@@ -5,6 +5,14 @@ import com.letta.mobile.runtime.RunId
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 
+/**
+ * The App Server mints `local-run-N` ids in memory (they recycle after a restart); the host's run.get reads only
+ * the local backend run store (`run-<uuid>`) and refuses them, so looking one up is a refused RPC every tick.
+ */
+internal fun RunId.isAppServerRunId(): Boolean = value.startsWith(APP_SERVER_RUN_ID_PREFIX)
+
+private const val APP_SERVER_RUN_ID_PREFIX = "local-run-"
+
 internal suspend fun ActiveTurnSession.reconcileIfActive(owner: ActiveTurnCoordinator) {
     val turn = owner.state.value
     if (turn.phase == ActiveTurnPhase.Idle) return

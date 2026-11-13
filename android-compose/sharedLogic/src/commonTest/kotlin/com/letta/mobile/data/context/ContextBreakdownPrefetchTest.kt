@@ -1,5 +1,6 @@
 package com.letta.mobile.data.context
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CompletableDeferred
@@ -9,10 +10,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -104,6 +107,7 @@ class ContextBreakdownPrefetchTest {
         assertEquals(listOf<Int?>(10_000), asked, "nothing is fetched while the turn runs")
 
         focus.value = settled(CONVERSATION_A, tokens = 15_000)
+        advanceTimeBy(REFRESH_WAIT_MS)
         runCurrent()
         // The same settled reading again (a window change, a recomposition) is not another turn.
         focus.value = settled(CONVERSATION_A, tokens = 15_000).copy(windowTokens = 300_000)
@@ -111,6 +115,50 @@ class ContextBreakdownPrefetchTest {
 
         assertEquals(listOf<Int?>(10_000, 15_000), asked)
         collector.cancel()
+    }
+
+    @Test
+    fun theRunBoundariesOfOneTurnFetchOneBreakdownNotOnePerRun() = runTest {
+        // Live host, 2026-11-12: an observer asked agent.context after each of local-run-327/328/329,
+        // the runs of one App Server turn, because the gap between runs reads as settled.
+        val focus = MutableStateFlow(settled(CONVERSATION_A, tokens = 10_000))
+        val asked = mutableListOf<Int?>()
+        val loader = ContextBreakdownLoader { request -> asked += request.reportedTotal; overview(used = request.reportedTotal ?: 0) }
+        val collector = launch { focus.contextUsageStates(loader).collect {} }
+        runCurrent()
+
+        listOf(12_000, 14_000, 16_000).forEach { tokens ->
+            focus.value = running(CONVERSATION_A, tokens)
+            advanceTimeBy(RUN_MS)
+            focus.value = settled(CONVERSATION_A, tokens) // The run ended; the next one starts a moment later.
+            advanceTimeBy(BETWEEN_RUNS_MS)
+            runCurrent()
+        }
+        assertEquals(listOf<Int?>(10_000), asked, "nothing is fetched between the runs of one turn")
+
+        advanceTimeBy(REFRESH_WAIT_MS)
+        runCurrent()
+        assertEquals(listOf<Int?>(10_000, 16_000), asked, "the settled turn is fetched once")
+        collector.cancel()
+    }
+
+    @Test
+    fun aBreakdownAlreadyLoadedIsNotFetchedAgainForAnotherCaller() = runTest {
+        var calls = 0
+        val loader = ContextBreakdownLoader { request -> calls += 1; overview(used = request.reportedTotal ?: 0) }
+        val a = ContextBreakdownRequest(AgentId(AGENT), ConversationId(CONVERSATION_A), reportedTotal = 30_000)
+        val b = ContextBreakdownRequest(AgentId(AGENT), ConversationId(CONVERSATION_B), reportedTotal = 4_000)
+
+        // Two panes (or the meter and the card) on different conversations take turns asking.
+        repeat(3) {
+            loader.load(a)
+            loader.load(b)
+        }
+
+        assertEquals(2, calls, "one agent.context per conversation and total")
+        assertEquals(overview(used = 30_000), assertIs<ContextBreakdownState.Loaded>(loader.load(a)).overview)
+        loader.load(a.copy(reportedTotal = 31_000))
+        assertEquals(3, calls, "a new total is a new breakdown")
     }
 
     @Test
@@ -126,6 +174,7 @@ class ContextBreakdownPrefetchTest {
         assertEquals(11_000, states.last().usage?.usedTokens)
 
         focus.value = settled(CONVERSATION_A, tokens = 20_000)
+        advanceTimeBy(REFRESH_WAIT_MS)
         runCurrent()
 
         assertEquals(20_000, states.last().usage?.usedTokens)
@@ -168,5 +217,9 @@ class ContextBreakdownPrefetchTest {
         const val AGENT = "agent-1"
         const val CONVERSATION_A = "conv-a"
         const val CONVERSATION_B = "conv-b"
+        const val RUN_MS = 4_000L
+        const val BETWEEN_RUNS_MS = 1_500L
+        /** Past the loader's settled-quiet period before it refreshes a known breakdown. */
+        const val REFRESH_WAIT_MS = 10_001L
     }
 }

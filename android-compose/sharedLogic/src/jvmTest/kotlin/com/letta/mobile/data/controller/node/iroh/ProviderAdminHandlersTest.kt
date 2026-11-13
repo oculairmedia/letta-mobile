@@ -116,7 +116,7 @@ class ProviderAdminHandlersTest {
     }
 
     private fun router(client: FakeProviderModelClient?): AdminRpcRouter =
-        AdminRpcRouter().also { ModelAdminHandlers.register(it, client) }
+        AdminRpcRouter().also { ModelAdminHandlers.register(it, NativeReadTiers(nativeClient = client)) }
 
     private fun JsonObject.string(key: String): String = getValue(key).jsonPrimitive.content
 }
