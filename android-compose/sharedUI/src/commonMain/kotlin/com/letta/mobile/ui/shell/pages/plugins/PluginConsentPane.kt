@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +17,7 @@ import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.catalog.PluginConsentItem
 import com.letta.mobile.data.plugin.catalog.PluginConsentSheet
 import com.letta.mobile.data.plugin.catalog.PluginsPageActions
+import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.host.LettaPaneButton
 import com.letta.mobile.ui.host.LettaPaneButtonRow
@@ -69,8 +69,8 @@ private fun ConsentItemRow(item: PluginConsentItem, decision: Boolean?, onDecide
             item.description?.let { Detail(it) }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-            FilterChip(decision == true, onClick = { onDecide(true) }, label = { Text(ALLOW) }, modifier = Modifier.testTag(PluginsPageTags.allow(item)))
-            FilterChip(decision == false, onClick = { onDecide(false) }, label = { Text(DENY) }, modifier = Modifier.testTag(PluginsPageTags.deny(item)))
+            LettaChipTab(ALLOW, active = decision == true, onClick = { onDecide(true) }, modifier = Modifier.testTag(PluginsPageTags.allow(item)))
+            LettaChipTab(DENY, active = decision == false, onClick = { onDecide(false) }, modifier = Modifier.testTag(PluginsPageTags.deny(item)))
         }
     }
 }
