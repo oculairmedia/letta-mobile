@@ -14,7 +14,9 @@ import java.util.Base64
  *
  * The tag is neither a secret nor a MAC: it only makes a cursor issued to another principal, or in
  * another format, refused rather than read. A cursor a caller forges for itself can only choose a
- * starting point in its own list, which every page still rechecks grant by grant.
+ * starting point in its own list, which every page still rechecks grant by grant. Grant document ids
+ * are treated as not secret from their grantee, so a cursor carries one of the caller's own grant ids
+ * readably rather than sealed.
  */
 internal object SharedNotesCursors {
     /** The longest document id (in UTF-8 bytes) a cursor can name; a longer grant id is never a listed position. */

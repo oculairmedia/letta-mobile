@@ -840,7 +840,6 @@
     "com.letta.mobile.ui.shell.pages.memory -> com.letta.mobile.data.memory.memfs",
     "com.letta.mobile.ui.shell.pages.memory -> com.letta.mobile.ui.memory",
     "com.letta.mobile.ui.shell.pages.memory -> com.letta.mobile.ui.shell.pages.memfs",
-    "com.letta.mobile.ui.shell.pages.memory -> com.letta.mobile.ui.theme",
     "com.letta.mobile.ui.shell.pages.projects -> com.letta.mobile.data.model",
     "com.letta.mobile.ui.shell.pages.projects -> com.letta.mobile.data.projects",
     "com.letta.mobile.ui.shell.pages.projects -> com.letta.mobile.data.settings",
