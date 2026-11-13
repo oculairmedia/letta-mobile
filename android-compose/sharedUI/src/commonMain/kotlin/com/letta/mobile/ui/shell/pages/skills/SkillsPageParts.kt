@@ -43,6 +43,7 @@ import com.letta.mobile.data.skills.SkillSourceLabels
 import com.letta.mobile.ui.components.LettaCatalogCard
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaInfoBox
+import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.theme.LettaPill
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.host.LettaPane
@@ -130,10 +131,12 @@ internal fun SkillsPageRowContent(row: SkillsPageRow, page: SkillsPageScope) {
 /** A failed install / remove, with its own dismiss; the skills stay listed beneath it. */
 @Composable
 private fun ActionErrorNotice(message: String, page: SkillsPageScope) {
-    Row(Modifier.fillMaxWidth().testTag(SkillsPageTags.ACTION_ERROR), verticalAlignment = Alignment.CenterVertically) {
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
-        IconButton(onClick = page.actions.onDismissSkillActionError) { Icon(Icons.Outlined.Close, contentDescription = DISMISS) }
-    }
+    LettaInlineError(
+        message,
+        Modifier.testTag(SkillsPageTags.ACTION_ERROR),
+        title = null,
+        onDismiss = page.actions.onDismissSkillActionError,
+    )
 }
 
 @Composable
@@ -342,4 +345,3 @@ private const val CLOSE = "Close"
 private const val INSTALL = "Install"
 private const val REMOVE = "Remove"
 private const val SELECT_AGENT_HINT = "Open an agent to install or remove skills."
-private const val DISMISS = "Dismiss"

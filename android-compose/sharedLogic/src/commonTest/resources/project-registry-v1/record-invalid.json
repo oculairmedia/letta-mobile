@@ -1,0 +1,23 @@
+{
+  "_contract": "project-registry-v1 \u00a72",
+  "projectId": "c2e4a6b8-d0f1-4a3c-b5e7-9a8b7c6d5e4f",
+  "key": "broken-file",
+  "name": "broken-file",
+  "state": "invalid",
+  "invalidReason": "field_out_of_range",
+  "checkouts": [
+    {
+      "root": "stacks",
+      "relativePath": "broken-file",
+      "path": "/srv/roots/stacks/broken-file",
+      "primary": true
+    }
+  ],
+  "pmAgentId": "agent-fixture-pm-two",
+  "roleAgents": {},
+  "engine": {
+    "enabled": false,
+    "ciChecks": []
+  },
+  "revision": "r-000040"
+}
