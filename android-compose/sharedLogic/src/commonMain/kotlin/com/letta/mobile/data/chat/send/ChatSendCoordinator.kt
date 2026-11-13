@@ -1,6 +1,9 @@
 package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.chat.sentruns.IdentifiedChatSend
+import com.letta.mobile.data.chat.sentruns.IdentifiedSendBinding
+import com.letta.mobile.data.chat.sentruns.SentMessageId
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Delivery
 import com.letta.mobile.data.model.AgentId
@@ -23,6 +26,7 @@ import com.letta.mobile.util.backendUrlTelemetryDescriptor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.seconds
@@ -98,6 +102,12 @@ class ChatSendCoordinator(
         },
         sendOfConversation = { conversationId -> turnRegistry.peekState(ConversationId(conversationId))?.inFlightSend },
     )
+
+    /** The id the last send under [turnStateMutex] was enqueued under; read and written only under it. */
+    private var enqueuedSend: QueuedSendId? = null
+
+    /** This coordinator's sends with their identity, and the runs they started (paired in the turn registry). */
+    val identifiedSend: IdentifiedChatSend = IdentifiedSendBinding(turnRegistry.sentRuns.state, ::sendIdentified)
 
     /** The send queue a chat screen shows and controls. */
     val sendQueue: ChatSendQueueControls = ChatSendQueueControls(scope, queueDriver, queuedSends.state)
@@ -268,6 +278,23 @@ class ChatSendCoordinator(
         }
     }
 
+    /**
+     * Sends [text] exactly as [send] does and returns the otid the message was enqueued under, read
+     * under the same lock hold that enqueued it; null when the send returned before enqueuing.
+     */
+    private suspend fun sendIdentified(text: String): SentMessageId? {
+        val targetConversationId = activeConversationId()
+        eventSubscription.claimForSend()
+        val enqueued = scope.async {
+            turnStateMutex.withLock {
+                enqueuedSend = null
+                sendInternalLocked(text, emptyList(), targetConversationId)
+                enqueuedSend
+            }
+        }
+        return enqueued.await()?.let { SentMessageId(it.value) }
+    }
+
     private suspend fun sendInternalLocked(
         text: String,
         attachments: List<MessageContentPart.Image>,
@@ -347,6 +374,7 @@ class ChatSendCoordinator(
         // letta-mobile-1n5py: never jump messages already waiting, and never fail a send because
         // a turn is running: queue it behind that turn instead.
         val queuePosition = queueDriver.submitLocked(pending)
+        enqueuedSend = pending.id
         if (queuePosition != null) reportQueuedSend(pending, queuePosition)
         timer.stop(
             "accepted" attr true,

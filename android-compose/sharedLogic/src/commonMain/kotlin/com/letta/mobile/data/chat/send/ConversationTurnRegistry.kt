@@ -1,6 +1,9 @@
 package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.chat.sentruns.SentMessageId
+import com.letta.mobile.data.chat.sentruns.SentRunId
+import com.letta.mobile.data.chat.sentruns.SentRunLedger
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
@@ -26,6 +29,9 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
     // Also published inside identity.acceptSend; a setter must not acquire the index lock there.
     @Volatile var lastActiveConversationId: String? = null
 
+    /** The runs this pipeline's sends started, shared by every conversation's state. */
+    val sentRuns = SentRunLedger()
+
     /** UI publication is performed by the coordinator after releasing the index lock. */
     data class Binding(val state: ConversationTurnState?, val rekeyedConversationId: ConversationId?)
 
@@ -44,7 +50,7 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
 
     private fun stateForLocked(conversationId: ConversationId): ConversationTurnState {
         val targetId = conversationAliases[conversationId] ?: conversationId
-        val state = turnStates.remove(targetId) ?: ConversationTurnState(targetId.value)
+        val state = turnStates.remove(targetId) ?: ConversationTurnState(targetId.value, sentRuns)
         turnStates[targetId] = state
         evictOverflowStatesLocked(keep = targetId)
         return state
@@ -128,11 +134,18 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
     ): Binding {
         var rekeyedConversation: ConversationId? = null
         val originating = synchronized(turnStateLock) {
-            val state = bindableStateLocked(otid) ?: return@synchronized null
+            val state = bindableStateLocked(otid)
+            if (state == null) {
+                // An echo of a send whose turn already settled still pairs its otid with that settled run.
+                val settledRun = tail.runId?.takeIf { it.isNotBlank() && otid in settledOtids }
+                settledRun?.let { sentRuns.lateEcho(SentMessageId(otid.value), SentRunId(it)) }
+                return@synchronized null
+            }
             val serverConversation = serverConversationId?.takeIf { it.value.isNotBlank() }
             rekeyedConversation = serverConversation?.let { state.rebindToServerConversationLocked(it, tail) }
             if (tail.turnId != null && state.turnId == null) state.turnId = tail.turnId
             if (tail.runId != null && state.runId == null) state.runId = tail.runId
+            state.bindOwnRun(tail)
             state
         }
 
