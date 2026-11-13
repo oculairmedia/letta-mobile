@@ -30,15 +30,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledIconButton
@@ -49,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -66,7 +63,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_actions_open
@@ -120,16 +116,13 @@ internal fun TouchComposerBar(
     leading: (@Composable () -> Unit)? = null,
 ) {
     var sheetOpen by remember { mutableStateOf(false) }
-    val sheetItems = touchSheetItems(model, onAttachImage)
+    val modePicker = remember { TouchModePicker() }
+    val sheetItems = touchSheetItems(model, onAttachImage, onPermissionMode = { modePicker.open = true })
     Column(modifier.fillMaxWidth().then(touchBarSwipe(model))) {
         TouchAttachments(model)
-        TouchBarSurface(model, underBar = touchUnderBarLine(model)) {
+        TouchBarSurface(model) {
             leading?.invoke()
-            // With one item the "+" does that item directly (when it can act); with more it opens the sheet.
-            TouchPlusButton(items = sheetItems) {
-                val single = sheetItems.singleOrNull()
-                if (single == null) sheetOpen = true else if (single.enabled) single.onClick()
-            }
+            TouchPlus(model, sheetItems, modePicker, onOpenSheet = { sheetOpen = true })
             Box(Modifier.weight(1f).padding(horizontal = TouchComposerDimens.fieldPadding, vertical = TouchComposerDimens.fieldPadding)) {
                 ComposerTextField(model = model, style = touchFieldStyle(model))
             }
@@ -194,17 +187,9 @@ private fun animatedTouchBarLook(model: ComposerModel, focused: Boolean): TouchB
     return TouchBarLook(corner, elevation, color)
 }
 
-/**
- * The bar's surface: top corners only, easing from its resting to its engaged look. [underBar], when
- * set, is a reserved line under the row, between it and the navigation bar: it takes the row's
- * bottom padding, so the bar grows for it only by the navigation bar's own inset.
- */
+/** The bar's surface: top corners only, easing from its resting to its engaged look. */
 @Composable
-private fun TouchBarSurface(
-    model: ComposerModel,
-    underBar: (@Composable () -> Unit)?,
-    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
-) {
+private fun TouchBarSurface(model: ComposerModel, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
     val scheme = MaterialTheme.colorScheme
     var focused by remember { mutableStateOf(false) }
     val look = animatedTouchBarLook(model, focused)
@@ -216,55 +201,18 @@ private fun TouchBarSurface(
         contentColor = scheme.onSurface,
         tonalElevation = look.elevation,
     ) {
-        Column(Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(
-                    start = TouchComposerDimens.horizontalPadding,
-                    end = TouchComposerDimens.horizontalPadding,
-                    top = padding.first,
-                    bottom = if (underBar == null) padding.second else 0.dp,
-                ),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(TouchComposerDimens.itemSpacing),
-                content = content,
-            )
-            underBar?.let { line -> TouchUnderBar(line) }
-        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(
+                start = TouchComposerDimens.horizontalPadding,
+                end = TouchComposerDimens.horizontalPadding,
+                top = padding.first,
+                bottom = padding.second,
+            ),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(TouchComposerDimens.itemSpacing),
+            content = content,
+        )
     }
-}
-
-/**
- * The permission mode's line under the Touch bar's row, on the full page only (the canvas dock stays
- * one compact bar). It steps aside while the keyboard is up, as Send does: the keyboard's frame
- * already moves the page then, and the row keeps its compact padding. Null when there is no line.
- */
-@Composable
-private fun touchUnderBarLine(model: ComposerModel): (@Composable () -> Unit)? {
-    val state = model.composer.permissionMode ?: return null
-    if (!touchUnderBarShown(docked = model.mode == ChatSurfaceMode.Docked, keyboardOpen = keyboardOpen())) return null
-    return { ComposerPermissionModeLine(state, model.actions::setPermissionMode) }
-}
-
-/** The Touch bar shows its under-bar line on the full page while the keyboard is down. */
-internal fun touchUnderBarShown(docked: Boolean, keyboardOpen: Boolean): Boolean = !docked && !keyboardOpen
-
-/**
- * The reserved line: one fixed height whatever the mode reads (it ellipsizes, never wraps, so a mode
- * change never moves the timeline), then the navigation bar's inset so the line is not drawn under it.
- */
-@Composable
-private fun TouchUnderBar(line: @Composable () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(TouchComposerDimens.restingVerticalPadding)
-            .padding(horizontal = LettaDimens.Space.lg)
-            .testTag(ComposerTestTags.TOUCH_UNDER_BAR),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        line()
-    }
-    Spacer(Modifier.fillMaxWidth().windowInsetsBottomHeight(WindowInsets.navigationBars))
 }
 
 /** The chips' easing: their own duration, or none under reduced motion. */
@@ -278,9 +226,7 @@ private fun <T> chipSpec(): AnimationSpec<T> {
  * the inset itself, so it tracks the keyboard frame by frame). The bar runs flush to the screen's
  * bottom edge (legacy ChatScreen's bottomInsetDp = 0): the opaque bar sits
  * under the navigation bar, which draws over its bottom padding, instead of growing by the
- * navigation inset and floating its controls ~48 dp up on three-button devices. The one exception
- * is the permission mode's line under the row ([TouchUnderBar]): it takes the bottom padding and
- * keeps the navigation inset below it, because text drawn under the system bar is unreadable.
+ * navigation inset and floating its controls ~48 dp up on three-button devices.
  */
 @Composable
 private fun touchBarPadding(): Pair<Dp, Dp> {
@@ -293,6 +239,26 @@ private fun touchBarPadding(): Pair<Dp, Dp> {
 internal fun touchBarVerticalPadding(imePx: Int): Dp {
     val compact = (imePx / TouchComposerDimens.imeInsetForCompactPx).coerceIn(0f, 1f)
     return lerp(TouchComposerDimens.restingVerticalPadding, TouchComposerDimens.compactVerticalPadding, compact)
+}
+
+/** Whether the modes' popover the "+" sheet's mode row opens is showing. */
+@Stable
+private class TouchModePicker {
+    var open: Boolean by mutableStateOf(false)
+}
+
+/**
+ * The "+" with the modes' popover the sheet's mode row opens, above the "+" it came from. With one
+ * item the "+" does that item directly (when it can act); with more it opens the sheet.
+ */
+@Composable
+private fun TouchPlus(model: ComposerModel, items: List<TouchSheetItem>, modePicker: TouchModePicker, onOpenSheet: () -> Unit) {
+    Box {
+        TouchPlusButton(items = items, onClick = { items.singleOrNull()?.let { if (it.enabled) it.onClick() } ?: onOpenSheet() })
+        model.composer.permissionMode?.let { state ->
+            ComposerPermissionModePicker(state, modePicker.open, model.actions::setPermissionMode, onDismiss = { modePicker.open = false })
+        }
+    }
 }
 
 /**
@@ -345,16 +311,20 @@ private fun TouchPlusButton(items: List<TouchSheetItem>, onClick: () -> Unit) {
 }
 
 /**
- * What the "+" offers: attach an image, and open the canvas where the page has one to open. The
- * permission mode is not here: it is the line under the bar ([touchUnderBarLine]).
+ * What the "+" offers: attach an image; open the canvas where the page has one to open; and on the
+ * full page (not the compact dock), the permission mode, which the Touch bar has no control row for.
  */
 @Composable
-private fun touchSheetItems(model: ComposerModel, onAttachImage: () -> Unit): List<TouchSheetItem> {
+private fun touchSheetItems(model: ComposerModel, onAttachImage: () -> Unit, onPermissionMode: () -> Unit): List<TouchSheetItem> {
     val attach = stringResource(Res.string.composer_attach_image)
     val canvas = stringResource(Res.string.composer_open_canvas)
+    val mode = model.composer.permissionMode
+        ?.takeIf { model.mode != ChatSurfaceMode.Docked }
+        ?.let { permissionModeSheetItem(it, onPermissionMode) }
     return buildList {
         if (model.capabilities.attachImages) add(TouchSheetItem(attach, LettaIcons.Add, onAttachImage))
         if (model.offersOpenCanvas) add(TouchSheetItem(canvas, LettaIcons.Edit, onClick = { model.onIntent(ChatSurfaceIntent.OpenCanvas) }))
+        mode?.let(::add)
     }
 }
 

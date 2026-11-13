@@ -28,6 +28,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_actions_title
@@ -41,9 +43,18 @@ import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.TouchComposerDimens
 import org.jetbrains.compose.resources.stringResource
 
-/** One row of the Touch composer's "+" sheet; a row that cannot act now stays, greyed ([enabled]). */
+/**
+ * One row of the Touch composer's "+" sheet; a row that cannot act now stays, greyed ([enabled]).
+ * [stateDescription], when set, is announced as the row's current state (the permission mode's).
+ */
 @Immutable
-internal class TouchSheetItem(val label: String, val icon: ImageVector, val onClick: () -> Unit, val enabled: Boolean = true)
+internal class TouchSheetItem(
+    val label: String,
+    val icon: ImageVector,
+    val onClick: () -> Unit,
+    val enabled: Boolean = true,
+    val stateDescription: String? = null,
+)
 
 /**
  * The "+" sheet, "Add to message". A port of the legacy Android composer's
@@ -87,6 +98,7 @@ private fun TouchSheetRow(item: TouchSheetItem, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs)
+            .then(item.stateDescription?.let { state -> Modifier.semantics { stateDescription = state } } ?: Modifier)
             .testTag(ComposerTestTags.TOUCH_SHEET_ROW),
         shape = RoundedCornerShape(look.corner),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
