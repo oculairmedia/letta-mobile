@@ -305,14 +305,8 @@ private fun NoteRows(notes: List<SharedNote>, more: MoreNotes?, enabled: Boolean
             )
         }
         more?.let { item(key = MORE_KEY) { ShowMore(it, actions.more) } }
-        if (capped) item(key = CAPPED_KEY) { CappedNotice() }
+        if (capped) item(key = CAPPED_KEY) { Notice(Res.string.shared_notes_capped, CAPPED_TAG, count = SharedNoteBrowser.MAX_HELD) }
     }
-}
-
-/** The end of a list cut at the most notes the browser holds; a refresh lists again from the start. */
-@Composable
-private fun CappedNotice() {
-    NoticeText(stringResource(Res.string.shared_notes_capped, SharedNoteBrowser.MAX_HELD), CAPPED_TAG)
 }
 
 /** The end of a list the host has more of: a full-width "Show more", busy while it asks, with why the last ask failed. */
@@ -334,17 +328,14 @@ private const val CAPPED_KEY = "shell-document-capped"
 /** The notice ending a list cut at [SharedNoteBrowser.MAX_HELD] notes. */
 private const val CAPPED_TAG = "shell-document-capped"
 
+/** A line of notice text; [count], when given, fills the resource's one number placeholder. */
 @Composable
-private fun Notice(text: StringResource, tag: String?, error: Boolean = false) {
-    NoticeText(stringResource(text), tag, error)
-}
-
-@Composable
-private fun NoticeText(text: String, tag: String?, error: Boolean = false) {
+private fun Notice(text: StringResource, tag: String?, error: Boolean = false, count: Int? = null) {
+    val shown = if (count == null) stringResource(text) else stringResource(text, count)
     val color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
     val tagged = tag?.let { Modifier.testTag(it) } ?: Modifier
     Text(
-        text,
+        shown,
         style = MaterialTheme.typography.bodyMedium,
         color = color,
         modifier = tagged.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
