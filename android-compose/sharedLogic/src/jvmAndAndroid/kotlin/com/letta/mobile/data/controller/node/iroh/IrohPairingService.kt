@@ -169,14 +169,16 @@ class IrohPairingService(
 
     /**
      * Record a successful authentication for the inventory's "last used"
-     * column. Throttled so a reconnect storm does not rewrite the store.
+     * column. Throttled so a reconnect storm does not rewrite the store. Like
+     * every mutator here it changes the record under the store's lock
+     * ([PairedPeerStore.update]), so it never overwrites a concurrent change.
      */
     fun touch(nodeId: String) {
-        val existing = store.get(nodeId) ?: return
         val now = nowMs()
-        val last = existing.lastSeenAtMs
-        if (last != null && now - last < LAST_SEEN_WRITE_INTERVAL_MS) return
-        store.save(existing.copy(lastSeenAtMs = now))
+        store.update(nodeId) { existing ->
+            val last = existing.lastSeenAtMs
+            if (last != null && now - last < LAST_SEEN_WRITE_INTERVAL_MS) existing else existing.copy(lastSeenAtMs = now)
+        }
     }
 
     /**
@@ -185,9 +187,7 @@ class IrohPairingService(
      * capabilities are untouched.
      */
     fun rename(nodeId: String, name: String): PairedPeer? {
-        val existing = store.get(nodeId) ?: return null
-        val updated = existing.copy(name = name)
-        store.save(updated)
+        val updated = store.update(nodeId) { it.copy(name = name) } ?: return null
         Telemetry.event("IrohPairing", "peer.renamed", "nodeId" attr nodeId, "name" attr name)
         return updated
     }
@@ -200,18 +200,14 @@ class IrohPairingService(
      * peer's live sessions immediately (grants are re-read per request).
      */
     fun setCapabilities(nodeId: String, capabilities: Set<String>): PairedPeer? {
-        val existing = store.get(nodeId) ?: return null
-        val updated = existing.copy(capabilities = capabilities)
-        store.save(updated)
+        val updated = store.update(nodeId) { it.copy(capabilities = capabilities) } ?: return null
         Telemetry.event("IrohPairing", "peer.capabilities_set", "nodeId" attr nodeId)
         return updated
     }
 
     /** Replace a paired peer's agent scope (null = every agent). */
     fun setAgentScope(nodeId: String, agentIds: Set<String>?): PairedPeer? {
-        val existing = store.get(nodeId) ?: return null
-        val updated = existing.copy(agentIds = agentIds)
-        store.save(updated)
+        val updated = store.update(nodeId) { it.copy(agentIds = agentIds) } ?: return null
         Telemetry.event("IrohPairing", "peer.agents_set", "nodeId" attr nodeId, "agentScoped" attr (agentIds != null))
         return updated
     }
