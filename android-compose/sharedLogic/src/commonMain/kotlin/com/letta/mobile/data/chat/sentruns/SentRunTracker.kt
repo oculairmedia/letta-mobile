@@ -52,6 +52,16 @@ internal class SentRunTracker(private val ledger: SentRunLedger) {
         if (otid != sent) end(failed = false)
     }
 
+    /**
+     * The turn known by [runIds] settled, as a failure when [failed]: remembered for a late echo,
+     * and the own run, if one is in flight, ends.
+     */
+    fun settle(runIds: Set<String?>, failed: Boolean) {
+        val ids = runIds.filterNot { it.isNullOrBlank() }.mapTo(mutableSetOf()) { SentRunId(it.orEmpty()) }
+        ledger.settled(ids, failed)
+        end(failed)
+    }
+
     /** The own run ended, as a failure when [failed]; nothing when no own run is in flight. */
     fun end(failed: Boolean) {
         val sent = otid ?: return

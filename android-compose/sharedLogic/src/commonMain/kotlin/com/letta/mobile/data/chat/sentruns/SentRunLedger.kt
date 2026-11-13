@@ -11,10 +11,12 @@ import kotlinx.coroutines.flow.update
  *
  * Bounded: past [MAX_SENT_MESSAGES] entries the oldest entries whose run has ended are dropped. An
  * entry whose run is still in flight is never dropped, so a published run stays published until
- * it ends.
+ * it ends. The last [MAX_SETTLED_RUNS] settled run ids are remembered with how they ended, so an
+ * echo that arrives only after its turn settled can still be paired, as an ended run ([lateEcho]).
  */
 internal class SentRunLedger {
     private val runs = MutableStateFlow(SentMessageRuns())
+    private val settledRuns = MutableStateFlow<Map<SentRunId, Boolean>>(emptyMap())
 
     /** The published runs. */
     val state: StateFlow<SentMessageRuns> = runs.asStateFlow()
@@ -29,6 +31,37 @@ internal class SentRunLedger {
     fun ended(id: SentMessageId, failed: Boolean) {
         runs.update { it.withEnded(id, failed) }
     }
+
+    /** A turn known by [ids] settled, as a failure when [failed], whoever's run it was. */
+    fun settled(ids: Set<SentRunId>, failed: Boolean) {
+        if (ids.isEmpty()) return
+        settledRuns.update { current -> (current - ids + ids.associateWith { failed }).newest(MAX_SETTLED_RUNS) }
+    }
+
+    /**
+     * The echo of the send [id] named [run] after that send's turn settled: when [run] is a settled
+     * run, publishes it as the run [id] started, already ended (failed when it failed). An unknown
+     * run is not published.
+     */
+    fun lateEcho(id: SentMessageId, run: SentRunId) {
+        val failed = settledRuns.value[run] ?: return
+        runs.update { it.withSettledRun(id, run, failed) }
+    }
+}
+
+/** How many settled run ids are remembered for a late echo. */
+internal const val MAX_SETTLED_RUNS = 16
+
+private fun <K, V> Map<K, V>.newest(limit: Int): Map<K, V> =
+    if (size <= limit) this else entries.drop(size - limit).associate { it.key to it.value }
+
+/** [id] started [run], which already ended (as a failure when [failed]); it never becomes active. */
+internal fun SentMessageRuns.withSettledRun(id: SentMessageId, run: SentRunId, failed: Boolean): SentMessageRuns {
+    val next = copy(
+        started = started + (id to started[id].orEmpty() + run),
+        failed = if (failed) this.failed + run else this.failed,
+    )
+    return next.bounded()
 }
 
 /** Past this many entries, ended ones are dropped oldest first. */

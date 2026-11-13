@@ -57,6 +57,30 @@ class SentRunLedgerTest {
     }
 
     @Test
+    fun aLateEchoOfASettledRunIsPublishedAsEnded() {
+        ledger.settled(setOf(durable), failed = true)
+        ledger.lateEcho(first, durable)
+        assertEquals(mapOf(first to setOf(durable)), ledger.state.value.started)
+        assertTrue(ledger.state.value.active.isEmpty())
+        assertEquals(setOf(durable), ledger.state.value.failed)
+    }
+
+    @Test
+    fun aLateEchoOfAnUnknownRunPublishesNothing() {
+        ledger.settled(setOf(durable), failed = false)
+        ledger.lateEcho(first, provisional)
+        assertTrue(ledger.state.value.started.isEmpty())
+    }
+
+    @Test
+    fun onlyTheNewestSettledRunsAreRemembered() {
+        ledger.settled(setOf(provisional), failed = false)
+        repeat(MAX_SETTLED_RUNS) { ledger.settled(setOf(SentRunId("later-$it")), failed = false) }
+        ledger.lateEcho(first, provisional)
+        assertTrue(ledger.state.value.started.isEmpty())
+    }
+
+    @Test
     fun theLedgerDropsOldEndedEntriesButNeverARunInFlight() {
         ledger.started(first, setOf(provisional))
         repeat(MAX_SENT_MESSAGES + 4) { index ->

@@ -96,7 +96,8 @@ data class SentUtterance(
  * send's otid and the runs the send pipeline pairs with it by identity (the send's echo names its
  * run; a durable id promoting a provisional one joins it). Nothing in the adapter guesses: a chat
  * owner that cannot name the message it sent offers no such sender, and then there is no voice
- * session over it.
+ * session over it. The shared chat send coordinator is such a sender; no host builds the adapter
+ * yet.
  */
 interface VoiceChatSession {
     /** The conversation state. */

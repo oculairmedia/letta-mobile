@@ -51,3 +51,11 @@ interface IdentifiedChatSend {
      */
     suspend fun sendIdentified(text: String): SentMessageId?
 }
+
+/** An [IdentifiedChatSend] over a send pipeline's published [sentRuns] and its identified [send]. */
+internal class IdentifiedSendBinding(
+    override val sentRuns: StateFlow<SentMessageRuns>,
+    private val send: suspend (String) -> SentMessageId?,
+) : IdentifiedChatSend {
+    override suspend fun sendIdentified(text: String): SentMessageId? = send(text)
+}

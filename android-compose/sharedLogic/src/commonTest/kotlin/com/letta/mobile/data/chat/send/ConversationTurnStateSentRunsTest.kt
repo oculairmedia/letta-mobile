@@ -102,6 +102,19 @@ class ConversationTurnStateSentRunsTest {
     }
 
     @Test
+    fun anEchoAfterTheTurnSettledPairsTheSettledRunAsEnded() {
+        accept("c1")
+        turnStarted("t1", "run-1")
+        state.ownRun.settle(setOf("run-1", null), failed = false)
+        TurnSettlementOwnership(registry, ChatSendQueue()).clear(state, reason = "test")
+        assertTrue(runs.started.isEmpty())
+
+        echo("c1", "t1", "run-1")
+        assertEquals(mapOf(SentMessageId("c1") to setOf(SentRunId("run-1"))), runs.started)
+        assertTrue(runs.active.isEmpty())
+    }
+
+    @Test
     fun aNewSendEndsAnOwnRunStillMarkedInFlight() {
         accept("c1")
         echo("c1", "t1", "run-1")

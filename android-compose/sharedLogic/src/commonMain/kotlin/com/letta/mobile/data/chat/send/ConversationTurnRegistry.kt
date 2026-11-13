@@ -1,6 +1,8 @@
 package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.chat.sentruns.SentMessageId
+import com.letta.mobile.data.chat.sentruns.SentRunId
 import com.letta.mobile.data.chat.sentruns.SentRunLedger
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -132,7 +134,13 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
     ): Binding {
         var rekeyedConversation: ConversationId? = null
         val originating = synchronized(turnStateLock) {
-            val state = bindableStateLocked(otid) ?: return@synchronized null
+            val state = bindableStateLocked(otid)
+            if (state == null) {
+                // An echo of a send whose turn already settled still pairs its otid with that settled run.
+                val settledRun = tail.runId?.takeIf { it.isNotBlank() && otid in settledOtids }
+                settledRun?.let { sentRuns.lateEcho(SentMessageId(otid.value), SentRunId(it)) }
+                return@synchronized null
+            }
             val serverConversation = serverConversationId?.takeIf { it.value.isNotBlank() }
             rekeyedConversation = serverConversation?.let { state.rebindToServerConversationLocked(it, tail) }
             if (tail.turnId != null && state.turnId == null) state.turnId = tail.turnId

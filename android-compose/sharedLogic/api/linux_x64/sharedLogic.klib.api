@@ -36166,6 +36166,8 @@ final class com.letta.mobile.data.chat.send/ChatSendCoordinator { // com.letta.m
 
     final val eventSubscription // com.letta.mobile.data.chat.send/ChatSendCoordinator.eventSubscription|{}eventSubscription[0]
         final fun <get-eventSubscription>(): com.letta.mobile.data.chat.send/ChatSendEventSubscription // com.letta.mobile.data.chat.send/ChatSendCoordinator.eventSubscription.<get-eventSubscription>|<get-eventSubscription>(){}[0]
+    final val identifiedSend // com.letta.mobile.data.chat.send/ChatSendCoordinator.identifiedSend|{}identifiedSend[0]
+        final fun <get-identifiedSend>(): com.letta.mobile.data.chat.sentruns/IdentifiedChatSend // com.letta.mobile.data.chat.send/ChatSendCoordinator.identifiedSend.<get-identifiedSend>|<get-identifiedSend>(){}[0]
     final val sendQueue // com.letta.mobile.data.chat.send/ChatSendCoordinator.sendQueue|{}sendQueue[0]
         final fun <get-sendQueue>(): com.letta.mobile.data.chat.send/ChatSendQueueControls // com.letta.mobile.data.chat.send/ChatSendCoordinator.sendQueue.<get-sendQueue>|<get-sendQueue>(){}[0]
 
