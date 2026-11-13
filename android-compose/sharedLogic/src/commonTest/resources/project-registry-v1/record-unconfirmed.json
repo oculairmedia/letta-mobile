@@ -1,0 +1,23 @@
+{
+  "_contract": "project-registry-v1 \u00a72",
+  "projectId": "7a9d0c14-2b3e-4f5a-8c6d-0e1f2a3b4c5d",
+  "name": "third-party-tool",
+  "state": "unconfirmed",
+  "repository": {
+    "slug": "someone-else/third-party-tool"
+  },
+  "checkouts": [
+    {
+      "root": "stacks",
+      "relativePath": "third-party-tool",
+      "path": "/srv/roots/stacks/third-party-tool",
+      "primary": true
+    }
+  ],
+  "roleAgents": {},
+  "engine": {
+    "enabled": false,
+    "ciChecks": []
+  },
+  "revision": "r-000037"
+}
