@@ -1,10 +1,11 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.AGENT
 import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.CONVERSATION
 import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.WEEKEND_PLAN
 import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.receipt
-import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.verifiedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.CanvasOpId
@@ -33,7 +34,7 @@ class CanvasComposeHostParityTest {
         invoke(
             CanvasToolContract.COMPOSE,
             Json.parseToJsonElement(request).jsonObject,
-            ExternalToolCaller.verified(AGENT, CONVERSATION, toolCallId),
+            verifiedToolCaller(ToolCallScope(AGENT, CONVERSATION, toolCallId)),
         )
 
     /** The app's canvas as the host's: the conversation's, empty, the agent its writer. */

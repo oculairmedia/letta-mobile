@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.canvas
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import androidx.compose.ui.geometry.Offset
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasGetSceneResult
@@ -11,7 +12,7 @@ import com.letta.mobile.data.canvas.HostCanvasBackend
 import com.letta.mobile.data.canvas.HostCanvasTools
 import com.letta.mobile.data.canvas.InMemoryCanvasRelayStore
 import com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory
-import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.claimedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import io.ak1.drawbox.domain.model.DrawingSerializer
@@ -109,7 +110,7 @@ class CanvasConnectFollowTest {
 
     private companion object {
         const val CONVERSATION = "conv-connect-follow"
-        val CALLER = ExternalToolCaller.claimed(agentId = "agent-1", conversationId = CONVERSATION)
+        val CALLER = claimedToolCaller(ToolCallScope(agentId = "agent-1", conversationId = CONVERSATION))
         val FRAMES = mapOf(
             "n-a" to CanvasDocumentFrame(16f, 24f, 140f, 80f),
             "n-b" to CanvasDocumentFrame(240f, 24f, 140f, 80f),

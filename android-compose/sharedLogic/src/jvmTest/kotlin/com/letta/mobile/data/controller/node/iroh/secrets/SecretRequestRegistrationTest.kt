@@ -26,7 +26,7 @@ class SecretRequestRegistrationTest {
     )
 
     private fun feature(policy: IrohAuthPolicy, keystore: TestKeystoreProvider?): SecretRequestFeature? =
-        SecretRequestFeature.forHost(policy, keystore, InMemorySecretRequestJournal(), SecretItemScope.PerAgent)
+        SecretRequestFeature.forHost(policy, SecretRequestStorage(keystore, InMemorySecretRequestJournal()), SecretItemScope.PerAgent)
 
     private fun routerWith(feature: SecretRequestFeature?): AdminRpcRouter =
         AdminRpcRegistry.buildRouter(services = AdminRpcHostServices(secretRequestRoutes = feature?.routes))

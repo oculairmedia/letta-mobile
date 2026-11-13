@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh.secrets
 
-import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
+import com.letta.mobile.data.controller.extras.verifiedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.secrets.host.SecretItemScope
@@ -25,15 +26,14 @@ class SecretRequestRouteScopeTest {
         JsonObject(createInput() + (SecretRequestRouteWire.VAULT_ITEM_NAME to JsonPrimitive(item)))
 
     private suspend fun SecretRequestFeature.createAsRequester(item: String): ExternalToolResult =
-        hostTools.single().invoke(createFor(item), ExternalToolCaller.verified(REQUESTER.agentId.value))
+        hostTools.single().invoke(createFor(item), verifiedToolCaller(ToolCallScope(REQUESTER.agentId.value)))
 
     @Test
     fun forHostServesTheScopeItIsGivenEvenOverAWiderOneInTheSettings() = runTest {
         val feature = assertNotNull(
             SecretRequestFeature.forHost(
                 IrohAuthPolicy.PairedPeersOnly,
-                TestKeystoreProvider(),
-                InMemorySecretRequestJournal(),
+                SecretRequestStorage(TestKeystoreProvider(), InMemorySecretRequestJournal()),
                 SecretItemScope.PerAgent,
                 SecretRequestSettings(policy = TEAM_SCOPE),
             ),

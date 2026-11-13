@@ -1,7 +1,10 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.claimedToolCaller
+import com.letta.mobile.data.controller.extras.verifiedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
@@ -183,9 +186,9 @@ internal class ExternalToolDispatcher(
         val agentId = request.runtime?.agentId
         val conversationId = request.runtime?.conversationId
         return if (client.vouchesForRuntimeScope) {
-            ExternalToolCaller.verified(agentId, conversationId, request.toolCallId)
+            verifiedToolCaller(ToolCallScope(agentId, conversationId, request.toolCallId))
         } else {
-            ExternalToolCaller.claimed(agentId, conversationId, request.toolCallId)
+            claimedToolCaller(ToolCallScope(agentId, conversationId, request.toolCallId))
         }
     }
 

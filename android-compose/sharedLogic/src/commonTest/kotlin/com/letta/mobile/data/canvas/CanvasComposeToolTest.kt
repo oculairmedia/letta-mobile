@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.receipt
 import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.refusal
 import com.letta.mobile.data.canvas.compose.CanvasComposeGuide
@@ -8,7 +9,7 @@ import com.letta.mobile.data.canvas.compose.CanvasComposeService
 import com.letta.mobile.data.canvas.compose.ComposeErrorCode
 import com.letta.mobile.data.canvas.compose.ComposeProblemCode
 import com.letta.mobile.data.canvas.compose.ComposeStatus
-import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.verifiedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.model.CanvasId
@@ -74,7 +75,7 @@ class CanvasComposeToolTest {
         registry.invoke(
             CanvasToolContract.COMPOSE,
             Json.parseToJsonElement(request).jsonObject,
-            ExternalToolCaller.verified(agent, conversation, toolCallId),
+            verifiedToolCaller(ToolCallScope(agent, conversation, toolCallId)),
         )
 
     private suspend fun revision(): Long = Json { ignoreUnknownKeys = true }.decodeFromString<CanvasGetSceneResult>(

@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.shell.workspace
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -36,7 +37,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasCreateOptions
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
-import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.claimedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.model.CanvasId
@@ -172,7 +173,7 @@ class ShellLayoutAgentToolUiTest {
         }
 
     private fun ComposeUiTest.agentCalls(input: String): ExternalToolResult {
-        val caller = ExternalToolCaller.claimed(agentId = "agent-a")
+        val caller = claimedToolCaller(ToolCallScope(agentId = "agent-a"))
         val result = runBlocking { tool.invoke(Json.parseToJsonElement(input).jsonObject, caller) }
         waitForIdle()
         return result
@@ -487,7 +488,7 @@ class ShellLayoutAgentToolUiTest {
         shell(1200.dp) { assertTrue(port.attached.value != null) }
         assertEquals(null, port.attached.value)
         assertTrue("No app shell" in assertIs<ExternalToolResult.Error>(runBlocking {
-            tool.invoke(Json.parseToJsonElement("""{"action":"get"}""").jsonObject, ExternalToolCaller.claimed(agentId = "agent-a"))
+            tool.invoke(Json.parseToJsonElement("""{"action":"get"}""").jsonObject, claimedToolCaller(ToolCallScope(agentId = "agent-a")))
         }).error)
     }
 }

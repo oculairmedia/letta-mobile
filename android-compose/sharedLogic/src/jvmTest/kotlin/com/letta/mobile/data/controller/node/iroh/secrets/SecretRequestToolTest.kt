@@ -89,9 +89,9 @@ class SecretRequestToolTest {
             "`code` span",
             "visit https://example.test",
             "ring the bell \u0007",
-            "right-to-left ‮ override",
-            "zero​width",
-            "line separator",
+            "right-to-left \u202e override",
+            "zero\u200bwidth",
+            "line\u2028separator",
             "# heading",
         )
         for (purpose in notPlain) {

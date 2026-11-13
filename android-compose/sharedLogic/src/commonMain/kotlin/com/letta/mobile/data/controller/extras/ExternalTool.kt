@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.extras
 
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.identity.CallerIdentity
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -81,71 +82,52 @@ interface ExternalTool {
  * tool that must answer a retried call the same way (canvas_compose derives its artifact id from
  * it) reads it; null when the call came some other way.
  *
- * Anyone may build a [claimed] caller. A verified one is made only inside this module, by
- * [verified], and only where the host or runtime itself vouches for the scope: the App Server
- * dispatcher (for a client that owns its App Server connection) and the Meridian live-call binder.
- * A guard test fails if any other production file calls it. There is no public constructor and no
- * `copy`: [withArguments] keeps verification only while the identity fields stay the same.
+ * Anyone may build a claimed caller ([claimedToolCaller]). A verified one is made only inside
+ * this module, by [verifiedToolCaller], and only where the host or runtime itself vouches for the
+ * scope: the App Server dispatcher (for a client that owns its App Server connection) and the
+ * Meridian live-call binder. The constructor is internal and a guard test fails if any other
+ * production file calls it or [verifiedToolCaller]. It is not a data class, so there is no `copy`:
+ * [withArguments] keeps verification only while the identity fields stay the same.
  */
-class ExternalToolCaller private constructor(
-    /** Whether [agentId] was stamped by the host or runtime, or only claimed. */
+class ExternalToolCaller internal constructor(
+    /** Whether [scope] was stamped by the host or runtime, or only claimed. */
     val identity: CallerIdentity,
-    /** The agent the call is for, or null when the frame carried no scope. */
-    val agentId: String?,
-    /** The conversation the call is for, or null. */
-    val conversationId: String?,
-    /** The model's tool call id, or null. */
-    val toolCallId: String?,
+    /** The call's agent, conversation and tool call id. */
+    val scope: ToolCallScope,
 ) {
+    /** The agent the call is for, or null when the frame carried no scope. */
+    val agentId: String? get() = scope.agentId
+
+    /** The conversation the call is for, or null. */
+    val conversationId: String? get() = scope.conversationId
+
+    /** The model's tool call id, or null. */
+    val toolCallId: String? get() = scope.toolCallId
+
     /** Whether the host or runtime vouched for [agentId] ([CallerIdentity.VERIFIED]). */
     val isVerified: Boolean get() = identity == CallerIdentity.VERIFIED
 
     /**
-     * This caller with other values. It stays verified only when [agentId] and [conversationId]
-     * are unchanged; changing either makes it claimed, so a verified scope cannot be moved to
-     * another agent or conversation. [toolCallId] is not identity and may change freely.
+     * This caller for [other]. It stays verified only when the agent and conversation are
+     * unchanged; changing either makes it claimed, so a verified scope cannot be moved to another
+     * agent or conversation. The tool call id is not identity and may change freely.
      */
-    fun withArguments(
-        agentId: String? = this.agentId,
-        conversationId: String? = this.conversationId,
-        toolCallId: String? = this.toolCallId,
-    ): ExternalToolCaller {
-        val sameScope = agentId == this.agentId && conversationId == this.conversationId
-        return ExternalToolCaller(if (sameScope) identity else CallerIdentity.CLAIMED, agentId, conversationId, toolCallId)
+    fun withArguments(other: ToolCallScope): ExternalToolCaller {
+        val sameScope = other.agentId == agentId && other.conversationId == conversationId
+        return ExternalToolCaller(if (sameScope) identity else CallerIdentity.CLAIMED, other)
     }
 
-    @Suppress("NoAnyType") // The equals signature.
-    override fun equals(other: Any?): Boolean = other is ExternalToolCaller && fields() == other.fields()
-
-    override fun hashCode(): Int = fields().hashCode()
-
-    override fun toString(): String =
-        "ExternalToolCaller(identity=$identity, agentId=$agentId, conversationId=$conversationId, toolCallId=$toolCallId)"
-
-    private fun fields(): Fields = Fields(identity, agentId, conversationId, toolCallId)
-
-    /** Value equality without exposing a data class (and its `copy`). */
-    private data class Fields(
-        val identity: CallerIdentity,
-        val agentId: String?,
-        val conversationId: String?,
-        val toolCallId: String?,
-    )
-
-    /** The only ways to make a caller. */
-    companion object {
-        /** A caller whose scope nothing vouches for: an argument, an environment variable, a relayed frame. */
-        fun claimed(agentId: String?, conversationId: String? = null, toolCallId: String? = null): ExternalToolCaller =
-            ExternalToolCaller(CallerIdentity.CLAIMED, agentId, conversationId, toolCallId)
-
-        /**
-         * A caller whose scope the host or runtime vouches for. Only the App Server dispatcher and
-         * the Meridian live-call binder may call this (pinned by a guard test).
-         */
-        internal fun verified(agentId: String?, conversationId: String? = null, toolCallId: String? = null): ExternalToolCaller =
-            ExternalToolCaller(CallerIdentity.VERIFIED, agentId, conversationId, toolCallId)
-    }
+    override fun toString(): String = "ExternalToolCaller(identity=$identity, scope=$scope)"
 }
+
+/** A caller whose [scope] nothing vouches for: an argument, an environment variable, a relayed frame. */
+fun claimedToolCaller(scope: ToolCallScope): ExternalToolCaller = ExternalToolCaller(CallerIdentity.CLAIMED, scope)
+
+/**
+ * A caller whose [scope] the host or runtime vouches for. Only the App Server dispatcher and the
+ * Meridian live-call binder may call this (pinned by a guard test).
+ */
+internal fun verifiedToolCaller(scope: ToolCallScope): ExternalToolCaller = ExternalToolCaller(CallerIdentity.VERIFIED, scope)
 
 /**
  * Host-owned external tool that is available because of the client device, not

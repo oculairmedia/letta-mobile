@@ -36,8 +36,9 @@ class SecretRequestFeature internal constructor(policy: IrohAuthPolicy, internal
     /** The gated factory. */
     companion object {
         /**
-         * The feature for a host whose endpoint enforces [policy], writing through [keystore] and
-         * recording requests in [journal]; null under the anonymous test policy or without a keystore.
+         * The feature for a host whose endpoint enforces [policy], writing through the keystore of
+         * [storage] and recording requests in its journal; null under the anonymous test policy or
+         * without a keystore.
          *
          * [itemScope] has no default on purpose: the host must say which items agents may name.
          * [SecretItemScope.PerAgent] (each agent only under `agents/<its id>`) is the recommended
@@ -52,21 +53,32 @@ class SecretRequestFeature internal constructor(policy: IrohAuthPolicy, internal
          */
         fun forHost(
             policy: IrohAuthPolicy,
-            keystore: KeystoreProvider?,
-            journal: SecretRequestJournal,
+            storage: SecretRequestStorage,
             itemScope: SecretItemScope,
             settings: SecretRequestSettings = SecretRequestSettings(),
         ): SecretRequestFeature? {
+            val keystore = storage.keystore
             if (keystore == null || !policy.admitsSecretRequests()) {
                 val reason = if (keystore == null) "no_keystore" else "insecure_policy"
                 Telemetry.event(SECRET_ROUTE_TAG, "feature.withheld", "reason" attr reason)
                 return null
             }
             val scoped = settings.copy(policy = settings.policy.copy(itemScope = itemScope))
-            return SecretRequestFeature(policy, SecretRequestHandlers(SecretRequestService(journal, keystore, scoped)))
+            return SecretRequestFeature(policy, SecretRequestHandlers(SecretRequestService(storage.journal, keystore, scoped)))
         }
     }
 }
+
+/**
+ * Where the feature writes values ([keystore]: none exists on any host yet) and keeps its
+ * requests ([journal]).
+ */
+data class SecretRequestStorage(
+    /** The keystore provider values are written through, or null when the host has none. */
+    val keystore: KeystoreProvider?,
+    /** The journal requests are recorded in. */
+    val journal: SecretRequestJournal,
+)
 
 /**
  * Installs all six routes and advertises [SecretRequestRouteWire.CAPABILITY] under a secure

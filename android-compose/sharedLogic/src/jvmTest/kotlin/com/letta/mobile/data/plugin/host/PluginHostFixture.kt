@@ -1,10 +1,11 @@
 package com.letta.mobile.data.plugin.host
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.canvas.CanvasRelayHost
 import com.letta.mobile.data.canvas.HostCanvasBackend
 import com.letta.mobile.data.canvas.InMemoryCanvasRelayStore
 import com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory
-import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.verifiedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.plugin.host.process.ProcessDriverOptions
 import com.letta.mobile.data.plugin.host.process.ProcessPluginDriverProvider
@@ -89,7 +90,7 @@ class PluginHostFixture(val pluginsDir: Path = Files.createTempDirectory("plugin
 
         suspend fun PluginHostRuntime.callTool(name: String = TOOL): ExternalToolResult {
             val tool = toolSource.tools.value.single { it.name == name }
-            return tool.invoke(JsonObject(emptyMap()), ExternalToolCaller.verified("agent-1", "conv-1", "call-1"))
+            return tool.invoke(JsonObject(emptyMap()), verifiedToolCaller(ToolCallScope("agent-1", "conv-1", "call-1")))
         }
     }
 }

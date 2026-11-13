@@ -1,6 +1,7 @@
 package com.letta.mobile.data.shell.layout.edit
 
-import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
+import com.letta.mobile.data.controller.extras.verifiedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.home.HomeViews
@@ -39,7 +40,7 @@ class ShellLayoutToolTest {
     private val storeSettings = InMemorySecureSettingsStore()
     private val store = ShellLayoutConfigStore(storeSettings, "shell.tool.lanes")
     private val tool = ShellLayoutTool(port)
-    private val caller = ExternalToolCaller.verified(agentId = "agent-layout-test")
+    private val caller = verifiedToolCaller(ToolCallScope(agentId = "agent-layout-test"))
 
     init {
         port.attach(store)

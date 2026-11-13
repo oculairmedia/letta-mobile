@@ -1,7 +1,10 @@
 package com.letta.mobile.data.controller.node.iroh.secrets
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.claimedToolCaller
+import com.letta.mobile.data.controller.extras.verifiedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
 import com.letta.mobile.data.controller.node.iroh.AdminRpcInvocation
@@ -113,8 +116,8 @@ internal class SecretRouteHarness(val parts: SecretRouteParts = SecretRouteParts
         private const val CONVERSATION = "conv-secret-test"
 
         private fun callerOf(identity: CallerIdentity, agentId: String?): ExternalToolCaller = when (identity) {
-            CallerIdentity.VERIFIED -> ExternalToolCaller.verified(agentId, CONVERSATION)
-            CallerIdentity.CLAIMED -> ExternalToolCaller.claimed(agentId, CONVERSATION)
+            CallerIdentity.VERIFIED -> verifiedToolCaller(ToolCallScope(agentId, CONVERSATION))
+            CallerIdentity.CLAIMED -> claimedToolCaller(ToolCallScope(agentId, CONVERSATION))
         }
     }
 }

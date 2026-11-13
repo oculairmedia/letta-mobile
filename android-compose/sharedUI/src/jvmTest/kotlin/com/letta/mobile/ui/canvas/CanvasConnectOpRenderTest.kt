@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.canvas
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -41,7 +42,7 @@ import com.letta.mobile.data.canvas.InMemoryCanvasRelayStore
 import com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory
 import com.letta.mobile.data.canvas.NotebookCanvasDocumentStore
 import com.letta.mobile.data.canvas.NotebookLocalStore
-import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.claimedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.model.CanvasId
@@ -218,7 +219,7 @@ class CanvasConnectOpRenderTest {
     }
 
     private suspend fun call(tool: String, input: JsonObject): ExternalToolResult =
-        registry.invoke(tool, input, ExternalToolCaller.claimed(agentId = AGENT, conversationId = CONVERSATION))
+        registry.invoke(tool, input, claimedToolCaller(ToolCallScope(agentId = AGENT, conversationId = CONVERSATION)))
 
     private suspend fun catchUp(session: CanvasSession) {
         relay.readAfter(CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION)), cursor).forEach { entry ->

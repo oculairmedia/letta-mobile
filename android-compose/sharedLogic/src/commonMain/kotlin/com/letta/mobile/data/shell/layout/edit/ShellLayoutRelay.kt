@@ -1,6 +1,8 @@
 package com.letta.mobile.data.shell.layout.edit
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.claimedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
 import com.letta.mobile.data.controller.extras.relay.AppToolCallResult
@@ -54,14 +56,14 @@ class ShellLayoutRelayTool(
     private val relay: AppToolRelayHost,
 ) : HostExternalTool by ShellLayoutTool(ShellLayoutAgentPort()) {
     override suspend fun invoke(input: JsonObject, agent: String?): ExternalToolResult =
-        invoke(input, ExternalToolCaller.claimed(agent))
+        invoke(input, claimedToolCaller(ToolCallScope(agent)))
 
     override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult =
         relay.call(name, input, AppToolCallScope(caller.agentId, caller.conversationId, caller.toolCallId)).toToolResult()
 }
 
 /** A scope relayed from the host: this app cannot vouch for how the host learned it, so it is claimed. */
-private fun AppToolCallScope.toCaller() = ExternalToolCaller.claimed(agentId, conversationId, toolCallId)
+private fun AppToolCallScope.toCaller() = claimedToolCaller(ToolCallScope(agentId, conversationId, toolCallId))
 
 private fun ExternalToolResult.toRelayResult(): AppToolCallResult = when (this) {
     is ExternalToolResult.Success -> AppToolCallResult(content)

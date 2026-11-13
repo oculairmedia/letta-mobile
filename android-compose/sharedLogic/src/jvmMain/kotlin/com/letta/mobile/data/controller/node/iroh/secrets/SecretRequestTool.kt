@@ -1,8 +1,10 @@
 package com.letta.mobile.data.controller.node.iroh.secrets
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.claimedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
 import com.letta.mobile.data.model.AgentId
@@ -43,7 +45,7 @@ internal class SecretRequestTool(private val handlers: SecretRequestHandlers) : 
 
     /** The legacy entry carries a bare agent id nothing vouches for: claimed, so always refused. */
     override suspend fun invoke(input: JsonObject, agent: String?): ExternalToolResult =
-        invoke(input, ExternalToolCaller.claimed(agent))
+        invoke(input, claimedToolCaller(ToolCallScope(agent)))
 
     override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
         val agent = verifiedAgentOf(caller) ?: return refusal(SecretServiceError.FORBIDDEN)

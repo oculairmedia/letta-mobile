@@ -17817,22 +17817,18 @@ public final class com/letta/mobile/data/controller/extras/ExternalTool$DefaultI
 }
 
 public final class com/letta/mobile/data/controller/extras/ExternalToolCaller {
-	public static final field Companion Lcom/letta/mobile/data/controller/extras/ExternalToolCaller$Companion;
-	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAgentId ()Ljava/lang/String;
 	public final fun getConversationId ()Ljava/lang/String;
 	public final fun getIdentity ()Lcom/letta/mobile/data/controller/extras/identity/CallerIdentity;
+	public final fun getScope ()Lcom/letta/mobile/data/controller/extras/identity/ToolCallScope;
 	public final fun getToolCallId ()Ljava/lang/String;
-	public fun hashCode ()I
 	public final fun isVerified ()Z
 	public fun toString ()Ljava/lang/String;
-	public final fun withArguments (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;
-	public static synthetic fun withArguments$default (Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;
+	public final fun withArguments (Lcom/letta/mobile/data/controller/extras/identity/ToolCallScope;)Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;
 }
 
-public final class com/letta/mobile/data/controller/extras/ExternalToolCaller$Companion {
-	public final fun claimed (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;
-	public static synthetic fun claimed$default (Lcom/letta/mobile/data/controller/extras/ExternalToolCaller$Companion;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;
+public final class com/letta/mobile/data/controller/extras/ExternalToolKt {
+	public static final fun claimedToolCaller (Lcom/letta/mobile/data/controller/extras/identity/ToolCallScope;)Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;
 }
 
 public final class com/letta/mobile/data/controller/extras/ExternalToolRegistry : com/letta/mobile/data/controller/reconnect/ExternalToolRegistrar {
@@ -18121,6 +18117,22 @@ public final class com/letta/mobile/data/controller/extras/identity/CallerIdenti
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/controller/extras/identity/CallerIdentity;
 	public static fun values ()[Lcom/letta/mobile/data/controller/extras/identity/CallerIdentity;
+}
+
+public final class com/letta/mobile/data/controller/extras/identity/ToolCallScope {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/extras/identity/ToolCallScope;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/extras/identity/ToolCallScope;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/identity/ToolCallScope;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
+	public final fun getConversationId ()Ljava/lang/String;
+	public final fun getToolCallId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/controller/extras/messaging/IrohMessageOptions {
@@ -20708,8 +20720,21 @@ public final class com/letta/mobile/data/controller/node/iroh/secrets/SecretRequ
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/secrets/SecretRequestFeature$Companion {
-	public final fun forHost (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/plugin/keystore/KeystoreProvider;Lcom/letta/mobile/data/secrets/journal/SecretRequestJournal;Lcom/letta/mobile/data/secrets/host/SecretItemScope;Lcom/letta/mobile/data/secrets/host/SecretRequestSettings;)Lcom/letta/mobile/data/controller/node/iroh/secrets/SecretRequestFeature;
-	public static synthetic fun forHost$default (Lcom/letta/mobile/data/controller/node/iroh/secrets/SecretRequestFeature$Companion;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/plugin/keystore/KeystoreProvider;Lcom/letta/mobile/data/secrets/journal/SecretRequestJournal;Lcom/letta/mobile/data/secrets/host/SecretItemScope;Lcom/letta/mobile/data/secrets/host/SecretRequestSettings;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/secrets/SecretRequestFeature;
+	public final fun forHost (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/secrets/SecretRequestStorage;Lcom/letta/mobile/data/secrets/host/SecretItemScope;Lcom/letta/mobile/data/secrets/host/SecretRequestSettings;)Lcom/letta/mobile/data/controller/node/iroh/secrets/SecretRequestFeature;
+	public static synthetic fun forHost$default (Lcom/letta/mobile/data/controller/node/iroh/secrets/SecretRequestFeature$Companion;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/secrets/SecretRequestStorage;Lcom/letta/mobile/data/secrets/host/SecretItemScope;Lcom/letta/mobile/data/secrets/host/SecretRequestSettings;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/secrets/SecretRequestFeature;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/secrets/SecretRequestStorage {
+	public fun <init> (Lcom/letta/mobile/plugin/keystore/KeystoreProvider;Lcom/letta/mobile/data/secrets/journal/SecretRequestJournal;)V
+	public final fun component1 ()Lcom/letta/mobile/plugin/keystore/KeystoreProvider;
+	public final fun component2 ()Lcom/letta/mobile/data/secrets/journal/SecretRequestJournal;
+	public final fun copy (Lcom/letta/mobile/plugin/keystore/KeystoreProvider;Lcom/letta/mobile/data/secrets/journal/SecretRequestJournal;)Lcom/letta/mobile/data/controller/node/iroh/secrets/SecretRequestStorage;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/secrets/SecretRequestStorage;Lcom/letta/mobile/plugin/keystore/KeystoreProvider;Lcom/letta/mobile/data/secrets/journal/SecretRequestJournal;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/secrets/SecretRequestStorage;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getJournal ()Lcom/letta/mobile/data/secrets/journal/SecretRequestJournal;
+	public final fun getKeystore ()Lcom/letta/mobile/plugin/keystore/KeystoreProvider;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/controller/reconnect/AppServerClientGeneration {

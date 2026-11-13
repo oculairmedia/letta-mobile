@@ -60,7 +60,7 @@ class SecretRequestToolIdentityTest {
     @Test
     fun theProvenanceCheckRunsBeforeAnyArgumentIsRead() = runTest {
         val harness = SecretRouteHarness()
-        val unreadable = listOf(JsonObject(emptyMap()), JsonObject(mapOf("action" to JsonPrimitive("submit"))), createInput("‮"))
+        val unreadable = listOf(JsonObject(emptyMap()), JsonObject(mapOf("action" to JsonPrimitive("submit"))), createInput("\u202e"))
         for (input in unreadable) {
             assertEquals(forbidden, harness.tool(input, REQUESTER, CallerIdentity.CLAIMED), input.toString())
         }

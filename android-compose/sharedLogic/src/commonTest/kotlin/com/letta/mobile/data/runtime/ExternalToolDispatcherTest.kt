@@ -71,7 +71,9 @@ class ExternalToolDispatcherTest {
         }
         dispatcher(RecordingClient(vouchesForRuntimeScope = true), registry = registryOf(tool)).answerRequest()
         // letta-mobile-bglj6.12: and the request's tool_call_id, which the timeline keys the call on.
-        assertEquals(com.letta.mobile.data.controller.extras.ExternalToolCaller.verified("agent-1", "conv-1", TOOL_CALL_ID), seen)
+        val caller = assertNotNull(seen)
+        assertEquals(listOf("agent-1", "conv-1", TOOL_CALL_ID), listOf(caller.agentId, caller.conversationId, caller.toolCallId))
+        assertTrue(caller.isVerified)
     }
 
     /** The scope is only as trustworthy as the client that delivered it: a client that does not own its App Server connection is claimed. */

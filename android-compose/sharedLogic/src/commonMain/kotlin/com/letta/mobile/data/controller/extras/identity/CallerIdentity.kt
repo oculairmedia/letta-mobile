@@ -2,8 +2,8 @@ package com.letta.mobile.data.controller.extras.identity
 
 /**
  * Where a tool caller's `ExternalToolCaller.agentId` came from. A caller is built as claimed by
- * anyone (`ExternalToolCaller.claimed`) and as [VERIFIED] only by the App Server dispatcher and the
- * Meridian live-call binder (`ExternalToolCaller.verified`, internal and pinned by a guard test).
+ * anyone (`claimedToolCaller`) and as [VERIFIED] only by the App Server dispatcher and the
+ * Meridian live-call binder (`verifiedToolCaller`, internal and pinned by a guard test).
  * A security-sensitive tool (one that acts on per-agent state the agent must not reach for
  * another agent, such as `secret_request`) must refuse anything but [VERIFIED].
  */

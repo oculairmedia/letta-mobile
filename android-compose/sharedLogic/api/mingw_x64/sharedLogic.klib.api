@@ -38091,6 +38091,25 @@ final class com.letta.mobile.data.controller.channels/InMemoryChannelAccountCach
     final fun record(kotlin.collections/List<com.letta.mobile.data.controller.channels/ChannelAccountRef>) // com.letta.mobile.data.controller.channels/InMemoryChannelAccountCache.record|record(kotlin.collections.List<com.letta.mobile.data.controller.channels.ChannelAccountRef>){}[0]
 }
 
+final class com.letta.mobile.data.controller.extras.identity/ToolCallScope { // com.letta.mobile.data.controller.extras.identity/ToolCallScope|null[0]
+    constructor <init>(kotlin/String?, kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.controller.extras.identity/ToolCallScope.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+
+    final val agentId // com.letta.mobile.data.controller.extras.identity/ToolCallScope.agentId|{}agentId[0]
+        final fun <get-agentId>(): kotlin/String? // com.letta.mobile.data.controller.extras.identity/ToolCallScope.agentId.<get-agentId>|<get-agentId>(){}[0]
+    final val conversationId // com.letta.mobile.data.controller.extras.identity/ToolCallScope.conversationId|{}conversationId[0]
+        final fun <get-conversationId>(): kotlin/String? // com.letta.mobile.data.controller.extras.identity/ToolCallScope.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+    final val toolCallId // com.letta.mobile.data.controller.extras.identity/ToolCallScope.toolCallId|{}toolCallId[0]
+        final fun <get-toolCallId>(): kotlin/String? // com.letta.mobile.data.controller.extras.identity/ToolCallScope.toolCallId.<get-toolCallId>|<get-toolCallId>(){}[0]
+
+    final fun component1(): kotlin/String? // com.letta.mobile.data.controller.extras.identity/ToolCallScope.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.controller.extras.identity/ToolCallScope.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.data.controller.extras.identity/ToolCallScope.component3|component3(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.controller.extras.identity/ToolCallScope // com.letta.mobile.data.controller.extras.identity/ToolCallScope.copy|copy(kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras.identity/ToolCallScope.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras.identity/ToolCallScope.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.identity/ToolCallScope.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions { // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions|null[0]
     constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/Map<kotlin/String, kotlin/String>? = ..., kotlin/String? = ...) // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.collections.Map<kotlin.String,kotlin.String>?;kotlin.String?){}[0]
 
@@ -38299,17 +38318,13 @@ final class com.letta.mobile.data.controller.extras/ExternalToolCaller { // com.
         final fun <get-identity>(): com.letta.mobile.data.controller.extras.identity/CallerIdentity // com.letta.mobile.data.controller.extras/ExternalToolCaller.identity.<get-identity>|<get-identity>(){}[0]
     final val isVerified // com.letta.mobile.data.controller.extras/ExternalToolCaller.isVerified|{}isVerified[0]
         final fun <get-isVerified>(): kotlin/Boolean // com.letta.mobile.data.controller.extras/ExternalToolCaller.isVerified.<get-isVerified>|<get-isVerified>(){}[0]
+    final val scope // com.letta.mobile.data.controller.extras/ExternalToolCaller.scope|{}scope[0]
+        final fun <get-scope>(): com.letta.mobile.data.controller.extras.identity/ToolCallScope // com.letta.mobile.data.controller.extras/ExternalToolCaller.scope.<get-scope>|<get-scope>(){}[0]
     final val toolCallId // com.letta.mobile.data.controller.extras/ExternalToolCaller.toolCallId|{}toolCallId[0]
         final fun <get-toolCallId>(): kotlin/String? // com.letta.mobile.data.controller.extras/ExternalToolCaller.toolCallId.<get-toolCallId>|<get-toolCallId>(){}[0]
 
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras/ExternalToolCaller.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras/ExternalToolCaller.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras/ExternalToolCaller.toString|toString(){}[0]
-    final fun withArguments(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.controller.extras/ExternalToolCaller // com.letta.mobile.data.controller.extras/ExternalToolCaller.withArguments|withArguments(kotlin.String?;kotlin.String?;kotlin.String?){}[0]
-
-    final object Companion { // com.letta.mobile.data.controller.extras/ExternalToolCaller.Companion|null[0]
-        final fun claimed(kotlin/String?, kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.controller.extras/ExternalToolCaller // com.letta.mobile.data.controller.extras/ExternalToolCaller.Companion.claimed|claimed(kotlin.String?;kotlin.String?;kotlin.String?){}[0]
-    }
+    final fun withArguments(com.letta.mobile.data.controller.extras.identity/ToolCallScope): com.letta.mobile.data.controller.extras/ExternalToolCaller // com.letta.mobile.data.controller.extras/ExternalToolCaller.withArguments|withArguments(com.letta.mobile.data.controller.extras.identity.ToolCallScope){}[0]
 }
 
 final class com.letta.mobile.data.controller.extras/ExternalToolRegistry : com.letta.mobile.data.controller.reconnect/ExternalToolRegistrar { // com.letta.mobile.data.controller.extras/ExternalToolRegistry|null[0]
@@ -79375,6 +79390,7 @@ final fun com.letta.mobile.data.context/formatContextShare(kotlin/Float): kotlin
 final fun com.letta.mobile.data.context/formatContextTokens(kotlin/Int): kotlin/String // com.letta.mobile.data.context/formatContextTokens|formatContextTokens(kotlin.Int){}[0]
 final fun com.letta.mobile.data.context/modelCatalogWindowOf(kotlin.collections/List<com.letta.mobile.data.model/LlmModel>, kotlin/String?): kotlin/Int? // com.letta.mobile.data.context/modelCatalogWindowOf|modelCatalogWindowOf(kotlin.collections.List<com.letta.mobile.data.model.LlmModel>;kotlin.String?){}[0]
 final fun com.letta.mobile.data.context/reduceContextReadings(kotlin.collections/Map<com.letta.mobile.data.context/ContextReadingKey, kotlin/Int>, com.letta.mobile.data.transport/ServerFrame): kotlin.collections/Map<com.letta.mobile.data.context/ContextReadingKey, kotlin/Int> // com.letta.mobile.data.context/reduceContextReadings|reduceContextReadings(kotlin.collections.Map<com.letta.mobile.data.context.ContextReadingKey,kotlin.Int>;com.letta.mobile.data.transport.ServerFrame){}[0]
+final fun com.letta.mobile.data.controller.extras/claimedToolCaller(com.letta.mobile.data.controller.extras.identity/ToolCallScope): com.letta.mobile.data.controller.extras/ExternalToolCaller // com.letta.mobile.data.controller.extras/claimedToolCaller|claimedToolCaller(com.letta.mobile.data.controller.extras.identity.ToolCallScope){}[0]
 final fun com.letta.mobile.data.controller.extras/defaultIrohCliRunnerOrNull(): com.letta.mobile.data.controller.extras/IrohCliRunner? // com.letta.mobile.data.controller.extras/defaultIrohCliRunnerOrNull|defaultIrohCliRunnerOrNull(){}[0]
 final fun com.letta.mobile.data.home/buildFleetOverview(com.letta.mobile.data.home/FleetOverviewParams): com.letta.mobile.data.home/FleetOverview // com.letta.mobile.data.home/buildFleetOverview|buildFleetOverview(com.letta.mobile.data.home.FleetOverviewParams){}[0]
 final fun com.letta.mobile.data.home/conversationRecency(kotlin/String): kotlin.time/Instant // com.letta.mobile.data.home/conversationRecency|conversationRecency(kotlin.String){}[0]

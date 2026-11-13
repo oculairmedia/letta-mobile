@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport.iroh
 
-import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
+import com.letta.mobile.data.controller.extras.verifiedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.relay.AppToolCallRequest
 import com.letta.mobile.data.controller.extras.relay.AppToolCallResult
@@ -45,7 +46,7 @@ import org.junit.Assume.assumeTrue
  */
 class IrohAppToolRelayEndToEndTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val caller = ExternalToolCaller.verified(agentId = AGENT, conversationId = CONVERSATION, toolCallId = "tc-e2e")
+    private val caller = verifiedToolCaller(ToolCallScope(agentId = AGENT, conversationId = CONVERSATION, toolCallId = "tc-e2e"))
     private val input = buildJsonObject { put("action", "get") }
 
     @BeforeTest

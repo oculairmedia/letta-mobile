@@ -249,7 +249,7 @@ External-tool registries, offers and dynamic tool-source contracts. Platform CLI
 
 # Package com.letta.mobile.data.controller.extras.identity
 
-Provenance of a tool caller's agent id. [CallerIdentity](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras.identity/-caller-identity/index.html) says whether a tool caller's agent id was vouched for. Anyone can build a claimed caller (`ExternalToolCaller.claimed`); a verified one is made only inside sharedLogic, by the App Server dispatcher when its client owns the App Server connection (`AppServerClient.vouchesForRuntimeScope`) and by the Meridian live-call binder, and a guard test pins those two. Changing a verified caller's agent or conversation makes it claimed. Security-sensitive tools serve only verified callers.
+Provenance of a tool caller's agent id. [CallerIdentity](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras.identity/-caller-identity/index.html) says whether a tool caller's agent id was vouched for. Anyone can build a claimed caller (`claimedToolCaller`); a verified one is made only inside sharedLogic, by the App Server dispatcher when its client owns the App Server connection (`AppServerClient.vouchesForRuntimeScope`) and by the Meridian live-call binder, and a guard test pins those two. Changing a verified caller's agent or conversation makes it claimed. Security-sensitive tools serve only verified callers.
 
 # Package com.letta.mobile.data.controller.extras.relay
 

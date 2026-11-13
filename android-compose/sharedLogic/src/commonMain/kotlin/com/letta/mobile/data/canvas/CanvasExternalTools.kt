@@ -1,11 +1,13 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.canvas.compose.ComposeErrorCode
 import com.letta.mobile.data.canvas.compose.ComposePublishException
 import com.letta.mobile.data.canvas.compose.ComposeTarget
 import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.claimedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
 import com.letta.mobile.data.model.AgentId
@@ -552,7 +554,7 @@ class CanvasComposeTool(
     override val inputSchema: JsonObject = CanvasToolContract.compose.inputSchema
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
-        invoke(input, ExternalToolCaller.claimed(agentId))
+        invoke(input, claimedToolCaller(ToolCallScope(agentId)))
 
     /** The whole caller: the conversation names the default canvas, the tool call id the artifact. */
     override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {

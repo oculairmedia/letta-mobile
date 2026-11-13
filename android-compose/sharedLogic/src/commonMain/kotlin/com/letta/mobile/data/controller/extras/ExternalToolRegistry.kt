@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.extras
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.controller.capability.RemoteCapabilities
 import com.letta.mobile.data.controller.reconnect.ExternalToolRegistrar
 import com.letta.mobile.data.transport.appserver.AppServerExternalToolDefinition
@@ -194,7 +195,7 @@ class ExternalToolRegistry(
         input: JsonObject,
         agentId: String? = null,
         conversationId: String? = null,
-    ): ExternalToolResult = invoke(toolName, input, ExternalToolCaller.claimed(agentId, conversationId))
+    ): ExternalToolResult = invoke(toolName, input, claimedToolCaller(ToolCallScope(agentId, conversationId)))
 
     /**
      * [invoke] on behalf of [caller]: its agent and conversation, and the request's `tool_call_id`
