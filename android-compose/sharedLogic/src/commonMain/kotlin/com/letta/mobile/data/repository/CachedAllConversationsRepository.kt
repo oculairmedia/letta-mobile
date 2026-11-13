@@ -8,6 +8,8 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.ConversationRecency
+import com.letta.mobile.data.model.visibleConversationsInLists
 import com.letta.mobile.data.repository.api.AllConversationsLocalCache
 import com.letta.mobile.data.repository.api.ConversationRemoteSource
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
@@ -15,6 +17,7 @@ import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -88,12 +91,16 @@ open class CachedAllConversationsRepository(
             }
         }
         transport?.let { channelTransport ->
-            repositoryScope.launch { observeConversationInvalidations(channelTransport.conversationChanges(), ::applyPush) }
+            repositoryScope.launch { observeConversationInvalidations(channelTransport.conversationChanges(), PUSH_COALESCE_WINDOW, ::applyPush) }
             repositoryScope.launch { observeReconnectRefresh(channelTransport) { refreshAfterPush("reconnect") } }
         }
     }
 
-    /** A legacy push without an agent keeps its row refetch; scoped pushes list each owning agent once. */
+    /**
+     * A push re-reads only the conversations it names (`conversation.get`), never their agents'
+     * pages: a turn's pushes used to re-list its agent every few seconds (letta-mobile-ybdv3). A
+     * row that cannot be read alone falls back to the shared owner/roster reconciliation.
+     */
     private suspend fun applyPush(dirty: Map<ConversationId, AgentId?>) {
         if (!hasLoadedAtLeastOnce) return
         try {
@@ -115,15 +122,35 @@ open class CachedAllConversationsRepository(
     private suspend fun refreshPushedLocked(dirty: Map<ConversationId, AgentId?>) = refreshMutex.withLock {
         if (!hasLoadedAtLeastOnce) return@withLock
         val source = irohConversationListSource?.takeIf { it.shouldUseIroh() }
-        val legacy = dirty.keys.singleOrNull()?.takeIf { dirty[it] == null }
-        if (legacy != null && source != null) {
-            val fresh = source.getConversation(legacy)
-            fleet.record(fresh)
-            handleOptimisticUpdate(fresh)
-        } else {
-            val (listed, _) = fleet.refreshForInvalidations(dirty, roster) { id -> source?.getConversation(id) }
-            publish(listed)
+        val fresh = source?.let { readEach(it, dirty.keys) }.orEmpty()
+        if (fresh.isNotEmpty()) publishRows(fresh)
+        val unread = dirty.filterKeys { id -> fresh.none { it.id == id } }
+        if (unread.isEmpty()) return@withLock
+        val (listed, _) = fleet.refreshForInvalidations(unread, roster) { id -> source?.getConversation(id) }
+        publish(listed)
+    }
+
+    /** Each conversation read by itself; one that cannot be read (gone, refused) is left out. */
+    private suspend fun readEach(source: IrohAdminRpcConversationListSource, ids: Set<ConversationId>): List<Conversation> =
+        ids.mapNotNull { id ->
+            try {
+                source.getConversation(id)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
         }
+
+    /** Folds re-read rows into the fleet and the published list, newest first, as a list read would. */
+    private suspend fun publishRows(fresh: List<Conversation>) {
+        fresh.forEach { fleet.record(it) }
+        val visible = fresh.visibleConversationsInLists()
+        val ids = fresh.mapTo(mutableSetOf()) { it.id }
+        _conversations.update { current ->
+            (visible + current.filterNot { it.id in ids }).sortedWith(ConversationRecency.newestFirst)
+        }
+        if (visible.isNotEmpty()) cacheConversations(visible)
     }
 
     /** Only a list that has loaded is refreshed: an unopened list loads fresh when first shown. */
@@ -211,6 +238,9 @@ open class CachedAllConversationsRepository(
 
         /** The list filters archived rows itself (its Archived tab), so it reads them too. */
         private const val ARCHIVE_STATUS_ALL = "all"
+
+        /** Pushes within this window of the first are re-read together. */
+        private val PUSH_COALESCE_WINDOW = 500.milliseconds
     }
 
     private suspend fun refreshLocked() {
