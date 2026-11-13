@@ -3049,6 +3049,7 @@ final enum class com.letta.mobile.data.secrets.request/PrincipalOrigin : kotlin/
 final enum class com.letta.mobile.data.secrets.request/SecretFailureReason : kotlin/Enum<com.letta.mobile.data.secrets.request/SecretFailureReason> { // com.letta.mobile.data.secrets.request/SecretFailureReason|null[0]
     enum entry INTERRUPTED // com.letta.mobile.data.secrets.request/SecretFailureReason.INTERRUPTED|null[0]
     enum entry ROLLBACK_FAILED // com.letta.mobile.data.secrets.request/SecretFailureReason.ROLLBACK_FAILED|null[0]
+    enum entry TARGET_CHANGED // com.letta.mobile.data.secrets.request/SecretFailureReason.TARGET_CHANGED|null[0]
     enum entry TARGET_NOT_WRITABLE // com.letta.mobile.data.secrets.request/SecretFailureReason.TARGET_NOT_WRITABLE|null[0]
     enum entry VALUE_REJECTED // com.letta.mobile.data.secrets.request/SecretFailureReason.VALUE_REJECTED|null[0]
     enum entry VAULT_DENIED // com.letta.mobile.data.secrets.request/SecretFailureReason.VAULT_DENIED|null[0]
@@ -3096,6 +3097,7 @@ final enum class com.letta.mobile.data.secrets.request/SecretRequestProblem : ko
     enum entry PURPOSE_NOT_PLAIN_TEXT // com.letta.mobile.data.secrets.request/SecretRequestProblem.PURPOSE_NOT_PLAIN_TEXT|null[0]
     enum entry PURPOSE_TOO_LONG // com.letta.mobile.data.secrets.request/SecretRequestProblem.PURPOSE_TOO_LONG|null[0]
     enum entry TOO_MANY_PENDING // com.letta.mobile.data.secrets.request/SecretRequestProblem.TOO_MANY_PENDING|null[0]
+    enum entry TOO_MANY_REQUESTS // com.letta.mobile.data.secrets.request/SecretRequestProblem.TOO_MANY_REQUESTS|null[0]
 
     final val entries // com.letta.mobile.data.secrets.request/SecretRequestProblem.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.secrets.request/SecretRequestProblem> // com.letta.mobile.data.secrets.request/SecretRequestProblem.entries.<get-entries>|<get-entries>#static(){}[0]
@@ -3132,6 +3134,7 @@ final enum class com.letta.mobile.data.secrets.request/SecretRequestState : kotl
 }
 
 final enum class com.letta.mobile.data.secrets.request/SecretServiceError : kotlin/Enum<com.letta.mobile.data.secrets.request/SecretServiceError> { // com.letta.mobile.data.secrets.request/SecretServiceError|null[0]
+    enum entry BUSY // com.letta.mobile.data.secrets.request/SecretServiceError.BUSY|null[0]
     enum entry FORBIDDEN // com.letta.mobile.data.secrets.request/SecretServiceError.FORBIDDEN|null[0]
     enum entry INVALID_PARAMS // com.letta.mobile.data.secrets.request/SecretServiceError.INVALID_PARAMS|null[0]
     enum entry INVALID_REQUEST // com.letta.mobile.data.secrets.request/SecretServiceError.INVALID_REQUEST|null[0]
@@ -6910,6 +6913,8 @@ abstract interface com.letta.mobile.data.transport.appserver/AppServerClient { /
         open fun <get-isConnected>(): kotlinx.coroutines.flow/Flow<kotlin/Boolean> // com.letta.mobile.data.transport.appserver/AppServerClient.isConnected.<get-isConnected>|<get-isConnected>(){}[0]
     open val serverInfo // com.letta.mobile.data.transport.appserver/AppServerClient.serverInfo|{}serverInfo[0]
         open fun <get-serverInfo>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.transport.appserver/AppServerInfoData?> // com.letta.mobile.data.transport.appserver/AppServerClient.serverInfo.<get-serverInfo>|<get-serverInfo>(){}[0]
+    open val vouchesForRuntimeScope // com.letta.mobile.data.transport.appserver/AppServerClient.vouchesForRuntimeScope|{}vouchesForRuntimeScope[0]
+        open fun <get-vouchesForRuntimeScope>(): kotlin/Boolean // com.letta.mobile.data.transport.appserver/AppServerClient.vouchesForRuntimeScope.<get-vouchesForRuntimeScope>|<get-vouchesForRuntimeScope>(){}[0]
 
     abstract suspend fun abort(com.letta.mobile.data.transport.appserver/AppServerCommand.AbortMessage): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AbortMessageResponse // com.letta.mobile.data.transport.appserver/AppServerClient.abort|abort(com.letta.mobile.data.transport.appserver.AppServerCommand.AbortMessage){}[0]
     abstract suspend fun adminRpc(com.letta.mobile.data.transport.appserver/AppServerCommand.AdminRpc): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AdminRpcResponse // com.letta.mobile.data.transport.appserver/AppServerClient.adminRpc|adminRpc(com.letta.mobile.data.transport.appserver.AppServerCommand.AdminRpc){}[0]
@@ -25863,6 +25868,9 @@ abstract class com.letta.mobile.data.canvas/StateCanvasDeliveryStore : com.letta
 abstract class com.letta.mobile.data.controller.reconnect/ForwardingAppServerClient : com.letta.mobile.data.transport.appserver/AppServerClient { // com.letta.mobile.data.controller.reconnect/ForwardingAppServerClient|null[0]
     constructor <init>() // com.letta.mobile.data.controller.reconnect/ForwardingAppServerClient.<init>|<init>(){}[0]
 
+    open val vouchesForRuntimeScope // com.letta.mobile.data.controller.reconnect/ForwardingAppServerClient.vouchesForRuntimeScope|{}vouchesForRuntimeScope[0]
+        open fun <get-vouchesForRuntimeScope>(): kotlin/Boolean // com.letta.mobile.data.controller.reconnect/ForwardingAppServerClient.vouchesForRuntimeScope.<get-vouchesForRuntimeScope>|<get-vouchesForRuntimeScope>(){}[0]
+
     abstract fun target(): com.letta.mobile.data.transport.appserver/AppServerClient // com.letta.mobile.data.controller.reconnect/ForwardingAppServerClient.target|target(){}[0]
     open suspend fun abort(com.letta.mobile.data.transport.appserver/AppServerCommand.AbortMessage): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AbortMessageResponse // com.letta.mobile.data.controller.reconnect/ForwardingAppServerClient.abort|abort(com.letta.mobile.data.transport.appserver.AppServerCommand.AbortMessage){}[0]
     open suspend fun acknowledgeTurnFinished(com.letta.mobile.data.transport.appserver/AppServerCommand.TurnFinishedAck) // com.letta.mobile.data.controller.reconnect/ForwardingAppServerClient.acknowledgeTurnFinished|acknowledgeTurnFinished(com.letta.mobile.data.transport.appserver.AppServerCommand.TurnFinishedAck){}[0]
@@ -38283,25 +38291,25 @@ final class com.letta.mobile.data.controller.extras/DiscoverableAgent { // com.l
 }
 
 final class com.letta.mobile.data.controller.extras/ExternalToolCaller { // com.letta.mobile.data.controller.extras/ExternalToolCaller|null[0]
-    constructor <init>(com.letta.mobile.data.controller.extras.identity/CallerIdentity, kotlin/String?, kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.controller.extras/ExternalToolCaller.<init>|<init>(com.letta.mobile.data.controller.extras.identity.CallerIdentity;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
-
     final val agentId // com.letta.mobile.data.controller.extras/ExternalToolCaller.agentId|{}agentId[0]
         final fun <get-agentId>(): kotlin/String? // com.letta.mobile.data.controller.extras/ExternalToolCaller.agentId.<get-agentId>|<get-agentId>(){}[0]
     final val conversationId // com.letta.mobile.data.controller.extras/ExternalToolCaller.conversationId|{}conversationId[0]
         final fun <get-conversationId>(): kotlin/String? // com.letta.mobile.data.controller.extras/ExternalToolCaller.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
     final val identity // com.letta.mobile.data.controller.extras/ExternalToolCaller.identity|{}identity[0]
         final fun <get-identity>(): com.letta.mobile.data.controller.extras.identity/CallerIdentity // com.letta.mobile.data.controller.extras/ExternalToolCaller.identity.<get-identity>|<get-identity>(){}[0]
+    final val isVerified // com.letta.mobile.data.controller.extras/ExternalToolCaller.isVerified|{}isVerified[0]
+        final fun <get-isVerified>(): kotlin/Boolean // com.letta.mobile.data.controller.extras/ExternalToolCaller.isVerified.<get-isVerified>|<get-isVerified>(){}[0]
     final val toolCallId // com.letta.mobile.data.controller.extras/ExternalToolCaller.toolCallId|{}toolCallId[0]
         final fun <get-toolCallId>(): kotlin/String? // com.letta.mobile.data.controller.extras/ExternalToolCaller.toolCallId.<get-toolCallId>|<get-toolCallId>(){}[0]
 
-    final fun component1(): com.letta.mobile.data.controller.extras.identity/CallerIdentity // com.letta.mobile.data.controller.extras/ExternalToolCaller.component1|component1(){}[0]
-    final fun component2(): kotlin/String? // com.letta.mobile.data.controller.extras/ExternalToolCaller.component2|component2(){}[0]
-    final fun component3(): kotlin/String? // com.letta.mobile.data.controller.extras/ExternalToolCaller.component3|component3(){}[0]
-    final fun component4(): kotlin/String? // com.letta.mobile.data.controller.extras/ExternalToolCaller.component4|component4(){}[0]
-    final fun copy(com.letta.mobile.data.controller.extras.identity/CallerIdentity = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.controller.extras/ExternalToolCaller // com.letta.mobile.data.controller.extras/ExternalToolCaller.copy|copy(com.letta.mobile.data.controller.extras.identity.CallerIdentity;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras/ExternalToolCaller.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras/ExternalToolCaller.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras/ExternalToolCaller.toString|toString(){}[0]
+    final fun withArguments(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.controller.extras/ExternalToolCaller // com.letta.mobile.data.controller.extras/ExternalToolCaller.withArguments|withArguments(kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+
+    final object Companion { // com.letta.mobile.data.controller.extras/ExternalToolCaller.Companion|null[0]
+        final fun claimed(kotlin/String?, kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.controller.extras/ExternalToolCaller // com.letta.mobile.data.controller.extras/ExternalToolCaller.Companion.claimed|claimed(kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+    }
 }
 
 final class com.letta.mobile.data.controller.extras/ExternalToolRegistry : com.letta.mobile.data.controller.reconnect/ExternalToolRegistrar { // com.letta.mobile.data.controller.extras/ExternalToolRegistry|null[0]
@@ -60531,10 +60539,12 @@ final class com.letta.mobile.data.secrets.request/SecretRequestCreated { // com.
 }
 
 final class com.letta.mobile.data.secrets.request/SecretRequestDetails { // com.letta.mobile.data.secrets.request/SecretRequestDetails|null[0]
-    constructor <init>(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.secrets.request/SecretRequestTarget, com.letta.mobile.data.secrets.request/AuthoredPurpose) // com.letta.mobile.data.secrets.request/SecretRequestDetails.<init>|<init>(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.secrets.request.SecretRequestTarget;com.letta.mobile.data.secrets.request.AuthoredPurpose){}[0]
+    constructor <init>(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.secrets.request/SecretRequestTarget, com.letta.mobile.data.secrets.request/AuthoredPurpose, kotlin/Boolean = ...) // com.letta.mobile.data.secrets.request/SecretRequestDetails.<init>|<init>(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.secrets.request.SecretRequestTarget;com.letta.mobile.data.secrets.request.AuthoredPurpose;kotlin.Boolean){}[0]
 
     final val purpose // com.letta.mobile.data.secrets.request/SecretRequestDetails.purpose|{}purpose[0]
         final fun <get-purpose>(): com.letta.mobile.data.secrets.request/AuthoredPurpose // com.letta.mobile.data.secrets.request/SecretRequestDetails.purpose.<get-purpose>|<get-purpose>(){}[0]
+    final val replacesExisting // com.letta.mobile.data.secrets.request/SecretRequestDetails.replacesExisting|{}replacesExisting[0]
+        final fun <get-replacesExisting>(): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestDetails.replacesExisting.<get-replacesExisting>|<get-replacesExisting>(){}[0]
     final val requestingAgent // com.letta.mobile.data.secrets.request/SecretRequestDetails.requestingAgent|{}requestingAgent[0]
         final fun <get-requestingAgent>(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.secrets.request/SecretRequestDetails.requestingAgent.<get-requestingAgent>|<get-requestingAgent>(){}[0]
     final val target // com.letta.mobile.data.secrets.request/SecretRequestDetails.target|{}target[0]
@@ -60543,7 +60553,8 @@ final class com.letta.mobile.data.secrets.request/SecretRequestDetails { // com.
     final fun component1(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.secrets.request/SecretRequestDetails.component1|component1(){}[0]
     final fun component2(): com.letta.mobile.data.secrets.request/SecretRequestTarget // com.letta.mobile.data.secrets.request/SecretRequestDetails.component2|component2(){}[0]
     final fun component3(): com.letta.mobile.data.secrets.request/AuthoredPurpose // com.letta.mobile.data.secrets.request/SecretRequestDetails.component3|component3(){}[0]
-    final fun copy(com.letta.mobile.data.model/AgentId = ..., com.letta.mobile.data.secrets.request/SecretRequestTarget = ..., com.letta.mobile.data.secrets.request/AuthoredPurpose = ...): com.letta.mobile.data.secrets.request/SecretRequestDetails // com.letta.mobile.data.secrets.request/SecretRequestDetails.copy|copy(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.secrets.request.SecretRequestTarget;com.letta.mobile.data.secrets.request.AuthoredPurpose){}[0]
+    final fun component4(): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestDetails.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.model/AgentId = ..., com.letta.mobile.data.secrets.request/SecretRequestTarget = ..., com.letta.mobile.data.secrets.request/AuthoredPurpose = ..., kotlin/Boolean = ...): com.letta.mobile.data.secrets.request/SecretRequestDetails // com.letta.mobile.data.secrets.request/SecretRequestDetails.copy|copy(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.secrets.request.SecretRequestTarget;com.letta.mobile.data.secrets.request.AuthoredPurpose;kotlin.Boolean){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestDetails.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestDetails.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestDetails.toString|toString(){}[0]
@@ -68420,7 +68431,7 @@ final class com.letta.mobile.data.transport.appserver/CompactProfileRuntimePolic
 }
 
 final class com.letta.mobile.data.transport.appserver/DefaultAppServerClient : com.letta.mobile.data.transport.appserver/AppServerClient { // com.letta.mobile.data.transport.appserver/DefaultAppServerClient|null[0]
-    constructor <init>(com.letta.mobile.data.transport.appserver/AppServerTransport, kotlin/Long = ..., kotlinx.coroutines/CoroutineScope? = ...) // com.letta.mobile.data.transport.appserver/DefaultAppServerClient.<init>|<init>(com.letta.mobile.data.transport.appserver.AppServerTransport;kotlin.Long;kotlinx.coroutines.CoroutineScope?){}[0]
+    constructor <init>(com.letta.mobile.data.transport.appserver/AppServerTransport, kotlin/Long = ..., kotlinx.coroutines/CoroutineScope? = ..., kotlin/Boolean = ...) // com.letta.mobile.data.transport.appserver/DefaultAppServerClient.<init>|<init>(com.letta.mobile.data.transport.appserver.AppServerTransport;kotlin.Long;kotlinx.coroutines.CoroutineScope?;kotlin.Boolean){}[0]
 
     final val events // com.letta.mobile.data.transport.appserver/DefaultAppServerClient.events|{}events[0]
         final fun <get-events>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.transport.appserver/AppServerReceivedFrame> // com.letta.mobile.data.transport.appserver/DefaultAppServerClient.events.<get-events>|<get-events>(){}[0]
@@ -68428,6 +68439,8 @@ final class com.letta.mobile.data.transport.appserver/DefaultAppServerClient : c
         final fun <get-isConnected>(): kotlinx.coroutines.flow/Flow<kotlin/Boolean> // com.letta.mobile.data.transport.appserver/DefaultAppServerClient.isConnected.<get-isConnected>|<get-isConnected>(){}[0]
     final val serverInfo // com.letta.mobile.data.transport.appserver/DefaultAppServerClient.serverInfo|{}serverInfo[0]
         final fun <get-serverInfo>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.transport.appserver/AppServerInfoData?> // com.letta.mobile.data.transport.appserver/DefaultAppServerClient.serverInfo.<get-serverInfo>|<get-serverInfo>(){}[0]
+    final val vouchesForRuntimeScope // com.letta.mobile.data.transport.appserver/DefaultAppServerClient.vouchesForRuntimeScope|{}vouchesForRuntimeScope[0]
+        final fun <get-vouchesForRuntimeScope>(): kotlin/Boolean // com.letta.mobile.data.transport.appserver/DefaultAppServerClient.vouchesForRuntimeScope.<get-vouchesForRuntimeScope>|<get-vouchesForRuntimeScope>(){}[0]
 
     final fun failPendingRequests(kotlin/String) // com.letta.mobile.data.transport.appserver/DefaultAppServerClient.failPendingRequests|failPendingRequests(kotlin.String){}[0]
     final suspend fun abort(com.letta.mobile.data.transport.appserver/AppServerCommand.AbortMessage): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AbortMessageResponse // com.letta.mobile.data.transport.appserver/DefaultAppServerClient.abort|abort(com.letta.mobile.data.transport.appserver.AppServerCommand.AbortMessage){}[0]
@@ -68497,6 +68510,8 @@ final class com.letta.mobile.data.transport.appserver/DualLaneAppServerClient : 
         final fun <get-isConnected>(): kotlinx.coroutines.flow/Flow<kotlin/Boolean> // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.isConnected.<get-isConnected>|<get-isConnected>(){}[0]
     final val serverInfo // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.serverInfo|{}serverInfo[0]
         final fun <get-serverInfo>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.transport.appserver/AppServerInfoData?> // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.serverInfo.<get-serverInfo>|<get-serverInfo>(){}[0]
+    final val vouchesForRuntimeScope // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.vouchesForRuntimeScope|{}vouchesForRuntimeScope[0]
+        final fun <get-vouchesForRuntimeScope>(): kotlin/Boolean // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.vouchesForRuntimeScope.<get-vouchesForRuntimeScope>|<get-vouchesForRuntimeScope>(){}[0]
 
     final suspend fun abort(com.letta.mobile.data.transport.appserver/AppServerCommand.AbortMessage): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AbortMessageResponse // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.abort|abort(com.letta.mobile.data.transport.appserver.AppServerCommand.AbortMessage){}[0]
     final suspend fun acknowledgeTurnFinished(com.letta.mobile.data.transport.appserver/AppServerCommand.TurnFinishedAck) // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.acknowledgeTurnFinished|acknowledgeTurnFinished(com.letta.mobile.data.transport.appserver.AppServerCommand.TurnFinishedAck){}[0]
@@ -77816,8 +77831,12 @@ final object com.letta.mobile.data.secrets.request/SecretRequestLifecycle { // c
 }
 
 final object com.letta.mobile.data.secrets.request/SecretRequestLimits { // com.letta.mobile.data.secrets.request/SecretRequestLimits|null[0]
+    final const val CREATION_WINDOW_MS // com.letta.mobile.data.secrets.request/SecretRequestLimits.CREATION_WINDOW_MS|{}CREATION_WINDOW_MS[0]
+        final fun <get-CREATION_WINDOW_MS>(): kotlin/Long // com.letta.mobile.data.secrets.request/SecretRequestLimits.CREATION_WINDOW_MS.<get-CREATION_WINDOW_MS>|<get-CREATION_WINDOW_MS>(){}[0]
     final const val DEFAULT_TTL_MS // com.letta.mobile.data.secrets.request/SecretRequestLimits.DEFAULT_TTL_MS|{}DEFAULT_TTL_MS[0]
         final fun <get-DEFAULT_TTL_MS>(): kotlin/Long // com.letta.mobile.data.secrets.request/SecretRequestLimits.DEFAULT_TTL_MS.<get-DEFAULT_TTL_MS>|<get-DEFAULT_TTL_MS>(){}[0]
+    final const val MAX_CREATED_PER_WINDOW // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_CREATED_PER_WINDOW|{}MAX_CREATED_PER_WINDOW[0]
+        final fun <get-MAX_CREATED_PER_WINDOW>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_CREATED_PER_WINDOW.<get-MAX_CREATED_PER_WINDOW>|<get-MAX_CREATED_PER_WINDOW>(){}[0]
     final const val MAX_ENDPOINT_LENGTH // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_ENDPOINT_LENGTH|{}MAX_ENDPOINT_LENGTH[0]
         final fun <get-MAX_ENDPOINT_LENGTH>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_ENDPOINT_LENGTH.<get-MAX_ENDPOINT_LENGTH>|<get-MAX_ENDPOINT_LENGTH>(){}[0]
     final const val MAX_FIELD_LENGTH // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_FIELD_LENGTH|{}MAX_FIELD_LENGTH[0]
@@ -77834,6 +77853,8 @@ final object com.letta.mobile.data.secrets.request/SecretRequestLimits { // com.
         final fun <get-MAX_PENDING_PER_AGENT>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_PENDING_PER_AGENT.<get-MAX_PENDING_PER_AGENT>|<get-MAX_PENDING_PER_AGENT>(){}[0]
     final const val MAX_PURPOSE_LENGTH // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_PURPOSE_LENGTH|{}MAX_PURPOSE_LENGTH[0]
         final fun <get-MAX_PURPOSE_LENGTH>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_PURPOSE_LENGTH.<get-MAX_PURPOSE_LENGTH>|<get-MAX_PURPOSE_LENGTH>(){}[0]
+    final const val MAX_SETTLED_PER_AGENT // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_SETTLED_PER_AGENT|{}MAX_SETTLED_PER_AGENT[0]
+        final fun <get-MAX_SETTLED_PER_AGENT>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_SETTLED_PER_AGENT.<get-MAX_SETTLED_PER_AGENT>|<get-MAX_SETTLED_PER_AGENT>(){}[0]
     final const val MAX_VALUE_BYTES // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_VALUE_BYTES|{}MAX_VALUE_BYTES[0]
         final fun <get-MAX_VALUE_BYTES>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_VALUE_BYTES.<get-MAX_VALUE_BYTES>|<get-MAX_VALUE_BYTES>(){}[0]
     final const val SETTLED_RETENTION_MS // com.letta.mobile.data.secrets.request/SecretRequestLimits.SETTLED_RETENTION_MS|{}SETTLED_RETENTION_MS[0]
