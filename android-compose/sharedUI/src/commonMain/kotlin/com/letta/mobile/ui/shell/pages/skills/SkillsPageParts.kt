@@ -131,7 +131,12 @@ internal fun SkillsPageRowContent(row: SkillsPageRow, page: SkillsPageScope) {
 /** A failed install / remove, with its own dismiss; the skills stay listed beneath it. */
 @Composable
 private fun ActionErrorNotice(message: String, page: SkillsPageScope) {
-    LettaInlineError(message, Modifier.testTag(SkillsPageTags.ACTION_ERROR), title = null, onDismiss = page.actions.onDismissSkillActionError)
+    LettaInlineError(
+        message,
+        Modifier.testTag(SkillsPageTags.ACTION_ERROR),
+        title = null,
+        onDismiss = page.actions.onDismissSkillActionError,
+    )
 }
 
 @Composable
