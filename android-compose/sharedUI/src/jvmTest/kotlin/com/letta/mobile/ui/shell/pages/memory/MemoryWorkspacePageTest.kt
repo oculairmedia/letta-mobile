@@ -50,7 +50,11 @@ class MemoryWorkspacePageTest {
         files = listOf(MemfsFile("system/persona.md", isSystem = true, description = null, sizeBytes = 12, kind = MemfsFileKind.Markdown)),
     )
 
-    private fun ComposeUiTest.show(view: MemoryWorkspaceView, host: LettaHost = LettaHost.Touch, files: MemfsPageState = this@MemoryWorkspacePageTest.files) {
+    private fun ComposeUiTest.show(
+        view: MemoryWorkspaceView,
+        host: LettaHost = LettaHost.Touch,
+        files: MemfsPageState = this@MemoryWorkspacePageTest.files,
+    ) {
         val binding = MemoryWorkspaceBinding(
             memory = MemoryPageState(),
             memoryActions = recording(),
