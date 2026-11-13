@@ -33,6 +33,23 @@ internal class SentRunTracker(private val ledger: SentRunLedger) {
         ledger.started(SentMessageId(sent), setOfNotNull(run, sameTurnRun).mapTo(mutableSetOf(), ::SentRunId))
     }
 
+    /** The send behind [sent] was accepted: rows the server stamps with it as their turn are its run's. */
+    fun accepted(sent: String) {
+        ledger.sent(SentMessageId(sent))
+    }
+
+    /**
+     * A live row of [turn] carried [run]: it joins the own run when [turn] is the send's own id or
+     * the turn its echo named.
+     */
+    fun row(turn: String?, run: String?) {
+        ledger.row(turn, run)
+        val sent = otid ?: return
+        val own = turnId ?: return
+        if (turn != own || run.isNullOrBlank()) return
+        ledger.started(SentMessageId(sent), setOf(SentRunId(run)))
+    }
+
     /** The state took [run] while on [currentTurn]: an id of the own run's turn joins its entry. */
     fun alias(run: String?, currentTurn: String?) {
         val sent = otid ?: return

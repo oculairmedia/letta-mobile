@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.update
 internal class SentRunLedger {
     private val runs = MutableStateFlow(SentMessageRuns())
     private val settledRuns = MutableStateFlow<Map<SentRunId, Boolean>>(emptyMap())
+    private val sentIds = MutableStateFlow<List<SentMessageId>>(emptyList())
 
     /** The published runs. */
     val state: StateFlow<SentMessageRuns> = runs.asStateFlow()
@@ -27,15 +28,35 @@ internal class SentRunLedger {
         runs.update { it.withStarted(id, ids) }
     }
 
+    /** This pipeline accepted a message under [id]: a row the server stamps with it as its turn is that message's run. */
+    fun sent(id: SentMessageId) {
+        sentIds.update { current -> (current - id + id).takeLast(MAX_SENT_MESSAGES) }
+    }
+
+    /**
+     * A live row of turn [turn] carried [run]. The host stamps every row of a turn with the client
+     * message id of the input that started it, so when [turn] is a message this pipeline sent,
+     * [run] is (an id of) that message's run. A row of any other turn is not ours and changes nothing.
+     */
+    fun row(turn: String?, run: String?) {
+        val id = turn?.takeIf { it.isNotBlank() }?.let(::SentMessageId) ?: return
+        val runId = run?.takeIf { it.isNotBlank() }?.let(::SentRunId) ?: return
+        if (id in sentIds.value) started(id, setOf(runId))
+    }
+
     /** The run [id] started has ended, as a failure when [failed]. */
     fun ended(id: SentMessageId, failed: Boolean) {
         runs.update { it.withEnded(id, failed) }
     }
 
-    /** A turn known by [ids] settled, as a failure when [failed], whoever's run it was. */
+    /**
+     * A turn known by [ids] settled, as a failure when [failed], whoever's run it was. A sent
+     * message whose run is one of [ids] has ended with it.
+     */
     fun settled(ids: Set<SentRunId>, failed: Boolean) {
         if (ids.isEmpty()) return
         settledRuns.update { current -> (current - ids + ids.associateWith { failed }).newest(MAX_SETTLED_RUNS) }
+        runs.update { it.withSettled(ids, failed) }
     }
 
     /**
@@ -86,6 +107,11 @@ internal fun SentMessageRuns.withEnded(id: SentMessageId, failed: Boolean): Sent
     val ids = started[id] ?: return this
     return copy(active = active - ids, failed = if (failed) this.failed + ids else this.failed)
 }
+
+/** Every entry whose run is one of the settled [ids] has ended, failed too when [failed]. */
+internal fun SentMessageRuns.withSettled(ids: Set<SentRunId>, failed: Boolean): SentMessageRuns =
+    started.entries.filter { (_, runIds) -> runIds.any { it in ids } }
+        .fold(this) { current, entry -> current.withEnded(entry.key, failed) }
 
 private fun SentMessageRuns.bounded(): SentMessageRuns {
     var current = this
