@@ -42,8 +42,10 @@ internal data class PlayerOptions(
  * when the line opened at another rate, and writes it in short chunks, reporting each chunk's
  * level. It returns once the line has played everything it was given.
  *
- * Cancelling stops at once: the cancelling coroutine aborts the line (stop and discard queued
- * audio), waits for the writer to exit and releases the line before the cancellation completes.
+ * Cancelling stops at once and never drains: the cancelling coroutine aborts the line (stop and
+ * discard queued audio) whatever the writer was doing (writing, or waiting for queued audio to play
+ * out), waits for the writer to exit and releases the line before the cancellation completes.
+ * Nothing is written after the abort.
  */
 internal class LinePcmPlayer(
     private val device: PcmOutputDevice,
@@ -54,12 +56,24 @@ internal class LinePcmPlayer(
         val line = withContext(options.dispatcher + NonCancellable) { device.open(PcmFormat(pcm.format.sampleRateHz)) }
         try {
             coroutineScope {
-                val writer = launch(options.dispatcher) { LineWriter(line, options, onLevel).playAll(pcm) }
+                var failure: VoiceAudioException? = null
+                val writer = launch(options.dispatcher) {
+                    try {
+                        LineWriter(line, options, onLevel).playAll(pcm)
+                    } catch (error: VoiceAudioException) {
+                        failure = error
+                    }
+                }
+                var ended = false
                 try {
                     writer.join()
+                    ended = !writer.isCancelled
                 } finally {
-                    if (!writer.isCompleted) line.abort()
+                    // A writer cancelled while waiting for the queue to play out may already have
+                    // completed here: the queued audio must still be discarded, not left to drain.
+                    if (!ended) line.abort()
                 }
+                failure?.let { throw it }
             }
         } finally {
             withContext(options.dispatcher + NonCancellable) { line.release() }

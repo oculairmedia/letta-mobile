@@ -41,7 +41,11 @@ import kotlin.time.Clock
  * [VoiceLoopConfig.releaseTimeout]). Speech while the app only waits for an answer interrupts
  * nothing: it is sent as a follow-up, and every answer is spoken in the order its utterance was
  * sent (at most [VoiceLoopConfig.maxPendingReplies] at once). A tap or a key while answering drops
- * every pending answer. [stop] works in every phase. A failed answer, an answer that produced no
+ * every pending answer. With [VoiceLoopConfig.voiceInterrupts] off (half-duplex, a microphone
+ * without echo cancellation) speech reported over the app's output never interrupts it; a tap or a
+ * key does. Answer text is held only while the person's turn is open
+ * ([com.letta.mobile.data.voice.engine.VoiceEarEvent.SpeechEnded] releases it), never while that
+ * turn is only being transcribed. [stop] works in every phase. A failed answer, an answer that produced no
  * text in time, or a failed segment of speech is reported in [VoiceLoopState.turnFailure] and the
  * loop goes on; microphone failures and engines that end or will not let go settle in FAILED with a
  * tagged error, and activating again starts over.
@@ -59,7 +63,8 @@ import kotlin.time.Clock
  *   awaited) before the ear opens, and a step that starts speech without barge-in closes the ear
  *   first; the ear stays open during speech only while barge-in keeps it open on purpose. A mouth
  *   that will not stop keeps the ear closed. The ear is told when output is playing
- *   ([com.letta.mobile.data.voice.engine.VoiceEar.setOutputActive]).
+ *   ([com.letta.mobile.data.voice.engine.VoiceEar.setOutputActive]): before the mouth is handed
+ *   speech, and that it ended only once a stop has returned (or the speech finished).
  * - Mouth failures name their segment; a failure for output already stopped is ignored.
  * - End of turn is the ear's decision; the loop has no silence timer. The only timer is the
  *   first-text timeout: it runs while an answer is open and has produced no text, in any phase

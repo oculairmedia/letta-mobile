@@ -2,8 +2,10 @@ package com.letta.mobile.data.voice.loop.machine
 
 import com.letta.mobile.data.voice.CapturedAudioHandle
 import com.letta.mobile.data.voice.SpeechSkipReason
+import com.letta.mobile.data.voice.SpeechStopReason
 import com.letta.mobile.data.voice.VoiceActionDecision
 import com.letta.mobile.data.voice.VoiceActionKind
+import com.letta.mobile.data.voice.VoiceConversationMode
 import com.letta.mobile.data.voice.VoiceDecision
 import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoiceErrorCode
@@ -146,7 +148,7 @@ class VoiceLoopMachineTest {
         val failed = speaking.then(LoopInput.FromMouth(VoiceMouthEvent.Failed(error, firstSegment)))
         assertEquals(error, failed.model.view.turnFailure)
         assertEquals(null, failed.model.view.failure)
-        assertTrue(LoopEffect.StopMouth in failed.effects)
+        assertTrue(LoopEffect.StopMouth(SpeechStopReason.MOUTH_FAILED) in failed.effects)
         assertTrue(LoopEffect.ReleaseReply(firstTurn) in failed.effects)
         assertTrue(LoopEffect.SpeechSkipped(SpeechSkipReason.MOUTH_FAILED, 1) in failed.effects)
     }
@@ -220,7 +222,7 @@ class VoiceLoopMachineTest {
         val barged = speaking.then(heard)
         assertEquals(VoicePhase.LISTENING, barged.model.phase)
         assertEquals(
-            listOf(LoopEffect.StopMouth, LoopEffect.SpeechSkipped(SpeechSkipReason.BARGE_IN, 1), LoopEffect.RequestInterrupt(firstTurn)),
+            listOf(LoopEffect.StopMouth(SpeechStopReason.BARGE_IN), LoopEffect.SpeechSkipped(SpeechSkipReason.BARGE_IN, 1), LoopEffect.RequestInterrupt(firstTurn)),
             barged.effects,
         )
         val next = barged.model.then(
@@ -271,5 +273,72 @@ class VoiceLoopMachineTest {
         assertEquals((2L..5L).map(::TurnKey), step.model.turn.replies.map { it.key })
         assertTrue(LoopEffect.ReleaseReply(firstTurn) in step.effects)
         assertTrue(LoopEffect.SpeechSkipped(SpeechSkipReason.PENDING_LIMIT, 1) in step.effects)
+    }
+
+    private val halfDuplex = idle.copy(config = VoiceLoopConfig(voiceInterrupts = false))
+
+    private val closed = LoopInput.FromEar(VoiceEarEvent.SpeechEnded)
+
+    @Test
+    fun halfDuplexSpeechReportedOverTheOutputInterruptsNothing() {
+        val speaking = halfDuplex.then(activate, endOfTurn(VoiceText("first")), segment(VoiceText("One."))).model
+        val step = speaking.then(heard)
+        assertEquals(VoicePhase.SPEAKING, step.model.phase)
+        assertTrue(step.effects.isEmpty())
+        assertEquals(false, step.model.turn.userSpeaking)
+        assertTrue(step.model.micWanted, "half-duplex keeps the microphone open; the ear ignores it during output")
+    }
+
+    @Test
+    fun aPressWhileSpeakingStopsPlaybackAndListensInEitherMode() {
+        listOf(idle, halfDuplex).forEach { start ->
+            val speaking = start.then(activate, endOfTurn(VoiceText("first")), segment(VoiceText("One."))).model
+            val pressed = speaking.then(activate)
+            assertEquals(VoicePhase.LISTENING, pressed.model.phase)
+            assertEquals(LoopEffect.StopMouth(SpeechStopReason.BUTTON), pressed.effects.first())
+            assertEquals(false, pressed.model.outputActive)
+            assertTrue(pressed.model.micWanted)
+        }
+    }
+
+    @Test
+    fun aFinishedAnswerHeldByAShortSoundIsSpokenWhenTheTurnClosesNotWhenItsTranscriptArrives() {
+        listOf(idle, halfDuplex).forEach { start ->
+            val holding = start.then(
+                activate,
+                endOfTurn(VoiceText("first")),
+                heard,
+                segment(VoiceText("One.")),
+                LoopInput.FromReply(firstTurn, ReplySignal.Completed),
+            )
+            assertEquals(emptyList(), said(holding.effects))
+            val released = holding.model.then(closed)
+            assertEquals(listOf("One."), said(released.effects))
+            assertEquals(VoicePhase.SPEAKING, released.model.phase)
+            assertEquals(1, released.model.turn.transcribing)
+            // The short sound transcribes to nothing: the answer plays on, untouched.
+            val nothing = released.model.then(endOfTurn(VoiceText("  ")))
+            assertTrue(nothing.effects.isEmpty())
+            assertEquals(VoicePhase.SPEAKING, nothing.model.phase)
+            assertEquals(0, nothing.model.turn.transcribing)
+        }
+    }
+
+    @Test
+    fun aTranscriptArrivingWhileTheReleasedAnswerPlaysIsAFollowUpNotABargeIn() {
+        val released = idle.then(activate, endOfTurn(VoiceText("first")), heard, segment(VoiceText("One.")), closed).model
+        val followUp = released.then(endOfTurn(VoiceText("and also")))
+        assertTrue(followUp.effects.none { it is LoopEffect.StopMouth || it is LoopEffect.RequestInterrupt })
+        assertEquals(listOf(LoopEffect.Respond(secondTurn, VoiceUtterance(VoiceText("and also")))), followUp.effects)
+        assertEquals(VoicePhase.SPEAKING, followUp.model.phase)
+        assertEquals(listOf(firstTurn, secondTurn), followUp.model.turn.replies.map { it.key })
+    }
+
+    @Test
+    fun aSingleShotKeepsListeningWhileTheClosedTurnIsTranscribed() {
+        val single = idle.copy(config = VoiceLoopConfig(mode = VoiceConversationMode.SINGLE_SHOT))
+        val step = single.then(activate, heard, closed)
+        assertEquals(VoicePhase.LISTENING, step.model.phase)
+        assertTrue(step.model.micWanted)
     }
 }

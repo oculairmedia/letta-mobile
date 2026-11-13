@@ -3,6 +3,7 @@ package com.letta.mobile.data.voice.loop.machine
 import com.letta.mobile.data.voice.AudioLevel
 import com.letta.mobile.data.voice.CapturedAudioHandle
 import com.letta.mobile.data.voice.SpeechSkipReason
+import com.letta.mobile.data.voice.SpeechStopReason
 import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoiceLoopConfig
 import com.letta.mobile.data.voice.VoicePhase
@@ -41,8 +42,13 @@ internal data class PendingReply(
 internal data class TurnState(
     /** Answers awaited or being spoken, in send order; the head is spoken next (or now). */
     val replies: List<PendingReply> = emptyList(),
-    /** The ear reported speech in this listening window and no end of turn yet. */
+    /**
+     * The ear reported speech and the turn is still open (the person is talking). Reply speech is
+     * held only while this is true.
+     */
     val userSpeaking: Boolean = false,
+    /** Turns of the person's that closed and whose transcript has not arrived yet; they hold nothing back. */
+    val transcribing: Int = 0,
     /** Interrupted turns whose answers may still arrive; their text is dropped. */
     val interrupting: Set<TurnKey> = emptySet(),
     /** An interrupt was not confirmed in time. */
@@ -207,8 +213,8 @@ internal sealed interface LoopEffect {
     /** Hand [segment] to the mouth. */
     data class Speak(val segment: SpeechSegment) : LoopEffect
 
-    /** Stop the mouth and wait (bounded) until it has stopped. */
-    data object StopMouth : LoopEffect
+    /** Stop the mouth for [reason] and wait (bounded) until it has stopped. */
+    data class StopMouth(val reason: SpeechStopReason) : LoopEffect
 
     /** Tell the mouth no more text is coming for now. */
     data object FlushMouth : LoopEffect

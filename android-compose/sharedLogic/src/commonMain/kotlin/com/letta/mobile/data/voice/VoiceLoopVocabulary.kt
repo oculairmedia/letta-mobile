@@ -62,12 +62,36 @@ enum class SpeechSkipReason {
     TIMED_OUT,
 }
 
+/** Why the app's speech was stopped before it finished. */
+enum class SpeechStopReason {
+    /** The person pressed to interrupt (the voice button, a key, the strip's control). */
+    BUTTON,
+
+    /** The person spoke over it. */
+    BARGE_IN,
+
+    /** Voice mode stopped (a stop, a conversation change, a failure the loop cannot go on after). */
+    MODE_STOPPED,
+
+    /** Speaking failed; the mouth was reset. */
+    MOUTH_FAILED,
+
+    /** The answer produced no text in time; its own immediate reply was stopped. */
+    TIMED_OUT,
+}
+
 /** How the loop behaves. */
 data class VoiceLoopConfig(
     /** Single shot or continuous conversation. */
     val mode: VoiceConversationMode = VoiceConversationMode.CONTINUOUS,
-    /** Whether speech while the app speaks interrupts it (keeps the microphone open while speaking). */
+    /** Whether the microphone stays open while answering (for follow-ups and, with [voiceInterrupts], barge-in). */
     val bargeIn: Boolean = true,
+    /**
+     * Whether speech heard while the app speaks interrupts it. Turn it off where the microphone is
+     * not echo-cancelled (half-duplex): the ear then ignores the microphone during output, speech
+     * reported over the output never stops it, and the person interrupts with a press instead.
+     */
+    val voiceInterrupts: Boolean = true,
     /** What happens to replies that arrive after the loop went back to listening. */
     val lateReplies: LateReplyPolicy = LateReplyPolicy.SPEAK_WHEN_QUIET,
     /** Longest wait from sending an utterance to the first reply text. */

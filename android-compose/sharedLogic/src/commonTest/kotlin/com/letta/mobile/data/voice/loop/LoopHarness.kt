@@ -1,6 +1,7 @@
 package com.letta.mobile.data.voice.loop
 
 import com.letta.mobile.data.voice.SpeechSkipReason
+import com.letta.mobile.data.voice.SpeechStopReason
 import com.letta.mobile.data.voice.VoiceLoopConfig
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.activation.VoiceActivationKind
@@ -11,6 +12,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 /** A loop over scripted fakes on the test scheduler, owned by [owner] (the test's background scope by default). */
@@ -22,6 +24,9 @@ internal class LoopHarness(
 ) {
     /** Every speech.skipped decision the loop reported, as "REASON:segments". */
     val skipped = mutableListOf<String>()
+
+    /** Every confirmed stop of the mouth the loop reported, by reason. */
+    val stopped = mutableListOf<SpeechStopReason>()
     val log = EngineLog()
     val ear = FakeEar(log)
     val mouth = FakeMouth(log)
@@ -35,6 +40,10 @@ internal class LoopHarness(
         VoiceLoopRuntime(owner, StandardTestDispatcher(test.testScheduler), clock, observer = object : VoiceLoopObserver {
             override fun speechSkipped(reason: SpeechSkipReason, segments: Int) {
                 skipped += "${reason.name}:$segments"
+            }
+
+            override fun speechStopped(reason: SpeechStopReason, silentAfter: Duration) {
+                stopped += reason
             }
         }),
     )

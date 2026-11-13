@@ -64,11 +64,14 @@ internal class LoopEffectRunner(private val wiring: LoopWiring) {
         val model = step.model
         val faults = mutableListOf<LoopInput>()
         if (!model.micWanted) ear.reconcile(model)?.let(faults::add)
+        // Output starting is reported before the mouth is handed anything; output ending only after
+        // the stop below has returned (the speaker is silent).
+        if (model.outputActive) ear.reportOutput(true)?.let(faults::add)
         step.effects.filterNot(ear::handles).forEach { effect ->
             if (faults.isEmpty() || !effect.startsOutput()) execute(effect)?.let(faults::add)
         }
         if (faults.isEmpty()) faults += openEar(step)
-        ear.reportOutput(model)?.let(faults::add)
+        ear.reportOutput(model.outputActive || mouth.holding)?.let(faults::add)
         reconcileTimer(model)
         return faults
     }
@@ -107,7 +110,7 @@ internal class LoopEffectRunner(private val wiring: LoopWiring) {
     private suspend fun mouthEffect(effect: LoopEffect): LoopInput? = when (effect) {
         is LoopEffect.Speak -> mouth.speak(effect.segment)
         LoopEffect.FlushMouth -> mouth.flush()
-        LoopEffect.StopMouth -> mouth.stop()
+        is LoopEffect.StopMouth -> mouth.stop(effect.reason)
         is LoopEffect.SpeechSkipped -> report(effect)
         else -> null
     }

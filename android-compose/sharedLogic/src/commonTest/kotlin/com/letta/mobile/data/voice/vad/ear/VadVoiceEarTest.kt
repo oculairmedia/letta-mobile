@@ -29,7 +29,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-private fun VadVoiceEar.turns(): Flow<VoiceEarEvent> = listen().filterNot { it is VoiceEarEvent.InputLevel }
+private fun VadVoiceEar.turns(): Flow<VoiceEarEvent> =
+    listen().filterNot { it is VoiceEarEvent.InputLevel || it == VoiceEarEvent.SpeechEnded }
 
 private fun said(words: String) = VoiceEarEvent.EndOfTurn(VoiceUtterance(VoiceText(words)))
 

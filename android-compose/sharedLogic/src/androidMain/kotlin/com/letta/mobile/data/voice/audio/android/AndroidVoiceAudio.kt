@@ -9,7 +9,8 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Voice mode's audio on Android ([AndroidAudio]): `AudioRecord` on the communication path, so echo
- * cancellation lets the person talk over the reply, and `AudioTrack` with assistant usage. Capture
+ * cancellation lets the person talk over the reply (the microphone reports `echoCancelled` when the
+ * device offers the canceller), and `AudioTrack` with assistant usage. Capture
  * fails with PERMISSION_REQUIRED until `RECORD_AUDIO` is granted.
  */
 class AndroidVoiceAudio(context: Context) : VoiceAudio {

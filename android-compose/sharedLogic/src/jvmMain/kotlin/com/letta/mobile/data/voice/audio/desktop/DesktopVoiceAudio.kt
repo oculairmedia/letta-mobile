@@ -6,7 +6,11 @@ import com.letta.mobile.data.voice.audio.AudioPlayer
 import com.letta.mobile.data.voice.session.VoiceAudio
 import kotlinx.coroutines.flow.Flow
 
-/** Voice mode's audio on the desktop: the default Java Sound microphone and speaker ([DesktopAudio]). */
+/**
+ * Voice mode's audio on the desktop: the default Java Sound microphone and speaker ([DesktopAudio]).
+ * Java Sound has no echo cancellation, so the microphone reports `echoCancelled = false` and voice
+ * mode is half-duplex unless the person turns on interrupting by speaking (with headphones).
+ */
 object DesktopVoiceAudio : VoiceAudio {
     override fun microphone(format: AudioFrameFormat): AudioFrameSource = DesktopAudio.frameSource(format)
 

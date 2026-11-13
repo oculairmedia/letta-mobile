@@ -15,6 +15,8 @@ import com.letta.mobile.data.voice.vad.SpeechDetectorFactory
 import com.letta.mobile.data.voice.vad.VadSensitivity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Turns captured audio into text. Failures are thrown: a
@@ -47,9 +49,25 @@ data class VadEarConfig(
     val transcripts: TranscriptPolicy = TranscriptPolicy(),
     /** Hears the ear's turn decisions, for diagnostics. */
     val observer: EarObserver = EarObserver.None,
+    /**
+     * Half-duplex, for a microphone without echo cancellation: while the app's output is active
+     * ([VadVoiceEar.setOutputActive]) and for [outputTail] after it ends, the microphone is ignored
+     * altogether (no turn opens, nothing is kept for transcription, no barge-in). Off: the echo
+     * guard's raised thresholds apply instead, and speech over the output interrupts it.
+     */
+    val halfDuplex: Boolean = false,
+    /** Half-duplex: how long after the output ends the microphone is still ignored (room reverb, device latency). */
+    val outputTail: Duration = DEFAULT_OUTPUT_TAIL,
 ) {
     init {
         require(format.channels == 1) { "The voice-activity ear listens to mono audio" }
+        require(!outputTail.isNegative()) { "Negative output tail" }
+    }
+
+    /** Defaults. */
+    companion object {
+        /** Twelve 32 ms frames: covers room reverb and the output device's own latency. */
+        val DEFAULT_OUTPUT_TAIL: Duration = 384.milliseconds
     }
 }
 
@@ -63,8 +81,15 @@ data class VadEarConfig(
  *
  * Events: [VoiceEarEvent.ListeningStarted] with the first frame, [VoiceEarEvent.InputLevel] per
  * frame, [VoiceEarEvent.SpeechStarted] once speech has lasted the policy's minimum (the barge-in
- * signal; raised thresholds while [setOutputActive] is true), [VoiceEarEvent.EndOfTurn] after
- * transcription, and [VoiceEarEvent.Failed].
+ * signal; raised thresholds while [setOutputActive] is true), [VoiceEarEvent.SpeechEnded] when the
+ * turn closes, [VoiceEarEvent.EndOfTurn] after transcription, and [VoiceEarEvent.Failed].
+ *
+ * Half-duplex ([VadEarConfig.halfDuplex]): while output is active and for the tail after it, input
+ * is ignored (levels report silent) and a turn that was open when output started is dropped, ending
+ * as an empty utterance. Independently, a captured turn is handed to transcription only if its
+ * audio overlaps no output window (nor output active right now); otherwise it is dropped as
+ * [com.letta.mobile.data.voice.vad.TurnDiscardReason.OUTPUT_ACTIVE] and ends as an empty
+ * utterance, so the app can never transcribe and send its own speech.
  *
  * Kept audio: a turn whose transcription failed is kept, in memory only and bounded by the hard
  * cap, under the handle its [VoiceEarEvent.Failed] offers, until the first of: [retry] takes it (one

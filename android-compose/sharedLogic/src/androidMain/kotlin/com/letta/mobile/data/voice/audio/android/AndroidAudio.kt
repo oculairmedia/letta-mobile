@@ -5,6 +5,7 @@ import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.media.audiofx.AcousticEchoCanceler
 import com.letta.mobile.data.voice.AudioLevel
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.audio.AudioCapture
@@ -60,11 +61,16 @@ data class CaptureEffects(
     val noiseSuppressor: Boolean = false,
 )
 
-/** An Android microphone frame source that also reports which capture effects are active while it is open. */
+/**
+ * An Android microphone frame source that also reports which capture effects are active while it
+ * is open. [echoCancelled] is true on the COMMUNICATION path when the device offers acoustic echo
+ * cancellation (the source attaches and enables it on every open).
+ */
 class AndroidFrameSource internal constructor(
     private val delegate: MeteredFrameSource,
     /** The effects running now; all false while closed or in RECOGNITION mode. */
     val effects: StateFlow<CaptureEffects>,
+    override val echoCancelled: Boolean = false,
 ) : MeteredFrameSource by delegate
 
 /**
@@ -86,7 +92,8 @@ class AndroidAudio(private val context: Context) {
     ): AndroidFrameSource {
         val effects = MutableStateFlow(CaptureEffects())
         val source = LineFrameSource(AudioRecordInputDevice(context, options, effects), format)
-        return AndroidFrameSource(source, effects.asStateFlow())
+        val echoCancelled = options.mode == AndroidCaptureMode.COMMUNICATION && echoCancellerAvailable()
+        return AndroidFrameSource(source, effects.asStateFlow(), echoCancelled)
     }
 
     /** [AudioCapture] on the same microphone path as [frameSource]. */
@@ -121,6 +128,9 @@ class AndroidAudio(private val context: Context) {
         awaitClose { manager.unregisterAudioDeviceCallback(callback) }
     }
 }
+
+/** Whether the device offers an acoustic echo canceller; a platform that throws counts as none. */
+private fun echoCancellerAvailable(): Boolean = runCatching { AcousticEchoCanceler.isAvailable() }.getOrDefault(false)
 
 /** Holds transient, duck-allowing audio focus around each clip; a focus loss stops the clip. */
 internal class FocusedPlayer(private val delegate: AudioPlayer, private val manager: AudioManager) : AudioPlayer {

@@ -64,6 +64,8 @@ class RecoveringFrameSource(
 ) : AudioFrameSource {
     override val format: AudioFrameFormat get() = source.format
 
+    override val echoCancelled: Boolean get() = source.echoCancelled
+
     override fun frames(): Flow<AudioFrame> = flow { RecoveryRun().run(this) }
 
     private inner class RecoveryRun {

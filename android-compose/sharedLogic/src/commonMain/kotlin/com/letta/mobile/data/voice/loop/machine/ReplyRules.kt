@@ -2,6 +2,7 @@ package com.letta.mobile.data.voice.loop.machine
 
 import com.letta.mobile.data.voice.LateReplyPolicy
 import com.letta.mobile.data.voice.SpeechSkipReason
+import com.letta.mobile.data.voice.SpeechStopReason
 import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoicePhase
@@ -135,7 +136,7 @@ internal object Recovery {
     fun timedOut(model: LoopModel, head: PendingReply): Step {
         val ownSpeech = model.outputActive && model.speech.owner == head.key
         val effects = buildList {
-            if (ownSpeech) add(LoopEffect.StopMouth)
+            if (ownSpeech) add(LoopEffect.StopMouth(SpeechStopReason.TIMED_OUT))
             add(LoopEffect.RequestInterrupt(head.key))
         }
         val stopped = model.withTurn { without(head.key).copy(interrupting = interrupting + head.key) }

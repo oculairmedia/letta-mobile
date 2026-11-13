@@ -2,6 +2,7 @@ package com.letta.mobile.data.voice.loop.machine
 
 import com.letta.mobile.data.voice.AudioLevel
 import com.letta.mobile.data.voice.SpeechSkipReason
+import com.letta.mobile.data.voice.SpeechStopReason
 import com.letta.mobile.data.voice.VoiceDecision
 import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoicePhase
@@ -16,6 +17,7 @@ internal object EarRules {
         is VoiceEarEvent.InputLevel -> Step(model.withView { copy(inputLevel = event.level) })
         is VoiceEarEvent.PartialTranscript -> Step(model.withView { copy(transcript = event.text) })
         VoiceEarEvent.SpeechStarted -> speechStarted(model)
+        VoiceEarEvent.SpeechEnded -> speechEnded(model)
         is VoiceEarEvent.EndOfTurn -> endOfTurn(model, event.utterance)
         is VoiceEarEvent.Failed -> Transitions.fail(model, event.error).let { step ->
             step.copy(model = step.model.withView { copy(retryable = event.retry) })
@@ -29,21 +31,50 @@ internal object EarRules {
     }
 
     /**
-     * Speech over the answer being spoken interrupts it (barge-in). While the loop only waits for an
+     * Speech over the answer being spoken interrupts it (barge-in), unless interrupting by voice is
+     * off (half-duplex: the ear should not report speech over the output at all, and if it does, it
+     * is not the person to be trusted over the app's own echo). While the loop only waits for an
      * answer nothing is interrupted: the person is starting a follow-up, and answer text that
-     * arrives meanwhile is held until they finish.
+     * arrives meanwhile is held until their turn closes.
      */
     private fun speechStarted(model: LoopModel): Step = when (model.phase) {
-        VoicePhase.SPEAKING -> Interrupts.bargeIn(model)
+        VoicePhase.SPEAKING -> if (model.config.voiceInterrupts) Interrupts.bargeIn(model) else Step(model)
         VoicePhase.LISTENING, VoicePhase.THINKING ->
             Step(model.withTurn { copy(userSpeaking = true) }.withView { copy(retryable = null) })
         else -> Step(model)
     }
 
-    private fun endOfTurn(model: LoopModel, utterance: VoiceUtterance): Step = when (model.phase) {
-        VoicePhase.LISTENING, VoicePhase.THINKING -> Turns.start(model, utterance)
-        VoicePhase.SPEAKING -> Interrupts.bargeIn(model).let { step -> Turns.start(step.model, utterance).after(step.effects) }
-        else -> Step(model)
+    /**
+     * The person's turn closed; only its transcript is still to come. Held answer text is released
+     * now rather than when the transcript arrives: a short sound that opened a turn must not hold a
+     * finished answer back for the length of a transcription. If the turn was real speech, its
+     * transcript arrives as a follow-up and is answered after.
+     */
+    private fun speechEnded(model: LoopModel): Step {
+        if (!model.turn.userSpeaking) return Step(model)
+        val ended = model.withTurn { copy(userSpeaking = false, transcribing = transcribing + 1) }
+        val waiting = ended.turn.head != null || ended.late.held.isNotEmpty()
+        val answering = ended.phase == VoicePhase.LISTENING || ended.phase == VoicePhase.THINKING
+        return if (waiting && answering) Transitions.maybeFinish(ended) else Step(ended)
+    }
+
+    /**
+     * A transcript arrived. While the app speaks it is a follow-up (its turn closed before the
+     * speech started) and is answered after; only an end of turn the loop never saw start, from an
+     * ear that reports no start, still interrupts by voice where that is on.
+     */
+    private fun endOfTurn(model: LoopModel, utterance: VoiceUtterance): Step {
+        val unannounced = !model.turn.userSpeaking && model.turn.transcribing == 0
+        val heard = model.withTurn { if (transcribing > 0) copy(transcribing = transcribing - 1) else copy(userSpeaking = false) }
+        return when (model.phase) {
+            VoicePhase.LISTENING, VoicePhase.THINKING -> Turns.start(heard, utterance)
+            VoicePhase.SPEAKING -> if (model.config.voiceInterrupts && unannounced) {
+                Interrupts.bargeIn(heard).let { step -> Turns.start(step.model.withTurn { copy(userSpeaking = false) }, utterance).after(step.effects) }
+            } else {
+                Turns.start(heard, utterance)
+            }
+            else -> Step(model)
+        }
     }
 }
 
@@ -51,7 +82,7 @@ internal object EarRules {
 internal object Turns {
     /** Starts answering [utterance] (nothing for an empty one), then lets the pending answers move on. */
     fun start(model: LoopModel, utterance: VoiceUtterance): Step {
-        val heard = model.withTurn { copy(userSpeaking = false) }.withView { copy(transcript = utterance.text) }
+        val heard = model.withView { copy(transcript = utterance.text) }
         if (utterance.isEmpty) return Transitions.maybeFinish(heard)
         val key = TurnKey(heard.turn.nextKey)
         val answered = utterance.decision != VoiceDecision.AnsweredByEar
@@ -109,7 +140,7 @@ internal object MouthRules {
     private fun failed(model: LoopModel, error: VoiceError): Step {
         val speaking = model.speech.owner?.let(model.turn::find)
         val effects = buildList {
-            add(LoopEffect.StopMouth)
+            add(LoopEffect.StopMouth(SpeechStopReason.MOUTH_FAILED))
             addAll(skipped(SpeechSkipReason.MOUTH_FAILED, model.speech.outstanding.size))
             speaking?.let { add(LoopEffect.ReleaseReply(it.key)) }
         }

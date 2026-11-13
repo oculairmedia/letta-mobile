@@ -2,6 +2,7 @@ package com.letta.mobile.data.voice.loop.machine
 
 import com.letta.mobile.data.voice.AudioLevel
 import com.letta.mobile.data.voice.SpeechSkipReason
+import com.letta.mobile.data.voice.SpeechStopReason
 import com.letta.mobile.data.voice.VoiceConversationMode
 import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoicePhase
@@ -36,7 +37,7 @@ internal object Transitions {
     /** Stops everything and settles in [phase] (IDLE or FAILED), reporting [failure]. */
     fun halt(model: LoopModel, phase: VoicePhase, failure: VoiceError?): Step {
         val effects = buildList {
-            if (model.outputActive) add(LoopEffect.StopMouth)
+            if (model.outputActive) add(LoopEffect.StopMouth(SpeechStopReason.MODE_STOPPED))
             if (model.hasAnswers()) add(LoopEffect.CancelAllReplies)
         }
         val halted = model.copy(
@@ -88,8 +89,9 @@ internal object Transitions {
     /**
      * The next pending answer takes its turn once nothing is playing: answers that ended with
      * nothing to say are dropped, an answer holding text is spoken, an open one is awaited in
-     * THINKING, and with none left the turn is over. While the person is speaking nothing starts
-     * (with nothing left to await, the loop shows that it is listening to them).
+     * THINKING, and with none left the turn is over. While the person is speaking (their turn is
+     * open) nothing starts (with nothing left to await, the loop shows that it is listening to
+     * them); a turn that has closed and is only being transcribed holds nothing back.
      */
     fun resume(model: LoopModel): Step {
         val head = model.turn.head
@@ -117,9 +119,11 @@ internal object Transitions {
         }
     }
 
-    private fun restingPhase(model: LoopModel): VoicePhase = when (model.config.mode) {
-        VoiceConversationMode.CONTINUOUS -> VoicePhase.LISTENING
-        VoiceConversationMode.SINGLE_SHOT -> VoicePhase.IDLE
+    /** Listening again; a single shot goes idle, but not while the person's last turn is still being transcribed. */
+    private fun restingPhase(model: LoopModel): VoicePhase = when {
+        model.turn.transcribing > 0 -> VoicePhase.LISTENING
+        model.config.mode == VoiceConversationMode.CONTINUOUS -> VoicePhase.LISTENING
+        else -> VoicePhase.IDLE
     }
 }
 
@@ -133,7 +137,7 @@ internal object Interrupts {
     fun bargeIn(model: LoopModel): Step {
         val speaking = model.speech.owner?.let(model.turn::find)
         val effects = buildList {
-            if (model.outputActive) add(LoopEffect.StopMouth)
+            if (model.outputActive) add(LoopEffect.StopMouth(SpeechStopReason.BARGE_IN))
             addAll(skipped(SpeechSkipReason.BARGE_IN, model.speech.outstanding.size))
             speaking?.let { add(LoopEffect.RequestInterrupt(it.key)) }
         }
@@ -151,7 +155,7 @@ internal object Interrupts {
         val open = replies.filter { it.open }
         val dropped = model.speech.outstanding.size + replies.sumOf { it.held.size }
         val effects = buildList {
-            if (model.outputActive) add(LoopEffect.StopMouth)
+            if (model.outputActive) add(LoopEffect.StopMouth(SpeechStopReason.BUTTON))
             addAll(skipped(SpeechSkipReason.INTERRUPTED, dropped))
             open.forEach { add(LoopEffect.RequestInterrupt(it.key)) }
         }

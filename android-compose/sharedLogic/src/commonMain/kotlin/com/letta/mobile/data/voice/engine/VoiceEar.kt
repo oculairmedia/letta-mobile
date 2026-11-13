@@ -34,9 +34,11 @@ interface VoiceEar {
     fun commitTurn()
 
     /**
-     * Echo-suppression hook: true while the app's own speech is playing. An engine can apply echo
-     * cancellation or raise its speech threshold so it does not hear the app (self-barge-in).
-     * The loop only reports the fact; it does not filter audio.
+     * Echo-suppression hook: true while the app's own speech is queued or playing, false once the
+     * mouth has confirmed it stopped (so the speaker is silent). An engine can apply echo
+     * cancellation, raise its speech threshold so it does not hear the app (self-barge-in), or
+     * ignore the microphone altogether (half-duplex). The loop only reports the fact; it does not
+     * filter audio.
      */
     fun setOutputActive(active: Boolean) = Unit
 
@@ -67,6 +69,13 @@ sealed interface VoiceEarEvent {
 
     /** The person started speaking. While the app is speaking this is a barge-in. */
     data object SpeechStarted : VoiceEarEvent
+
+    /**
+     * The person stopped speaking: the turn is closed and its [EndOfTurn] follows once it has been
+     * transcribed (possibly as an empty utterance). An ear that decides end of turn and transcript
+     * together may skip it.
+     */
+    data object SpeechEnded : VoiceEarEvent
 
     /** The ear decided the person finished a turn. */
     data class EndOfTurn(
