@@ -24,7 +24,7 @@ REASON_MIN_LENGTH = 20
 SAFE_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/~^-]{0,199}")
 COMMIT_SHA = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 KOTLIN_TOKEN = re.compile(r'//[^\n]*|/\*[\s\S]*?\*/|"""[\s\S]*?"""|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'')
-KOTLIN_CLASS = re.compile(r"\b(?:class|object|interface)\s+([A-Za-z_]\w*)\b[^{}]*\{")
+KOTLIN_CLASS = re.compile(r"\b(?:class|object|interface)\s+([A-Za-z_]\w*)\b")
 KOTLIN_TEST = re.compile(r"@(?:[\w.]+\.)?Test\b(?:(?!\b(?:fun|class|object|interface)\b|[{};])[\s\S])*?\bfun\s+(?:<[^>]+>\s*)?(`[^`]+`|[A-Za-z_]\w*)\s*\(")
 KOTLIN_SKIP = re.compile(r'@(?:[\w.]+\.)?(Ignore|Disabled)\b|@(?:[\w.]+\.)?Suppress\s*\([^)]*\bUNUSED_STRING\b[^)]*\)|\.\s*(skip)\b')
 CALL = re.compile(r"\b([A-Za-z_]\w*)\s*\(")
@@ -69,11 +69,37 @@ def clean_kotlin_token(match):
     return ('UNUSED' + ' ' * (len(token) - 6)) if token == '"unused"' else re.sub(r"[^\n]", " ", token)
 
 
+def class_body_start(text, start):
+    depth = 0
+    pos = start
+    while pos < len(text):
+        char = text[pos]
+        if char in "([<":
+            depth += 1
+        elif char in ")]>":
+            depth = max(0, depth - 1)
+        elif depth == 0:
+            if char == "{":
+                return pos
+            if char in "};=":
+                return None
+            if char == "\n":
+                previous = text[start:pos].rstrip()
+                following = text[pos + 1:].lstrip()
+                if not (previous.endswith((":", ",", "(")) or following.startswith((":", ",", "(", "{", "where "))):
+                    return None
+        pos += 1
+    return None
+
+
 def kotlin_classes(text):
     classes = []
     for match in KOTLIN_CLASS.finditer(text):
+        body = class_body_start(text, match.end())
+        if body is None:
+            continue
         depth = 1
-        pos = match.end()
+        pos = body + 1
         while pos < len(text) and depth:
             depth += (text[pos] == "{") - (text[pos] == "}")
             pos += 1
