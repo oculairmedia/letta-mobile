@@ -86,8 +86,11 @@ Decided by the host from its own records only, never from params or document con
   canvas with no known owner is visible only without agent scope. A canvas the host does not have is
   visible to no one.
 
-A canvas that does not exist and one the caller may not see are denied identically. Any failed
-lookup denies; it is reported as `unavailable` / `authority`, never as a policy answer.
+A canvas that does not exist and one the caller may not see are denied identically, and take the
+same conversation owner lookup. While judging a proposed canvas (bind, replace, default.set) a
+failed lookup is that same `canvas.mount.denied`, never `unavailable`, so a probe learns nothing
+from it. Any other failed lookup (addressing, the winner check, a candidates listing) denies and is
+reported as `unavailable` / `authority`; `unavailable` / `storage` is the mount store's own failure.
 
 ## Params
 

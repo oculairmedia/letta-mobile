@@ -20,7 +20,8 @@ internal sealed interface CanvasOwnership {
 /**
  * The host's canvas records the mount visibility rule (owner decision D3) reads: its canvas directory, its relay
  * store and its conversation records. Request fields and document content (titles, ACLs inside a scene) are never
- * consulted. A failed lookup throws; the authority then answers `unavailable` / `authority`.
+ * consulted. A failed lookup throws; the authority then denies a proposal, and answers any other check
+ * `unavailable` / `authority`.
  */
 class CanvasMountCatalog(
     /** The host's agent canvas directory (`host-canvases.json`), written only by the host canvas tools. */
@@ -33,15 +34,18 @@ class CanvasMountCatalog(
      * by the agents its ACL names as writers (the creating agent, stamped by the runtime); a conversation's canonical
      * canvas the relay has bound is owned by that conversation's agent; any other canvas the relay has bound has no
      * known owner; anything else does not exist.
+     *
+     * The conversation owner lookup (the only one that leaves the host) runs before existence is decided, for the
+     * entry's conversation or else the conversation a canonical-shaped id names, so a missing canvas and another
+     * agent's take the same path and fail the same way.
      */
     internal suspend fun ownership(canvas: CanvasId, directory: CanvasMountDirectory): CanvasOwnership {
-        canvases.get(canvas)?.let { entry ->
-            val conversation = entry.conversationId?.let(::ConversationId)
-            return if (conversation != null) owned(directory.ownerOf(conversation)) else writers(entry.acl.writerAgentIds)
-        }
-        val conversation = conversationOf(canvas)
+        val entry = canvases.get(canvas)
+        val conversation = entry?.conversationId?.let(::ConversationId) ?: conversationOf(canvas)
+        val owner = conversation?.let { directory.ownerOf(it) }
+        if (entry != null) return if (entry.conversationId != null) owned(owner) else writers(entry.acl.writerAgentIds)
         if (conversation != null && relay.boundCanvas(CanvasRelayProtocol.conversationTopic(conversation)) == canvas) {
-            return owned(directory.ownerOf(conversation))
+            return owned(owner)
         }
         val bound = relay.boundCanvas(CanvasRelayProtocol.canvasTopic(canvas)) == canvas
         return if (bound) CanvasOwnership.Owned(emptySet()) else CanvasOwnership.Absent

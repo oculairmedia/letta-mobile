@@ -92,7 +92,9 @@ internal class CanvasMountCallTrace {
 
 /**
  * The host's mount policy for one call, built from the verified [connection] only. Every answer is ALLOW only on
- * positive evidence; any failed lookup abstains (deny) and is recorded in [trace].
+ * positive evidence; any failed lookup abstains (deny) and is recorded in [trace], except while judging a PROPOSED
+ * canvas ([mayPropose]): there a failed lookup is the same plain denial as a canvas the caller may not see or the
+ * host does not have, so a probe cannot tell those apart by the answer.
  *
  * - Address: the request's principal is the connection's; the agent is in the peer's agent scope; for a binding,
  *   the conversation is in its conversation scope and the host's [directory] says the agent owns it.
@@ -105,8 +107,10 @@ internal class CanvasMountCallTrace {
  * Visibility (owner decision D3): a binding's own conversation canvas is visible to a caller allowed to address that
  * binding while the catalog shows that id unused or held through the binding's own conversation
  * ([CanvasMountCatalog.canonicalHeldBy]); otherwise it is judged like any other canvas. Any other canvas must exist
- * on this host and be owned by an agent in the connection's agent scope ([CanvasMountCatalog.ownership]). A canvas with no known owner is visible only with unrestricted agent
- * scope, and a canvas the host does not have is visible to no one, so both deny exactly like any other denial.
+ * on this host and be owned by an agent in the connection's agent scope ([CanvasMountCatalog.ownership], which makes
+ * the same owner lookup whether or not the canvas exists). A canvas with no known owner is visible only with
+ * unrestricted agent scope, and a canvas the host does not have is visible to no one, so both deny exactly like any
+ * other denial.
  */
 internal class HostCanvasMountAuthority(
     private val connection: CanvasMountConnection,
@@ -124,17 +128,19 @@ internal class HostCanvasMountAuthority(
         }
 
     override suspend fun mayPropose(request: CanvasMountRequest<CanvasMountScope>, proposed: CanvasId): CanvasMountDecision {
-        val decision = decide(request) { scope -> proposal(scope, proposed) }
+        val decision = decide(request) { scope -> proposal(scope, proposed, failureDenies = true) }
         if (decision == CanvasMountDecision.ALLOW) trace.enter(CanvasMountPhase.STORING)
         return decision
     }
 
     /**
      * Whether `canvas.mount.candidates` may list [canvas] for the addressed record: exactly the proposal rule of
-     * [mayPropose] (owner decision D6), without entering the storing phase, since nothing is stored.
+     * [mayPropose] (owner decision D6), without entering the storing phase, since nothing is stored. Unlike a proposal,
+     * a failed lookup is recorded, so the listing answers `unavailable` rather than a silently partial list (listed
+     * canvases come from the host's own directory, never from a caller's probe).
      */
     suspend fun mayList(request: CanvasMountRequest<CanvasMountScope>, canvas: CanvasId): CanvasMountDecision =
-        decide(request) { scope -> proposal(scope, canvas) }
+        decide(request) { scope -> proposal(scope, canvas, failureDenies = false) }
 
     /**
      * This authority over one call's records loaded once: [entries] answer every directory read, and each
@@ -144,10 +150,18 @@ internal class HostCanvasMountAuthority(
     internal fun over(entries: List<HostCanvasEntry>): HostCanvasMountAuthority =
         HostCanvasMountAuthority(connection, catalog.over(entries), MemoisedMountDirectory(directory), trace)
 
-    private suspend fun proposal(scope: CanvasMountScope, proposed: CanvasId): CanvasMountDecision = when {
+    private suspend fun proposal(scope: CanvasMountScope, proposed: CanvasId, failureDenies: Boolean): CanvasMountDecision = when {
         scope is CanvasMountScope.AgentDefault && !mayChangeDefault(scope) -> CanvasMountDecision.DENY
+        failureDenies -> allowIf(visibleOrDenied(scope, proposed))
         else -> allowIf(visible(scope, proposed))
     }
+
+    /** [visible], with a failed lookup answering false: the denial a missing or invisible canvas gets. */
+    private suspend fun visibleOrDenied(scope: CanvasMountScope, canvas: CanvasId): Boolean =
+        runCatchingCancellable { visible(scope, canvas) }.getOrElse { failure ->
+            if (failure is Error) throw failure
+            false
+        }
 
     override suspend fun mayClear(request: CanvasMountRequest<CanvasMountScope>): CanvasMountDecision {
         val decision = decide(request) { scope -> allowIf(scope is CanvasMountScope.AgentDefault && mayChangeDefault(scope)) }

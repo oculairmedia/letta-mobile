@@ -160,7 +160,7 @@ class CanvasMountFailureTest {
     }
 
     @Test
-    fun failedAuthorityLookupsAreUnavailableBeforeStorageAndOutcomeUnknownAfterABind() = runBlocking {
+    fun failedLookupsAreUnavailableOrDeniedBeforeStorageAndOutcomeUnknownAfterABind() = runBlocking {
         val secret = IllegalStateException("canvas directory at /srv/secret/host-canvases.json")
         val directoryDown = granted(MountHarness()).apply { directory.failure = secret }
         val grantsDown = granted(MountHarness()).apply { canvases.failure = secret }
@@ -171,8 +171,9 @@ class CanvasMountFailureTest {
         }
         val read = directoryDown.call(CanvasMountRoute.RESOLVE, bindingParams(AGENT_A, CONV_A), PEER)
         assertEquals(unavailable(CanvasMountWire.REASON_AUTHORITY), read.unavailability())
+        // Judging a proposed canvas, a failed lookup is the plain denial a missing or invisible canvas gets.
         val proposal = grantsDown.call(CanvasMountRoute.BIND, bindingParams(AGENT_A, CONV_A, NEXT), PEER)
-        assertEquals(unavailable(CanvasMountWire.REASON_AUTHORITY), proposal.unavailability())
+        assertEquals(DENIED_RESPONSE, proposal.raw)
         assertNull(grantsDown.store().readBinding(AGENT_A, CONV_A))
         val committed = winnerCheckDown.call(CanvasMountRoute.BIND, bindingParams(AGENT_A, CONV_A, NEXT), PEER)
         assertEquals(CanvasMountWire.OUTCOME_UNKNOWN, committed.status)
