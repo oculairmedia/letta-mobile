@@ -111,6 +111,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
     private val tracker = TurnTracker(parts.config.policy, format, detector.hop)
     private val splitter = HopSplitter(detector.hop)
     private val recorder = CaptureRecorder(samplesOf(parts.config.policy.preRoll), limit())
+    // overflow: one entry per finished spoken turn (each within the hard cap); undelivered turns are wiped on close.
     private val turns = Channel<CapturedTurn>(Channel.UNLIMITED) { it.wipe() }
     private var started = false
 
@@ -171,20 +172,29 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
     private suspend fun apply(signal: TurnSignal, hop: Hop?) {
         when (signal) {
             TurnSignal.None -> if (tracker.recording) record(hop)
-            TurnSignal.Candidate -> recorder.begin().also { record(hop) }
-            TurnSignal.Confirmed -> record(hop).also { speechStarted() }
+            TurnSignal.Candidate -> {
+                recorder.begin()
+                record(hop)
+            }
+            TurnSignal.Confirmed -> speechStarted(hop)
             TurnSignal.Abandoned -> recorder.discard()
-            is TurnSignal.Ended -> record(hop).also { turns.send(CapturedTurn(memory.nextHandle(), recorder.finish())) }
+            is TurnSignal.Ended -> endTurn(hop)
         }
     }
 
     private fun record(hop: Hop?) {
-        hop?.let { recorder.record(it.samples) }
+        if (hop != null) recorder.record(hop.samples)
     }
 
-    private suspend fun speechStarted() {
+    private suspend fun speechStarted(hop: Hop?) {
+        record(hop)
         memory.forget()
         out.send(VoiceEarEvent.SpeechStarted)
+    }
+
+    private suspend fun endTurn(hop: Hop?) {
+        record(hop)
+        turns.send(CapturedTurn(memory.nextHandle(), recorder.finish()))
     }
 
     private suspend fun fail(code: VoiceErrorCode): Nothing {

@@ -79,6 +79,7 @@ internal class CapturePump(
     @Volatile
     private var running = true
     private var next = 0L
+    private var idleReads = 0L // touched by the capture thread only
     private val thread = Thread(::pump, "voice-capture").apply { isDaemon = true }
 
     fun start() = thread.start()
@@ -104,22 +105,32 @@ internal class CapturePump(
     private fun readFrame(): AudioFrame? {
         val samples = ShortArray(format.samplesPerFrame)
         var filled = 0
-        var idleReads = 0L
-        val idleLimit = options.stallTimeout / options.pollInterval
+        idleReads = 0
         while (filled < samples.size) {
             if (!running) return null
-            val buffer = if (filled == 0) samples else ShortArray(samples.size - filled)
-            val read = line.read(buffer)
-            if (read < 0) throw VoiceAudioException(VoiceErrorCode.ENGINE_FAILED)
-            idleReads = if (read == 0) idleReads + 1 else 0
-            if (idleReads > idleLimit) throw VoiceAudioException(VoiceErrorCode.UNAVAILABLE)
-            if (read == 0) TimeUnit.MILLISECONDS.sleep(options.pollInterval.inWholeMilliseconds)
-            if (buffer !== samples) buffer.copyInto(samples, filled, 0, read)
-            filled += read
+            filled += readInto(samples, filled)
         }
         val frame = AudioFrame(samples, SamplePosition(next))
         next += format.frameSamples
         return frame
+    }
+
+    /** Reads what the line has into [samples] after [filled]; returns the count (0 after an idle wait). */
+    private fun readInto(samples: ShortArray, filled: Int): Int {
+        val buffer = if (filled == 0) samples else ShortArray(samples.size - filled)
+        val read = line.read(buffer)
+        if (read < 0) throw VoiceAudioException(VoiceErrorCode.ENGINE_FAILED)
+        if (read == 0) return 0.also { waitIdle() }
+        idleReads = 0
+        if (buffer !== samples) buffer.copyInto(samples, filled, 0, read)
+        return read
+    }
+
+    /** Sleeps one poll interval; a line idle for longer than the stall timeout is UNAVAILABLE. */
+    private fun waitIdle() {
+        idleReads++
+        if (idleReads > options.stallTimeout / options.pollInterval) throw VoiceAudioException(VoiceErrorCode.UNAVAILABLE)
+        TimeUnit.MILLISECONDS.sleep(options.pollInterval.inWholeMilliseconds)
     }
 
     /** Queues [frame], dropping the oldest queued frame while the buffer is full. */
