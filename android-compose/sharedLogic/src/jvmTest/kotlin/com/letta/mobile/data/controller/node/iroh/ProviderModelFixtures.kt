@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -77,6 +78,7 @@ internal object AdminRpcTestEnvelope {
 internal class FakeProviderModelClient(
     private val connectSucceeds: Boolean = true,
     private val updateSucceeds: Boolean = true,
+    private val appliedTo: String? = "conversation",
 ) : AppServerClient {
     override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow()
     val commands = mutableListOf<AppServerCommand>()
@@ -108,7 +110,9 @@ internal class FakeProviderModelClient(
 
     override suspend fun updateModel(command: AppServerCommand.UpdateModel): AppServerInboundFrame.UpdateModelResponse {
         commands += command
-        if (!updateSucceeds) {
+        // letta.js applyModelUpdateForRuntime refuses the default conversation without an agent.
+        val agentFree = command.runtime.conversationId == IdFormats.DEFAULT_CONVERSATION_ID && command.runtime.agentId == null
+        if (!updateSucceeds || agentFree) {
             return (ProviderModelFixtures.errorFrames().getValue("update_model_response")
                 as AppServerInboundFrame.UpdateModelResponse).copy(requestId = command.requestId)
         }
@@ -116,7 +120,7 @@ internal class FakeProviderModelClient(
             requestId = command.requestId,
             success = true,
             scope = command.runtime,
-            appliedTo = "conversation",
+            appliedTo = appliedTo,
             modelHandle = command.payload.modelHandle,
         )
     }

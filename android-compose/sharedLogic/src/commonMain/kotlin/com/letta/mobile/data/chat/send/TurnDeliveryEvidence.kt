@@ -4,6 +4,7 @@ import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.runtime.TurnFailureNotices
+import com.letta.mobile.data.timeline.IROH_SYNTHETIC_RUN_ID_PREFIXES
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
 
@@ -63,8 +64,20 @@ private fun ConversationTurnState.countsAsActiveTurnDelivery(
 ): Boolean {
     if (event.isReplay || turnId == null) return false
     if (message.content.isBlank()) return false
-    if (!frameConversationMatchesActive(event, resolvedFrame)) return false
+    if (!frameConversationMatchesActive(event, resolvedFrame) || namesAnotherTurnWithoutOwnRun(event)) return false
     return runMatchesActiveTurn(message)
+}
+
+/**
+ * Until this turn has a real run, [runMatchesActiveTurn] accepts any run, so the
+ * reply of another device's turn streaming into this conversation counted as this send's delivery.
+ * The host then refused this send as busy, and the bounce (which needs "nothing delivered") lost
+ * to the generic dead-turn notice. A frame stamped with a different turn id is not this turn's.
+ */
+private fun ConversationTurnState.namesAnotherTurnWithoutOwnRun(event: WsTimelineEvent.MessageDelta): Boolean {
+    val tagged = event.turnId?.takeIf { it.isNotBlank() } ?: return false
+    val ownRun = runId?.takeUnless { run -> IROH_SYNTHETIC_RUN_ID_PREFIXES.any(run::startsWith) }
+    return ownRun == null && tagged != turnId
 }
 
 private fun ConversationTurnState.frameConversationMatchesActive(
