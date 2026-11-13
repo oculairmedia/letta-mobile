@@ -50,6 +50,11 @@ internal class SentRunTracker(private val ledger: SentRunLedger) {
         ledger.started(SentMessageId(sent), setOf(SentRunId(run)))
     }
 
+    /** The same turn's TurnStarted promoted [previous] to [next]: whoever's run [previous] was gains [next]. */
+    fun promoted(previous: String?, next: String?) {
+        ledger.promoted(previous, next)
+    }
+
     /** The state took [run] while on [currentTurn]: an id of the own run's turn joins its entry. */
     fun alias(run: String?, currentTurn: String?) {
         val sent = otid ?: return

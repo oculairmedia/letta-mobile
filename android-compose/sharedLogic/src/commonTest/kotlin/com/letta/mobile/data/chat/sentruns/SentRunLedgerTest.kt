@@ -126,4 +126,19 @@ class SentRunLedgerTest {
         assertEquals(setOf(SentRunId("local-run-58")), ledger.state.value.active)
         assertTrue(ledger.state.value.failed.isEmpty())
     }
+
+    @Test
+    fun aPromotionOfTheSameTurnJoinsTheEntryAndKeepsItActive() {
+        ledger.started(first, setOf(provisional))
+        ledger.promoted(provisional.value, durable.value)
+        assertEquals(setOf(provisional, durable), ledger.state.value.started[first])
+        assertEquals(setOf(provisional, durable), ledger.state.value.active)
+    }
+
+    @Test
+    fun aPromotionOfARunNoSentMessageStartedChangesNothing() {
+        ledger.started(first, setOf(provisional))
+        ledger.promoted("someone-elses-run", durable.value)
+        assertEquals(setOf(provisional), ledger.state.value.started[first])
+    }
 }

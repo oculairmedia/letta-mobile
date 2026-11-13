@@ -44,6 +44,16 @@ internal class SentRunLedger {
         if (id in sentIds.value) started(id, setOf(runId))
     }
 
+    /**
+     * The turn that ran [previous] now runs [next] (a durable id promoting a provisional one, in the
+     * same turn): every sent message whose run is [previous] gains [next].
+     */
+    fun promoted(previous: String?, next: String?) {
+        val from = previous?.takeIf { it.isNotBlank() }?.let(::SentRunId) ?: return
+        val to = next?.takeIf { it.isNotBlank() && it != previous }?.let(::SentRunId) ?: return
+        runs.value.started.filterValues { from in it }.keys.forEach { started(it, setOf(to)) }
+    }
+
     /** The run [id] started has ended, as a failure when [failed]. */
     fun ended(id: SentMessageId, failed: Boolean) {
         runs.update { it.withEnded(id, failed) }
