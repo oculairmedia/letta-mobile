@@ -3,7 +3,13 @@
 package com.letta.mobile.ui.chat.surface.composer
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeUiTest
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -62,6 +68,20 @@ class ComposerPermissionModeUiTest {
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_OPTION + AppServerPermissionMode.Standard.name).performClick()
         runOnIdle { assertEquals(listOf(AppServerPermissionMode.Standard), actions.permissionModes) }
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_POPOVER).assertDoesNotExist()
+    }
+
+    /** The line has no chevron, but is still announced as the permission-mode control that opens its picker. */
+    @Test
+    fun theLineIsAnnouncedAsTheModeControlWithoutAChevron() = runComposeUiTest {
+        showPanel(unrestricted)
+
+        val config = onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).fetchSemanticsNode().config
+        assertEquals(Role.Button, config.getOrNull(SemanticsProperties.Role))
+        assertEquals("Permission mode", config.getOrNull(SemanticsActions.OnClick)?.label)
+        assertEquals(listOf("Permission mode"), config.getOrNull(SemanticsProperties.ContentDescription))
+        assertEquals("Approve all", config.getOrNull(SemanticsProperties.StateDescription))
+        val chevrons = hasTestTag(ComposerTestTags.CHIP_CHEVRON) and hasAnyAncestor(hasTestTag(ComposerTestTags.PERMISSION_MODE_LINE))
+        assertEquals(0, onAllNodes(chevrons, useUnmergedTree = true).fetchSemanticsNodes().size)
     }
 
     @Test
