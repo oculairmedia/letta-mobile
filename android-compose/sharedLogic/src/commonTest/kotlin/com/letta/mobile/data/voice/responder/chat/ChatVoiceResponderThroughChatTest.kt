@@ -66,7 +66,7 @@ class ChatVoiceResponderThroughChatTest {
     private fun complete() = ownership.clear(state, reason = "turnFinished")
 
     private fun fail() {
-        state.ownRun.end(failed = true)
+        state.ownRun.fail()
         ownership.clear(state, reason = "turnFinished")
     }
 

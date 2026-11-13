@@ -1,6 +1,7 @@
 package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.chat.sentruns.SentRunTail
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Delivery
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -125,7 +126,7 @@ internal class IncomingTurnProjection(
         if (delta.isReplay) return
         val ownRun = state?.ownRun
         if (ownRun != null) {
-            ownRun.row(delta.turnId, delta.message.runId)
+            ownRun.row(SentRunTail(delta.turnId, delta.message.runId))
         } else {
             turnRegistry.sentRuns.row(delta.turnId, delta.message.runId)
         }

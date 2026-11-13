@@ -7,6 +7,9 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.UserMessage
+import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Delivery
+import com.letta.mobile.data.timeline.api.TimelinePendingSendAttempt
+import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -15,11 +18,14 @@ import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -107,6 +113,36 @@ internal class ChatSendCoordinatorIdentifiedSendTest : ChatSendCoordinatorConver
     }
 
     @Test
+    fun aCallerCancelledWhileItsMessageIsEnqueuedStillReceivesItsId() = runTest(UnconfinedTestDispatcher()) {
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true), activeChatTurn = true)) { CONV }
+        val release = CompletableDeferred<Unit>().also { timeline.appendRelease = it }
+        var reported: SentMessageId? = null
+
+        val caller = launch { reported = coordinator.identifiedSend.sendIdentified("hello") }
+        caller.cancel()
+        release.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(timeline.externalLocals.single().otid, reported?.value)
+    }
+
+    @Test
+    fun aDisconnectWhoseTimelineWriteFailsStillEndsTheSentRunAsFailed() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = true)
+        val coordinator = standalone(transport = transport, writer = FailingFailureMarks(timeline)) { CONV }
+        val id = assertNotNull(coordinator.identifiedSend.sendIdentified("hello"))
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT, CONV, "run-1"))
+        coordinator.handleEvent(echo(id, TurnTail("turn-1", "run-1")))
+        assertEquals(setOf(SentRunId("run-1")), coordinator.identifiedSend.sentRuns.value.active)
+
+        coordinator.handleEvent(WsTimelineEvent.Disconnected(code = 1006, reason = "gone"))
+        advanceUntilIdle()
+
+        assertTrue(coordinator.identifiedSend.sentRuns.value.active.isEmpty())
+        assertEquals(setOf(SentRunId("run-1")), coordinator.identifiedSend.sentRuns.value.failed)
+    }
+
+    @Test
     fun aSendThatCannotPrepareItsConversationHasNoId() = runTest(UnconfinedTestDispatcher()) {
         prepareConversation = { error("not ready") }
         val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true))) { CONV }
@@ -137,17 +173,21 @@ internal class ChatSendCoordinatorIdentifiedSendTest : ChatSendCoordinatorConver
         assertEquals("Chat channel is not connected", ui.currentError())
     }
 
-    /** A coordinator with [config] and a repository that cannot create conversations. */
-    private fun standalone(
+    /**
+     * A coordinator with [config], writing through [writer], and a repository that cannot create
+     * conversations; it runs on the test's scheduler, so its connect wait passes in virtual time.
+     */
+    private fun TestScope.standalone(
         config: LettaConfig? = CONFIG,
         transport: IChannelTransport,
+        writer: TimelineExternalTransportWriter = timeline,
         activeConversationId: () -> String?,
     ) = ChatSendCoordinator(
-        scope = CoroutineScope(UnconfinedTestDispatcher()),
+        scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler)),
         agentId = AGENT,
         activeConfig = { config },
         wsChatBridge = WsChatBridge(transport),
-        timelineRepository = timeline,
+        timelineRepository = writer,
         conversationRepository = NoCreateConversations(),
         ui = ui,
         clearComposerAfterSend = {},
@@ -158,12 +198,17 @@ internal class ChatSendCoordinatorIdentifiedSendTest : ChatSendCoordinatorConver
         otidGenerator = { "otid-standalone" },
     )
 
-    /** A channel that is not connected and cannot connect. */
+    /** A channel that is not connected and never becomes connected. */
     private class OfflineTransport(base: IChannelTransport) : IChannelTransport by base {
         override val state: StateFlow<ChannelTransportState> = MutableStateFlow(ChannelTransportState.Idle)
+    }
 
-        override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) =
-            error("offline")
+    /** A timeline that records like [base] but fails to mark a pending send as failed. */
+    private class FailingFailureMarks(private val base: RecordingTimelineWriter) : TimelineExternalTransportWriter by base {
+        override suspend fun markPendingSend(attempt: TimelinePendingSendAttempt, delivery: Delivery) {
+            check(delivery != Delivery.Failed) { "timeline write failed" }
+            base.markPendingSend(attempt, delivery)
+        }
     }
 
     private class NoCreateConversations : IConversationRepository {

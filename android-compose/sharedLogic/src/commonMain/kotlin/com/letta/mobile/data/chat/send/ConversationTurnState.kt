@@ -1,8 +1,10 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.data.chat.sentruns.SentMessageId
 import com.letta.mobile.data.chat.sentruns.SentRunLedger
 import com.letta.mobile.data.chat.sentruns.SentRunTail
 import com.letta.mobile.data.chat.sentruns.SentRunTracker
+import com.letta.mobile.data.chat.sentruns.SentTurnMove
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.timeline.IROH_SYNTHETIC_RUN_ID_PREFIXES
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -43,13 +45,13 @@ internal class ConversationTurnState(
     // duplicates defensively (drop with telemetry rather than overwriting).
     @Volatile var turnId: String? = null
         set(value) {
-            ownRun.leave(field, value)
+            ownRun.leave(SentTurnMove(field, value))
             field = value
         }
     @Volatile var runId: String? = null
         set(value) {
             field = value
-            ownRun.alias(value, turnId)
+            ownRun.alias(SentRunTail(turnId, value))
         }
     val activeAssistantMessageRunIds = linkedSetOf<String>()
     @Volatile var stopReason: String? = null
@@ -93,8 +95,9 @@ internal class ConversationTurnState(
      */
     fun acceptSend(pending: QueuedChatSend, send: () -> Boolean, onAccepted: () -> Unit): Boolean =
         identity.acceptSend(pending.conversationId.value, send) {
-            ownRun.endUnless(pending.id.value)
-            ownRun.accepted(pending.id.value)
+            val sent = SentMessageId(pending.id.value)
+            ownRun.endUnless(sent)
+            ownRun.accepted(sent)
             otid = pending.id.value
             inFlightSend = pending
             localConversationId = pending.conversationId.value.takeIf { it.isNotBlank() }
@@ -213,7 +216,7 @@ private const val MAX_SETTLED_RUN_IDS = 8
 /** The echo of this conversation's own send named [tail]'s run: it is the run the send behind its otid started. */
 internal fun ConversationTurnState.bindOwnRun(tail: TurnTail) {
     val sent = otid ?: return
-    ownRun.bind(sent, SentRunTail(tail.turnId, tail.runId), SentRunTail(turnId, runId))
+    ownRun.bind(SentMessageId(sent), SentRunTail(tail.turnId, tail.runId), SentRunTail(turnId, runId))
 }
 
 internal fun shouldAdoptPassiveDelta(

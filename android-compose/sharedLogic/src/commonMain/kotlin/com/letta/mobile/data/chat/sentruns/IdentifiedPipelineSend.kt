@@ -1,10 +1,12 @@
 package com.letta.mobile.data.chat.sentruns
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * A send pipeline's identified send: one text sent through the pipeline's own locked send, and the
@@ -14,6 +16,10 @@ import kotlinx.coroutines.sync.withLock
  * enqueued; so the otid taken during this send's own hold of [lock] is the one it enqueued, and
  * none was taken when the send returned before enqueuing. [target] is read, in the caller's turn,
  * before the hold, and [sendLocked] runs in [scope] under it.
+ *
+ * Once started, a send is not withdrawn by its caller's cancellation: the enqueue runs to its end
+ * and the caller still receives the otid it was enqueued under, so a message that went out always
+ * has an identity its sender can follow or stop.
  */
 internal class IdentifiedPipelineSend(
     private val scope: CoroutineScope,
@@ -40,6 +46,6 @@ internal class IdentifiedPipelineSend(
                 taken
             }
         }
-        return enqueued.await()?.let(::SentMessageId)
+        return withContext(NonCancellable) { enqueued.await() }?.let(::SentMessageId)
     }
 }

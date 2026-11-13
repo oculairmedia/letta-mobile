@@ -2,6 +2,7 @@ package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.data.chat.sentruns.SentMessageId
 import com.letta.mobile.data.chat.sentruns.SentRunId
+import com.letta.mobile.data.chat.sentruns.SettledSentTurn
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.transport.WsTimelineEvent
 import kotlin.test.Test
@@ -61,6 +62,34 @@ class ConversationTurnStateSentRunsTest {
     }
 
     @Test
+    fun aTurnlessEchoTakesItsTurnFromTheFrameThatNamesItsRunAndKeepsTheDurableId() {
+        accept("c1")
+        echo("c1", null, "iroh-run-1")
+        turnStarted("t1", "iroh-run-1")
+        turnStarted("t1", "run-42")
+        assertEquals(setOf(SentRunId("iroh-run-1"), SentRunId("run-42")), runs.started[SentMessageId("c1")])
+        assertEquals(setOf(SentRunId("iroh-run-1"), SentRunId("run-42")), runs.active)
+    }
+
+    @Test
+    fun aTurnlessEchoAfterItsTurnStartedTakesThatTurn() {
+        accept("c1")
+        turnStarted("t1", "iroh-run-1")
+        echo("c1", null, "iroh-run-1")
+        turnStarted("t1", "run-42")
+        assertEquals(setOf(SentRunId("iroh-run-1"), SentRunId("run-42")), runs.started[SentMessageId("c1")])
+    }
+
+    @Test
+    fun aTurnlessEchoNeverTakesATurnThatNamesAnotherRun() {
+        accept("c1")
+        echo("c1", null, "run-1")
+        turnStarted("t0", "someone-else")
+        turnStarted("t0", "someone-else-durable")
+        assertEquals(setOf(SentRunId("run-1")), runs.started[SentMessageId("c1")])
+    }
+
+    @Test
     fun anotherTurnsRunIsNeverAddedToTheSend() {
         accept("c1")
         turnStarted("t0", "someone-else")
@@ -89,7 +118,7 @@ class ConversationTurnStateSentRunsTest {
     fun clearingTheTurnEndsTheRunAndAFailureMarksIt() {
         accept("c1")
         echo("c1", "t1", "run-1")
-        state.ownRun.end(failed = true)
+        state.ownRun.fail()
         TurnSettlementOwnership(registry, ChatSendQueue()).clear(state, reason = "test")
         assertTrue(runs.active.isEmpty())
         assertEquals(setOf(SentRunId("run-1")), runs.failed)
@@ -105,7 +134,7 @@ class ConversationTurnStateSentRunsTest {
     fun anEchoAfterTheTurnSettledPairsTheSettledRunAsEnded() {
         accept("c1")
         turnStarted("t1", "run-1")
-        state.ownRun.settle(setOf("run-1", null), failed = false)
+        state.ownRun.settle(SettledSentTurn(setOf("run-1", null), failed = false))
         TurnSettlementOwnership(registry, ChatSendQueue()).clear(state, reason = "test")
         assertTrue(runs.started.isEmpty())
 

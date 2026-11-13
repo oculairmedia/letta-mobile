@@ -1,6 +1,7 @@
 package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.chat.sentruns.SettledSentTurn
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Delivery
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -248,7 +249,7 @@ internal class TurnSettlement(
             // run, or a terminal re-emitted without its turn id). Fence it too, or that re-emitted
             // terminal settles the cleared state a second time and writes a second failure row.
             state.retainSettledRun(request.event.runId)
-            state.ownRun.settle(setOf(request.event.runId, state.runId), failed = status is BridgeTurnStatus.Failed)
+            state.ownRun.settle(SettledSentTurn(setOf(request.event.runId, state.runId), failed = status is BridgeTurnStatus.Failed))
             ownership.clear(state, reason = "turnFinished")
             val transportPresence = runCatching { timelineRepository.clearExternalTransportActive(conversationId.value) }
             listOf(localSettlement, foregroundPresence, toolSweep, transportPresence)
@@ -260,13 +261,17 @@ internal class TurnSettlement(
         event: WsTimelineEvent.Disconnected,
     ) {
         val conversationId = state.conversationId.takeIf { it.isNotBlank() } ?: foreground.visibleConversation?.value
-        failOptimisticLocalForDisconnect(state, conversationId?.let(::ConversationId), event)
-        if (conversationId != null) {
-            cleanupDisconnectedTurnFragments(state, ConversationId(conversationId))
-            endConversationAbnormally(ConversationId(conversationId))
+        try {
+            failOptimisticLocalForDisconnect(state, conversationId?.let(::ConversationId), event)
+            if (conversationId != null) {
+                cleanupDisconnectedTurnFragments(state, ConversationId(conversationId))
+                endConversationAbnormally(ConversationId(conversationId))
+            }
+        } finally {
+            // The disconnect ended the own run even when a timeline write above failed.
+            state.ownRun.settle(SettledSentTurn(setOf(state.runId), failed = true))
         }
         state.reachedTerminal = true
-        state.ownRun.settle(setOf(state.runId), failed = true)
         ownership.clear(state, reason = "disconnect")
     }
 
