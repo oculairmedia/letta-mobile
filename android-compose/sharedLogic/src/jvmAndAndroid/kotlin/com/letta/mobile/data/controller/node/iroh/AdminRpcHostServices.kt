@@ -19,7 +19,7 @@ class AdminRpcHostServices(
     /** Host-specific plugin routes; null registers capability-unavailable responses for plugin methods. */
     val pluginRoutes: AdminRpcRoutes? = null,
     /**
-     * The secret request routes (letta-mobile-n2stx.2.4); null registers and advertises none. Only the JVM host can
+     * The secret request routes; null registers and advertises none. Only the JVM host can
      * build them, and only with a secure auth policy and a keystore provider; they register nothing otherwise.
      */
     val secretRequestRoutes: AdminRpcRoutes? = null,

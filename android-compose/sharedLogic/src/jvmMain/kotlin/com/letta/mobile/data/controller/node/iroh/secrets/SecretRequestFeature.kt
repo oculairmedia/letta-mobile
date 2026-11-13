@@ -16,8 +16,8 @@ import com.letta.mobile.util.attr
 import kotlinx.serialization.json.JsonElement
 
 /**
- * The secure secret-input flow on a JVM host (`docs/reference/contracts/secret-request-v1.md`,
- * letta-mobile-n2stx.2.4): the admin RPC [routes] for the person's device and the `secret_request`
+ * The secure secret-input flow on a JVM host (`docs/reference/contracts/secret-request-v1.md`):
+ * the admin RPC [routes] for the person's device and the `secret_request`
  * tool for agents ([hostTools]), both over one [SecretRequestService].
  *
  * Built only by [forHost], which answers null (the host registers, advertises and offers nothing)

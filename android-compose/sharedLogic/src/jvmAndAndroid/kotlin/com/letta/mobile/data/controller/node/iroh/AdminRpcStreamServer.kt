@@ -296,7 +296,7 @@ internal class AdminRpcStreamServer(
             throw ce
         } catch (error: Exception) {
             // Fixed text: a JSON parser's message quotes the frame, and a frame can carry a secret
-            // (secret.request.submit, letta-mobile-n2stx.2.4).
+            // (secret.request.submit).
             errorEnvelope("", "Failed to parse admin_rpc frame (${error::class.simpleName})")
         }
     }

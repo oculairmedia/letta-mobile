@@ -15,7 +15,7 @@ internal data class AdminRpcRequest(
     val path: String,
     val body: String?,
 ) {
-    /** Never the body: it can carry a secret (`secret.request.submit`, letta-mobile-n2stx.2.4). */
+    /** Never the body: it can carry a secret (`secret.request.submit`). */
     override fun toString(): String = "AdminRpcRequest(method=$method, path=$path, body=<redacted>)"
 }
 

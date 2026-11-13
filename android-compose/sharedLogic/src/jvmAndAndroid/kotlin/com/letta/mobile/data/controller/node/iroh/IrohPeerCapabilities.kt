@@ -40,7 +40,7 @@ object IrohPeerCapabilities {
     const val SUBAGENT_SPAWN = "subagent.spawn"
     const val WORKACTIVITY_REPORT = "workactivity.report"
 
-    // letta-mobile-n2stx.2.4: secret request routes. Granted to no role: the human side's handler still requires a
+    // Secret request routes. Granted to no role: the human side's handler still requires a
     // paired device holding admin.full, and no connection is ever an agent (the agent side is the secret_request tool).
     /** Admits `secret.request.list`, `.get`, `.submit` and `.cancel` at the gate. */
     const val SECRET_REQUEST_ANSWER = SecretRequestRouteWire.ANSWER_CAPABILITY

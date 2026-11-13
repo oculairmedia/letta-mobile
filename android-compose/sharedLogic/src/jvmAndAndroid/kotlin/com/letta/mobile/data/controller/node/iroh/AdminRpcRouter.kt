@@ -49,7 +49,7 @@ data class AdminRpcRequestContext(
     val authenticatedEndpointId: String? = null,
     /**
      * Whether the serving connection authenticated a paired device by its stored pairing record
-     * (letta-mobile-n2stx.2.4). False for bootstrap sessions (bearer token, static allowlist,
+     * (the human principal of the secret request routes). False for bootstrap sessions (bearer token, static allowlist,
      * anonymous test mode), which is how a host-local process holding an admin token is told apart
      * from a person's device. Only the serving connection sets it.
      */

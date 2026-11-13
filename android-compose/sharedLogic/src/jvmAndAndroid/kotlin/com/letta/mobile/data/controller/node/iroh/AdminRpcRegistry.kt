@@ -165,7 +165,7 @@ object AdminRpcRegistry {
 
     val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos", "subagent.dismiss")
 
-    /** Host-supplied route families: the plugin host, and the secret request routes (letta-mobile-n2stx.2.4). */
+    /** Host-supplied route families: the plugin host, and the secret request routes. */
     private fun registerHostRoutes(router: AdminRpcRouter, services: AdminRpcHostServices) {
         services.pluginRoutes?.register(router)
             ?: CapabilityUnavailable.register(router, PluginAdminRpc.METHODS, "plugin host")

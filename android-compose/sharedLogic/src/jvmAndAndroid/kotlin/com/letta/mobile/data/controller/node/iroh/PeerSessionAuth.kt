@@ -124,7 +124,7 @@ internal class PeerSessionAuth(
     /**
      * Whether this session is a paired device whose pairing record still exists: never a bootstrap
      * session (bearer token, static allowlist or anonymous test mode), so a host-local process
-     * holding an admin token is not a paired device (letta-mobile-n2stx.2.4).
+     * holding an admin token is not a paired device.
      */
     fun isPairedDevice(): Boolean = authenticated.get() && pairedSession.get() && pairing?.peer(remoteId) != null
 
