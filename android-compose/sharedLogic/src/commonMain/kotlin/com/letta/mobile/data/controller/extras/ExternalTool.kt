@@ -95,13 +95,10 @@ class ExternalToolCaller internal constructor(
     /** The call's agent, conversation and tool call id. */
     val scope: ToolCallScope,
 ) {
-    /** The agent the call is for, or null when the frame carried no scope. */
     val agentId: String? get() = scope.agentId
 
-    /** The conversation the call is for, or null. */
     val conversationId: String? get() = scope.conversationId
 
-    /** The model's tool call id, or null. */
     val toolCallId: String? get() = scope.toolCallId
 
     /** Whether the host or runtime vouched for [agentId] ([CallerIdentity.VERIFIED]). */
@@ -117,6 +114,7 @@ class ExternalToolCaller internal constructor(
         return ExternalToolCaller(if (sameScope) identity else CallerIdentity.CLAIMED, other)
     }
 
+    /** The identity and the scope: ids only, never anything the call carries. */
     override fun toString(): String = "ExternalToolCaller(identity=$identity, scope=$scope)"
 }
 
