@@ -91,7 +91,7 @@ internal fun SummaryLine(
     spec: RunStepRowSpec,
     disclosure: RunStepDisclosure?,
     modifier: Modifier = Modifier,
-    trailing: @Composable RowScope.() -> Unit = {},
+    trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val reducedMotion = LocalReducedMotion.current
     val haptics = LocalHaptics.current
@@ -122,7 +122,7 @@ internal fun SummaryLine(
     ) {
         RunStatusGlyph(spec.tone, Modifier.testTag(spec.tags.glyph), spec.glyphLabel)
         RunSummaryTitleText(spec.title, runSummaryColor(spec.tone), reducedMotion, Modifier.weight(1f))
-        trailing()
+        trailing?.invoke(this)
         if (disclosure != null) DisclosureChevron(expanded = disclosure.expanded)
     }
 }
