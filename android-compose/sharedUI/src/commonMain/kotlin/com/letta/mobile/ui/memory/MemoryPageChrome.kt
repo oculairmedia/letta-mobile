@@ -1,19 +1,20 @@
 package com.letta.mobile.ui.memory
 
+import androidx.compose.ui.platform.testTag
+import com.letta.mobile.ui.components.LettaChipTabRow
+import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.LettaMenuItem
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -35,17 +36,17 @@ import com.letta.mobile.ui.components.ChevronEmphasis
 import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LettaInlineError
-import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.LettaPageHeader
 import com.letta.mobile.ui.components.lettaCount
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 
-/** [showTitle]: the host does not title the screen; [canCreateBlock]: offer "New block". */
-internal data class MemoryChromeOptions(val showTitle: Boolean, val canCreateBlock: Boolean)
+/** The host's presentation choices, and [canCreateBlock]: offer "New block". */
+internal data class MemoryChromeOptions(val page: MemoryPageOptions, val canCreateBlock: Boolean)
 
 /**
- * Title row, agent picker and stats strip above the graph. The chrome scrolls (with nothing to
+ * The shared page header (title, agent picker, refresh, "New block", the host's controls) with the
+ * load error and the stats strip under it, above the graph. The chrome scrolls (with nothing to
  * scroll) so a pull on it reaches the page's LettaRefreshable on touch; the graph keeps its drags
  * for panning.
  */
@@ -56,64 +57,47 @@ internal fun MemoryPageChrome(
     options: MemoryChromeOptions,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    val picker: (@Composable () -> Unit)? = if (parity.agents.isNotEmpty()) {
+        { MemoryAgentPicker(parity.agents, parity.memory.selectedAgentId, actions::selectAgent) }
+    } else {
+        null
+    }
+    LettaPageHeader(
+        title = "Memory".takeIf { options.page.showTitle },
+        modifier = modifier.verticalScroll(rememberScrollState()),
+        primaryAction = LettaMenuItem(label = "New block", onClick = actions::beginCreate).takeIf { options.canCreateBlock },
+        context = options.page.headerContext ?: picker,
+        // Touch pulls the chrome down instead (MemoryPage's LettaRefreshable).
+        refresh = { LettaRefreshAction(refreshing = parity.isLoading, onRefresh = actions::refresh) },
+        controls = options.page.headerControls,
     ) {
-        MemoryHeaderRow(parity, actions, options)
         parity.errorMessage?.let { MemoryErrorBanner(it) }
         MemorySummaryStrip(parity.memory.summary)
     }
 }
 
+/** The agent whose memory the page shows: the header's context control. */
 @Composable
-private fun MemoryHeaderRow(
-    parity: MemoryParityControllerState,
-    actions: MemoryPageActions,
-    options: MemoryChromeOptions,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-    ) {
-        if (options.showTitle) {
-            Text("Memory", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        }
-        Box(Modifier.weight(1f)) {
-            if (parity.agents.isNotEmpty()) {
-                MemoryAgentPicker(parity.agents, parity.memory.selectedAgentId, actions::selectAgent)
-            }
-        }
-        if (options.canCreateBlock) {
-            IconButton(onClick = actions::beginCreate) {
-                Icon(LettaIcons.Add, contentDescription = "New block")
-            }
-        }
-        // Touch pulls the chrome down instead (MemoryPage's LettaRefreshable).
-        LettaRefreshAction(refreshing = parity.isLoading, onRefresh = actions::refresh)
-    }
-}
-
-@Composable
-private fun MemoryAgentPicker(
+internal fun MemoryAgentPicker(
     agents: List<MemoryParityAgentOption>,
     selectedAgentId: String?,
     onAgentSelected: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val selected = agents.firstOrNull { it.id == selectedAgentId } ?: agents.first()
+    val selected = agents.firstOrNull { it.id == selectedAgentId }
     Box {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.widthIn(max = LettaDimens.Pane.sidePanelWidth)) {
-            Text(selected.name, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Text(
+                selected?.name ?: CHOOSE_AGENT,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
             DisclosureChevron(
                 expanded = false,
                 emphasis = ChevronEmphasis.Emphasized,
                 indicates = ChevronIndication.Sheet,
-                contentDescription = "Choose agent",
+                contentDescription = CHOOSE_AGENT,
             )
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -129,6 +113,8 @@ private fun MemoryAgentPicker(
         }
     }
 }
+
+private const val CHOOSE_AGENT = "Choose agent"
 
 /**
  * Counts with grouped digits, then the context window as a meter ("801 / 1,000,000 tokens") on
@@ -156,4 +142,17 @@ private fun MemorySummaryStrip(summary: MemoryParitySummary) {
 @Composable
 private fun MemoryErrorBanner(message: String) {
     LettaInlineError(message = message, title = null)
+}
+
+/**
+ * The Memory destination's view switch (Blocks | Files) for the header's controls row: one chip per
+ * [labels] entry, tagged by [tags], the [selected] one raised.
+ */
+@Composable
+fun MemoryViewSwitch(labels: List<String>, tags: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+    LettaChipTabRow {
+        labels.forEachIndexed { index, label ->
+            LettaChipTab(text = label, active = index == selected, onClick = { onSelect(index) }, modifier = Modifier.testTag(tags[index]))
+        }
+    }
 }

@@ -40,9 +40,10 @@ import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LocalLettaHost
 
 /**
- * Where the permission-mode and context chips sit: the mode chip in the card's control row beside
- * the model and effort chips, the context chip at the right end of the keyboard-hint footer (or in
- * the control row where there is no footer); the Touch bar has no mode chip (its "+" sheet offers the mode).
+ * Where the permission mode and the context chip sit: the mode is a quiet line under the pointer
+ * card, never in the control row (the Touch bar offers it in its "+" sheet instead); the context
+ * chip ends the line under the card where the platform shows the keyboard hint, and stays in the
+ * control row otherwise.
  */
 class ComposerChipPlacementUiTest {
     private val composer = ChatComposerUiState(
@@ -89,18 +90,20 @@ class ComposerChipPlacementUiTest {
     }
 
     @Test
-    fun theModeChipSitsInTheControlRowAndTheContextChipEndsTheHintFooter() = runComposeUiTest {
+    fun theModeLineSitsUnderTheCardAndTheContextChipEndsTheHintFooter() = runComposeUiTest {
         showPanel()
 
-        waitUntilExactlyOneExists(chipIn(ComposerTestTags.PERMISSION_MODE_CHIP, ComposerTestTags.CONTROLS))
+        waitUntilExactlyOneExists(chipIn(ComposerTestTags.PERMISSION_MODE_LINE, ComposerTestTags.HINT_FOOTER))
+        waitUntilDoesNotExist(chipIn(ComposerTestTags.PERMISSION_MODE_LINE, ComposerTestTags.CONTROLS))
         waitUntilExactlyOneExists(chipIn(ComposerTestTags.CONTEXT_CHIP, ComposerTestTags.HINT_FOOTER))
         waitUntilDoesNotExist(chipIn(ComposerTestTags.CONTEXT_CHIP, ComposerTestTags.CONTROLS))
 
-        // The mode chip follows the model chip on the same line.
-        val model = onNodeWithTag(ComposerTestTags.MODEL_CHIP).getUnclippedBoundsInRoot()
-        val mode = onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).getUnclippedBoundsInRoot()
-        assertTrue(mode.left >= model.right, "mode chip at ${mode.left} is not after the model chip ending ${model.right}")
-        assertTrue(mode.top < model.bottom && model.top < mode.bottom, "mode chip $mode is not on the model chip's line $model")
+        // The mode line starts the line under the card, before the hint.
+        val card = onNodeWithTag(ComposerTestTags.CARD).getUnclippedBoundsInRoot()
+        val mode = onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).getUnclippedBoundsInRoot()
+        assertTrue(mode.top >= card.bottom, "mode line $mode is not under the card $card")
+        val hintStart = onNodeWithTag(ComposerTestTags.HINT, useUnmergedTree = true).getUnclippedBoundsInRoot().left
+        assertTrue(mode.right <= hintStart, "mode line $mode runs into the hint starting at $hintStart")
 
         // The context chip is on the hint's line, right-aligned in the footer.
         val footer = onNodeWithTag(ComposerTestTags.HINT_FOOTER).getUnclippedBoundsInRoot()
@@ -115,8 +118,8 @@ class ComposerChipPlacementUiTest {
     fun bothChipsKeepTheirPopoversInTheirNewPlaces() = runComposeUiTest {
         showPanel()
 
-        waitUntilExactlyOneExists(hasTestTag(ComposerTestTags.PERMISSION_MODE_CHIP))
-        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).performClick()
+        waitUntilExactlyOneExists(hasTestTag(ComposerTestTags.PERMISSION_MODE_LINE))
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).performClick()
         waitUntilExactlyOneExists(hasTestTag(ComposerTestTags.PERMISSION_MODE_POPOVER))
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_OPTION + AppServerPermissionMode.Standard.name).performClick()
         waitUntilDoesNotExist(hasTestTag(ComposerTestTags.PERMISSION_MODE_POPOVER))
@@ -162,11 +165,20 @@ class ComposerChipPlacementUiTest {
     }
 
     @Test
-    fun withoutAHintFooterTheContextChipStaysInTheControlRow() = runComposeUiTest {
+    fun withoutKeyboardHintsTheContextChipStaysInTheControlRowAndTheModeLineUnderTheCard() = runComposeUiTest {
         showPanel(keyboardHints = false)
 
         waitUntilExactlyOneExists(chipIn(ComposerTestTags.CONTEXT_CHIP, ComposerTestTags.CONTROLS))
-        waitUntilExactlyOneExists(chipIn(ComposerTestTags.PERMISSION_MODE_CHIP, ComposerTestTags.CONTROLS))
+        waitUntilExactlyOneExists(chipIn(ComposerTestTags.PERMISSION_MODE_LINE, ComposerTestTags.HINT_FOOTER))
+        waitUntilDoesNotExist(chipIn(ComposerTestTags.PERMISSION_MODE_LINE, ComposerTestTags.CONTROLS))
+        waitUntilDoesNotExist(hasTestTag(ComposerTestTags.HINT))
+    }
+
+    @Test
+    fun withNeitherHintsNorAModeThereIsNoLineUnderTheCard() = runComposeUiTest {
+        showPanel(keyboardHints = false, composer = composer.copy(permissionMode = null))
+
+        waitUntilExactlyOneExists(hasTestTag(ComposerTestTags.CARD))
         waitUntilDoesNotExist(hasTestTag(ComposerTestTags.HINT_FOOTER))
     }
 
@@ -174,26 +186,30 @@ class ComposerChipPlacementUiTest {
     fun aNarrowCardWrapsTheChipsAndKeepsEverythingInside() = runComposeUiTest {
         showPanel(width = 360.dp, keyboardHints = false)
 
-        waitUntilExactlyOneExists(chipIn(ComposerTestTags.PERMISSION_MODE_CHIP, ComposerTestTags.CONTROLS))
         waitUntilExactlyOneExists(chipIn(ComposerTestTags.CONTEXT_CHIP, ComposerTestTags.CONTROLS))
+        waitUntilExactlyOneExists(hasTestTag(ComposerTestTags.PERMISSION_MODE_LINE))
         val card = onNodeWithTag(ComposerTestTags.CARD).getUnclippedBoundsInRoot()
-        listOf(ComposerTestTags.SEND, ComposerTestTags.MODEL_CHIP, ComposerTestTags.PERMISSION_MODE_CHIP, ComposerTestTags.CONTEXT_CHIP)
+        listOf(ComposerTestTags.SEND, ComposerTestTags.MODEL_CHIP, ComposerTestTags.CONTEXT_CHIP)
             .forEach { tag ->
                 val bounds = onNodeWithTag(tag).getUnclippedBoundsInRoot()
                 assertTrue(bounds.left >= card.left && bounds.right <= card.right, "$tag $bounds overflows the card $card")
             }
-        // The mode chip wraps below the primary row.
+        // The context chip wraps below the primary row; the mode line sits under the card, inside its width.
         val model = onNodeWithTag(ComposerTestTags.MODEL_CHIP).getUnclippedBoundsInRoot()
-        val mode = onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).getUnclippedBoundsInRoot()
-        assertTrue(mode.top >= model.bottom, "mode chip $mode did not wrap below model chip $model")
+        val context = onNodeWithTag(ComposerTestTags.CONTEXT_CHIP).getUnclippedBoundsInRoot()
+        assertTrue(context.top >= model.bottom, "context chip $context did not wrap below model chip $model")
+        val mode = onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).getUnclippedBoundsInRoot()
+        assertTrue(mode.top >= card.bottom, "mode line $mode is not under the card $card")
+        assertTrue(mode.left >= card.left && mode.right <= card.right, "mode line $mode overflows the card's width $card")
     }
 
-    /** The Touch bar carries no mode chip: its "+" sheet offers the mode (TouchComposerBarUiTest). */
+    /** The Touch bar carries no mode line: its "+" sheet offers the mode (TouchComposerBarUiTest). */
     @Test
-    fun theTouchBarHasNoModeChipAboveIt() = runComposeUiTest {
+    fun theTouchBarHasNoModeLineOrChip() = runComposeUiTest {
         showPanel(width = 360.dp, keyboardHints = false, style = LettaInput.Touch)
 
         waitUntilExactlyOneExists(hasTestTag(ComposerTestTags.TOUCH_BAR))
-        waitUntilDoesNotExist(hasTestTag(ComposerTestTags.PERMISSION_MODE_CHIP))
+        waitUntilDoesNotExist(hasTestTag(ComposerTestTags.PERMISSION_MODE_LINE))
+        waitUntilDoesNotExist(hasTestTag(ComposerTestTags.HINT_FOOTER))
     }
 }

@@ -36,9 +36,12 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 
-/** What a composer chip shows: its label, after an optional leading icon. */
+/**
+ * What a composer chip shows: its label, after an optional leading icon, and an optional quieter
+ * [suffix] after a dot (the model chip's effort: "Opus 5.5 · High"). The label gives way first.
+ */
 @Immutable
-internal data class ComposerChipLabel(val text: String, val leadingIcon: ImageVector? = null)
+internal data class ComposerChipLabel(val text: String, val leadingIcon: ImageVector? = null, val suffix: String? = null)
 
 /**
  * A composer chip that opens something (a picker, a popover). Lifted from desktop's
@@ -78,7 +81,16 @@ internal fun ComposerActionChip(
                 style = MaterialTheme.typography.labelMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
+            label.suffix?.let { suffix ->
+                Text(
+                    text = "$CHIP_SUFFIX_SEPARATOR $suffix",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
             Icon(
                 imageVector = LettaIcons.KeyboardArrowDown,
                 contentDescription = null,
@@ -88,6 +100,8 @@ internal fun ComposerActionChip(
         }
     }
 }
+
+private const val CHIP_SUFFIX_SEPARATOR = "·"
 
 /**
  * A popover above its anchor (the chip it is composed beside), clamped into the window.

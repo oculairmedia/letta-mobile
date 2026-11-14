@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -27,14 +26,15 @@ import com.letta.mobile.data.repository.modelcontrol.ModelVisibilityFilter
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementController
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementState
 import com.letta.mobile.data.repository.modelcontrol.VisibleSection
+import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshable
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.theme.lettaSectionTitle
-import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.theme.LettaDimens
 
 /** Callbacks of [ProviderManagementPane]; [bind] wires them to the shared controller. */
 data class ProviderManagementActions(
@@ -148,10 +148,10 @@ private fun PaneToolbar(state: ProviderManagementState, actions: ProviderManagem
             modifier = Modifier.fillMaxWidth(),
         ) {
             ModelVisibilityFilter.entries.forEach { filter ->
-                FilterChip(
-                    selected = state.filter == filter,
+                LettaChipTab(
+                    text = filter.label,
+                    active = state.filter == filter,
                     onClick = { actions.onFilterChange(filter) },
-                    label = { Text(filter.label) },
                     modifier = Modifier.testTag("${ProviderManagementTags.FILTER_PREFIX}${filter.name.lowercase()}"),
                 )
             }

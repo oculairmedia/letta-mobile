@@ -212,6 +212,8 @@ private fun androidNavigationActions(shell: WorkspaceShell): ShellWorkspaceNavig
             },
             onPinConversation = { id, pinned -> model.setConversationPinned(ConversationId(id), pinned) },
             onOpenCanvas = { canvasId -> shell.exits.openCanvasById(canvasId.value) },
+            // A board of its own for the focused agent, opened on its page as before.
+            onNewCanvas = { shell.exits.openCanvas(shell.workspace.focusedAgentId?.value, null, null) },
             conversationMarks = model.conversationMarkActions,
             chatOptions = shell.chatPanel.value?.chatOptionsActions ?: base.panel.chatOptions,
         ),

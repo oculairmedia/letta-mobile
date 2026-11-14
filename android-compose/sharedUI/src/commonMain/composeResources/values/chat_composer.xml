@@ -23,9 +23,13 @@
     <string name="composer_clipboard_unreadable_image">the clipboard did not contain an image the app could read</string>
     <string name="composer_attach_too_large">larger than %1$d MB</string>
     <string name="composer_model_fallback">Model</string>
-    <string name="composer_model_selected">Selected</string>
     <string name="composer_effort_header">Effort</string>
     <string name="composer_effort_default">Default</string>
+    <!-- The prompt's one model control (model and effort) and the picker's effort section under its list. -->
+    <string name="composer_model_control">Model and effort</string>
+    <string name="composer_model_effort_state">%1$s, %2$s effort</string>
+    <string name="composer_effort_group">Effort for %1$s</string>
+    <string name="composer_effort_unavailable">%1$s has no effort levels</string>
     <string name="composer_context_label">Context %1$s</string>
     <string name="composer_context_title">Context window</string>
     <string name="composer_context_show_breakdown">Show the context breakdown</string>
@@ -63,7 +67,7 @@
     <string name="composer_actions_open">Add to message</string>
     <string name="composer_actions_title">Add to message</string>
     <string name="composer_attach_image">Attach image</string>
-    <!-- The "+" sheet's permission-mode row: the mode as the pointer chip names it. -->
+    <!-- The "+" sheet's permission-mode row: the mode as the under-card line names it. -->
     <string name="composer_permission_mode_item">Permission mode: %1$s</string>
     <string name="composer_open_chat">Open the chat</string>
 </resources>

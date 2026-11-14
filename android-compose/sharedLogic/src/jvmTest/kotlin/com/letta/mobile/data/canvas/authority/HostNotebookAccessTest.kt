@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas.authority
 import com.letta.mobile.data.canvas.NotebookDocumentId
 import com.letta.mobile.data.canvas.NotebookItem
 import com.letta.mobile.data.canvas.NotebookLocalStore
+import com.letta.mobile.data.canvas.NotebookDocumentIndex
 import com.letta.mobile.data.canvas.NotebookHistoryArchive
 import com.letta.mobile.data.canvas.NotebookPeerGrant
 import com.letta.mobile.data.canvas.notes.notebookStorageId
@@ -16,12 +17,16 @@ import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceOpen
 import com.letta.mobile.data.canvas.workspace.SharedNote
 import com.letta.mobile.data.canvas.workspace.SharedNoteListing
 import com.letta.mobile.data.canvas.workspace.SharedNotesCursor
+import java.io.IOException
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.automerge.ObjectId
+import org.automerge.repo.DocumentId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -242,20 +247,128 @@ class HostNotebookAccessTest {
         }
     }
 
-    /** Skipping ids that cannot name a notebook does not hide a real failure: a note that cannot be read fails the page. */
+    /**
+     * A note whose title cannot be read is counted as checked and left out, and the page goes on past it,
+     * so one broken note never makes the listing unavailable for everyone it is shared with.
+     */
     @Test
-    fun aNoteThatCannotBeReadStillMakesThePageUnavailable() = runBlocking {
+    fun aNoteThatCannotBeReadIsSkippedAndThePageGoesOn() = runBlocking {
+        withNotes(2) { notebooks, ids ->
+            val (broken, readable) = ids.sortedBy { it.value }
+            breakTitle(notebooks, broken)
+            val grants = MemoryGrants(editableInvalid(1) + (broken to EDITOR) + (readable to EDITOR))
+
+            val listing = HostNotebookAccess(notebooks, grants, PEER).sharedNotes()
+
+            assertEquals(SharedNoteListing.Listed(listOf(SharedNote(readable, titleOf(notebooks, readable)))), listing)
+            assertEquals(3, grants.rechecks, "the unreadable note was checked once and the walk went on")
+        }
+    }
+
+    /** Skipping an unreadable note does not hide a store-wide failure: a grant store that cannot be read is unavailable. */
+    @Test
+    fun aGrantStoreThatCannotBeReadStillMakesThePageUnavailable() = runBlocking {
         withNotes(1) { notebooks, (id) ->
-            val handle = requireNotNull(notebooks.open(notebookStorageId(id)))
-            handle.withDocument { document ->
-                document.startTransaction().use { tx ->
-                    tx.set(ObjectId.ROOT, "title", true)
-                    tx.commit()
-                }
-            }.get()
-            val grants = MemoryGrants(editableInvalid(1) + (id to EDITOR))
+            val grants = MemoryGrants(listOf(id to EDITOR)).apply { unreadable = true }
 
             assertIs<SharedNoteListing.Unavailable>(HostNotebookAccess(notebooks, grants, PEER).sharedNotes())
+        }
+    }
+
+    /** A grant whose note was retired (moved to a successor) is not listed, and no successor is looked up for it. */
+    @Test
+    fun aRetiredNoteIsNotListedEvenWithARecordedSuccessor() = runBlocking {
+        val directory = Files.createTempDirectory("notebook-shared-retired")
+        val retired = NotebookLocalStore(directory, "host").use { store ->
+            store.create("Retired").also { id ->
+                store.insertMarkdown(id, 0, "Retired body")
+                check(store.persistCanvas(id))
+            }
+        }
+        val retiredKey = keyOf(retired)
+        val successor = NotebookHistoryArchive(directory)
+            .compactToNewDocument(retiredKey, 1_000L, NotebookDocumentIndex(directory), 1_024L).newKey
+        NotebookLocalStore(directory, "host").use { notebooks ->
+            assertEquals(successor, notebooks.resolveStorageId(retired)?.let(::keyOf), "the successor is recorded")
+            val grants = MemoryGrants(listOf(NotebookDocumentId(retiredKey) to EDITOR, NotebookDocumentId(successor) to EDITOR))
+
+            val listing = assertIs<SharedNoteListing.Listed>(HostNotebookAccess(notebooks, grants, PEER).sharedNotes())
+
+            assertEquals(listOf(NotebookDocumentId(successor)), listing.notes.map { it.id })
+            assertNull(listing.next)
+        }
+    }
+
+    /**
+     * The file store reuses what it parsed only while the file's bytes are unchanged, so a grant revoked
+     * by another instance (as another process would) is rechecked and left out on the next page.
+     */
+    @Test
+    fun aGrantRevokedThroughAnotherFileStoreIsNotListedByOneThatParsedTheFileBefore() = runBlocking {
+        assumeDurableGrantHost()
+        withNotes(2) { notebooks, ids ->
+            val path = Files.createTempDirectory("notebook-grant-reuse").resolve("grants.json")
+            val admin = FileNotebookGrantStore(path)
+            ids.forEach { admin.provision(it, EDITOR) }
+            val access = HostNotebookAccess(notebooks, FileNotebookGrantStore(path), PEER)
+            val sorted = ids.sortedBy { it.value }
+            assertEquals(sorted, assertIs<SharedNoteListing.Listed>(access.sharedNotes()).notes.map { it.id })
+
+            admin.revoke(PEER, sorted.first())
+
+            assertEquals(listOf(sorted.last()), assertIs<SharedNoteListing.Listed>(access.sharedNotes()).notes.map { it.id })
+        }
+    }
+
+    /** Long titles are cut on the wire, never inside a surrogate pair, and a reader cuts them too. */
+    @Test
+    fun titlesAreCutToTheWireMaximumWithoutSplittingACharacter() {
+        val max = SharedNotesWire.MAX_TITLE_CHARS
+        val pairAtTheCut = "a".repeat(max - 1) + "😀" + "tail"
+        val id = NotebookDocumentId("0123456789abcdef0123456789abcdef")
+
+        assertEquals("b".repeat(max), SharedNotesWire.boundedTitle("b".repeat(max + 10)))
+        assertEquals("a".repeat(max - 1), SharedNotesWire.boundedTitle(pairAtTheCut))
+        assertEquals("short", SharedNotesWire.boundedTitle("short"))
+        val long = buildJsonObject {
+            put("status", "listed")
+            put("notes", buildJsonArray { add(buildJsonObject { put("document_id", id.value); put("title", "c".repeat(max * 3)) }) })
+        }
+        val read = assertIs<SharedNoteListing.Listed>(SharedNotesWire.readSharedNotes(long))
+        assertEquals(max, read.notes.single().title.length)
+        val sent = SharedNotesWire.sharedNotes(SharedNoteListing.Listed(listOf(SharedNote(id, "d".repeat(max * 3)))))
+        assertEquals(max, assertIs<SharedNoteListing.Listed>(SharedNotesWire.readSharedNotes(sent)).notes.single().title.length)
+    }
+
+    /** A reader keeps only entries whose id is a host note id, dropping (not failing on) the others. */
+    @Test
+    fun aReaderDropsEntriesWhoseIdIsNotAHostNoteId() {
+        val good = "0123456789abcdef0123456789abcdef"
+        val bad = listOf("", "../etc/passwd", good.uppercase(), good + "0", good.drop(1), "g".repeat(32))
+        val body = buildJsonObject {
+            put("status", "listed")
+            put("notes", buildJsonArray {
+                (bad + good).forEach { id -> add(buildJsonObject { put("document_id", id); put("title", "T") }) }
+            })
+        }
+
+        assertEquals(SharedNoteListing.Listed(listOf(SharedNote(NotebookDocumentId(good), "T"))), SharedNotesWire.readSharedNotes(body))
+    }
+
+    /** A page whose entries would pass the byte budget stops before it, and the next page starts with the note that did not fit. */
+    @Test
+    fun aPageStopsAtTheByteBudgetAndTheNextStartsWithTheNoteThatDidNotFit() = runBlocking {
+        val count = 2 * SharedNotesWire.MAX_PAGE_BYTES / longEntryBytes() + 1
+        withNotes(count, title = { LONG_TITLE }) { notebooks, ids ->
+            val grants = MemoryGrants(ids.map { it to EDITOR })
+            val pages = walk(HostNotebookAccess(notebooks, grants, PEER))
+
+            assertTrue(pages.size >= 3, "a page stops at the byte budget, not at the note count")
+            assertEquals(ids.sortedBy { it.value }, pages.flatMap { page -> page.notes.map { it.id } })
+            for (page in pages) {
+                assertTrue(page.notes.sumOf(SharedNotesWire::entryBytes) <= SharedNotesWire.MAX_PAGE_BYTES)
+                assertTrue(page.notes.all { it.title.length == SharedNotesWire.MAX_TITLE_CHARS })
+            }
         }
     }
 
@@ -329,12 +442,36 @@ class HostNotebookAccessTest {
         assertEquals(buildJsonObject { put("cursor", "v1.opaque") }, SharedNotesWire.request(page.next))
     }
 
-    private suspend fun withNotes(count: Int, block: suspend (NotebookLocalStore, List<NotebookDocumentId>) -> Unit) {
+    /** [count] new notes, the n-th titled [title] of n ("Note n" by default), in a fresh store. */
+    private suspend fun withNotes(
+        count: Int,
+        title: (Int) -> String = { "Note $it" },
+        block: suspend (NotebookLocalStore, List<NotebookDocumentId>) -> Unit,
+    ) {
         val root = Files.createTempDirectory("notebook-shared-listing")
         NotebookLocalStore(Files.createDirectory(root.resolve("notebooks")), "host").use { notebooks ->
-            block(notebooks, (0 until count).map { requireNotNull(notebooks.read(notebooks.create("Note $it"))).id })
+            block(notebooks, (0 until count).map { requireNotNull(notebooks.read(notebooks.create(title(it)))).id })
         }
     }
+
+    /** The encoded size of one note entry titled [LONG_TITLE], as a page counts it. */
+    private fun longEntryBytes(): Int =
+        SharedNotesWire.entryBytes(SharedNote(NotebookDocumentId("0".repeat(32)), SharedNotesWire.boundedTitle(LONG_TITLE)))
+
+    /** Makes the note's title something other than a string, so a title read throws. */
+    private fun breakTitle(notebooks: NotebookLocalStore, id: NotebookDocumentId) {
+        requireNotNull(notebooks.open(notebookStorageId(id))).withDocument { document ->
+            document.startTransaction().use { tx ->
+                tx.set(ObjectId.ROOT, "title", true)
+                tx.commit()
+            }
+        }.get()
+    }
+
+    private fun titleOf(notebooks: NotebookLocalStore, id: NotebookDocumentId): String =
+        requireNotNull(notebooks.read(notebookStorageId(id))).title
+
+    private fun keyOf(id: DocumentId): String = id.bytes.joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
 
     /** Every page the host hands out, following cursors from the first until one has none. */
     private suspend fun walk(access: HostNotebookAccess): List<SharedNoteListing.Listed> {
@@ -365,12 +502,14 @@ class HostNotebookAccessTest {
 
     /**
      * Grants held in memory, listed in id order as the store contract says. Counts every grant handed
-     * to a transaction ([rechecks]) and every store read, each transaction or listing ([reads]).
+     * to a transaction ([rechecks]) and every store read, each transaction or listing ([reads]). While
+     * [unreadable], listing still works but every grant transaction fails, as a broken store would.
      */
     private class MemoryGrants(grants: List<Pair<NotebookDocumentId, NotebookPeerGrant>>) : NotebookGrantStore {
         private val byDocument = grants.toMap().toMutableMap()
         var rechecks = 0
         var reads = 0
+        var unreadable = false
 
         fun revoke(id: NotebookDocumentId) {
             byDocument.remove(id)
@@ -391,6 +530,7 @@ class HostNotebookAccessTest {
             documentIds: Collection<NotebookDocumentId>,
             action: suspend (Map<NotebookDocumentId, NotebookPeerGrant>) -> T,
         ): T {
+            if (unreadable) throw IOException("grant store unreadable")
             rechecks += documentIds.size
             reads++
             val held = documentIds.mapNotNull { id -> byDocument[id]?.takeIf { it.peerId == principal }?.let { id to it } }
@@ -404,6 +544,8 @@ class HostNotebookAccessTest {
     }
 
     private companion object {
+        /** Control characters, which JSON writes as six bytes each, so few notes pass the byte budget. */
+        val LONG_TITLE = "\u0001".repeat(2 * SharedNotesWire.MAX_TITLE_CHARS)
         const val PEER = "peer"
         const val MAX_PAGES = 10
         val EDITOR = NotebookPeerGrant(PEER, mayRead = true, mayEdit = true)

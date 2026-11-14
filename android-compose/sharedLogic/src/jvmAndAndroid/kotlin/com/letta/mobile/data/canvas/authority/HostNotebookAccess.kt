@@ -23,7 +23,11 @@ import com.letta.mobile.data.canvas.workspace.SharedNoteListing
 import com.letta.mobile.data.canvas.workspace.SharedNotesCursor
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
+import java.util.concurrent.ExecutionException
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 import kotlinx.coroutines.CancellationException
+import org.automerge.repo.DocumentId
 
 /**
  * Host-side access bound to a principal obtained from authenticated transport state. Never construct
@@ -77,12 +81,19 @@ class HostNotebookAccess(
      * One page of the notes this principal may open now, starting after [from] (null for the first
      * page). Grants are rechecked for read and edit in id order, [SHARED_NOTES_CHECKS_PER_TRANSACTION]
      * at a time under one grant transaction ([NotebookGrantStore.withGrants]), and each note's title is
-     * read inside the transaction that allowed it. A granted note missing from the store is left out,
-     * as is a grant whose id cannot name a local notebook, or is longer than a cursor can name
-     * ([SharedNotesCursors.MAX_ID_BYTES]; the host's own note ids are far shorter). A page holds up to
-     * [SharedNotesWire.MAX_LISTED] notes that pass that check and rechecks at most [SharedNotesWire.MAX_CHECKED] grants; one that stopped
-     * before the principal's last grant carries [SharedNoteListing.Listed.next], naming the last grant
-     * it checked, so following cursors reaches every grant however many cannot open the editor.
+     * read inside the transaction that allowed it, by a title-only read that never loads the rest of the
+     * note and never resolves a retired id to a successor. A granted note that is missing or retired is
+     * left out, as is a grant whose id cannot name a local notebook, or is longer than a cursor can name
+     * ([SharedNotesCursors.MAX_ID_BYTES]; the host's own note ids are far shorter). A note whose title
+     * read fails or times out is left out too and logged with its id and the error class only, so one
+     * unreadable note never stops the walk; a grant store that cannot be read still answers unavailable.
+     *
+     * A page holds up to [SharedNotesWire.MAX_LISTED] notes whose entries together stay within
+     * [SharedNotesWire.MAX_PAGE_BYTES], rechecks at most [SharedNotesWire.MAX_CHECKED] grants, and stops
+     * taking new notes once [SHARED_NOTES_PAGE_SECONDS] have passed. One that stopped before the
+     * principal's last grant carries [SharedNoteListing.Listed.next], naming the last grant it checked
+     * (a note that did not fit is not counted as checked, so the next page starts with it), so following
+     * cursors reaches every grant however many cannot open the editor.
      *
      * Consistency: every page is a fresh decision over a fresh, id-ordered read of the principal's
      * grants, and starts strictly after the cursor's id, so pages never repeat a note and a walk
@@ -112,12 +123,16 @@ class HostNotebookAccess(
         return SharedNoteListing.Listed(page.notes, nextCursor(candidates, page.checked))
     }
 
-    /** Checks [chunk] in order against the grants read for it in this transaction, until the page is full. */
+    /**
+     * Checks [chunk] in order against the grants read for it in this transaction, until the page is full.
+     * A note that passes but no longer fits stops the page uncounted, so the next page rechecks it first.
+     */
     private fun checkChunk(chunk: List<NotebookDocumentId>, held: Map<NotebookDocumentId, NotebookPeerGrant>, page: SharedNotesPage) {
         for (id in chunk) {
             if (page.full()) return
+            val note = openable(id, held[id])
+            if (note != null && !page.add(note)) return
             page.checked++
-            openable(id, held[id])?.let(page.notes::add)
         }
     }
 
@@ -138,30 +153,76 @@ class HostNotebookAccess(
     /**
      * The note as listed, when [grant] (read in the current transaction) lets this principal open it. A
      * grant whose id cannot name a local notebook opens nothing and is left out, still counted as
-     * checked so the cursor moves past it; a failing read of a real note id still fails the page.
+     * checked so the cursor moves past it, as is a note whose title cannot be read.
      */
     private fun openable(id: NotebookDocumentId, grant: NotebookPeerGrant?): SharedNote? {
         if (!mayEditNotebookContent(grant)) return null
         val storage = notebookStorageIdOrNull(id) ?: return null
-        return notebooks.read(storage)?.let { SharedNote(id, it.title) }
+        return titleOrSkip(id, storage)?.let { SharedNote(id, SharedNotesWire.boundedTitle(it)) }
+    }
+
+    /** The note's title; null when it is missing or retired, or (logged, without the title) when the read fails. */
+    private fun titleOrSkip(id: NotebookDocumentId, storage: DocumentId): String? {
+        // Any failure of this one read (timeout, failed load, malformed title) skips the note; cancellation still propagates.
+        return runCatching { notebooks.titleOf(storage) }.getOrElse { unreadable ->
+            if (unreadable is CancellationException || unreadable !is Exception) throw unreadable
+            reportUnreadable(id, unreadable)
+            null
+        }
     }
 }
 
+/** Logs a note left out of a listing: its id and the error class only, never its title or the principal. */
+private fun reportUnreadable(id: NotebookDocumentId, failure: Exception) {
+    val cause = (failure as? ExecutionException)?.cause ?: failure
+    Telemetry.event(
+        "NotebookAuthority", "shared_list.note_unreadable",
+        "documentId" attr id.value, "error" attr (cause::class.simpleName ?: "unknown"),
+        level = Telemetry.Level.WARN,
+    )
+}
+
 /**
- * How many grants one listing transaction rechecks. A page reads the grant store at most
- * MAX_CHECKED / this + 1 times (21) rather than once per grant, while the grant lock is held for one
- * store read plus at most this many note reads, so provisioning and revocation wait for one chunk,
- * never for a whole page.
+ * How many grants one listing transaction rechecks. A page runs at most MAX_CHECKED / this
+ * transactions after its listing read, and the grant lock is held for one store read plus at most
+ * this many title-only reads, so provisioning and revocation wait for one chunk, never for a whole
+ * page. The grant file itself is parsed once and reused while its bytes are unchanged (see
+ * [FileNotebookGrantStore]).
  */
 internal const val SHARED_NOTES_CHECKS_PER_TRANSACTION = 50
 
-/** One page being built: the notes that passed their recheck, and how many grants were checked. */
+/**
+ * After this long a page takes no further notes (once it has checked at least one grant) and hands back
+ * a cursor, so a run of slow notes bounds how long one request holds the grant lock.
+ */
+internal const val SHARED_NOTES_PAGE_SECONDS = 5L
+
+/**
+ * One page being built: the notes that passed their recheck and fit, how many grants were checked, and
+ * whether the page stopped because the next note would pass the byte budget or its time ran out.
+ */
 private class SharedNotesPage {
     val notes = mutableListOf<SharedNote>()
     var checked = 0
+    private var bytes = 0
+    private var overBudget = false
+    private val deadline = TimeSource.Monotonic.markNow() + SHARED_NOTES_PAGE_SECONDS.seconds
 
     fun full(): Boolean {
-        return notes.size == SharedNotesWire.MAX_LISTED
+        if (notes.size == SharedNotesWire.MAX_LISTED || overBudget) return true
+        return checked > 0 && deadline.hasPassedNow()
+    }
+
+    /** Adds [note] when its entry fits the byte budget (the first always does); false, and the page is full, when not. */
+    fun add(note: SharedNote): Boolean {
+        val size = SharedNotesWire.entryBytes(note)
+        if (notes.isNotEmpty() && bytes + size > SharedNotesWire.MAX_PAGE_BYTES) {
+            overBudget = true
+            return false
+        }
+        notes += note
+        bytes += size
+        return true
     }
 }
 

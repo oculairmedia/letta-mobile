@@ -32,6 +32,10 @@ Interactive canvas layers, gestures, cameras, selection, notes, formatting and s
 
 How a view that shows one board wherever it is placed (the shell's canvas module) opens a stored board by its id. A host that can open boards by id provides a `CanvasBoardSource` through `LocalCanvasBoardSource`; null is a host that cannot, whose such views show only boards already live in `LocalCanvasSessionRegistry`. The source decides the store; it holds no sessions or rendering of its own.
 
+# Package com.letta.mobile.ui.canvas.mount
+
+The board seat of a conversation's page, the same on every host. `ConversationCanvasFrame` draws the conversation's own board at once and switches to the canvas the host has mounted for it once the window's `ConversationCanvasPicker` (provided through `LocalConversationCanvasPicker`; null is a host without mounts) says so, saving the board on screen first through the workspace's `LocalCanvasBoardSave`. It reports that its page is on screen, and canvas mode (`LocalChatCanvasOnBoard`, provided by the chat surface), to the window's `CanvasModeFocus`, and gives the side menu its view of the picker (`PickerShellCanvasMounts` as `LocalShellCanvasMounts`), so a pick mounts on the conversation on screen: in place in canvas mode, and opened in the host's pane as well in chat mode. `CloseCanvasPaneShownOnBoard` closes a host's pane copy of the board once canvas mode shows it. Resolution, retries and the switch rule live in sharedLogic; this package holds no policy of its own.
+
 # Package com.letta.mobile.ui.canvas.library
 
 Canvas-library status presented through the shared overlay host. `CanvasLibraryNotice` keeps storage failures visible, offers reload-only retry, and withdraws the notice after recovery. Hosts supply the shared library controller; keep persistence and retry policy in sharedLogic rather than the composable.

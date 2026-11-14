@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.surface.composer
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -97,9 +98,7 @@ internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modi
             DockedComposerBar(model, images.attach)
         } else {
             ComposerCompanionRow(model) { ComposerPromptCard(model, images.attach) }
-            if (inputs.platform.showKeyboardHints) {
-                ComposerHintRow(visible = composerHintVisible(composer), contextUsage = composer.contextUsage)
-            }
+            ComposerUnderCardLine(model)
         }
     }
 }
@@ -160,6 +159,29 @@ private fun TouchComposerPanel(model: ComposerModel, attachImage: () -> Unit, mo
     }
 }
 
+/**
+ * The line directly under the full page's card: the permission mode, then the keyboard hint and the
+ * context indicator where the platform shows the hint. Nothing when it would hold neither.
+ */
+@Composable
+private fun ComposerUnderCardLine(model: ComposerModel) {
+    val permission = model.composer.permissionMode
+    val hints = model.platform.showKeyboardHints
+    if (permission == null && !hints) return
+    // The mode takes its own width first (ellipsized if the line is narrower); the hint gives way.
+    val leading: (@Composable RowScope.() -> Unit)? = if (permission == null) {
+        null
+    } else {
+        { ComposerPermissionModeLine(permission, model.actions::setPermissionMode) }
+    }
+    ComposerHintRow(
+        visible = hints && composerHintVisible(model.composer),
+        contextUsage = model.composer.contextUsage.takeIf { model.contextInHintFooter },
+        showHint = hints,
+        leading = leading,
+    )
+}
+
 /** What stacks above the prompt: the queue, the error, the working directory, suggestions. */
 @Composable
 private fun ComposerAboveCard(model: ComposerModel) {
@@ -180,8 +202,8 @@ private fun ComposerAboveCard(model: ComposerModel) {
     if (model.showWorkingDirectory && model.mode != ChatSurfaceMode.Docked) {
         model.composer.workingDirectory?.let { ComposerWorkingDirectoryRow(it, model.host.pickWorkingDirectory) }
     }
-    // The mode is chrome of the full page, not of the compact dock. The pointer card's control row
-    // carries its chip, the Touch bar's "+" sheet its row; only its note stays here.
+    // The mode is chrome of the full page, not of the compact dock. Its line sits under the pointer
+    // card, its row in the Touch bar's "+" sheet; only its note stays here.
     if (model.mode != ChatSurfaceMode.Docked) {
         model.composer.permissionMode?.let { state -> ComposerPermissionModeNoteRow(state) }
         ComposerAgentMentionChips(model.composer.text, actions::updateComposerText)

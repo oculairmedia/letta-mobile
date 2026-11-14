@@ -28,8 +28,13 @@ import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSyncTransport
 import com.letta.mobile.data.canvas.InMemoryCanvasOpLog
+import com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.ui.canvas.boards.LocalCanvasBoardSessions
+import com.letta.mobile.ui.canvas.mount.ConversationCanvasFrame
+import com.letta.mobile.util.runCatchingCancellable
 import com.letta.mobile.data.storage.AssetStore
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.sharedui.resources.Res
@@ -51,6 +56,7 @@ import com.letta.mobile.ui.chat.surface.ChatCanvasPlaceholder
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
+import com.letta.mobile.ui.chat.surface.LocalChatCanvasOnBoard
 import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
 import com.letta.mobile.ui.shell.LocalShellFloatingChromeInset
 import com.letta.mobile.ui.theme.LettaDimens
@@ -107,7 +113,10 @@ class ShellChatLook(
     val pagedTimeline: CanonicalTimelinePresentation? = null,
     val recents: ChatRecentInteractions? = null,
     val canvasHeaderTrailing: (@Composable () -> Unit)? = null,
-    /** The board on show, so the host can route its own opens of it to this page (desktop's dock); null when it leaves. */
+    /**
+     * The board on show, so the host can route its own opens of it to this page (desktop's dock); null when it
+     * leaves, and while a mounted board waits under the chat page (it is not on show until canvas mode).
+     */
     val onBoardShown: ((CanvasId?) -> Unit)? = null,
     /** The conversation's subagent dual view; null draws the page alone. */
     val subagentViews: SubagentDualViewBinding? = null,
@@ -126,19 +135,12 @@ fun ShellChatDestination(
     modifier: Modifier = Modifier,
     look: ShellChatLook = ShellChatLook(),
 ) {
-    val session = rememberConversationBoard(page.board, page.owner)
-    look.onBoardShown?.let { report ->
-        DisposableEffect(report, session) {
-            report(session?.canvasId)
-            onDispose { report(null) }
-        }
-    }
     // The page draws under the workspace's floating chrome and rests its content below it.
     val platform = look.platform.underFloatingChrome(LocalShellFloatingChromeInset.current)
     // letta-mobile-zxk2n.8: a subagent's conversation opens beside this one (in its place on a narrow page), read-only.
     val dualViewOptions = SubagentDualViewOptions(look.appearance, page.host, platform.topChromeInset)
     SubagentDualViewFrame(look.subagentViews, modifier, dualViewOptions) { parentModifier ->
-        ParentChatPage(ParentChatInputs(page, presentation, look, session, platform), parentModifier)
+        ParentChatPage(ParentChatInputs(page, presentation, look, platform), parentModifier)
     }
 }
 
@@ -146,7 +148,6 @@ private class ParentChatInputs(
     val page: ShellChatPage,
     val presentation: ShellChatPresentation,
     val look: ShellChatLook,
-    val session: CanvasSession?,
     /** The look's platform with the floating chrome folded in. */
     val platform: ChatSurfacePlatform,
 )
@@ -157,7 +158,6 @@ private fun ParentChatPage(inputs: ParentChatInputs, modifier: Modifier) {
     val page = inputs.page
     val presentation = inputs.presentation
     val look = inputs.look
-    val session = inputs.session
     var dockGeometry by page.dockGeometry
     ChatSurface(
         port = page.port,
@@ -178,7 +178,10 @@ private fun ParentChatPage(inputs: ParentChatInputs, modifier: Modifier) {
         pagedTimeline = look.pagedTimeline,
         canvas = { actions ->
             if (page.owner.conversationId != null) {
-                ConversationBoard(BoardInputs(session, page.board, look, inputs.platform.topChromeInset), actions)
+                // The board the conversation shows: its mount when the host has one, else its own.
+                ConversationCanvasFrame(page.owner.mountTarget()) { mounted ->
+                    ConversationBoard(BoardInputs(page, look, inputs.platform.topChromeInset, mounted), actions)
+                }
             } else {
                 ChatCanvasPlaceholder()
             }
@@ -193,17 +196,27 @@ private fun ParentChatPage(inputs: ParentChatInputs, modifier: Modifier) {
 fun escapeCollapsesToCanvas(mode: ChatSurfaceMode, key: Key, type: KeyEventType): Boolean =
     mode == ChatSurfaceMode.FullScreen && key == Key.Escape && type == KeyEventType.KeyDown
 
-/** The conversation's own board, created on first open; none for a chat that has no conversation yet. */
+/** The conversation the owner's board belongs to, for its mount; null for a new chat. */
+private fun ShellCanvasOwner.mountTarget(): ConversationCanvasTarget? =
+    ConversationCanvasTarget.of(agentId?.let(::AgentId), conversationId?.let(::ConversationId))
+
+/**
+ * The board on show: the [mounted] canvas held through the window's boards, or else (no mount, no
+ * window boards, or a mount this device cannot open) the conversation's own board, created on
+ * first open. None for a chat that has no conversation yet.
+ */
 @Composable
-private fun rememberConversationBoard(board: ShellChatBoard, owner: ShellCanvasOwner): CanvasSession? {
+private fun rememberConversationBoard(board: ShellChatBoard, owner: ShellCanvasOwner, mounted: CanvasId?): CanvasSession? {
     val title = stringResource(
         Res.string.shell_chat_canvas_title,
         owner.agentName.ifBlank { stringResource(Res.string.shell_chat_canvas_owner_fallback) },
     )
-    val session by produceState<CanvasSession?>(null, board, owner.conversationId, owner.agentId) {
+    val boards = LocalCanvasBoardSessions.current
+    val session by produceState<CanvasSession?>(null, board, owner.conversationId, owner.agentId, mounted) {
         value = null
         val conversation = owner.conversationId ?: return@produceState
-        value = CanvasSession.getOrCreateForConversation(
+        val held = mounted?.let { canvas -> boards?.let { runCatchingCancellable { it.acquire(canvas) }.getOrNull() } }
+        value = held ?: CanvasSession.getOrCreateForConversation(
             store = board.store,
             conversationId = ConversationId(conversation),
             options = CanvasConversationOptions(
@@ -213,23 +226,35 @@ private fun rememberConversationBoard(board: ShellChatBoard, owner: ShellCanvasO
                 syncTransport = board.syncTransport,
             ),
         )
+        if (held != null) awaitDispose { boards?.release(held) }
     }
     return session
 }
 
-private class BoardInputs(val session: CanvasSession?, val board: ShellChatBoard, val look: ShellChatLook, val chromeTopInset: Dp)
+private class BoardInputs(val page: ShellChatPage, val look: ShellChatLook, val chromeTopInset: Dp, val mounted: CanvasId?)
 
 @Composable
 private fun ConversationBoard(inputs: BoardInputs, actions: ChatCanvasActions) {
-    val session = inputs.session
+    val board = inputs.page.board
+    val session = rememberConversationBoard(board, inputs.page.owner, inputs.mounted)
+    // A mounted board under the chat page is not on show: the host may show it in its side pane
+    // (the same live session, through the window's boards) until canvas mode puts it on show.
+    val onBoard = LocalChatCanvasOnBoard.current
+    val shown = session?.canvasId?.takeIf { inputs.mounted == null || onBoard }
+    inputs.look.onBoardShown?.let { report ->
+        DisposableEffect(report, shown) {
+            report(shown)
+            onDispose { report(null) }
+        }
+    }
     if (session == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LettaSpinner(size = LettaDimens.Control.spinnerLg) }
         return
     }
     CanvasWorkspace(
         session = session,
-        presenceTransport = inputs.board.presence,
-        assets = inputs.board.assets,
+        presenceTransport = board.presence,
+        assets = board.assets,
         // The canvas is the page: no title bar or back arrow, just its actions pill.
         onNavigateBack = null,
         onShareToChat = actions::shareToChat,

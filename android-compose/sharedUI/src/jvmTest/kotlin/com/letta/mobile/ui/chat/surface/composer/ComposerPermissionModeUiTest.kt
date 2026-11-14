@@ -3,7 +3,13 @@
 package com.letta.mobile.ui.chat.surface.composer
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeUiTest
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -25,7 +31,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import com.letta.mobile.ui.chat.surface.setPointerContent
 
-/** letta-mobile-bzvro.13 (F13): the permission-mode chip in the composer's control row. */
+/** The permission mode: its quiet line under the composer card, its popover and its Shift+Tab cycle. */
 class ComposerPermissionModeUiTest {
     private val unrestricted = ChatPermissionModeUiState(selected = AppServerPermissionMode.Unrestricted)
 
@@ -46,15 +52,15 @@ class ComposerPermissionModeUiTest {
     }
 
     @Test
-    fun theChipShowsTheConfirmedModeAndOpensThePicker() = runComposeUiTest {
+    fun theLineShowsTheConfirmedModeAndOpensThePicker() = runComposeUiTest {
         val actions = RecordingChatActions()
         showPanel(unrestricted, actions)
 
-        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertIsEnabled()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).assertIsEnabled()
         onNodeWithText("Approve all").assertExists()
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_POPOVER).assertDoesNotExist()
 
-        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).performClick()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).performClick()
         AppServerPermissionMode.entries.forEach { mode ->
             onNodeWithTag(ComposerTestTags.PERMISSION_MODE_OPTION + mode.name).assertExists()
         }
@@ -64,19 +70,33 @@ class ComposerPermissionModeUiTest {
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_POPOVER).assertDoesNotExist()
     }
 
+    /** The line has no chevron, but is still announced as the permission-mode control that opens its picker. */
+    @Test
+    fun theLineIsAnnouncedAsTheModeControlWithoutAChevron() = runComposeUiTest {
+        showPanel(unrestricted)
+
+        val config = onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).fetchSemanticsNode().config
+        assertEquals(Role.Button, config.getOrNull(SemanticsProperties.Role))
+        assertEquals("Permission mode", config.getOrNull(SemanticsActions.OnClick)?.label)
+        assertEquals(listOf("Permission mode"), config.getOrNull(SemanticsProperties.ContentDescription))
+        assertEquals("Approve all", config.getOrNull(SemanticsProperties.StateDescription))
+        val chevrons = hasTestTag(ComposerTestTags.CHIP_CHEVRON) and hasAnyAncestor(hasTestTag(ComposerTestTags.PERMISSION_MODE_LINE))
+        assertEquals(0, onAllNodes(chevrons, useUnmergedTree = true).fetchSemanticsNodes().size)
+    }
+
     @Test
     fun aRequestedChangeShowsPendingUntilTheServerEchoesIt() = runComposeUiTest {
         showPanel(unrestricted.copy(pending = AppServerPermissionMode.Standard))
 
         onNodeWithText("Changing to Ask for approval…").assertExists()
-        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertIsNotEnabled()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).assertIsNotEnabled()
     }
 
     @Test
-    fun whereTheModeCannotBeChangedTheChipIsLockedWithItsReason() = runComposeUiTest {
+    fun whereTheModeCannotBeChangedTheLineIsLockedWithItsReason() = runComposeUiTest {
         showPanel(unrestricted.copy(unavailableReason = "Not supported over Iroh yet"))
 
-        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertIsNotEnabled()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).assertIsNotEnabled()
         onNodeWithText("Not supported over Iroh yet").assertExists()
     }
 
@@ -84,10 +104,10 @@ class ComposerPermissionModeUiTest {
     fun anUnconfirmedChangeSaysSo() = runComposeUiTest {
         showPanel(unrestricted.copy(selected = AppServerPermissionMode.Strict, unconfirmed = AppServerPermissionMode.Unrestricted))
 
-        // The chip names the requested mode as unconfirmed; it does not claim the old one.
+        // The line names the requested mode as unconfirmed; it does not claim the old one.
         onNodeWithText("Approve all (unconfirmed)").assertExists()
         onNodeWithText("The server did not confirm the change").assertExists()
-        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertIsEnabled()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).assertIsEnabled()
     }
 
     @Test
@@ -95,7 +115,7 @@ class ComposerPermissionModeUiTest {
         showPanel(unrestricted.copy(selected = AppServerPermissionMode.Strict, appliesOnStart = true))
 
         onNodeWithText("Applies when the conversation starts").assertExists()
-        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertIsEnabled()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).assertIsEnabled()
     }
 
     @Test
@@ -106,17 +126,17 @@ class ComposerPermissionModeUiTest {
     }
 
     @Test
-    fun noChipForAnOwnerWithoutAMode() = runComposeUiTest {
+    fun noLineForAnOwnerWithoutAMode() = runComposeUiTest {
         showPanel(null)
 
-        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertDoesNotExist()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).assertDoesNotExist()
     }
 
     @Test
-    fun theCompactDockStaysOneBarWithoutTheChip() = runComposeUiTest {
+    fun theCompactDockStaysOneBarWithoutTheLine() = runComposeUiTest {
         showPanel(unrestricted, mode = ChatSurfaceMode.Docked)
 
-        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertDoesNotExist()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).assertDoesNotExist()
     }
 
     /** letta-mobile-bzvro.40 (G48): Shift+Tab at the prompt moves to the next mode, as Letta Desktop does. */

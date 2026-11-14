@@ -14,8 +14,7 @@ import com.letta.mobile.data.canvas.CanvasRelayClient
 import com.letta.mobile.data.canvas.CanvasSyncTransport
 import com.letta.mobile.data.canvas.FileCanvasDeliveryStore
 import com.letta.mobile.data.canvas.FileCanvasOpLog
-import com.letta.mobile.data.canvas.StoreCanvasClosedBoardApplier
-import com.letta.mobile.data.canvas.relayTopicOf
+import com.letta.mobile.data.canvas.storedBoardsRelayClient
 import com.letta.mobile.data.transport.iroh.IrohCanvasRelayClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,8 +50,6 @@ internal object DesktopNotebookCanvasStore {
 object DesktopCanvasHostSync {
     val opLog: CanvasOpLog = FileCanvasOpLog()
 
-    private val documents get() = DesktopNotebookCanvasStore.documents
-
     /**
      * Where the desktop's canvases keep their images (and any other large things put on a board),
      * in `~/.letta/canvas/assets`. One store for the boards and the relay: the image a board places
@@ -62,15 +59,10 @@ object DesktopCanvasHostSync {
         DesktopCanvasDocumentStore.defaultRootDirectory().resolve("assets").toFile(),
     )
 
-    val relay: CanvasRelayClient = CanvasRelayClient(
+    val relay: CanvasRelayClient = DesktopNotebookCanvasStore.documents.storedBoardsRelayClient(
         opLog = opLog,
-        delivery = FileCanvasDeliveryStore(
-            DesktopCanvasDocumentStore.defaultRootDirectory().resolve("delivery.json").toFile(),
-        ),
-        topicOf = { documents.relayTopicOf(it) },
+        delivery = FileCanvasDeliveryStore(DesktopCanvasDocumentStore.defaultRootDirectory().resolve("delivery.json").toFile()),
         assets = assets,
-        // Ops for a board no window has open go straight into the stored canvas (qygvv.23).
-        closedBoard = StoreCanvasClosedBoardApplier(documents, opLog),
     )
 
     @Suppress("NoDetachedCoroutineLifecycle") // Lives as long as the desktop process, like the op log.

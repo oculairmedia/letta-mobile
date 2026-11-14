@@ -31,11 +31,12 @@ internal class DesktopCanvasShell(
     val viewers: CanvasDocumentViewerRegistry = notebookCanvasViewers(DesktopNotebookCanvasStore.notebooks),
     /** One live session per board for the page and every canvas module; the page holds what it opens. */
     val boards: CanvasBoardSessions = CanvasBoardSessions(store, DesktopCanvasHostSync.options, sessions),
-) {
+) : com.letta.mobile.ui.shell.sidebar.ShellCanvasPane {
     private val page = CanvasPageBoard(boards)
-    var activeSession: CanvasSession? by page
+    val picker = com.letta.mobile.data.canvas.mount.client.ConversationCanvasPicker(DesktopCanvasMountClient.mounts) // this window's
+    override var activeSession: CanvasSession? by page
 
-    fun open(id: CanvasId) = library.open(id, boards, page::take)
+    override fun open(id: CanvasId) = library.open(id, boards, page::take)
 
     fun createNew(agentId: String?) = library.createNew(agentId?.let(::AgentId)) { activeSession = it }
 
@@ -51,7 +52,7 @@ internal class DesktopCanvasShell(
         ),
     )
 
-    fun close() {
+    override fun close() {
         activeSession = null
     }
 }

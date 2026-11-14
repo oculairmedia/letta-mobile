@@ -82,7 +82,7 @@ class MemoryGraphRenderTest {
             assertTrue(out.length() > 0)
         }
 
-    private fun pageState(nodeId: String): MemoryPageState {
+    internal fun pageState(nodeId: String): MemoryPageState {
         val memory = memory()
         val view = MemoryGraphViews.build(memory.graph, emptySet())
         val detail = requireNotNull(MemoryNodeDetails.resolve(memory, nodeId))
@@ -191,7 +191,7 @@ class MemoryGraphRenderTest {
         )
     }
 
-    private fun actions(): MemoryPageActions =
+    internal fun actions(): MemoryPageActions =
         Proxy.newProxyInstance(MemoryPageActions::class.java.classLoader, arrayOf(MemoryPageActions::class.java)) { proxy, method, args ->
             when (method.name) {
                 "equals" -> proxy === args?.firstOrNull()
@@ -201,7 +201,7 @@ class MemoryGraphRenderTest {
             }
         } as MemoryPageActions
 
-    private companion object {
+    internal companion object {
         const val AGENT = "agent:agent-1"
         const val HUMAN_BLOCK = "memory:block-human"
         const val BLOOM_SETTLE_MILLIS = 8_000L
