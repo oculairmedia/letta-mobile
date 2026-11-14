@@ -68,11 +68,27 @@ interface AudioCapture {
     fun capture(format: PcmFormat): Flow<AudioChunk>
 }
 
+/**
+ * A run of streamed 16-bit PCM: whole interleaved sample frames in [format]. Its [toString] reports
+ * the size and format only.
+ */
+class PcmChunk(
+    /** The interleaved samples; never log or store them. */
+    val samples: ShortArray,
+    /** Rate and channel count. */
+    val format: PcmFormat,
+) {
+    override fun toString(): String = "PcmChunk(samples=${samples.size}, format=$format)"
+}
+
 /** The platform's speaker, used by mouths that synthesise their own audio. */
 interface AudioPlayer {
     /**
-     * Plays [clip] to the end, reporting loudness through [onLevel]. Cancelling the call stops
-     * playback and returns only after the output is released.
+     * Plays [chunks] as they arrive, reporting loudness through [onLevel], and returns only once
+     * everything collected has been played out, not when the last chunk arrived. A wait between
+     * chunks is an underrun, never the end. Every chunk has the first chunk's format; an empty flow
+     * plays nothing. Cancelling the call stops playback at once, stops collecting [chunks] and
+     * returns only after the output is released.
      */
-    suspend fun play(clip: AudioClip, onLevel: (AudioLevel) -> Unit)
+    suspend fun play(chunks: Flow<PcmChunk>, onLevel: (AudioLevel) -> Unit)
 }

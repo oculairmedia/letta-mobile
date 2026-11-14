@@ -8,6 +8,10 @@ import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioEncoding
 import com.letta.mobile.data.voice.audio.AudioPlayer
+import com.letta.mobile.data.voice.audio.PcmChunk
+import com.letta.mobile.data.voice.audio.PcmFormat
+import com.letta.mobile.data.voice.audio.pcm.PcmAudio
+import com.letta.mobile.data.voice.audio.pcm.WavCodec
 import com.letta.mobile.data.voice.consent.EndpointOrigin
 import com.letta.mobile.data.voice.consent.VoiceEndpointGrant
 import com.letta.mobile.data.voice.consent.VoiceEndpointGrants
@@ -27,6 +31,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNot
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onSubscription
@@ -58,7 +63,11 @@ class EndpointEnginesTest {
         MockEngine {
             val number = ++requests
             val code = if (number == failingRequest) HttpStatusCode.Unauthorized else status
-            respond("""{"text":"hello"}""", code, headersOf(HttpHeaders.ContentType, "application/json"))
+            if (it.url.encodedPath.endsWith("/speech")) {
+                respond(SPEECH_WAV, code)
+            } else {
+                respond("""{"text":"hello"}""", code, headersOf(HttpHeaders.ContentType, "application/json"))
+            }
         },
         SpeechEndpointConfig(base),
     )
@@ -118,6 +127,7 @@ class EndpointEnginesTest {
         )
         assertEquals(expected, events)
         assertEquals(2, player.played)
+        assertEquals(listOf(SPEECH_SAMPLES, SPEECH_SAMPLES), player.samplesPerSegment, "every segment's audio reached the player")
     }
 
     @Test
@@ -157,35 +167,39 @@ class EndpointEnginesTest {
 
     private class RecordingPlayer : AudioPlayer {
         var played = 0
+        val samplesPerSegment = mutableListOf<Int>()
 
-        override suspend fun play(clip: AudioClip, onLevel: (AudioLevel) -> Unit) {
+        override suspend fun play(chunks: Flow<PcmChunk>, onLevel: (AudioLevel) -> Unit) {
+            var samples = 0
+            chunks.collect { samples += it.samples.size }
             onLevel(AudioLevel(0.5f))
+            samplesPerSegment += samples
             played++
         }
     }
 
     @Test
     fun aSynthesisFailureStopsPlaybackOfPrefetchedSegmentsAndFurtherRequests() = runTest {
-        failingRequest = 3
+        failingRequest = 2
         val player = GatedPlayer()
         val mouth = mouth(player)
         val failed = async { mouth.events.first { it is VoiceMouthEvent.Failed } }
         val later = async { mouth.events.first { it == VoiceMouthEvent.Started(SpeechSegmentId(2)) } }
         testScheduler.runCurrent()
         (1..4).forEach { mouth.speak(SpeechSegment(SpeechSegmentId(it.toLong()), VoiceText("Segment $it."))) }
-        assertEquals(SpeechSegmentId(3), (failed.await() as VoiceMouthEvent.Failed).id)
+        assertEquals(SpeechSegmentId(2), (failed.await() as VoiceMouthEvent.Failed).id)
         player.gate.complete(Unit)
         val secondPlayed = withContext(Dispatchers.Default) { withTimeoutOrNull(300.milliseconds) { later.await() } }
         later.cancel()
         assertEquals(null, secondPlayed)
-        assertEquals(3, requests)
+        assertEquals(2, requests)
     }
 
-    /** Holds each clip until [gate] opens. */
+    /** Holds each segment until [gate] opens. */
     private class GatedPlayer : AudioPlayer {
         val gate = CompletableDeferred<Unit>()
 
-        override suspend fun play(clip: AudioClip, onLevel: (AudioLevel) -> Unit) {
+        override suspend fun play(chunks: Flow<PcmChunk>, onLevel: (AudioLevel) -> Unit) {
             gate.await()
         }
     }
@@ -235,7 +249,7 @@ class EndpointEnginesTest {
                 val number = ++requests
                 if (number == 2) releaseFailure.await()
                 val code = if (number == 2) HttpStatusCode.Unauthorized else HttpStatusCode.OK
-                respond("audio", code)
+                respond(SPEECH_WAV, code)
             },
             SpeechEndpointConfig(base),
         )
@@ -264,13 +278,13 @@ class EndpointEnginesTest {
         }
     }
 
-    /** Holds every clip until cancelled; reports [levels] output levels once [startLevels] opens. */
+    /** Holds every segment until cancelled; reports [levels] output levels once [startLevels] opens. */
     private class HoldingPlayer(private val levels: Int) : AudioPlayer {
         val startLevels = CompletableDeferred<Unit>()
         val levelsDone = CompletableDeferred<Unit>()
         val cancelled = CompletableDeferred<Unit>()
 
-        override suspend fun play(clip: AudioClip, onLevel: (AudioLevel) -> Unit) {
+        override suspend fun play(chunks: Flow<PcmChunk>, onLevel: (AudioLevel) -> Unit) {
             startLevels.await()
             repeat(levels) { onLevel(AudioLevel(0.5f)) }
             levelsDone.complete(Unit)
@@ -286,5 +300,7 @@ class EndpointEnginesTest {
         const val TEARDOWN_REPEATS = 10
         const val FLOOD_LEVELS = 200
         val TEARDOWN_BUDGET = 5.seconds
+        const val SPEECH_SAMPLES = 480
+        val SPEECH_WAV = WavCodec.encode(PcmAudio(ShortArray(SPEECH_SAMPLES) { 1_000 }, PcmFormat(24_000)))
     }
 }

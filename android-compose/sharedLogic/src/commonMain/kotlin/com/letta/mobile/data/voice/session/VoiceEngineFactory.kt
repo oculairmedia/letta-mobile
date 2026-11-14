@@ -80,7 +80,7 @@ fun interface VoiceEngineFactory {
 /**
  * The endpoint engines over a platform's [audio]: a voice-activity ear on the microphone (reopened
  * when a device goes away) that transcribes each turn through the endpoint, the agent's chat as the
- * responder, and a mouth that synthesises WAVE audio through the endpoint and plays it on the
+ * responder, and a mouth that streams WAVE audio from the endpoint and plays it on the
  * speaker. Where the microphone is not echo-cancelled and the person has not asked to interrupt
  * by speaking, the ear is half-duplex. Each session gets its own HTTP client on a fresh engine
  * from [httpEngine], closed on release. Every engine reports its decisions as `VoiceMode`

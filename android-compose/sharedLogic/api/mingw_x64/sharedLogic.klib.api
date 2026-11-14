@@ -7235,7 +7235,7 @@ abstract interface com.letta.mobile.data.voice.audio/AudioFrameSource { // com.l
 }
 
 abstract interface com.letta.mobile.data.voice.audio/AudioPlayer { // com.letta.mobile.data.voice.audio/AudioPlayer|null[0]
-    abstract suspend fun play(com.letta.mobile.data.voice.audio/AudioClip, kotlin/Function1<com.letta.mobile.data.voice/AudioLevel, kotlin/Unit>) // com.letta.mobile.data.voice.audio/AudioPlayer.play|play(com.letta.mobile.data.voice.audio.AudioClip;kotlin.Function1<com.letta.mobile.data.voice.AudioLevel,kotlin.Unit>){}[0]
+    abstract suspend fun play(kotlinx.coroutines.flow/Flow<com.letta.mobile.data.voice.audio/PcmChunk>, kotlin/Function1<com.letta.mobile.data.voice/AudioLevel, kotlin/Unit>) // com.letta.mobile.data.voice.audio/AudioPlayer.play|play(kotlinx.coroutines.flow.Flow<com.letta.mobile.data.voice.audio.PcmChunk>;kotlin.Function1<com.letta.mobile.data.voice.AudioLevel,kotlin.Unit>){}[0]
 }
 
 abstract interface com.letta.mobile.data.voice.engine/VoiceEar { // com.letta.mobile.data.voice.engine/VoiceEar|null[0]
@@ -69803,6 +69803,17 @@ final class com.letta.mobile.data.voice.audio/AudioFrameFormat { // com.letta.mo
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.audio/AudioFrameFormat.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.voice.audio/PcmChunk { // com.letta.mobile.data.voice.audio/PcmChunk|null[0]
+    constructor <init>(kotlin/ShortArray, com.letta.mobile.data.voice.audio/PcmFormat) // com.letta.mobile.data.voice.audio/PcmChunk.<init>|<init>(kotlin.ShortArray;com.letta.mobile.data.voice.audio.PcmFormat){}[0]
+
+    final val format // com.letta.mobile.data.voice.audio/PcmChunk.format|{}format[0]
+        final fun <get-format>(): com.letta.mobile.data.voice.audio/PcmFormat // com.letta.mobile.data.voice.audio/PcmChunk.format.<get-format>|<get-format>(){}[0]
+    final val samples // com.letta.mobile.data.voice.audio/PcmChunk.samples|{}samples[0]
+        final fun <get-samples>(): kotlin/ShortArray // com.letta.mobile.data.voice.audio/PcmChunk.samples.<get-samples>|<get-samples>(){}[0]
+
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.audio/PcmChunk.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.voice.audio/PcmFormat { // com.letta.mobile.data.voice.audio/PcmFormat|null[0]
     constructor <init>(kotlin/Int = ..., kotlin/Int = ...) // com.letta.mobile.data.voice.audio/PcmFormat.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
 
@@ -69854,6 +69865,7 @@ final class com.letta.mobile.data.voice.consent/VoiceEndpointGrants { // com.let
 final class com.letta.mobile.data.voice.endpoint/EndpointSpeechSynthesizer { // com.letta.mobile.data.voice.endpoint/EndpointSpeechSynthesizer|null[0]
     constructor <init>(com.letta.mobile.data.voice.endpoint/SpeechEndpointClient, com.letta.mobile.data.voice.consent/VoiceEndpointGrantSource, com.letta.mobile.data.voice/VoiceEndpointSettings, com.letta.mobile.data.voice.audio/AudioEncoding = ...) // com.letta.mobile.data.voice.endpoint/EndpointSpeechSynthesizer.<init>|<init>(com.letta.mobile.data.voice.endpoint.SpeechEndpointClient;com.letta.mobile.data.voice.consent.VoiceEndpointGrantSource;com.letta.mobile.data.voice.VoiceEndpointSettings;com.letta.mobile.data.voice.audio.AudioEncoding){}[0]
 
+    final fun stream(com.letta.mobile.data.voice/VoiceText): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.voice.audio/PcmChunk> // com.letta.mobile.data.voice.endpoint/EndpointSpeechSynthesizer.stream|stream(com.letta.mobile.data.voice.VoiceText){}[0]
     final suspend fun synthesize(com.letta.mobile.data.voice/VoiceText): com.letta.mobile.data.voice.audio/AudioClip // com.letta.mobile.data.voice.endpoint/EndpointSpeechSynthesizer.synthesize|synthesize(com.letta.mobile.data.voice.VoiceText){}[0]
 }
 
@@ -81118,6 +81130,7 @@ final suspend fun (com.letta.mobile.data.timeline/TimelineTransport).com.letta.m
 final suspend fun (com.letta.mobile.data.transport.api/IChannelTransport).com.letta.mobile.data.transport.api/sendSubagentListFor(com.letta.mobile.data.repository.api/SubagentParentScope, kotlin/Boolean, kotlin/Long = ...): com.letta.mobile.data.transport/ServerFrame.SubagentListResponse // com.letta.mobile.data.transport.api/sendSubagentListFor|sendSubagentListFor@com.letta.mobile.data.transport.api.IChannelTransport(com.letta.mobile.data.repository.api.SubagentParentScope;kotlin.Boolean;kotlin.Long){}[0]
 final suspend fun (com.letta.mobile.data.transport.appserver/AppServerClient).com.letta.mobile.data.compaction/executeCommandAnswer(com.letta.mobile.data.transport.appserver/AppServerCommand.ExecuteCommand): com.letta.mobile.data.compaction/CommandAnswer // com.letta.mobile.data.compaction/executeCommandAnswer|executeCommandAnswer@com.letta.mobile.data.transport.appserver.AppServerClient(com.letta.mobile.data.transport.appserver.AppServerCommand.ExecuteCommand){}[0]
 final suspend fun (com.letta.mobile.data.transport.appserver/AppServerClient).com.letta.mobile.data.controller.reconnect/reattachRuntimes(kotlin.collections/List<com.letta.mobile.data.transport.appserver/AppServerRuntimeScope>, kotlin/Function1<com.letta.mobile.data.transport.appserver/AppServerRuntimeScope, com.letta.mobile.data.transport.appserver/AppServerCommand.RuntimeStart>) // com.letta.mobile.data.controller.reconnect/reattachRuntimes|reattachRuntimes@com.letta.mobile.data.transport.appserver.AppServerClient(kotlin.collections.List<com.letta.mobile.data.transport.appserver.AppServerRuntimeScope>;kotlin.Function1<com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,com.letta.mobile.data.transport.appserver.AppServerCommand.RuntimeStart>){}[0]
+final suspend fun (com.letta.mobile.data.voice.audio/AudioPlayer).com.letta.mobile.data.voice.audio.pcm/play(com.letta.mobile.data.voice.audio/AudioClip, kotlin/Function1<com.letta.mobile.data.voice/AudioLevel, kotlin/Unit>) // com.letta.mobile.data.voice.audio.pcm/play|play@com.letta.mobile.data.voice.audio.AudioPlayer(com.letta.mobile.data.voice.audio.AudioClip;kotlin.Function1<com.letta.mobile.data.voice.AudioLevel,kotlin.Unit>){}[0]
 final suspend fun <#A: kotlin/Any?> com.letta.mobile.data.repository/exhaustCursorPages(kotlin/Int = ..., kotlin/Int = ..., kotlin.coroutines/SuspendFunction2<kotlin/Int, kotlin/String?, kotlin.collections/List<#A>>, kotlin/Function1<#A, kotlin/String>): kotlin.collections/List<#A> // com.letta.mobile.data.repository/exhaustCursorPages|exhaustCursorPages(kotlin.Int;kotlin.Int;kotlin.coroutines.SuspendFunction2<kotlin.Int,kotlin.String?,kotlin.collections.List<0:0>>;kotlin.Function1<0:0,kotlin.String>){0§<kotlin.Any?>}[0]
 final suspend fun <#A: kotlin/Any?> com.letta.mobile.data.repository/exhaustCursorPages(kotlin/Int = ..., kotlin/Int = ..., kotlin.coroutines/SuspendFunction2<kotlin/Int, kotlin/String?, kotlin.collections/List<#A>>, kotlin/Function1<#A, kotlin/String>, kotlin/Function1<#A, kotlin/Any>): kotlin.collections/List<#A> // com.letta.mobile.data.repository/exhaustCursorPages|exhaustCursorPages(kotlin.Int;kotlin.Int;kotlin.coroutines.SuspendFunction2<kotlin.Int,kotlin.String?,kotlin.collections.List<0:0>>;kotlin.Function1<0:0,kotlin.String>;kotlin.Function1<0:0,kotlin.Any>){0§<kotlin.Any?>}[0]
 final suspend fun <#A: kotlin/Any?> com.letta.mobile.data.repository/exhaustPages(kotlin/Int = ..., kotlin/Int = ..., kotlin.coroutines/SuspendFunction2<kotlin/Int, kotlin/Int, kotlin.collections/List<#A>>, kotlin/Function1<#A, kotlin/Any>): kotlin.collections/List<#A> // com.letta.mobile.data.repository/exhaustPages|exhaustPages(kotlin.Int;kotlin.Int;kotlin.coroutines.SuspendFunction2<kotlin.Int,kotlin.Int,kotlin.collections.List<0:0>>;kotlin.Function1<0:0,kotlin.Any>){0§<kotlin.Any?>}[0]

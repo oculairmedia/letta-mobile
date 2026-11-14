@@ -42,20 +42,57 @@ object WavCodec {
     private const val MAX_SAMPLE_RATE_HZ = 384_000L
     private const val PLACEHOLDER_SIZE = 0xFFFFFFFFL
     private const val HEADER_BYTES = 44
+    private const val RIFF_TAG = "RIFF"
 
     /** Reads [bytes] as a WAVE file. */
     fun parse(bytes: ByteArray): WavParse {
         val reader = LittleEndianReader(bytes)
         if (!reader.hasRiffWave()) return WavParse.Refused(VoiceErrorCode.BAD_RESPONSE)
+        val walk = reader.walkToData()
+        if (walk !is WavWalk.Found) return WavParse.Refused(VoiceErrorCode.BAD_RESPONSE)
+        return decode(reader, walk.fmt, walk.data)
+    }
+
+    /**
+     * Reads the start of a WAVE stream, [bytes] being everything received so far: the format and
+     * where the samples start once the `data` chunk header is in, [WavHeaderRead.Incomplete] while
+     * it may still arrive, refused as [parse] would refuse it otherwise. A `data` size that is a
+     * streaming placeholder (0 or 0xFFFFFFFF) means the samples run to the end of the stream.
+     */
+    internal fun readHeader(bytes: ByteArray): WavHeaderRead {
+        val reader = LittleEndianReader(bytes)
+        if (bytes.size < RIFF_HEADER) {
+            val riffSoFar = bytes.indices.all { it >= RIFF_TAG.length || bytes[it] == RIFF_TAG[it].code.toByte() }
+            return if (riffSoFar) WavHeaderRead.Incomplete else WavHeaderRead.Refused(VoiceErrorCode.BAD_RESPONSE)
+        }
+        if (!reader.hasRiffWave()) return WavHeaderRead.Refused(VoiceErrorCode.BAD_RESPONSE)
+        return when (val walk = reader.walkToData()) {
+            WavWalk.Truncated -> WavHeaderRead.Incomplete
+            WavWalk.Malformed -> WavHeaderRead.Refused(VoiceErrorCode.BAD_RESPONSE)
+            is WavWalk.Found -> headerOf(walk)
+        }
+    }
+
+    private fun headerOf(walk: WavWalk.Found): WavHeaderRead {
+        val format = walk.fmt ?: return WavHeaderRead.Refused(VoiceErrorCode.BAD_RESPONSE)
+        if (!format.isSupported()) return WavHeaderRead.Refused(VoiceErrorCode.UNSUPPORTED_FORMAT)
+        val size = walk.data.size
+        val dataBytes = if (size == 0L || size == PLACEHOLDER_SIZE) null else size
+        val pcm = PcmFormat(format.sampleRateHz.toInt(), format.channels)
+        return WavHeaderRead.Header(pcm, walk.data.body.toInt(), dataBytes)
+    }
+
+    /** Walks the chunks up to the `data` chunk header, remembering the last `fmt `. */
+    private fun LittleEndianReader.walkToData(): WavWalk {
         var offset = RIFF_HEADER.toLong()
         var fmt: WavFmt? = null
-        while (offset + CHUNK_HEADER <= bytes.size) {
-            val chunk = reader.chunkAt(offset.toInt())
-            if (chunk.id == "data") return decode(reader, fmt, chunk)
-            if (chunk.id == "fmt ") fmt = reader.fmtOf(chunk) ?: return WavParse.Refused(VoiceErrorCode.BAD_RESPONSE)
+        while (offset + CHUNK_HEADER <= size) {
+            val chunk = chunkAt(offset.toInt())
+            if (chunk.id == "data") return WavWalk.Found(fmt, chunk)
+            if (chunk.id == "fmt ") fmt = fmtOf(chunk) ?: return unreadableFmt(chunk)
             offset = chunk.body + chunk.size + (chunk.size and 1L)
         }
-        return WavParse.Refused(VoiceErrorCode.BAD_RESPONSE)
+        return WavWalk.Truncated
     }
 
     /** [audio] as a canonical 44-byte-header WAVE file. */
@@ -81,6 +118,10 @@ object WavCodec {
         val samples = ShortArray((usable / BYTES_PER_SAMPLE).toInt()) { reader.s16(chunk.body.toInt() + it * BYTES_PER_SAMPLE) }
         return WavParse.Decoded(PcmAudio(samples, PcmFormat(format.sampleRateHz.toInt(), format.channels)))
     }
+
+    /** A `fmt ` chunk that could not be read: cut short by the end of the bytes, or malformed. */
+    private fun LittleEndianReader.unreadableFmt(chunk: WavChunk): WavWalk =
+        if (chunk.body + chunk.size > size) WavWalk.Truncated else WavWalk.Malformed
 
     private fun WavFmt.isSupported(): Boolean {
         val pcm16 = formatTag == FORMAT_PCM && bitsPerSample == BITS_16
@@ -115,6 +156,27 @@ object WavCodec {
         val isPcm = PCM_SUB_FORMAT.indices.all { u8(subFormat + it) == PCM_SUB_FORMAT[it] }
         return if (isPcm) FORMAT_PCM else FORMAT_EXTENSIBLE
     }
+}
+
+/** What the start of a WAVE stream says so far. */
+internal sealed interface WavHeaderRead {
+    /** The `data` chunk header has not arrived yet. */
+    data object Incomplete : WavHeaderRead
+
+    /** The stream is refused: BAD_RESPONSE or UNSUPPORTED_FORMAT, as [WavCodec.parse] would. */
+    data class Refused(val code: VoiceErrorCode) : WavHeaderRead
+
+    /** Samples in [format] start at byte [dataStart]; [dataBytes] of them, or to the end of the stream when null. */
+    class Header(val format: PcmFormat, val dataStart: Int, val dataBytes: Long?) : WavHeaderRead
+}
+
+/** Where a walk over the chunks ended: at the `data` chunk, short of it, or at a malformed `fmt `. */
+private sealed interface WavWalk {
+    data object Truncated : WavWalk
+
+    data object Malformed : WavWalk
+
+    class Found(val fmt: WavFmt?, val data: WavChunk) : WavWalk
 }
 
 private class WavChunk(val id: String, val size: Long, val body: Long)
