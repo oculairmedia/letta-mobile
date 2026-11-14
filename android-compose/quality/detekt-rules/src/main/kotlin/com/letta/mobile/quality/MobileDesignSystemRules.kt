@@ -54,10 +54,12 @@ internal fun KtFile.uiPath(): String = virtualFilePath.replace('\\', '/')
 
 internal fun KtFile.isUiSource(): Boolean {
     val path = uiPath()
-    return UI_PATH_MARKERS.any { it in path } && !path.isExemptFromUiChecks()
+    val marker = UI_PATH_MARKERS.firstOrNull { it in path } ?: return false
+    // Judge only the part from the module root on, so checkout directories named src or build do not count.
+    return !path.substring(path.lastIndexOf(marker)).isExemptFromUiChecks()
 }
 
-/** Spikes, previews, build output and test source sets. */
+/** Spikes, previews, build output and test source sets, in a path that starts at the module root. */
 private fun String.isExemptFromUiChecks(): Boolean {
     val sourceSet = substringAfter("/src/", "").substringBefore('/')
     val buildOutput = "/build/" in this || "/generated/" in this

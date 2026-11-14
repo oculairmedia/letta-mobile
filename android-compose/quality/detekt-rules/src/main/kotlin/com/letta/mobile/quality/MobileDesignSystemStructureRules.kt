@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtLambdaArgument
 import org.jetbrains.kotlin.psi.KtValueArgument
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
@@ -42,6 +43,9 @@ private val STATUS_ICON = Regex(
 private fun KtCallExpression.calleeName(): String? = calleeExpression?.text
 
 private fun KtValueArgument.name(): String? = getArgumentName()?.asName?.asString()
+
+/** Source text without whitespace, so `LettaIcons` + newline + `.ChevronDown` reads as one reference. */
+private fun KtExpression.compactText(): String = text.filterNot(Char::isWhitespace)
 
 /**
  * `RoundedCornerShape(8.dp)` at a call site. Corner radii are part of the shape
@@ -142,11 +146,11 @@ internal class RawDisclosureIcon(config: Config = Config.empty) : MobileRule(
 ) {
     override fun visitDotQualifiedExpression(expression: KtDotQualifiedExpression) {
         super.visitDotQualifiedExpression(expression)
-        if (!DISCLOSURE_ICON.matches(expression.text)) return
-        if (!expression.containingKtFile.isFeatureUiSource()) return
+        val reference = expression.compactText()
+        if (!DISCLOSURE_ICON.matches(reference) || !expression.containingKtFile.isFeatureUiSource()) return
         report(
             expression,
-            "`${expression.text}` hand-draws a disclosure arrow. Use DisclosureChevron for expand and " +
+            "`$reference` hand-draws a disclosure arrow. Use DisclosureChevron for expand and " +
                 "collapse, or a shared pager component for previous/next.",
         )
     }
@@ -199,7 +203,7 @@ internal class RawStatusGlyph(config: Config = Config.empty) : MobileRule(
     private fun KtExpression.statusIconReference(): String? {
         val candidates = listOfNotNull(this as? KtDotQualifiedExpression) +
             collectDescendantsOfType<KtDotQualifiedExpression>()
-        return candidates.firstOrNull { STATUS_ICON.matches(it.text) }?.text
+        return candidates.map { it.compactText() }.firstOrNull(STATUS_ICON::matches)
     }
 
     private companion object {
@@ -227,8 +231,24 @@ internal class BareClickable(config: Config = Config.empty) : MobileRule(
     }
 
     private fun KtCallExpression.isBareClickable(): Boolean =
-        calleeName() == "clickable" && valueArguments.none { it.declaresRole() }
+        calleeName() == "clickable" && roleArgument().let { it == null || it == "null" }
 
-    private fun KtValueArgument.declaresRole(): Boolean =
-        name() == "role" || getArgumentExpression()?.text?.startsWith("Role.") == true
+    /**
+     * The role argument's text: named, or positional at the role slot of the two overloads,
+     * `clickable(enabled, onClickLabel, role, onClick)` and
+     * `clickable(interactionSource, indication, enabled, onClickLabel, role, onClick)`.
+     */
+    private fun KtCallExpression.roleArgument(): String? {
+        valueArguments.firstOrNull { it.name() == "role" }?.let { return it.getArgumentExpression()?.text }
+        val positional = valueArguments
+            .filter { it.name() == null && it !is KtLambdaArgument }
+            .map { it.getArgumentExpression()?.text }
+        val slot = if (positional.size > INDICATION_ROLE_SLOT) INDICATION_ROLE_SLOT else ENABLED_ROLE_SLOT
+        return positional.getOrNull(slot)
+    }
+
+    private companion object {
+        const val ENABLED_ROLE_SLOT = 2
+        const val INDICATION_ROLE_SLOT = 4
+    }
 }

@@ -83,8 +83,10 @@ class MobileDesignSystemRulesTest {
             val d = Icons.AutoMirrored.Filled.KeyboardArrowRight
             val e = LettaIcons.ArrowBack
             val f = LettaIcons.Close
+            val g = LettaIcons
+                .ChevronRight
         """.trimIndent()
-        assertEquals(4, RawDisclosureIcon().lintAt(root, FEATURE, code).size)
+        assertEquals(5, RawDisclosureIcon().lintAt(root, FEATURE, code).size)
         assertEquals(0, RawDisclosureIcon().lintAt(root, COMPONENT, code).size)
         assertEquals(0, RawDisclosureIcon().lintAt(root, THEME, code).size)
         val registry = "sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/icons/LettaIcons.kt"
@@ -109,8 +111,13 @@ class MobileDesignSystemRulesTest {
             fun d() = Icon(LettaIcons.Close, contentDescription = null)
             fun e() = Icon(LettaIcons.AccountCircle, contentDescription = null)
             fun f() = Button(onClick = {}) { Text("Check") }
+            fun g() = Icon(
+                LettaIcons
+                    .CheckCircle,
+                contentDescription = null,
+            )
         """.trimIndent()
-        assertEquals(3, RawStatusGlyph().lintAt(root, FEATURE, code).size)
+        assertEquals(4, RawStatusGlyph().lintAt(root, FEATURE, code).size)
         assertEquals(0, RawStatusGlyph().lintAt(root, COMPONENT, code).size)
         assertEquals(0, RawStatusGlyph().lintAt(root, PREVIEW, code).size)
     }
@@ -123,10 +130,22 @@ class MobileDesignSystemRulesTest {
             val c = Modifier.clickable(role = Role.Button) { open() }
             val d = Modifier.clickable(true, null, Role.Switch) { open() }
             val e = Modifier.combinedClickable(onClick = {})
+            val f = Modifier.clickable(role = null) { open() }
+            val g = Modifier.clickable(true, null, buttonRole) { open() }
+            val h = Modifier.clickable(source, null, true, null, buttonRole) { open() }
+            val i = Modifier.clickable(source, null) { open() }
         """.trimIndent()
-        assertEquals(2, BareClickable().lintAt(root, FEATURE, code).size)
+        assertEquals(4, BareClickable().lintAt(root, FEATURE, code).size)
         assertEquals(0, BareClickable().lintAt(root, COMPONENT, code).size)
         assertEquals(0, BareClickable().lintAt(root, NOT_UI, code).size)
+    }
+
+    @Test
+    fun `checkout directories named src or build do not change the verdict`(@TempDir root: File) {
+        val code = "val a = RoundedCornerShape(8.dp)\n"
+        val checkout = "home/src/build/letta-mobile/android-compose/"
+        assertEquals(1, RawShapeLiteral().lintAt(root, checkout + FEATURE, code).size)
+        assertEquals(0, RawShapeLiteral().lintAt(root, checkout + TEST, code).size)
     }
 
     @Test
