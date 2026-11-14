@@ -1927,6 +1927,7 @@ public final class com/letta/mobile/ui/chat/subagents/SubagentTodoSheetState$Loa
 public final class com/letta/mobile/ui/chat/subagents/SubagentTodoSheetTags {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/subagents/SubagentTodoSheetTags;
+	public static final field ROSTER Ljava/lang/String;
 	public static final field SHEET Ljava/lang/String;
 }
 

@@ -267,9 +267,12 @@ fun SubagentTodoSheet(
             }
         },
     ) {
+        // The body takes what the pane has left under its header (docked, sheet or dialog: each
+        // bounds it), so the roster below can fill it instead of stopping at a fixed height.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .weight(1f, fill = false)
                 .padding(
                     start = LettaDimens.Space.lg,
                     end = LettaDimens.Space.lg,
@@ -297,8 +300,9 @@ fun SubagentTodoSheet(
             }
             roster?.let { section ->
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                // The roster is a list of its own: bounded, so the todos above stay in view.
-                Box(Modifier.fillMaxWidth().heightIn(max = SheetListMaxHeight)) { section() }
+                // The roster takes all the height the todos leave and scrolls only past it; the
+                // checklist above is the bounded part, so it can never push the roster out.
+                Box(Modifier.fillMaxWidth().weight(1f, fill = false).testTag(SubagentTodoSheetTags.ROSTER)) { section() }
             }
         }
     }
@@ -307,9 +311,12 @@ fun SubagentTodoSheet(
 /** Test tags of the todo sheet. */
 object SubagentTodoSheetTags {
     const val SHEET = "subagent-todo-sheet"
+
+    /** The roster's slot under the todos: it fills the height the sheet has left. */
+    const val ROSTER = "subagent-todo-sheet-roster"
 }
 
-/** The checklist and the roster each scroll inside the sheet past this height. */
+/** The checklist scrolls inside the sheet past this height, leaving the rest to the roster. */
 private val SheetListMaxHeight = LettaDimens.Pane.editorMinHeight * 2
 private const val STATE_FADE_MS = 200
 
