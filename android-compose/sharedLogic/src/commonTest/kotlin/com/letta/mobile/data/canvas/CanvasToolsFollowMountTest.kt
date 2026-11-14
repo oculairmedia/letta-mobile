@@ -4,21 +4,22 @@ import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.receipt
 import com.letta.mobile.data.canvas.mount.client.ConversationCanvasResolver
 import com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget
 import com.letta.mobile.data.canvas.mount.client.FakeCanvasMountClient
-import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.controller.extras.claimedToolCaller
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 /** The app's canvas tools default to the board the person sees: the conversation's mount, else its own. */
 class CanvasToolsFollowMountTest {
@@ -45,7 +46,7 @@ class CanvasToolsFollowMountTest {
     private suspend fun compose(): ExternalToolResult = registry.invoke(
         CanvasToolContract.COMPOSE,
         Json.parseToJsonElement("""{"items":[{"kind":"NOTE","markdown":"From the agent"}]}""").jsonObject,
-        ExternalToolCaller(agentId = AGENT, conversationId = CONVERSATION, toolCallId = "call-1"),
+        claimedToolCaller(ToolCallScope(agentId = AGENT, conversationId = CONVERSATION, toolCallId = "call-1")),
     )
 
     private suspend fun listed(): String = assertIs<ExternalToolResult.Success>(
