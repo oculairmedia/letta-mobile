@@ -85,9 +85,10 @@ object WavCodec {
         while (offset + CHUNK_HEADER <= size) {
             val chunk = chunkAt(offset.toInt())
             if (chunk.id == "data") return WavWalk.Found(fmt, chunk)
-            if (chunk.id == "fmt ") {
-                fmt = fmtOf(chunk) ?: return if (chunk.body + chunk.size > size) WavWalk.Truncated else WavWalk.Malformed
-            }
+            val isFmt = chunk.id == "fmt "
+            val read = if (isFmt) fmtOf(chunk) else fmt
+            if (isFmt && read == null) return if (chunk.body + chunk.size > size) WavWalk.Truncated else WavWalk.Malformed
+            fmt = read
             offset = chunk.body + chunk.size + (chunk.size and 1L)
         }
         return WavWalk.Truncated
