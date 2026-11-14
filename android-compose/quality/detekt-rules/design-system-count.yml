@@ -1,0 +1,27 @@
+# Local counting aid only; never a CI gate. Runs every design-system rule over the paths given in
+# -PdesignLintPaths with no includes scoping, so debt work can see what is left in an area:
+#   ./gradlew :quality:detekt-rules:designSystemLintCount -PdesignLintPaths=sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat
+# CI uses detekt-guardrails.yml, where each rule is scoped to paths already proven clean.
+build:
+  maxIssues: -1
+
+letta-mobile-design-system:
+  active: true
+  RawDimensionLiteral:
+    active: true
+  HardcodedComposeColor:
+    active: true
+  LowContentAlpha:
+    active: true
+  RawShapeLiteral:
+    active: true
+  TypographyOverride:
+    active: true
+  RawDisclosureIcon:
+    active: true
+  DisclosureOutsideSharedRow:
+    active: true
+  RawStatusGlyph:
+    active: true
+  BareClickable:
+    active: true
