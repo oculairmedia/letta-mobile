@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh.mounts
 
+import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
 import com.letta.mobile.data.canvas.CanvasRelayHost
 import com.letta.mobile.data.canvas.HostCanvasAccess
 import com.letta.mobile.data.canvas.HostCanvasBackend
@@ -37,8 +38,9 @@ class CanvasMountToolLookupTest {
         directory = InMemoryHostCanvasDirectory(),
         mounts = lookup,
     )
-    private val callerA = HostCanvasCaller(AGENT_A.value, CONV_A.value)
-    private val callerB = HostCanvasCaller(AGENT_B.value, CONV_B.value)
+    // These model tool calls the App Server stamped with their scope; a claimed scope follows no mount.
+    private val callerA = HostCanvasCaller(AGENT_A.value, CONV_A.value, scopeTrust = CallerScopeTrust.RUNTIME_STAMPED)
+    private val callerB = HostCanvasCaller(AGENT_B.value, CONV_B.value, scopeTrust = CallerScopeTrust.RUNTIME_STAMPED)
 
     @Test
     fun withoutABindingAToolActsOnItsOwnConversationsCanvas() = runBlocking {
