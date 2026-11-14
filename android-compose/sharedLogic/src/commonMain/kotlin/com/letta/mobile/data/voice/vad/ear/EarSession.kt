@@ -18,6 +18,7 @@ import com.letta.mobile.data.voice.audio.pcm.PcmLevels
 import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
 import com.letta.mobile.data.voice.audio.pcm.WavCodec
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointException
+import com.letta.mobile.data.voice.endpoint.Transcript
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.vad.CaptureRecorder
 import com.letta.mobile.data.voice.vad.Hop
@@ -258,9 +259,11 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
         val verdict = gate.judge(hop.end.value, hop.samples.size, outputActive)
         if (halfDuplex && verdict == GateVerdict.MUTE_STARTED) muteForOutput()
         if (halfDuplex && verdict != GateVerdict.OPEN) return
-        detector.setOutputActive(outputActive)
+        // Full duplex: the echo guard stays up through the tail after the output, which may still be heard.
+        val guarded = verdict != GateVerdict.OPEN
+        detector.setOutputActive(guarded)
         val probability = detector.probability(hop.samples)
-        val signal = tracker.onHop(HopObservation(probability, hop.end, outputActive))
+        val signal = tracker.onHop(HopObservation(probability, hop.end, guarded))
         if (signal == TurnSignal.Candidate) peakDb = SILENT_DB
         if (tracker.recording || signal is TurnSignal.Ended) peakDb = maxOf(peakDb, PcmLevels.dbfs(hop.samples))
         apply(signal, hop)
@@ -457,8 +460,9 @@ private class TranscriptionWorker(
     }
 
     /** The transcript as the turn's utterance, or an empty one (the loop listens on) when the policy drops it. */
-    private fun judged(text: VoiceText, report: EarTurnReport): VoiceUtterance {
-        val reason = parts.config.transcripts.discardReason(text, report)
+    private fun judged(transcript: Transcript, report: EarTurnReport): VoiceUtterance {
+        val text = transcript.text
+        val reason = parts.config.transcripts.discardReason(text, report, transcript.confidence)
         if (reason != null) {
             parts.config.observer.turnDiscarded(report, reason)
             return VoiceUtterance(VoiceText.Empty)

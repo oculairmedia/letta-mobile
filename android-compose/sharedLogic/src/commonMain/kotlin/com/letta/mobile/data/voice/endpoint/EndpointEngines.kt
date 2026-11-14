@@ -30,8 +30,8 @@ class EndpointTranscriber(
     private val grants: VoiceEndpointGrantSource,
     private val settings: VoiceEndpointSettings,
 ) {
-    /** The text spoken in [audio]. */
-    suspend fun transcribe(audio: AudioClip): VoiceText {
+    /** The text spoken in [audio], with the recogniser's own confidence when the server reports it. */
+    suspend fun transcribe(audio: AudioClip): Transcript {
         client.requireGrant(grants, VoiceEndpointPayload.AUDIO_FOR_TRANSCRIPTION, SpeechOperation.TRANSCRIPTION)
         return client.transcribe(TranscriptionRequest(audio, settings.transcriptionModel, settings.language))
     }

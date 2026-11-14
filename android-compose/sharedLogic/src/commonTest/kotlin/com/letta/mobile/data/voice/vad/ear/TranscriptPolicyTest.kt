@@ -3,6 +3,7 @@ package com.letta.mobile.data.voice.vad.ear
 import app.cash.turbine.test
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.VoiceUtterance
+import com.letta.mobile.data.voice.endpoint.RecognizerConfidence
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
 import com.letta.mobile.data.voice.vad.SpeechDetectorFactory
@@ -25,7 +26,14 @@ class TranscriptPolicyTest {
     private val shortLoud = EarTurnReport(voiced = 400.milliseconds, peakDb = -15.0, floorDb = -55.0)
     private val longQuiet = EarTurnReport(voiced = 3.seconds, peakDb = -40.0, floorDb = -55.0)
 
-    private fun reason(text: String, report: EarTurnReport = shortLoud) = policy.discardReason(VoiceText(text), report)
+    /** A short, loud turn just over the filler limit: a real one-word answer said clearly in a loud room. */
+    private val shortLoudAnswer = EarTurnReport(voiced = 700.milliseconds, peakDb = -12.0, floorDb = -40.0)
+
+    /** What a recogniser reports for clear speech. */
+    private val confidentSpeech = RecognizerConfidence(noSpeechProbability = 0.05, averageLogProbability = -0.3)
+
+    private fun reason(text: String, report: EarTurnReport = shortLoud, confidence: RecognizerConfidence? = null) =
+        policy.discardReason(VoiceText(text), report, confidence)
 
     @Test
     fun emptyAndWordlessTranscriptsAreDroppedWhateverTheTurn() {
@@ -36,17 +44,49 @@ class TranscriptPolicyTest {
     }
 
     @Test
-    fun stockNoisePhrasesAreDroppedOnlyForShortQuietTurns() {
+    fun stockNoisePhrasesAreDroppedForShortTurnsHoweverLoud() {
         assertEquals(TurnDiscardReason.STOCK_PHRASE, reason(" you", shortQuiet))
         assertEquals(TurnDiscardReason.STOCK_PHRASE, reason("Thank you.", shortQuiet))
         assertEquals(TurnDiscardReason.STOCK_PHRASE, reason("Thanks for watching!", shortQuiet))
-        assertNull(reason("Thank you.", shortLoud))
+        assertEquals(TurnDiscardReason.STOCK_PHRASE, reason("Thank you.", shortLoud))
+        assertEquals(TurnDiscardReason.STOCK_PHRASE, reason(" Thank you.", shortLoudAnswer))
         assertNull(reason("Thank you.", longQuiet))
     }
 
     @Test
-    fun aTurnWithNoFloorMeasuredCountsAsQuiet() {
+    fun aLoneFillerWordFromAVeryShortTurnIsDropped() {
+        assertEquals(TurnDiscardReason.FILLER_WORD, reason("So", shortLoud))
+        assertEquals(TurnDiscardReason.FILLER_WORD, reason(" So.", shortQuiet))
+        assertEquals(TurnDiscardReason.FILLER_WORD, reason("Okay.", shortLoud))
+        assertNull(reason("So.", shortLoudAnswer), "a longer turn may mean it")
+        assertNull(reason("So what time is it?", shortLoud))
+    }
+
+    @Test
+    fun aTurnWithNoFloorMeasuredIsJudgedTheSame() {
         assertEquals(TurnDiscardReason.STOCK_PHRASE, reason("you", EarTurnReport(400.milliseconds, -10.0, null)))
+        assertEquals(TurnDiscardReason.FILLER_WORD, reason("so", EarTurnReport(400.milliseconds, -10.0, null)))
+    }
+
+    @Test
+    fun theRecognisersOwnNoSpeechVerdictDropsTheTranscript() {
+        val certain = RecognizerConfidence(noSpeechProbability = 0.95, averageLogProbability = -0.2)
+        val whisperSilence = RecognizerConfidence(noSpeechProbability = 0.7, averageLogProbability = -1.2)
+        val garbled = RecognizerConfidence(noSpeechProbability = 0.1, averageLogProbability = -2.4)
+        assertEquals(TurnDiscardReason.NOT_SPEECH, reason("Thank you.", longQuiet, certain))
+        assertEquals(TurnDiscardReason.NOT_SPEECH, reason("I'll see you next time.", longQuiet, whisperSilence))
+        assertEquals(TurnDiscardReason.NOT_SPEECH, reason("what time is it", longQuiet, garbled))
+        val unsureButSpeech = RecognizerConfidence(noSpeechProbability = 0.7, averageLogProbability = -0.6)
+        assertNull(reason("what time is it", longQuiet, unsureButSpeech), "Whisper keeps a confident transcript")
+    }
+
+    @Test
+    fun shortGenuineAnswersPass() {
+        listOf("yes", "Yes.", "no", "No.", "ok", "Yeah.", "Sure.", "Nope.").forEach { answer ->
+            assertNull(reason(answer, shortLoud), answer)
+            assertNull(reason(answer, shortQuiet), answer)
+            assertNull(reason(answer, shortLoudAnswer, confidentSpeech), answer)
+        }
     }
 
     @Test
@@ -54,6 +94,7 @@ class TranscriptPolicyTest {
         assertNull(reason("ok", shortQuiet))
         assertNull(reason("What time is it?", shortQuiet))
         assertNull(reason("you know what, never mind", shortQuiet))
+        assertNull(reason("What time is it?", shortLoud, confidentSpeech))
     }
 }
 
@@ -107,6 +148,22 @@ class EarTranscriptGateTest {
         val judged = observer.seen.filter { it.startsWith("discarded") || it.startsWith("accepted") }
         assertEquals(listOf("opened", "closed:SILENCE", "opened", "closed:SILENCE"), turns)
         assertEquals(listOf("discarded:STOCK_PHRASE", "accepted:15"), judged)
+    }
+
+    @Test
+    fun aTranscriptTheRecogniserCallsNotSpeechEndsAsAnEmptyUtterance() = runTest {
+        val observer = RecordingObserver()
+        val noise = RecognizerConfidence(noSpeechProbability = 0.97, averageLogProbability = -0.4)
+        val transcriber = ScriptedTranscriber(heard("I'm going to go to bed now", noise))
+        ear(ScriptedSource(turn()), transcriber, observer).listen()
+            .filterNot { it is VoiceEarEvent.InputLevel || it == VoiceEarEvent.SpeechEnded }
+            .test {
+                assertEquals(VoiceEarEvent.ListeningStarted, awaitItem())
+                assertEquals(VoiceEarEvent.SpeechStarted, awaitItem())
+                assertEquals(VoiceEarEvent.EndOfTurn(VoiceUtterance(VoiceText.Empty)), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        assertEquals("discarded:NOT_SPEECH", observer.seen.last())
     }
 
     @Test

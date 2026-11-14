@@ -11,6 +11,8 @@ import com.letta.mobile.data.voice.audio.pcm.PcmAudio
 import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
 import com.letta.mobile.data.voice.audio.pcm.WavCodec
 import com.letta.mobile.data.voice.audio.pcm.WavParse
+import com.letta.mobile.data.voice.endpoint.RecognizerConfidence
+import com.letta.mobile.data.voice.endpoint.Transcript
 import com.letta.mobile.data.voice.vad.DetectorHop
 import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
 import com.letta.mobile.data.voice.vad.SpeechDetector
@@ -85,22 +87,24 @@ internal class ValueDetector : SpeechDetector {
 }
 
 /** Answers transcriptions from [outcomes] in order, keeping a decoded copy of every clip. */
-/** One scripted transcription: the words, or the failure to throw. */
-internal class Outcome(val words: VoiceText?, val error: Throwable?)
+/** One scripted transcription: the words (with the recogniser's confidence, if any), or the failure to throw. */
+internal class Outcome(val words: VoiceText?, val error: Throwable?, val confidence: RecognizerConfidence? = null)
 
 internal class ScriptedTranscriber(vararg outcomes: Outcome) : SpeechTranscriber {
     private val queue = ArrayDeque(outcomes.toList())
     val clips = mutableListOf<PcmAudio>()
 
-    override suspend fun transcribe(audio: AudioClip): VoiceText {
+    override suspend fun transcribe(audio: AudioClip): Transcript {
         clips += (WavCodec.parse(audio.bytes) as WavParse.Decoded).audio
         val next = queue.removeFirst()
         next.error?.let { throw it }
-        return checkNotNull(next.words)
+        return Transcript(checkNotNull(next.words), next.confidence)
     }
 }
 
 internal fun heard(words: String): Outcome = Outcome(VoiceText(words), null)
+
+internal fun heard(words: String, confidence: RecognizerConfidence): Outcome = Outcome(VoiceText(words), null, confidence)
 
 internal fun failing(error: Throwable): Outcome = Outcome(null, error)
 
