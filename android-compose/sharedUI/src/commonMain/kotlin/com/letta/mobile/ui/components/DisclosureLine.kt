@@ -121,10 +121,18 @@ internal fun SummaryLine(
         stateDescription = stateDescription,
         minHeight = minHeight,
     ) {
-        val titleWeight = if (detail != null) Modifier.weight(1f, fill = false) else Modifier.weight(1f)
-        LineTitle(spec.title, style, spec.tone.titleColor(), titleWeight)
-        detail?.let { LineText(it, style, muted, Modifier.weight(1f)) }
-        meta?.let { LineText(it, style, muted, Modifier) }
+        // The words share one weighted slot, so however long they run the glyph, the badge and the
+        // chevron keep their size and the chevron stays on the rail's edge.
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(ChatRowSpacing.lineGap),
+        ) {
+            val titleWeight = if (detail != null) Modifier.weight(1f, fill = false) else Modifier.weight(1f)
+            LineTitle(spec.title, style, spec.tone.titleColor(), titleWeight)
+            detail?.let { LineText(it, style, muted, Modifier.weight(1f)) }
+            meta?.let { LineText(it, style, muted, Modifier) }
+        }
         trailing?.invoke(this)
     }
 }
