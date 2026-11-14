@@ -174,6 +174,24 @@ class SharedNoteBrowserTest {
     }
 
     @Test
+    fun aHostListingMoreThanTheBrowserHoldsShowsOnlyTheFirstAndSaysSo() = runTest {
+        val paged = pagedBrowser(EndlessDirectory())
+        paged.refresh()
+        var pages = 1
+        while (pages <= MAX_ENDLESS_PAGES && paged.loadMore()) pages++
+
+        val listing = assertIs<SharedNoteListing.Listed>(paged.state.value.listing)
+        assertEquals(SharedNoteBrowser.MAX_HELD, listing.notes.size)
+        assertEquals(SharedNoteBrowser.MAX_HELD / ENDLESS_PAGE, pages, "nothing is asked once the browser holds its most")
+        assertNull(listing.next)
+        assertTrue(paged.state.value.capped)
+
+        paged.refresh()
+        assertFalse(paged.state.value.capped, "a refresh lists again from the start")
+        assertEquals(ENDLESS_PAGE, assertIs<SharedNoteListing.Listed>(paged.state.value.listing).notes.size)
+    }
+
+    @Test
     fun aPageThatFailsKeepsWhatIsShownAndCanBeAskedAgain() = runTest {
         val directory = PagedDirectory().apply { nextPageFails = true }
         val paged = pagedBrowser(directory)
@@ -303,6 +321,20 @@ class SharedNoteBrowserTest {
         val SECOND = SharedNote(NotebookDocumentId("fedcba9876543210fedcba9876543210"), "Later")
         val CURSOR = SharedNotesCursor("after-first")
         val OBSOLETE = SharedNote(NotebookDocumentId("00000000000000000000000000000000"), "Gone")
+        const val ENDLESS_PAGE = 500
+        const val MAX_ENDLESS_PAGES = 100
+    }
+
+    /** A host that always has another full page of distinct notes; the cursor is the next page's number. */
+    private class EndlessDirectory : SharedNoteDirectory {
+        override suspend fun list(from: SharedNotesCursor?): SharedNoteListing {
+            val page = from?.value?.toInt() ?: 0
+            val notes = (0 until ENDLESS_PAGE).map { index ->
+                val number = page * ENDLESS_PAGE + index
+                SharedNote(NotebookDocumentId(number.toString(16).padStart(32, '0')), "Note $number")
+            }
+            return SharedNoteListing.Listed(notes, SharedNotesCursor("${page + 1}"))
+        }
     }
 
     /** Two pages: [FIRST] with a cursor, then [SECOND] with none; the second can be made to fail. */

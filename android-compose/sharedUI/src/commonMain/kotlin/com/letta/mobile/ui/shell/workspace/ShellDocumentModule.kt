@@ -44,6 +44,7 @@ import com.letta.mobile.data.shell.layout.edit.ShellLayoutEditRule
 import com.letta.mobile.data.shell.layout.edit.SharedNotesPlacement
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.shared_notes_back_to_list
+import com.letta.mobile.sharedui.resources.shared_notes_capped
 import com.letta.mobile.sharedui.resources.shared_notes_close_view
 import com.letta.mobile.sharedui.resources.shared_notes_denied
 import com.letta.mobile.sharedui.resources.shared_notes_empty
@@ -260,6 +261,7 @@ private fun ScrollingNotice(tag: String? = null, content: @Composable ColumnScop
 /**
  * The listed notes and, while the host has more to check, a "Show more" control at the end that
  * appends the next page. A page that failed to load keeps what is shown and says so beside the control.
+ * Once the browser holds as many notes as it will, the end of the list says only the first ones show.
  */
 @Composable
 private fun ListedNotes(
@@ -277,7 +279,7 @@ private fun ListedNotes(
         open = { note -> scope.launch { browser.open(note.id) } },
         more = { scope.launch { browser.loadMore() } },
     )
-    NoteRows(listing.notes, more, enabled = state.opening == null, actions)
+    NoteRows(listing.notes, more, enabled = state.opening == null, capped = state.capped, actions)
 }
 
 /** Whether the next page is being asked for, and whether the latest ask failed. */
@@ -287,7 +289,7 @@ private data class MoreNotes(val loading: Boolean, val failed: Boolean)
 private class NoteActions(val open: (SharedNote) -> Unit, val more: () -> Unit)
 
 @Composable
-private fun NoteRows(notes: List<SharedNote>, more: MoreNotes?, enabled: Boolean, actions: NoteActions) {
+private fun NoteRows(notes: List<SharedNote>, more: MoreNotes?, enabled: Boolean, capped: Boolean, actions: NoteActions) {
     val untitled = stringResource(Res.string.shared_notes_untitled)
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = LettaDimens.Space.sm).testTag(ShellDocumentTags.LIST),
@@ -303,6 +305,7 @@ private fun NoteRows(notes: List<SharedNote>, more: MoreNotes?, enabled: Boolean
             )
         }
         more?.let { item(key = MORE_KEY) { ShowMore(it, actions.more) } }
+        if (capped) item(key = CAPPED_KEY) { Notice(Res.string.shared_notes_capped, CAPPED_TAG, count = SharedNoteBrowser.MAX_HELD) }
     }
 }
 
@@ -320,13 +323,19 @@ private fun ShowMore(more: MoreNotes, onMore: () -> Unit) {
 
 private const val MORE_KEY = "shell-document-more"
 private const val NONE_YET_KEY = "shell-document-none-yet"
+private const val CAPPED_KEY = "shell-document-capped"
 
+/** The notice ending a list cut at [SharedNoteBrowser.MAX_HELD] notes. */
+private const val CAPPED_TAG = "shell-document-capped"
+
+/** A line of notice text; [count], when given, fills the resource's one number placeholder. */
 @Composable
-private fun Notice(text: StringResource, tag: String?, error: Boolean = false) {
+private fun Notice(text: StringResource, tag: String?, error: Boolean = false, count: Int? = null) {
+    val shown = if (count == null) stringResource(text) else stringResource(text, count)
     val color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
     val tagged = tag?.let { Modifier.testTag(it) } ?: Modifier
     Text(
-        stringResource(text),
+        shown,
         style = MaterialTheme.typography.bodyMedium,
         color = color,
         modifier = tagged.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),

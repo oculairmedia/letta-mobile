@@ -636,3 +636,23 @@ class CanvasRelayClient(
         val MAX_FETCH_CHUNKS = (CanvasRelayHost.MAX_ASSET_BYTES / CanvasRelayHost.ASSET_CHUNK_BYTES).toInt() + 1
     }
 }
+
+/**
+ * The relay client over the boards stored here, with [opLog] and [delivery], bound the same on
+ * every host: topics by conversation ([relayTopicOf]) and ops for a board no window has open written
+ * straight into the stored board ([StoreCanvasClosedBoardApplier]). [snapshotSeed] seeds a
+ * never-shared board's first join where the op log is bounded.
+ */
+fun CanvasDocumentStore.storedBoardsRelayClient(
+    opLog: CanvasOpLog,
+    delivery: CanvasDeliveryStore,
+    assets: AssetStore? = null,
+    snapshotSeed: CanvasSnapshotSeed? = null,
+): CanvasRelayClient = CanvasRelayClient(
+    opLog = opLog,
+    delivery = delivery,
+    topicOf = { relayTopicOf(it) },
+    assets = assets,
+    closedBoard = StoreCanvasClosedBoardApplier(this, opLog),
+    snapshotSeed = snapshotSeed,
+)

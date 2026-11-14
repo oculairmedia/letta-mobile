@@ -34,3 +34,6 @@ fun ChatCanvasPlaceholder(modifier: Modifier = Modifier) {
 /** A conversation page's retained key, scoped to its owner generation; null before a conversation exists. */
 fun chatCanvasKey(conversationId: String?, generation: Long): String? =
     conversationId?.takeIf { it.isNotBlank() }?.let { "canvas:$generation:$it" }
+
+/** True while the chat page shows its board with the chat over it (canvas mode); the chat surface provides it to its board. */
+val LocalChatCanvasOnBoard = androidx.compose.runtime.compositionLocalOf { false }

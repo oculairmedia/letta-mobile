@@ -16,13 +16,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import com.letta.mobile.ui.components.row.LettaListRow
-import com.letta.mobile.ui.components.row.LettaListRowSpec
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,7 +33,10 @@ import com.letta.mobile.data.diff.DiffLineKind
 import com.letta.mobile.data.memory.memfs.MemfsCommit
 import com.letta.mobile.data.memory.memfs.MemfsFileChange
 import com.letta.mobile.data.memory.memfs.MemfsFileDiff
+import com.letta.mobile.ui.components.row.LettaListRow
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.theme.LettaChip
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 
@@ -59,9 +59,9 @@ internal fun MemfsCommitList(page: MemfsPageScope) {
                 modifier = Modifier.weight(1f),
             )
             if (history.path != null) {
-                AssistChip(
+                LettaChip(
+                    text = ALL_FILES,
                     onClick = { page.actions.showHistory(null) },
-                    label = { Text(ALL_FILES) },
                     modifier = Modifier.testTag(MemfsPageTags.HISTORY_ALL),
                 )
             }

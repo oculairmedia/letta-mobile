@@ -35,10 +35,17 @@ internal fun AndroidCanvasHost(
     val owner = deps.canvasOwner
     LaunchedEffect(owner, config?.id) { owner.updateBackend(config) }
     val context by owner.context.collectAsStateWithLifecycle()
+    // Which board each conversation shows and the side menu's pick, over the window's mounts (this
+    // device's until the host's mount client is wired). A new backend starts the picker over.
+    val picker = remember(context.generation) {
+        com.letta.mobile.data.canvas.mount.client.ConversationCanvasPicker(
+            com.letta.mobile.data.canvas.mount.client.ConversationCanvasResolver(owner.mounts(context.generation)),
+        )
+    }
     androidx.compose.runtime.CompositionLocalProvider(
         com.letta.mobile.ui.canvas.boards.LocalCanvasBoardGeneration provides context.generation,
     ) {
-        com.letta.mobile.ui.canvas.boards.ProvideCanvasHostWithBoards(deps.canvasViewers, context.boards, content)
+        com.letta.mobile.ui.canvas.boards.ProvideCanvasHostWithBoards(deps.canvasViewers, context.boards, picker, content = content)
     }
 }
 

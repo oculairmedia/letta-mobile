@@ -162,6 +162,9 @@ internal fun ShellWorkspaceNavigationActions.closing(drawer: ShellWorkspaceDrawe
             onEditAgent = panel.onEditAgent.then(close),
             onConversationSelected = panel.onConversationSelected.then(close),
             onOpenCanvas = panel.onOpenCanvas.then(close),
+            onOpenCanvasInPane = panel.onOpenCanvasInPane?.then(close),
+            onNewCanvas = panel.onNewCanvas?.then(close),
+            onCanvasMounted = panel.onCanvasMounted.then(close),
         ),
     )
 }
