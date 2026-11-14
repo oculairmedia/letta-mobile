@@ -2,8 +2,7 @@ package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.chat.sentruns.IdentifiedChatSend
-import com.letta.mobile.data.chat.sentruns.IdentifiedSendBinding
-import com.letta.mobile.data.chat.sentruns.SentMessageId
+import com.letta.mobile.data.chat.sentruns.IdentifiedPipelineSend
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Delivery
 import com.letta.mobile.data.model.AgentId
@@ -26,7 +25,6 @@ import com.letta.mobile.util.backendUrlTelemetryDescriptor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.seconds
@@ -87,11 +85,7 @@ class ChatSendCoordinator(
     // and run in order once the turn ahead ends. See [QueuedSendDriver].
     private val queuedSends = ChatSendQueue()
     private val queueTurns = CoordinatorQueueTurns(turnStateMutex, wsChatBridge, ::dispatchPendingSend)
-    private val queueDriver = QueuedSendDriver(
-        scope,
-        queuedSends,
-        queueTurns,
-    )
+    private val queueDriver = QueuedSendDriver(scope, queuedSends, queueTurns)
 
     private val serverQueueMarks = ServerQueueMarks(
         queue = queuedSends,
@@ -103,21 +97,10 @@ class ChatSendCoordinator(
         sendOfConversation = { conversationId -> turnRegistry.peekState(ConversationId(conversationId))?.inFlightSend },
     )
 
-    /** The id the last send under [turnStateMutex] was enqueued under; read and written only under it. */
-    private var enqueuedSend: QueuedSendId? = null
-
-    /** This coordinator's sends with their identity, and the runs they started (paired in the turn registry). */
-    val identifiedSend: IdentifiedChatSend = IdentifiedSendBinding(turnRegistry.sentRuns.state, ::sendIdentified)
-
     /** The send queue a chat screen shows and controls. */
     val sendQueue: ChatSendQueueControls = ChatSendQueueControls(scope, queueDriver, queuedSends.state)
     private val bridgeEventDeduplicator = BridgeEventDeduplicator()
-    private val postSendReconciler = PostSendReconciler(
-        scope = scope,
-        agentId = agentId,
-        timelineRepository = timelineRepository,
-        delaysMs = { postSendReconcileDelaysMs },
-    )
+    private val postSendReconciler = PostSendReconciler(scope, agentId, timelineRepository) { postSendReconcileDelaysMs }
     private val runtimeEventBatcher = RuntimeEventBatcher(scope, recordRuntimeEvents)
 
     private val incoming = IncomingTurnProjection(AgentId(agentId), timelineRepository, turnRegistry, runtimeEventBatcher, foreground)
@@ -133,6 +116,14 @@ class ChatSendCoordinator(
         },
         handle = { event -> handleEvent(event) },
     )
+
+    private val identified = IdentifiedPipelineSend(
+        scope, turnStateMutex, otidGenerator, { Telemetry.error("AdminChatVM", "identifiedSend.failedAfterAccept", it) },
+        target = { activeConversationId().also { eventSubscription.claimForSend() } },
+    ) { text, target -> sendInternalLocked(text, emptyList(), target) }
+
+    /** This coordinator's sends with their identity, and the runs they started (paired in the turn registry). */
+    val identifiedSend: IdentifiedChatSend = identified.binding(turnRegistry.sentRuns)
 
     init {
         scope.launch {
@@ -278,23 +269,6 @@ class ChatSendCoordinator(
         }
     }
 
-    /**
-     * Sends [text] exactly as [send] does and returns the otid the message was enqueued under, read
-     * under the same lock hold that enqueued it; null when the send returned before enqueuing.
-     */
-    private suspend fun sendIdentified(text: String): SentMessageId? {
-        val targetConversationId = activeConversationId()
-        eventSubscription.claimForSend()
-        val enqueued = scope.async {
-            turnStateMutex.withLock {
-                enqueuedSend = null
-                sendInternalLocked(text, emptyList(), targetConversationId)
-                enqueuedSend
-            }
-        }
-        return enqueued.await()?.let { SentMessageId(it.value) }
-    }
-
     private suspend fun sendInternalLocked(
         text: String,
         attachments: List<MessageContentPart.Image>,
@@ -366,7 +340,7 @@ class ChatSendCoordinator(
         }
 
         val pending = QueuedChatSend(
-            id = QueuedSendId(otidGenerator()),
+            id = QueuedSendId(identified.nextOtid()),
             conversationId = QueueConversationId(conversationId),
             text = text,
             attachments = attachments,
@@ -374,7 +348,6 @@ class ChatSendCoordinator(
         // letta-mobile-1n5py: never jump messages already waiting, and never fail a send because
         // a turn is running: queue it behind that turn instead.
         val queuePosition = queueDriver.submitLocked(pending)
-        enqueuedSend = pending.id
         if (queuePosition != null) reportQueuedSend(pending, queuePosition)
         timer.stop(
             "accepted" attr true,
@@ -430,7 +403,8 @@ class ChatSendCoordinator(
         if (pending.attempt > 0 && !timelineRepository.isPendingSendCurrent(pending.pendingAttempt(agentId))) return true
         val state = turnRegistry.stateFor(ConversationId(pending.conversationId.value))
         val previousSend = state.inFlightSend?.takeUnless { state.reachedTerminal || it.id == pending.id }
-        val accepted = reserveAndAcceptSend(pending, state) ?: return true
+        // Null is a refusal before acceptance: the send leaves the queue, and it has no identity to report.
+        val accepted = reserveAndAcceptSend(pending, state) ?: return true.also { identified.refuse(pending.id.value) }
         Telemetry.event(
             "IrohTrace", "dispatchPendingSend.bridgeSend.done",
             "conversationId" attr pending.conversationId.value,
@@ -533,10 +507,7 @@ class ChatSendCoordinator(
         // on the shim. Multi-step turns may produce per-step usage; the
         // run-level record reflects the first. Drop subsequent ones.
         if (state.usageRecorded) {
-            Telemetry.event(
-                "AdminChatVM", "ws.usage.duplicate",
-                "turnId" attr event.turnId,
-            )
+            Telemetry.event("AdminChatVM", "ws.usage.duplicate", "turnId" attr event.turnId)
         } else {
             state.usageRecorded = true
             foreground.usage(ConversationId(state.ownerConversationId), event)

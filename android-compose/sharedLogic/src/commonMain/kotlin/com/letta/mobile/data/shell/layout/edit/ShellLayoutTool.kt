@@ -1,7 +1,9 @@
 package com.letta.mobile.data.shell.layout.edit
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.claimedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
 import com.letta.mobile.data.model.AgentId
@@ -27,7 +29,8 @@ class ShellLayoutTool(private val port: ShellLayoutAgentPort = ShellLayoutAgentP
     /** Host tools are offered whatever the backend advertises; this value is never used as a gate. */
     override val capability: Capability = Capability.ImageHydration
 
-    override suspend fun invoke(input: JsonObject, agent: String?): ExternalToolResult = invoke(input, ExternalToolCaller(agent))
+    override suspend fun invoke(input: JsonObject, agent: String?): ExternalToolResult =
+        invoke(input, claimedToolCaller(ToolCallScope(agent)))
 
     override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
         val reading = ShellLayoutToolInput.read(input)

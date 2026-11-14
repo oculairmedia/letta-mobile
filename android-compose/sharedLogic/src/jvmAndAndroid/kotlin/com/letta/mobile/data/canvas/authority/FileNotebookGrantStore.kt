@@ -24,6 +24,11 @@ import kotlinx.serialization.json.JsonPrimitive
  * Administration requires directory synchronization. A failure after replacement leaves its
  * durability unconfirmed and must be reported, even when the new record is already visible.
  * Windows administration refuses before locking or touching files; existing grants remain readable.
+ *
+ * Every transaction reads the file's current bytes under the lock. The last parsed contents are kept
+ * with the exact bytes they came from and reused only while a fresh read returns identical bytes, so
+ * a listing that runs many short transactions parses the file once, yet each transaction still
+ * decides from the grants on disk at that moment, whichever process last wrote them.
  */
 class FileNotebookGrantStore internal constructor(
     file: Path,
@@ -92,12 +97,23 @@ class FileNotebookGrantStore internal constructor(
 
     private suspend fun <T> locked(action: suspend () -> T): T = file.locked(action)
 
+    /** The last contents this instance parsed and the bytes they were parsed from; read and written only under the lock. */
+    @Volatile
+    private var parsed: ParsedGrants? = null
+
     private fun read(): FileData {
         if (!Files.exists(path, NOFOLLOW_LINKS)) return FileData(VERSION, emptyList())
         require(Files.isRegularFile(path, NOFOLLOW_LINKS)) { "Notebook grant store is not a regular file" }
         require(Files.size(path) <= MAX_BYTES) { "Notebook grant store is too large" }
+        val bytes = Files.readAllBytes(path)
+        parsed?.takeIf { it.bytes.contentEquals(bytes) }?.let { return it.data }
+        return parse(bytes).also { parsed = ParsedGrants(bytes, it) }
+    }
+
+    /** The validated contents of [bytes]; anything malformed throws. */
+    private fun parse(bytes: ByteArray): FileData {
         val data = try {
-            val content = Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(Files.readAllBytes(path))).toString()
+            val content = Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString()
             StrictHostJson.requireUniqueKeys(content)
             requireStrictFormat(content)
             Json.decodeFromString<FileData>(content)
@@ -154,6 +170,9 @@ class FileNotebookGrantStore internal constructor(
     private fun validateKey(principal: String, documentId: NotebookDocumentId) {
         require(principal.isNotBlank() && documentId.value.isNotBlank()) { "Empty notebook grant key" }
     }
+
+    /** Parsed grants and the exact file bytes they came from. */
+    private class ParsedGrants(val bytes: ByteArray, val data: FileData)
 
     @Serializable
     private data class FileData(val version: Int, val grants: List<Entry>)

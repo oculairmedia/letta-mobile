@@ -68,17 +68,5 @@ class DesktopSidebarBindingTest {
         ConversationArchiveFilter.entries.forEach { assertEquals(it, it.toShellArchiveFilter().toConversationArchiveFilter()) }
     }
 
-    @Test
-    fun chatOptionsFollowTheWindowsFontScaleAndOpenChat() {
-        val options = desktopChatOptionsState(
-            display = com.letta.mobile.data.chat.display.ChatDisplayOptions.Default,
-            fontScale = 1f,
-            autoPin = true,
-            hasChat = false,
-        )
-        assertTrue(options.autoPinNewChats)
-        assertFalse(options.canDownloadTranscript)
-    }
-
     private fun page(destination: DesktopDestination) = desktopPanelPage(destination, WorkPlayMode.Work)
 }

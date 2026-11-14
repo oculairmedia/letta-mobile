@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.shell.pages.home
 
+import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LocalObjectVerbs
 import com.letta.mobile.ui.components.items
 import com.letta.mobile.data.objectverbs.ObjectRef
@@ -20,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -116,10 +116,10 @@ private fun FleetSortChips(page: HomePageScope) {
     ) {
         FleetSortKey.entries.forEach { key ->
             val active = sort.key == key
-            FilterChip(
-                selected = active,
+            LettaChipTab(
+                text = if (active) "${key.label} ${sortArrow(sort.descending)}" else key.label,
+                active = active,
                 onClick = { page.actions.selectSort(key) },
-                label = { Text(if (active) "${key.label} ${sortArrow(sort.descending)}" else key.label) },
                 modifier = chipModifier.testTag(HomePageTags.sort(key)),
             )
         }

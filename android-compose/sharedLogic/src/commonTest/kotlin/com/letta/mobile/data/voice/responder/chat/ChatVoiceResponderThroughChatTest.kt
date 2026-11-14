@@ -66,7 +66,7 @@ class ChatVoiceResponderThroughChatTest {
     private fun complete() = ownership.clear(state, reason = "turnFinished")
 
     private fun fail() {
-        state.ownRun.end(failed = true)
+        state.ownRun.fail()
         ownership.clear(state, reason = "turnFinished")
     }
 
@@ -88,23 +88,28 @@ class ChatVoiceResponderThroughChatTest {
 
     private fun failed(code: VoiceErrorCode) = VoiceReplyEvent.Failed(VoiceError(code, VoicePort.RESPONDER))
 
-    /** The second send used to stop the first run (one Stop press); as a follow-up it now stops nothing. */
     @Test
     fun overlappingSendsEachHearOnlyTheirOwnRun() = runTest {
         val first = collect(ask("first"))
         settle {
             turnStarted("t1", "run-1")
             echo("c1", "t1", "run-1")
-            page.add(userRow("c1", "first", sentAs = "c1"), assistantRow("m1", "One.", run = "run-1"))
+            page.add(
+                userRow(RowId("c1"), "first", sentAs = SentMessageId("c1")),
+                assistantRow(RowId("m1"), "One.", run = RowRun("run-1")),
+            )
         }
 
         val second = collect(ask("second"))
-        assertEquals(0, page.stops)
-        settle { page.replace(assistantRow("m1", "One. And a late tail.", run = "run-1")) }
+        assertEquals(1, page.stops)
+        settle { page.replace(assistantRow(RowId("m1"), "One. And a late tail.", run = RowRun("run-1"))) }
         settle {
             turnStarted("t2", "run-2")
             echo("c2", "t2", "run-2")
-            page.add(userRow("c2", "second", sentAs = "c2"), assistantRow("m2", "Two.", run = "run-2"))
+            page.add(
+                userRow(RowId("c2"), "second", sentAs = SentMessageId("c2")),
+                assistantRow(RowId("m2"), "Two.", run = RowRun("run-2")),
+            )
         }
         settle { complete() }
 
@@ -120,10 +125,13 @@ class ChatVoiceResponderThroughChatTest {
         settle {
             turnStarted("t1", "iroh-run-1")
             echo("c1", "t1", "iroh-run-1")
-            page.add(userRow("c1", "what time is it", sentAs = "c1"), assistantRow("m1", "It is", run = "iroh-run-1"))
+            page.add(
+                userRow(RowId("c1"), "what time is it", sentAs = SentMessageId("c1")),
+                assistantRow(RowId("m1"), "It is", run = RowRun("iroh-run-1")),
+            )
         }
         settle { turnStarted("t1", "run-42") }
-        settle { page.replace(assistantRow("m1", "It is noon.", run = "run-42")) }
+        settle { page.replace(assistantRow(RowId("m1"), "It is noon.", run = RowRun("run-42"))) }
         settle { complete() }
 
         assertEquals(listOf("It is", " noon."), texts(events))
@@ -136,7 +144,7 @@ class ChatVoiceResponderThroughChatTest {
         settle {
             turnStarted("t1", "run-1")
             echo("c1", "t1", "run-1")
-            page.add(assistantRow("m1", "Working", run = "run-1"))
+            page.add(assistantRow(RowId("m1"), "Working", run = RowRun("run-1")))
         }
         settle { fail() }
 
@@ -149,11 +157,14 @@ class ChatVoiceResponderThroughChatTest {
         val events = collect(ask("mine"))
         settle {
             turnStarted("t0", "other-run")
-            page.add(userRow("u-x", "theirs"), assistantRow("m0", "Their answer.", run = "other-run"))
+            page.add(userRow(RowId("u-x"), "theirs"), assistantRow(RowId("m0"), "Their answer.", run = RowRun("other-run")))
         }
         settle {
             echo("c1", "t1", "run-1")
-            page.add(userRow("c1", "mine", sentAs = "c1"), assistantRow("m1", "Mine.", run = "run-1"))
+            page.add(
+                userRow(RowId("c1"), "mine", sentAs = SentMessageId("c1")),
+                assistantRow(RowId("m1"), "Mine.", run = RowRun("run-1")),
+            )
         }
         settle { turnStarted("t1", "run-1") }
         settle { complete() }
@@ -167,7 +178,10 @@ class ChatVoiceResponderThroughChatTest {
         val events = collect(ask("mine"))
         settle {
             turnStarted("t0", "other-run")
-            page.add(userRow("c1", "mine", sentAs = "c1"), assistantRow("m0", "Their answer.", run = "other-run"))
+            page.add(
+                userRow(RowId("c1"), "mine", sentAs = SentMessageId("c1")),
+                assistantRow(RowId("m0"), "Their answer.", run = RowRun("other-run")),
+            )
         }
         advanceTimeBy(31.seconds)
         runCurrent()
@@ -183,7 +197,7 @@ class ChatVoiceResponderThroughChatTest {
         settle {
             turnStarted("t1", "run-1")
             echo("c1", "t1", "run-1")
-            page.add(assistantRow("m1", "Once upon a time", run = "run-1"))
+            page.add(assistantRow(RowId("m1"), "Once upon a time", run = RowRun("run-1")))
         }
 
         assertEquals(VoiceCancelOutcome.STOPPED, reply.cancel())

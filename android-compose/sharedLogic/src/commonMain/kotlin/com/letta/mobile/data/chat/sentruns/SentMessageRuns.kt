@@ -49,7 +49,8 @@ interface IdentifiedChatSend {
 
     /**
      * Sends [text] the way the composer's direct send does and returns the id the message was
-     * enqueued under, or null when the send was refused before anything was enqueued.
+     * enqueued under, or null when the send was refused before anything was enqueued. A send that
+     * has started is not withdrawn when the caller is cancelled: it still returns the id.
      */
     suspend fun sendIdentified(text: String): SentMessageId?
 }

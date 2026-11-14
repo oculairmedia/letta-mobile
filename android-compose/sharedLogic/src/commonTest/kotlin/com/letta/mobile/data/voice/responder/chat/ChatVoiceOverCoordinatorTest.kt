@@ -1,6 +1,7 @@
 package com.letta.mobile.data.voice.responder.chat
 
 import com.letta.mobile.data.chat.send.ChatSendCoordinatorConversationFixture
+import com.letta.mobile.data.chat.sentruns.SentMessageId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.transport.BridgeTurnStatus
@@ -47,14 +48,17 @@ internal class ChatVoiceOverCoordinatorTest : ChatSendCoordinatorConversationFix
         advanceUntilIdle()
         val otid = timeline.externalLocals.single().otid
 
-        page.show(userRow("u-x", "theirs"), assistantRow("m0", "Their answer.", run = "other-run"))
+        page.show(userRow(RowId("u-x"), "theirs"), assistantRow(RowId("m0"), "Their answer.", run = RowRun("other-run")))
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT, CONV, "iroh-run-1"))
         coordinator.handleEvent(echo(otid, "turn-1", "iroh-run-1"))
-        page.add(userRow(otid, "what time is it", sentAs = otid), assistantRow("m1", "It is", run = "iroh-run-1"))
+        page.add(
+            userRow(RowId(otid), "what time is it", sentAs = SentMessageId(otid)),
+            assistantRow(RowId("m1"), "It is", run = RowRun("iroh-run-1")),
+        )
         advanceUntilIdle()
 
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT, CONV, "run-42"))
-        page.replace(assistantRow("m1", "It is noon.", run = "run-42"))
+        page.replace(assistantRow(RowId("m1"), "It is noon.", run = RowRun("run-42")))
         advanceUntilIdle()
         coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-42", BridgeTurnStatus.Completed))
         advanceUntilIdle()

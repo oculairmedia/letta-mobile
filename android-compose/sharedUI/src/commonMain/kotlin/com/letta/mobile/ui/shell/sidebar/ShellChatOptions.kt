@@ -41,6 +41,19 @@ data class ShellChatOptionsState(
     val offersAutoPin: Boolean = true,
 )
 
+/** The Chat options dialog's state for a window: display options, its text size at [fontScale], auto-pin, and whether a chat is open. */
+fun shellChatOptionsState(
+    display: ChatDisplayOptions,
+    fontScale: Float,
+    autoPin: Boolean,
+    hasChat: Boolean,
+): ShellChatOptionsState = ShellChatOptionsState(
+    display = display,
+    textSize = ChatTextSize.nearest(fontScale),
+    autoPinNewChats = autoPin,
+    canDownloadTranscript = hasChat,
+)
+
 /** What the Chat options dialog changes. Every callback defaults to a no-op; a null download hides it. */
 data class ShellChatOptionsActions(
     val onDisplayChange: (ChatDisplayOptions) -> Unit = {},

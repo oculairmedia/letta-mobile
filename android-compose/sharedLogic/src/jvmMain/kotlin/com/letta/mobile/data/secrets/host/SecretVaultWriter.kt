@@ -1,6 +1,7 @@
 package com.letta.mobile.data.secrets.host
 
 import com.letta.mobile.data.secrets.request.SecretFailureReason
+import com.letta.mobile.data.secrets.request.SecretRequestDetails
 import com.letta.mobile.data.secrets.request.SecretRequestEvent
 import com.letta.mobile.data.secrets.request.SecretRequestTarget
 import com.letta.mobile.plugin.keystore.KeystoreCapability
@@ -23,8 +24,10 @@ import kotlinx.coroutines.CancellationException
  * Writes one submitted value to its fixed target so that either the verified value is stored or
  * nothing new is left behind:
  *
- * - An existing slot is replaced; its previous value is held (host memory only) to restore it if
- *   the read-back does not match, then wiped.
+ * - An existing slot is replaced only when the request said so when it was made
+ *   ([SecretRequestDetails.replacesExisting], found by [holdsValue]); its previous value is held
+ *   (host memory only) to restore it if the read-back does not match, then wiped. A slot that
+ *   appeared after the request was made is refused with [SecretFailureReason.TARGET_CHANGED].
  * - A missing slot is created only when the provider can list and the listing proves the whole
  *   item is absent, so undoing the write is deleting the item. A missing slot in an existing (or
  *   unprovable) item is refused with [SecretFailureReason.TARGET_NOT_WRITABLE]: keystore v1 has no
@@ -37,19 +40,38 @@ import kotlinx.coroutines.CancellationException
  * A provider that throws is treated as [KeystoreError.Internal]. The caller owns and wipes the value.
  */
 internal class SecretVaultWriter(private val provider: KeystoreProvider) {
-    /** Writes [value] to [target]; answers the event that settles the request. */
-    suspend fun write(target: SecretRequestTarget, value: SecretValue): SecretRequestEvent {
+    /**
+     * Whether [target] holds a value now: read when a request is created so the person can be told
+     * it replaces one. Any failure (or a malformed target) answers false, the safe side: such a
+     * request may then never replace a value. The value read is wiped at once.
+     */
+    suspend fun holdsValue(target: SecretRequestTarget): Boolean {
         val ref = refOf(target)
+        if (ref.problemFor(provider.describe().id) != null) return false
+        val found = guarded { provider.get(ref) }.valueOrNull() ?: return false
+        found.wipe()
+        return true
+    }
+
+    /**
+     * Writes [value] to the request's fixed target; answers the event that settles the request.
+     * An existing value is replaced only when [details] says the request [SecretRequestDetails.replacesExisting].
+     */
+    suspend fun write(details: SecretRequestDetails, value: SecretValue): SecretRequestEvent {
+        val ref = refOf(details.target)
         if (ref.problemFor(provider.describe().id) != null) return fail(SecretFailureReason.TARGET_NOT_WRITABLE)
         return when (val prior = guarded { provider.get(ref) }) {
             is KeystoreResult.Success -> try {
-                writeVerified(ref, value, WriteMode.REPLACE) { provider.put(ref, prior.value, PutOptions(WriteMode.REPLACE)) }
+                if (details.replacesExisting) replace(ref, value, prior.value) else fail(SecretFailureReason.TARGET_CHANGED)
             } finally {
                 prior.value.wipe()
             }
             is KeystoreResult.Failure -> if (prior.error is KeystoreError.NotFound) create(ref, value) else fail(reasonFor(prior.error))
         }
     }
+
+    private suspend fun replace(ref: SecretRef, value: SecretValue, prior: SecretValue): SecretRequestEvent =
+        writeVerified(ref, value, WriteMode.REPLACE) { provider.put(ref, prior, PutOptions(WriteMode.REPLACE)) }
 
     private suspend fun create(ref: SecretRef, value: SecretValue): SecretRequestEvent {
         val problem = itemAbsenceProblem(ref)

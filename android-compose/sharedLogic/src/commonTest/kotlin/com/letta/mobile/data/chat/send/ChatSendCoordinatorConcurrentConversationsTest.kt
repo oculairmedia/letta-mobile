@@ -882,6 +882,17 @@ internal abstract class ChatSendCoordinatorConversationFixture {
     }
 
     protected class RecordingTimelineWriter : TimelineExternalTransportWriter {
+        /** When set, the pending store refuses every send with this failure (e.g. the outbox byte budget). */
+        var admissionFailure: Throwable? = null
+        override suspend fun acceptPendingSend(
+            attempt: com.letta.mobile.data.timeline.api.TimelinePendingSendAttempt,
+            content: String,
+            attachments: List<MessageContentPart.Image>,
+            accept: () -> Boolean,
+        ): Boolean {
+            admissionFailure?.let { throw it }
+            return accept()
+        }
         var appendStarted: CompletableDeferred<Unit>? = null
         var appendRelease: CompletableDeferred<Unit>? = null
         var cursorRepairStarted: CompletableDeferred<Unit>? = null

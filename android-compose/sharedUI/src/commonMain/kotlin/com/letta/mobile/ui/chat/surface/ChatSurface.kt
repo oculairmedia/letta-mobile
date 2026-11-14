@@ -152,7 +152,7 @@ fun ChatSurface(
     val stableOnIntent = rememberLatestIntent(onIntent)
     val stableHost = rememberStableHost(host)
     val stablePlatform = rememberStablePlatform(platform)
-    val canvasActions = remember(viewedPort, shareFailed) { ChatCanvasActions(viewedPort.actions, stableOnIntent, shareFailed) }
+    val canvasActions = rememberChatCanvasActions(viewedPort.actions, stableOnIntent, shareFailed)
     // With a canvas in hand, "open canvas" is a mode change, not the host's navigation, and
     // "show on canvas" also frames the artifact on this page's own board (letta-mobile-bglj6.13).
     val effectiveHost = remember(stableHost, canvas != null, canvasActions) {
@@ -207,11 +207,21 @@ fun ChatSurface(
         ) {
             // letta-mobile-ckmub.1 (S4): the page's insets are owned once, by its LettaPageScaffold.
             ChatSurfacePageFrame(modifier) {
-                ChatSurfaceLayers(frame, canvas?.let { { it(canvasActions) } })
+                ChatSurfaceLayers(frame, rememberBoardOnShow(canvas, canvasActions, frame.mode))
             }
             VoiceSetupPaneHost(voiceMode)
         }
     }
+}
+
+/** The host's board, told whether it is on show with the chat over it (canvas mode); kept while they hold, so a stream skips it. */
+@Composable
+private fun rememberBoardOnShow(
+    slot: (@Composable (ChatCanvasActions) -> Unit)?,
+    actions: ChatCanvasActions,
+    mode: ChatSurfaceMode,
+): (@Composable () -> Unit)? = remember(slot, actions, mode) {
+    slot?.let { { CompositionLocalProvider(LocalChatCanvasOnBoard provides (mode != ChatSurfaceMode.FullScreen)) { it(actions) } } }
 }
 
 /** The page's layers for its idiom, under the send flight. Skipped while only the keyboard moves. */

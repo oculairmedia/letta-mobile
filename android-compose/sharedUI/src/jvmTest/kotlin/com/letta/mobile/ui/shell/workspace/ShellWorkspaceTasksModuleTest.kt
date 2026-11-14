@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.shell.workspace
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
@@ -27,7 +28,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.width
-import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.claimedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
@@ -310,7 +311,7 @@ class ShellWorkspaceTasksModuleTest {
         onNodeWithTag(SHELL_TASKS_MODULE_TAG).assertDoesNotExist()
 
         val input = Json.parseToJsonElement("""{"action":"apply","ops":[{"op":"add","lane":"side","view":"shell.tasks","index":0}]}""")
-        val result = runBlocking { tool.invoke(input.jsonObject, ExternalToolCaller(agentId = Agent)) }
+        val result = runBlocking { tool.invoke(input.jsonObject, claimedToolCaller(ToolCallScope(agentId = Agent))) }
         assertIs<ExternalToolResult.Success>(result, "the agent's edit applies")
         assertListsTheOpenConversation()
         waitUntil(timeoutMillis = TimeoutMillis) { onAllNodesWithText("Layout changed by Ada").fetchSemanticsNodes().isNotEmpty() }

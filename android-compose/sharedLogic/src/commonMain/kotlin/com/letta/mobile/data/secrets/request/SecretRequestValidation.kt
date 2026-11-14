@@ -14,7 +14,10 @@ enum class SecretRequestProblem {
     @SerialName("purpose_too_long")
     PURPOSE_TOO_LONG,
 
-    /** The purpose holds markup, a link, a line break or an invisible or control character. */
+    /**
+     * The purpose holds markup, a link, a line break, an invisible or control character, or a word
+     * that mixes Latin letters with Greek or Cyrillic look-alikes.
+     */
     @SerialName("purpose_not_plain_text")
     PURPOSE_NOT_PLAIN_TEXT,
 
@@ -33,6 +36,13 @@ enum class SecretRequestProblem {
     /** The agent already has [SecretRequestLimits.MAX_PENDING_PER_AGENT] pending requests. */
     @SerialName("too_many_pending")
     TOO_MANY_PENDING,
+
+    /**
+     * The agent already created [SecretRequestLimits.MAX_CREATED_PER_WINDOW] requests within the
+     * last [SecretRequestLimits.CREATION_WINDOW_MS]; it may ask again once the oldest leaves the window.
+     */
+    @SerialName("too_many_requests")
+    TOO_MANY_REQUESTS,
 }
 
 /** The outcome of validating an agent's request. */
@@ -95,7 +105,44 @@ sealed interface SecretRequestValidation {
                 FORBIDDEN_SUBSTRINGS.none(lowered::contains),
                 text.none { it.category in INVISIBLE_CATEGORIES },
                 !text.startsWith('#'),
+                !hasMixedScriptWord(text),
             ).all { it }
         }
+
+        /**
+         * Whether one word (a run of letters) mixes Latin letters with Greek or Cyrillic ones, the
+         * look-alike trick that spells a familiar name with foreign letters (a Latin word with one
+         * Cyrillic U+0430 in place of "a"). A sentence may use several scripts, each word one of
+         * them. The cost is a word that really mixes them, such as the Greek mu U+03BC glued to a
+         * unit ("s"); the micro sign U+00B5 is not Greek and is fine.
+         */
+        private fun hasMixedScriptWord(text: String): Boolean {
+            var latin = false
+            var lookalike = false
+            for (char in text) {
+                if (!char.isLetter()) {
+                    latin = false
+                    lookalike = false
+                    continue
+                }
+                latin = latin || LATIN.any { char in it }
+                lookalike = lookalike || LOOKALIKE.any { char in it }
+                if (latin && lookalike) return true
+            }
+            return false
+        }
+
+        /** Basic Latin, Latin-1 and Latin Extended-A/B letters, and Latin Extended Additional. */
+        private val LATIN = listOf('A'..'Z', 'a'..'z', '\u00C0'..'\u024F', '\u1E00'..'\u1EFF')
+
+        /** Greek (with extended), and Cyrillic (with supplement and extensions A to C). */
+        private val LOOKALIKE = listOf(
+            '\u0370'..'\u03FF',
+            '\u1F00'..'\u1FFF',
+            '\u0400'..'\u052F',
+            '\u1C80'..'\u1C8F',
+            '\u2DE0'..'\u2DFF',
+            '\uA640'..'\uA69F',
+        )
     }
 }

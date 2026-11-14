@@ -20,9 +20,7 @@ internal fun ConversationTurnState.advanceStartedIdentity(event: WsTimelineEvent
         "previousRunId" attr (runId ?: ""),
         "runId" attr event.runId,
     )
-    val previous = runId
     runId = event.runId
-    ownRun.promoted(previous, event.runId)
     return true
 }
 

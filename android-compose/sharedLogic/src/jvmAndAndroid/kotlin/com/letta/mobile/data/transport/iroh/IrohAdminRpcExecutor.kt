@@ -14,7 +14,10 @@ internal data class AdminRpcRequest(
     val method: String,
     val path: String,
     val body: String?,
-)
+) {
+    /** Never the body: it can carry a secret (`secret.request.submit`). */
+    override fun toString(): String = "AdminRpcRequest(method=$method, path=$path, body=<redacted>)"
+}
 
 /**
  * Generation-scoped Admin RPC executor and retry/escalation state for [IrohChannelTransport].

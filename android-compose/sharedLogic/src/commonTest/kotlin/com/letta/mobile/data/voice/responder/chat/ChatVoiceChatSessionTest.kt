@@ -64,13 +64,17 @@ class ChatVoiceChatSessionTest {
     @Test
     fun rowsAreMappedByKindAndOnlyUserRowsCarryTheClientId() {
         page.show(
-            userRow("local-1", "hi", sentAs = "c1"),
-            userRow("u-other", "from elsewhere"),
-            assistantRow("m1", "Hello", run = "run-1").copy(clientMessageId = "c1"),
-            assistantRow("r1", "thinking", run = "run-1").copy(isReasoning = true),
-            assistantRow("tc", "", run = "run-1").copy(toolCalls = listOf(UiToolCall(name = "search", arguments = "{}", result = null))),
-            assistantRow("ap", "", run = "run-1").copy(approvalRequest = UiApprovalRequest(requestId = "q", toolCalls = emptyList())),
-            assistantRow("e1", "It broke", run = "run-1").copy(role = "system", isError = true),
+            userRow(RowId("local-1"), "hi", sentAs = SentMessageId("c1")),
+            userRow(RowId("u-other"), "from elsewhere"),
+            assistantRow(RowId("m1"), "Hello", run = RowRun("run-1")).copy(clientMessageId = "c1"),
+            assistantRow(RowId("r1"), "thinking", run = RowRun("run-1")).copy(isReasoning = true),
+            assistantRow(RowId("tc"), "", run = RowRun("run-1")).copy(
+                toolCalls = listOf(UiToolCall(name = "search", arguments = "{}", result = null)),
+            ),
+            assistantRow(RowId("ap"), "", run = RowRun("run-1")).copy(
+                approvalRequest = UiApprovalRequest(requestId = "q", toolCalls = emptyList()),
+            ),
+            assistantRow(RowId("e1"), "It broke", run = RowRun("run-1")).copy(role = "system", isError = true),
         )
         val rows = session.state.value.rows
         assertEquals(
@@ -87,10 +91,16 @@ class ChatVoiceChatSessionTest {
 
     @Test
     fun rowKeysStayStableWhileTextStreamsTheUserRowConfirmsAndTheRunIsPromoted() {
-        page.show(userRow("local-1", "hi", sentAs = "c1"), assistantRow("m1", "Hel", run = "iroh-run-1"))
+        page.show(
+            userRow(RowId("local-1"), "hi", sentAs = SentMessageId("c1")),
+            assistantRow(RowId("m1"), "Hel", run = RowRun("iroh-run-1")),
+        )
         val before = session.state.value.rows.map { it.key }
 
-        page.show(userRow("server-9", "hi", sentAs = "c1"), assistantRow("m1", "Hello there", run = "run-42"))
+        page.show(
+            userRow(RowId("server-9"), "hi", sentAs = SentMessageId("c1")),
+            assistantRow(RowId("m1"), "Hello there", run = RowRun("run-42")),
+        )
         val after = session.state.value.rows
         assertEquals(before, after.map { it.key })
         assertEquals(VoiceRunId("run-42"), after[1].runId)
@@ -98,7 +108,10 @@ class ChatVoiceChatSessionTest {
 
     @Test
     fun aSentRowAndAnAgentRowWithTheSameOtidKeepDistinctKeys() {
-        page.show(userRow("local-1", "hi", sentAs = "c1"), assistantRow("c1", "Hello", run = "run-1"))
+        page.show(
+            userRow(RowId("local-1"), "hi", sentAs = SentMessageId("c1")),
+            assistantRow(RowId("c1"), "Hello", run = RowRun("run-1")),
+        )
         val keys = session.state.value.rows.map { it.key }
         assertEquals(keys.toSet().size, keys.size)
     }

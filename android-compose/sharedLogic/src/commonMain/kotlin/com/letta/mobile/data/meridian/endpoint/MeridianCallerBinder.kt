@@ -1,6 +1,9 @@
 package com.letta.mobile.data.meridian.endpoint
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.claimedToolCaller
+import com.letta.mobile.data.controller.extras.verifiedToolCaller
 import com.letta.mobile.data.meridian.MeridianError
 import com.letta.mobile.data.meridian.MeridianErrorCode
 
@@ -53,7 +56,7 @@ class MeridianCallerBinder(
         return when {
             live != null -> Result.success(live.toCaller())
             mode == MeridianCallerBindingMode.ENV_SCOPED && (claimedAgent != null || claimedConversation != null) ->
-                Result.success(ExternalToolCaller(claimedAgent, claimedConversation))
+                Result.success(claimedToolCaller(ToolCallScope(claimedAgent, claimedConversation)))
             token == null -> denied(
                 "no tool token: meridian runs from an agent's shell tool, which gets LETTA_TOOL_TOKEN for that one call",
             )
@@ -61,14 +64,15 @@ class MeridianCallerBinder(
         }
     }
 
-    private fun MeridianLiveCall.toCaller() = ExternalToolCaller(
+    // The token was issued for this one live shell call; its scope is the App Server's stamp.
+    private fun MeridianLiveCall.toCaller() = verifiedToolCaller(ToolCallScope(
         agentId = scope.agentId.takeUnless { scope.isAgentFree },
         conversationId = scope.conversationId,
         // The first meridian invocation of a shell call carries the call's own id, so a compose
         // lands on the artifact the native tool would have named; later ones in the same command
         // get their own, or a second compose would answer as a retry of the first.
         toolCallId = if (invocation <= 1) toolCallId else "$toolCallId:$invocation",
-    )
+    ))
 
     private fun <T> denied(message: String): Result<T> = Result.failure(
         MeridianWireRefusal(

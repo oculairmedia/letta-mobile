@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.tools.ToolPreviewTarget
@@ -48,6 +46,7 @@ import com.letta.mobile.ui.shell.pages.memfs.MemfsPageOptions
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceBinding
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceView
 import com.letta.mobile.ui.shell.pages.workspace.MemoryPreview
+import com.letta.mobile.ui.theme.LettaChip
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.compose.resources.stringResource
@@ -111,9 +110,9 @@ class ShellMemoryPreview(private val sources: ShellMemorySources, private val ag
         if (viewOf(target) == null) return
         val state by sources.memory.collectAsState()
         val visible = memoryForFocus(state, agent())
-        AssistChip(
+        LettaChip(
+            text = chipLabel(target, visible.parity.memory),
             onClick = { open(target, step) },
-            label = { Text(chipLabel(target, visible.parity.memory), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             modifier = Modifier.testTag(ShellMemoryPreviewTags.CHIP),
         )
     }

@@ -11,6 +11,7 @@
     <string name="shared_notes_empty">The host shares no notes with this device yet.</string>
     <string name="shared_notes_show_more">Show more</string>
     <string name="shared_notes_none_yet">No notes found yet. The host has more to check.</string>
+    <string name="shared_notes_capped">Showing the first %1$d shared notes. Refresh to list them again from the start.</string>
     <string name="shared_notes_more_failed">More notes could not be loaded. What is shown is still current.</string>
     <string name="shared_notes_unavailable">The host is not reachable right now.</string>
     <string name="shared_notes_denied">The host does not let this device see its notes.</string>

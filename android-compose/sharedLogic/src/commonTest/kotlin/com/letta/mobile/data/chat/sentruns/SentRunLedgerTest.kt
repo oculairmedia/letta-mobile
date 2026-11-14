@@ -49,6 +49,39 @@ class SentRunLedgerTest {
     }
 
     @Test
+    fun anIdAddedAfterTheRunFailedIsFailedToo() {
+        ledger.started(first, setOf(provisional))
+        ledger.ended(first, failed = true)
+        ledger.started(first, setOf(durable))
+        assertEquals(setOf(provisional, durable), ledger.state.value.failed)
+        assertTrue(ledger.state.value.active.isEmpty())
+    }
+
+    @Test
+    fun aStampedRowArrivingAfterItsSendsTurnSettledIsPublishedAsEnded() {
+        ledger.sent(first)
+        ledger.settled(setOf(provisional), failed = true)
+        ledger.sendSettled(first, failed = true)
+        ledger.row(first.value, provisional.value)
+        assertEquals(mapOf(first to setOf(provisional)), ledger.state.value.started)
+        assertTrue(ledger.state.value.active.isEmpty())
+        assertEquals(setOf(provisional), ledger.state.value.failed)
+    }
+
+    @Test
+    fun aRunIdReusedByALaterMessageCarriesNoEarlierFailure() {
+        ledger.started(first, setOf(provisional))
+        ledger.ended(first, failed = true)
+        ledger.started(second, setOf(provisional))
+        assertEquals(setOf(provisional), ledger.state.value.active)
+        assertTrue(ledger.state.value.failed.isEmpty())
+
+        ledger.settled(setOf(provisional), failed = false)
+        assertTrue(ledger.state.value.active.isEmpty())
+        assertTrue(ledger.state.value.failed.isEmpty())
+    }
+
+    @Test
     fun endingAnUnknownMessageChangesNothing() {
         ledger.started(first, setOf(provisional))
         ledger.ended(second, failed = true)
@@ -125,20 +158,5 @@ class SentRunLedgerTest {
 
         assertEquals(setOf(SentRunId("local-run-58")), ledger.state.value.active)
         assertTrue(ledger.state.value.failed.isEmpty())
-    }
-
-    @Test
-    fun aPromotionOfTheSameTurnJoinsTheEntryAndKeepsItActive() {
-        ledger.started(first, setOf(provisional))
-        ledger.promoted(provisional.value, durable.value)
-        assertEquals(setOf(provisional, durable), ledger.state.value.started[first])
-        assertEquals(setOf(provisional, durable), ledger.state.value.active)
-    }
-
-    @Test
-    fun aPromotionOfARunNoSentMessageStartedChangesNothing() {
-        ledger.started(first, setOf(provisional))
-        ledger.promoted("someone-elses-run", durable.value)
-        assertEquals(setOf(provisional), ledger.state.value.started[first])
     }
 }
