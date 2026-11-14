@@ -146,17 +146,24 @@ internal class TurnTracker(private val policy: EndOfTurnPolicy, format: AudioFra
         val voiced = observed.probability.value >= thresholds(observed).exit
         if (voiced) voicedSamples += hop.samples
         val lastVoice = if (voiced) end else current.lastVoice
-        val withinCap = end - current.start < cap
-        // A gap that outlasted what the candidate may bridge abandons it, even if a lower barge-in bar now counts it as enough voice.
-        val withinGap = voiced || bridges(end - lastVoice)
-        if (withinCap && withinGap && voicedSamples >= needed(observed)) {
+        if (!stillOpen(current.start, end, voiced, lastVoice)) return abandon()
+        if (voicedSamples >= needed(observed)) {
             phase = TurnPhase.Speaking(current.start, lastVoice)
             return TurnSignal.Confirmed
         }
-        if (withinCap && withinGap) {
-            phase = TurnPhase.Candidate(current.start, lastVoice)
-            return TurnSignal.None
-        }
+        phase = TurnPhase.Candidate(current.start, lastVoice)
+        return TurnSignal.None
+    }
+
+    /**
+     * Whether a candidate that began at [start] may go on at [end]: within the hard cap, and voiced now or
+     * within the gap it may bridge. A gap that outlasted that abandons it, even if a lower barge-in bar
+     * would now count it as enough voice.
+     */
+    private fun stillOpen(start: Long, end: Long, voiced: Boolean, lastVoice: Long): Boolean =
+        end - start < cap && (voiced || bridges(end - lastVoice))
+
+    private fun abandon(): TurnSignal {
         phase = TurnPhase.Quiet
         return TurnSignal.Abandoned(if (voicedSamples < onset) TurnDiscardReason.NO_ONSET else TurnDiscardReason.TOO_LITTLE_VOICE)
     }
