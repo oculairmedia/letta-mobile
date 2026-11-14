@@ -191,6 +191,10 @@ Lock order is coordinator lifecycle mutex, registry index lock, then per-turn id
 
 Retention remains unchanged: registry aliases are capped at 64, settled OTIDs at 16, settled-run and assistant-run evidence sets at 8, deduplication at 512 and tracked conversation states have a soft cap 32. The existing pre-conversation delta deque, runtime audit channel, client send queue and turn-fence history retain their existing unbounded policies; this extraction does not add a new retention policy.
 
+
+# Package com.letta.mobile.data.chat.sentruns
+
+Which run each message this client sent started, by identity only. The send pipeline's turn state publishes an entry when the send's echo pairs its otid with a run, adds every later id of the same turn (a durable id promoting a provisional one), and ends the entry when the turn completes, fails, is stopped or is replaced. An echo that arrives only after its turn settled is still paired, as an ended run, when that run is among the recently settled ones. Entries are bounded; one whose run is in flight is never dropped. [IdentifiedChatSend](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.sentruns/-identified-chat-send/index.html) is what a chat owner offers when it can name the message a send enqueued; the shared send coordinator offers one as `identifiedSend`, returning the otid read under the same lock hold that enqueued the message.
 # Package com.letta.mobile.data.chat.tools
 
 The tool presenter plugin contract: how a tool call reads as a timeline step on every host. A presenter claims calls by tool name (exact or globbed) and argument shape, and gives a cheap step line (verb, target, preview targets, failure) and an inset built only when the step opens. Shell tools hand each command they run to a second-level command presenter registry keyed on the program and its subcommands. Bundled presenters and the ones a plugin's manifest contributes register through the same calls; keep painting in `sharedUI`; register through [ToolPresenterRegistry](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools/-tool-presenter-registry/index.html) and implement [ToolPresenter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools/-tool-presenter/index.html) or [CommandPresenter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools/-command-presenter/index.html).
@@ -733,7 +737,11 @@ The voice loop's internal transition table: a pure function from model and input
 
 # Package com.letta.mobile.data.voice.responder
 
-The responder for the conversation's agent, over its own port, [VoiceChatSession](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.responder/-voice-chat-session/index.html): sending returns the message's client id, and the state publishes the run each sent message started. Replies are attributed by that identity only, never by text, position or timing; without it nothing is spoken and the reply ends unattributed. No adapter from the app's chat session exists yet, because the chat session does not return a sent message's id or publish the run it started.
+The responder for the conversation's agent, over its own port, [VoiceChatSession](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.responder/-voice-chat-session/index.html): sending returns the message's client id, and the state publishes the run each sent message started. Replies are attributed by that identity only, never by text, position or timing; without it nothing is spoken and the reply ends unattributed. The app's chat session is adapted to this port in `data.voice.responder.chat`.
+
+# Package com.letta.mobile.data.voice.responder.chat
+
+The app's chat session as a [VoiceChatSession](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.responder/-voice-chat-session/index.html). The chat page's rows become voice rows (the person's messages, the agent's plain text, errors; reasoning, tool calls, approvals and everything else are never spoken) under keys that stay put while text streams, while a pending message confirms and while a run id is promoted. Each send's otid and the runs it started come from an [IdentifiedChatSend](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.sentruns/-identified-chat-send/index.html), and stopping is the page's own Stop. Building the adapter starts nothing; no host builds one yet.
 
 # Package com.letta.mobile.data.voice.speech
 

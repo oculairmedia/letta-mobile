@@ -15171,6 +15171,7 @@ public final class com/letta/mobile/data/chat/send/ChatSendCoordinator {
 	public synthetic fun <init> (Lkotlinx/coroutines/CoroutineScope;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Lcom/letta/mobile/data/transport/WsChatBridge;Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Lcom/letta/mobile/data/repository/api/IConversationRepository;Lcom/letta/mobile/data/chat/send/ChatSendUiSink;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun cancel ()Z
 	public final fun getEventSubscription ()Lcom/letta/mobile/data/chat/send/ChatSendEventSubscription;
+	public final fun getIdentifiedSend ()Lcom/letta/mobile/data/chat/sentruns/IdentifiedChatSend;
 	public final fun getSendQueue ()Lcom/letta/mobile/data/chat/send/ChatSendQueueControls;
 	public final fun handleEvent (Lcom/letta/mobile/data/transport/WsTimelineEvent;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun send (Ljava/lang/String;Ljava/util/List;)Lkotlinx/coroutines/Job;
@@ -15341,6 +15342,56 @@ public final class com/letta/mobile/data/chat/send/ServerQueueBlocker : java/lan
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/chat/send/ServerQueueBlocker;
 	public static fun values ()[Lcom/letta/mobile/data/chat/send/ServerQueueBlocker;
+}
+
+public abstract interface class com/letta/mobile/data/chat/sentruns/IdentifiedChatSend {
+	public abstract fun getSentRuns ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun sendIdentified-mHpWIMA (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/chat/sentruns/SentMessageId {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/chat/sentruns/SentMessageId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/sentruns/SentMessageRuns {
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/Map;
+	public final fun component2 ()Ljava/util/Set;
+	public final fun component3 ()Ljava/util/Set;
+	public final fun copy (Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;)Lcom/letta/mobile/data/chat/sentruns/SentMessageRuns;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/sentruns/SentMessageRuns;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/sentruns/SentMessageRuns;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActive ()Ljava/util/Set;
+	public final fun getFailed ()Ljava/util/Set;
+	public final fun getStarted ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/sentruns/SentRunId {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/chat/sentruns/SentRunId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/chat/tools/CommandMatch {
@@ -71559,6 +71610,17 @@ public final class com/letta/mobile/data/voice/responder/VoiceRunId {
 	public fun toString ()Ljava/lang/String;
 	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
 	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/responder/chat/ChatSendRefusedException : java/lang/IllegalStateException {
+	public fun <init> ()V
+}
+
+public final class com/letta/mobile/data/voice/responder/chat/ChatVoiceChatSession : com/letta/mobile/data/voice/responder/VoiceChatSession {
+	public fun <init> (Lcom/letta/mobile/ui/chat/session/ChatSessionPort;Lcom/letta/mobile/data/chat/sentruns/IdentifiedChatSend;Lkotlinx/coroutines/flow/StateFlow;)V
+	public fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun send-iyX4eW4 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun stopRun ()V
 }
 
 public final class com/letta/mobile/data/voice/speech/SentenceChunker {
