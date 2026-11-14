@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.components.StatusGlyph
+import com.letta.mobile.ui.components.line.StatusTone
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
@@ -50,7 +52,6 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.customColors
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 
@@ -130,12 +131,11 @@ internal fun CopyIconButton(
 /** The copy glyph, or the success check for a moment after a copy. */
 @Composable
 private fun CopyGlyph(copied: Boolean, tint: Color) {
-    Icon(
-        imageVector = if (copied) LettaIcons.Check else LettaIcons.Copy,
-        contentDescription = null,
-        tint = if (copied) successTint() else tint,
-        modifier = Modifier.size(LettaDimens.Control.icon),
-    )
+    if (copied) {
+        StatusGlyph(StatusTone.Success, size = LettaDimens.Control.icon)
+    } else {
+        Icon(imageVector = LettaIcons.Copy, contentDescription = null, tint = tint, modifier = Modifier.size(LettaDimens.Control.icon))
+    }
 }
 
 /** The "copied" flag, which falls back by itself once the feedback has shown. */
@@ -184,12 +184,6 @@ private fun copyAlpha(action: CopyAction, engaged: Boolean): Float {
         action.emphasized || engaged -> 1f
         else -> ChatRowAlpha.copyIdle
     }
-}
-
-@Composable
-internal fun successTint(): Color {
-    return MaterialTheme.customColors.successColor.takeIf { it != Color.Unspecified }
-        ?: MaterialTheme.colorScheme.primary
 }
 
 private const val COPY_FADE_MILLIS = 120

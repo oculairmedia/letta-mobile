@@ -1,12 +1,14 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.theme.ChatRowInsetShape
+import com.letta.mobile.ui.theme.ChatRowType
+import com.letta.mobile.ui.components.successTint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -18,7 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import com.letta.mobile.data.diff.DiffLine
 import com.letta.mobile.data.diff.DiffLineKind
 import com.letta.mobile.data.diff.UnifiedDiff
@@ -43,7 +44,7 @@ internal fun DiffBlock(text: String, maxRows: Int = ChatRowDimens.diffVisibleLin
     }
     Surface(
         modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.DIFF_BLOCK),
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        shape = ChatRowInsetShape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         SelectionContainer {
@@ -81,7 +82,7 @@ private fun diffRowStyle(kind: DiffLineKind): DiffRowStyle {
 @Composable
 private fun DiffBlockRow(line: DiffLine) {
     val style = diffRowStyle(line.kind)
-    val mono = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+    val mono = ChatRowType.monoBody
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -105,7 +106,7 @@ private fun DiffBlockRow(line: DiffLine) {
 private fun DiffGutter(lineNumber: Int?) {
     Text(
         text = lineNumber?.toString().orEmpty(),
-        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+        style = ChatRowType.monoLabel,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1,
         modifier = Modifier.width(LettaDimens.Space.xxl).padding(end = LettaDimens.Space.sm),

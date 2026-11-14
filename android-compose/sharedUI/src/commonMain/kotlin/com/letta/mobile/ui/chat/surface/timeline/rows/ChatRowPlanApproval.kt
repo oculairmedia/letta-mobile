@@ -1,11 +1,12 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.theme.ChatRowInsetShape
+import com.letta.mobile.ui.theme.ChatRowType
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -13,7 +14,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.model.PlanApproval
 import com.letta.mobile.data.model.PlanPreview
@@ -57,7 +57,7 @@ internal fun ExitPlanModeCard(approval: UiApprovalRequest, decider: ApprovalDeci
     // Only the ExitPlanMode call's id: other bundled calls must not be decoded as the gate.
     val toolCallIds = remember(toolCall.toolCallId) { listOf(toolCall.toolCallId) }
     val approveReason = remember(toolCall.arguments) { PlanApproval.approveReason(toolCall.arguments) }
-    ApprovalChrome(icon = LettaIcons.ListIcon, title = stringResource(Res.string.rows_plan_title)) {
+    ApprovalChrome(title = stringResource(Res.string.rows_plan_title), icon = LettaIcons.ListIcon) {
         PlanPreviewBlock(plan)
         if (decider.submit != null) {
             ApprovalDecisionButtons(toolCallIds, decider, approveReason = approveReason, rejectCopy = PlanRejectCopy)
@@ -89,7 +89,7 @@ internal fun PlanWritePreview(toolCall: UiApprovalToolCall) {
 private fun PlanPreviewBlock(plan: PlanPreview) {
     Surface(
         modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.APPROVAL_PLAN),
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        shape = ChatRowInsetShape,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
@@ -100,8 +100,7 @@ private fun PlanPreviewBlock(plan: PlanPreview) {
             plan.shortFilePath?.let { path ->
                 Text(
                     text = path,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontFamily = FontFamily.Monospace,
+                    style = ChatRowType.monoLabel,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

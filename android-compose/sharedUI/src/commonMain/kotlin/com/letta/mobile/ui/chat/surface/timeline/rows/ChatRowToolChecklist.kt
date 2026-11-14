@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.components.StatusGlyph
+import com.letta.mobile.ui.components.line.StatusTone
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -47,13 +49,14 @@ private fun ChecklistRow(item: ToolInset.Checklist.Item, current: Boolean) {
         Box(Modifier.size(ChatRowSpacing.runGlyphSize), contentAlignment = Alignment.Center) {
             when {
                 item.done -> Text(DONE_MARK, style = MaterialTheme.typography.bodySmall, color = muted)
-                current -> RunStatusGlyph(RunSummaryTone.Working, Modifier.testTag(ChatRowTestTags.TOOL_CHECKLIST_CURRENT))
+                current -> StatusGlyph(StatusTone.Working, Modifier.testTag(ChatRowTestTags.TOOL_CHECKLIST_CURRENT))
                 else -> Text(PENDING_MARK, style = MaterialTheme.typography.bodySmall, color = muted)
             }
         }
         Text(
             text = item.text,
-            style = MaterialTheme.typography.bodySmall.copy(textDecoration = if (item.done) TextDecoration.LineThrough else null),
+            style = MaterialTheme.typography.bodySmall,
+            textDecoration = if (item.done) TextDecoration.LineThrough else null,
             color = if (item.done) muted else MaterialTheme.colorScheme.onSurface,
         )
     }

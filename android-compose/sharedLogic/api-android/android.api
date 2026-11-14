@@ -13503,7 +13503,6 @@ public final class com/letta/mobile/data/chat/display/BackgroundCommandReport {
 }
 
 public final class com/letta/mobile/data/chat/display/BackgroundCommandReportKt {
-	public static final fun isCommand (Lcom/letta/mobile/data/model/UiSubagentNotification;)Z
 	public static final fun parseBackgroundCommandReport (Ljava/lang/String;)Lcom/letta/mobile/data/chat/display/BackgroundCommandReport;
 	public static final fun toInset (Lcom/letta/mobile/data/chat/display/BackgroundCommandReport;)Lcom/letta/mobile/data/chat/tools/ToolInset$Command;
 }
@@ -33820,6 +33819,7 @@ public final class com/letta/mobile/data/model/SubagentKindKt {
 
 public final class com/letta/mobile/data/model/SubagentNotificationParserKt {
 	public static final fun extractSubagentNotification (Ljava/lang/String;)Lcom/letta/mobile/data/model/UiSubagentNotification;
+	public static final fun isCommand (Lcom/letta/mobile/data/model/UiSubagentNotification;)Z
 }
 
 public final class com/letta/mobile/data/model/SubagentParentIdentity {

@@ -1,11 +1,12 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.components.PagerBar
+import com.letta.mobile.ui.components.line.PagerStep
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,8 +21,6 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import com.composables.icons.lucide.ChevronLeft
-import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.CloudOff
 import com.composables.icons.lucide.Lucide
 import com.letta.mobile.data.chat.approval.ApprovalStepDecision
@@ -95,24 +94,23 @@ internal fun rememberApprovalStepper(messages: List<UiMessage>, actions: ChatAct
 /** "Approval 2 of 3" with back and next, over the current step's card. */
 @Composable
 internal fun ApprovalStepHeader(steps: ApprovalSteps, onBack: () -> Unit, onForward: () -> Unit) {
-    Row(
+    PagerBar(
+        label = stringResource(Res.string.rows_approval_step, steps.position, steps.total),
+        back = PagerStep(
+            stringResource(Res.string.rows_approval_step_back),
+            steps.canGoBack(),
+            onBack,
+            ChatRowTestTags.APPROVAL_STEP_BACK,
+        ),
+        forward = PagerStep(
+            stringResource(Res.string.rows_approval_step_next),
+            steps.canGoForward(),
+            onForward,
+            ChatRowTestTags.APPROVAL_STEP_NEXT,
+        ),
         modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.APPROVAL_STEP_HEADER),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-    ) {
-        IconButton(onClick = onBack, enabled = steps.canGoBack(), modifier = Modifier.testTag(ChatRowTestTags.APPROVAL_STEP_BACK)) {
-            Icon(Lucide.ChevronLeft, contentDescription = stringResource(Res.string.rows_approval_step_back))
-        }
-        Text(
-            text = stringResource(Res.string.rows_approval_step, steps.position, steps.total),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.testTag(ChatRowTestTags.APPROVAL_STEP_COUNTER),
-        )
-        IconButton(onClick = onForward, enabled = steps.canGoForward(), modifier = Modifier.testTag(ChatRowTestTags.APPROVAL_STEP_NEXT)) {
-            Icon(Lucide.ChevronRight, contentDescription = stringResource(Res.string.rows_approval_step_next))
-        }
-    }
+        labelTag = ChatRowTestTags.APPROVAL_STEP_COUNTER,
+    )
 }
 
 private fun ChatApprovalAnswer.toDecision() = ApprovalStepDecision(

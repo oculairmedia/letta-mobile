@@ -27,7 +27,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
-import com.letta.mobile.ui.components.row.LettaListRowDefaults
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.longClick
@@ -375,7 +375,7 @@ class ChatRowInteractionUiTest {
         onNodeWithContentDescription("Reasoning in progress", useUnmergedTree = true).assertExists()
         onNodeWithTag(ChatRowTestTags.REASONING_TOGGLE).assertIsNotEnabled()
         onNode(
-            hasTestTag(LettaListRowDefaults.TitleTestTag) and hasAnyAncestor(hasTestTag(ChatRowTestTags.REASONING_TOGGLE)),
+            hasText("Thinking", substring = true) and hasAnyAncestor(hasTestTag(ChatRowTestTags.REASONING_TOGGLE)),
             useUnmergedTree = true,
         ).assertExists()
 

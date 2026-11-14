@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.components.line.StatusTone
+import com.letta.mobile.ui.theme.ChatRowType
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,7 +30,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
@@ -38,7 +39,6 @@ import com.letta.mobile.avatar.core.gaze.AttentionKind
 import com.letta.mobile.ui.mascot.mascotAttention
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Terminal
@@ -293,7 +293,7 @@ internal fun ApprovalRequestCard(approval: UiApprovalRequest, decider: ApprovalD
     // letta-mobile-8fq4j: the same precedence for ExitPlanMode's plan card.
     if (!parkedOtherTool && ExitPlanModeCard(approval, decider)) return
     val actionable = decider.submit != null
-    ApprovalChrome(icon = LettaIcons.CheckCircle, title = stringResource(Res.string.rows_approval_requested)) {
+    ApprovalChrome(tone = StatusTone.Attention, title = stringResource(Res.string.rows_approval_requested)) {
         ApprovalCardContent(approval, decider, actionable)
     }
 }
@@ -317,16 +317,21 @@ private fun ColumnScope.ApprovalCardContent(approval: UiApprovalRequest, decider
  * tool label's voice over the content with no card around it (the timeline row is the surface).
  */
 @Composable
-internal fun ApprovalChrome(icon: ImageVector, title: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun ApprovalChrome(
+    title: String,
+    icon: ImageVector? = null,
+    tone: StatusTone? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     if (!touchStyle()) {
-        ArtifactCard(icon = icon, title = title, content = content)
+        ArtifactCard(icon = icon, title = title, tone = tone, content = content)
         return
     }
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        Text(text = title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        Text(text = title, style = ChatRowType.cardTitle)
         content()
     }
 }
@@ -342,7 +347,7 @@ private fun ApprovalBody() {
 
 @Composable
 private fun ApprovalToolCallLine(toolCall: UiApprovalToolCall) {
-    Text(text = toolCall.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
+    Text(text = toolCall.name, style = ChatRowType.itemTitle)
     if (toolCall.arguments.isNotBlank()) {
         val primary = remember(toolCall.arguments) { ToolArguments.primary(toolCall.arguments) }
         CodeBlock(primary)
@@ -375,8 +380,7 @@ private fun ApprovalToolCallCard(toolCall: UiApprovalToolCall) {
             )
             Text(
                 text = toolCall.name,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
+                style = ChatRowType.itemTitle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
@@ -557,7 +561,7 @@ private fun AskUserQuestionCard(approval: UiApprovalRequest, decider: ApprovalDe
     val toolCallIds = remember(toolCall.toolCallId) { listOf(toolCall.toolCallId) }
     val stateKey = "${approval.requestId}:${toolCall.toolCallId}:${toolCall.arguments}"
     val answers = remember(stateKey) { QuestionAnswers(mutableStateMapOf(), mutableStateMapOf()) }
-    ApprovalChrome(icon = LettaIcons.Help, title = stringResource(Res.string.rows_question)) {
+    ApprovalChrome(title = stringResource(Res.string.rows_question), icon = LettaIcons.Help) {
         spec.questions.forEach { QuestionBlock(it, answers) }
         val built = answers.build(spec.questions)
         val canSubmit = built.isNotEmpty() && built.size == spec.questions.count { it.question.isNotBlank() }
@@ -586,7 +590,7 @@ private fun QuestionBlock(question: AskUserQuestionItem, answers: QuestionAnswer
     val selected = answers.selections[question.question].orEmpty()
     Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), modifier = Modifier.fillMaxWidth()) {
         question.header?.takeIf { it.isNotBlank() }?.let {
-            Text(text = it, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            Text(text = it, style = ChatRowType.cardTitle)
         }
         Text(text = question.question, style = MaterialTheme.typography.bodySmall)
         FlowRow(
@@ -623,12 +627,12 @@ private fun QuestionBlock(question: AskUserQuestionItem, answers: QuestionAnswer
 @Composable
 internal fun ApprovalResponseCard(response: UiApprovalResponse) {
     // The shared verdict fails closed: any explicit rejection reads Rejected.
-    val (title, icon) = when (response.verdict) {
-        true -> stringResource(Res.string.rows_approved) to LettaIcons.CheckCircle
-        false -> stringResource(Res.string.rows_rejected) to LettaIcons.Error
-        null -> stringResource(Res.string.rows_approval_response) to LettaIcons.CheckCircle
+    val (title, tone) = when (response.verdict) {
+        true -> stringResource(Res.string.rows_approved) to StatusTone.Done
+        false -> stringResource(Res.string.rows_rejected) to StatusTone.Failed
+        null -> stringResource(Res.string.rows_approval_response) to StatusTone.Done
     }
-    ApprovalChrome(icon = icon, title = title) {
+    ApprovalChrome(title = title, tone = tone) {
         response.reason?.takeIf { it.isNotBlank() }?.let {
             Text(text = it, style = MaterialTheme.typography.bodySmall)
         }
@@ -649,7 +653,7 @@ internal fun ToolArgumentLine(arguments: String) {
     SelectionContainer {
         Text(
             text = stringResource(Res.string.rows_tool_argument_line, primary),
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            style = ChatRowType.monoBody,
             color = MaterialTheme.colorScheme.onSurface,
         )
     }

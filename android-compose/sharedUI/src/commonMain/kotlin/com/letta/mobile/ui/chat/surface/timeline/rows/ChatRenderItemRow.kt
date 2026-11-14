@@ -12,7 +12,9 @@ import androidx.compose.ui.unit.Density
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.common.GroupPosition
+import com.letta.mobile.ui.components.LocalStatusGlyphAnimated
 
 /**
  * Renders one timeline item (a single message or a run block) with
@@ -30,6 +32,14 @@ internal fun ChatRenderItemRow(
     modifier: Modifier = Modifier,
 ) {
     LocalRowComposed.current?.invoke(item.key)
+    // A docked panel's ambient glow already says "working": the rows' status glyphs then hold still.
+    CompositionLocalProvider(LocalStatusGlyphAnimated provides LocalChatWorkingCueAnimated.current) {
+        RowContent(item, context, callbacks, modifier)
+    }
+}
+
+@Composable
+private fun RowContent(item: ChatRenderItem, context: ChatRowContext, callbacks: ChatRowCallbacks, modifier: Modifier) {
     WithRowFontScale(context.fontScale) {
         Column(modifier = modifier.fillMaxWidth()) {
             // A lone message holding its run's key draws as that run, as Android does, so the row
@@ -84,7 +94,7 @@ internal object ChatRowTestTags {
     const val FORK_REPLY = "fork-reply"
     const val TOOL_CARD_TOGGLE = "tool-card-toggle"
     const val TOOL_CARD_BODY = "tool-card-body"
-    /** A running tool step's small spinner: the run summary's [RunStatusGlyph] while it works. */
+    /** A running tool step's small spinner: the shared status glyph while it works. */
     const val TOOL_STATUS_GLYPH = "tool-status-glyph"
     /** A step line's muted note: "exited N" / "failed" in amber, "awaiting approval" while parked. */
     const val TOOL_STEP_NOTE = "tool-step-note"
@@ -109,11 +119,20 @@ internal object ChatRowTestTags {
     const val CANVAS_ARTIFACT_STATUS = "chat-canvas-artifact-status"
     const val DIFF_BLOCK = "tool-diff"
     const val COMPLETED_ACTIVITY_SUMMARY = "completed-activity-summary"
+    /** A completed report's summary-line glyph: the shared status glyph. */
+    const val COMPLETED_ACTIVITY_GLYPH = "completed-activity-glyph"
     const val SUBAGENT_DISPATCH = "subagent-dispatch"
     const val SUBAGENT_NOTIFICATION = "subagent-notification"
     /** A Monitor watch's chip, and one of its actionable events. */
     const val MONITOR_WATCHER = "monitor-watcher"
     const val MONITOR_EVENT = "monitor-event"
+    /** The summary line of a Monitor watch or event, and its status glyph. */
+    const val MONITOR_WATCHER_LINE = "monitor-watcher-line"
+    const val MONITOR_EVENT_LINE = "monitor-event-line"
+    const val MONITOR_GLYPH = "monitor-glyph"
+    /** An in-flight, failed or unknown task notification's summary line, and its status glyph. */
+    const val NOTIFICATION_HEADER = "notification-header"
+    const val NOTIFICATION_GLYPH = "notification-glyph"
     const val COMMAND_REPORT = "command-report"
     const val NOTIFICATION_TRANSCRIPT = "notification-transcript"
     const val USER_PROMPT = "chat-user-prompt"
@@ -122,7 +141,7 @@ internal object ChatRowTestTags {
     const val AGENT_TEXT = "chat-agent-text"
     const val AGENT_TEXT_ACTIONS = "chat-agent-text-actions"
     const val REASONING_TOGGLE = "chat-reasoning-toggle"
-    /** The reasoning row's [RunStatusGlyph]: the run's spinner while it streams, a check once it settles. */
+    /** The reasoning row's status glyph: the run's spinner while it streams, a check once it settles. */
     const val REASONING_GLYPH = "chat-reasoning-glyph"
     const val RUN_BLOCK = "chat-run-block"
     const val RUN_HEADER = "chat-run-header"

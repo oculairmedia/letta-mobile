@@ -28,6 +28,12 @@ import com.letta.mobile.sharedui.resources.rows_thinking
 import com.letta.mobile.sharedui.resources.rows_thought
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import com.letta.mobile.ui.chat.session.ChatMessageId
+import com.letta.mobile.ui.components.StepLine
+import com.letta.mobile.ui.components.line.LineDisclosure
+import com.letta.mobile.ui.components.line.LineDisclosureLabels
+import com.letta.mobile.ui.components.line.LineSpec
+import com.letta.mobile.ui.components.line.LineTags
+import com.letta.mobile.ui.components.line.StatusTone
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.LettaDimens
@@ -36,8 +42,8 @@ import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * A reasoning step is one of the run's step rows ([RunStepListRow]: the
- * shared [LettaListRow], the run's [RunStatusGlyph] and [DisclosureChevron]), so it reads like the
+ * A reasoning step is one of the run's step lines (the shared [StepLine] on the step rail, with the
+ * shared status glyph and chevron), so it reads like the
  * tool calls beside it: "Thinking…" with the run's spinner while it streams, then "Thought for 2.4s"
  * with a check, its first line under the title and a chevron; expanded, the reasoning reads below.
  *
@@ -71,22 +77,22 @@ private data class ReasoningDisclosure(val isActive: Boolean, val collapsed: Boo
 private fun ReasoningHeader(message: UiMessage, disclosure: ReasoningDisclosure, onToggle: () -> Unit) {
     val emptyPreview = stringResource(Res.string.rows_reasoning_empty)
     val preview = remember(message.content, emptyPreview) { reasoningPreview(message.content) ?: emptyPreview }
-    val spec = RunStepRowSpec(
+    val spec = LineSpec(
         title = reasoningTitle(message, disclosure.isActive),
         subtitle = if (disclosure.collapsed) preview else stringResource(Res.string.rows_reasoning_shown),
-        tone = if (disclosure.isActive) RunSummaryTone.Working else RunSummaryTone.Done,
+        tone = if (disclosure.isActive) StatusTone.Working else StatusTone.Done,
         glyphLabel = if (disclosure.isActive) stringResource(Res.string.rows_reasoning_state_working) else null,
         tags = ReasoningTags,
     )
-    RunStepListRow(
+    StepLine(
         spec = spec,
-        disclosure = if (disclosure.isActive) null else RunStepDisclosure(!disclosure.collapsed, ReasoningLabels, onToggle),
+        disclosure = if (disclosure.isActive) null else LineDisclosure(!disclosure.collapsed, ReasoningLabels, onToggle),
     )
 }
 
-private val ReasoningTags = RunStepRowTags(ChatRowTestTags.REASONING_TOGGLE, ChatRowTestTags.REASONING_GLYPH)
+private val ReasoningTags = LineTags(ChatRowTestTags.REASONING_TOGGLE, ChatRowTestTags.REASONING_GLYPH)
 
-private val ReasoningLabels = RunStepDisclosureLabels(
+private val ReasoningLabels = LineDisclosureLabels(
     expand = Res.string.rows_reasoning_expand,
     collapse = Res.string.rows_reasoning_collapse,
     expandedState = Res.string.rows_reasoning_state_expanded,

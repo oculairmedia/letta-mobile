@@ -2,6 +2,7 @@ package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.chat.projection.deduplicateRenderItemsByMessageId
+import com.letta.mobile.data.model.UiSubagentNotification
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import kotlin.test.assertEquals
@@ -884,6 +885,170 @@ class ChatRenderModelBuilderTest {
         assertTrue(renderedIds.contains("u1"))
         assertTrue(renderedIds.contains("a1"))
     }
+
+    @Test
+    fun `a background command report inside an open tool chain keeps one run whatever its run id`() {
+        for (reportRunId in listOf(null, "run-wake")) {
+            val model = buildChatRenderModel(commandReportTurn(reportRunId), ChatDisplayMode.Interactive)
+
+            val run = model.renderItems.filterIsInstance<ChatRenderItem.RunBlock>().single()
+            assertEquals("run-1", run.runId)
+            assertEquals(listOf("t1", "t2", "report", "t3", "answer"), run.messages.map { it.first.id })
+            val activity = assertNotNull(projectRunActivity(run.messages.map { it.first }, isActiveRunStreaming = false))
+            assertEquals(3, activity.toolCount, "the run counts the steps before and after the report (report run id $reportRunId)")
+            assertEquals(listOf("prompt"), model.renderItems.filterIsInstance<ChatRenderItem.Single>().map { it.message.id })
+        }
+    }
+
+    @Test
+    fun `a run spanning a command report does not count the wait for it`() {
+        val model = buildChatRenderModel(commandReportTurn(reportRunId = null), ChatDisplayMode.Interactive)
+
+        val run = model.renderItems.filterIsInstance<ChatRenderItem.RunBlock>().single()
+        val activity = assertNotNull(projectRunActivity(run.messages.map { it.first }, isActiveRunStreaming = false))
+        // Prompt 12:00:00 -> answer 12:01:20 is 80s; t2 (12:00:10, 2s of execution) to the report
+        // (12:01:10) is 58s spent waiting on the background command, not working.
+        assertEquals(22_000L, activity.durationMs)
+    }
+
+    @Test
+    fun `a prompt after a command report still ends the run`() {
+        val messages = listOf(
+            user("prompt", ts = "2026-04-19T12:00:00Z"),
+            toolRound("t1", runId = "run-1", ts = "2026-04-19T12:00:05Z"),
+            commandReport("report", runId = null, ts = "2026-04-19T12:01:00Z"),
+            user("next", ts = "2026-04-19T12:02:00Z"),
+            toolRound("t2", runId = "run-2", ts = "2026-04-19T12:02:05Z"),
+        )
+
+        val chained = chainToolRoundRunIds(messages).associate { it.id to it.runId }
+
+        assertEquals("run-1", chained["report"], "the report joins the open chain")
+        assertEquals("run-2", chained["t2"], "the next prompt's work is its own run")
+    }
+
+    @Test
+    fun `a command report after the turn's prose joins its run and hands it to the work it wakes`() {
+        for (reportRunId in listOf(null, "run-9")) {
+            // The agent started the command, said so and waited: its report wakes the same work.
+            val messages = listOf(
+                user("prompt", ts = "2026-04-19T12:00:00Z"),
+                toolRound("t1", runId = "run-1", ts = "2026-04-19T12:00:05Z"),
+                toolRound("t2", runId = "run-2", ts = "2026-04-19T12:00:06Z"),
+                assistant("started", content = "Started it.", runId = "run-2", ts = "2026-04-19T12:00:07Z"),
+                commandReport("report", runId = reportRunId, ts = "2026-04-19T12:01:00Z"),
+                toolRound("t3", runId = "run-3", ts = "2026-04-19T12:01:02Z"),
+                assistant("answer", content = "All green.", runId = "run-3", ts = "2026-04-19T12:01:09Z"),
+            )
+
+            val items = buildChatRenderModel(messages, ChatDisplayMode.Interactive).renderItems
+
+            val run = items.filterIsInstance<ChatRenderItem.RunBlock>().single()
+            assertEquals("run-1", run.runId)
+            assertEquals(listOf("t1", "t2", "started", "report", "t3", "answer"), run.messages.map { it.first.id })
+            assertEquals(listOf("prompt"), items.filterIsInstance<ChatRenderItem.Single>().map { it.message.id })
+        }
+    }
+
+    @Test
+    fun `a command report after the turn's reasoning joins its run`() {
+        val messages = listOf(
+            user("prompt", ts = "2026-04-19T12:00:00Z"),
+            toolRound("t1", runId = "run-1", ts = "2026-04-19T12:00:05Z"),
+            reasoning("thought", ts = "2026-04-19T12:00:06Z").copy(runId = "run-2"),
+            commandReport("report", runId = null, ts = "2026-04-19T12:01:00Z"),
+            toolRound("t2", runId = "run-3", ts = "2026-04-19T12:01:02Z"),
+        )
+
+        val chained = chainToolRoundRunIds(messages).associate { it.id to it.runId }
+
+        assertEquals("run-1", chained["report"], "the report joins the run the reasoning closed")
+        assertEquals("run-1", chained["t2"], "the work the report wakes joins it too")
+    }
+
+    @Test
+    fun `a command report straight after a prompt stays its own row`() {
+        for (reportRunId in listOf(null, "run-9")) {
+            val messages = listOf(
+                user("prompt", ts = "2026-04-19T12:00:00Z"),
+                commandReport("report", runId = reportRunId, ts = "2026-04-19T12:01:00Z"),
+                toolRound("t1", runId = "run-1", ts = "2026-04-19T12:01:05Z"),
+            )
+
+            val chained = chainToolRoundRunIds(messages).associate { it.id to it.runId }
+
+            assertEquals(reportRunId, chained["report"], "no assistant message before it, so nothing to join")
+            assertEquals("run-1", chained["t1"])
+        }
+    }
+
+    @Test
+    fun `a command report never joins work across a prompt`() {
+        val messages = listOf(
+            user("prompt", ts = "2026-04-19T12:00:00Z"),
+            assistant("answer", content = "Done.", runId = "run-1", ts = "2026-04-19T12:00:05Z"),
+            user("next", ts = "2026-04-19T12:00:10Z"),
+            commandReport("report", runId = null, ts = "2026-04-19T12:01:00Z"),
+            toolRound("t1", runId = "run-2", ts = "2026-04-19T12:01:05Z"),
+        )
+
+        val chained = chainToolRoundRunIds(messages).associate { it.id to it.runId }
+
+        assertEquals(null, chained["report"], "the prompt between them ends the earlier run")
+        assertEquals("run-2", chained["t1"])
+    }
+
+    @Test
+    fun `a sub-agent or Monitor report still closes the tool chain`() {
+        for (taskId in listOf("task_7", "monitor_1")) {
+            val messages = listOf(
+                user("prompt", ts = "2026-04-19T12:00:00Z"),
+                toolRound("t1", runId = "run-1", ts = "2026-04-19T12:00:05Z"),
+                commandReport("report", runId = null, ts = "2026-04-19T12:01:00Z", taskId = taskId),
+                toolRound("t2", runId = "run-2", ts = "2026-04-19T12:01:05Z"),
+            )
+
+            val chained = chainToolRoundRunIds(messages).associate { it.id to it.runId }
+
+            assertEquals(null, chained["report"], "$taskId keeps its own row")
+            assertEquals("run-2", chained["t2"], "$taskId ends the chain")
+        }
+    }
+
+    /** One stretch of work: two tool rounds, a background command's report, one more round and the answer. */
+    private fun commandReportTurn(reportRunId: String?): List<UiMessage> = listOf(
+        user("prompt", ts = "2026-04-19T12:00:00Z"),
+        toolRound("t1", runId = "run-1", ts = "2026-04-19T12:00:05Z"),
+        toolRound("t2", runId = "run-2", ts = "2026-04-19T12:00:10Z", executionMs = 2_000),
+        commandReport("report", runId = reportRunId, ts = "2026-04-19T12:01:10Z"),
+        toolRound("t3", runId = "run-3", ts = "2026-04-19T12:01:12Z"),
+        assistant("answer", content = "All green.", runId = "run-3", ts = "2026-04-19T12:01:20Z"),
+    )
+
+    private fun toolRound(id: String, runId: String, ts: String, executionMs: Long? = null) = assistantToolCall(
+        id = id,
+        ts = ts,
+        toolCalls = listOf(
+            UiToolCall(name = "Bash", arguments = "{\"command\":\"pwd\"}", result = "/tmp\n", executionTimeMs = executionMs),
+        ),
+    ).copy(runId = runId)
+
+    /** A `<task-notification>` as the confirmed projection draws it: an assistant row with no words. */
+    private fun commandReport(id: String, runId: String?, ts: String, taskId: String = "bash_12") = UiMessage(
+        id = id,
+        role = "assistant",
+        content = "",
+        timestamp = ts,
+        runId = runId,
+        subagentNotification = UiSubagentNotification(
+            status = "completed",
+            summary = "Background command \"Fetch origin/main\" completed",
+            result = "$ git fetch origin main",
+            usage = null,
+            transcriptUri = null,
+            taskId = taskId,
+        ),
+    )
 
     private fun user(
         id: String,

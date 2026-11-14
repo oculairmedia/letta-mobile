@@ -2,6 +2,7 @@ package com.letta.mobile.data.chat.display
 
 import com.letta.mobile.data.chat.tools.ToolOutputStream
 import com.letta.mobile.data.model.UiSubagentNotification
+import com.letta.mobile.data.model.isCommand
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

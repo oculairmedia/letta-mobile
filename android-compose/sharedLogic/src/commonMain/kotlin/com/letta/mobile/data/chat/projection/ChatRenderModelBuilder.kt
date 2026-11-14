@@ -3,6 +3,7 @@ package com.letta.mobile.data.chat.projection
 import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.isCommand
 import com.letta.mobile.data.timeline.TimelineInstant
 import com.letta.mobile.data.timeline.parseTimelineInstantOrNull
 import com.letta.mobile.data.timeline.timelineInstantDurationMillis
@@ -129,7 +130,16 @@ fun backfillMissingAssistantRunIds(messages: List<UiMessage>): List<UiMessage> {
  * it joins it under the FIRST round's id: one run block, "Working · 4 tools" over one
  * "Ran 4 commands" group, keyed by the run that opened the turn so its slot never moves as rounds
  * append. A run that ended in prose (end_turn) closes the turn, as does any message that is not
- * the assistant's (the next prompt, a notice), so separate turns never merge.
+ * the assistant's (the next prompt, a sub-agent's report, a Monitor event), so separate turns never merge.
+ *
+ * A background command's report is the exception: the agent started the command as part of the
+ * work and wakes on its report to carry on, so a report that follows the assistant's own messages
+ * takes the chain's id and hands the chain on, whatever run id the report carries, whether the run
+ * before it called a tool or ended in prose or reasoning (the agent said "started it" and waited).
+ * The work before and after it is one run with one step count. Only a message that is not the
+ * assistant's (the next prompt, a sub-agent's report, a Monitor event) still ends the chain, so a
+ * report never joins work across a real prompt; a report with no assistant message before it stays
+ * its own row.
  *
  * [messages] must be in chronological order. Returns [messages] itself when nothing chains.
  */
@@ -151,6 +161,7 @@ private class ToolRoundChain {
     private var handsOn = false
 
     fun shown(message: UiMessage): UiMessage {
+        if (message.isCommandReport() && serverRunId != null) return wake(message)
         val runId = message.assistantRunId() ?: return breakChain(message)
         if (runId != serverRunId) startRound(runId)
         handsOn = message.callsTool()
@@ -164,6 +175,12 @@ private class ToolRoundChain {
 
     private fun continuesChain(): Boolean = serverRunId != null && handsOn
 
+    /** A command's report wakes the agent to carry on: it joins the chain and hands it to the next run. */
+    private fun wake(report: UiMessage): UiMessage {
+        handsOn = true
+        return report.underRun(shownRunId)
+    }
+
     private fun breakChain(message: UiMessage): UiMessage {
         shownRunId = null
         serverRunId = null
@@ -175,6 +192,10 @@ private class ToolRoundChain {
 private fun UiMessage.assistantRunId(): String? = runId?.takeIf { role == "assistant" && it.isNotBlank() }
 
 private fun UiMessage.callsTool(): Boolean = !toolCalls.isNullOrEmpty() || approvalRequest != null
+
+private fun UiMessage.isCommandReport(): Boolean = subagentNotification?.isCommand() == true
+
+private fun UiMessage.underRun(runId: String?): UiMessage = if (this.runId == runId) this else copy(runId = runId)
 
 private fun nextAssistantSegmentStart(messages: List<UiMessage>, from: Int): Int {
     var index = from
