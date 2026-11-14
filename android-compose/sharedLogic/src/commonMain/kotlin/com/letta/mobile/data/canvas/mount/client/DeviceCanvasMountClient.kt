@@ -1,0 +1,52 @@
+package com.letta.mobile.data.canvas.mount.client
+
+import com.letta.mobile.data.model.CanvasId
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
+
+/**
+ * Canvas mounts held on this device only, in memory for as long as its owner lives (the app
+ * session), one per conversation ([ConversationCanvasTarget]). It stands in for a host without
+ * mounts so a pick still swaps the board on screen; it reaches nothing else, so its [reach] is
+ * [CanvasMountReach.Device]: other devices and the agent's canvas tools keep the conversation's own
+ * canvas, and it answers [resolveOnHost] with [CanvasMountUnavailableReason.DeviceOnly]. Its writes
+ * always answer and never fail.
+ */
+class DeviceCanvasMountClient : CanvasMountClient {
+    private val held = MutableStateFlow<Map<ConversationCanvasTarget, CanvasId>>(emptyMap())
+    private val always = MutableStateFlow(true).asStateFlow()
+
+    override val supported: StateFlow<Boolean> get() = always
+
+    override val reach: Flow<CanvasMountReach> get() = flowOf(CanvasMountReach.Device)
+
+    override suspend fun resolve(target: ConversationCanvasTarget): CanvasMountLookup =
+        held.value[target]?.let { CanvasMountLookup.Found(it, CanvasMountSource.Binding) } ?: CanvasMountLookup.None
+
+    /** This device's mounts say nothing about the host's. */
+    override suspend fun resolveOnHost(target: ConversationCanvasTarget): CanvasMountLookup = DEVICE_ONLY
+
+    /** Mounting the conversation's own canvas is the same as [unmount]. */
+    override suspend fun mount(target: ConversationCanvasTarget, canvas: CanvasId): CanvasMountChange {
+        held.update { it + (target to canvas) }
+        return CanvasMountChange.Applied(canvas)
+    }
+
+    /** Holds the own board as the conversation's choice, as a host binding would, rather than forgetting the choice. */
+    override suspend fun unmount(target: ConversationCanvasTarget): CanvasMountChange = mount(target, target.ownCanvas)
+
+    /** [target]'s board after each change made after this call (its own canvas once unmounted). */
+    override fun changes(target: ConversationCanvasTarget): Flow<CanvasId> =
+        held.map { it[target] ?: target.ownCanvas }.distinctUntilChanged().drop(1)
+
+    private companion object {
+        val DEVICE_ONLY = CanvasMountLookup.Failed(CanvasMountProblem.Unavailable(CanvasMountUnavailableReason.DeviceOnly))
+    }
+}

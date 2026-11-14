@@ -44,6 +44,13 @@ internal const val WHEEL_ZOOM_STEP = 1.1f
 internal const val CANVAS_WORKSPACE_LOAD_FAILURE_TAG = "canvas-workspace-load-failure"
 
 /**
+ * Where a host that may replace the board (a conversation switching to its mounted canvas) attaches
+ * the board's save of the drawing in progress: it is given the save and returns the detach. Null
+ * (the default) is a host that never replaces a board under the person.
+ */
+val LocalCanvasBoardSave = androidx.compose.runtime.staticCompositionLocalOf<((suspend () -> Boolean) -> () -> Unit)?> { null }
+
+/**
  * Shared Canvas Workspace composable for Meridian: the DrawBox board with block-document notes
  * placed on it as elements, whiteboard-style chrome (title and actions pills, floating tool bar,
  * zoom pill), sample import and JSON/SVG export, and optional persistent [CanvasSession]
@@ -117,6 +124,13 @@ fun CanvasWorkspace(
     val sessionLifecycle = CanvasWorkspaceSessionLifetime(host.session, host.sessionRegistry)
     val sessionLoadState = sessionLifecycle.loadState.value
     val prepareViewerChange = remember(session, controller) { mutableStateOf<suspend () -> Boolean>({ true }) }
+    // A conversation switching to another board saves this one first, as a viewer change does.
+    LocalCanvasBoardSave.current?.let { attach ->
+        DisposableEffect(attach, prepareViewerChange) {
+            val detach = attach { prepareViewerChange.value() }
+            onDispose { detach() }
+        }
+    }
     val activeSession = host.session
     if (activeSession == null) {
         CanvasWorkspaceBoard(host, modifier)

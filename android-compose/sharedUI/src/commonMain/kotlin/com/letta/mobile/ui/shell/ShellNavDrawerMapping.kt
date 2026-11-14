@@ -8,6 +8,7 @@ import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.ui.shell.rail.ShellAgentRailState
@@ -16,6 +17,7 @@ import com.letta.mobile.ui.shell.rail.ShellRailMapping
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelState
 import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
 import com.letta.mobile.ui.shell.sidebar.ShellCanvasRowModel
+import com.letta.mobile.ui.shell.sidebar.ShellCanvasScope
 import com.letta.mobile.ui.shell.sidebar.ShellChatOptionsState
 import com.letta.mobile.ui.shell.sidebar.ShellConversationMarks
 import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
@@ -116,17 +118,11 @@ object ShellNavDrawerMapping {
             input.recentAgentsPolicy,
         )
 
-    /** The canvases under the filter, most recently edited first. */
+    /** The canvases under the filter, the focused agent's first, each group most recently edited first. */
     fun canvasRows(input: ShellNavDrawerInput, now: Instant): List<ShellCanvasRowModel> =
-        input.canvases
-            .filter { input.archiveFilter.admits(it.id in input.archivedCanvasIds) }
-            .sortedByDescending { it.updatedAtEpochMs }
-            .map { canvas ->
-                ShellCanvasRowModel(
-                    id = canvas.id,
-                    title = canvas.title,
-                    timeLabel = TimeLabels.age(Instant.fromEpochMilliseconds(canvas.updatedAtEpochMs), now),
-                    archived = canvas.id in input.archivedCanvasIds,
-                )
-            }
+        ShellSidebarMapping.canvasRows(
+            input.canvases,
+            ShellCanvasScope(input.agent.agentId?.let(::AgentId), input.archiveFilter, input.archivedCanvasIds),
+            now,
+        )
 }
