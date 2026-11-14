@@ -2,6 +2,7 @@ package com.letta.mobile.ui.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.letta.mobile.ui.components.foundation.LettaNotice
 import com.letta.mobile.ui.components.foundation.LettaNoticeAction
 import com.letta.mobile.ui.theme.tokens.LettaPanelTone
 import com.letta.mobile.ui.components.foundation.LettaInlineNotice as SharedInlineNotice
@@ -58,13 +59,10 @@ internal fun LettaInlineNotice(
     dismissTag: String = LettaInlineErrorTags.DISMISS,
 ) {
     SharedInlineNotice(
-        message = message,
+        notice = LettaNotice(message, LettaPanelTone.Error, title, LettaInlineErrorTags.ERROR),
         modifier = modifier,
-        tone = LettaPanelTone.Error,
-        title = title,
         action = onAction?.let { LettaNoticeAction(actionLabel, it, actionTag, actionEnabled) },
         dismiss = onDismiss?.let { LettaNoticeAction(dismissLabel, it, dismissTag) },
-        contentTag = LettaInlineErrorTags.ERROR,
     )
 }
 

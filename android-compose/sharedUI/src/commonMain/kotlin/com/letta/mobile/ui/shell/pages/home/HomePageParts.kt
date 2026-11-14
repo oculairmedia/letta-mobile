@@ -40,6 +40,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.components.foundation.LettaSearchField
+import com.letta.mobile.ui.components.foundation.LettaSearchOptions
 import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
@@ -74,8 +75,7 @@ private fun HomeSearchField(page: HomePageScope, modifier: Modifier) {
         query = page.state.search.query,
         onQueryChange = page.actions::updateSearchQuery,
         modifier = modifier.testTag(HomePageTags.SEARCH),
-        placeholder = HomeSearchPlaceholder,
-        onClear = page.actions::clearSearch,
+        options = LettaSearchOptions(placeholder = HomeSearchPlaceholder, onClear = page.actions::clearSearch),
     )
 }
 

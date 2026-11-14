@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -21,49 +22,51 @@ import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
 
 /**
- * The one switch row: [title] over an optional one-line [supporting] helper, a Material [Switch] at
- * the end, and the whole row as the hit target (one node, role Switch, at least the platform's minimum
- * touch target tall). Replaces the hand-built switch rows that each chose their own label style and
- * padding; Settings' toggle rows are built on it.
+ * A row's words and state: [title] over an optional one-line [supporting] helper; [enabled] false greys
+ * them (and the row's control), [destructive] draws the title in the error colour.
+ */
+@Immutable
+data class LettaRowLabel(
+    val title: String,
+    val supporting: String? = null,
+    val enabled: Boolean = true,
+    val destructive: Boolean = false,
+)
+
+/**
+ * The one switch row: a [LettaRowLabel] at the start, a Material [Switch] at the end, and the whole
+ * row as the hit target (one node, role Switch, at least the platform's minimum touch target tall).
+ * Replaces the hand-built switch rows that each chose their own label style and padding; Settings'
+ * toggle rows are built on it.
  *
- * Use it for any on/off preference or option in a list. [enabled] false greys the words and the
+ * Use it for any on/off preference or option in a list. A disabled [label] greys the words and the
  * switch and ignores taps. [modifier] goes on the row (test tags).
  */
 @Composable
 fun LettaToggleRow(
-    title: String,
+    label: LettaRowLabel,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    supporting: String? = null,
-    enabled: Boolean = true,
 ) {
-    LettaControlRow(
-        title = title,
-        modifier = modifier,
-        supporting = supporting,
-        enabled = enabled,
-        interaction = Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange),
-    ) {
-        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+    val interaction = Modifier.toggleable(value = checked, enabled = label.enabled, role = Role.Switch, onValueChange = onCheckedChange)
+    LettaControlRow(label = label, modifier = modifier, interaction = interaction) {
+        Switch(checked = checked, onCheckedChange = null, enabled = label.enabled)
     }
 }
 
 /**
  * The row anatomy under [LettaToggleRow] and Settings' rows, for a row whose trailing control is not
- * a switch (a value, a status, a chevron): [title] over an optional one-line [supporting] helper at
- * the start, [trailing] at the end, at least the platform's minimum touch target tall.
+ * a switch (a value, a status, a chevron): the [label] at the start, [trailing] at the end, at least
+ * the platform's minimum touch target tall.
  *
  * [interaction] is the row's `clickable`/`toggleable` modifier (or none); it goes on the whole row,
- * which merges its children into one node. [destructive] draws the title in the error colour.
+ * which merges its children into one node.
  */
 @Composable
 fun LettaControlRow(
-    title: String,
+    label: LettaRowLabel,
     modifier: Modifier = Modifier,
-    supporting: String? = null,
-    enabled: Boolean = true,
-    destructive: Boolean = false,
     interaction: Modifier = Modifier,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
@@ -77,7 +80,7 @@ fun LettaControlRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaSpaceTokens.md),
     ) {
-        LettaRowWords(title, supporting, enabled, Modifier.weight(1f), destructive)
+        LettaRowWords(label, Modifier.weight(1f))
         trailing()
     }
 }
@@ -87,21 +90,15 @@ fun LettaControlRow(
  * its own trailing part but should read the same.
  */
 @Composable
-fun LettaRowWords(
-    title: String,
-    supporting: String?,
-    enabled: Boolean,
-    modifier: Modifier = Modifier,
-    destructive: Boolean = false,
-) {
+fun LettaRowWords(label: LettaRowLabel, modifier: Modifier = Modifier) {
     val titleColor = when {
-        destructive -> MaterialTheme.colorScheme.error
-        enabled -> MaterialTheme.colorScheme.onSurface
+        label.destructive -> MaterialTheme.colorScheme.error
+        label.enabled -> MaterialTheme.colorScheme.onSurface
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(LettaSpaceTokens.hair)) {
-        Text(title, style = MaterialTheme.typography.bodyLarge, color = titleColor)
-        supporting?.let {
+        Text(label.title, style = MaterialTheme.typography.bodyLarge, color = titleColor)
+        label.supporting?.let {
             Text(
                 it,
                 style = MaterialTheme.typography.bodySmall,

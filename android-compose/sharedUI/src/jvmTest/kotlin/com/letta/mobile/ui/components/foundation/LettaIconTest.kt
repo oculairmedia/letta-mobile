@@ -27,7 +27,7 @@ class LettaIconTest {
         setFoundationContent {
             Row {
                 LettaIcon(LettaIcons.Search, contentDescription = null, modifier = Modifier.testTag("default"))
-                LettaIcon(LettaIcons.Search, contentDescription = null, modifier = Modifier.testTag("small"), size = LettaControlTokens.iconSm)
+                LettaIcon(LettaIcons.Search, contentDescription = null, modifier = Modifier.testTag("small"), style = LettaIconStyle(LettaControlTokens.iconSm))
             }
         }
         onNodeWithTag("default").assertWidthIsEqualTo(LettaControlTokens.icon).assertHeightIsEqualTo(LettaControlTokens.icon)
@@ -38,7 +38,7 @@ class LettaIconTest {
     fun anIconButtonIsAButtonDrawnCompactWithAFullTouchTarget() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
         var clicks = 0
         setFoundationContent {
-            LettaIconButton(LettaIcons.Close, contentDescription = "Close", onClick = { clicks++ })
+            LettaIconButton(LettaButtonIcon(LettaIcons.Close, "Close"), onClick = { clicks++ })
         }
         onNodeWithContentDescription("Close", useUnmergedTree = false)
             .assert(hasRole(Role.Button))

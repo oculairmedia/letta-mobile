@@ -8,6 +8,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,25 +23,33 @@ import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import com.letta.mobile.ui.theme.tokens.LettaStrokeTokens
 
 /**
- * The one colour swatch: a circle of [color] at [size] with a hairline `outlineVariant` ring, or a
- * [LettaComponentDimens.swatchSelectedStroke] `primary` ring when [selected]. A fully transparent
- * colour shows a "none" glyph. Replaces the canvas and mascot pickers' own swatches, which used
- * different sizes and selected rings.
+ * A swatch's colour and state: [color], whether it is the [selected] choice, its [name] for a screen
+ * reader ("Color red"; null when words beside it already say it) and its [size]
+ * ([LettaComponentDimens.swatch] by default).
+ */
+@Immutable
+data class LettaSwatch(
+    val color: Color,
+    val selected: Boolean = false,
+    val name: String? = null,
+    val size: Dp = LettaComponentDimens.swatch,
+)
+
+/**
+ * The one colour swatch: a circle of the swatch's colour with a hairline `outlineVariant` ring, or a
+ * [LettaComponentDimens.swatchSelectedStroke] `primary` ring when selected. A fully transparent colour
+ * shows a "none" glyph. Replaces the canvas and mascot pickers' own swatches, which used different
+ * sizes and selected rings.
  *
  * With [onClick] it is a radio-style choice (role RadioButton, selected state; Compose extends its
  * touch bounds to the platform's 48 dp minimum without growing its layout); without, it only shows a
- * colour. [contentDescription] names the colour for a
- * screen reader ("Color red").
+ * colour.
  */
 @Composable
-fun LettaColorSwatch(
-    color: Color,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    size: Dp = LettaComponentDimens.swatch,
-    contentDescription: String? = null,
-    onClick: (() -> Unit)? = null,
-) {
+fun LettaColorSwatch(swatch: LettaSwatch, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    val color = swatch.color
+    val selected = swatch.selected
+    val name = swatch.name
     val ring = if (selected) {
         Pair(LettaComponentDimens.swatchSelectedStroke, MaterialTheme.colorScheme.primary)
     } else {
@@ -56,14 +65,14 @@ fun LettaColorSwatch(
     Box(
         modifier = modifier
             .then(interaction)
-            .size(size)
+            .size(swatch.size)
             .background(color, CircleShape)
             .border(ring.first, ring.second, CircleShape)
-            .semantics { contentDescription?.let { this.contentDescription = it } },
+            .semantics { name?.let { contentDescription = it } },
         contentAlignment = Alignment.Center,
     ) {
         if (color.alpha == 0f) {
-            LettaIcon(LettaIcons.NoneSet, contentDescription = null, size = LettaControlTokens.iconSm, tint = MaterialTheme.colorScheme.outline)
+            LettaIcon(LettaIcons.NoneSet, contentDescription = null, style = LettaIconStyle(LettaControlTokens.iconSm, MaterialTheme.colorScheme.outline))
         }
     }
 }

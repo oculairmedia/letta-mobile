@@ -20,7 +20,6 @@ fun LettaNavChevron(modifier: Modifier = Modifier) {
         LettaIcons.ChevronRight,
         contentDescription = null,
         modifier = modifier,
-        size = LettaControlTokens.icon,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = LettaIconStyle(LettaControlTokens.icon, MaterialTheme.colorScheme.onSurfaceVariant),
     )
 }

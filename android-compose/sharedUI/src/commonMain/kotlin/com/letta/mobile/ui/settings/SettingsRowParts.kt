@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.ui.components.foundation.LettaControlRow
+import com.letta.mobile.ui.components.foundation.LettaRowLabel
 import com.letta.mobile.ui.components.foundation.LettaRowWords
 import com.letta.mobile.ui.components.foundation.LettaStatusLabel
 import com.letta.mobile.ui.icons.LettaIcons
@@ -56,11 +57,8 @@ internal fun SettingsRowFrame(
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     LettaControlRow(
-        title = words.title,
+        label = words.label(enabled),
         modifier = Modifier.testTag(tag),
-        supporting = words.helper,
-        enabled = enabled,
-        destructive = words.destructive,
         interaction = interaction,
         trailing = trailing,
     )
@@ -69,8 +67,10 @@ internal fun SettingsRowFrame(
 /** A row's label over its one-line helper. */
 @Composable
 internal fun RowWordsColumn(words: RowWords, enabled: Boolean, modifier: Modifier = Modifier) {
-    LettaRowWords(words.title, words.helper, enabled, modifier, words.destructive)
+    LettaRowWords(words.label(enabled), modifier)
 }
+
+private fun RowWords.label(enabled: Boolean) = LettaRowLabel(title, helper, enabled, destructive)
 
 /** A status as a dot, a glyph for its tone and its words: never colour alone. */
 @Composable

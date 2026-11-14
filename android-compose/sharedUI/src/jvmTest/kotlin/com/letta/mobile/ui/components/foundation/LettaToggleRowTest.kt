@@ -31,11 +31,10 @@ class LettaToggleRowTest {
                 var checked by mutableStateOf(false)
                 setFoundationContent(width) {
                     LettaToggleRow(
-                        title = "Sync memory",
+                        label = LettaRowLabel("Sync memory", supporting = "Keeps blocks in step across devices"),
                         checked = checked,
                         onCheckedChange = { checked = it },
                         modifier = Modifier.testTag(ROW),
-                        supporting = "Keeps blocks in step across devices",
                     )
                 }
                 val row = onNodeWithTag(ROW).assert(hasRole(Role.Switch)).assertIsOff().assertWidthIsEqualTo(width)
@@ -51,7 +50,7 @@ class LettaToggleRowTest {
     fun aDisabledRowIgnoresTaps() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
         var checked by mutableStateOf(false)
         setFoundationContent {
-            LettaToggleRow("Sync", checked, { checked = it }, Modifier.testTag(ROW), enabled = false)
+            LettaToggleRow(LettaRowLabel("Sync", enabled = false), checked, { checked = it }, Modifier.testTag(ROW))
         }
         onNodeWithTag(ROW).assertIsNotEnabled().performClick().assertIsOff()
     }

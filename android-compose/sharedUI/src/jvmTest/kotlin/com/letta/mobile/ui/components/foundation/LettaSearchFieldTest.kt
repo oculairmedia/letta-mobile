@@ -54,7 +54,7 @@ class LettaSearchFieldTest {
                         query = query,
                         onQueryChange = { query = it },
                         modifier = Modifier.testTag(ROW),
-                        fieldModifier = Modifier.testTag(FIELD),
+                        options = LettaSearchOptions(fieldModifier = Modifier.testTag(FIELD)),
                     )
                 }
                 onNodeWithTag(ROW).assertWidthIsEqualTo(width)

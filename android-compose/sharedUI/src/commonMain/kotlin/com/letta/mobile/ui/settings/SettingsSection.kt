@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.settings.SettingsAction
 import com.letta.mobile.data.settings.SettingsDrafts
 import com.letta.mobile.data.settings.SettingsRow
+import com.letta.mobile.ui.components.foundation.LettaRowLabel
 import com.letta.mobile.ui.components.foundation.LettaToggleRow
 import com.letta.mobile.ui.components.picker.LettaPicker
 import com.letta.mobile.ui.components.picker.LettaPickerSpec
@@ -138,12 +139,10 @@ object SettingsScope {
         val lock = LocalSettingsLock.current
         val enabled = row.enabled && lock == null
         LettaToggleRow(
-            title = row.title,
+            label = LettaRowLabel(row.title, lock ?: row.supporting, enabled),
             checked = row.checked,
             onCheckedChange = row.onChange,
             modifier = Modifier.testTag(SettingsSectionTags.ROW_PREFIX + row.key),
-            supporting = lock ?: row.supporting,
-            enabled = enabled,
         )
     }
 

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.letta.mobile.ui.components.foundation.LettaDivider
 import com.letta.mobile.ui.components.foundation.LettaInlineSearchField
+import com.letta.mobile.ui.components.foundation.LettaSearchOptions
 
 /**
  * The borderless search row pinned at the top of a picker (and the Models sheet), with a hairline
@@ -20,9 +21,7 @@ fun LettaPickerSearchField(
     LettaInlineSearchField(
         query = query,
         onQueryChange = onQueryChange,
-        placeholder = search.placeholder,
-        autoFocus = search.autoFocus,
-        fieldModifier = fieldModifier,
+        options = LettaSearchOptions(placeholder = search.placeholder, autoFocus = search.autoFocus, fieldModifier = fieldModifier),
     )
     LettaDivider()
 }

@@ -29,29 +29,39 @@ data class LettaNoticeAction(
 )
 
 /**
- * The one inline banner: [message] (under an optional [title]) in a borderless [LettaPanel] of
- * [tone], with an optional [action] (an outlined button) and [dismiss] (a text button). With a
- * [title] it leads with the tone's glyph. Replaces the pages' private banner composables; the shared
- * LettaInlineError is this at [LettaPanelTone.Error] with a retry.
+ * What a [LettaInlineNotice] says: [message] (under an optional [title]) in [tone]'s panel; [contentTag]
+ * goes on the content row inside the panel, for tests.
+ */
+@Immutable
+data class LettaNotice(
+    val message: String,
+    val tone: LettaPanelTone = LettaPanelTone.Info,
+    val title: String? = null,
+    val contentTag: String = "",
+)
+
+/**
+ * The one inline banner: a [LettaNotice] in a borderless [LettaPanel] of its tone, with an optional
+ * [action] (an outlined button) and [dismiss] (a text button). With a title it leads with the tone's
+ * glyph. Replaces the pages' private banner composables; the shared LettaInlineError is this at
+ * [LettaPanelTone.Error] with a retry.
  *
  * Use it for a note that stays in the page's layout ("Read only while offline", "Sign in to sync"),
- * not for a transient message (that is a snackbar or an overlay). [contentTag] goes on the content
- * row inside the panel; [modifier] on the panel.
+ * not for a transient message (that is a snackbar or an overlay). [modifier] goes on the panel.
  */
 @Composable
 fun LettaInlineNotice(
-    message: String,
+    notice: LettaNotice,
     modifier: Modifier = Modifier,
-    tone: LettaPanelTone = LettaPanelTone.Info,
-    title: String? = null,
     action: LettaNoticeAction? = null,
     dismiss: LettaNoticeAction? = null,
-    contentTag: String = "",
 ) {
+    val tone = notice.tone
+    val title = notice.title
     LettaPanel(modifier = modifier.fillMaxWidth(), tone = tone, border = false) {
         Row(
             modifier = Modifier
-                .testTag(contentTag)
+                .testTag(notice.contentTag)
                 .padding(if (title == null) LettaSpaceTokens.md else LettaSpaceTokens.lg),
             horizontalArrangement = Arrangement.spacedBy(LettaSpaceTokens.md),
             verticalAlignment = Alignment.CenterVertically,
@@ -60,7 +70,7 @@ fun LettaInlineNotice(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LettaSpaceTokens.hair)) {
                 title?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
                 Text(
-                    text = message,
+                    text = notice.message,
                     style = MaterialTheme.typography.bodyMedium,
                     color = tone.contentColor().copy(alpha = if (title == null) 1f else MESSAGE_ALPHA),
                 )

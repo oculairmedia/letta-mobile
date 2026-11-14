@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -15,9 +16,20 @@ import com.letta.mobile.ui.theme.tokens.LettaComponentDimens
 import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
 
 /**
- * The one empty state for a page or pane with nothing to show: an optional [icon], an optional
- * [title], the [text] saying why it is empty or what to do, and an optional [action] (a button), all
- * centred. Replaces the pages' private hint, empty and message composables.
+ * What a [LettaEmptyState] says: the [text] saying why it is empty or what to do, under an optional
+ * [title] and an optional [icon].
+ */
+@Immutable
+data class LettaEmptyContent(
+    val text: String,
+    val title: String? = null,
+    val icon: ImageVector? = null,
+)
+
+/**
+ * The one empty state for a page or pane with nothing to show: the [content]'s icon, title and words
+ * and an optional [action] (a button), all centred. Replaces the pages' private hint, empty and
+ * message composables.
  *
  * It fills the width it is given and centres itself in it; give [modifier] `fillMaxSize()` (and a
  * scroll, when a pull-to-refresh must still reach it) to centre it in a whole pane. For a quiet one-line
@@ -25,10 +37,8 @@ import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
  */
 @Composable
 fun LettaEmptyState(
-    text: String,
+    content: LettaEmptyContent,
     modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
-    title: String? = null,
     action: (@Composable () -> Unit)? = null,
 ) {
     Column(
@@ -36,13 +46,13 @@ fun LettaEmptyState(
         verticalArrangement = Arrangement.spacedBy(LettaSpaceTokens.md, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        icon?.let {
-            LettaIcon(it, contentDescription = null, size = LettaComponentDimens.emptyStateIcon, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        content.icon?.let {
+            LettaIcon(it, contentDescription = null, style = LettaIconStyle(LettaComponentDimens.emptyStateIcon, MaterialTheme.colorScheme.onSurfaceVariant))
         }
-        title?.let {
+        content.title?.let {
             Text(it, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
         }
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        Text(content.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         action?.invoke()
     }
 }

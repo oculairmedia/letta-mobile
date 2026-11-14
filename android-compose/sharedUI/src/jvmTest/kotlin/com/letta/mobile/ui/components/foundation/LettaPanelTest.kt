@@ -56,10 +56,8 @@ class LettaPanelTest {
                 var dismissed = 0
                 setFoundationContent(width) {
                     LettaInlineNotice(
-                        message = "Read only while offline",
+                        notice = LettaNotice("Read only while offline", LettaPanelTone.Warning, title = "Offline"),
                         modifier = Modifier.fillMaxWidth().testTag(NOTICE),
-                        tone = LettaPanelTone.Warning,
-                        title = "Offline",
                         action = LettaNoticeAction("Retry", { acted++ }, tag = ACTION),
                         dismiss = LettaNoticeAction("Dismiss", { dismissed++ }, tag = DISMISS),
                     )

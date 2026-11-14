@@ -70,7 +70,7 @@ class LettaFoundationPartsTest {
     fun aSwatchIsARadioChoiceWithAFullTouchTarget() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
         var picked = 0
         setFoundationContent {
-            LettaColorSwatch(Color.Red, selected = true, modifier = Modifier.testTag(SWATCH), contentDescription = "Color red", onClick = { picked++ })
+            LettaColorSwatch(LettaSwatch(Color.Red, selected = true, name = "Color red"), Modifier.testTag(SWATCH), onClick = { picked++ })
         }
         onNodeWithTag(SWATCH)
             .assert(hasRole(Role.RadioButton))
@@ -89,9 +89,8 @@ class LettaFoundationPartsTest {
                 var acted = false
                 setFoundationContent(width) {
                     LettaEmptyState(
-                        text = "Use New schedule to create one.",
+                        content = LettaEmptyContent("Use New schedule to create one.", title = "No schedules yet"),
                         modifier = Modifier.testTag(EMPTY),
-                        title = "No schedules yet",
                         action = { TextButton(onClick = { acted = true }) { Text("New schedule") } },
                     )
                 }

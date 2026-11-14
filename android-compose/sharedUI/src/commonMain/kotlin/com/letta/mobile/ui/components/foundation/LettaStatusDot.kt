@@ -66,7 +66,7 @@ fun LettaStatusLabel(text: String, color: Color, modifier: Modifier = Modifier, 
         horizontalArrangement = Arrangement.spacedBy(LettaSpaceTokens.xs),
     ) {
         if (icon != null) {
-            LettaIcon(icon, contentDescription = null, size = LettaControlTokens.iconSm, tint = color)
+            LettaIcon(icon, contentDescription = null, style = LettaIconStyle(LettaControlTokens.iconSm, color))
         } else {
             LettaStatusDot(color)
         }

@@ -34,6 +34,7 @@ import com.letta.mobile.data.repository.modelcontrol.CatalogRow
 import com.letta.mobile.data.repository.modelcontrol.ExposureChange
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementController
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementState
+import com.letta.mobile.ui.components.foundation.LettaEmptyContent
 import com.letta.mobile.ui.components.foundation.LettaEmptyState
 import com.letta.mobile.ui.components.picker.LettaPickerSearchField
 import com.letta.mobile.ui.theme.LettaBusyBar
@@ -123,7 +124,11 @@ private fun TitleBar(onClose: () -> Unit) {
 private fun LazyListScope.exposureSections(state: ProviderManagementState, onExposedChange: (ExposureChange) -> Unit) {
     val sections = state.visible.filter { it.rows.isNotEmpty() }
     if (sections.isEmpty() && !state.loading) {
-        item("empty") { LettaEmptyState(if (state.searching) ModelControlStrings.noMatch(state.query.trim()) else ModelControlStrings.NO_PROVIDER_MODELS) }
+        item("empty") {
+            LettaEmptyState(
+                LettaEmptyContent(if (state.searching) ModelControlStrings.noMatch(state.query.trim()) else ModelControlStrings.NO_PROVIDER_MODELS),
+            )
+        }
     }
     sections.forEach { visible ->
         val section = visible.section
