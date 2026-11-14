@@ -4,12 +4,14 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -17,11 +19,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.RunActivityProjection
 import com.letta.mobile.data.chat.projection.RunActivityState
 import com.letta.mobile.sharedui.resources.Res
-import com.letta.mobile.sharedui.resources.rows_run_collapse
-import com.letta.mobile.sharedui.resources.rows_run_expand
 import com.letta.mobile.sharedui.resources.rows_run_failed
 import com.letta.mobile.sharedui.resources.rows_run_failed_of
 import com.letta.mobile.sharedui.resources.rows_run_for_duration
@@ -53,46 +54,84 @@ import org.jetbrains.compose.resources.stringResource
  * "Waiting for your approval") and, when the run folds, a single trailing chevron. The whole line is
  * the hit target. The run's steps (its reasoning and its tool step rows) list under it only
  * once it is opened, so a folded run never shows a second stray line with a chevron of its own.
- * Its glyph is the shared [RunStatusGlyph], the same component and size every step row leads with.
+ * Its glyph is the shared [RunStatusGlyph], the same component and size every step row leads with;
+ * the line itself is the shared [SummaryLine] a completed background report draws with too.
  */
 @Composable
 internal fun RunSummaryLine(state: RunHeaderState) {
     val fold = state.fold
     val tone = runSummaryTone(state)
-    val reducedMotion = LocalReducedMotion.current
     val description = runSummaryStateDescription(state.activity, fold)
-    val toggleLabel = fold?.let { stringResource(if (it.collapsed) Res.string.rows_run_expand else Res.string.rows_run_collapse) }
-    val haptics = LocalHaptics.current
-    Row(
+    SummaryLine(
+        spec = RunStepRowSpec(
+            title = runSummaryTitle(state.activity, tone),
+            subtitle = null,
+            tone = tone,
+            glyphLabel = null,
+            tags = RunStepRowTags(row = ChatRowTestTags.RUN_HEADER, glyph = ChatRowTestTags.RUN_GLYPH),
+        ),
+        disclosure = fold?.let { RunStepDisclosure(expanded = !it.collapsed, labels = RunStepDisclosureLabels.Run, onToggle = it.toggle) },
         modifier = Modifier
-            .fillMaxWidth()
-            .testTag(ChatRowTestTags.RUN_HEADER)
             .heightIn(min = if (state.tall) ChatRowSpacing.runHeaderToggleMinHeight else ChatRowSpacing.runHeaderMinHeight)
-            .semantics(mergeDescendants = true) { description?.let { stateDescription = it } }
+            .semantics(mergeDescendants = true) { description?.let { stateDescription = it } },
+    )
+}
+
+/**
+ * The one shape every summary line in the timeline draws with: a run's header and a finished
+ * background task's row. The shared [RunStatusGlyph] at the run header's inset, the title in the
+ * header's type and tone colour, [trailing] after it (a badge), and, when [disclosure] is set, the one
+ * trailing chevron with the whole line as its toggle. Sharing it keeps such rows in one column: the
+ * same glyph slot, label start and chevron edge. [modifier] carries the caller's height floor and
+ * spoken state; [RunStepRowSpec.tags] tag the line and its glyph. Inside a parent that already insets
+ * it ([LocalSummaryLineInsetByParent]) the line drops its own side inset.
+ */
+@Composable
+internal fun SummaryLine(
+    spec: RunStepRowSpec,
+    disclosure: RunStepDisclosure?,
+    modifier: Modifier = Modifier,
+    trailing: @Composable RowScope.() -> Unit = {},
+) {
+    val reducedMotion = LocalReducedMotion.current
+    val haptics = LocalHaptics.current
+    val toggleLabel = disclosure?.let { stringResource(if (it.expanded) it.labels.collapse else it.labels.expand) }
+    val sides = !LocalSummaryLineInsetByParent.current
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(spec.tags.row)
             .then(
-                if (fold != null) {
+                if (disclosure != null) {
                     Modifier.clickable(onClickLabel = toggleLabel) {
                         haptics.play(LettaHapticCue.SegmentTick)
-                        fold.toggle()
+                        disclosure.onToggle()
                     }
                 } else {
                     Modifier
                 },
             )
             .padding(
-                start = ChatRowSpacing.runHeaderHorizontal,
-                end = LettaDimens.Space.sm,
+                start = if (sides) ChatRowSpacing.runHeaderHorizontal else 0.dp,
+                end = if (sides) LettaDimens.Space.sm else 0.dp,
                 top = ChatRowSpacing.runHeaderVertical,
                 bottom = ChatRowSpacing.runHeaderVertical,
             ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        RunStatusGlyph(tone, Modifier.testTag(ChatRowTestTags.RUN_GLYPH))
-        RunSummaryTitleText(runSummaryTitle(state.activity, tone), runSummaryColor(tone), reducedMotion, Modifier.weight(1f))
-        if (fold != null) DisclosureChevron(expanded = !fold.collapsed)
+        RunStatusGlyph(spec.tone, Modifier.testTag(spec.tags.glyph), spec.glyphLabel)
+        RunSummaryTitleText(spec.title, runSummaryColor(spec.tone), reducedMotion, Modifier.weight(1f))
+        trailing()
+        if (disclosure != null) DisclosureChevron(expanded = disclosure.expanded)
     }
 }
+
+/**
+ * True where a parent already insets a [SummaryLine] on both sides: an open tool step's details sit
+ * flush with the step's title and keep its chevron's edge, so a report drawn there takes no inset of its own.
+ */
+internal val LocalSummaryLineInsetByParent = staticCompositionLocalOf { false }
 
 /** What the summary line's glyph and tint say about the run. */
 internal enum class RunSummaryTone {

@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.RunActivityProjection
 import com.letta.mobile.data.chat.projection.projectRunActivity
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.isCommand
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatRunId
 import com.letta.mobile.ui.common.GroupPosition
@@ -390,7 +391,7 @@ private fun stepPosition(index: Int, count: Int): GroupPosition {
  * take the grouped beat, as do the middle and last of a run's steps; the first takes the section break.
  */
 internal fun runStepTop(message: UiMessage, position: GroupPosition): Dp {
-    if (message.isReasoning || !message.toolCalls.isNullOrEmpty()) return ChatRowSpacing.grouped
+    if (message.isReasoning || !message.toolCalls.isNullOrEmpty() || message.isFoldedCommandReport()) return ChatRowSpacing.grouped
     if (position == GroupPosition.Middle || position == GroupPosition.Last) return ChatRowSpacing.grouped
     return ChatRowSpacing.ungrouped
 }
@@ -427,16 +428,29 @@ private fun RunStepRow(positioned: PositionedRunStep, row: RunRowScope, modifier
     }
 }
 
-/** Work the summary line stands for (a reasoning, the tool line), as opposed to the run's prose. */
+/**
+ * Work the summary line stands for (a reasoning, the tool line, a background command's completed
+ * report), as opposed to the run's prose.
+ */
 internal fun RunStep.isWork(): Boolean {
     val message = (this as? RunStep.Message)?.message ?: return true
-    return message.isReasoning
+    return message.isReasoning || message.isFoldedCommandReport()
 }
 
-/** A message the summary line folds away: a reasoning, or one carrying the run's tool calls. */
+/** A message the summary line folds away: a reasoning, a completed command report, or one carrying the run's tool calls. */
 private fun UiMessage.isRunWorkMessage(): Boolean {
-    if (isReasoning) return true
+    if (isReasoning || isFoldedCommandReport()) return true
     return isPlainAssistantStep()
+}
+
+/**
+ * A background command's completed report inside a run: the run's own work (the agent started the
+ * command and woke on its report), so it folds with the run's steps and lists in order when the run
+ * is open. A failed report stays visible, like the run's prose.
+ */
+internal fun UiMessage.isFoldedCommandReport(): Boolean {
+    val notification = subagentNotification ?: return false
+    return notification.isCommand() && notification.isSuccessfulCompletion()
 }
 
 /** A step of a run, in chat order. */
@@ -462,10 +476,24 @@ internal sealed interface RunStep {
 /**
  * Compacts a run into steps (feature-chat compactRunToolCallSteps): all of the run's tool calls
  * fold into ONE [RunStep.ToolCalls] at the first tool call's position; a message carrying both
- * prose and tool calls contributes its calls there and keeps its prose as its own step.
+ * prose and tool calls contributes its calls there and keeps its prose as its own step. A background
+ * command's completed report starts a new group, so the open run lists the work before the report,
+ * the report, then the work it woke, in that order.
  */
 internal fun compactRunSteps(messages: List<UiMessage>): List<RunStep> {
     if (messages.isEmpty()) return emptyList()
+    val steps = ArrayList<RunStep>(messages.size)
+    for (segment in messages.splitAtCommandReports()) steps += compactRunSegment(segment)
+    return steps
+}
+
+/** [this] cut before each completed command report, each report opening its own segment. */
+private fun List<UiMessage>.splitAtCommandReports(): List<List<UiMessage>> {
+    val starts = indices.filter { it == 0 || this[it].isFoldedCommandReport() }
+    return starts.mapIndexed { index, start -> subList(start, starts.getOrNull(index + 1) ?: size) }
+}
+
+private fun compactRunSegment(messages: List<UiMessage>): List<RunStep> {
     // The group is emitted once, at the first tool-bearing message.
     var pendingGroup = runToolCallGroup(messages)
     val steps = ArrayList<RunStep>(messages.size)

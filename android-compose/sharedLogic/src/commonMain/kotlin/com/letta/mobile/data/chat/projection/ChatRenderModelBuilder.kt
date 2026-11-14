@@ -3,6 +3,7 @@ package com.letta.mobile.data.chat.projection
 import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.isCommand
 import com.letta.mobile.data.timeline.TimelineInstant
 import com.letta.mobile.data.timeline.parseTimelineInstantOrNull
 import com.letta.mobile.data.timeline.timelineInstantDurationMillis
@@ -129,7 +130,12 @@ fun backfillMissingAssistantRunIds(messages: List<UiMessage>): List<UiMessage> {
  * it joins it under the FIRST round's id: one run block, "Working · 4 tools" over one
  * "Ran 4 commands" group, keyed by the run that opened the turn so its slot never moves as rounds
  * append. A run that ended in prose (end_turn) closes the turn, as does any message that is not
- * the assistant's (the next prompt, a notice), so separate turns never merge.
+ * the assistant's (the next prompt, a sub-agent's report, a Monitor event), so separate turns never merge.
+ *
+ * A background command's report is the exception: the agent started the command as part of the
+ * work and wakes on its report to carry on, so a report arriving while the chain is open takes the
+ * chain's id and leaves it open, whatever run id the report carries. The work before and after it is
+ * one run with one step count. A report that arrives with no chain open stays its own row.
  *
  * [messages] must be in chronological order. Returns [messages] itself when nothing chains.
  */
@@ -151,6 +157,7 @@ private class ToolRoundChain {
     private var handsOn = false
 
     fun shown(message: UiMessage): UiMessage {
+        if (message.isCommandReport() && continuesChain()) return message.underRun(shownRunId)
         val runId = message.assistantRunId() ?: return breakChain(message)
         if (runId != serverRunId) startRound(runId)
         handsOn = message.callsTool()
@@ -175,6 +182,10 @@ private class ToolRoundChain {
 private fun UiMessage.assistantRunId(): String? = runId?.takeIf { role == "assistant" && it.isNotBlank() }
 
 private fun UiMessage.callsTool(): Boolean = !toolCalls.isNullOrEmpty() || approvalRequest != null
+
+private fun UiMessage.isCommandReport(): Boolean = subagentNotification?.isCommand() == true
+
+private fun UiMessage.underRun(runId: String?): UiMessage = if (this.runId == runId) this else copy(runId = runId)
 
 private fun nextAssistantSegmentStart(messages: List<UiMessage>, from: Int): Int {
     var index = from

@@ -2,7 +2,6 @@ package com.letta.mobile.data.chat.display
 
 import com.letta.mobile.data.chat.tools.ToolInset
 import com.letta.mobile.data.chat.tools.ToolOutputStream
-import com.letta.mobile.data.model.UiSubagentNotification
 
 /**
  * A background shell's `<task-notification>` report, split into the parts letta-code wrote
@@ -26,12 +25,6 @@ data class CommandStream(
     /** Which stream a tail came from; [Output] is exec_command's unlabelled mix. */
     enum class Kind { Stdout, Stderr, Output }
 }
-
-/** The background tasks whose reports are shell output: `Bash` (`bash_N`) and `exec_command`. */
-fun UiSubagentNotification.isCommand(): Boolean =
-    COMMAND_TASK_PREFIXES.any { taskId?.startsWith(it) == true }
-
-private val COMMAND_TASK_PREFIXES = listOf("bash_", "exec_")
 
 /** Splits a command [result] into its sections; never fails, unparsed text stays in the command. */
 fun parseBackgroundCommandReport(result: String): BackgroundCommandReport {

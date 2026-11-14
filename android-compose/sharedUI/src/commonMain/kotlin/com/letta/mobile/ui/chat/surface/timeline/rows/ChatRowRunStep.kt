@@ -39,6 +39,10 @@ import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_collapse
 import com.letta.mobile.sharedui.resources.rows_expand
+import com.letta.mobile.sharedui.resources.rows_run_collapse
+import com.letta.mobile.sharedui.resources.rows_run_expand
+import com.letta.mobile.sharedui.resources.rows_run_state_collapsed
+import com.letta.mobile.sharedui.resources.rows_run_state_expanded
 import com.letta.mobile.sharedui.resources.rows_state_collapsed
 import com.letta.mobile.sharedui.resources.rows_state_expanded
 import com.letta.mobile.data.chat.tools.steps.activity
@@ -139,6 +143,14 @@ internal class RunStepDisclosureLabels(
     companion object {
         /** A tool call's details. */
         val Step = RunStepDisclosureLabels(Res.string.rows_expand, Res.string.rows_collapse, Res.string.rows_state_expanded, Res.string.rows_state_collapsed)
+
+        /** A run's steps, under its summary line. */
+        val Run = RunStepDisclosureLabels(
+            Res.string.rows_run_expand,
+            Res.string.rows_run_collapse,
+            Res.string.rows_run_state_expanded,
+            Res.string.rows_run_state_collapsed,
+        )
     }
 }
 

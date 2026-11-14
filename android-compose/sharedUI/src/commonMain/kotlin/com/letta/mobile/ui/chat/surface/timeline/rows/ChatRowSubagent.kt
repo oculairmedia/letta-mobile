@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -23,13 +24,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextOverflow
-import com.letta.mobile.data.chat.display.isCommand
 import com.letta.mobile.data.chat.display.parseBackgroundCommandReport
 import com.letta.mobile.data.chat.display.toInset
 import com.letta.mobile.data.chat.display.TaskActivity
 import com.letta.mobile.data.chat.display.activity
 import com.letta.mobile.data.model.UiSubagentNotification
+import com.letta.mobile.data.model.isCommand
 import com.letta.mobile.data.subagents.SubagentIdentity
 import com.letta.mobile.data.subagents.subagentIdentityOf
 import com.letta.mobile.sharedui.resources.Res
@@ -57,6 +57,7 @@ import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.theme.ChatRowAlpha
+import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaTonalPill
 import com.letta.mobile.ui.theme.pill.LettaPillColors
@@ -80,9 +81,7 @@ private data class NotificationModel(
     /**  (G40): a report from an external coding agent names it. */
     val identity: SubagentIdentity = subagentIdentityOf(null, listOf(notification.subagentAgentId))
 
-    // The protocol names `completed` as its successful terminal state; older producers said
-    // `success`. Never compact a status that is not positively successful.
-    val isSuccessfulCompletion: Boolean = status in NOTIFICATION_SUCCESS_STATUSES
+    val isSuccessfulCompletion: Boolean = notification.isSuccessfulCompletion()
 
     /** A report, or a transcript to point at: what the details disclosure has to show. */
     fun hasDetails(): Boolean {
@@ -94,8 +93,17 @@ private val NOTIFICATION_FAILURE_STATUSES = setOf("failed", "error")
 private val NOTIFICATION_SUCCESS_STATUSES = setOf("completed", "success")
 
 /**
+ * The protocol names `completed` as its successful terminal state; older producers said `success`.
+ * Only such a report compacts into one summary line: never a status that is not positively successful.
+ */
+internal fun UiSubagentNotification.isSuccessfulCompletion(): Boolean =
+    status.trim().lowercase() in NOTIFICATION_SUCCESS_STATUSES
+
+/**
  * A completed subagent contributes one compact row; its report, metadata and actions stay
  * behind a disclosure. In-flight, failed or unknown statuses keep their evidence visible.
+ * A completed card adds no vertical padding of its own: its compact row is a [SummaryLine] with a
+ * run header's floor, so it keeps a run header's rhythm in the timeline and inside a tool step's details.
  */
 @Composable
 internal fun SubagentNotificationCard(
@@ -118,7 +126,10 @@ internal fun SubagentNotificationCard(
         onToggleDetails = { detailsExpanded = !detailsExpanded },
     )
     Column(
-        modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.SUBAGENT_NOTIFICATION).padding(vertical = LettaDimens.Space.sm),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(ChatRowTestTags.SUBAGENT_NOTIFICATION)
+            .then(if (model.isSuccessfulCompletion) Modifier else Modifier.padding(vertical = LettaDimens.Space.sm)),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         if (model.isSuccessfulCompletion) {
@@ -143,35 +154,22 @@ private fun UiSubagentNotification.activityLabel(): StringResource = when (activ
     TaskActivity.Task -> Res.string.rows_activity_task
 }
 
+/** The completed report's one line: a run header's [SummaryLine], its chevron opening the details. */
 @Composable
 private fun CompletedSummaryRow(model: NotificationModel, expanded: Boolean, onToggle: () -> Unit) {
     val summary = model.notification.summary ?: stringResource(Res.string.rows_activity_subagent)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(ChatRowTestTags.COMPLETED_ACTIVITY_SUMMARY)
-            .clickable(onClick = onToggle)
-            .padding(vertical = LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        Icon(
-            imageVector = LettaIcons.CheckCircle,
-            contentDescription = stringResource(Res.string.rows_completed),
-            modifier = Modifier.size(LettaDimens.Control.icon),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = summary,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        ExternalAgentBadge(model.identity)
-        DisclosureChevron(expanded = expanded, contentDescription = detailsLabel(model, expanded))
-    }
+    SummaryLine(
+        spec = RunStepRowSpec(
+            title = summary,
+            subtitle = null,
+            tone = RunSummaryTone.Done,
+            glyphLabel = stringResource(Res.string.rows_completed),
+            tags = RunStepRowTags(row = ChatRowTestTags.COMPLETED_ACTIVITY_SUMMARY, glyph = ChatRowTestTags.COMPLETED_ACTIVITY_GLYPH),
+        ),
+        disclosure = RunStepDisclosure(expanded = expanded, labels = detailsLabels(model), onToggle = onToggle),
+        modifier = Modifier.heightIn(min = ChatRowSpacing.runHeaderToggleMinHeight),
+        trailing = { ExternalAgentBadge(model.identity) },
+    )
 }
 
 @Composable
@@ -337,12 +335,18 @@ private fun NotificationActionRow(model: NotificationModel, expanded: Boolean, a
 
 @Composable
 private fun detailsLabel(model: NotificationModel, expanded: Boolean): String {
-    val resource = when {
-        model.report != null -> if (expanded) Res.string.rows_hide_full_report else Res.string.rows_show_full_report
-        model.isSuccessfulCompletion -> if (expanded) Res.string.rows_hide_details else Res.string.rows_show_details
-        else -> if (expanded) Res.string.rows_hide_transcript else Res.string.rows_show_transcript
+    val labels = detailsLabels(model)
+    return stringResource(if (expanded) labels.collapse else labels.expand)
+}
+
+/** What the details disclosure says: the full report, the details, or the transcript. */
+private fun detailsLabels(model: NotificationModel): RunStepDisclosureLabels {
+    val (show, hide) = when {
+        model.report != null -> Res.string.rows_show_full_report to Res.string.rows_hide_full_report
+        model.isSuccessfulCompletion -> Res.string.rows_show_details to Res.string.rows_hide_details
+        else -> Res.string.rows_show_transcript to Res.string.rows_hide_transcript
     }
-    return stringResource(resource)
+    return RunStepDisclosureLabels(show, hide, RunStepDisclosureLabels.Step.expandedState, RunStepDisclosureLabels.Step.collapsedState)
 }
 
 @Composable

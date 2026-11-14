@@ -109,6 +109,8 @@ internal object ChatRowTestTags {
     const val CANVAS_ARTIFACT_STATUS = "chat-canvas-artifact-status"
     const val DIFF_BLOCK = "tool-diff"
     const val COMPLETED_ACTIVITY_SUMMARY = "completed-activity-summary"
+    /** A completed report's summary-line glyph: the run header's [RunStatusGlyph]. */
+    const val COMPLETED_ACTIVITY_GLYPH = "completed-activity-glyph"
     const val SUBAGENT_DISPATCH = "subagent-dispatch"
     const val SUBAGENT_NOTIFICATION = "subagent-notification"
     /** A Monitor watch's chip, and one of its actionable events. */

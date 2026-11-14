@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.NonRestartableComposable
 import androidx.compose.runtime.State
@@ -323,7 +324,10 @@ private fun ToolStepDetails(
 private fun ToolStepInset(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean, failed: Boolean) {
     val notification = remember(toolCall.result) { toolCall.result?.let(::extractSubagentNotification) }
     if (notification != null) {
-        SubagentNotificationCard(notification, callbacks.openSubagent, toolCall.toolCallId)
+        // The details already sit flush with the step's title and inside its chevron's edge.
+        CompositionLocalProvider(LocalSummaryLineInsetByParent provides true) {
+            SubagentNotificationCard(notification, callbacks.openSubagent, toolCall.toolCallId)
+        }
         return
     }
     val presenters = LocalToolPresenters.current
