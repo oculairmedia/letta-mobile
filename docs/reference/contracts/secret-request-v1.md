@@ -1,12 +1,13 @@
 # Secret request v1: secure secret-input flow
 
-Status: **PROPOSED for review; contract, shared logic and host service stage.** This stage
+Status: **PROPOSED for review; contract, shared logic, host service and route stages.** Stage 1
 supplies the shared models (`:sharedLogic`, package `com.letta.mobile.data.secrets.request`), a
 durable journal (package `com.letta.mobile.data.secrets.journal`), the host service (package `com.letta.mobile.data.secrets.host`, JVM only) and the
-shared fixtures below. It registers no admin RPC route, agent tool, App Server command or
-capability, and ships no client UI, secure-window binding or real keystore provider. Sections
-marked *route* state what the stage that registers the methods must enforce; nothing in this
-stage enforces them.
+shared fixtures below. Stage 2 registers the admin RPC routes and the agent tool (package
+`com.letta.mobile.data.controller.node.iroh.secrets`, JVM only), the route wire (package
+`com.letta.mobile.data.secrets.wire`) and the client over the routes (package
+`com.letta.mobile.data.secrets.client`); see Routes. No stage ships a real keystore provider.
+Sections marked *route* state what the route stage enforces.
 
 Agents need secrets (API keys, tokens) and until now the only way to hand one over was to paste it
 into a conversation, where it stays in the transcript, the prompt and every log. This flow keeps
@@ -63,9 +64,16 @@ Each is a test target of `:sharedLogic:jvmTest` (`com.letta.mobile.data.secrets.
 
 - **N1** Names are compared as exact strings: no case folding, normalization or decoding. A
   malformed name is refused, never repaired.
-- **N2** The host may confine items to a scope (an item name; requested items must equal it or lie
-  under it by whole segments). Without one any well-formed item is accepted.
-- **N3** One agent may have at most 8 pending requests. A journal holds at most 512 records.
+- **N2** Every requested item must equal the agent's scope root or lie under it by whole segments.
+  The default root is per agent, `agents/<agentId>` (the verified requesting agent's id), so an
+  agent can never name another agent's items; an agent id that is not one item segment gets no
+  root and every item is refused. A wider, shared root is configured explicitly by the host owner
+  (`SecretItemScope.Shared`); there is no unrestricted scope, and `SecretRequestFeature.forHost`
+  takes the scope as a required argument. A request outside the scope is `item_outside_scope`.
+- **N3** One agent may have at most 8 pending requests (`too_many_pending`) and may create at most
+  8 requests in any 15 minutes, a sliding window counted from the journal (`too_many_requests`;
+  declined, expired and failed requests count too). The journal keeps at most 16 settled requests
+  per agent, newest first. A journal holds at most 512 records.
 - **N4** A request expires 15 minutes after creation. The agent cannot choose the lifetime.
 
 ### Purpose
@@ -75,7 +83,12 @@ renders markup in it, never turns text in it into a link and never presents it a
 text. The host trims surrounding whitespace and refuses (`purpose_not_plain_text`) any purpose
 that holds `<`, `>`, `[`, `]` or a backtick, `://`, `www.` or `mailto:`, starts with `#`, or holds a
 control, format (including bidirectional overrides and zero-width characters), line or paragraph
-separator, private-use, surrogate or unassigned character.
+separator, private-use, surrogate or unassigned character, or a word (a run of letters) that mixes
+Latin letters with Greek or Cyrillic ones (the look-alike trick of spelling a familiar name with a
+Cyrillic "a"); a sentence may still use several scripts, one per word. A bare domain such as
+`api.openai.com` is accepted on purpose: naming the service a key is for is an ordinary purpose,
+and no small rule tells a domain from `ASP.NET` or a file name. The defence against a link is the
+client's: it never turns purpose text into a link, and the target it shows is the host's.
 
 ## Methods
 
@@ -100,14 +113,19 @@ A *request* (what a client sees) is:
   "details": {
     "requestingAgent": "agent-...",
     "target": {"keystore": "local.vault", "item": "agents/notes/openai", "field": "api_key"},
-    "purpose": {"text": "...", "author": "agent"}
+    "purpose": {"text": "...", "author": "agent"},
+    "replacesExisting": true
   },
   "timing": {"createdAtMs": 0, "expiresAtMs": 0},
   "status": {"state": "pending", "reason": "...", "settledAtMs": 0}
 }
 ```
 
-`status.reason` is present only for `failed`; `status.settledAtMs` only for terminal states. A
+`status.reason` is present only for `failed`; `status.settledAtMs` only for terminal states.
+`details.replacesExisting` is present (and `true`) only when the target slot already held a value
+when the host created the request: the host reads the slot itself at creation, never takes it
+from the agent, and a client shows it as "this replaces an existing value". The agent's answers
+never carry it. A
 *receipt* is `{status, itemId, fieldName, reason?}`: `status` is `saved`, `cancelled`, `expired`
 or `failed`; `itemId` and `fieldName` are the target's item and field; `reason` is present only
 for `failed`.
@@ -117,22 +135,25 @@ for `failed`.
 - **M2** `secret.request.status` is a poll. The host service can also await a receipt
   (`awaitReceipt`); how the agent is told that its request settled is decided with the agent
   integration (open decision 5).
-- **M3** *route* A refusal keeps the admin RPC envelope: `{"success": false, "error": <code>}`, plus
-  `"problem": <problem>` for `invalid_request`.
+- **M3** *route* A refusal keeps the admin RPC envelope: `{"success": false, "error": <text>}`, where
+  `<text>` is the code, or for `invalid_request` the code, `:` and the problem
+  (`"invalid_request:purpose_blank"`). The admin RPC envelope has no other field a handler can set.
 
 ### Errors
 
 | Code | When | Calls |
 | --- | --- | --- |
 | `invalid_request` | The agent's request breaks a rule; `problem` says which | `secret.request` |
-| `forbidden` | The caller is not the human principal | Human calls |
+| `forbidden` | A human call from anything but the human principal; an agent call from anything but the agent tool (no admin RPC connection is an agent) | All |
 | `not_pending` | Unknown, pruned, malformed, expired, cancelled, answered or being written: one code for all, nothing written | `submit`, `cancel` |
-| `invalid_value` | The value is empty or over 65 536 bytes; the request stays pending | `submit` |
+| `invalid_value` | The value is empty, over 65 536 bytes, or not canonical padded base64; the request stays pending | `submit` |
 | `unknown_request` | No such request for this caller; another agent's request answers the same | `status`, `get` |
 | `journal_unavailable` | The journal cannot be read or written; nothing was written to the keystore by this call | All |
+| `invalid_params` | *route* The params are not exactly the method's fields, or a field is not a JSON string; nothing about the params is echoed | All |
+| `busy` | Another submission's write did not finish within the lock wait (default 2 s); nothing was decoded, claimed or written and the request stays pending | `submit` |
 
 Problems for `invalid_request`: `purpose_blank`, `purpose_too_long`, `purpose_not_plain_text`,
-`item_malformed`, `field_malformed`, `item_outside_scope`, `too_many_pending`.
+`item_malformed`, `field_malformed`, `item_outside_scope`, `too_many_pending`, `too_many_requests`.
 
 Failure reasons in a `failed` receipt, each a fixed code with no provider text:
 
@@ -148,6 +169,14 @@ Failure reasons in a `failed` receipt, each a fixed code with no provider text:
 | `verify_failed` | The read-back did not match; the write was undone |
 | `rollback_failed` | The read-back did not match and undoing the write failed too; an operator must check the item |
 | `interrupted` | The host stopped (or could not record the outcome) while the write was in progress; the outcome is unknown |
+| `target_changed` | The slot held no value when the request was made (`replacesExisting` absent) but holds one now; nothing was replaced |
+
+What a receipt reveals about the keystore: `target_not_writable` tells the agent that the item
+exists while the field does not (or that the keystore cannot list), and `target_changed` that the
+slot gained a value after the request was made. No other answer depends on what the keystore
+holds: creating a request answers the same whether or not the slot exists, and `saved` does not
+say whether a value was replaced. Under the per-agent scope both reveal only items in the agent's
+own namespace.
 
 ## Lifecycle
 
@@ -175,8 +204,10 @@ pending --submit (claim)--> submitting --verified--> saved
 The host writes the value to `{keystore, item, field}` through the keystore SPI so that either the
 verified value is stored or nothing new is left behind:
 
-- **W1** An existing slot is replaced (`put` mode `replace`); its previous value is read first and
-  held in host memory only, then wiped. A mismatch restores it.
+- **W1** An existing slot is replaced (`put` mode `replace`) only when the request carries
+  `replacesExisting`; its previous value is read first and held in host memory only, then wiped. A
+  mismatch restores it. A slot that came into existence after the request was made is never
+  replaced: the submission settles `failed` (`target_changed`) and nothing is written.
 - **W2** A missing slot is created (`put` mode `create`) only when the keystore can `list` and the
   listing proves the whole item is absent, so undoing it is deleting the item. A missing slot in an
   existing item, or in an item whose absence cannot be proved, is refused with
@@ -187,6 +218,14 @@ verified value is stored or nothing new is left behind:
   undo fails.
 - **W4** Every keystore error maps to a fixed reason; diagnostics and exception text are dropped.
   There is no automatic retry. Writes are serialized across requests.
+- **W5** *Time bounds.* A submission for a request that is not pending is refused at once. One
+  that cannot get the write lock within the lock wait (default 2 s) is refused `busy` before its
+  value is decoded or its request claimed. A keystore write, and the creation-time check of the
+  slot, may take at most the keystore deadline (default 15 s): a write that runs over settles
+  `failed` (`vault_unavailable`), its value is wiped and the lock is freed (the value may or may
+  not have been stored, as for `interrupted`); a check that runs over counts as "no existing
+  value". The deadline can stop only a provider that suspends cancellably; one that blocks a
+  thread holds it until it returns.
 
 ## Principals
 
@@ -213,12 +252,58 @@ verified value is stored or nothing new is left behind:
 | --- | --- | --- |
 | Requesting agent | Its own `requestId`, `expiresAtMs`, receipt (`status`, `itemId`, `fieldName`, `reason`) | The value, its length, other agents' requests, who answered |
 | Other agents | Nothing about the request (`unknown_request`) | Anything |
-| Human (paired device, `admin.full`) | Every request: target, requesting agent, purpose, timing, state, reason | The value after submission (never returned) |
+| Human (paired device, `admin.full`) | Every request of an agent in the device's agent scope: target, requesting agent, purpose, timing, state, reason | The value after submission (never returned); requests of agents outside its scope |
 | Journal, logs, telemetry | Ids, targets, purpose (journal only), states, timestamps, fixed codes, bounded id labels | The value, provider diagnostics, exception text |
 | Keystore provider | The value, at the fixed target | The purpose, the agent |
 
 Telemetry records only fixed codes and an 11-character label of a well-formed request id; never an
 item, field, purpose, path or value.
+
+## Routes
+
+*route* Stage 2 (letta-mobile-n2stx.2.4), in `com.letta.mobile.data.controller.node.iroh.secrets`.
+
+- **R1 Registration.** `SecretRequestFeature.forHost` builds the routes and the tool only when the
+  auth policy it is given is paired peers only and a keystore provider is configured; otherwise it
+  answers null and the host registers, advertises and offers nothing. Bearer-token and peer-allowlist
+  endpoints are excluded because their bootstrap sessions hold `admin.full` and can mint pairing
+  invites (independent review, 2026-11-12). The routes refuse to register under any other policy
+  even when handed one. Two limits: the policy is whatever the caller passes, since the factory cannot see the
+  endpoint, so this check is only as good as the future wiring; the per-call backstop is R3 (an
+  anonymous endpoint's sessions are never paired devices, so even routes built for a paired-peers
+  policy refuse them, test-pinned). And today the feature is inert because nothing in production calls
+  `forHost` at all (no keystore provider exists yet), not because `forHost` answers null on real
+  hosts. The classes exist only in the JVM host (decision 8). All six methods register together, and
+  only then is host capability `secret.request.v1` advertised.
+- **R2 Gate.** At the connection's capability gate the human methods need peer capability
+  `secret.request.answer` and the agent methods `secret.request.agent` (`admin.full` passes both, as
+  for every method). No role grants either.
+- **R3 Human principal.** Built from the request context the serving Iroh connection made: it must
+  be authenticated, carry a 64-hex verified endpoint id, be a paired device by its stored record
+  (`pairedDevice`; a bootstrap session such as a host-local process holding the admin token is not,
+  and neither is a connection that began as a bootstrap session (bearer token or allowlist) and
+  then redeemed an invite on that same connection: the session keeps its bootstrap provenance),
+  and hold `admin.full` (`grantedCapabilities`). The device's agent scope applies: `list` shows only
+  requests of agents in scope; `get` of a request outside it answers `unknown_request` and
+  `submit`/`cancel` answer `not_pending`, byte for byte as for an unknown id. Byte-identical holds
+  for every denial the handler makes; a call the connection's capability gate denies (R2) never
+  reaches the handler and gets the gate's envelope, which also carries a `capability` field.
+- **R4 Agent principal.** No admin RPC connection is ever an agent: `secret.request` and
+  `secret.request.status` answer `forbidden` to every connection. Agents call the host tool
+  `secret_request` (actions `create` and `status`), which is bound to the agent id the host runtime
+  stamped on the tool call, never to an argument. The caller's identity must be verified
+  (`CallerIdentity.VERIFIED`: the App Server's runtime stamp, or a Meridian live-call token); a
+  claimed identity (Meridian env-scoped binding, a bare agent id, a scope relayed from another
+  host) or a call without an agent answers `forbidden` before any argument is read (owner decision
+  2026-11-11). Its result is the route's result and its error the route's code.
+- **R5 Order.** Principal, then strict params (exactly the method's fields, all JSON strings), then
+  visibility of the named request, then the service. For `submit` the service checks that the
+  request is pending and takes the write lock (W5) before the value is touched; only then is it
+  decoded (length and padding checked against 65 536 bytes before any byte is allocated, then
+  decoded straight into the keystore secret type). A malformed id answers like an unknown one.
+- **R6 No value out.** No result, refusal, telemetry event or `toString` carries a value. The routes
+  log method, side, transport and outcome code only; the stream server answers a frame it cannot
+  parse with fixed text.
 
 ## Journal
 
@@ -235,9 +320,11 @@ item, field, purpose, path or value.
   UTF-8 JSON, has duplicate keys, has an unknown version, or holds records that break the rules
   (malformed ids or names, duplicate ids, inconsistent status, more than 512 records) is never
   reset or rewritten; every operation answers `journal_unavailable`.
-- **J5** *Bounds.* Terminal records are pruned 24 hours after they settle; pending and submitting
-  records are never pruned. An update that would exceed 512 records or 2 MiB is refused. A pruned
-  id answers like an unknown one.
+- **J5** *Bounds.* Terminal records are pruned 24 hours after they settle, and beyond the newest 16
+  per agent; pending and submitting records are never pruned. A new request that would push the
+  journal over 512 records or 2 MiB first makes room by pruning settled records created before
+  the 15-minute creation window, then, if that is not enough, every settled record; only then is
+  it refused (`journal_unavailable`). A pruned id answers like an unknown one.
 - **J6** Only a missing journal file reads as empty. Deleting it forgets every request, so its
   directory must be writable only by the host.
 
@@ -248,7 +335,8 @@ The normative examples are in
 one file per method: `{method, caller, cases: [{name, params, result | error}]}`. Their values are
 sentinels. `SecretRequestContractFixturesTest` decodes every case into the typed models, re-encodes
 it to an equal JSON value, checks validation against the documented problems and checks the name
-grammars against the keystore SPI. They are not admin RPC route fixtures: no route exists yet.
+grammars against the keystore SPI. They are model fixtures; the admin RPC route fixtures are the
+per-method wire contracts under `docs/reference/contracts/secret.request*/secret-request-v1.md`.
 
 ## Tests and what they cannot see
 
@@ -261,8 +349,7 @@ Server's logs, the admin RPC transport, a real provider's own storage or the cli
 
 ## Non-goals
 
-No route registration, tool or capability in this stage; no client UI or secure window; no real
-keystore provider or vault contact. Out of v1 entirely: agent-callable keystore reads; rotation;
+No real keystore provider or vault contact in any stage so far (stage 4). Out of v1 entirely: agent-callable keystore reads; rotation;
 deleting a single field; multiple fields per request; requests for another agent; delegation of
 answering to an agent; reading a value back to any client; recovering the outcome of an
 interrupted write.
@@ -275,7 +362,10 @@ Each was settled conservatively for v1 and is listed for the owner:
    could leave a partial store. Allowing it needs a keystore field delete (a keystore minor).
 2. **`submitting` is a visible lifecycle state** for the human's client (needed for crash safety);
    receipts still carry only the four terminal statuses.
-3. **No item scope by default** (N2). A host can confine agent requests to a prefix.
+3. **Per-agent item scope by default and no silent replace** (N2, W1): author's choice after the
+   2026-11-13 security review, awaiting owner confirmation. Before it, any well-formed item was
+   accepted and an existing slot was replaced, so an agent could overwrite any secret it could
+   name.
 4. **`interrupted` means unknown outcome**: the value may or may not be stored. The host does not
    probe the keystore after a restart because it no longer holds the value to compare.
 5. **Receipt delivery to the agent** is a poll (`secret.request.status`) in this contract; pushing a
@@ -288,5 +378,15 @@ Each was settled conservatively for v1 and is listed for the owner:
    the route stage.
 8. **The host service is JVM only**, because `:plugin-api` is a JVM-only dependency of
    `:sharedLogic`. An Android host would need that dependency on Android too.
-9. **Limits**: purpose 280 characters, 8 pending requests per agent, 512 journal records, 15 minute
-   lifetime, 24 hour retention of settled records.
+9. **Limits**: purpose 280 characters, 8 pending requests per agent, 8 created per agent in any 15
+   minutes, 16 settled records kept per agent, 512 journal records, 15 minute lifetime, 24 hour
+   retention of settled records, 15 s keystore deadline, 2 s write-lock wait.
+10. **Open for the owner, unchanged on purpose** (2026-11-13 security review): (a) a Meridian
+    live-call token can be requested by any local process running as the same OS user, so
+    `CallerIdentity.VERIFIED` does not separate agents that share one OS user; (b) whether a
+    record should store which device answered it; (c) whether `secret.request.answer` should be
+    granted to any role (today it is granted to none, so only `admin.full` devices answer); (d)
+    holding a bootstrap admin token lets you pair a device: a bootstrap session can mint an admin
+    invite and redeem it from a second, fresh connection, which is then a paired device. A
+    bearer-token or allowlist host registers no secret routes, but the paired-peer store persists,
+    so a device paired that way can answer once the host runs paired-peers-only. Not closed in v1.

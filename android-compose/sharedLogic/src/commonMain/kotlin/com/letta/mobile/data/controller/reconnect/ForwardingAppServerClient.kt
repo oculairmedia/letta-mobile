@@ -14,6 +14,10 @@ import com.letta.mobile.data.transport.appserver.AppServerWorkspaceCommand
 abstract class ForwardingAppServerClient : AppServerClient {
     protected abstract fun target(): AppServerClient
 
+    /** The current connection's trust; false while there is none. */
+    override val vouchesForRuntimeScope: Boolean
+        get() = runCatching { target() }.getOrNull()?.vouchesForRuntimeScope ?: false
+
     override suspend fun auth(command: AppServerCommand.Auth): AppServerInboundFrame.AuthResponse =
         target().auth(command)
 

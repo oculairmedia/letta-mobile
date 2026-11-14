@@ -1,6 +1,8 @@
 package com.letta.mobile.data.meridian
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.claimedToolCaller
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -18,7 +20,7 @@ import kotlinx.serialization.json.put
 data class MeridianRequest(
     val argv: List<String>,
     val stdin: String? = null,
-    val caller: ExternalToolCaller = ExternalToolCaller(agentId = null),
+    val caller: ExternalToolCaller = claimedToolCaller(ToolCallScope(agentId = null)),
 )
 
 /**

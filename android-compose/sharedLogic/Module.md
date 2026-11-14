@@ -255,6 +255,10 @@ Enabled-channel account caching and restoration across App Server connection gen
 
 External-tool registries, offers and dynamic tool-source contracts. Platform CLI runners bind execution while the shared registry describes which tools can be offered to a runtime. Keep platform execution behind host adapters rather than discovery metadata; contribute tools through [ToolSource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras/-tool-source/index.html) and execution through [HostExternalTool](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras/-host-external-tool/index.html) or [IrohCliRunner](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras/-iroh-cli-runner/index.html).
 
+# Package com.letta.mobile.data.controller.extras.identity
+
+Provenance of a tool caller's agent id. [CallerIdentity](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras.identity/-caller-identity/index.html) says whether a tool caller's agent id was vouched for. Anyone can build a claimed caller (`claimedToolCaller`); a verified one is made only inside sharedLogic, by the App Server dispatcher when its client owns the App Server connection (`AppServerClient.vouchesForRuntimeScope`) and by the Meridian live-call binder, and a guard test pins those two. Changing a verified caller's agent or conversation makes it claimed. Security-sensitive tools serve only verified callers.
+
 # Package com.letta.mobile.data.controller.extras.relay
 
 The app-tool relay: an Iroh host offers agents the tools that act on the app on screen under the app tools' own names, and forwards each call to the app viewing the caller's conversation over that app's authenticated control stream. Both peers negotiate it in the auth exchange, each side relays only its own allow-list of tools, and the caller is the scope the host's App Server stamped, never model input. This package knows frames and routing only, never a particular tool, so the Iroh host and transport can depend on it; tools plug in from their own packages. Route host calls through [AppToolRelayHost](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras.relay/-app-tool-relay-host/index.html) and answer them in the app by installing an [AppToolRelayAnswerer](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras.relay/-app-tool-relay-answerer/index.html) on [AppToolRelayResponder](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras.relay/-app-tool-relay-responder/index.html).
@@ -282,6 +286,10 @@ JVM/Android Iroh controller hosting: authentication, pairing, viewer fanout and 
 Host construction separates endpoint network/identity binding (`IrohEndpointBinding`) from per-peer authentication (`IrohConnectionAuthentication`). Admin routes receive native sources, change notifications and pairing dependencies via `AdminRpcNativeSources`, `AdminRpcNotifications` and `AdminRpcPairing`, alongside host bindings in `AdminRpcHostServices`; omitted optional sources continue to fail closed.
 
 `conversation.list` supports opt-in `visible_only: true` for unfiltered requests without `summary_search`. It shares the held full list with per-agent pages, removes agent-free, hidden-agent, hidden-conversation, archived and unauthorized rows before pagination, and returns newest-first recents (default 30). `after` names a visible conversation; unknown cursors restart from the top. Limits retain App Server integer/negative-prefix semantics; absent or invalid limits default to 30 in this mode. Legacy unfiltered, per-agent and search requests are unchanged. Visible mode requires the host's local agent visibility index; without it the opt-in request fails with `capability_unavailable` rather than return potentially hidden-agent rows. Above the held-list cap or without a usable signature, recents fetch the full list without retaining it rather than filter a truncated raw page.
+
+# Package com.letta.mobile.data.controller.node.iroh.secrets
+
+The secret request admin RPC routes and the agent's `secret_request` tool on the JVM host. [SecretRequestFeature](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh.secrets/-secret-request-feature/index.html) builds both only for a paired-peers-only auth policy (as the caller passes it) with a keystore provider and an explicit item scope, and nothing in production calls it yet; the human principal comes from the serving connection (a paired device holding `admin.full`), the agent principal only from the runtime-stamped tool call, and no route returns or logs a value.
 
 # Package com.letta.mobile.data.controller.node.iroh.discovery
 
@@ -545,7 +553,7 @@ Agent secret sources and vault state/controller logic. Secret values have redact
 
 # Package com.letta.mobile.data.secrets.client
 
-Client side of the secure secret-input flow. `SecretRequestClient` is the port the form uses to list pending requests, submit a value and decline; no implementation here talks to a host. `SecretBuffer` is the one place a typed value lives and `SecretInput` carries it to the port once: both redact themselves, are never saved or logged, and are zeroed on every exit path. `SecretFormMachine` is the pure state machine and `SecretFormController` applies it. Nothing in this package registers a route or a tool.
+Client side of the secure secret-input flow. `SecretRequestClient` is the port the form uses to list pending requests, submit a value and decline; [AdminRpcSecretRequestClient](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.client/-admin-rpc-secret-request-client/index.html) implements it over the host's admin RPC routes, inert when the host does not advertise them. `SecretBuffer` is the one place a typed value lives and `SecretInput` carries it to the port once: both redact themselves, are never saved or logged, and are zeroed on every exit path. `SecretFormMachine` is the pure state machine and `SecretFormController` applies it. Nothing in this package registers a route or a tool.
 
 # Package com.letta.mobile.data.secrets.host
 
@@ -558,6 +566,10 @@ Durable storage of secret requests so single use and expiry survive a host resta
 # Package com.letta.mobile.data.secrets.request
 
 Shared models of the secret request contract: typed ids and names with the keystore grammar, the agent request and receipt, the request record clients see, validation of agent-authored purposes, and the lifecycle as pure functions in [SecretRequestLifecycle](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.request/-secret-request-lifecycle/index.html). Nothing here carries a secret value; clients and the host share these types.
+
+# Package com.letta.mobile.data.secrets.wire
+
+The admin RPC wire of the secret request routes, shared by host and client: method sets, capabilities and params fields in [SecretRequestRouteWire](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.wire/-secret-request-route-wire/index.html), and the submitted value's base64 codec in [SecretValueBase64](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.wire/-secret-value-base64/index.html), which encodes into and decodes from arrays its caller zeroes and never makes a string of a value.
 
 # Package com.letta.mobile.data.serialization
 

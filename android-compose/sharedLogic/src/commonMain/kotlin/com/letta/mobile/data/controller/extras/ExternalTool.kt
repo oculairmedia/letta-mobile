@@ -1,6 +1,8 @@
 package com.letta.mobile.data.controller.extras
 
 import com.letta.mobile.data.controller.capability.Capability
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -73,17 +75,57 @@ interface ExternalTool {
 /**
  * Who a tool call comes from: the runtime scope the App Server stamped on the request, which the
  * model cannot choose. [agentId] and [conversationId] are null when the frame carried no scope.
+ * [identity] says whether [agentId] is [CallerIdentity.VERIFIED] or only [CallerIdentity.CLAIMED].
  *
  * [toolCallId] is the request's `tool_call_id`: the id the model's tool call has in the run, the
  * same one the timeline's TOOL_CALL event and its return are keyed. A
  * tool that must answer a retried call the same way (canvas_compose derives its artifact id from
  * it) reads it; null when the call came some other way.
+ *
+ * Anyone may build a claimed caller ([claimedToolCaller]). A verified one is made only inside
+ * this module, by [verifiedToolCaller], and only where the host or runtime itself vouches for the
+ * scope: the App Server dispatcher (for a client that owns its App Server connection) and the
+ * Meridian live-call binder. The constructor is internal and a guard test fails if any other
+ * production file calls it or [verifiedToolCaller]. It is not a data class, so there is no `copy`:
+ * [withArguments] keeps verification only while the identity fields stay the same.
  */
-data class ExternalToolCaller(
-    val agentId: String?,
-    val conversationId: String? = null,
-    val toolCallId: String? = null,
-)
+class ExternalToolCaller internal constructor(
+    /** Whether [scope] was stamped by the host or runtime, or only claimed. */
+    val identity: CallerIdentity,
+    /** The call's agent, conversation and tool call id. */
+    val scope: ToolCallScope,
+) {
+    val agentId: String? get() = scope.agentId
+
+    val conversationId: String? get() = scope.conversationId
+
+    val toolCallId: String? get() = scope.toolCallId
+
+    /** Whether the host or runtime vouched for [agentId] ([CallerIdentity.VERIFIED]). */
+    val isVerified: Boolean get() = identity == CallerIdentity.VERIFIED
+
+    /**
+     * This caller for [other]. It stays verified only when the agent and conversation are
+     * unchanged; changing either makes it claimed, so a verified scope cannot be moved to another
+     * agent or conversation. The tool call id is not identity and may change freely.
+     */
+    fun withArguments(other: ToolCallScope): ExternalToolCaller {
+        val sameScope = other.agentId == agentId && other.conversationId == conversationId
+        return ExternalToolCaller(if (sameScope) identity else CallerIdentity.CLAIMED, other)
+    }
+
+    /** The identity and the scope: ids only, never anything the call carries. */
+    override fun toString(): String = "ExternalToolCaller(identity=$identity, scope=$scope)"
+}
+
+/** A caller whose [scope] nothing vouches for: an argument, an environment variable, a relayed frame. */
+fun claimedToolCaller(scope: ToolCallScope): ExternalToolCaller = ExternalToolCaller(CallerIdentity.CLAIMED, scope)
+
+/**
+ * A caller whose [scope] the host or runtime vouches for. Only the App Server dispatcher and the
+ * Meridian live-call binder may call this (pinned by a guard test).
+ */
+internal fun verifiedToolCaller(scope: ToolCallScope): ExternalToolCaller = ExternalToolCaller(CallerIdentity.VERIFIED, scope)
 
 /**
  * Host-owned external tool that is available because of the client device, not
