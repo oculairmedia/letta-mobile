@@ -2,6 +2,8 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.node.iroh.discovery.ConversationDiscovery
+import com.letta.mobile.data.controller.node.iroh.timing.AdminRpcPhase
+import com.letta.mobile.data.controller.node.iroh.timing.timedPhase
 import com.letta.mobile.data.controller.node.listcache.HeldListCache
 import com.letta.mobile.data.controller.node.listcache.HeldListLimits
 import com.letta.mobile.data.model.AgentId
@@ -145,9 +147,11 @@ object ConversationAdminHandlers {
         val heldList = discovery?.heldList
         router.registerScoped("conversation.list") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
-            if (nativeClient != null) {
-                discovery?.prime(context.authenticated, ::reportDiscoveryWarning) { id, remaining ->
-                    NativeAdmin.retrieveForDiscovery(nativeClient, ConversationId(id), remaining.milliseconds)
+            if (nativeClient != null && discovery != null) {
+                timedPhase(AdminRpcPhase.Discovery) {
+                    discovery.prime(context.authenticated, ::reportDiscoveryWarning) { id, remaining ->
+                        NativeAdmin.retrieveForDiscovery(nativeClient, ConversationId(id), remaining.milliseconds)
+                    }
                 }
             }
             val conversations = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationList) { c ->
@@ -225,20 +229,22 @@ object ConversationAdminHandlers {
 
     /** The conversation list exactly as the client asked for it, from the App Server. */
     private suspend fun listConversations(client: AppServerClient, params: JsonObject?): JsonArray? {
-        val response = client.conversationList(
-            AppServerCommand.ConversationList(
-                requestId = NativeAdmin.requestId(),
-                query = NativeAdmin.queryOf(
-                    "agent_id" to param(params, AdminParamKey("agent_id")),
-                    "limit" to param(params, AdminParamKey("limit")),
-                    "after" to param(params, AdminParamKey("after")),
-                    "archive_status" to param(params, AdminParamKey("archive_status")),
-                    "summary_search" to param(params, AdminParamKey("summary_search")),
-                    "order" to param(params, AdminParamKey("order")),
-                    "order_by" to param(params, AdminParamKey("order_by")),
+        val response = timedPhase(AdminRpcPhase.AppServer) {
+            client.conversationList(
+                AppServerCommand.ConversationList(
+                    requestId = NativeAdmin.requestId(),
+                    query = NativeAdmin.queryOf(
+                        "agent_id" to param(params, AdminParamKey("agent_id")),
+                        "limit" to param(params, AdminParamKey("limit")),
+                        "after" to param(params, AdminParamKey("after")),
+                        "archive_status" to param(params, AdminParamKey("archive_status")),
+                        "summary_search" to param(params, AdminParamKey("summary_search")),
+                        "order" to param(params, AdminParamKey("order")),
+                        "order_by" to param(params, AdminParamKey("order_by")),
+                    ),
                 ),
-            ),
-        )
+            )
+        }
         return if (response.success) response.conversations ?: JsonArray(emptyList()) else null
     }
 
@@ -248,12 +254,14 @@ object ConversationAdminHandlers {
      * is the App Server's; no agent's page includes them.
      */
     private suspend fun listAgentConversations(client: AppServerClient): JsonArray? {
-        val response = client.conversationList(
-            AppServerCommand.ConversationList(
-                requestId = NativeAdmin.requestId(),
-                query = NativeAdmin.queryOf("limit" to (MAX_HELD_CONVERSATIONS + 1).toString()),
-            ),
-        )
+        val response = timedPhase(AdminRpcPhase.AppServer) {
+            client.conversationList(
+                AppServerCommand.ConversationList(
+                    requestId = NativeAdmin.requestId(),
+                    query = NativeAdmin.queryOf("limit" to (MAX_HELD_CONVERSATIONS + 1).toString()),
+                ),
+            )
+        }
         return if (response.success) response.conversations ?: JsonArray(emptyList()) else null
     }
 
@@ -450,15 +458,17 @@ object ConversationAdminHandlers {
             requireConversationAccess(context, convId)
             val effectiveLimit = param(params, AdminParamKey("limit")) ?: MessageListPageGuard.DEFAULT_PAGE_LIMIT.toString()
             val response = NativeAdmin.require(nativeClient, NativeAdminOp.MessageList) { c ->
-                val native = c.conversationMessagesList(
-                    nativeMessageList(
-                        ConversationId(convId),
-                        "limit" to effectiveLimit,
-                        "after" to param(params, AdminParamKey("after")),
-                        "before" to param(params, AdminParamKey("before")),
-                        "order" to param(params, AdminParamKey("order")),
-                    ),
-                )
+                val native = timedPhase(AdminRpcPhase.AppServer) {
+                    c.conversationMessagesList(
+                        nativeMessageList(
+                            ConversationId(convId),
+                            "limit" to effectiveLimit,
+                            "after" to param(params, AdminParamKey("after")),
+                            "before" to param(params, AdminParamKey("before")),
+                            "order" to param(params, AdminParamKey("order")),
+                        ),
+                    )
+                }
                 if (native.success) native.messages else null
             }
             val projected = MessageListWireProjection.projectMessageList(response, convId).let { wire ->
@@ -467,7 +477,8 @@ object ConversationAdminHandlers {
                 val rows = wire as? JsonArray ?: return@let wire
                 // Read from the transcript's end: a full parse cost grew with the conversation and
                 // ran again after every append during a live turn.
-                val local = localStore?.newestMessageContents(ConversationId(convId), ENRICHMENT_WINDOW)
+                val local = localStore
+                    ?.let { store -> timedPhase(AdminRpcPhase.LocalStore) { store.newestMessageContents(ConversationId(convId), ENRICHMENT_WINDOW) } }
                     ?.filterIsInstance<JsonObject>()?.associateBy { it["id"] } ?: return@let wire
                 JsonArray(rows.map { element ->
                     val row = element as? JsonObject ?: return@map element
