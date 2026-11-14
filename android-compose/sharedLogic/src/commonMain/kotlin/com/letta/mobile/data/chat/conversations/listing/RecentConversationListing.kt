@@ -147,7 +147,7 @@ internal class RecentConversationListing(
     private suspend fun readSearchAgents(agents: List<AgentId>) {
         val failures = mutableMapOf<AgentId, Throwable>()
         for (id in agents) {
-            runCatchingCancellable { readAllAgentPages(id) }.onFailure { failure ->
+            runCatchingCancellable { fleet.readAllAgentPages(id) }.onFailure { failure ->
                 failures[id] = failure
                 Telemetry.event(
                     "Conversations", "list.agent_read_failed", "agentId" attr id.value, "reason" attr failure.message,
@@ -165,25 +165,31 @@ internal class RecentConversationListing(
         val refresh = mutableSetOf<AgentId>()
         for ((id, hintedOwner) in dirty) {
             val owner = hintedOwner ?: conversations.firstOrNull { it.id == id }?.agentId
-            if (owner in fleet.loadedAgents) {
-                // The dirty row may be in a cached older page, outside the refreshed first page.
-                val row = gateway.getConversation(id.value)
-                if (row.agentId in fleet.loadedAgents) fleet.record(row)
-                refresh += requireNotNull(owner)
-            } else {
-                // An unloaded owner's row: its owner may have loaded meanwhile, else it joins the recents.
-                val row = gateway.getConversation(id.value)
-                if (row.agentId in fleet.loadedAgents) refresh += row.agentId else mergeRecent(row, roster)
-            }
+            dirtyRowRefreshTarget(id, owner, roster)?.let { refresh += it }
         }
         fleet.refreshAgents(refresh)
         recents = recents.filterNot { it.agentId in refresh }
         conversations
     }
 
-    private suspend fun readAllAgentPages(id: AgentId) {
-        if (id !in fleet.loadedAgents) fleet.refreshAgents(setOf(id))
-        while (fleet.hasMore(id)) fleet.loadMore(id)
+    /**
+     * Re-reads one dirty row and returns the loaded agent to refresh for it, or null when it joined the recents.
+     * A loaded owner's row may be in a cached older page, outside the refreshed first page, so it is recorded;
+     * an unloaded owner may have loaded meanwhile, else its row joins the recents.
+     */
+    private suspend fun dirtyRowRefreshTarget(id: ConversationId, owner: AgentId?, roster: List<Agent>): AgentId? {
+        val row = gateway.getConversation(id.value)
+        val ownerLoaded = owner != null && owner in fleet.loadedAgents
+        val rowLoaded = row.agentId in fleet.loadedAgents
+        if (ownerLoaded && rowLoaded) fleet.record(row)
+        return when {
+            ownerLoaded -> owner
+            rowLoaded -> row.agentId
+            else -> {
+                mergeRecent(row, roster)
+                null
+            }
+        }
     }
 
     /** A row of an unloaded agent replaces its recents entry; archived or hidden rows leave the recents. */
@@ -197,6 +203,11 @@ internal class RecentConversationListing(
     private companion object {
         const val RECENTS_LIMIT = 30
     }
+}
+
+private suspend fun AgentConversationFleet.readAllAgentPages(id: AgentId) {
+    if (id !in loadedAgents) refreshAgents(setOf(id))
+    while (hasMore(id)) loadMore(id)
 }
 
 private fun hiddenAgentsIn(roster: List<Agent>): Set<AgentId> =

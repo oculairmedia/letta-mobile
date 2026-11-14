@@ -45,6 +45,13 @@ class RecentsFirstAllConversationsTest {
         const val ROSTER_SIZE = 359
         const val DRAWER_MAX_AGE_MS = 60_000L
         const val SETTLE_MS = 2_000L
+
+        /** ISO-8601 instants ordered by [n]: a larger [n] is newer. */
+        fun stamp(n: Int): String {
+            val minutes = n % 60
+            val hours = n / 60
+            return "2026-11-14T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00Z"
+        }
     }
 
     private val roster = List(ROSTER_SIZE) { Agent(AgentId("agent-$it"), name = "Agent $it") }
@@ -52,9 +59,11 @@ class RecentsFirstAllConversationsTest {
 
     /** Each agent's own conversation, the newest agent first, behind a burst of agent-free worker rows. */
     private fun hostRows(): List<HostRow> =
-        List(40) { HostRow("worker-$it", agent = null, at = stamp(ROSTER_SIZE + it)) } +
-            HostRow("archived", agent = "agent-1", at = stamp(ROSTER_SIZE + 50), archived = true) +
-            roster.indices.map { HostRow("conv-$it", agent = "agent-$it", at = stamp(ROSTER_SIZE - it)) }
+        List(40) { HostRow(ConversationId("worker-$it"), agent = null, at = ROSTER_SIZE + it) } +
+            HostRow(ConversationId("archived"), agent = AgentId("agent-1"), at = ROSTER_SIZE + 50, archived = true) +
+            roster.indices.map {
+                HostRow(ConversationId("conv-$it"), agent = AgentId("agent-$it"), at = ROSTER_SIZE - it)
+            }
 
     private fun repository(host: Host, scope: kotlinx.coroutines.CoroutineScope) = CachedAllConversationsRepository(
         roster = { roster }, remote = RemoteRoute.Absent(SessionRoute.CONVERSATIONS), repositoryScope = scope,
@@ -152,8 +161,9 @@ class RecentsFirstAllConversationsTest {
         host.lists.clear()
         host.gets.clear()
 
-        host.rows = host.rows.map { if (it.id == "conv-300") it.copy(summary = "fresh", at = stamp(ROSTER_SIZE * 2)) else it }
-        host.events.emit(push("conv-300", "agent-300"))
+        val pushed = ConversationId("conv-300")
+        host.rows = host.rows.map { if (it.id == pushed) it.copy(summary = "fresh", at = ROSTER_SIZE * 2) else it }
+        host.events.emit(push(ConversationId("conv-300"), AgentId("agent-300")))
         advanceTimeBy(SETTLE_MS)
         runCurrent()
 
@@ -174,38 +184,32 @@ class RecentsFirstAllConversationsTest {
         )
         repository.handleOptimisticUpdate(optimistic)
 
-        host.events.emit(push("conv-0", "agent-0"))
+        host.events.emit(push(ConversationId("conv-0"), AgentId("agent-0")))
         advanceTimeBy(SETTLE_MS)
         runCurrent()
 
         assertEquals(ConversationId("local-new"), repository.conversations.value.first().id)
     }
 
-    private fun push(id: String, agent: String) = ServerFrame.ConversationUpdated(
-        id = "push-$id", ts = "2026-11-14T00:00:00Z", conversationId = id, agentId = agent,
+    private fun push(id: ConversationId, agent: AgentId) = ServerFrame.ConversationUpdated(
+        id = "push-${id.value}", ts = "2026-11-14T00:00:00Z", conversationId = id.value, agentId = agent.value,
     )
 
-    /** ISO-8601 instants ordered by [n]: a larger [n] is newer. */
-    private fun stamp(n: Int): String {
-        val minutes = n % 60
-        val hours = n / 60
-        return "2026-11-14T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00Z"
-    }
-
+    /** A host row; [at] is its [stamp] ordinal, so a larger [at] is newer. */
     private data class HostRow(
-        val id: String,
-        val agent: String?,
-        val at: String,
+        val id: ConversationId,
+        val agent: AgentId?,
+        val at: Int,
         val archived: Boolean = false,
-        val summary: String = id,
+        val summary: String = id.value,
     ) {
         fun json(): JsonObject = buildJsonObject {
-            put("id", id)
-            put("agent_id", agent)
+            put("id", id.value)
+            put("agent_id", agent?.value)
             put("summary", summary)
             put("archived", archived)
-            put("last_message_at", at)
-            put("updated_at", at)
+            put("last_message_at", stamp(at))
+            put("updated_at", stamp(at))
         }
     }
 
@@ -239,7 +243,7 @@ class RecentsFirstAllConversationsTest {
             val params = body?.let { LettaJson.wire.parseToJsonElement(it).jsonObject } ?: JsonObject(emptyMap())
             return when (method) {
                 "conversation.list" -> list(params)
-                "conversation.get" -> get(path.substringAfterLast('/'))
+                "conversation.get" -> get(ConversationId(path.substringAfterLast('/')))
                 else -> error("unexpected $method")
             }
         }
@@ -256,13 +260,13 @@ class RecentsFirstAllConversationsTest {
             }
             requireNotNull(agent) { "the fleet list never asks for every agent at once" }
             lists += Read.Agent(agent)
-            val own = newestFirst(rows.filter { it.agent == agent })
+            val own = newestFirst(rows.filter { it.agent?.value == agent })
                 .filter { params.text("archive_status") == "all" || !it.archived }
             return ok(page(own, params, default = own.size))
         }
 
-        private fun get(id: String): AppServerInboundFrame.AdminRpcResponse {
-            gets += id
+        private fun get(id: ConversationId): AppServerInboundFrame.AdminRpcResponse {
+            gets += id.value
             val row = rows.firstOrNull { it.id == id }
                 ?: return AppServerInboundFrame.AdminRpcResponse("request", success = false, error = "conversation not found")
             return AppServerInboundFrame.AdminRpcResponse("request", success = true, result = row.json())
@@ -272,7 +276,7 @@ class RecentsFirstAllConversationsTest {
 
         private fun page(rows: List<HostRow>, params: JsonObject, default: Int): List<HostRow> {
             val after = params.text("after")
-            val from = after?.let { id -> rows.indexOfFirst { it.id == id } + 1 } ?: 0
+            val from = after?.let { id -> rows.indexOfFirst { it.id.value == id } + 1 } ?: 0
             return rows.drop(from).take(params.text("limit")?.toIntOrNull() ?: default)
         }
 
