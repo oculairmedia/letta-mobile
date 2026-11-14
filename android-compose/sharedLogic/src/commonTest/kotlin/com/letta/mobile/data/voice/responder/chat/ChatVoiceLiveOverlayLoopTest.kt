@@ -122,13 +122,22 @@ internal class ChatVoiceLiveOverlayLoopTest : ChatSendCoordinatorConversationFix
 
     /** The send's echo on [stamp]'s run; its turn is the send's otid. */
     private fun echo(stamp: Stamp) = row(
-        UserMessage(id = "$prefix-echo", contentRaw = JsonPrimitive("hi"), date = DATE, otid = stamp.turn, runId = stamp.run, turnId = stamp.turn),
+        UserMessage(
+            id = "$prefix-echo",
+            contentRaw = JsonPrimitive("hi"),
+            date = DATE,
+            otid = stamp.turn,
+            runId = stamp.run,
+            turnId = stamp.turn,
+        ),
         stamp.turn,
     )
 
     /** The live overlay shows the reply row (and the tool step before it), as the canonical route draws it. */
     private fun Rig.overlay(text: String, runs: OverlayRuns) {
-        val tool = runs.tool?.let { UiMessage(id = "$prefix-tool", role = "assistant", content = "", timestamp = "t", runId = it, isReasoning = true) }
+        val tool = runs.tool?.let { run ->
+            UiMessage(id = "$prefix-tool", role = "assistant", content = "", timestamp = "t", runId = run, isReasoning = true)
+        }
         live.update { listOfNotNull(tool, assistantRow(RowId("$prefix-reply"), text, RowRun(runs.reply))) }
     }
 

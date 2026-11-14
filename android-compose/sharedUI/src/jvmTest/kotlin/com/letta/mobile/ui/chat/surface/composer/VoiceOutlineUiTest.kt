@@ -126,7 +126,9 @@ class VoiceOutlineUiTest {
         val scope = rememberCoroutineScope()
         return remember {
             val store = VoiceSetupStore(InMemorySecureSettingsStore(), InMemorySecureSettingsStore())
-            val engines = VoiceEngineFactory { VoiceEngineSet(VoiceEngines(UnusedOutlineEar(), UnusedOutlineResponder, UnusedOutlineMouth())) {} }
+            val engines = VoiceEngineFactory {
+                VoiceEngineSet(VoiceEngines(UnusedOutlineEar(), UnusedOutlineResponder, UnusedOutlineMouth())) {}
+            }
             val controller = VoiceModeController(
                 VoiceChatSessions { null },
                 store,
@@ -248,8 +250,9 @@ class VoiceOutlineUiTest {
             assertEquals(role, semantic(base.bar, VoiceOutlineRoleKey), "the outline carries $shown once text is typed ${base.where}")
             assertFixed(base, base.typedOff, "with text while $shown")
         }
-        assertNotEquals(roles[VoiceModeState.Hearing], roles[VoiceModeState.WaitingForReply], "hearing and thinking differ in colour ${base.where}")
-        assertNotEquals(roles[VoiceModeState.Hearing], roles[VoiceModeState.Speaking], "hearing and speaking differ in colour ${base.where}")
+        val hearing = roles[VoiceModeState.Hearing]
+        assertNotEquals(hearing, roles[VoiceModeState.WaitingForReply], "hearing and thinking differ in colour ${base.where}")
+        assertNotEquals(hearing, roles[VoiceModeState.Speaking], "hearing and speaking differ in colour ${base.where}")
     }
 
     /** The outline only draws: the last row, the field and the voice button still take their clicks. */

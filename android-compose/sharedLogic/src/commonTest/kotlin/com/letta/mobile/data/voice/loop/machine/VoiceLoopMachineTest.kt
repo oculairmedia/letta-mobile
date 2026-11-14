@@ -222,7 +222,11 @@ class VoiceLoopMachineTest {
         val barged = speaking.then(heard)
         assertEquals(VoicePhase.LISTENING, barged.model.phase)
         assertEquals(
-            listOf(LoopEffect.StopMouth(SpeechStopReason.BARGE_IN), LoopEffect.SpeechSkipped(SpeechSkipReason.BARGE_IN, 1), LoopEffect.RequestInterrupt(firstTurn)),
+            listOf(
+                LoopEffect.StopMouth(SpeechStopReason.BARGE_IN),
+                LoopEffect.SpeechSkipped(SpeechSkipReason.BARGE_IN, 1),
+                LoopEffect.RequestInterrupt(firstTurn),
+            ),
             barged.effects,
         )
         val next = barged.model.then(

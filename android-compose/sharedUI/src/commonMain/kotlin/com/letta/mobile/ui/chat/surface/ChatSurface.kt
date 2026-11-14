@@ -165,7 +165,6 @@ fun ChatSurface(
     AcknowledgeLaneTranscript(uiState)
     ReleaseImagesOnConversationChange(conversationId)
     val listState = remember(conversationId, pagedTimeline) { LazyListState() }
-    val dockReady = dockGeometry != null
     val dock = rememberChatDockState(dockGeometry ?: ChatDockGeometry.Default, onDockGeometryChange)
     // Picked images encode in the page's scope: a mode switch composes a different composer
     // panel, and the encode must outlive the one that started it.
@@ -183,7 +182,7 @@ fun ChatSurface(
         appearance = appearance,
         platform = stablePlatform,
         companionAnchors = companionAnchors,
-        dock = dock.takeIf { dockReady },
+        dock = dock.takeIf { dockGeometry != null },
         recents = recents,
     )
     val focusHandoff = remember { ComposerFocusHandoff() }

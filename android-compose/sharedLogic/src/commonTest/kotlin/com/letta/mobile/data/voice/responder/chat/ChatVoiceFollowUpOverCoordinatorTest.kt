@@ -48,7 +48,13 @@ internal class ChatVoiceFollowUpOverCoordinatorTest : ChatSendCoordinatorConvers
     private data class Stamp(val run: String, val turn: String)
 
     private fun assistant(id: String, text: String, stamp: Stamp) = WsTimelineEvent.MessageDelta(
-        message = AssistantMessage(id = "$prefix-$id", contentRaw = JsonPrimitive(text), date = DATE, runId = stamp.run, turnId = stamp.turn),
+        message = AssistantMessage(
+            id = "$prefix-$id",
+            contentRaw = JsonPrimitive(text),
+            date = DATE,
+            runId = stamp.run,
+            turnId = stamp.turn,
+        ),
         conversationId = CONV,
         turnId = stamp.turn,
     )

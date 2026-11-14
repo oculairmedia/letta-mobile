@@ -11,6 +11,7 @@ import com.letta.mobile.util.attr
  * field becomes a telemetry attribute of its own kind (text, number, flag, or none). Voice mode only
  * ever reports states, reasons, ids, counts, levels and timings through it.
  */
+@Suppress("SpreadOperator") // Telemetry.event takes varargs; the fields arrive as a list, so one array is built.
 val VoiceModeTelemetry: VoiceTelemetrySink = VoiceTelemetrySink { tag, name, fields ->
     Telemetry.event(tag, name, *Array(fields.size) { index -> fields[index].first attrOf fields[index].second })
 }

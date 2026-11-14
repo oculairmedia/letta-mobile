@@ -292,22 +292,6 @@ class VoiceModeController(
         return LiveVoice(loop, set, job, listOf(follower, tracer, watcher, hearing, playing))
     }
 
-    /**
-     * Steps a [VoiceLevelMeter] toward the latest of [readings] and publishes it into [out]: at most
-     * once per [VoiceLevelMeter.INTERVAL_MILLIS], and only while the level still has somewhere to go
-     * (a steady reading publishes nothing more). Readings arriving faster are conflated to the latest.
-     */
-    private suspend fun publishLevel(readings: Flow<Float>, out: MutableStateFlow<Float>) = coroutineScope {
-        val meter = VoiceLevelMeter()
-        val latest = MutableStateFlow(0f)
-        launch { readings.collect { latest.value = it } }
-        while (true) {
-            val reading = latest.first { !meter.settled(it) }
-            out.value = meter.update(reading, VoiceLevelMeter.INTERVAL_MILLIS)
-            delay(VoiceLevelMeter.INTERVAL_MILLIS)
-        }
-    }
-
     /** Releases the live session, if any (reporting [reason]), and then publishes [next]. Completes even when cancelled. */
     private suspend fun end(next: VoiceModeState, reason: String = SHUTDOWN) = withContext(NonCancellable) {
         val current = live
@@ -354,6 +338,23 @@ class VoiceModeController(
         class Close(val done: CompletableDeferred<Unit>) : Command
     }
 }
+
+/**
+ * Steps a [VoiceLevelMeter] toward the latest of [readings] and publishes it into [out]: at most
+ * once per [VoiceLevelMeter.INTERVAL_MILLIS], and only while the level still has somewhere to go
+ * (a steady reading publishes nothing more). Readings arriving faster are conflated to the latest.
+ */
+private suspend fun publishLevel(readings: Flow<Float>, out: MutableStateFlow<Float>) = coroutineScope {
+    val meter = VoiceLevelMeter()
+    val latest = MutableStateFlow(0f)
+    launch { readings.collect { latest.value = it } }
+    while (true) {
+        val reading = latest.first { !meter.settled(it) }
+        out.value = meter.update(reading, VoiceLevelMeter.INTERVAL_MILLIS)
+        delay(VoiceLevelMeter.INTERVAL_MILLIS)
+    }
+}
+
 
 /**
  * A chat session bound to the conversation it was first seen in. Once the session has moved to

@@ -112,7 +112,7 @@ fun AmbientShaderAgentBackground(
     // adjacent to the theme rather than a palette of its own.
     val onDark = colorScheme.background.luminance() <= 0.5f
     val targetColor = remember(status, colorScheme, identitySeed, onDark, voice) {
-        val hueSource = if (voice?.role == AmbientVoiceRole.You) Color(voice.youTintArgb) else when (status) {
+        val hueSource = youHue(voice) ?: when (status) {
             AmbientAgentStatus.Idle -> Color.Transparent
             AmbientAgentStatus.Running,
             AmbientAgentStatus.Active -> identitySeed ?: colorScheme.primary
@@ -338,6 +338,8 @@ private fun DrawScope.drawAmbientFallback(
         ),
     )
 }
+
+private fun youHue(voice: AmbientVoice?): Color? = voice?.takeIf { it.role == AmbientVoiceRole.You }?.let { Color(it.youTintArgb) }
 
 private fun Color.toOpaqueArgbForTelemetry(): Int = copy(alpha = 1f).toArgb()
 
