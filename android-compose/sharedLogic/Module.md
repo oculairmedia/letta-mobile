@@ -295,6 +295,10 @@ The secret request admin RPC routes and the agent's `secret_request` tool on the
 
 JVM/Android host discovery primes externally created local conversations before wrapper list requests. It bounds and throttles retrievals, invalidates held lists after successful priming, and leaves authorization and output filtering to the owning admin handler.
 
+# Package com.letta.mobile.data.controller.node.iroh.timing
+
+Per-call phase timing for the JVM/Android host's admin RPC router. A handler marks the time it spends waiting on the App Server, discovering conversations or reading the local backend, and a slow call's `handler.slow` event reports those phases and the remaining wrapper work separately. Timing never changes a response.
+
 # Package com.letta.mobile.data.controller.node.iroh.auth
 
 JVM/Android authentication policy values and operator-configuration resolution for Iroh hosts. The sealed `IrohAuthPolicy` contract distinguishes bearer credentials, a vetted peer allowlist, pairing-only access and explicit anonymous test mode; `IrohAuthPolicy.resolve(...)` returns a secure policy, a warned test-only selection or a refusal. This leaf package owns configuration validation and pre-authentication decisions; it must not depend on endpoint lifecycle, verifier state, pairing persistence or RPC handlers. Hosts provide the policy to their connection/authentication boundaries, which own verification, rate limits and revocation.

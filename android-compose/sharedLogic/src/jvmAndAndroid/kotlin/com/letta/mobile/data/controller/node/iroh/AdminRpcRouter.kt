@@ -2,9 +2,11 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.node.iroh.errors.AdminRpcClientError
+import com.letta.mobile.data.controller.node.iroh.timing.AdminRpcPhaseTimings
 import com.letta.mobile.data.transport.iroh.AdminRpcErrors
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -167,11 +169,12 @@ class AdminRpcRouter(
         val handler = checkNotNull(handlers[invocation.method])
         val agentScope = invocation.context.authorizedAgentIds
         val startedNs = System.nanoTime()
+        val phases = AdminRpcPhaseTimings()
         return try {
             val result = AgentScopeGuard.filterResult(
                 agentScope,
                 invocation.method,
-                handler(invocation.params, invocation.context),
+                withContext(phases) { handler(invocation.params, invocation.context) },
             )
             json.encodeToString(
                 kotlinx.serialization.serializer(),
@@ -181,7 +184,7 @@ class AdminRpcRouter(
                     put("success", true)
                     put("result", result)
                 },
-            ).also { response -> reportIfSlow(invocation, startedNs, response.length) }
+            ).also { response -> reportIfSlow(invocation, startedNs, response.length, phases) }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {

@@ -4,7 +4,6 @@ import com.letta.mobile.data.controller.node.listcache.HeldListCache
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonArray
@@ -12,7 +11,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
-/** Primes records created by other local-backend processes before either kind of held list is served. */
+/**
+ * Primes records created by other local-backend processes before either kind of held list is served.
+ * Every record is primed, but [onPrimed] hears only of ids that appeared after the first directory
+ * read: what was already on disk when this host started (a wrapper restart) is not news to clients.
+ */
 internal class ConversationDiscovery(
     private val directory: File,
     val heldList: HeldListCache?,
@@ -23,6 +26,8 @@ internal class ConversationDiscovery(
     private val scanning = Mutex()
     private val known = mutableSetOf<String>()
     private val pending = ArrayDeque<String>()
+    /** Ids on disk at the first successful directory read; null until that read. */
+    private var baseline: Set<String>? = null
     private var lastScanAt: Long? = null
     private var directoryMtime: Long? = null
     private var directoryReadAt: Long? = null
@@ -34,33 +39,44 @@ internal class ConversationDiscovery(
         synchronized(known) { known.addAll(ids) }
     }
 
+    /**
+     * Runs a bounded pass unless one ran within [MIN_INTERVAL_MS]. A call arriving while another
+     * request's pass is retrieving returns at once rather than waiting for it: that pass announces
+     * what it finds and drops the held list, so the caller's list is never held up by it.
+     */
     suspend fun prime(
         authenticated: Boolean,
         warn: (String, Int, Boolean) -> Unit,
         retrieve: suspend (String, Long) -> Boolean,
     ) {
-        if (!authenticated) return
-        scanning.withLock {
-            val now = clock()
-            if (lastScanAt?.let { now - it < MIN_INTERVAL_MS } == true) return
-            lastScanAt = now
-            refreshPending(now, warn)
-            pending.removeAll { isKnown(it) }
-            var failures = 0
-            var timedOut = false
-            repeat(minOf(MAX_PER_PASS, pending.size)) {
-                val remaining = PASS_BUDGET_MS - (clock() - now)
-                if (remaining <= 0) {
-                    timedOut = true
-                    return@repeat
-                }
-                val id = pending.removeFirst()
-                if (isKnown(id)) return@repeat
-                if (!primeOne(id, remaining, retrieve)) failures++
+        if (!authenticated || !scanning.tryLock()) return
+        try {
+            pass(warn, retrieve)
+        } finally {
+            scanning.unlock()
+        }
+    }
+
+    private suspend fun pass(warn: (String, Int, Boolean) -> Unit, retrieve: suspend (String, Long) -> Boolean) {
+        val now = clock()
+        if (lastScanAt?.let { now - it < MIN_INTERVAL_MS } == true) return
+        lastScanAt = now
+        refreshPending(now, warn)
+        pending.removeAll { isKnown(it) }
+        var failures = 0
+        var timedOut = false
+        repeat(minOf(MAX_PER_PASS, pending.size)) {
+            val remaining = PASS_BUDGET_MS - (clock() - now)
+            if (remaining <= 0) {
+                timedOut = true
+                return@repeat
             }
-            if (failures > 0 || timedOut) {
-                warn("conversation_discovery.retrieve_failed", failures, timedOut)
-            }
+            val id = pending.removeFirst()
+            if (isKnown(id)) return@repeat
+            if (!primeOne(id, remaining, retrieve)) failures++
+        }
+        if (failures > 0 || timedOut) {
+            warn("conversation_discovery.retrieve_failed", failures, timedOut)
         }
     }
 
@@ -82,7 +98,7 @@ internal class ConversationDiscovery(
     private suspend fun recordPrimed(id: String) {
         synchronized(known) { known.add(id) }
         heldList?.invalidate()
-        onPrimed(id, null)
+        if (baseline?.contains(id) != true) onPrimed(id, null)
     }
 
     private fun refreshPending(now: Long, warn: (String, Int, Boolean) -> Unit) {
@@ -95,6 +111,7 @@ internal class ConversationDiscovery(
         val modified = directory.lastModified()
         if (directoryMtime == modified && directoryReadAt?.let { now - it < FULL_RECHECK_MS } == true) return
         val ids = readCandidateIds(warn) ?: return
+        if (baseline == null) baseline = ids
         pending.retainAll(ids)
         val queued = pending.toSet()
         ids.sorted().filterNot { it in queued || isKnown(it) }.forEach(pending::addLast)
