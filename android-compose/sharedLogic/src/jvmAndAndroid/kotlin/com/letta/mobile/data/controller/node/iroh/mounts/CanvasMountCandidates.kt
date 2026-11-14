@@ -58,7 +58,8 @@ internal class CanvasMountCandidates(private val authority: HostCanvasMountAutho
     ): List<CanvasMountCandidate> {
         val found = mutableListOf<CanvasMountCandidate>()
         val remaining = entries.iterator()
-        while (found.size < CanvasMountWire.MAX_CANDIDATES && remaining.hasNext()) {
+        // One more than the answer can hold, so an omitted candidate is reported as truncated even without the own canvas.
+        while (found.size <= CanvasMountWire.MAX_CANDIDATES && remaining.hasNext()) {
             val entry = remaining.next()
             if (listing.mayList(request, entry.id) == CanvasMountDecision.ALLOW) found += entry.candidate()
         }

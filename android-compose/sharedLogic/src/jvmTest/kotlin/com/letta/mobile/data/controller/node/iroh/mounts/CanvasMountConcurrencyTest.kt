@@ -9,6 +9,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 private const val PEERS = 8
 private const val ROUNDS = 12
@@ -45,6 +46,9 @@ class CanvasMountConcurrencyTest {
             )
         }.awaitAll()
         assertEquals(setOf(CanvasMountWire.REPLACED), writes.map { it.status }.toSet())
+        // Each key holds one of the canvases written concurrently, read by fresh store instances, before anything rewrites it.
+        assertTrue(MountHarness(root, records = first.records).store().readBinding(AGENT_A, CONV_A) in canvases)
+        assertTrue(MountHarness(root, records = first.records).store().readBinding(AGENT_A, CONV_A2) in canvases)
         val last = canvases.last()
         first.call(CanvasMountRoute.REPLACE, bindingParams(AGENT_A, CONV_A, last), PEER)
         second.call(CanvasMountRoute.REPLACE, bindingParams(AGENT_A, CONV_A2, canvases.first()), PEER)

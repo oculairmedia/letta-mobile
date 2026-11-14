@@ -15,6 +15,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -118,13 +119,19 @@ class CanvasMountFailureTest {
         )
         val holder = granted(MountHarness(root, HarnessOptions(hooks = hooks)))
         val held = async(Dispatchers.Default) { holder.call(CanvasMountRoute.BIND, bindingParams(AGENT_A, CONV_A, FIRST), PEER) }
-        assertTrue(entered.await(10, TimeUnit.SECONDS))
-        val waiter = granted(MountHarness(root, HarnessOptions(deadline = SHORT)))
-        val timedOut = waiter.call(CanvasMountRoute.REPLACE, bindingParams(AGENT_A, CONV_A, NEXT), PEER)
-        assertEquals(unavailable(CanvasMountWire.REASON_TIMEOUT_BEFORE_COMMIT), timedOut.unavailability())
-        release.countDown()
-        assertEquals(CanvasMountWire.BOUND to FIRST.value, held.await().let { it.status to it.canvas })
-        assertEquals(FIRST, waiter.store().readBinding(AGENT_A, CONV_A))
+        try {
+            assertTrue(entered.await(10, TimeUnit.SECONDS))
+            val waiter = granted(MountHarness(root, HarnessOptions(deadline = SHORT)))
+            val timedOut = waiter.call(CanvasMountRoute.REPLACE, bindingParams(AGENT_A, CONV_A, NEXT), PEER)
+            assertEquals(unavailable(CanvasMountWire.REASON_TIMEOUT_BEFORE_COMMIT), timedOut.unavailability())
+            release.countDown()
+            assertEquals(CanvasMountWire.BOUND to FIRST.value, held.await().let { it.status to it.canvas })
+            assertEquals(FIRST, waiter.store().readBinding(AGENT_A, CONV_A))
+        } finally {
+            // A failed assertion must not leave the hook blocked or the held call running.
+            release.countDown()
+            held.cancelAndJoin()
+        }
     }
 
     @Test
@@ -133,9 +140,12 @@ class CanvasMountFailureTest {
         val release = CountDownLatch(1)
         val hooks = DurableHostFileHooks(afterMove = { release.await() })
         val stuck = granted(MountHarness(root, HarnessOptions(hooks = hooks, deadline = SHORT)))
-        val reply = stuck.call(CanvasMountRoute.REPLACE, bindingParams(AGENT_A, CONV_A, NEXT), PEER)
-        assertEquals(CanvasMountWire.OUTCOME_UNKNOWN, reply.status)
-        release.countDown()
+        try {
+            val reply = stuck.call(CanvasMountRoute.REPLACE, bindingParams(AGENT_A, CONV_A, NEXT), PEER)
+            assertEquals(CanvasMountWire.OUTCOME_UNKNOWN, reply.status)
+        } finally {
+            release.countDown()
+        }
         val resolved = granted(MountHarness(root)).call(CanvasMountRoute.RESOLVE, bindingParams(AGENT_A, CONV_A), PEER)
         assertEquals(NEXT.value, resolved.canvas)
     }

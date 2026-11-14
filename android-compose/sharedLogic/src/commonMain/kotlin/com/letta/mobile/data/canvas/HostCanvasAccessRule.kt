@@ -49,13 +49,17 @@ internal val HostCanvasMount.Mounted.canvas: CanvasId get() = CanvasId(canvasId)
  *
  * Its ACL admits no agent (owner the local user, readers that user only, so not public-read): only the mount grant
  * ([mountedHere]) lets an agent use it.
+ *
+ * A conversation's canonical id resolves through its conversation topic first, the same precedence the mount
+ * catalog decides ownership by, so a canvas authorised through one log is never read or written through another
+ * (any signed-in app may bind the canvas topic of a canonical id as well).
  */
 internal suspend fun relayOnlyEntry(store: CanvasRelayStore, canvas: CanvasId): HostCanvasEntry? {
-    val canvasTopic = CanvasRelayProtocol.canvasTopic(canvas)
-    if (store.isBound(canvas)) return transientEntry(canvas, canvasTopic, null)
-    val conversation = canonicalConversationOf(canvas) ?: return null
-    val conversationTopic = CanvasRelayProtocol.conversationTopic(conversation)
-    return if (store.isBound(canvas, conversation)) transientEntry(canvas, conversationTopic, conversation) else null
+    val conversation = canonicalConversationOf(canvas)
+    if (conversation != null && store.isBound(canvas, conversation)) {
+        return transientEntry(canvas, CanvasRelayProtocol.conversationTopic(conversation), conversation)
+    }
+    return if (store.isBound(canvas)) transientEntry(canvas, CanvasRelayProtocol.canvasTopic(canvas), null) else null
 }
 
 /**
