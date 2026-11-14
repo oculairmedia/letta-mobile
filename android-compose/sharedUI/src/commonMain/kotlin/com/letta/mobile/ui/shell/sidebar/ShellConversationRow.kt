@@ -37,6 +37,15 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.shell_canvas_current
+import com.letta.mobile.sharedui.resources.shell_canvas_current_device
+import com.letta.mobile.sharedui.resources.shell_canvas_current_device_state
+import com.letta.mobile.sharedui.resources.shell_canvas_current_state
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Palette
@@ -304,17 +313,37 @@ private fun ArchiveToggleIcon(archived: Boolean, noun: String, onToggle: () -> U
     )
 }
 
+/** What a canvas row offers: archive or restore (null: the host keeps no archive), and the mounted row's way back. */
+class ShellCanvasRowActions(
+    val onArchiveToggle: (() -> Unit)? = null,
+    /** "Use this conversation's own canvas"; only on the canvas mounted for the conversation on screen, else null. */
+    val onUseOwn: (() -> Unit)? = null,
+)
+
 /**
  * One canvas in the library, as a roster row: icon, title, last-edit time. On hover, or while the
  * row has keyboard focus, the icon becomes a one-click archive (or restore), as a conversation's
- * does; its menu ([ShellRowMenus.canvas]) offers the same. A null [onArchiveToggle] (a host with no
- * canvas archive) leaves both out.
+ * does; its menu ([ShellRowMenus.canvas]) offers the same. A null archive (a host with no canvas
+ * archive) leaves both out. The canvas mounted for the conversation on screen reads as current in
+ * words (its subtitle and its state for accessibility), not only in emphasis, and ends with the way
+ * back; a mount held on this device only says so there, and that the agent keeps its own canvas.
  */
 @Composable
-fun ShellCanvasRow(model: ShellCanvasRowModel, row: RosterRowState, onArchiveToggle: (() -> Unit)?) {
+fun ShellCanvasRow(model: ShellCanvasRowModel, row: RosterRowState, actions: ShellCanvasRowActions = ShellCanvasRowActions()) {
     var focused by remember { mutableStateOf(false) }
+    val onArchiveToggle = actions.onArchiveToggle
+    val words = mountedWords(model)
+    val current = stringResource(words.subtitle).takeIf { model.mounted }
+    val currentState = stringResource(words.state)
     RosterListRow(
-        spec = LettaListRowSpec(title = model.title, icon = Lucide.Palette, trailing = model.timeLabel, selected = model.selected),
+        spec = LettaListRowSpec(
+            title = model.title,
+            icon = Lucide.Palette,
+            trailing = model.timeLabel,
+            selected = model.selected,
+            subtitle = current,
+            emphasized = model.mounted,
+        ),
         row = row,
         slots = RosterRowSlots(
             leading = {
@@ -329,9 +358,20 @@ fun ShellCanvasRow(model: ShellCanvasRowModel, row: RosterRowState, onArchiveTog
                     )
                 }
             },
+            end = actions.onUseOwn?.let { useOwn -> { UseOwnCanvasButton(useOwn) } },
         ),
-        modifier = Modifier.onFocusChanged { focused = it.hasFocus },
+        modifier = Modifier
+            .onFocusChanged { focused = it.hasFocus }
+            .semantics { if (model.mounted) stateDescription = currentState },
     )
+}
+
+/** How a mounted canvas row says it is current: a mount on this device only also says the agent keeps its own canvas. */
+private class MountedWords(val subtitle: StringResource, val state: StringResource)
+
+private fun mountedWords(model: ShellCanvasRowModel): MountedWords = when {
+    model.mountedHereOnly -> MountedWords(Res.string.shell_canvas_current_device, Res.string.shell_canvas_current_device_state)
+    else -> MountedWords(Res.string.shell_canvas_current, Res.string.shell_canvas_current_state)
 }
 
 private val PIN_ICON_SIZE = 12.dp

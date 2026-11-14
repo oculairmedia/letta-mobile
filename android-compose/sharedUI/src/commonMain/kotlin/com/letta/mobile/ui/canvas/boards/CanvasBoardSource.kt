@@ -1,5 +1,10 @@
 package com.letta.mobile.ui.canvas.boards
 
+import com.letta.mobile.data.canvas.mount.client.ConversationCanvasPicker
+import com.letta.mobile.ui.canvas.mount.CloseCanvasPaneShownOnBoard
+import com.letta.mobile.ui.canvas.mount.ProvideConversationCanvasPicker
+import com.letta.mobile.ui.shell.sidebar.ShellCanvasPane
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -57,17 +62,25 @@ fun ProvideCanvasBoardSource(sessions: CanvasBoardSessions, content: @Composable
 
 /**
  * A host's canvas services ([ProvideCanvasHost]: its live boards and views) together with the
- * window's table [boards], where every view inside [content] opens boards by id.
+ * window's table [boards], where every view inside [content] opens boards by id, and the window's
+ * [picker] (which board each conversation shows; null is a host without canvas mounts). A host with
+ * a side [pane] of canvases has it closed when the conversation on screen enters canvas mode with
+ * the pane's board mounted: the board behind the chat shows it, so the pane copy closes.
  */
 @Composable
 fun ProvideCanvasHostWithBoards(
     viewers: CanvasDocumentViewerRegistry?,
     boards: CanvasBoardSessions,
+    picker: ConversationCanvasPicker? = null,
+    pane: ShellCanvasPane? = null,
     content: @Composable () -> Unit,
 ) {
     ProvideCanvasHost(boards.registry, viewers) {
         CompositionLocalProvider(LocalCanvasBoardSessions provides boards) {
-            ProvideCanvasBoardSource(boards, content)
+            ProvideConversationCanvasPicker(picker) {
+                if (pane != null) CloseCanvasPaneShownOnBoard(pane)
+                ProvideCanvasBoardSource(boards, content)
+            }
         }
     }
 }

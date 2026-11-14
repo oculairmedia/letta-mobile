@@ -4,6 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.unit.Dp
+import com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 
 /** letta-mobile-bglj6.1: which conversation's board the shared chat page docks under. */
@@ -11,7 +14,9 @@ import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 data class ChatCanvasTarget(
     val agentId: String,
     val conversationId: String?,
-)
+) {
+    val mountTarget: ConversationCanvasTarget? get() = ConversationCanvasTarget.of(AgentId(agentId), conversationId?.let(::ConversationId))
+}
 
 /**
  * letta-mobile-bglj6.1: the app's canvas, drawn by the shared chat page in its docked mode.
