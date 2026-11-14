@@ -19,6 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -40,7 +41,9 @@ internal data class PlayerOptions(
  * An [AudioPlayer] on a blocking [PcmOutputDevice]. It decodes the clip ([ClipDecoder]: WAVE only;
  * anything else is refused with a [VoiceAudioException]), mixes it down to mono, resamples
  * when the line opened at another rate, and writes it in short chunks, reporting each chunk's
- * level. It returns once the line has played everything it was given.
+ * level. It returns once the line has played everything it was given. A line that stops playing
+ * queued audio for the stall timeout fails PLAYBACK_FAILED, also while a write or the end-of-stream
+ * call is still blocked on it (the line is then aborted and released).
  *
  * Cancelling stops at once: the cancelling coroutine aborts the line (stop and discard queued
  * audio), waits for the writer to exit and releases the line before the cancellation completes.
@@ -54,12 +57,15 @@ internal class LinePcmPlayer(
         val line = acquire(options.dispatcher) { device.open(PcmFormat(pcm.format.sampleRateHz)) }
         try {
             coroutineScope {
-                val writer = launch(options.dispatcher) { LineWriter(line, options, onLevel).playAll(pcm) }
+                val progress = WriteProgress()
+                val writer = launch(options.dispatcher) { LineWriter(line, options, onLevel, progress).playAll(pcm) }
+                val watchdog = launch { watchWrites(line, progress, options) }
                 try {
                     writer.join()
                 } finally {
                     if (!writer.isCompleted) line.abort()
                 }
+                watchdog.cancel()
             }
         } finally {
             withContext(options.dispatcher + NonCancellable) { line.release() }
@@ -78,11 +84,39 @@ internal class LinePcmPlayer(
     }
 }
 
+/** How far a writer has got: frames the line accepted, and whether it is still writing (or ending the stream). */
+private class WriteProgress {
+    val queued = AtomicLong()
+
+    @Volatile
+    var writing = true
+}
+
+/**
+ * Fails with PLAYBACK_FAILED when, while the writer is still writing, the line plays none of the
+ * audio it has accepted for the stall timeout: a device that stopped consuming leaves the writer
+ * blocked in a write, where [LineWriter]'s own drain check never runs. Failing cancels the scope,
+ * whose caller aborts the line so the blocked write returns.
+ */
+private suspend fun watchWrites(line: PcmOutputLine, progress: WriteProgress, options: PlayerOptions) {
+    var lastPlayed = line.playedFrames()
+    var stalled = Duration.ZERO
+    while (progress.writing) {
+        delay(options.drainPoll)
+        val played = line.playedFrames()
+        val starved = played == lastPlayed && progress.queued.get() > played
+        stalled = if (starved) stalled + options.drainPoll else Duration.ZERO
+        if (stalled >= options.stallTimeout) throw VoiceAudioException(VoiceErrorCode.PLAYBACK_FAILED)
+        lastPlayed = played
+    }
+}
+
 /** Writes one clip to one line, then waits for it to be played. */
 private class LineWriter(
     private val line: PcmOutputLine,
     private val options: PlayerOptions,
     private val onLevel: (AudioLevel) -> Unit,
+    private val progress: WriteProgress,
 ) {
     private var written = 0L
 
@@ -97,6 +131,7 @@ private class LineWriter(
         }
         resampler?.let { writeFully(it.finish()) }
         line.endOfStream()
+        progress.writing = false
         awaitPlayed()
     }
 
@@ -109,6 +144,7 @@ private class LineWriter(
             if (count < 0) throw VoiceAudioException(VoiceErrorCode.PLAYBACK_FAILED)
             if (count == 0) delay(options.drainPoll)
             offset += count
+            progress.queued.addAndGet(count.toLong())
         }
         written += samples.size
     }

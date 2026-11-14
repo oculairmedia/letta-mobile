@@ -21,8 +21,16 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
-/** How a fake speaker behaves: its rate, and whether writes block until abort or it never plays. */
-private data class SpeakerScript(val rateHz: Int? = null, val blockWrites: Boolean = false, val stuck: Boolean = false)
+/**
+ * How a fake speaker behaves: its rate, whether writes block until abort (all of them, or every one
+ * after the first, like a device that stops consuming) and whether it never plays.
+ */
+private data class SpeakerScript(
+    val rateHz: Int? = null,
+    val blockWrites: Boolean = false,
+    val stuck: Boolean = false,
+    val jamAfterFirstWrite: Boolean = false,
+)
 
 private class FakeSpeaker(private val script: SpeakerScript) : PcmOutputDevice {
     val written = Collections.synchronizedList(mutableListOf<Short>())
@@ -40,7 +48,8 @@ private class FakeSpeaker(private val script: SpeakerScript) : PcmOutputDevice {
 
             override fun write(samples: ShortArray, count: Int): Int {
                 writing.countDown()
-                if (script.blockWrites) return if (aborted.await(5, TimeUnit.SECONDS)) 0 else count
+                val jammed = script.jamAfterFirstWrite && written.isNotEmpty()
+                if (script.blockWrites || jammed) return if (aborted.await(5, TimeUnit.SECONDS)) 0 else count
                 for (index in 0 until count) written += samples[index]
                 return count
             }
@@ -142,6 +151,14 @@ class LinePcmPlayerTest {
         playing.join()
         assertTrue("release" in speaker.events)
         assertTrue(speaker.written.isEmpty())
+    }
+
+    @Test
+    fun aSpeakerThatStopsConsumingMidClipFailsWhileTheWriteIsBlocked() = runBlocking {
+        val speaker = FakeSpeaker(SpeakerScript(stuck = true, jamAfterFirstWrite = true))
+        val error = assertFailsWith<VoiceAudioException> { LinePcmPlayer(speaker, options).play(wavClip(24_000)) { } }
+        assertEquals(VoiceErrorCode.PLAYBACK_FAILED, error.code)
+        assertEquals(listOf("abort", "release"), speaker.events.toList())
     }
 
     @Test
