@@ -9,11 +9,18 @@ import com.letta.mobile.data.canvas.HostCanvasCaller
 import com.letta.mobile.data.canvas.HostCanvasTools
 import com.letta.mobile.data.canvas.mount.AuthorizedCanvasMounts
 import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
+import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -22,11 +29,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 /** An agent no conversation of the harness belongs to. */
 private val AGENT_C = AgentId("agent-c")
@@ -145,7 +147,7 @@ class CanvasMountGrantTest {
         harness.call(CanvasMountRoute.REPLACE, bindingParams(AGENT_A, conversation, canvas), PEER)
 
     private suspend fun call(tool: String, input: JsonObject, agent: AgentId, conversation: ConversationId?): ExternalToolResult =
-        tools.invoke(tool, input, agentId = agent.value, conversationId = conversation?.value)
+        tools.invoke(tool, input, ExternalToolCaller(agent.value, conversation?.value, scopeTrust = CallerScopeTrust.RUNTIME_STAMPED))
 
     private fun named(canvas: CanvasId) = buildJsonObject { put("canvas_id", canvas.value) }
 

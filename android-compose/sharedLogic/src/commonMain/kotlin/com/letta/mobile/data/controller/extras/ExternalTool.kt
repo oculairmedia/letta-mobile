@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.extras
 
+import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
 import com.letta.mobile.data.controller.capability.Capability
 import kotlinx.serialization.json.JsonObject
 
@@ -71,8 +72,10 @@ interface ExternalTool {
 }
 
 /**
- * Who a tool call comes from: the runtime scope the App Server stamped on the request, which the
- * model cannot choose. [agentId] and [conversationId] are null when the frame carried no scope.
+ * Who a tool call comes from. [agentId] and [conversationId] are null when the call carried no scope.
+ * [scopeTrust] says whether that scope is the App Server's runtime stamp (or a live-call token this
+ * host issued), which the model cannot choose, or merely claimed; it is [CallerScopeTrust.CLAIMED]
+ * unless the caller was built from a runtime stamp.
  *
  * [toolCallId] is the request's `tool_call_id`: the id the model's tool call has in the run, the
  * same one the timeline's TOOL_CALL event and its return are keyed. A
@@ -83,6 +86,7 @@ data class ExternalToolCaller(
     val agentId: String?,
     val conversationId: String? = null,
     val toolCallId: String? = null,
+    val scopeTrust: CallerScopeTrust = CallerScopeTrust.CLAIMED,
 )
 
 /**

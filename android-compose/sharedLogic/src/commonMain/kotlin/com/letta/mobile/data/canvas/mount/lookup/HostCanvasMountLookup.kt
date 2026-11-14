@@ -16,8 +16,9 @@ sealed interface HostCanvasMount {
 }
 
 /**
- * Reads, and can never change, the canvas mounted for the agent and conversation the runtime stamped on a call
- * ([C], the host canvas caller); nothing in a tool's input reaches it. Agents cannot mount canvases (owner decision O4).
+ * Reads, and can never change, the canvas mounted for a caller's agent and conversation ([C], the host canvas
+ * caller); nothing in a tool's input reaches it. The canvas backend asks only for a caller whose scope the runtime
+ * stamped or a live-call token vouched for, never for a claimed scope. Agents cannot mount canvases (owner decision O4).
  */
 fun interface HostCanvasMountLookup<in C> {
     /** The mount of [caller]'s own conversation; none for a caller in no conversation. */

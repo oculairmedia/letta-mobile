@@ -18,8 +18,10 @@ import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CoroutineScope
 
 /**
- * The host canvas tools' view of the mount (S1): which canvas the runtime-stamped caller's OWN conversation is
- * mounted on, read through [AuthorizedCanvasMounts] like every other access, never changed (owner decision O4).
+ * The host canvas tools' view of the mount (S1): which canvas a caller's OWN conversation is mounted on, read through
+ * [AuthorizedCanvasMounts] like every other access, never changed (owner decision O4). It reads whatever agent and
+ * conversation the caller names; the canvas backend asks only for a caller whose scope the App Server runtime stamped
+ * or a Meridian live-call token vouched for, and a claimed scope (env-scoped binding, arguments) never reaches it.
  *
  * Each lookup runs as [RuntimeToolAuthority.PRINCIPAL], a host-internal principal that is not a 64-hex endpoint id and
  * so can never be, or be mistaken for, a remote peer. Its authority admits only the caller's own binding and its
@@ -59,7 +61,7 @@ class CanvasMountToolLookup internal constructor(
 }
 
 /**
- * Read-only authority for one tool call: [agent] and [conversation] are the runtime's stamp, never tool input. It
+ * Read-only authority for one tool call: [agent] and [conversation] are the caller's scope (never tool input). It
  * admits exactly that binding and that agent's default, never a proposal, and only for [PRINCIPAL].
  */
 internal class RuntimeToolAuthority(private val agent: AgentId, private val conversation: ConversationId) : CanvasMountAuthority {

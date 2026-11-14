@@ -6,6 +6,7 @@ import com.letta.mobile.data.canvas.compose.ComposeTarget
 import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
 import com.letta.mobile.data.model.AgentId
@@ -31,15 +32,23 @@ private val canvasJson = Json {
  * Server stamped on the tool-call frame. It is never read from the tool input, which the model
  * controls, so a caller cannot name a different agent to read or write as it.
  */
-private class CanvasToolContext(private val tool: BaseCanvasTool, val agentId: String) {
+private class CanvasToolContext(
+    private val tool: BaseCanvasTool,
+    val agentId: String,
+    private val scopeTrust: CallerScopeTrust = CallerScopeTrust.CLAIMED,
+) {
     val store: CanvasDocumentStore get() = tool.store
     val sessions: CanvasSessionRegistry get() = tool.sessions
 
     /** The plugin kinds whose props a plugin element write is held to. */
     val kinds: PluginKindCatalog get() = tool.kinds
 
-    /** The canvas mounted for a conversation; null keeps every conversation on its own board. */
-    val mounts: (suspend (AgentId, ConversationId) -> CanvasId?)? get() = tool.mounts
+    /**
+     * The canvas mounted for a conversation; null keeps every conversation on its own board, as for a caller whose
+     * scope is only claimed, which never follows a mount.
+     */
+    val mounts: (suspend (AgentId, ConversationId) -> CanvasId?)?
+        get() = tool.mounts.takeIf { scopeTrust == CallerScopeTrust.RUNTIME_STAMPED }
 
     fun resolveCallerId(): CanvasActorId = CanvasActorId(agentId)
 }
@@ -369,13 +378,14 @@ abstract class BaseCanvasTool(
 private inline fun BaseCanvasTool.runWithContext(
     agentId: String?,
     failurePrefix: String,
+    scopeTrust: CallerScopeTrust = CallerScopeTrust.CLAIMED,
     action: (CanvasToolContext) -> ExternalToolResult,
 ): ExternalToolResult {
     if (agentId.isNullOrBlank()) {
         return ExternalToolResult.Error("$failurePrefix: canvas tools require an authenticated agent identity")
     }
     return runCatching {
-        action(CanvasToolContext(this, agentId))
+        action(CanvasToolContext(this, agentId, scopeTrust))
     }.getOrElse { ExternalToolResult.Error("$failurePrefix: ${it.message}") }
 }
 
@@ -544,7 +554,11 @@ class CanvasListTool(
     override val inputSchema: JsonObject = CanvasToolContract.list.inputSchema
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
-        runWithContext(agentId, "Failed to list canvases") { context ->
+        invoke(input, ExternalToolCaller(agentId))
+
+    /** The caller's [ExternalToolCaller.scopeTrust] decides whether a conversation's mount is listed for it. */
+    override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult =
+        runWithContext(caller.agentId, "Failed to list canvases", caller.scopeTrust) { context ->
             val ids = executeListCanvases(context, input)
             ExternalToolResult.Success(canvasJson.encodeToString(CanvasListResult(ids = ids)))
         }
@@ -577,7 +591,7 @@ class CanvasComposeTool(
             return ExternalToolResult.Error("$FAILURE: canvas tools require an authenticated agent identity")
         }
         return try {
-            executeCompose(CanvasToolContext(this, agentId), input, caller)
+            executeCompose(CanvasToolContext(this, agentId, caller.scopeTrust), input, caller)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {

@@ -16,6 +16,7 @@ import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountStoreLocatio
 import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountToolLookup
 import com.letta.mobile.data.controller.node.iroh.mounts.directory.CanvasMountDirectory
 import com.letta.mobile.data.controller.node.iroh.mounts.upgrade.CanvasMountDeviceUpgrade
+import com.letta.mobile.data.meridian.endpoint.MeridianCallerBindingMode
 import com.letta.mobile.data.model.HostId
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import java.nio.file.Path
@@ -39,6 +40,18 @@ internal class CanvasMountWiring private constructor(
     val toolLookup: HostCanvasMountLookup<HostCanvasCaller> = CanvasMountToolLookup(location, scope)
 
     /**
+     * The lookup the host canvas tools get under Meridian caller [binding]. Env-scoped binding lets an agent claim any
+     * agent and conversation through its shell environment, so there, as defence in depth beside the backend's own
+     * refusal of claimed scopes, the tools follow no mount at all ([log] says so once); devices' mount routes are
+     * unaffected. Under live-call binding the tools get [toolLookup].
+     */
+    fun toolLookupFor(binding: MeridianCallerBindingMode, log: (String) -> Unit): HostCanvasMountLookup<HostCanvasCaller> {
+        if (binding != MeridianCallerBindingMode.ENV_SCOPED) return toolLookup
+        log(ENV_SCOPED_NOTICE)
+        return HostCanvasMountLookup.none()
+    }
+
+    /**
      * The six canvas mount routes for [policy] (they register nothing under the anonymous test policy); null without an App
      * Server client, whose conversation and agent records the authority needs: incomplete wiring registers nothing.
      */
@@ -48,6 +61,10 @@ internal class CanvasMountWiring private constructor(
         }
 
     companion object {
+        /** The startup line printed when env-scoped Meridian binding turns the tools' mount lookup off. */
+        const val ENV_SCOPED_NOTICE: String = "[iroh-app-server] Canvas mounts: agent canvas tools will NOT follow mounts " +
+            "under --meridian-caller-binding env-scoped (claimed scopes); device mount routes still work"
+
         /** Null unless [options] enable mounts; then requires the secret key file that keeps the host id stable. */
         suspend fun of(options: CanvasMountOptions, productState: Path, records: HostCanvasRecords, scope: CoroutineScope): CanvasMountWiring? {
             if (!options.enabled) return null

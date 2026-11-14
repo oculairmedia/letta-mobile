@@ -1,6 +1,7 @@
 package com.letta.mobile.data.meridian.endpoint
 
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
 import com.letta.mobile.data.meridian.MeridianError
 import com.letta.mobile.data.meridian.MeridianErrorCode
 
@@ -52,8 +53,9 @@ class MeridianCallerBinder(
         val claimedConversation = conversationId?.trim()?.takeIf { it.isNotEmpty() }
         return when {
             live != null -> Result.success(live.toCaller())
+            // The environment's scope is the agent's to set: it names the caller but grants nothing derived from it.
             mode == MeridianCallerBindingMode.ENV_SCOPED && (claimedAgent != null || claimedConversation != null) ->
-                Result.success(ExternalToolCaller(claimedAgent, claimedConversation))
+                Result.success(ExternalToolCaller(claimedAgent, claimedConversation, scopeTrust = CallerScopeTrust.CLAIMED))
             token == null -> denied(
                 "no tool token: meridian runs from an agent's shell tool, which gets LETTA_TOOL_TOKEN for that one call",
             )
@@ -68,6 +70,8 @@ class MeridianCallerBinder(
         // lands on the artifact the native tool would have named; later ones in the same command
         // get their own, or a second compose would answer as a retry of the first.
         toolCallId = if (invocation <= 1) toolCallId else "$toolCallId:$invocation",
+        // The scope is the live call's, as the App Server stamped it; this host issued the token for that call.
+        scopeTrust = CallerScopeTrust.RUNTIME_STAMPED,
     )
 
     private fun <T> denied(message: String): Result<T> = Result.failure(

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
@@ -199,6 +200,8 @@ internal class ExternalToolDispatcher(
                             // letta-mobile-bglj6.12: the model's tool call id, the key the
                             // timeline files this call's return under (canvas_compose's receipt).
                             toolCallId = request.toolCallId,
+                            // The scope is the App Server's own stamp on the frame; without one, nothing is stamped.
+                            scopeTrust = if (request.runtime != null) CallerScopeTrust.RUNTIME_STAMPED else CallerScopeTrust.CLAIMED,
                         ),
                     )
                 } ?: run {

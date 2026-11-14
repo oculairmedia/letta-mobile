@@ -878,7 +878,8 @@ class AppServerServeIrohCommand : CliktCommand(
             store = canvasStore,
             directory = hostCanvases,
             kinds = pluginKinds,
-            mounts = canvasMounts?.toolLookup ?: com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup.none(),
+            mounts = canvasMounts?.toolLookupFor(meridianTools.config(cliServed = agentToolsPolicy.servesCli()).binding, ::println)
+                ?: com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup.none(),
         )
         hostCanvasTools = com.letta.mobile.data.canvas.HostCanvasTools.all(backend)
         pluginCanvas = PluginHostCanvas(backend, assetStore, pluginKinds)

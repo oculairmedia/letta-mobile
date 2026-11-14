@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMount
 import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup
 import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
+import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
 import com.letta.mobile.data.model.CanvasActorId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.CanvasOpId
@@ -14,11 +15,17 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * Who is calling a host canvas tool: the runtime scope the App Server stamped, never the input.
- * [toolCallId] is the call's own id in the run, for a tool that must answer
- * a retried call the same way.
+ * Who is calling a host canvas tool, never read from the tool input. [toolCallId] is the call's own id in the run,
+ * for a tool that must answer a retried call the same way. [scopeTrust] says whether [agentId] and [conversationId]
+ * are the runtime's stamp (or a live-call token's) or merely claimed: grants derived from the conversation's canvas
+ * mount apply only to a [CallerScopeTrust.RUNTIME_STAMPED] caller.
  */
-data class HostCanvasCaller(val agentId: String, val conversationId: String? = null, val toolCallId: String? = null) {
+data class HostCanvasCaller(
+    val agentId: String,
+    val conversationId: String? = null,
+    val toolCallId: String? = null,
+    val scopeTrust: CallerScopeTrust = CallerScopeTrust.CLAIMED,
+) {
     /** [agentId] as the actor its canvas ops are stamped with. */
     val actor: CanvasActorId get() = CanvasActorId(agentId)
 }

@@ -12,11 +12,18 @@ import com.letta.mobile.data.canvas.HostCanvasEntry
 import com.letta.mobile.data.canvas.HostCanvasTools
 import com.letta.mobile.data.canvas.mount.AuthorizedCanvasMounts
 import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
+import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -25,11 +32,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 /** Agent A's canonical canvas id, which a device proposes for agent B's conversation. */
 private val A_CANONICAL = CanvasId.forConversation(CONV_A)
@@ -110,7 +112,7 @@ class CanvasMountCanonicalIdTest {
     }
 
     private suspend fun tool(name: String, input: JsonObject, agent: AgentId, conversation: ConversationId): ExternalToolResult =
-        tools.invoke(name, input, agentId = agent.value, conversationId = conversation.value)
+        tools.invoke(name, input, ExternalToolCaller(agent.value, conversation.value, scopeTrust = CallerScopeTrust.RUNTIME_STAMPED))
 
     private fun ops(text: String) = buildJsonObject {
         put(

@@ -1,8 +1,11 @@
 package com.letta.mobile.cli.commands.mounts
 
+import com.letta.mobile.data.canvas.HostCanvasCaller
 import com.letta.mobile.data.canvas.InMemoryCanvasRelayStore
 import com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory
+import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMount
 import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
+import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
 import com.letta.mobile.data.controller.node.iroh.AdminRpcHostServices
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
@@ -13,6 +16,7 @@ import com.letta.mobile.data.controller.node.iroh.NoConversationViewers
 import com.letta.mobile.data.controller.node.iroh.PairedPeer
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.mounts.upgrade.CanvasMountDeviceUpgrade
+import com.letta.mobile.data.meridian.endpoint.MeridianCallerBindingMode
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import java.lang.reflect.Proxy
 import java.nio.file.Files
@@ -85,6 +89,23 @@ class CanvasMountWiringTest {
         assertEquals(CanvasMountDeviceUpgrade.Outcome.Applied(upgraded = 1), upgradePairedDevicesForCanvasMounts(enabled, peers))
         assertEquals(IrohPeerCapabilities.CHAT_ROLE + IrohPeerCapabilities.MOUNT_CAPABILITIES, FilePairedPeerStore(peers).get("phone")?.capabilities)
         assertEquals(CanvasMountDeviceUpgrade.Outcome.AlreadyApplied, upgradePairedDevicesForCanvasMounts(enabled, peers))
+    }
+
+    @Test
+    fun withTheFlagAndEnvScopedMeridianBindingTheToolsFollowNoMountAndSaySo() = runBlocking {
+        val wiring = enabled()
+        val logged = mutableListOf<String>()
+        val claimedPair = HostCanvasCaller("agent-a", "conv-a", scopeTrust = CallerScopeTrust.RUNTIME_STAMPED)
+
+        val envScoped = wiring.toolLookupFor(MeridianCallerBindingMode.ENV_SCOPED, logged::add)
+        val liveCall = wiring.toolLookupFor(MeridianCallerBindingMode.LIVE_CALL, logged::add)
+
+        assertEquals(HostCanvasMount.None, envScoped.mounted(claimedPair), "env-scoped: the tools get no mount lookup")
+        assertEquals(listOf(CanvasMountWiring.ENV_SCOPED_NOTICE), logged, "one clear startup line, and only for env-scoped")
+        assertTrue(liveCall === wiring.toolLookup, "live-call: the tools follow mounts")
+        // Devices' mount routes are unaffected by the binding.
+        val router = router(wiring.routes(IrohAuthPolicy.PairedPeersOnly, client(), NoConversationViewers))
+        assertTrue(router.registeredMethods.containsAll(CanvasMountWire.METHODS))
     }
 
     private suspend fun enabled(): CanvasMountWiring =

@@ -7,18 +7,19 @@ import com.letta.mobile.data.canvas.mount.client.FakeCanvasMountClient
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 /** The app's canvas tools default to the board the person sees: the conversation's mount, else its own. */
 class CanvasToolsFollowMountTest {
@@ -42,14 +43,18 @@ class CanvasToolsFollowMountTest {
         }
     }
 
-    private suspend fun compose(): ExternalToolResult = registry.invoke(
+    private suspend fun compose(trust: CallerScopeTrust = CallerScopeTrust.RUNTIME_STAMPED): ExternalToolResult = registry.invoke(
         CanvasToolContract.COMPOSE,
         Json.parseToJsonElement("""{"items":[{"kind":"NOTE","markdown":"From the agent"}]}""").jsonObject,
-        ExternalToolCaller(agentId = AGENT, conversationId = CONVERSATION, toolCallId = "call-1"),
+        ExternalToolCaller(agentId = AGENT, conversationId = CONVERSATION, toolCallId = "call-1", scopeTrust = trust),
     )
 
-    private suspend fun listed(): String = assertIs<ExternalToolResult.Success>(
-        registry.invoke(CanvasToolContract.LIST, JsonObject(mapOf("conversation_id" to JsonPrimitive(CONVERSATION))), AGENT),
+    private suspend fun listed(trust: CallerScopeTrust = CallerScopeTrust.RUNTIME_STAMPED): String = assertIs<ExternalToolResult.Success>(
+        registry.invoke(
+            CanvasToolContract.LIST,
+            JsonObject(mapOf("conversation_id" to JsonPrimitive(CONVERSATION))),
+            ExternalToolCaller(agentId = AGENT, scopeTrust = trust),
+        ),
     ).content
 
     @Test
@@ -68,6 +73,16 @@ class CanvasToolsFollowMountTest {
         boards()
         assertEquals(own.value, receipt(compose()).canvasId)
         assertTrue(own.value in listed())
+    }
+
+    @Test
+    fun aCallerWhoseScopeIsOnlyClaimedStaysOnItsOwnBoard() = runTest {
+        boards()
+        client.stored[target] = mounted
+
+        assertEquals(own.value, receipt(compose(CallerScopeTrust.CLAIMED)).canvasId)
+        assertEquals(1L, store.get(mounted)!!.revision)
+        assertTrue(mounted.value !in listed(CallerScopeTrust.CLAIMED))
     }
 
     private companion object {

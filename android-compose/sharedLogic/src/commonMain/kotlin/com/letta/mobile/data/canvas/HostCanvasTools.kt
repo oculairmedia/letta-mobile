@@ -229,7 +229,7 @@ private class HostCanvasTool(
             return ExternalToolResult.Error("$failurePrefix: canvas tools require an authenticated agent identity")
         }
         return try {
-            run(HostCanvasCaller(agentId, caller.conversationId, caller.toolCallId), input)
+            run(HostCanvasCaller(agentId, caller.conversationId, caller.toolCallId, caller.scopeTrust), input)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {

@@ -9,21 +9,23 @@ import com.letta.mobile.data.canvas.InMemoryCanvasRelayStore
 import com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory
 import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMount
 import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup
+import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.PLUGIN_ID
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.catalog
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.place
 import com.letta.mobile.plugin.api.PluginEmit
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 /**
  * Documents CURRENT behaviour, pending an owner decision: plugin placement inherits the canvas mount grant of the
- * call it is attributed to. A plugin called by agent A in conversation A, which is mounted on agent B's board, places
- * on B's board, and so does that plugin's later background emit (attributed to the last caller once no call is in
- * flight). The grant still follows the live mount: once the mount is gone, the same emit lands on A's own board.
+ * call it is attributed to, when that call's scope was stamped by the runtime. A plugin called by agent A in
+ * conversation A, which is mounted on agent B's board, places on B's board, and so does that plugin's later
+ * background emit (attributed to the last caller once no call is in flight). The grant still follows the live mount:
+ * once the mount is gone, the same emit lands on A's own board. A call whose scope is only claimed inherits nothing.
  * If the owner decides placement must not inherit the grant, this test changes with that decision.
  */
 class PluginPlacementMountGrantTest {
@@ -50,7 +52,7 @@ class PluginPlacementMountGrantTest {
         val othersBoard = backend.create(HostCanvasCaller(AGENT_B, CONVERSATION_B), "Agent B's board")
         mounted = othersBoard.id
 
-        val call = board.begin(HostCanvasCaller(AGENT_A, CONVERSATION_A))
+        val call = board.begin(HostCanvasCaller(AGENT_A, CONVERSATION_A, scopeTrust = CallerScopeTrust.RUNTIME_STAMPED))
         placement.emit(PluginEmit(place = listOf(place()), callId = call.value))
         board.end(call)
         assertEquals(1, placedOn(othersBoard), "the call's emit lands on the board mounted for its conversation")
@@ -65,6 +67,20 @@ class PluginPlacementMountGrantTest {
         assertEquals(2, placedOn(othersBoard))
         val own = checkNotNull(directory.forConversation(com.letta.mobile.data.model.ConversationId(CONVERSATION_A)))
         assertTrue(placedOn(own) >= 1)
+    }
+
+    @Test
+    fun aPluginCallWithAClaimedScopeInheritsNoMountGrant() = runTest {
+        val othersBoard = backend.create(HostCanvasCaller(AGENT_B, CONVERSATION_B), "Agent B's board")
+        mounted = othersBoard.id
+
+        val call = board.begin(HostCanvasCaller(AGENT_A, CONVERSATION_A, scopeTrust = CallerScopeTrust.CLAIMED))
+        placement.emit(PluginEmit(place = listOf(place()), callId = call.value))
+        board.end(call)
+
+        assertEquals(0, placedOn(othersBoard), "a claimed scope never reaches the board mounted for it")
+        val own = checkNotNull(directory.forConversation(com.letta.mobile.data.model.ConversationId(CONVERSATION_A)))
+        assertEquals(1, placedOn(own))
     }
 
     private suspend fun placedOn(entry: HostCanvasEntry): Int =
