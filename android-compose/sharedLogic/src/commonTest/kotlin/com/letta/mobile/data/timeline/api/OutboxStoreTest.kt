@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline.api
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
 import com.letta.mobile.data.timeline.InMemoryTimelineStore
+import com.letta.mobile.data.timeline.engineTransaction
 import com.letta.mobile.data.timeline.OutboxStore
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.test.runTest
@@ -119,11 +120,11 @@ internal class OutboxStoreTest {
     fun anEchoIsConfirmedInsideTheTransactionThatWritesIt() = runTest {
         outbox.enqueue(scope, prompt)
         val revision = ledger.current.revision
-        val confirmed = ledger.transaction(scope) { confirmOutboxEcho(this, "otid-1", now) }
+        val confirmed = ledger.engineTransaction(scope) { confirmOutboxEcho(this, "otid-1", now) }
         assertTrue(confirmed)
         assertEquals(revision, ledger.current.revision)
         assertEquals(emptyList(), outbox.load(scope))
-        assertEquals(false, ledger.transaction(scope) { confirmOutboxEcho(this, "otid-1", now) })
+        assertEquals(false, ledger.engineTransaction(scope) { confirmOutboxEcho(this, "otid-1", now) })
     }
 
     @Test

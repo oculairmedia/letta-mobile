@@ -269,12 +269,12 @@ class TimelineExactCanonicalWriterTest {
         val live = kotlin.test.assertNotNull(message("same response").toTimelineEvent(0.0)).copy(
             serverId = "cm-stream-provider-assistant-0-segment-a", otid = "provider-assistant-0-segment-a",
         )
-        store.transaction(scope) { writer.mergeEvent(this, live) }
+        store.engineTransaction(scope) { writer.mergeEvent(this, live) }
         // A history producer preserving the exact segment OTID reconciles without text heuristics.
-        store.transaction(scope) { writer.mergeEvent(this, live.copy(serverId = "ui-msg-a")) }
+        store.engineTransaction(scope) { writer.mergeEvent(this, live.copy(serverId = "ui-msg-a")) }
         assertEquals(1, store.rows.size)
         // Same content and run with independent provenance must remain a separate response.
-        store.transaction(scope) { writer.mergeEvent(this, live.copy(serverId = "ui-msg-b", otid = "ui-msg-b")) }
+        store.engineTransaction(scope) { writer.mergeEvent(this, live.copy(serverId = "ui-msg-b", otid = "ui-msg-b")) }
         assertEquals(2, store.rows.size)
     }
 
@@ -678,7 +678,7 @@ class TimelineExactCanonicalWriterTest {
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
         val local = CanonicalPendingLocalStore.Record("local", "hello", emptyList(), "2026-01-01T00:00:00Z")
         pending.save(scope, local)
-        store.transaction(scope) {
+        store.engineTransaction(scope) {
             writer.merge(this, TimelineRemoteRecord(TimelineMessageId("id"), message("reply").copy(otid = "assistant-local"), 0))
         }
         assertEquals(listOf(local), pending.load(scope))
@@ -688,17 +688,17 @@ class TimelineExactCanonicalWriterTest {
         )
         val record = TimelineRemoteRecord(TimelineMessageId("user"), echo, 0)
         kotlin.test.assertFailsWith<IllegalStateException> {
-            store.transaction(scope) {
+            store.engineTransaction(scope) {
                 writer.merge(this, record)
                 error("simulated commit failure")
             }
         }
         assertEquals(listOf(local), pending.load(scope))
         assertEquals(1, store.rows.size)
-        store.transaction(scope) { assertTrue(writer.merge(this, record)) }
+        store.engineTransaction(scope) { assertTrue(writer.merge(this, record)); true }
         assertEquals(emptyList(), pending.load(scope))
         pending.save(scope, local)
-        store.transaction(scope) { assertTrue(writer.merge(this, record)) }
+        store.engineTransaction(scope) { assertTrue(writer.merge(this, record)); true }
         assertEquals(emptyList(), pending.load(scope))
         assertEquals(2, store.rows.size)
     }
@@ -855,14 +855,14 @@ class TimelineExactCanonicalWriterTest {
     @Test fun historicalCorrectionReadsOneBodyAmong28kRows() = runTest {
         val store = InMemoryTimelineStore()
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
-        store.transaction(scope) { writer.merge(this, TimelineRemoteRecord(TimelineMessageId("id"), message("hello"), 0)) }
+        store.engineTransaction(scope) { writer.merge(this, TimelineRemoteRecord(TimelineMessageId("id"), message("hello"), 0)) }
         val seed = store.rows.values.single()
         repeat(28_000) { index ->
             val key = TimelinePageKey(index.toLong(), TimelineMessageId("history-$index"))
             store.rows[key] = seed.copy(key = key)
         }
         store.bodyReads = 0
-        store.transaction(scope) { writer.merge(this, TimelineRemoteRecord(TimelineMessageId("id"), message("hello world"), 0)) }
+        store.engineTransaction(scope) { writer.merge(this, TimelineRemoteRecord(TimelineMessageId("id"), message("hello world"), 0)) }
         assertEquals(1, store.bodyReads)
         assertEquals(28_001, store.rows.size)
     }
@@ -1137,7 +1137,7 @@ class TimelineExactCanonicalWriterTest {
             id = streamedId, contentRaw = kotlinx.serialization.json.JsonPrimitive("hello"),
             date = "2026-01-01T00:00:00Z", logicalMessageId = "server-reply-assistant",
         )
-        store.transaction(scope) {
+        store.engineTransaction(scope) {
             TimelineExactCanonicalWriter(scope, 100_000)
                 .merge(this, TimelineRemoteRecord(TimelineMessageId(streamedId), streamed, 0))
         }
@@ -1148,7 +1148,7 @@ class TimelineExactCanonicalWriterTest {
         val store = InMemoryTimelineStore()
         // Re-merging a row whose name is already canonical, as a migration replay does, must not
         // accumulate evidence: the two names do not differ, so there is nothing to record.
-        store.transaction(scope) {
+        store.engineTransaction(scope) {
             TimelineExactCanonicalWriter(scope, 100_000)
                 .merge(this, TimelineRemoteRecord(TimelineMessageId("id"), message("hello"), 0))
         }
@@ -1309,9 +1309,9 @@ class TimelineExactCanonicalWriterTest {
         pending.save(scope, second)
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
         fun echo(id: String, otid: String) = UserMessage(id = id, contentRaw = kotlinx.serialization.json.JsonPrimitive("same text"), otid = otid, date = sentAt)
-        store.transaction(scope) { writer.merge(this, record(echo("server-1", first.otid))) }
+        store.engineTransaction(scope) { writer.merge(this, record(echo("server-1", first.otid))) }
         assertEquals(listOf(second.otid), pending.load(scope).map { it.otid })
-        store.transaction(scope) { writer.merge(this, record(echo("server-2", second.otid))) }
+        store.engineTransaction(scope) { writer.merge(this, record(echo("server-2", second.otid))) }
         assertEquals(emptyList(), pending.load(scope))
         val engine = CanonicalTimelineEngine(store, writer, enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection

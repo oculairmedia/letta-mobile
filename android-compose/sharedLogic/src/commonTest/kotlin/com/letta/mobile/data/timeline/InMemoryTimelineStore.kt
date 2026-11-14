@@ -128,3 +128,11 @@ internal class InMemoryTimelineStore(
         }
     }
 }
+
+/** Runs the same change/revision contract the canonical engine applies around a writer. */
+internal suspend fun InMemoryTimelineStore.engineTransaction(
+    scope: TimelineScope,
+    block: suspend TimelineStoreTransaction.() -> Boolean,
+): Boolean = transaction(scope) {
+    block().also { changed -> if (changed) nextRevision() }
+}
