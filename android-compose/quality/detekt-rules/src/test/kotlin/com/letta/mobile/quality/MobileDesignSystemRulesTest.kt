@@ -135,8 +135,9 @@ class MobileDesignSystemRulesTest {
             val h = Modifier.clickable(source, null, true, null, buttonRole) { open() }
             val i = Modifier.clickable(source, null) { open() }
             val j = Modifier.clickable(source, null, true) { open() }
+            val k = Modifier.clickable(source, null, enabled) { open() }
         """.trimIndent()
-        assertEquals(5, BareClickable().lintAt(root, FEATURE, code).size)
+        assertEquals(6, BareClickable().lintAt(root, FEATURE, code).size)
         assertEquals(0, BareClickable().lintAt(root, COMPONENT, code).size)
         assertEquals(0, BareClickable().lintAt(root, NOT_UI, code).size)
     }

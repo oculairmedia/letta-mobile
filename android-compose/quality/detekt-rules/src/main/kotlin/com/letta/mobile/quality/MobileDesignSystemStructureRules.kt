@@ -230,29 +230,29 @@ internal class BareClickable(config: Config = Config.empty) : MobileRule(
         )
     }
 
-    private fun KtCallExpression.isBareClickable(): Boolean =
-        calleeName() == "clickable" && roleArgument() in NOT_A_ROLE
-
-    // A literal in the role slot is no role: null, or the `enabled` flag of the interactionSource
-    // overload, as in `clickable(source, null, true)`.
+    private fun KtCallExpression.isBareClickable(): Boolean = calleeName() == "clickable" && !declaresRole()
 
     /**
-     * The role argument's text: named, or positional at the role slot of the two overloads,
-     * `clickable(enabled, onClickLabel, role, onClick)` and
-     * `clickable(interactionSource, indication, enabled, onClickLabel, role, onClick)`.
+     * A named `role =` other than `null`, or a positional value that names a role (`Role.Button`,
+     * `buttonRole`) in the role slot of either overload: `clickable(enabled, onClickLabel, role, onClick)`
+     * or `clickable(interactionSource, indication, enabled, onClickLabel, role, onClick)`.
+     *
+     * Without type resolution a positional value cannot be told apart from the `enabled` flag of the
+     * second overload (`clickable(source, null, enabled)`), so it only counts when its text names a
+     * role. Anything else is reported; writing `role = ...` as a named argument resolves it.
      */
-    private fun KtCallExpression.roleArgument(): String? {
-        valueArguments.firstOrNull { it.name() == "role" }?.let { return it.getArgumentExpression()?.text }
+    private fun KtCallExpression.declaresRole(): Boolean {
+        val named = valueArguments.firstOrNull { it.name() == "role" }
+        if (named != null) return named.getArgumentExpression()?.text != "null"
         val positional = valueArguments
             .filter { it.name() == null && it !is KtLambdaArgument }
-            .map { it.getArgumentExpression()?.text }
+            .map { it.getArgumentExpression()?.text.orEmpty() }
         val slot = if (positional.size > INDICATION_ROLE_SLOT) INDICATION_ROLE_SLOT else ENABLED_ROLE_SLOT
-        return positional.getOrNull(slot)
+        return positional.getOrNull(slot)?.contains("role", ignoreCase = true) == true
     }
 
     private companion object {
         const val ENABLED_ROLE_SLOT = 2
         const val INDICATION_ROLE_SLOT = 4
-        val NOT_A_ROLE = setOf(null, "null", "true", "false")
     }
 }
