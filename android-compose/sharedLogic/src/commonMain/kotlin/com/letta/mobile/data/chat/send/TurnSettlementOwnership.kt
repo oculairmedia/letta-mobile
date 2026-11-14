@@ -34,6 +34,7 @@ internal class TurnSettlementOwnership(
                 "otid" attr (state.otid ?: ""),
             )
         }
+        state.ownRun.end()
         state.retainSettledRun()
         state.otid?.let { retainSettledOtid(QueuedSendId(it)) }
         state.otid = null

@@ -5390,6 +5390,13 @@ abstract interface com.letta.mobile.data.chat.send/ChatSendUiSink { // com.letta
     abstract fun onUsage(kotlin/Int, kotlin/Int, kotlin/Int) // com.letta.mobile.data.chat.send/ChatSendUiSink.onUsage|onUsage(kotlin.Int;kotlin.Int;kotlin.Int){}[0]
 }
 
+abstract interface com.letta.mobile.data.chat.sentruns/IdentifiedChatSend { // com.letta.mobile.data.chat.sentruns/IdentifiedChatSend|null[0]
+    abstract val sentRuns // com.letta.mobile.data.chat.sentruns/IdentifiedChatSend.sentRuns|{}sentRuns[0]
+        abstract fun <get-sentRuns>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.chat.sentruns/SentMessageRuns> // com.letta.mobile.data.chat.sentruns/IdentifiedChatSend.sentRuns.<get-sentRuns>|<get-sentRuns>(){}[0]
+
+    abstract suspend fun sendIdentified(kotlin/String): com.letta.mobile.data.chat.sentruns/SentMessageId? // com.letta.mobile.data.chat.sentruns/IdentifiedChatSend.sendIdentified|sendIdentified(kotlin.String){}[0]
+}
+
 abstract interface com.letta.mobile.data.chat.tools/CommandPresenter { // com.letta.mobile.data.chat.tools/CommandPresenter|null[0]
     abstract val id // com.letta.mobile.data.chat.tools/CommandPresenter.id|{}id[0]
         abstract fun <get-id>(): kotlin/String // com.letta.mobile.data.chat.tools/CommandPresenter.id.<get-id>|<get-id>(){}[0]
@@ -36730,6 +36737,8 @@ final class com.letta.mobile.data.chat.send/ChatSendCoordinator { // com.letta.m
 
     final val eventSubscription // com.letta.mobile.data.chat.send/ChatSendCoordinator.eventSubscription|{}eventSubscription[0]
         final fun <get-eventSubscription>(): com.letta.mobile.data.chat.send/ChatSendEventSubscription // com.letta.mobile.data.chat.send/ChatSendCoordinator.eventSubscription.<get-eventSubscription>|<get-eventSubscription>(){}[0]
+    final val identifiedSend // com.letta.mobile.data.chat.send/ChatSendCoordinator.identifiedSend|{}identifiedSend[0]
+        final fun <get-identifiedSend>(): com.letta.mobile.data.chat.sentruns/IdentifiedChatSend // com.letta.mobile.data.chat.send/ChatSendCoordinator.identifiedSend.<get-identifiedSend>|<get-identifiedSend>(){}[0]
     final val sendQueue // com.letta.mobile.data.chat.send/ChatSendCoordinator.sendQueue|{}sendQueue[0]
         final fun <get-sendQueue>(): com.letta.mobile.data.chat.send/ChatSendQueueControls // com.letta.mobile.data.chat.send/ChatSendCoordinator.sendQueue.<get-sendQueue>|<get-sendQueue>(){}[0]
 
@@ -36868,6 +36877,25 @@ final class com.letta.mobile.data.chat.send/ScopedRuntimeEvent { // com.letta.mo
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.send/ScopedRuntimeEvent.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.send/ScopedRuntimeEvent.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.send/ScopedRuntimeEvent.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.chat.sentruns/SentMessageRuns { // com.letta.mobile.data.chat.sentruns/SentMessageRuns|null[0]
+    constructor <init>(kotlin.collections/Map<com.letta.mobile.data.chat.sentruns/SentMessageId, kotlin.collections/Set<com.letta.mobile.data.chat.sentruns/SentRunId>> = ..., kotlin.collections/Set<com.letta.mobile.data.chat.sentruns/SentRunId> = ..., kotlin.collections/Set<com.letta.mobile.data.chat.sentruns/SentRunId> = ...) // com.letta.mobile.data.chat.sentruns/SentMessageRuns.<init>|<init>(kotlin.collections.Map<com.letta.mobile.data.chat.sentruns.SentMessageId,kotlin.collections.Set<com.letta.mobile.data.chat.sentruns.SentRunId>>;kotlin.collections.Set<com.letta.mobile.data.chat.sentruns.SentRunId>;kotlin.collections.Set<com.letta.mobile.data.chat.sentruns.SentRunId>){}[0]
+
+    final val active // com.letta.mobile.data.chat.sentruns/SentMessageRuns.active|{}active[0]
+        final fun <get-active>(): kotlin.collections/Set<com.letta.mobile.data.chat.sentruns/SentRunId> // com.letta.mobile.data.chat.sentruns/SentMessageRuns.active.<get-active>|<get-active>(){}[0]
+    final val failed // com.letta.mobile.data.chat.sentruns/SentMessageRuns.failed|{}failed[0]
+        final fun <get-failed>(): kotlin.collections/Set<com.letta.mobile.data.chat.sentruns/SentRunId> // com.letta.mobile.data.chat.sentruns/SentMessageRuns.failed.<get-failed>|<get-failed>(){}[0]
+    final val started // com.letta.mobile.data.chat.sentruns/SentMessageRuns.started|{}started[0]
+        final fun <get-started>(): kotlin.collections/Map<com.letta.mobile.data.chat.sentruns/SentMessageId, kotlin.collections/Set<com.letta.mobile.data.chat.sentruns/SentRunId>> // com.letta.mobile.data.chat.sentruns/SentMessageRuns.started.<get-started>|<get-started>(){}[0]
+
+    final fun component1(): kotlin.collections/Map<com.letta.mobile.data.chat.sentruns/SentMessageId, kotlin.collections/Set<com.letta.mobile.data.chat.sentruns/SentRunId>> // com.letta.mobile.data.chat.sentruns/SentMessageRuns.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/Set<com.letta.mobile.data.chat.sentruns/SentRunId> // com.letta.mobile.data.chat.sentruns/SentMessageRuns.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/Set<com.letta.mobile.data.chat.sentruns/SentRunId> // com.letta.mobile.data.chat.sentruns/SentMessageRuns.component3|component3(){}[0]
+    final fun copy(kotlin.collections/Map<com.letta.mobile.data.chat.sentruns/SentMessageId, kotlin.collections/Set<com.letta.mobile.data.chat.sentruns/SentRunId>> = ..., kotlin.collections/Set<com.letta.mobile.data.chat.sentruns/SentRunId> = ..., kotlin.collections/Set<com.letta.mobile.data.chat.sentruns/SentRunId> = ...): com.letta.mobile.data.chat.sentruns/SentMessageRuns // com.letta.mobile.data.chat.sentruns/SentMessageRuns.copy|copy(kotlin.collections.Map<com.letta.mobile.data.chat.sentruns.SentMessageId,kotlin.collections.Set<com.letta.mobile.data.chat.sentruns.SentRunId>>;kotlin.collections.Set<com.letta.mobile.data.chat.sentruns.SentRunId>;kotlin.collections.Set<com.letta.mobile.data.chat.sentruns.SentRunId>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.sentruns/SentMessageRuns.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.sentruns/SentMessageRuns.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.chat.sentruns/SentMessageRuns.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.data.chat.tools.shell/ShellCommand { // com.letta.mobile.data.chat.tools.shell/ShellCommand|null[0]
@@ -69532,6 +69560,20 @@ final class com.letta.mobile.data.voice.loop/VoiceLoopState { // com.letta.mobil
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.loop/VoiceLoopState.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.voice.responder.chat/ChatSendRefusedException : kotlin/IllegalStateException { // com.letta.mobile.data.voice.responder.chat/ChatSendRefusedException|null[0]
+    constructor <init>() // com.letta.mobile.data.voice.responder.chat/ChatSendRefusedException.<init>|<init>(){}[0]
+}
+
+final class com.letta.mobile.data.voice.responder.chat/ChatVoiceChatSession : com.letta.mobile.data.voice.responder/VoiceChatSession { // com.letta.mobile.data.voice.responder.chat/ChatVoiceChatSession|null[0]
+    constructor <init>(com.letta.mobile.ui.chat.session/ChatSessionPort, com.letta.mobile.data.chat.sentruns/IdentifiedChatSend, kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.model/ConversationId?>) // com.letta.mobile.data.voice.responder.chat/ChatVoiceChatSession.<init>|<init>(com.letta.mobile.ui.chat.session.ChatSessionPort;com.letta.mobile.data.chat.sentruns.IdentifiedChatSend;kotlinx.coroutines.flow.StateFlow<com.letta.mobile.data.model.ConversationId?>){}[0]
+
+    final val state // com.letta.mobile.data.voice.responder.chat/ChatVoiceChatSession.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.voice.responder/VoiceChatState> // com.letta.mobile.data.voice.responder.chat/ChatVoiceChatSession.state.<get-state>|<get-state>(){}[0]
+
+    final fun stopRun() // com.letta.mobile.data.voice.responder.chat/ChatVoiceChatSession.stopRun|stopRun(){}[0]
+    final suspend fun send(com.letta.mobile.data.voice/VoiceText): com.letta.mobile.data.voice.responder/SentUtterance // com.letta.mobile.data.voice.responder.chat/ChatVoiceChatSession.send|send(com.letta.mobile.data.voice.VoiceText){}[0]
+}
+
 final class com.letta.mobile.data.voice.responder/ChatReplyPolicy { // com.letta.mobile.data.voice.responder/ChatReplyPolicy|null[0]
     constructor <init>(kotlin.time/Duration = ..., kotlin.time/Duration = ...) // com.letta.mobile.data.voice.responder/ChatReplyPolicy.<init>|<init>(kotlin.time.Duration;kotlin.time.Duration){}[0]
 
@@ -72596,6 +72638,28 @@ final value class com.letta.mobile.data.chat.send/QueuedSendId { // com.letta.mo
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.send/QueuedSendId.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.send/QueuedSendId.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.send/QueuedSendId.toString|toString(){}[0]
+}
+
+final value class com.letta.mobile.data.chat.sentruns/SentMessageId { // com.letta.mobile.data.chat.sentruns/SentMessageId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.chat.sentruns/SentMessageId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.chat.sentruns/SentMessageId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.chat.sentruns/SentMessageId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.sentruns/SentMessageId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.sentruns/SentMessageId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.chat.sentruns/SentMessageId.toString|toString(){}[0]
+}
+
+final value class com.letta.mobile.data.chat.sentruns/SentRunId { // com.letta.mobile.data.chat.sentruns/SentRunId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.chat.sentruns/SentRunId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.chat.sentruns/SentRunId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.chat.sentruns/SentRunId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.sentruns/SentRunId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.sentruns/SentRunId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.chat.sentruns/SentRunId.toString|toString(){}[0]
 }
 
 final value class com.letta.mobile.data.controller.extras.relay/AppToolCallId { // com.letta.mobile.data.controller.extras.relay/AppToolCallId|null[0]

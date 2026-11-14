@@ -1,6 +1,8 @@
 package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.chat.sentruns.IdentifiedChatSend
+import com.letta.mobile.data.chat.sentruns.IdentifiedPipelineSend
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Delivery
 import com.letta.mobile.data.model.AgentId
@@ -83,11 +85,7 @@ class ChatSendCoordinator(
     // and run in order once the turn ahead ends. See [QueuedSendDriver].
     private val queuedSends = ChatSendQueue()
     private val queueTurns = CoordinatorQueueTurns(turnStateMutex, wsChatBridge, ::dispatchPendingSend)
-    private val queueDriver = QueuedSendDriver(
-        scope,
-        queuedSends,
-        queueTurns,
-    )
+    private val queueDriver = QueuedSendDriver(scope, queuedSends, queueTurns)
 
     private val serverQueueMarks = ServerQueueMarks(
         queue = queuedSends,
@@ -102,12 +100,7 @@ class ChatSendCoordinator(
     /** The send queue a chat screen shows and controls. */
     val sendQueue: ChatSendQueueControls = ChatSendQueueControls(scope, queueDriver, queuedSends.state)
     private val bridgeEventDeduplicator = BridgeEventDeduplicator()
-    private val postSendReconciler = PostSendReconciler(
-        scope = scope,
-        agentId = agentId,
-        timelineRepository = timelineRepository,
-        delaysMs = { postSendReconcileDelaysMs },
-    )
+    private val postSendReconciler = PostSendReconciler(scope, agentId, timelineRepository) { postSendReconcileDelaysMs }
     private val runtimeEventBatcher = RuntimeEventBatcher(scope, recordRuntimeEvents)
 
     private val incoming = IncomingTurnProjection(AgentId(agentId), timelineRepository, turnRegistry, runtimeEventBatcher, foreground)
@@ -123,6 +116,14 @@ class ChatSendCoordinator(
         },
         handle = { event -> handleEvent(event) },
     )
+
+    private val identified = IdentifiedPipelineSend(
+        scope, turnStateMutex, otidGenerator, { Telemetry.error("AdminChatVM", "identifiedSend.failedAfterAccept", it) },
+        target = { activeConversationId().also { eventSubscription.claimForSend() } },
+    ) { text, target -> sendInternalLocked(text, emptyList(), target) }
+
+    /** This coordinator's sends with their identity, and the runs they started (paired in the turn registry). */
+    val identifiedSend: IdentifiedChatSend = identified.binding(turnRegistry.sentRuns)
 
     init {
         scope.launch {
@@ -339,7 +340,7 @@ class ChatSendCoordinator(
         }
 
         val pending = QueuedChatSend(
-            id = QueuedSendId(otidGenerator()),
+            id = QueuedSendId(identified.nextOtid()),
             conversationId = QueueConversationId(conversationId),
             text = text,
             attachments = attachments,
@@ -402,7 +403,8 @@ class ChatSendCoordinator(
         if (pending.attempt > 0 && !timelineRepository.isPendingSendCurrent(pending.pendingAttempt(agentId))) return true
         val state = turnRegistry.stateFor(ConversationId(pending.conversationId.value))
         val previousSend = state.inFlightSend?.takeUnless { state.reachedTerminal || it.id == pending.id }
-        val accepted = reserveAndAcceptSend(pending, state) ?: return true
+        // Null is a refusal before acceptance: the send leaves the queue, and it has no identity to report.
+        val accepted = reserveAndAcceptSend(pending, state) ?: return true.also { identified.refuse(pending.id.value) }
         Telemetry.event(
             "IrohTrace", "dispatchPendingSend.bridgeSend.done",
             "conversationId" attr pending.conversationId.value,
@@ -505,10 +507,7 @@ class ChatSendCoordinator(
         // on the shim. Multi-step turns may produce per-step usage; the
         // run-level record reflects the first. Drop subsequent ones.
         if (state.usageRecorded) {
-            Telemetry.event(
-                "AdminChatVM", "ws.usage.duplicate",
-                "turnId" attr event.turnId,
-            )
+            Telemetry.event("AdminChatVM", "ws.usage.duplicate", "turnId" attr event.turnId)
         } else {
             state.usageRecorded = true
             foreground.usage(ConversationId(state.ownerConversationId), event)
