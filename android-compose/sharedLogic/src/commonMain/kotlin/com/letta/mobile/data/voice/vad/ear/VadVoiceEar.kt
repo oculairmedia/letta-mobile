@@ -39,10 +39,10 @@ data class VadEarConfig(
     val format: AudioFrameFormat = AudioFrameFormat(),
     /** When turns start and end. */
     val policy: EndOfTurnPolicy = EndOfTurnPolicy(),
-    /** How readily the built-in detector hears speech; used by the default [detectors]. */
+    /** How readily the built-in detector hears speech; applies when [detectors] is null. */
     val sensitivity: VadSensitivity = VadSensitivity.NORMAL,
-    /** The voice-activity detector, created afresh for every listen. */
-    val detectors: SpeechDetectorFactory = EnergySpeechDetector.factory(EnergyDetectorConfig.forSensitivity(sensitivity)),
+    /** The voice-activity detector, created afresh for every listen; null uses the built-in one at [sensitivity]. */
+    val detectors: SpeechDetectorFactory? = null,
     /** Which transcripts are dropped instead of sent (noise the recogniser wrote words for). */
     val transcripts: TranscriptPolicy = TranscriptPolicy(),
     /** Hears the ear's turn decisions, for diagnostics. */
@@ -51,6 +51,10 @@ data class VadEarConfig(
     init {
         require(format.channels == 1) { "The voice-activity ear listens to mono audio" }
     }
+
+    /** [detectors], or the built-in energy detector at the current [sensitivity] (so a copy with a new one applies it). */
+    internal fun detectorFactory(): SpeechDetectorFactory =
+        detectors ?: EnergySpeechDetector.factory(EnergyDetectorConfig.forSensitivity(sensitivity))
 }
 
 /**
@@ -72,7 +76,8 @@ data class VadEarConfig(
  * next turn's speech starts ([VoiceEarEvent.SpeechStarted], in this or any later listen), or
  * [close]. Cancelling a listen does not wipe it: the loop closes the microphone on a failure and
  * calls [retry] only once the reopened ear reports [VoiceEarEvent.ListeningStarted]. [retry] returns
- * false whenever the handle is no longer kept. A transcribed turn, and a retry cancelled mid-way,
+ * false whenever the handle is no longer kept; a retry it accepted that the next turn's speech
+ * overtakes before transcription is wiped without an event. A transcribed turn, and a retry cancelled mid-way,
  * are wiped at once; utterances carry no capture handle. A failure that arrives after the next
  * turn's speech has started offers no handle. At most four finished turns wait for transcription;
  * a turn beyond that is wiped and reported as TRANSCRIPTION_FAILED without a handle.

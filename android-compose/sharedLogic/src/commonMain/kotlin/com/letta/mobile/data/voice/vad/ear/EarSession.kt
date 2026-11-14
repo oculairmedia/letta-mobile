@@ -77,11 +77,15 @@ internal class EarMemory {
 
     fun nextHandle(): CapturedAudioHandle = CapturedAudioHandle(handles.updateAndGet { it + 1 })
 
-    /** A new turn's speech started: the kept capture, and any still being transcribed, expire. */
+    /** A new turn's speech started: the kept capture and any queued retry expire. */
     fun speechStarted() {
         speech.updateAndGet { it + 1 }
         forget()
+        drainRetries()
     }
+
+    /** Whether newer speech has started since [turn] was captured. */
+    fun isExpired(turn: CapturedTurn): Boolean = turn.generation != speech.value
 
     /**
      * Keeps [turn] for one retry, wiping whatever was kept before. Returns false, with [turn] wiped,
@@ -105,7 +109,7 @@ internal class EarMemory {
         return false
     }
 
-    private fun isCurrent(turn: CapturedTurn): Boolean = !isClosed && turn.generation == speech.value
+    private fun isCurrent(turn: CapturedTurn): Boolean = !isClosed && !isExpired(turn)
 
     /** Wipes the kept capture, if any. */
     fun forget() {
@@ -182,7 +186,7 @@ private class TranscriptionJob(val turn: CapturedTurn, val isRetry: Boolean)
 internal class EarSession(private val parts: EarParts, private val out: ProducerScope<VoiceEarEvent>) {
     private val memory = parts.memory
     private val format = parts.config.format
-    private val detector = parts.config.detectors.create(format)
+    private val detector = parts.config.detectorFactory().create(format)
     private val tracker = TurnTracker(parts.config.policy, format, detector.hop)
     private val splitter = HopSplitter(detector.hop)
     private val recorder = CaptureRecorder(samplesOf(parts.config.policy.preRoll), limit())
@@ -197,7 +201,8 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
         if (!accepts(parts.source)) return fail(VoiceErrorCode.UNSUPPORTED_FORMAT)
         out.launch { TranscriptionWorker(parts, out, pending.turns).run() }
         val frames = parts.source.frames()
-            .map<AudioFrame, FrameItem> { FrameItem.Frame(it) }
+            // The source may reuse a frame's array once emit returns, and produceIn buffers: copy first.
+            .map<AudioFrame, FrameItem> { FrameItem.Frame(AudioFrame(it.samples.copyOf(), it.start)) }
             .catch { emit(FrameItem.Failed(it)) }
             .produceIn(out)
         try {
@@ -220,7 +225,10 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
 
     /** Handles one item; returns the failure code when the source has ended. */
     private suspend fun onFrameItem(item: FrameItem?): VoiceErrorCode? = when (item) {
-        is FrameItem.Frame -> null.also { onFrame(item.frame) }
+        is FrameItem.Frame -> null.also {
+            onFrame(item.frame)
+            item.frame.samples.fill(0)
+        }
         is FrameItem.Failed -> sourceCodeOf(item.cause)
         null -> VoiceErrorCode.ENGINE_FAILED
     }
@@ -316,7 +324,8 @@ private class TranscriptionWorker(
                 turns.onReceiveCatching { result -> result.getOrNull()?.let { TranscriptionJob(it, isRetry = false) } }
                 memory.retries.onReceive { TranscriptionJob(it, isRetry = true) }
             } ?: return
-            deliver(job)
+            // A retry that newer speech overtook before it was transcribed has expired: no event.
+            if (job.isRetry && memory.isExpired(job.turn)) job.turn.wipe() else deliver(job)
         }
     }
 

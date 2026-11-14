@@ -7,7 +7,10 @@ import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoicePort
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.VoiceUtterance
+import com.letta.mobile.data.voice.audio.AudioFrame
 import com.letta.mobile.data.voice.audio.AudioFrameFormat
+import com.letta.mobile.data.voice.audio.AudioFrameSource
+import com.letta.mobile.data.voice.audio.SamplePosition
 import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointException
 import com.letta.mobile.data.voice.endpoint.SpeechOperation
@@ -19,6 +22,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNot
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -160,6 +164,30 @@ class VadVoiceEarTest {
             var event = awaitItem()
             while (event !is VoiceEarEvent.Failed) event = awaitItem()
             assertEquals(failed(VoiceErrorCode.TRANSCRIPTION_FAILED), event)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun aSourceThatReusesItsFrameArrayIsStillHeardCorrectly() = runTest {
+        val reused = ShortArray(512)
+        val script = turn()
+        val source = object : AudioFrameSource {
+            override val format = AudioFrameFormat()
+
+            override fun frames(): Flow<AudioFrame> = flow {
+                script.forEachIndexed { index, samples ->
+                    samples.copyInto(reused)
+                    emit(AudioFrame(reused, SamplePosition(index * 512L)))
+                    reused.fill(0)
+                }
+                awaitCancellation()
+            }
+        }
+        valueEar(source, ScriptedTranscriber(heard("hello"))).turns().test {
+            assertEquals(VoiceEarEvent.ListeningStarted, awaitItem())
+            assertEquals(VoiceEarEvent.SpeechStarted, awaitItem())
+            assertEquals(said("hello"), awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -362,6 +390,17 @@ class EarMemoryTest {
         assertFalse(memory.requestRetry(late))
         assertTrue(late.samples.all { it.toInt() == 0 })
         assertTrue(memory.retries.tryReceive().isFailure)
+    }
+
+    @Test
+    fun newSpeechExpiresAQueuedRetry() {
+        val memory = EarMemory()
+        val queued = captured(11)
+        assertTrue(memory.requestRetry(queued))
+        memory.speechStarted()
+        assertTrue(queued.samples.all { it.toInt() == 0 })
+        assertTrue(memory.retries.tryReceive().isFailure)
+        assertTrue(memory.isExpired(queued))
     }
 
     @Test
