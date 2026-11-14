@@ -403,7 +403,8 @@ class ChatSendCoordinator(
         if (pending.attempt > 0 && !timelineRepository.isPendingSendCurrent(pending.pendingAttempt(agentId))) return true
         val state = turnRegistry.stateFor(ConversationId(pending.conversationId.value))
         val previousSend = state.inFlightSend?.takeUnless { state.reachedTerminal || it.id == pending.id }
-        val accepted = reserveAndAcceptSend(pending, state) ?: return true
+        // Null is a refusal before acceptance: the send leaves the queue, and it has no identity to report.
+        val accepted = reserveAndAcceptSend(pending, state) ?: return true.also { identified.refuse(pending.id.value) }
         Telemetry.event(
             "IrohTrace", "dispatchPendingSend.bridgeSend.done",
             "conversationId" attr pending.conversationId.value,

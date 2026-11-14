@@ -34,8 +34,19 @@ internal class IdentifiedPipelineSend(
     /** The otid the pipeline took last; read and written only under [lock]. */
     private var taken: String? = null
 
+    /** Whether the send behind [taken] was refused before it was accepted or queued; under [lock]. */
+    private var refused = false
+
     /** A new otid for a send the pipeline enqueues next; call under [lock]. */
     fun nextOtid(): String = generateOtid().also { taken = it }
+
+    /**
+     * The send enqueued under [otid] was refused before it was accepted or queued (for example the
+     * pending store rejected it): it has no identity to report. Call under [lock].
+     */
+    fun refuse(otid: String) {
+        if (otid == taken) refused = true
+    }
 
     /** This send as an [IdentifiedChatSend] over the pipeline's sent-run [ledger]. */
     fun binding(ledger: SentRunLedger): IdentifiedChatSend =
@@ -50,8 +61,9 @@ internal class IdentifiedPipelineSend(
     /** Under [lock]: sends [outgoing] and returns the otid it was enqueued under, if any. */
     private suspend fun enqueue(outgoing: OutgoingText, ledger: SentRunLedger): SentMessageId? {
         taken = null
+        refused = false
         val failure = runCatching { sendLocked(outgoing.text, outgoing.conversation) }.exceptionOrNull()
-            ?: return taken?.let(::SentMessageId)
+            ?: return taken?.takeUnless { refused }?.let(::SentMessageId)
         if (failure is CancellationException) throw failure
         return acceptedDespite(failure, ledger)
     }

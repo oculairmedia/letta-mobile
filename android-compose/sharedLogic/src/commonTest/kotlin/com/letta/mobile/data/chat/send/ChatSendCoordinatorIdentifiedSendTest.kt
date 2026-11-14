@@ -153,6 +153,17 @@ internal class ChatSendCoordinatorIdentifiedSendTest : ChatSendCoordinatorConver
     }
 
     @Test
+    fun aSendThePendingStoreRefusesBeforeAcceptanceHasNoId() = runTest(UnconfinedTestDispatcher()) {
+        timeline.admissionFailure = IllegalArgumentException("Outbox byte budget exceeded")
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true), activeChatTurn = true)) { CONV }
+
+        assertNull(coordinator.identifiedSend.sendIdentified("over budget"))
+        assertEquals("Couldn’t save this message. Dismiss an unsent message or try a smaller message.", ui.currentError())
+        assertTrue(timeline.externalLocals.isEmpty())
+        assertTrue(coordinator.identifiedSend.sentRuns.value.started.isEmpty())
+    }
+
+    @Test
     fun aSendThatCannotPrepareItsConversationHasNoId() = runTest(UnconfinedTestDispatcher()) {
         prepareConversation = { error("not ready") }
         val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true))) { CONV }
