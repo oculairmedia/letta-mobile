@@ -3122,10 +3122,12 @@ final class com.letta.mobile.ui.chat.voice/VoiceModeHandle { // com.letta.mobile
 }
 
 final class com.letta.mobile.ui.chat.voice/VoiceSetupAccess { // com.letta.mobile.ui.chat.voice/VoiceSetupAccess|null[0]
-    constructor <init>(com.letta.mobile.data.voice.session/VoiceSetupStore, kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.voice.session/VoiceSetupDraft, com.letta.mobile.data.voice/VoiceErrorCode?>) // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.<init>|<init>(com.letta.mobile.data.voice.session.VoiceSetupStore;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.voice.session.VoiceSetupDraft,com.letta.mobile.data.voice.VoiceErrorCode?>){}[0]
+    constructor <init>(com.letta.mobile.data.voice.session/VoiceSetupStore, kotlin/Boolean = ..., kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.voice.session/VoiceSetupDraft, com.letta.mobile.data.voice/VoiceErrorCode?>) // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.<init>|<init>(com.letta.mobile.data.voice.session.VoiceSetupStore;kotlin.Boolean;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.voice.session.VoiceSetupDraft,com.letta.mobile.data.voice.VoiceErrorCode?>){}[0]
 
     final val check // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.check|{}check[0]
         final fun <get-check>(): kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.voice.session/VoiceSetupDraft, com.letta.mobile.data.voice/VoiceErrorCode?> // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.check.<get-check>|<get-check>(){}[0]
+    final val echoCancelled // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.echoCancelled|{}echoCancelled[0]
+        final fun <get-echoCancelled>(): kotlin/Boolean // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.echoCancelled.<get-echoCancelled>|<get-echoCancelled>(){}[0]
     final val store // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.store|{}store[0]
         final fun <get-store>(): com.letta.mobile.data.voice.session/VoiceSetupStore // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.store.<get-store>|<get-store>(){}[0]
 }
@@ -10363,6 +10365,8 @@ final object com.letta.mobile.ui.settings/SettingsSectionTags { // com.letta.mob
 final object com.letta.mobile.ui.settings/VoiceSettingsKeys { // com.letta.mobile.ui.settings/VoiceSettingsKeys|null[0]
     final const val CONSENT // com.letta.mobile.ui.settings/VoiceSettingsKeys.CONSENT|{}CONSENT[0]
         final fun <get-CONSENT>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.CONSENT.<get-CONSENT>|<get-CONSENT>(){}[0]
+    final const val INTERRUPT // com.letta.mobile.ui.settings/VoiceSettingsKeys.INTERRUPT|{}INTERRUPT[0]
+        final fun <get-INTERRUPT>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.INTERRUPT.<get-INTERRUPT>|<get-INTERRUPT>(){}[0]
     final const val KEY // com.letta.mobile.ui.settings/VoiceSettingsKeys.KEY|{}KEY[0]
         final fun <get-KEY>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.KEY.<get-KEY>|<get-KEY>(){}[0]
     final const val PANE // com.letta.mobile.ui.settings/VoiceSettingsKeys.PANE|{}PANE[0]

@@ -2154,12 +2154,6 @@ public final class com/letta/mobile/ui/chat/surface/composer/ComposableSingleton
 	public final fun getLambda$-743077059$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
-public final class com/letta/mobile/ui/chat/surface/composer/ComposableSingletons$ComposerVoiceModeControlsKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/composer/ComposableSingletons$ComposerVoiceModeControlsKt;
-	public fun <init> ()V
-	public final fun getLambda$995472508$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-}
-
 public final class com/letta/mobile/ui/chat/surface/composer/ComposerAgentMentionTags {
 	public static final field $stable I
 	public static final field CHIP Ljava/lang/String;
@@ -2428,8 +2422,10 @@ public final class com/letta/mobile/ui/chat/voice/VoiceModeTags {
 
 public final class com/letta/mobile/ui/chat/voice/VoiceSetupAccess {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;Lkotlin/jvm/functions/Function2;)V
+	public fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCheck ()Lkotlin/jvm/functions/Function2;
+	public final fun getEchoCancelled ()Z
 	public final fun getStore ()Lcom/letta/mobile/data/voice/session/VoiceSetupStore;
 }
 
@@ -2460,12 +2456,6 @@ public final class com/letta/mobile/ui/components/ComposableSingletons$LettaCata
 	public fun <init> ()V
 	public final fun getLambda$-1358207532$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$658221477$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-}
-
-public final class com/letta/mobile/ui/components/ComposableSingletons$LettaInlineErrorKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/components/ComposableSingletons$LettaInlineErrorKt;
-	public fun <init> ()V
-	public final fun getLambda$1841843035$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/components/ComposableSingletons$LettaPageHeaderKt {
@@ -7265,6 +7255,7 @@ public final class com/letta/mobile/ui/settings/VoiceSettingsKeys {
 	public static final field $stable I
 	public static final field CONSENT Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/ui/settings/VoiceSettingsKeys;
+	public static final field INTERRUPT Ljava/lang/String;
 	public static final field KEY Ljava/lang/String;
 	public static final field PANE Ljava/lang/String;
 	public static final field SAVE Ljava/lang/String;
