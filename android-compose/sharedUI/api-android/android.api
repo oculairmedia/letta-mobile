@@ -2013,7 +2013,7 @@ public final class com/letta/mobile/ui/chat/surface/ChatSurfaceConfigKt {
 }
 
 public final class com/letta/mobile/ui/chat/surface/ChatSurfaceKt {
-	public static final fun ChatSurface (Lcom/letta/mobile/ui/chat/session/ChatSessionPort;Lcom/letta/mobile/ui/chat/session/ChatSurfacePresentation;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatSurfaceHost;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/chat/surface/ChatSurfaceAppearance;Lcom/letta/mobile/ui/chat/surface/ChatSurfacePlatform;Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation;Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/ui/chat/session/ChatDockGeometry;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/surface/recents/ChatRecentInteractions;Landroidx/compose/runtime/Composer;III)V
+	public static final fun ChatSurface (Lcom/letta/mobile/ui/chat/session/ChatSessionPort;Lcom/letta/mobile/ui/chat/session/ChatSurfacePresentation;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatSurfaceHost;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/chat/surface/ChatSurfaceAppearance;Lcom/letta/mobile/ui/chat/surface/ChatSurfacePlatform;Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation;Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/ui/chat/session/ChatDockGeometry;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/surface/recents/ChatRecentInteractions;Lcom/letta/mobile/data/voice/session/VoiceChatSessions;Landroidx/compose/runtime/Composer;III)V
 }
 
 public final class com/letta/mobile/ui/chat/surface/ChatSurfacePlatform {
@@ -2391,6 +2391,44 @@ public final class com/letta/mobile/ui/chat/tools/ToolPresentersKt {
 	public static final fun title (Lcom/letta/mobile/data/chat/tools/ToolStepLine;Landroidx/compose/runtime/Composer;I)Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/chat/voice/VoiceErrorTextsKt {
+	public static final fun voiceErrorText (Lcom/letta/mobile/data/voice/VoiceErrorCode;)Lorg/jetbrains/compose/resources/StringResource;
+}
+
+public final class com/letta/mobile/ui/chat/voice/VoiceModeHandle {
+	public static final field $stable I
+	public final fun getController ()Lcom/letta/mobile/data/voice/session/VoiceModeController;
+	public final fun getSetupOpen ()Z
+	public final fun press ()V
+	public final fun setSetupOpen (Z)V
+}
+
+public final class com/letta/mobile/ui/chat/voice/VoiceModeKt {
+	public static final fun VoiceSetupPaneHost (Lcom/letta/mobile/ui/chat/voice/VoiceModeHandle;Landroidx/compose/runtime/Composer;I)V
+	public static final fun getLocalVoiceMode ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun getLocalVoiceSetup ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun getLocalVoiceSetupPane ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun rememberVoiceSetupAccess (Lcom/letta/mobile/data/storage/SecureSettingsStore;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/chat/voice/VoiceSetupAccess;
+}
+
+public final class com/letta/mobile/ui/chat/voice/VoiceModeTags {
+	public static final field $stable I
+	public static final field BUTTON Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/voice/VoiceModeTags;
+	public static final field STRIP Ljava/lang/String;
+	public static final field STRIP_ACTION Ljava/lang/String;
+	public static final field STRIP_CLOSE Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/chat/voice/VoiceSetupAccess {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCheck ()Lkotlin/jvm/functions/Function2;
+	public final fun getEchoCancelled ()Z
+	public final fun getStore ()Lcom/letta/mobile/data/voice/session/VoiceSetupStore;
+}
+
 public final class com/letta/mobile/ui/components/ChevronEmphasis : java/lang/Enum {
 	public static final field Emphasized Lcom/letta/mobile/ui/components/ChevronEmphasis;
 	public static final field Neutral Lcom/letta/mobile/ui/components/ChevronEmphasis;
@@ -2418,12 +2456,6 @@ public final class com/letta/mobile/ui/components/ComposableSingletons$LettaCata
 	public fun <init> ()V
 	public final fun getLambda$-1358207532$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$658221477$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-}
-
-public final class com/letta/mobile/ui/components/ComposableSingletons$LettaInlineErrorKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/components/ComposableSingletons$LettaInlineErrorKt;
-	public fun <init> ()V
-	public final fun getLambda$1841843035$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/components/ComposableSingletons$LettaPageHeaderKt {
@@ -7219,6 +7251,25 @@ public final class com/letta/mobile/ui/settings/SettingsStandardSectionsKt {
 	public static final fun ProvidersSettingsSection (Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
 
+public final class com/letta/mobile/ui/settings/VoiceSettingsKeys {
+	public static final field $stable I
+	public static final field CONSENT Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/ui/settings/VoiceSettingsKeys;
+	public static final field INTERRUPT Ljava/lang/String;
+	public static final field KEY Ljava/lang/String;
+	public static final field PANE Ljava/lang/String;
+	public static final field SAVE Ljava/lang/String;
+	public static final field SECTION Ljava/lang/String;
+	public static final field STATUS Ljava/lang/String;
+	public static final field TEST Ljava/lang/String;
+	public static final field URL Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/settings/VoiceSettingsSectionKt {
+	public static final fun VoiceSettingsSection (Lcom/letta/mobile/ui/chat/voice/VoiceSetupAccess;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;II)V
+	public static final fun VoiceSetupPane (Lcom/letta/mobile/ui/chat/voice/VoiceSetupAccess;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)V
+}
+
 public final class com/letta/mobile/ui/shell/AgentEditorBinding {
 	public static final field $stable I
 	public fun <init> (Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function4;)V
@@ -8150,7 +8201,8 @@ public final class com/letta/mobile/ui/shell/pages/ShellMemorySources {
 
 public final class com/letta/mobile/ui/shell/pages/ShellPageBindingKt {
 	public static final fun rememberShellPageDeps (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lcom/letta/mobile/ui/shell/pages/ShellLibraryControllers;Lcom/letta/mobile/ui/shell/pages/ShellPageHost;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/ShellPageDeps;
-	public static final fun shellPageDeps (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lcom/letta/mobile/ui/shell/pages/ShellLibraryControllers;Lcom/letta/mobile/ui/shell/pages/ShellPageHost;)Lcom/letta/mobile/ui/shell/ShellPageDeps;
+	public static final fun shellPageDeps (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lcom/letta/mobile/ui/shell/pages/ShellLibraryControllers;Lcom/letta/mobile/ui/shell/pages/ShellPageHost;Lcom/letta/mobile/ui/chat/voice/VoiceSetupAccess;)Lcom/letta/mobile/ui/shell/ShellPageDeps;
+	public static synthetic fun shellPageDeps$default (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lcom/letta/mobile/ui/shell/pages/ShellLibraryControllers;Lcom/letta/mobile/ui/shell/pages/ShellPageHost;Lcom/letta/mobile/ui/chat/voice/VoiceSetupAccess;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/ShellPageDeps;
 }
 
 public final class com/letta/mobile/ui/shell/pages/ShellPageFocus {
@@ -10798,8 +10850,8 @@ public final class com/letta/mobile/ui/shell/workspace/ShellChatDestinationKt {
 public final class com/letta/mobile/ui/shell/workspace/ShellChatLook {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/ui/chat/surface/ChatSurfaceAppearance;Lcom/letta/mobile/ui/chat/surface/ChatSurfacePlatform;Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation;Lcom/letta/mobile/ui/chat/surface/recents/ChatRecentInteractions;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/subagents/SubagentDualViewBinding;)V
-	public synthetic fun <init> (Lcom/letta/mobile/ui/chat/surface/ChatSurfaceAppearance;Lcom/letta/mobile/ui/chat/surface/ChatSurfacePlatform;Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation;Lcom/letta/mobile/ui/chat/surface/recents/ChatRecentInteractions;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/subagents/SubagentDualViewBinding;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/ui/chat/surface/ChatSurfaceAppearance;Lcom/letta/mobile/ui/chat/surface/ChatSurfacePlatform;Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation;Lcom/letta/mobile/ui/chat/surface/recents/ChatRecentInteractions;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/subagents/SubagentDualViewBinding;Lcom/letta/mobile/data/voice/session/VoiceChatSessions;)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/chat/surface/ChatSurfaceAppearance;Lcom/letta/mobile/ui/chat/surface/ChatSurfacePlatform;Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation;Lcom/letta/mobile/ui/chat/surface/recents/ChatRecentInteractions;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/subagents/SubagentDualViewBinding;Lcom/letta/mobile/data/voice/session/VoiceChatSessions;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getAppearance ()Lcom/letta/mobile/ui/chat/surface/ChatSurfaceAppearance;
 	public final fun getCanvasHeaderTrailing ()Lkotlin/jvm/functions/Function2;
 	public final fun getOnBoardShown ()Lkotlin/jvm/functions/Function1;
@@ -10807,6 +10859,7 @@ public final class com/letta/mobile/ui/shell/workspace/ShellChatLook {
 	public final fun getPlatform ()Lcom/letta/mobile/ui/chat/surface/ChatSurfacePlatform;
 	public final fun getRecents ()Lcom/letta/mobile/ui/chat/surface/recents/ChatRecentInteractions;
 	public final fun getSubagentViews ()Lcom/letta/mobile/ui/chat/subagents/SubagentDualViewBinding;
+	public final fun getVoiceSessions ()Lcom/letta/mobile/data/voice/session/VoiceChatSessions;
 }
 
 public final class com/letta/mobile/ui/shell/workspace/ShellChatPage {
@@ -11813,6 +11866,7 @@ public final class com/letta/mobile/ui/theme/TouchComposerDimens {
 	public final fun getFieldPadding-D9Ej5fM ()F
 	public final fun getHorizontalPadding-D9Ej5fM ()F
 	public final fun getItemSpacing-D9Ej5fM ()F
+	public final fun getMinFieldWidth-D9Ej5fM ()F
 	public final fun getRestingCorner-D9Ej5fM ()F
 	public final fun getRestingElevation-D9Ej5fM ()F
 	public final fun getRestingVerticalPadding-D9Ej5fM ()F

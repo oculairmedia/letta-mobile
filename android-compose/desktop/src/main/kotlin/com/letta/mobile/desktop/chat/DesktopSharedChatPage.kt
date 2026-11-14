@@ -163,6 +163,7 @@ internal fun DesktopSharedChatPage(
                 canvasHeaderTrailing = state.canvasHeaderTrailing,
                 onBoardShown = onBoardShown,
                 subagentViews = state.subagents?.views,
+                voiceSessions = remember(port) { com.letta.mobile.desktop.data.DesktopVoiceChatSessions(port.controller, port) },
             ),
         )
     }

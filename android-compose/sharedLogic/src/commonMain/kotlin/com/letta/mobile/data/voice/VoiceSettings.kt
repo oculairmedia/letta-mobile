@@ -125,7 +125,10 @@ data class VoiceSettings(
     val responder: VoiceResponderKind = VoiceResponderKind.CHAT_AGENT,
     /** Single shot or continuous conversation. */
     val mode: VoiceConversationMode = VoiceConversationMode.CONTINUOUS,
-    /** Whether speaking over a reply interrupts it. */
+    /**
+     * Whether speaking over a reply interrupts it. Only safe where the microphone is echo-cancelled
+     * or the person wears headphones; elsewhere voice mode runs half-duplex and a press interrupts.
+     */
     val bargeIn: Boolean = true,
     /** What to do with replies that arrive late. */
     val lateReplies: LateReplyPolicy = LateReplyPolicy.SPEAK_WHEN_QUIET,

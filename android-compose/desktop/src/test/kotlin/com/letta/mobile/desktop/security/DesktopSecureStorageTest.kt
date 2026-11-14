@@ -87,6 +87,16 @@ class DesktopSecureStorageTest {
     }
 
     @Test
+    fun voiceModeApiKeyIsEncryptedAtRest() {
+        val delegate = InMemoryStore()
+        val store = EncryptingSecureSettingsStore(delegate, tempVault())
+        store.putString(com.letta.mobile.data.voice.session.VoiceSetupStore.KEY_API_KEY, "sk-voice")
+
+        assertFalse(delegate.values.getValue(com.letta.mobile.data.voice.session.VoiceSetupStore.KEY_API_KEY).contains("sk-voice"))
+        assertEquals("sk-voice", store.getString(com.letta.mobile.data.voice.session.VoiceSetupStore.KEY_API_KEY, null))
+    }
+
+    @Test
     fun nonSensitiveKeysPassThroughUntouched() {
         val delegate = InMemoryStore()
         val store = EncryptingSecureSettingsStore(delegate, tempVault())

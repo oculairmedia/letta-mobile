@@ -14,6 +14,7 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
+import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.preparePost
@@ -107,6 +108,24 @@ class SpeechEndpointClient(
         val bytes = ByteArray(chunks.sumOf { it.size })
         chunks.fold(0) { offset, chunk -> chunk.copyInto(bytes, offset).let { offset + chunk.size } }
         return AudioClip(bytes, request.encoding)
+    }
+
+    /**
+     * Checks that the server answers at all, with `GET {base}/v1/models`; no audio or text is sent,
+     * so no destination grant is needed. Any HTTP answer counts as reachable except 401/403, which
+     * fail with UNAUTHORIZED; the base URL and key rules apply as for every request.
+     */
+    suspend fun checkReachable() {
+        call(SpeechOperation.REACHABILITY) {
+            val target = requestUrl(MODELS_ROUTE, SpeechOperation.REACHABILITY)
+            val response = client.get {
+                url(target)
+                authorize()
+            }
+            if (response.status.value in UNAUTHORIZED_STATUSES) {
+                throw SpeechEndpointException(SpeechOperation.REACHABILITY, VoiceErrorCode.UNAUTHORIZED, response.status.value)
+            }
+        }
     }
 
     /** Cancels the requests in flight and closes the client. */
@@ -204,6 +223,8 @@ class SpeechEndpointClient(
     private companion object {
         val TRANSCRIPTIONS_ROUTE = listOf("v1", "audio", "transcriptions")
         val SPEECH_ROUTE = listOf("v1", "audio", "speech")
+        val MODELS_ROUTE = listOf("v1", "models")
+        val UNAUTHORIZED_STATUSES = setOf(401, 403)
         const val CHUNK_BYTES = 8 * 1024
         const val HTTP_OK = 200
     }

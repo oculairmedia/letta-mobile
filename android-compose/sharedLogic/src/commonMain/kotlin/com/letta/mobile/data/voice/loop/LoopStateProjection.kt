@@ -16,6 +16,7 @@ internal object LoopStateProjection {
             inputLevel = view.inputLevel,
             outputLevel = view.outputLevel,
             microphoneOpen = view.micOpen,
+            userSpeaking = model.turn.userSpeaking || model.turn.transcribing > 0,
             failure = view.failure,
             activationNotice = view.notice,
             activation = view.activation,
@@ -23,6 +24,9 @@ internal object LoopStateProjection {
             interrupt = interruptStatus(model.turn),
             awaitingLateReply = model.late.delegated.isNotEmpty(),
             heldLateSegments = model.late.held.size,
+            turnFailure = view.turnFailure,
+            replyRetryable = view.retryUtterance != null,
+            pendingReplies = model.turn.replies.size,
             phaseSince = since,
         )
     }

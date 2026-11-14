@@ -1,5 +1,6 @@
 package com.letta.mobile.data.voice.responder.chat
 
+import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.chat.sentruns.SentMessageRuns
 import com.letta.mobile.data.chat.sentruns.SentRunId
 import com.letta.mobile.data.model.ConversationId
@@ -13,17 +14,23 @@ import com.letta.mobile.data.voice.responder.VoiceRowKey
 import com.letta.mobile.data.voice.responder.VoiceRowKind
 import com.letta.mobile.data.voice.responder.VoiceRunId
 
-/** The chat page's rows, the session's sent-message runs and its conversation, as the voice responder reads them. */
+/**
+ * The chat page's rows and send queue, the session's sent-message runs and its conversation, as the
+ * voice responder reads them. A queued message's id is the otid it is sent with once it runs; one the
+ * App Server parked behind another client's turn counts as queued too.
+ */
 internal fun voiceChatState(
     messages: List<UiMessage>,
     runs: SentMessageRuns,
     conversation: ConversationId?,
+    queue: ConversationSendQueue = ConversationSendQueue(),
 ): VoiceChatState = VoiceChatState(
     conversation = conversation?.let { VoiceConversationKey(it.value) },
     rows = messages.map(::voiceChatRow),
     startedRuns = runs.started.entries.associate { (id, ids) -> ClientMessageId(id.value) to ids.toVoiceRuns() },
     activeRuns = runs.active.toVoiceRuns(),
     failedRuns = runs.failed.toVoiceRuns(),
+    queued = (queue.items + listOfNotNull(queue.queuedOnServer)).mapTo(mutableSetOf()) { ClientMessageId(it.id.value) },
 )
 
 private fun Set<SentRunId>.toVoiceRuns(): Set<VoiceRunId> = mapTo(mutableSetOf()) { VoiceRunId(it.value) }

@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.security
 
 import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.data.voice.session.VoiceSetupStore
 import java.util.Base64
 
 /**
@@ -42,6 +43,6 @@ class EncryptingSecureSettingsStore(
         /** Marker for vault-encrypted values; never a valid token prefix. */
         const val PREFIX = "enc1:"
 
-        val DEFAULT_SENSITIVE_KEYS = setOf("letta.config.accessToken", "letta.config.parkedAccessToken")
+        val DEFAULT_SENSITIVE_KEYS = setOf("letta.config.accessToken", "letta.config.parkedAccessToken", VoiceSetupStore.KEY_API_KEY)
     }
 }

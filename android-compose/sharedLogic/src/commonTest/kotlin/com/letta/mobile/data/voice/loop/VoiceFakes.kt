@@ -19,6 +19,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.withContext
@@ -145,7 +146,17 @@ internal class FakeReply(val utterance: VoiceUtterance) : VoiceReply {
     var cancels = 0
         private set
 
-    override val events: Flow<VoiceReplyEvent> = channel.receiveAsFlow()
+    /** Set: a cancel suspends until it completes (a stop that takes a while to settle). */
+    var cancelGate: CompletableDeferred<Unit>? = null
+
+    /** Whether the loop has started collecting (that is, sending) this reply. */
+    var collected = false
+        private set
+
+    override val events: Flow<VoiceReplyEvent> = flow {
+        collected = true
+        emitAll(channel.receiveAsFlow())
+    }
 
     fun send(event: VoiceReplyEvent) {
         channel.trySend(event)
@@ -155,6 +166,7 @@ internal class FakeReply(val utterance: VoiceUtterance) : VoiceReply {
 
     override suspend fun cancel(): VoiceCancelOutcome {
         cancels++
+        cancelGate?.await()
         return cancelOutcome
     }
 }

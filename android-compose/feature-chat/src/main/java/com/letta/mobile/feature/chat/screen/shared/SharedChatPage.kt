@@ -177,6 +177,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
                     dockGeometry = dockGeometry,
                     onDockGeometryChange = { dockGeometry = it },
                     recents = params.recentInteractions,
+                    voiceSessions = remember(port, params.viewModel) { AndroidVoiceChatSessions(params.viewModel, port) },
                 )
             }
             SharedChatSubagentSheet(

@@ -981,7 +981,7 @@ class DesktopChatController(
     }
 
     /** The shared send coordinator uses the selected conversation's canonical presentation transport. */
-    private fun selectedCanonicalCoordinator(): com.letta.mobile.data.chat.send.ChatSendCoordinator? {
+    internal fun selectedCanonicalCoordinator(): com.letta.mobile.data.chat.send.ChatSendCoordinator? {
         val conversationId = _state.value.selectedConversationId
         val conversation = _state.value.conversations.firstOrNull { it.id == conversationId } ?: return null
         val agentId = conversation.agentId ?: return null

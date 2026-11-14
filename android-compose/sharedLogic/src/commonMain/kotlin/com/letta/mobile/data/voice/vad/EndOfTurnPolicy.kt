@@ -67,6 +67,12 @@ enum class TurnDiscardReason {
 
     /** A short, quiet turn transcribed as one of the recogniser's stock noise phrases. */
     STOCK_PHRASE,
+
+    /**
+     * Half-duplex: the sound was captured while the app's own speech was queued or playing (or in
+     * the tail after it), so it may be the app hearing itself; it is never transcribed.
+     */
+    OUTPUT_ACTIVE,
 }
 
 /** Why a turn ended. */
@@ -115,6 +121,14 @@ internal class TurnTracker(private val policy: EndOfTurnPolicy, format: AudioFra
 
     /** True while a turn is being recorded (candidate or speaking). */
     val recording: Boolean get() = phase != TurnPhase.Quiet
+
+    /** True while a confirmed turn is open (the person was reported speaking). */
+    val confirmed: Boolean get() = phase is TurnPhase.Speaking
+
+    /** Forgets the candidate or turn being tracked, without a signal (the ear reports why). */
+    fun drop() {
+        phase = TurnPhase.Quiet
+    }
 
     /** Voiced samples of the candidate or turn being tracked, or of the last one that ended or was dropped. */
     var voicedSamples: Long = 0

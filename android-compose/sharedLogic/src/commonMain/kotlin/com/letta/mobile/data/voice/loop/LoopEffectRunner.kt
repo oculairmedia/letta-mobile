@@ -23,6 +23,7 @@ internal class LoopWiring(
     val config: VoiceLoopConfig,
     val scope: CoroutineScope,
     val inputs: SendChannel<LoopInput>,
+    val observer: VoiceLoopObserver = VoiceLoopObserver.None,
 ) {
     /** A fault for an engine on [port] that would not let go. */
     fun unresponsive(port: VoicePort): LoopInput = LoopInput.Fault(VoiceError(VoiceErrorCode.UNRESPONSIVE, port))
@@ -63,11 +64,14 @@ internal class LoopEffectRunner(private val wiring: LoopWiring) {
         val model = step.model
         val faults = mutableListOf<LoopInput>()
         if (!model.micWanted) ear.reconcile(model)?.let(faults::add)
+        // Output starting is reported before the mouth is handed anything; output ending only after
+        // the stop below has returned (the speaker is silent).
+        if (model.outputActive) ear.reportOutput(true)?.let(faults::add)
         step.effects.filterNot(ear::handles).forEach { effect ->
             if (faults.isEmpty() || !effect.startsOutput()) execute(effect)?.let(faults::add)
         }
         if (faults.isEmpty()) faults += openEar(step)
-        ear.reportOutput(model)?.let(faults::add)
+        ear.reportOutput(model.outputActive || mouth.holding)?.let(faults::add)
         reconcileTimer(model)
         return faults
     }
@@ -106,8 +110,16 @@ internal class LoopEffectRunner(private val wiring: LoopWiring) {
     private suspend fun mouthEffect(effect: LoopEffect): LoopInput? = when (effect) {
         is LoopEffect.Speak -> mouth.speak(effect.segment)
         LoopEffect.FlushMouth -> mouth.flush()
-        LoopEffect.StopMouth -> mouth.stop()
+        is LoopEffect.StopMouth -> mouth.stop(effect.reason)
+        is LoopEffect.SpeechSkipped -> report(effect)
         else -> null
+    }
+
+    /** Tells the observer; an observer that throws is ignored (diagnostics never stop the loop). */
+    private fun report(effect: LoopEffect.SpeechSkipped): LoopInput? {
+        val error = runCatching { wiring.observer.speechSkipped(effect.reason, effect.segments) }.exceptionOrNull()
+        if (error is CancellationException) throw error
+        return null
     }
 
     /** The first-text timer runs whenever an answer is open and has produced no text, in any phase. */

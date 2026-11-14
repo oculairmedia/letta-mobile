@@ -165,6 +165,20 @@ class VoiceChatResponderTest {
     }
 
     @Test
+    fun aMessagesTextEndsWhenALaterRowOfItsRunFollowsNotOnlyWhenTheRunEnds() = runTest {
+        val events = collect(ask())
+        settle { start(Sent.FIRST, Runs.R1); add(reply(Keys.M1, VoiceText("Let me check."), Runs.R1)) }
+        assertEquals(listOf<VoiceReplyEvent>(VoiceReplyEvent.Text(VoiceText("Let me check."))), events)
+        settle { add(marker(Keys.THINK, VoiceRowKind.OTHER, Runs.R1)) }
+        assertEquals(VoiceReplyEvent.PartEnded, events.last())
+        settle { add(reply(Keys.M2, VoiceText("Sunny."), Runs.R1)) }
+        settle { end(Runs.R1) }
+        assertEquals(listOf("Let me check.", "\nSunny."), texts(events))
+        assertEquals(1, events.count { it == VoiceReplyEvent.PartEnded })
+        assertEquals(VoiceReplyEvent.Completed, events.last())
+    }
+
+    @Test
     fun runEndings() = runTest {
         val cases = listOf(
             Ending({ it.end(Runs.R1) }, VoiceReplyEvent.Completed),
@@ -236,21 +250,45 @@ class VoiceChatResponderTest {
         assertEquals(listOf<VoiceReplyEvent>(failed(VoiceErrorCode.NOT_DELIVERED)), events)
     }
 
+    /**
+     * A second utterance used to cancel the first reply (stopping its run) before sending. It is now
+     * a follow-up: nothing is stopped, and each reply speaks its own run to the end.
+     */
     @Test
-    fun secondUtteranceStopsOnlyTheFirstRunBeforeSending() = runTest {
+    fun aSecondUtteranceIsAFollowUpThatStopsNothing() = runTest {
         val first = collect(ask(Say.FIRST))
         settle { start(Sent.FIRST, Runs.R1); add(reply(Keys.M1, VoiceText("Partial"), Runs.R1)) }
         val second = collect(ask(Say.SECOND))
-        assertEquals(1, session.stops)
+        assertEquals(0, session.stops)
         assertEquals(listOf(Say.FIRST, Say.SECOND), session.sent)
-        settle {
-            add(reply(Keys.M2, VoiceText("Late words from the first run"), Runs.R1))
-            start(Sent.SECOND, Runs.R2)
-            add(reply(Keys.M3, VoiceText("Answer two."), Runs.R2))
-        }
+        settle { add(reply(Keys.M2, VoiceText("More from the first run."), Runs.R1)) }
+        settle { end(Runs.R1) }
+        settle { start(Sent.SECOND, Runs.R2); add(reply(Keys.M3, VoiceText("Answer two."), Runs.R2)) }
         settle { end(Runs.R2) }
-        assertEquals(listOf("Partial"), texts(first))
+        assertEquals(listOf("Partial", "\nMore from the first run."), texts(first))
+        assertEquals(VoiceReplyEvent.Completed, first.last())
         assertEquals(listOf("Answer two."), texts(second))
+        assertEquals(VoiceReplyEvent.Completed, second.last())
+    }
+
+    @Test
+    fun aFollowUpsDeliveryWaitStartsOnlyOnceItCanHaveStarted() = runTest {
+        val first = collect(ask(Say.FIRST))
+        settle { start(Sent.FIRST, Runs.R1) }
+        val second = collect(ask(Say.SECOND))
+        settle { update { copy(queued = setOf(Sent.SECOND)) } }
+        advanceTimeBy(ChatReplyPolicy().deliveryTimeout * 2)
+        runCurrent()
+        assertEquals(emptyList(), second, "nothing fails while the first answer streams")
+        settle { end(Runs.R1) }
+        advanceTimeBy(ChatReplyPolicy().deliveryTimeout * 2)
+        runCurrent()
+        assertEquals(emptyList(), second, "nothing fails while the chat holds it in its queue")
+        settle { update { copy(queued = emptySet()) } }
+        advanceTimeBy(ChatReplyPolicy().deliveryTimeout + 1.seconds)
+        runCurrent()
+        assertEquals(VoiceReplyEvent.Completed, first.last())
+        assertEquals(listOf<VoiceReplyEvent>(failed(VoiceErrorCode.NOT_DELIVERED)), second)
     }
 
     /** Starts [reply]'s cancel in the background; the outcome is null until the cancel returns. */
@@ -308,15 +346,19 @@ class VoiceChatResponderTest {
     }
 
     @Test
-    fun replyCancelledWhileThePreviousRunStopsSendsNothing() = runTest {
-        collect(ask(Say.FIRST))
-        settle { start(Sent.FIRST, Runs.R1) }
-        session.endRunOnStop = false
+    fun cancellingAFollowUpStopsNothingUntilItsOwnRunStarts() = runTest {
+        val first = collect(ask(Say.FIRST))
+        settle { start(Sent.FIRST, Runs.R1); add(reply(Keys.M1, VoiceText("Still going."), Runs.R1)) }
         val second = ask(Say.SECOND)
         collect(second)
-        backgroundScope.launch { second.cancel() }
-        advanceTimeBy(ChatReplyPolicy().stopTimeout + 1.seconds)
-        runCurrent()
-        assertEquals(listOf(Say.FIRST), session.sent)
+        val outcome = cancelLater(second)
+        assertEquals(0, session.stops)
+        settle { end(Runs.R1) }
+        assertEquals(0, session.stops)
+        assertEquals(listOf("Still going."), texts(first))
+        assertEquals(VoiceReplyEvent.Completed, first.last())
+        settle { start(Sent.SECOND, Runs.R2) }
+        assertEquals(1, session.stops)
+        assertEquals(VoiceCancelOutcome.STOPPED, outcome())
     }
 }

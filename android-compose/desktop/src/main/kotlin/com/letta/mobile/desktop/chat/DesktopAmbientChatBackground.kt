@@ -31,6 +31,8 @@ import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.ambient.ambientGlowShaderSource
 import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
+import com.letta.mobile.ui.ambient.AmbientVoiceRole
+import com.letta.mobile.ui.ambient.LocalAmbientVoice
 import com.letta.mobile.util.Telemetry
 import org.jetbrains.skia.Paint as SkiaPaint
 import org.jetbrains.skia.Rect as SkiaRect
@@ -66,9 +68,13 @@ internal fun DesktopAmbientChatBackground(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val spec = remember(status) { AmbientMotion.spec(status) }
-    val targetColor = remember(status, colorScheme, identitySeed) {
-        when (status) {
+    // Voice mode (LocalAmbientVoice): the glow takes that voice's colour and level; without one it is exactly the run's glow.
+    val voice = LocalAmbientVoice.current
+    val glowStatus = if (voice != null) AmbientMotionStatus.Running else status
+    val spec = remember(glowStatus) { AmbientMotion.spec(glowStatus) }
+    val targetColor = remember(glowStatus, colorScheme, identitySeed, voice) {
+        if (voice?.role == AmbientVoiceRole.You) return@remember Color(voice.youTintArgb)
+        when (glowStatus) {
             AmbientMotionStatus.Idle -> Color.Transparent
             AmbientMotionStatus.Running, AmbientMotionStatus.Active ->
                 identitySeed?.let { lerp(colorScheme.tertiary, it, IdentityBlend) } ?: colorScheme.tertiary
@@ -94,10 +100,10 @@ internal fun DesktopAmbientChatBackground(
 
     // Bloom→settle intensity envelope; continuous states just ease to steady.
     val envelope = remember { Animatable(spec.settledEnvelope) }
-    LaunchedEffect(status) {
+    LaunchedEffect(glowStatus) {
         // Same shared ramp as the Android renderer: climb into a bloom, never step into
         // one. See AmbientMotion.ramp for the flash this removed.
-        val ramp = AmbientMotion.ramp(current = envelope.value, status = status)
+        val ramp = AmbientMotion.ramp(current = envelope.value, status = glowStatus)
         if (ramp.risesFirst) {
             // Ease IN to the bloom for the same reason as the Android renderer: an
             // ease-out climb front-loads the brightening and reads as a flash.
@@ -127,16 +133,12 @@ internal fun DesktopAmbientChatBackground(
         }
     }
 
-    // Compiled once; null only if SkSL compilation fails, in which case the
-    // gradient fallback below takes over. Builder and paint are reused across
-    // frames (uniform writes overwrite) — only the per-frame Shader handle
-    // allocates. Drawn via the native Skia canvas because this Compose
-    // version's Shader type does not accept a raw skia Shader.
+    // Compiled once; null only if SkSL compilation fails, in which case the gradient fallback below takes over. Builder and paint are
+    // reused across frames (uniform writes overwrite) — only the per-frame Shader handle allocates. Drawn via the native Skia canvas
+    // because this Compose version's Shader type does not accept a raw skia Shader.
     //
-    // The failure branch is LOUD on purpose: a broken SkSL edit and "this GPU
-    // cannot run the shader" otherwise look identical from the outside — a
-    // subtly flatter glow that could ship unnoticed. Degradation is
-    // safe-direction, but it must still be greppable.
+    // The failure branch is LOUD on purpose: a broken SkSL edit and "this GPU cannot run the shader" otherwise look identical from the
+    // outside — a subtly flatter glow that could ship unnoticed. Degradation is safe-direction, but it must still be greppable.
     val glowStyle = LocalThinkingGlowStyle.current
     val shaderBuilder = remember(glowStyle) {
         val source = ambientGlowShaderSource(glowStyle) + AMBIENT_GLOW_MAIN_PREMULTIPLIED
@@ -153,10 +155,9 @@ internal fun DesktopAmbientChatBackground(
     }
     // Keyed with the builder: a style change disposes both together (the effect below).
     val shaderPaint = remember(glowStyle) { SkiaPaint() }
-    // The builder outlives individual frames, but not the composition: leaving
-    // and returning to Conversations disposes and recreates this pane, and each
-    // mount compiles another native-backed effect. Released explicitly rather
-    // than left to the cleaner, for the same reason the per-frame handles are.
+    // The builder outlives individual frames, but not the composition: leaving and returning to Conversations disposes and recreates this
+    // pane, and each mount compiles another native-backed effect. Released explicitly rather than left to the cleaner, for the same reason
+    // the per-frame handles are.
     DisposableEffect(shaderBuilder, shaderPaint) {
         onDispose {
             shaderPaint.shader = null
@@ -168,21 +169,19 @@ internal fun DesktopAmbientChatBackground(
     Box(modifier = modifier) {
         if (visible) {
             Canvas(modifier = Modifier.matchParentSize()) {
-                val intensity = envelope.value
+                val intensity = voice?.envelope(envelope.value) ?: envelope.value
                 if (shaderBuilder != null) {
                     shaderBuilder.uniform("uSize", size.width, size.height)
                     shaderBuilder.uniform("uTime", phase)
                     shaderBuilder.uniform("uAgitation", agitation)
                     shaderBuilder.uniform("uEnvelope", intensity)
-                    shaderBuilder.uniform("uStreamEnergy", 0f)
+                    shaderBuilder.uniform("uStreamEnergy", voice?.streamEnergy(0f) ?: 0f)
                     shaderBuilder.uniform("uPalettePull", AmbientMotion.PALETTE_HUE_PULL)
                     shaderBuilder.uniform("uBandTop", AmbientMotion.PANE_EDGE_BAND.top)
                     shaderBuilder.uniform("uBandPeak", AmbientMotion.PANE_EDGE_BAND.peak)
                     shaderBuilder.uniform("uColor", tint.red, tint.green, tint.blue, tint.alpha)
-                    // One native Shader per frame is unavoidable (uniforms bake
-                    // in at makeShader time), but leaving it to the cleaner is
-                    // not: a long turn draws ~60/s, so the handles must be
-                    // released as soon as the draw that used them returns.
+                    // One native Shader per frame is unavoidable (uniforms bake in at makeShader time), but leaving it to the cleaner is
+                    // not: a long turn draws ~60/s, so the handles must be released as soon as the draw that used them returns.
                     val frameShader = shaderBuilder.makeShader(null)
                     shaderPaint.shader = frameShader
                     drawIntoCanvas { canvas ->

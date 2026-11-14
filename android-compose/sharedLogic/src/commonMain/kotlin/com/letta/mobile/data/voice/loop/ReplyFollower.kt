@@ -14,6 +14,7 @@ import com.letta.mobile.data.voice.speech.SentenceChunker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -22,18 +23,29 @@ private class FollowedReply(val reply: VoiceReply, val job: Job)
 
 /**
  * Starts answers, follows each under its turn's generation token, and cancels them (bounded).
+ * Several answers may be followed at once (follow-ups); each is collected on its own.
+ *
+ * An answer is collected (which sends its utterance) only once every interrupt requested before it
+ * has settled, each wait bounded by [com.letta.mobile.data.voice.VoiceLoopConfig.releaseTimeout]:
+ * a stop of the answer the person spoke over then cannot reach the message they spoke next.
  * Used from the loop's processing coroutine.
  */
 internal class ReplyFollower(private val wiring: LoopWiring) {
     private val replies = mutableMapOf<TurnKey, FollowedReply>()
+    private val stopping = mutableListOf<Job>()
 
-    /** Starts answering; a responder that throws becomes an ENGINE_FAILED responder fault. */
+    /** Starts answering; a responder that throws fails that answer (ENGINE_FAILED), not the loop. */
     fun respond(effect: LoopEffect.Respond): LoopInput? {
         replies.entries.removeAll { !it.value.job.isActive }
+        stopping.removeAll { !it.isActive }
         var reply: VoiceReply? = null
-        val fault = wiring.call(VoicePort.RESPONDER) { reply = wiring.engines.responder.respond(effect.utterance) }
-        val started = reply ?: return fault
-        val job = wiring.scope.launch { follow(effect.turn, started) }
+        wiring.call(VoicePort.RESPONDER) { reply = wiring.engines.responder.respond(effect.utterance) }
+        val started = reply ?: return fail(effect.turn)
+        val stops = stopping.toList()
+        val job = wiring.scope.launch {
+            awaitStops(stops)
+            follow(effect.turn, started)
+        }
         replies[effect.turn] = FollowedReply(started, job)
         return null
     }
@@ -41,7 +53,22 @@ internal class ReplyFollower(private val wiring: LoopWiring) {
     /** Asks [turn]'s answer to stop without waiting; the outcome comes back as an input. */
     fun requestInterrupt(turn: TurnKey): LoopInput? {
         val followed = replies[turn] ?: return LoopInput.InterruptSettled(turn, VoiceCancelOutcome.ALREADY_FINISHED)
-        wiring.scope.launch { wiring.inputs.send(LoopInput.InterruptSettled(turn, boundedCancel(followed.reply))) }
+        stopping += wiring.scope.launch { wiring.inputs.send(LoopInput.InterruptSettled(turn, boundedCancel(followed.reply))) }
+        return null
+    }
+
+    /** Waits (bounded) until every stop requested before an answer has settled. */
+    private suspend fun awaitStops(stops: List<Job>) {
+        if (stops.isNotEmpty()) withTimeoutOrNull(wiring.config.releaseTimeout) { stops.joinAll() }
+    }
+
+    /**
+     * Fails [turn]'s answer through the input queue (unbounded, so this never drops) rather than as
+     * a fault of this step, which would hold back the step's other effects.
+     */
+    private fun fail(turn: TurnKey): LoopInput? {
+        val error = VoiceError(VoiceErrorCode.ENGINE_FAILED, VoicePort.RESPONDER)
+        wiring.inputs.trySend(LoopInput.FromReply(turn, ReplySignal.Failed(error)))
         return null
     }
 
