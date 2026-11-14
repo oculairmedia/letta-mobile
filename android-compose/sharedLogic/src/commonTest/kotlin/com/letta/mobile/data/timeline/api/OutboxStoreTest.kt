@@ -122,9 +122,11 @@ internal class OutboxStoreTest {
         val revision = ledger.current.revision
         val confirmed = ledger.engineTransaction(scope) { confirmOutboxEcho(this, "otid-1", now) }
         assertTrue(confirmed)
-        assertEquals(revision, ledger.current.revision)
+        // The enclosing echo transaction owns revision allocation, including replay-only removal.
+        assertEquals(revision + 1, ledger.current.revision)
         assertEquals(emptyList(), outbox.load(scope))
         assertEquals(false, ledger.engineTransaction(scope) { confirmOutboxEcho(this, "otid-1", now) })
+        assertEquals(revision + 1, ledger.current.revision)
     }
 
     @Test
