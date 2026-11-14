@@ -2285,8 +2285,6 @@ public final class com/letta/mobile/ui/chat/surface/timeline/ComposableSingleton
 	public fun <init> ()V
 	public final fun getLambda$-158926270$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-74494069$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$1093551903$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$220030344$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/chat/surface/timeline/ComposableSingletons$TimelineListChromeKt {
@@ -2348,19 +2346,12 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ChatRowToolPre
 	public static final fun getLocalMemoryPreview ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
-public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatApprovalStepperKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatApprovalStepperKt;
-	public fun <init> ()V
-	public final fun getLambda$-220239333$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$367194226$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-}
-
 public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowApprovalsKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowApprovalsKt;
 	public fun <init> ()V
 	public final fun getLambda$-1144760461$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-145576189$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-491711505$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-242433104$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowImageViewerKt {
