@@ -87,9 +87,15 @@ class ChatSurfaceSharedControlsGeometryUiTest {
     @Test
     fun agentPillKeepsItsSwitcherMarkInsideThePill() = atEveryWidth { width ->
         show(width) {
-            AgentIdentityPill(
-                AgentIdentity(agentId = "agent-geometry", name = LONG_NAME, isFavorite = true, isPinned = true, onClick = {}, onLongClick = {}),
+            val identity = AgentIdentity(
+                agentId = "agent-geometry",
+                name = LONG_NAME,
+                isFavorite = true,
+                isPinned = true,
+                onClick = {},
+                onLongClick = {},
             )
+            AgentIdentityPill(identity)
         }
         val frame = bounds(FRAME)
         val pill = bounds(AgentIdentityPillTestTags.PILL)
