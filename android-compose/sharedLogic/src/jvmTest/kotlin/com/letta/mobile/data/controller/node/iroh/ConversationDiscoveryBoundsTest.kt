@@ -58,6 +58,35 @@ class ConversationDiscoveryBoundsTest {
     }
 
     @Test
+    fun baselineDrainedOverPassesAndRereadIsNeverAnnounced() = runTest {
+        val root = createTempDirectory("discovery-baseline").toFile()
+        try {
+            repeat(40) { directory(root, "conversation:local-conv-$it") }
+            val announced = mutableListOf<String>()
+            var now = 0L
+            val discovery = ConversationDiscovery(
+                root, null, ::decodeTestKey, onPrimed = { id, _ -> announced += id }, clock = { now },
+            )
+            val server = RecordingClient(root)
+            discovery.prime(server, true)
+            now += 5_000
+            discovery.prime(server, true)
+            // A full re-read of the same directory finds nothing new.
+            now += 60_000
+            discovery.prime(server, true)
+            assertEquals(40, server.ids.size, "the baseline is still primed, over two capped passes")
+            assertEquals(emptyList(), announced)
+            directory(root, "conversation:local-conv-new")
+            check(root.setLastModified(root.lastModified() + 10_000))
+            now += 5_000
+            discovery.prime(server, true)
+            assertEquals(listOf("local-conv-new"), announced)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun periodicRecheckCoversCoarseDirectoryTimestamps() = runTest {
         val root = createTempDirectory("discovery-mtime").toFile()
         try {
