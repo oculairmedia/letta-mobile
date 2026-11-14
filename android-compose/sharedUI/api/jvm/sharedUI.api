@@ -11967,12 +11967,12 @@ public final class com/letta/mobile/ui/theme/LettaSectionLabelKt {
 }
 
 public final class com/letta/mobile/ui/theme/LettaStatusGlyphsKt {
-	public static final fun LettaCheckGlyph (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaCheckGlyph (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaDoneGlyph (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaFailedGlyph (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaInProgressGlyph (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaInProgressGlyph (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaMenuIndicator-FNF3uiM (Landroidx/compose/ui/Modifier;Ljava/lang/String;JLandroidx/compose/runtime/Composer;II)V
-	public static final fun LettaPendingGlyph (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaPendingGlyph (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/theme/PlatformAccessibility_jvmKt {

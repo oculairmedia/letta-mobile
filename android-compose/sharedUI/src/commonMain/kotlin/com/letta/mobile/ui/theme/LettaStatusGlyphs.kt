@@ -27,20 +27,21 @@ import com.composables.icons.lucide.Lucide
  *   LettaCheckGlyph       chosen or included (the selected option, an installed command): a bare check
  *   LettaMenuIndicator    the still "opens a menu" mark at the end of a chip or a switcher
  *
- * The status glyphs are drawn at the standard glyph size and are decorative unless given a
- * contentDescription; a row that already says the state in words leaves it null.
+ * The status glyphs are drawn at the standard glyph size. The pending, in-progress and check glyphs
+ * are decorative (their rows say the state in words); the done and failed glyphs take an optional
+ * contentDescription for a row that does not.
  */
 
 /** A task, a todo or a step that has not started. */
 @Composable
-fun LettaPendingGlyph(modifier: Modifier = Modifier, contentDescription: String? = null) {
-    StatusGlyph(Lucide.Circle, MaterialTheme.colorScheme.onSurfaceVariant, modifier, contentDescription)
+fun LettaPendingGlyph(modifier: Modifier = Modifier) {
+    StatusGlyph(Lucide.Circle, MaterialTheme.colorScheme.onSurfaceVariant, modifier, contentDescription = null)
 }
 
 /** A task, a todo or a step under way. */
 @Composable
-fun LettaInProgressGlyph(modifier: Modifier = Modifier, contentDescription: String? = null) {
-    StatusGlyph(Lucide.Clock, MaterialTheme.colorScheme.primary, modifier, contentDescription)
+fun LettaInProgressGlyph(modifier: Modifier = Modifier) {
+    StatusGlyph(Lucide.Clock, MaterialTheme.colorScheme.primary, modifier, contentDescription = null)
 }
 
 /** A task, a todo or a run that finished well. */
@@ -58,8 +59,8 @@ fun LettaFailedGlyph(modifier: Modifier = Modifier, contentDescription: String? 
 
 /** The chosen option in a list, or an item that is included: a bare check in the content colour. */
 @Composable
-fun LettaCheckGlyph(modifier: Modifier = Modifier, contentDescription: String? = null) {
-    StatusGlyph(Lucide.Check, LocalContentColor.current, modifier, contentDescription)
+fun LettaCheckGlyph(modifier: Modifier = Modifier) {
+    StatusGlyph(Lucide.Check, LocalContentColor.current, modifier, contentDescription = null)
 }
 
 /**
