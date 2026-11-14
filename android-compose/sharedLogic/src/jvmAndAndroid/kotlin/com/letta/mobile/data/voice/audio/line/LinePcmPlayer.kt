@@ -84,30 +84,50 @@ internal class LinePcmPlayer(
     }
 }
 
-/** How far a writer has got: frames the line accepted, and whether it is still writing (or ending the stream). */
+/**
+ * How far a writer has got: frames the line accepted, whether it is still writing (or ending the
+ * stream), and whether it is inside a blocking call into the line right now.
+ */
 private class WriteProgress {
     val queued = AtomicLong()
 
     @Volatile
     var writing = true
+
+    @Volatile
+    var inCall = false
+
+    /** Runs one blocking line call, marked as in progress until it returns. */
+    inline fun <T> blocking(call: () -> T): T {
+        inCall = true
+        try {
+            return call()
+        } finally {
+            inCall = false
+        }
+    }
 }
 
+/** What the watchdog compares between polls: frames played and frames the line has accepted. */
+private data class LineProgress(val played: Long, val queued: Long)
+
 /**
- * Fails with PLAYBACK_FAILED when, while the writer is still writing, the line plays none of the
- * audio it has accepted for the stall timeout: a device that stopped consuming leaves the writer
- * blocked in a write, where [LineWriter]'s own drain check never runs. Failing cancels the scope,
- * whose caller aborts the line so the blocked write returns.
+ * Fails with PLAYBACK_FAILED when, during the write phase, neither playback nor the accepted
+ * audio moves for the stall timeout while the writer waits on the line: blocked inside `write()` or
+ * `endOfStream()` (even the very first write, or after everything earlier has played), or retrying
+ * writes the line will not take while accepted audio sits unplayed. Failing cancels the scope, whose
+ * caller aborts the line so the blocked call returns, then releases it.
  */
 private suspend fun watchWrites(line: PcmOutputLine, progress: WriteProgress, options: PlayerOptions) {
-    var lastPlayed = line.playedFrames()
+    var last = LineProgress(line.playedFrames(), progress.queued.get())
     var stalled = Duration.ZERO
     while (progress.writing) {
         delay(options.drainPoll)
-        val played = line.playedFrames()
-        val starved = played == lastPlayed && progress.queued.get() > played
-        stalled = if (starved) stalled + options.drainPoll else Duration.ZERO
+        val now = LineProgress(line.playedFrames(), progress.queued.get())
+        val waiting = progress.inCall || now.queued > now.played
+        stalled = if (now == last && waiting) stalled + options.drainPoll else Duration.ZERO
         if (stalled >= options.stallTimeout) throw VoiceAudioException(VoiceErrorCode.PLAYBACK_FAILED)
-        lastPlayed = played
+        last = now
     }
 }
 
@@ -130,7 +150,7 @@ private class LineWriter(
             onLevel(PcmLevels.level(chunk))
         }
         resampler?.let { writeFully(it.finish()) }
-        line.endOfStream()
+        progress.blocking { line.endOfStream() }
         progress.writing = false
         awaitPlayed()
     }
@@ -140,7 +160,7 @@ private class LineWriter(
         while (offset < samples.size) {
             currentCoroutineContext().ensureActive()
             val remaining = if (offset == 0) samples else samples.copyOfRange(offset, samples.size)
-            val count = line.write(remaining, remaining.size)
+            val count = progress.blocking { line.write(remaining, remaining.size) }
             if (count < 0) throw VoiceAudioException(VoiceErrorCode.PLAYBACK_FAILED)
             if (count == 0) delay(options.drainPoll)
             offset += count

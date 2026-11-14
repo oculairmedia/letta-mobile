@@ -15,21 +15,27 @@ import kotlinx.coroutines.runBlocking
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.measureTime
 
 /**
  * How a fake speaker behaves: its rate, whether writes block until abort (all of them, or every one
- * after the first, like a device that stops consuming) and whether it never plays.
+ * after the first, like a device that stops consuming), whether endOfStream blocks until abort,
+ * whether it never plays, and whether each write takes 30 ms while playing its audio as it goes.
  */
 private data class SpeakerScript(
     val rateHz: Int? = null,
     val blockWrites: Boolean = false,
     val stuck: Boolean = false,
     val jamAfterFirstWrite: Boolean = false,
+    val blockEndOfStream: Boolean = false,
+    val slowButPlaying: Boolean = false,
 )
 
 private class FakeSpeaker(private val script: SpeakerScript) : PcmOutputDevice {
@@ -37,6 +43,7 @@ private class FakeSpeaker(private val script: SpeakerScript) : PcmOutputDevice {
     val events = Collections.synchronizedList(mutableListOf<String>())
     val writing = CountDownLatch(1)
     private val aborted = CountDownLatch(1)
+    private val playedSoFar = AtomicLong()
     var opens = 0
         private set
 
@@ -51,10 +58,27 @@ private class FakeSpeaker(private val script: SpeakerScript) : PcmOutputDevice {
                 val jammed = script.jamAfterFirstWrite && written.isNotEmpty()
                 if (script.blockWrites || jammed) return if (aborted.await(5, TimeUnit.SECONDS)) 0 else count
                 for (index in 0 until count) written += samples[index]
+                if (script.slowButPlaying) playSlowly(count)
                 return count
             }
 
-            override fun playedFrames(): Long = if (script.stuck) 0 else written.size.toLong()
+            /** Three 10 ms steps, each playing a third of [count]: blocked for 30 ms but always moving. */
+            private fun playSlowly(count: Int) {
+                repeat(3) { step ->
+                    Thread.sleep(10)
+                    playedSoFar.addAndGet(if (step < 2) count / 3L else count - 2 * (count / 3L))
+                }
+            }
+
+            override fun playedFrames(): Long = when {
+                script.stuck -> 0
+                script.slowButPlaying -> playedSoFar.get()
+                else -> written.size.toLong()
+            }
+
+            override fun endOfStream() {
+                if (script.blockEndOfStream) aborted.await(5, TimeUnit.SECONDS)
+            }
 
             override fun abort() {
                 events += "abort"
@@ -128,7 +152,9 @@ class LinePcmPlayerTest {
     @Test
     fun cancellingAbortsTheLineAndReleasesItBeforeReturning() = runBlocking {
         val speaker = FakeSpeaker(SpeakerScript(blockWrites = true))
-        val playing = launch(Dispatchers.IO) { LinePcmPlayer(speaker, options).play(wavClip(24_000)) { } }
+        // A long stall budget: this test cancels a blocked write, it must not race the stall watchdog.
+        val patient = options.copy(stallTimeout = 10.seconds)
+        val playing = launch(Dispatchers.IO) { LinePcmPlayer(speaker, patient).play(wavClip(24_000)) { } }
         assertTrue(speaker.writing.await(5, TimeUnit.SECONDS))
         playing.cancelAndJoin()
         assertEquals(listOf("abort", "release"), speaker.events)
@@ -159,6 +185,49 @@ class LinePcmPlayerTest {
         val error = assertFailsWith<VoiceAudioException> { LinePcmPlayer(speaker, options).play(wavClip(24_000)) { } }
         assertEquals(VoiceErrorCode.PLAYBACK_FAILED, error.code)
         assertEquals(listOf("abort", "release"), speaker.events.toList())
+    }
+
+    @Test
+    fun aFirstWriteThatNeverReturnsFailsWithinTheStallBudget() = runBlocking {
+        val speaker = FakeSpeaker(SpeakerScript(blockWrites = true))
+        val elapsed = measureTime {
+            val error = assertFailsWith<VoiceAudioException> { LinePcmPlayer(speaker, options).play(wavClip(2_400)) { } }
+            assertEquals(VoiceErrorCode.PLAYBACK_FAILED, error.code)
+        }
+        assertTrue(elapsed < 2.seconds, "took $elapsed")
+        assertEquals(listOf("abort", "release"), speaker.events.toList())
+    }
+
+    @Test
+    fun aWriteThatBlocksAfterEverythingEarlierPlayedFails() = runBlocking {
+        val speaker = FakeSpeaker(SpeakerScript(jamAfterFirstWrite = true))
+        val elapsed = measureTime {
+            val error = assertFailsWith<VoiceAudioException> { LinePcmPlayer(speaker, options).play(wavClip(2_400)) { } }
+            assertEquals(VoiceErrorCode.PLAYBACK_FAILED, error.code)
+        }
+        assertTrue(elapsed < 2.seconds, "took $elapsed")
+        assertEquals(listOf("abort", "release"), speaker.events.toList())
+    }
+
+    @Test
+    fun anEndOfStreamThatBlocksAfterTheClipPlayedFails() = runBlocking {
+        val speaker = FakeSpeaker(SpeakerScript(blockEndOfStream = true))
+        val elapsed = measureTime {
+            val error = assertFailsWith<VoiceAudioException> { LinePcmPlayer(speaker, options).play(wavClip(2_400)) { } }
+            assertEquals(VoiceErrorCode.PLAYBACK_FAILED, error.code)
+        }
+        assertTrue(elapsed < 2.seconds, "took $elapsed")
+        assertEquals(2_400, speaker.written.size)
+        assertEquals(listOf("abort", "release"), speaker.events.toList())
+    }
+
+    @Test
+    fun aSlowDeviceThatKeepsPlayingIsNotTreatedAsStalled() = runBlocking {
+        // Five 30 ms writes against a 50 ms budget: each write blocks, but playback moves every 10 ms.
+        val speaker = FakeSpeaker(SpeakerScript(slowButPlaying = true))
+        LinePcmPlayer(speaker, options).play(wavClip(2_400)) { }
+        assertEquals(2_400, speaker.written.size)
+        assertEquals(listOf("release"), speaker.events.toList())
     }
 
     @Test
