@@ -72938,7 +72938,14 @@ public final class com/letta/mobile/data/voice/audio/AudioFrameSource$DefaultImp
 }
 
 public abstract interface class com/letta/mobile/data/voice/audio/AudioPlayer {
-	public abstract fun play (Lcom/letta/mobile/data/voice/audio/AudioClip;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun play (Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/voice/audio/PcmChunk {
+	public fun <init> ([SLcom/letta/mobile/data/voice/audio/PcmFormat;)V
+	public final fun getFormat ()Lcom/letta/mobile/data/voice/audio/PcmFormat;
+	public final fun getSamples ()[S
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/voice/audio/PcmFormat {
@@ -73090,6 +73097,10 @@ public final class com/letta/mobile/data/voice/audio/pcm/ClipDecoder {
 	public final fun decode (Lcom/letta/mobile/data/voice/audio/AudioClip;)Lcom/letta/mobile/data/voice/audio/pcm/PcmAudio;
 }
 
+public final class com/letta/mobile/data/voice/audio/pcm/ClipDecoderKt {
+	public static final fun play (Lcom/letta/mobile/data/voice/audio/AudioPlayer;Lcom/letta/mobile/data/voice/audio/AudioClip;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public final class com/letta/mobile/data/voice/audio/pcm/PcmAudio {
 	public fun <init> ([SLcom/letta/mobile/data/voice/audio/PcmFormat;)V
 	public final fun getFormat ()Lcom/letta/mobile/data/voice/audio/PcmFormat;
@@ -73209,6 +73220,7 @@ public final class com/letta/mobile/data/voice/consent/VoiceEndpointPayload : ja
 public final class com/letta/mobile/data/voice/endpoint/EndpointSpeechSynthesizer {
 	public fun <init> (Lcom/letta/mobile/data/voice/endpoint/SpeechEndpointClient;Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrantSource;Lcom/letta/mobile/data/voice/VoiceEndpointSettings;Lcom/letta/mobile/data/voice/audio/AudioEncoding;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/voice/endpoint/SpeechEndpointClient;Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrantSource;Lcom/letta/mobile/data/voice/VoiceEndpointSettings;Lcom/letta/mobile/data/voice/audio/AudioEncoding;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun stream-8iZQIHs (Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
 	public final fun synthesize-iyX4eW4 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
