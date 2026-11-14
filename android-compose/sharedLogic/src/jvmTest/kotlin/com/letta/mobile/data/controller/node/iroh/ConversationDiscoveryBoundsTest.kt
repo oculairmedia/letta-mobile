@@ -24,6 +24,7 @@ import kotlinx.serialization.json.put
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ConversationDiscoveryBoundsTest {
     @Test
@@ -231,6 +232,32 @@ class ConversationDiscoveryBoundsTest {
             first.await()
             second.await()
             assertEquals(1, server.ids.size)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    /**
+     * After a restart every list request ran into the same pass: the ones arriving while it retrieved
+     * waited for it on the scanning lock, then found the interval not elapsed and did nothing.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun aCallArrivingDuringAPassDoesNotWaitForIt() = runTest {
+        val root = createTempDirectory("discovery-no-wait").toFile()
+        try {
+            directory(root, "conversation:local-conv-slow")
+            val gate = CompletableDeferred<Unit>()
+            val server = RecordingClient(root, gate = gate)
+            val discovery = ConversationDiscovery(root, null, ::decodeTestKey) { 0L }
+            val first = async { discovery.prime(server, true) }
+            runCurrent()
+            val second = async { discovery.prime(server, true) }
+            runCurrent()
+            assertTrue(second.isCompleted, "a list never waits on another request's discovery pass")
+            gate.complete(Unit)
+            first.await()
+            assertEquals(listOf("local-conv-slow"), server.ids)
         } finally {
             root.deleteRecursively()
         }

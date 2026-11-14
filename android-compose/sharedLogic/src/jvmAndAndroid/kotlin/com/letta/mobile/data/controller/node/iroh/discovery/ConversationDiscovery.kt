@@ -4,7 +4,6 @@ import com.letta.mobile.data.controller.node.listcache.HeldListCache
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonArray
@@ -40,33 +39,44 @@ internal class ConversationDiscovery(
         synchronized(known) { known.addAll(ids) }
     }
 
+    /**
+     * Runs a bounded pass unless one ran within [MIN_INTERVAL_MS]. A call arriving while another
+     * request's pass is retrieving returns at once rather than waiting for it: that pass announces
+     * what it finds and drops the held list, so the caller's list is never held up by it.
+     */
     suspend fun prime(
         authenticated: Boolean,
         warn: (String, Int, Boolean) -> Unit,
         retrieve: suspend (String, Long) -> Boolean,
     ) {
-        if (!authenticated) return
-        scanning.withLock {
-            val now = clock()
-            if (lastScanAt?.let { now - it < MIN_INTERVAL_MS } == true) return
-            lastScanAt = now
-            refreshPending(now, warn)
-            pending.removeAll { isKnown(it) }
-            var failures = 0
-            var timedOut = false
-            repeat(minOf(MAX_PER_PASS, pending.size)) {
-                val remaining = PASS_BUDGET_MS - (clock() - now)
-                if (remaining <= 0) {
-                    timedOut = true
-                    return@repeat
-                }
-                val id = pending.removeFirst()
-                if (isKnown(id)) return@repeat
-                if (!primeOne(id, remaining, retrieve)) failures++
+        if (!authenticated || !scanning.tryLock()) return
+        try {
+            pass(warn, retrieve)
+        } finally {
+            scanning.unlock()
+        }
+    }
+
+    private suspend fun pass(warn: (String, Int, Boolean) -> Unit, retrieve: suspend (String, Long) -> Boolean) {
+        val now = clock()
+        if (lastScanAt?.let { now - it < MIN_INTERVAL_MS } == true) return
+        lastScanAt = now
+        refreshPending(now, warn)
+        pending.removeAll { isKnown(it) }
+        var failures = 0
+        var timedOut = false
+        repeat(minOf(MAX_PER_PASS, pending.size)) {
+            val remaining = PASS_BUDGET_MS - (clock() - now)
+            if (remaining <= 0) {
+                timedOut = true
+                return@repeat
             }
-            if (failures > 0 || timedOut) {
-                warn("conversation_discovery.retrieve_failed", failures, timedOut)
-            }
+            val id = pending.removeFirst()
+            if (isKnown(id)) return@repeat
+            if (!primeOne(id, remaining, retrieve)) failures++
+        }
+        if (failures > 0 || timedOut) {
+            warn("conversation_discovery.retrieve_failed", failures, timedOut)
         }
     }
 
