@@ -6,6 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 /** [hops] hops at [probability]. */
 private data class Run(val hops: Int, val probability: Float)
@@ -72,6 +73,23 @@ class TurnTrackerTest {
             "a pause shorter than the trailing silence does not end the turn",
             listOf(Run(30, 0.9f), Run(30, 0f), Run(30, 0.9f), Run(100, 0f)),
             listOf(At(0, TurnSignal.Candidate), At(19, TurnSignal.Confirmed), At(146, ended(TurnEndReason.SILENCE))),
+        ),
+        PolicyCase(
+            "a candidate that reaches the hard cap unconfirmed is dropped",
+            listOf(Run(12, 0.9f), Run(50, 0f), Run(8, 0.9f), Run(10, 0f)),
+            listOf(
+                At(0, TurnSignal.Candidate),
+                At(62, abandoned(TurnDiscardReason.TOO_LITTLE_VOICE)),
+                At(63, TurnSignal.Candidate),
+                At(76, abandoned(TurnDiscardReason.NO_ONSET)),
+            ),
+            policy = EndOfTurnPolicy(maxTurn = 1.seconds),
+        ),
+        PolicyCase(
+            "while the app speaks a confirmed turn ends when only echo-level sound remains",
+            listOf(Run(40, 0.9f), Run(100, 0.5f)),
+            listOf(At(0, TurnSignal.Candidate), At(24, TurnSignal.Confirmed), At(96, ended(TurnEndReason.SILENCE))),
+            outputActive = true,
         ),
         PolicyCase(
             "below the enter threshold nothing starts",

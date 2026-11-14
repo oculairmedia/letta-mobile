@@ -24,7 +24,8 @@ data class SpeechThresholds(
  * test drives it without a clock. A hop at or above the enter threshold opens a candidate; voiced
  * hops (at or above the exit threshold) are counted. Before [onsetSustain] of voice has built up, a
  * gap longer than [onsetGap] drops the candidate (a click, a knock); after it, the candidate becomes
- * a turn once [minVoiced] of voice has been heard, and is dropped if [trailingSilence] passes first.
+ * a turn once [minVoiced] of voice has been heard, and is dropped if [trailingSilence] passes first
+ * or it reaches [maxTurn] unconfirmed.
  * A dropped candidate is never transcribed. A turn ends after [trailingSilence] without voice (the
  * hangover that keeps pauses between words inside one turn) or at [maxTurn]. While the app speaks,
  * the raised [echoGuard] thresholds apply and a turn needs [bargeInSustain] of voice.
@@ -139,28 +140,33 @@ internal class TurnTracker(private val policy: EndOfTurnPolicy, format: AudioFra
         return TurnSignal.Candidate
     }
 
+    /** A candidate within the hard cap is confirmed or kept; at the cap, or after too long a gap, it is dropped. */
     private fun candidate(current: TurnPhase.Candidate, observed: HopObservation): TurnSignal {
         val end = observed.end.value
         val voiced = observed.probability.value >= thresholds(observed).exit
         if (voiced) voicedSamples += hop.samples
         val lastVoice = if (voiced) end else current.lastVoice
-        val needed = if (observed.outputActive) bargeIn else minVoiced
-        if (voicedSamples >= needed) {
+        val withinCap = end - current.start < cap
+        if (withinCap && voicedSamples >= needed(observed)) {
             phase = TurnPhase.Speaking(current.start, lastVoice)
             return TurnSignal.Confirmed
         }
-        val beforeOnset = voicedSamples < onset
-        if (end - lastVoice <= if (beforeOnset) onsetGap else trailing) {
+        if (withinCap && bridges(end - lastVoice)) {
             phase = TurnPhase.Candidate(current.start, lastVoice)
             return TurnSignal.None
         }
         phase = TurnPhase.Quiet
-        return TurnSignal.Abandoned(if (beforeOnset) TurnDiscardReason.NO_ONSET else TurnDiscardReason.TOO_LITTLE_VOICE)
+        return TurnSignal.Abandoned(if (voicedSamples < onset) TurnDiscardReason.NO_ONSET else TurnDiscardReason.TOO_LITTLE_VOICE)
     }
+
+    private fun needed(observed: HopObservation): Long = if (observed.outputActive) bargeIn else minVoiced
+
+    /** Whether a candidate may stay silent for [gap]: the onset gap before its onset, the trailing silence after. */
+    private fun bridges(gap: Long): Boolean = gap <= if (voicedSamples < onset) onsetGap else trailing
 
     private fun speaking(current: TurnPhase.Speaking, observed: HopObservation): TurnSignal {
         val end = observed.end.value
-        val voiced = observed.probability.value >= policy.thresholds.exit
+        val voiced = observed.probability.value >= thresholds(observed).exit
         if (voiced) voicedSamples += hop.samples
         val lastVoice = if (voiced) end else current.lastVoice
         phase = TurnPhase.Speaking(current.start, lastVoice)
