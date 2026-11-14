@@ -1315,6 +1315,17 @@ final enum class com.letta.mobile.data.controller.channels/ChannelRestorePhase :
     final fun values(): kotlin/Array<com.letta.mobile.data.controller.channels/ChannelRestorePhase> // com.letta.mobile.data.controller.channels/ChannelRestorePhase.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.controller.extras.scope/CallerScopeTrust : kotlin/Enum<com.letta.mobile.data.controller.extras.scope/CallerScopeTrust> { // com.letta.mobile.data.controller.extras.scope/CallerScopeTrust|null[0]
+    enum entry CLAIMED // com.letta.mobile.data.controller.extras.scope/CallerScopeTrust.CLAIMED|null[0]
+    enum entry RUNTIME_STAMPED // com.letta.mobile.data.controller.extras.scope/CallerScopeTrust.RUNTIME_STAMPED|null[0]
+
+    final val entries // com.letta.mobile.data.controller.extras.scope/CallerScopeTrust.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.controller.extras.scope/CallerScopeTrust> // com.letta.mobile.data.controller.extras.scope/CallerScopeTrust.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.controller.extras.scope/CallerScopeTrust // com.letta.mobile.data.controller.extras.scope/CallerScopeTrust.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.controller.extras.scope/CallerScopeTrust> // com.letta.mobile.data.controller.extras.scope/CallerScopeTrust.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.controller.reconnect/GiveUpKind : kotlin/Enum<com.letta.mobile.data.controller.reconnect/GiveUpKind> { // com.letta.mobile.data.controller.reconnect/GiveUpKind|null[0]
     enum entry Authentication // com.letta.mobile.data.controller.reconnect/GiveUpKind.Authentication|null[0]
     enum entry Exhausted // com.letta.mobile.data.controller.reconnect/GiveUpKind.Exhausted|null[0]
@@ -33303,6 +33314,7 @@ final class com.letta.mobile.data.canvas/CanvasListTool : com.letta.mobile.data.
     final val name // com.letta.mobile.data.canvas/CanvasListTool.name|{}name[0]
         final fun <get-name>(): kotlin/String // com.letta.mobile.data.canvas/CanvasListTool.name.<get-name>|<get-name>(){}[0]
 
+    final suspend fun invoke(kotlinx.serialization.json/JsonObject, com.letta.mobile.data.controller.extras/ExternalToolCaller): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.canvas/CanvasListTool.invoke|invoke(kotlinx.serialization.json.JsonObject;com.letta.mobile.data.controller.extras.ExternalToolCaller){}[0]
     final suspend fun invoke(kotlinx.serialization.json/JsonObject, kotlin/String?): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.canvas/CanvasListTool.invoke|invoke(kotlinx.serialization.json.JsonObject;kotlin.String?){}[0]
 
     final object Companion { // com.letta.mobile.data.canvas/CanvasListTool.Companion|null[0]
@@ -34131,7 +34143,7 @@ final class com.letta.mobile.data.canvas/HostCanvasBackend { // com.letta.mobile
 }
 
 final class com.letta.mobile.data.canvas/HostCanvasCaller { // com.letta.mobile.data.canvas/HostCanvasCaller|null[0]
-    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.canvas/HostCanvasCaller.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.controller.extras.scope/CallerScopeTrust = ...) // com.letta.mobile.data.canvas/HostCanvasCaller.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String?;com.letta.mobile.data.controller.extras.scope.CallerScopeTrust){}[0]
 
     final val actor // com.letta.mobile.data.canvas/HostCanvasCaller.actor|{}actor[0]
         final fun <get-actor>(): com.letta.mobile.data.model/CanvasActorId // com.letta.mobile.data.canvas/HostCanvasCaller.actor.<get-actor>|<get-actor>(){}[0]
@@ -34139,13 +34151,16 @@ final class com.letta.mobile.data.canvas/HostCanvasCaller { // com.letta.mobile.
         final fun <get-agentId>(): kotlin/String // com.letta.mobile.data.canvas/HostCanvasCaller.agentId.<get-agentId>|<get-agentId>(){}[0]
     final val conversationId // com.letta.mobile.data.canvas/HostCanvasCaller.conversationId|{}conversationId[0]
         final fun <get-conversationId>(): kotlin/String? // com.letta.mobile.data.canvas/HostCanvasCaller.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+    final val scopeTrust // com.letta.mobile.data.canvas/HostCanvasCaller.scopeTrust|{}scopeTrust[0]
+        final fun <get-scopeTrust>(): com.letta.mobile.data.controller.extras.scope/CallerScopeTrust // com.letta.mobile.data.canvas/HostCanvasCaller.scopeTrust.<get-scopeTrust>|<get-scopeTrust>(){}[0]
     final val toolCallId // com.letta.mobile.data.canvas/HostCanvasCaller.toolCallId|{}toolCallId[0]
         final fun <get-toolCallId>(): kotlin/String? // com.letta.mobile.data.canvas/HostCanvasCaller.toolCallId.<get-toolCallId>|<get-toolCallId>(){}[0]
 
     final fun component1(): kotlin/String // com.letta.mobile.data.canvas/HostCanvasCaller.component1|component1(){}[0]
     final fun component2(): kotlin/String? // com.letta.mobile.data.canvas/HostCanvasCaller.component2|component2(){}[0]
     final fun component3(): kotlin/String? // com.letta.mobile.data.canvas/HostCanvasCaller.component3|component3(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.canvas/HostCanvasCaller // com.letta.mobile.data.canvas/HostCanvasCaller.copy|copy(kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    final fun component4(): com.letta.mobile.data.controller.extras.scope/CallerScopeTrust // com.letta.mobile.data.canvas/HostCanvasCaller.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.controller.extras.scope/CallerScopeTrust = ...): com.letta.mobile.data.canvas/HostCanvasCaller // com.letta.mobile.data.canvas/HostCanvasCaller.copy|copy(kotlin.String;kotlin.String?;kotlin.String?;com.letta.mobile.data.controller.extras.scope.CallerScopeTrust){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas/HostCanvasCaller.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas/HostCanvasCaller.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.canvas/HostCanvasCaller.toString|toString(){}[0]
@@ -38746,19 +38761,22 @@ final class com.letta.mobile.data.controller.extras/DiscoverableAgent { // com.l
 }
 
 final class com.letta.mobile.data.controller.extras/ExternalToolCaller { // com.letta.mobile.data.controller.extras/ExternalToolCaller|null[0]
-    constructor <init>(kotlin/String?, kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.controller.extras/ExternalToolCaller.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+    constructor <init>(kotlin/String?, kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.controller.extras.scope/CallerScopeTrust = ...) // com.letta.mobile.data.controller.extras/ExternalToolCaller.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.String?;com.letta.mobile.data.controller.extras.scope.CallerScopeTrust){}[0]
 
     final val agentId // com.letta.mobile.data.controller.extras/ExternalToolCaller.agentId|{}agentId[0]
         final fun <get-agentId>(): kotlin/String? // com.letta.mobile.data.controller.extras/ExternalToolCaller.agentId.<get-agentId>|<get-agentId>(){}[0]
     final val conversationId // com.letta.mobile.data.controller.extras/ExternalToolCaller.conversationId|{}conversationId[0]
         final fun <get-conversationId>(): kotlin/String? // com.letta.mobile.data.controller.extras/ExternalToolCaller.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+    final val scopeTrust // com.letta.mobile.data.controller.extras/ExternalToolCaller.scopeTrust|{}scopeTrust[0]
+        final fun <get-scopeTrust>(): com.letta.mobile.data.controller.extras.scope/CallerScopeTrust // com.letta.mobile.data.controller.extras/ExternalToolCaller.scopeTrust.<get-scopeTrust>|<get-scopeTrust>(){}[0]
     final val toolCallId // com.letta.mobile.data.controller.extras/ExternalToolCaller.toolCallId|{}toolCallId[0]
         final fun <get-toolCallId>(): kotlin/String? // com.letta.mobile.data.controller.extras/ExternalToolCaller.toolCallId.<get-toolCallId>|<get-toolCallId>(){}[0]
 
     final fun component1(): kotlin/String? // com.letta.mobile.data.controller.extras/ExternalToolCaller.component1|component1(){}[0]
     final fun component2(): kotlin/String? // com.letta.mobile.data.controller.extras/ExternalToolCaller.component2|component2(){}[0]
     final fun component3(): kotlin/String? // com.letta.mobile.data.controller.extras/ExternalToolCaller.component3|component3(){}[0]
-    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.controller.extras/ExternalToolCaller // com.letta.mobile.data.controller.extras/ExternalToolCaller.copy|copy(kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+    final fun component4(): com.letta.mobile.data.controller.extras.scope/CallerScopeTrust // com.letta.mobile.data.controller.extras/ExternalToolCaller.component4|component4(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.controller.extras.scope/CallerScopeTrust = ...): com.letta.mobile.data.controller.extras/ExternalToolCaller // com.letta.mobile.data.controller.extras/ExternalToolCaller.copy|copy(kotlin.String?;kotlin.String?;kotlin.String?;com.letta.mobile.data.controller.extras.scope.CallerScopeTrust){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras/ExternalToolCaller.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras/ExternalToolCaller.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras/ExternalToolCaller.toString|toString(){}[0]

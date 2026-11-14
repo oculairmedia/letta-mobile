@@ -6033,6 +6033,7 @@ public final class com/letta/mobile/data/canvas/CanvasListTool : com/letta/mobil
 	public fun getDescription ()Ljava/lang/String;
 	public fun getInputSchema ()Lkotlinx/serialization/json/JsonObject;
 	public fun getName ()Ljava/lang/String;
+	public fun invoke (Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun invoke (Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -8401,17 +8402,19 @@ public final class com/letta/mobile/data/canvas/HostCanvasBackend {
 }
 
 public final class com/letta/mobile/data/canvas/HostCanvasCaller {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/canvas/HostCanvasCaller;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/HostCanvasCaller;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/HostCanvasCaller;
+	public final fun component4 ()Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;)Lcom/letta/mobile/data/canvas/HostCanvasCaller;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/HostCanvasCaller;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/HostCanvasCaller;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getActor-DgFQ7z8 ()Ljava/lang/String;
 	public final fun getAgentId ()Ljava/lang/String;
 	public final fun getConversationId ()Ljava/lang/String;
+	public final fun getScopeTrust ()Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;
 	public final fun getToolCallId ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -18398,16 +18401,18 @@ public final class com/letta/mobile/data/controller/extras/ExternalTool$DefaultI
 }
 
 public final class com/letta/mobile/data/controller/extras/ExternalToolCaller {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;
+	public final fun component4 ()Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;)Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAgentId ()Ljava/lang/String;
 	public final fun getConversationId ()Ljava/lang/String;
+	public final fun getScopeTrust ()Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;
 	public final fun getToolCallId ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -18836,6 +18841,14 @@ public final class com/letta/mobile/data/controller/extras/relay/AppToolRelayRes
 public final class com/letta/mobile/data/controller/extras/relay/AppToolRelayResponder$Companion {
 	public final fun getDefault ()Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayResponder;
 	public final fun install (Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayAnswerer;)Ljava/lang/AutoCloseable;
+}
+
+public final class com/letta/mobile/data/controller/extras/scope/CallerScopeTrust : java/lang/Enum {
+	public static final field CLAIMED Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;
+	public static final field RUNTIME_STAMPED Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;
+	public static fun values ()[Lcom/letta/mobile/data/controller/extras/scope/CallerScopeTrust;
 }
 
 public final class com/letta/mobile/data/controller/fanout/AppServerRuntimeEventRouter {

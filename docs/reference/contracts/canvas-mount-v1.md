@@ -206,9 +206,18 @@ changed, so replacing or removing the mount revokes it on the next call. It cove
 canvas, only for that agent in that conversation; other conversations and agents gain nothing,
 except that a plugin called by that agent in that conversation places as that call and so inherits
 the grant, including the call's late and background emits, while the mount stays (current
-behaviour, pending an owner decision). A
+behaviour, pending an owner decision); a call whose scope is only claimed passes none on. A
 mount that cannot be read, or a mounted canvas the host does not have, is a refusal, never another
 board.
+
+Only a caller whose agent and conversation scope the host itself established follows a mount: the
+App Server's runtime stamp on the tool-call frame, or a Meridian live-call token this host issued for
+that one call. A claimed scope (Meridian's env-scoped binding, which takes the ids from the agent's
+shell environment, tool arguments, a client) gets no mount at all: no read or write grant, no
+mount-based board choice, no mounted canvas in `canvas_list`, exactly as on a host without mounts.
+The same holds for a plugin placing for such a call. As defence in depth, a host running
+`--enable-canvas-mounts` with `--meridian-caller-binding env-scoped` gives the agent canvas tools no
+mount lookup at all and logs that once at startup; the device routes above are unaffected.
 
 ## Client rules (for the later adapter)
 
