@@ -24,9 +24,12 @@ internal class WavStreamDecoder(private val headerLimit: Int = DEFAULT_HEADER_LI
         return frames(known, bytes)
     }
 
+    /** Whether the header has been read and samples may follow. */
+    val started: Boolean get() = format != null
+
     /** The stream ended. Throws BAD_RESPONSE when it ended before the samples started. */
     fun finish() {
-        if (format == null) throw VoiceAudioException(VoiceErrorCode.BAD_RESPONSE)
+        if (!started) throw VoiceAudioException(VoiceErrorCode.BAD_RESPONSE)
     }
 
     private fun header(bytes: ByteArray): PcmChunk? {

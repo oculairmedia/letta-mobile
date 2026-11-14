@@ -6,7 +6,6 @@ import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioEncoding
 import com.letta.mobile.data.voice.audio.PcmChunk
-import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
 import com.letta.mobile.data.voice.audio.pcm.WavStreamDecoder
 import com.letta.mobile.data.voice.consent.VoiceEndpointGrantSource
 import com.letta.mobile.data.voice.consent.VoiceEndpointPayload
@@ -72,14 +71,7 @@ class EndpointSpeechSynthesizer(
         client.requireGrant(grants, VoiceEndpointPayload.TEXT_FOR_SYNTHESIS, SpeechOperation.SPEECH)
         val decoder = WavStreamDecoder()
         val request = SpeechRequest(text, settings.speechModel, settings.voice, AudioEncoding.WAV)
-        client.synthesize(request) { chunk -> decoded { decoder.push(chunk.bytes) }?.let { send(it) } }
-        decoded { decoder.finish() }
-    }
-
-    /** Runs a decoder step, reporting a refused stream as the endpoint's bad answer. */
-    private inline fun <T> decoded(step: () -> T): T = try {
-        step()
-    } catch (refused: VoiceAudioException) {
-        throw SpeechEndpointException(SpeechOperation.SPEECH, refused.code)
+        client.synthesize(request) { chunk -> decoder.push(chunk.bytes)?.let { send(it) } }
+        if (!decoder.started) throw SpeechEndpointException(SpeechOperation.SPEECH, VoiceErrorCode.BAD_RESPONSE)
     }
 }

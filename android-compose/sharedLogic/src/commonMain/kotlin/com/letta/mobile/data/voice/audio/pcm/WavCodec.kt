@@ -34,12 +34,8 @@ object WavCodec {
     private const val FMT_MIN = 16
     private const val EXTENSIBLE_MIN = 40
     private const val SUB_FORMAT_OFFSET = 24
-    private const val FORMAT_PCM = 1
     private const val FORMAT_EXTENSIBLE = 0xFFFE
-    private const val BITS_16 = 16
     private const val BYTES_PER_SAMPLE = 2
-    private const val MAX_CHANNELS = 8
-    private const val MAX_SAMPLE_RATE_HZ = 384_000L
     private const val PLACEHOLDER_SIZE = 0xFFFFFFFFL
     private const val HEADER_BYTES = 44
     private const val RIFF_TAG = "RIFF"
@@ -89,7 +85,9 @@ object WavCodec {
         while (offset + CHUNK_HEADER <= size) {
             val chunk = chunkAt(offset.toInt())
             if (chunk.id == "data") return WavWalk.Found(fmt, chunk)
-            if (chunk.id == "fmt ") fmt = fmtOf(chunk) ?: return unreadableFmt(chunk)
+            if (chunk.id == "fmt ") {
+                fmt = fmtOf(chunk) ?: return if (chunk.body + chunk.size > size) WavWalk.Truncated else WavWalk.Malformed
+            }
             offset = chunk.body + chunk.size + (chunk.size and 1L)
         }
         return WavWalk.Truncated
@@ -117,15 +115,6 @@ object WavCodec {
         val usable = minOf(declared, present) / block * block
         val samples = ShortArray((usable / BYTES_PER_SAMPLE).toInt()) { reader.s16(chunk.body.toInt() + it * BYTES_PER_SAMPLE) }
         return WavParse.Decoded(PcmAudio(samples, PcmFormat(format.sampleRateHz.toInt(), format.channels)))
-    }
-
-    /** A `fmt ` chunk that could not be read: cut short by the end of the bytes, or malformed. */
-    private fun LittleEndianReader.unreadableFmt(chunk: WavChunk): WavWalk =
-        if (chunk.body + chunk.size > size) WavWalk.Truncated else WavWalk.Malformed
-
-    private fun WavFmt.isSupported(): Boolean {
-        val pcm16 = formatTag == FORMAT_PCM && bitsPerSample == BITS_16
-        return pcm16 && channels in 1..MAX_CHANNELS && sampleRateHz in 1L..MAX_SAMPLE_RATE_HZ
     }
 
     private fun LittleEndianReader.hasRiffWave(): Boolean {
@@ -181,8 +170,19 @@ private sealed interface WavWalk {
 
 private class WavChunk(val id: String, val size: Long, val body: Long)
 
+private const val FORMAT_PCM = 1
+private const val BITS_16 = 16
+private const val MAX_CHANNELS = 8
+private const val MAX_SAMPLE_RATE_HZ = 384_000L
+
 /** A `fmt ` chunk; the rate stays unsigned (a Long) until it has been checked. */
-private class WavFmt(val formatTag: Int, val channels: Int, val sampleRateHz: Long, val bitsPerSample: Int)
+private class WavFmt(val formatTag: Int, val channels: Int, val sampleRateHz: Long, val bitsPerSample: Int) {
+    /** 16-bit integer PCM, 1 to 8 channels, 1 Hz to 384 kHz. */
+    fun isSupported(): Boolean {
+        val pcm16 = formatTag == FORMAT_PCM && bitsPerSample == BITS_16
+        return pcm16 && channels in 1..MAX_CHANNELS && sampleRateHz in 1L..MAX_SAMPLE_RATE_HZ
+    }
+}
 
 /** KSDATAFORMAT_SUBTYPE_PCM, {00000001-0000-0010-8000-00aa00389b71}, as it is laid out in the file. */
 private val PCM_SUB_FORMAT = intArrayOf(0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71)
