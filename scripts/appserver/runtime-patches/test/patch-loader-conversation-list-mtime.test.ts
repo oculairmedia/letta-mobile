@@ -23,10 +23,16 @@ type ChildResult = { result: Record<string, unknown>; stderr: string };
 
 // A host that runs the App Server exports NODE_OPTIONS=--import=<deployed loader>; inheriting
 // it would patch the bundle twice (deployed copy, then this one). Start the child clean.
+/** Whether a parent environment variable may reach the child: not the loader hook and no LETTA_ settings. */
+function inherited(name: string): boolean {
+  return name !== "NODE_OPTIONS" && !name.startsWith("LETTA_");
+}
+
 function childEnv(bundle: string, storageDir: string): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [name, value] of Object.entries(process.env)) {
-    if (value !== undefined && name !== "NODE_OPTIONS" && !name.startsWith("LETTA_")) env[name] = value;
+    if (value === undefined || !inherited(name)) continue;
+    env[name] = value;
   }
   return { ...env, LETTA_CLI_PATH_REAL: bundle, LCP_STORE_DIR: storageDir };
 }
