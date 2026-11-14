@@ -199,26 +199,29 @@ private fun PinnedPromptCopy(prompt: ChatRenderItem, pinned: PinnedPrompt, bindi
         CompositionLocalProvider(LocalSendFlight provides null, LocalDockedPromptCompaction provides pinned.compaction) {
             // The bubble alone: without the row's leading space it holds snug under the chrome,
             // and bottom-aligned with its row it still rides the row seamlessly.
-            TimelineItemRow(prompt, bindings, leadingSpace = false)
+            TimelineItemRow(prompt, bindings, neighbours = null)
         }
     }
 }
 
 /**
  * One render item, at the chat column's width, through the shared row seam. In the list it
- * carries its own leading space ([timelineLeadingSpace], decided against the [older] row above it);
- * the pinned copy does not. A completed report whose work the [newer] row continues gives up its
- * line's floor ([LocalNoticeContinued]), as a run header does over its body.
+ * carries its own leading space ([timelineLeadingSpace], decided against the older of its
+ * [neighbours], the row above it); the pinned copy passes null and takes none. A completed report
+ * whose work the newer neighbour continues gives up its line's floor ([LocalNoticeContinued]), as a
+ * run header does over its body.
  */
 @Composable
 internal fun TimelineItemRow(
     item: ChatRenderItem,
     bindings: TimelineRowBindings,
     modifier: Modifier = Modifier,
-    leadingSpace: Boolean = true,
-    older: ChatRenderItem? = null,
-    newer: ChatRenderItem? = null,
+    /** The rows above and below it (older, newer) in the list; null for a copy outside the list. */
+    neighbours: Pair<ChatRenderItem?, ChatRenderItem?>? = NoNeighbours,
 ) {
+    val leadingSpace = neighbours != null
+    val older = neighbours?.first
+    val newer = neighbours?.second
     val sticky = LocalStickyPrompt.current.takeIf { item.isUserPrompt() }
     val context = bindings.contexts.forItem(item)
     Box(
@@ -237,6 +240,9 @@ internal fun TimelineItemRow(
         }
     }
 }
+
+/** A list row with no known rows around it. */
+internal val NoNeighbours: Pair<ChatRenderItem?, ChatRenderItem?> = null to null
 
 /** [next] is the bare tool step that carries on [notice]'s completed report: the report's body, not a new block. */
 private fun continuesNotice(notice: ChatRenderItem, next: ChatRenderItem): Boolean =

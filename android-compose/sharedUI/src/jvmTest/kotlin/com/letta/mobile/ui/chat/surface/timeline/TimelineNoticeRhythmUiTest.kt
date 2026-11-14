@@ -78,7 +78,7 @@ class TimelineNoticeRhythmUiTest {
                     val context = rowContext(itemState = renderState(collapsedRunIds = collapsedRunIds), newestMessageId = NEWEST_ID)
                     val bindings = TimelineRowBindings(TimelineRowContexts(context, streaming = null), rowCallbacks())
                     items.forEachIndexed { index, item ->
-                        TimelineItemRow(item, bindings, older = items.getOrNull(index - 1), newer = items.getOrNull(index + 1))
+                        TimelineItemRow(item, bindings, neighbours = items.getOrNull(index - 1) to items.getOrNull(index + 1))
                     }
                 }
             }
