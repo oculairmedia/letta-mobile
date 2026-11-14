@@ -2,14 +2,16 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.backend.RemoteRoute
-import com.letta.mobile.util.AgentConversationFleet
+import com.letta.mobile.data.chat.conversations.listing.RecentConversationListing
+import com.letta.mobile.data.chat.runtime.AgentConversationPage
+import com.letta.mobile.data.chat.runtime.ChatConversationStore
+import com.letta.mobile.util.AgentConversationFleetPaging
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ConversationRecency
-import com.letta.mobile.data.model.visibleConversationsInLists
 import com.letta.mobile.data.repository.api.AllConversationsLocalCache
 import com.letta.mobile.data.repository.api.ConversationRemoteSource
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
@@ -35,12 +37,13 @@ fun defaultCachedAllConversationsRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 /**
- * Phase 5b.2: platform-neutral cached all-conversations repository: the fleet's conversations, read
- * agent by agent through the shared [AgentConversationFleet] (each [roster] agent's own pages), never
- * as one window across every agent.
+ * Phase 5b.2: platform-neutral cached all-conversations repository, read recents-first through the
+ * shared [RecentConversationListing] that web and desktop use: one visible recents page plus the
+ * pinned agents' (and already listed agents') own pages, never one read per roster agent. A host
+ * without visible recents keeps the per-agent read of every visible [roster] agent.
  */
 open class CachedAllConversationsRepository(
-    /** The agents whose conversations the list carries, read when the list is (re)loaded. */
+    /** The agents whose conversations the list carries: visibility for recents, every agent on a legacy host. */
     private val roster: suspend () -> List<Agent>,
     private val remote: RemoteRoute<ConversationRemoteSource>,
     private val localCache: (() -> AllConversationsLocalCache)? = null,
@@ -52,6 +55,8 @@ open class CachedAllConversationsRepository(
      * restart.
      */
     transport: IChannelTransport? = null,
+    /** Pinned agents, whose own first pages load with every refresh as on web and desktop. */
+    private val pinnedAgents: suspend () -> Set<AgentId> = { emptySet() },
 ) : IAllConversationsRepository, BackendScopedCache {
     private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
     override val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
@@ -60,14 +65,13 @@ open class CachedAllConversationsRepository(
     override val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
 
     private val refreshMutex = Mutex()
-    private val fleet = AgentConversationFleet(::readAgentPage) { agent, failure ->
-        Telemetry.event(
-            TAG, "agent_read_failed",
-            "agentId" attr agent.value,
-            "error" attr failure.toString(),
-            level = Telemetry.Level.WARN,
-        )
-    }
+    private val store = RepositoryConversationStore()
+
+    /** Replaced on a backend switch, so the next host is asked for visible recents again. */
+    private var listing = newListing()
+
+    /** The roster the list was last read with; a push folds rows in by it without re-reading the roster. */
+    private var listedRoster: List<Agent> = emptyList()
     private var lastRefreshAtMillis: Long = 0L
     private var hasLoadedAtLeastOnce: Boolean = false
 
@@ -128,8 +132,7 @@ open class CachedAllConversationsRepository(
         if (fresh.isNotEmpty()) publishRows(fresh)
         val unread = dirty.filterKeys { id -> fresh.none { it.id == id } }
         if (unread.isEmpty()) return@withLock
-        val (listed, _) = fleet.refreshForInvalidations(unread, roster) { id -> source?.getConversation(id) }
-        publish(listed)
+        publish(listing.changed(unread, roster()))
     }
 
     /** Each conversation read by itself; one that cannot be read (gone, refused) is left out. */
@@ -144,15 +147,17 @@ open class CachedAllConversationsRepository(
             }
         }
 
-    /** Folds re-read rows into the fleet and the published list, newest first, as a list read would. */
+    /** Folds re-read rows into the listing and the published list, as a list read would; no agent is listed. */
     private suspend fun publishRows(fresh: List<Conversation>) {
-        fresh.forEach { fleet.record(it) }
-        val visible = fresh.visibleConversationsInLists()
+        val listed = listing.record(fresh, listedRoster)
         val ids = fresh.mapTo(mutableSetOf()) { it.id }
+        // Rows the list gained meanwhile (an optimistic write) stay; the re-read rows are as listed.
         _conversations.update { current ->
-            (visible + current.filterNot { it.id in ids }).sortedWith(ConversationRecency.newestFirst)
+            val listedIds = listed.mapTo(mutableSetOf()) { it.id }
+            (listed + current.filterNot { it.id in ids || it.id in listedIds }).sortedWith(ConversationRecency.newestFirst)
         }
-        if (visible.isNotEmpty()) cacheConversations(visible)
+        val kept = listed.filter { it.id in ids }
+        if (kept.isNotEmpty()) cacheConversations(kept)
     }
 
     /** Only a list that has loaded is refreshed: an unopened list loads fresh when first shown. */
@@ -176,7 +181,7 @@ open class CachedAllConversationsRepository(
     override suspend fun loadNextPage() = refreshMutex.withLock {
         if (!_hasMore.value) return@withLock
         if (!hasLoadedAtLeastOnce) return@withLock refreshLocked()
-        val listed = fleet.loadMore()
+        val listed = listing.loadMore()
         // Rows the list gained meanwhile (a push, an optimistic write) stay.
         publish(listed + _conversations.value.filterNot { row -> listed.any { it.id == row.id } })
     }
@@ -189,6 +194,8 @@ open class CachedAllConversationsRepository(
         refreshMutex.withLock {
             lastRefreshAtMillis = 0L
             hasLoadedAtLeastOnce = false
+            listing = newListing()
+            listedRoster = emptyList()
             _conversations.value = emptyList()
             _hasMore.value = true
             localCache?.invoke()?.deleteAll()
@@ -241,13 +248,39 @@ open class CachedAllConversationsRepository(
         /** The list filters archived rows itself (its Archived tab), so it reads them too. */
         private const val ARCHIVE_STATUS_ALL = "all"
 
+        /** A legacy host's agents are each read a page at a time, paged on by [loadNextPage]. */
+        private val LEGACY_PAGING = AgentConversationFleetPaging()
+
         /** Pushes within this window of the first are re-read together. */
         private val PUSH_COALESCE_WINDOW = 500.milliseconds
     }
 
+    private fun newListing() = RecentConversationListing(store, LEGACY_PAGING)
+
     private suspend fun refreshLocked() {
-        publish(fleet.refresh(roster()))
+        val agents = roster().also { listedRoster = it }
+        publish(listing.refresh(agents, pinnedAgents()) { recents -> _conversations.value = recents })
         lastRefreshAtMillis = nowMillis()
+    }
+
+    /**
+     * The repository's sources as the shared listing reads them: agent pages from the session channel
+     * or the backend seam; visible recents and single rows only over the channel (the seam has neither,
+     * so the listing keeps its per-agent reads there).
+     */
+    private inner class RepositoryConversationStore : ChatConversationStore {
+        override suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> =
+            readAgentPage(page.agent, page.after, page.limit)
+
+        override suspend fun listRecentConversations(limit: Int, after: ConversationId?): List<Conversation> =
+            channelSource()?.listRecentConversations(limit, after)
+                ?: throw UnsupportedOperationException("Visible recents need the session channel")
+
+        override suspend fun getConversation(id: ConversationId): Conversation =
+            channelSource()?.getConversation(id)
+                ?: throw UnsupportedOperationException("Single conversation reads need the session channel")
+
+        private fun channelSource() = irohConversationListSource?.takeIf { it.shouldUseIroh() }
     }
 
     /** One page of one agent's own conversations, from the session's channel or the backend seam. */
@@ -271,7 +304,7 @@ open class CachedAllConversationsRepository(
     private suspend fun publish(listed: List<Conversation>) {
         hasLoadedAtLeastOnce = true
         _conversations.value = listed
-        _hasMore.value = fleet.hasMore
+        _hasMore.value = listing.hasMore
         if (listed.isNotEmpty()) cacheConversations(listed)
     }
 

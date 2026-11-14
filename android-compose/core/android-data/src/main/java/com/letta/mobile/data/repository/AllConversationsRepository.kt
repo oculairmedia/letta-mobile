@@ -8,6 +8,7 @@ import com.letta.mobile.data.local.GatedDao
 import com.letta.mobile.data.local.SessionCacheGate
 import com.letta.mobile.data.local.RoomAllConversationsLocalCache
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.api.ConversationRemoteSource
 import com.letta.mobile.data.transport.api.IChannelTransport
 import dagger.Lazy
@@ -35,6 +36,8 @@ open class AllConversationsRepository(
     transport: IChannelTransport? = null,
     /** letta-mobile-by4vm.94: the session's cache clear every Room access waits for. */
     cacheGate: SessionCacheGate = SessionCacheGate.Open,
+    /** The pinned agents, whose own pages load with each refresh beside the visible recents. */
+    pinnedAgents: suspend () -> Set<AgentId> = { emptySet() },
 ) : CachedAllConversationsRepository(
     roster = roster,
     remote = remote,
@@ -42,6 +45,7 @@ open class AllConversationsRepository(
     repositoryScope = repositoryScope,
     irohConversationListSource = irohConversationListSource,
     transport = transport,
+    pinnedAgents = pinnedAgents,
 ) {
     /** A repository over [remote] (the backend seam; tests and previews bind a fake). */
     constructor(

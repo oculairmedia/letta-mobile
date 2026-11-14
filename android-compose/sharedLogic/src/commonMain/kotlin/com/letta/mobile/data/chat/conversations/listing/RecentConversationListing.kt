@@ -1,6 +1,6 @@
 package com.letta.mobile.data.chat.conversations.listing
 
-import com.letta.mobile.data.chat.runtime.ChatGateway
+import com.letta.mobile.data.chat.runtime.ChatConversationStore
 import com.letta.mobile.data.chat.runtime.agentConversationReader
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
@@ -20,13 +20,18 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** Session-local recents plus explicitly requested agent pages; legacy hosts retain their eager policy. */
-internal class RecentConversationListing(private val gateway: ChatGateway) {
+/**
+ * Session-local recents plus explicitly requested agent pages; legacy hosts retain their eager policy.
+ * Every conversation list (web and desktop timelines, Android's fleet list) reads through this one listing.
+ */
+internal class RecentConversationListing(
+    private val gateway: ChatConversationStore,
+    /** How a host without visible recents is read agent by agent; the caller keeps its own legacy paging. */
+    legacyPaging: AgentConversationFleetPaging = AgentConversationFleetPaging(eagerPagesPerAgent = READ_THROUGH_PAGES),
+) {
     private val mutex = Mutex()
     private val fleet = AgentConversationFleet(gateway.agentConversationReader())
-    private val legacy = AgentConversationFleet(
-        gateway.agentConversationReader(), AgentConversationFleetPaging(eagerPagesPerAgent = READ_THROUGH_PAGES),
-    )
+    private val legacy = AgentConversationFleet(gateway.agentConversationReader(), legacyPaging)
     private var recents: List<Conversation> = emptyList()
     private var knownHiddenAgents: Set<AgentId> = emptySet()
     var searchFailures: Map<AgentId, Throwable> = emptyMap()
@@ -41,6 +46,24 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
     val authoritativeAgents: Set<AgentId> get() = if (legacyMode) emptySet() else fleet.authoritativeAgents
 
     fun hasMore(agent: AgentId): Boolean = !legacyMode && fleet.hasMore(agent)
+
+    /** Some listed agent (any agent on a legacy host) has pages not read yet; recents alone never page. */
+    val hasMore: Boolean get() = if (legacyMode) legacy.hasMore else fleet.hasMore
+
+    /**
+     * Rows already re-read one by one (a push's `conversation.get`), folded in without listing any
+     * agent: a loaded agent's row joins its pages, any other visible row joins the recents.
+     */
+    suspend fun record(rows: List<Conversation>, roster: List<Agent>): List<Conversation> = mutex.withLock {
+        for (row in rows) {
+            when {
+                legacyMode -> legacy.record(row)
+                row.agentId in fleet.loadedAgents -> fleet.record(row)
+                else -> mergeRecent(row, roster)
+            }
+        }
+        conversations
+    }
 
     suspend fun refresh(roster: List<Agent>, pins: Set<AgentId>, publish: (List<Conversation>) -> Unit) = mutex.withLock {
         knownHiddenAgents = knownHiddenAgents + hiddenAgentsIn(roster)
@@ -101,8 +124,13 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
         conversations
     }
 
-    suspend fun loadMore(agent: AgentId): List<Conversation> = mutex.withLock {
-        if (!legacyMode) fleet.loadMore(agent)
+    /** The next page of just [agent], or of every listed agent that has one; never reads an unlisted agent. */
+    suspend fun loadMore(agent: AgentId? = null): List<Conversation> = mutex.withLock {
+        when {
+            agent != null -> if (!legacyMode) fleet.loadMore(agent)
+            legacyMode -> legacy.loadMore()
+            else -> fleet.loadMore()
+        }
         conversations
     }
 
@@ -143,7 +171,9 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
                 if (row.agentId in fleet.loadedAgents) fleet.record(row)
                 refresh += requireNotNull(owner)
             } else {
-                reconcileUnloadedRow(id, roster, refresh)
+                // An unloaded owner's row: its owner may have loaded meanwhile, else it joins the recents.
+                val row = gateway.getConversation(id.value)
+                if (row.agentId in fleet.loadedAgents) refresh += row.agentId else mergeRecent(row, roster)
             }
         }
         fleet.refreshAgents(refresh)
@@ -156,15 +186,11 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
         while (fleet.hasMore(id)) fleet.loadMore(id)
     }
 
-    private suspend fun reconcileUnloadedRow(id: ConversationId, roster: List<Agent>, refresh: MutableSet<AgentId>) {
-        val row = gateway.getConversation(id.value)
-        if (row.agentId in fleet.loadedAgents) {
-            refresh += row.agentId
-            return
-        }
+    /** A row of an unloaded agent replaces its recents entry; archived or hidden rows leave the recents. */
+    private fun mergeRecent(row: Conversation, roster: List<Agent>) {
         val hidden = isHiddenOwner(row.agentId, roster)
         val shown = listOf(row).visibleConversationsInLists().filterNot { it.archived == true || hidden }
-        recents = (shown + recents.filterNot { it.id == id })
+        recents = (shown + recents.filterNot { it.id == row.id })
             .sortedWith(ConversationRecency.newestFirst).take(RECENTS_LIMIT)
     }
 

@@ -16,6 +16,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.api.rosterForLists
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.ProjectWorkRepository
 import com.letta.mobile.data.repository.ScheduleRepository
@@ -30,6 +31,7 @@ import com.letta.mobile.data.repository.routedBackendKind
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
 import dagger.Lazy
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -131,6 +133,8 @@ class SessionGraphAssembler @Inject constructor(
                 // letta-mobile-lks7m: conversations started on another device arrive as pushes.
                 transport = request.channelTransport,
                 cacheGate = request.cacheGate,
+                // letta-mobile-ybdv3: pinned agents' pages load beside the recents, as on web and desktop.
+                pinnedAgents = { request.settingsRepository.pinnedAgents() },
             ),
             conversation = ConversationRepository(
                 remote = remoteSources.conversations,
@@ -197,3 +201,7 @@ class SessionGraphAssembler @Inject constructor(
         val conversation: ConversationRepository,
     )
 }
+
+/** The pinned agents as the conversation list reads them; none without settings. */
+private suspend fun ISettingsRepository?.pinnedAgents(): Set<AgentId> =
+    this?.getPinnedAgentIds()?.first().orEmpty().mapTo(mutableSetOf(), ::AgentId)
