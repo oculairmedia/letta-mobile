@@ -19,6 +19,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -112,7 +113,34 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, *page))
         val settled = engine.publication.value.durableRevision
         assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, *page))
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, *page))
         assertEquals(settled, engine.publication.value.durableRevision, "an unchanged page advanced the durable revision")
+    }
+
+    @Test fun deferredToolReturnFoldsIntoOwnerAndDeletesEvidence() = runTest {
+        val store = InMemoryTimelineStore()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val returned = com.letta.mobile.data.model.ToolReturnMessage(
+            id = "ui-return", toolCallId = "call-deferred", date = "2026-01-01T00:00:02Z",
+            toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("deferred result"),
+        )
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(returned)))
+        assertTrue("tool-return/deferred/call-deferred" in store.evidence)
+        val call = com.letta.mobile.data.model.ToolCallMessage(
+            id = "ui-call", toolCall = com.letta.mobile.data.model.ToolCall(
+                id = "call-deferred", name = "exec_command", arguments = "{}",
+            ), date = "2026-01-01T00:00:01Z",
+        )
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(call)))
+        assertFalse("tool-return/deferred/call-deferred" in store.evidence)
+        assertTrue(engine.publication.value.durableRevision > 1)
+        val reopened = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val reopenedSelection = assertIs<TimelineEngineOpen.Opened>(reopened.open(scope)).selection
+        val events = reopened.preparePage(reopenedSelection, TimelineReadPosition.Tail, 8, null)
+            .projectionInput.records.mapNotNull { it.event }
+        val owner = assertNotNull(events.single { it.toolCalls.any { tool -> tool.effectiveId == "call-deferred" } })
+        assertEquals("deferred result", owner.toolReturnContentByCallId["call-deferred"])
     }
 
     /** As above, for a return the server projected down to a preview (letta-mobile-fe51r). */
