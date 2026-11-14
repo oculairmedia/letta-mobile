@@ -18658,6 +18658,7 @@ public final class com/letta/mobile/data/controller/extras/identity/CallerIdenti
 	public static final field CLAIMED Lcom/letta/mobile/data/controller/extras/identity/CallerIdentity;
 	public static final field VERIFIED Lcom/letta/mobile/data/controller/extras/identity/CallerIdentity;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun isVerified ()Z
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/controller/extras/identity/CallerIdentity;
 	public static fun values ()[Lcom/letta/mobile/data/controller/extras/identity/CallerIdentity;
 }

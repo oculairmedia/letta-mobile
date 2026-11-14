@@ -1321,6 +1321,8 @@ final enum class com.letta.mobile.data.controller.extras.identity/CallerIdentity
 
     final val entries // com.letta.mobile.data.controller.extras.identity/CallerIdentity.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.controller.extras.identity/CallerIdentity> // com.letta.mobile.data.controller.extras.identity/CallerIdentity.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val isVerified // com.letta.mobile.data.controller.extras.identity/CallerIdentity.isVerified|{}isVerified[0]
+        final fun <get-isVerified>(): kotlin/Boolean // com.letta.mobile.data.controller.extras.identity/CallerIdentity.isVerified.<get-isVerified>|<get-isVerified>(){}[0]
 
     final fun valueOf(kotlin/String): com.letta.mobile.data.controller.extras.identity/CallerIdentity // com.letta.mobile.data.controller.extras.identity/CallerIdentity.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<com.letta.mobile.data.controller.extras.identity/CallerIdentity> // com.letta.mobile.data.controller.extras.identity/CallerIdentity.values|values#static(){}[0]
