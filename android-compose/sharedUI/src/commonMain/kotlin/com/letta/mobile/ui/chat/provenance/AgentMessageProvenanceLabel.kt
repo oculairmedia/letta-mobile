@@ -3,12 +3,13 @@ package com.letta.mobile.ui.chat.provenance
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import com.letta.mobile.ui.text.LettaSelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -20,16 +21,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.messaging.AgentMessageDeliveryState
 import com.letta.mobile.data.messaging.AgentMessageDirection
 import com.letta.mobile.data.messaging.AgentMessageProvenance
 import com.letta.mobile.data.messaging.agentMessageDisplayLabel
 import com.letta.mobile.data.messaging.displayLabel
-import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.LettaDisclosureHeader
+import com.letta.mobile.ui.theme.ChatChipShape
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.chatMonoLabel
 
 /**
  * Shared (Android + Desktop + Web) VISUAL render for
@@ -101,9 +102,9 @@ fun AgentMessageProvenanceMetadata(provenance: AgentMessageProvenance, tint: Col
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = LettaDimens.Space.sm),
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        shape = ChatChipShape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, tint.copy(alpha = 0.3f)),
+        border = BorderStroke(LettaDimens.Stroke.hairline, tint.copy(alpha = LettaDimens.Alpha.hairline)),
     ) {
         LettaSelectionContainer {
             Column(
@@ -158,25 +159,15 @@ private fun AgentMessageProvenanceHeader(
     onToggleExpand: () -> Unit,
     onAgentClick: (String) -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onToggleExpand)
-            .padding(bottom = LettaDimens.Space.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    LettaDisclosureHeader(
+        expanded = expanded,
+        onToggle = onToggleExpand,
+        chevronDescription = if (expanded) "Collapse agent message details" else "Expand agent message details",
     ) {
         AgentRoute(provenance, spec, colors, onAgentClick)
         DeliveryState(provenance.deliveryState, spec.isFailed, colors.muted)
-        DisclosureChevron(
-            expanded = expanded,
-            contentDescription = if (expanded) {
-                "Collapse agent message details"
-            } else {
-                "Expand agent message details"
-            },
-        )
     }
+    Spacer(Modifier.height(LettaDimens.Space.xs))
 }
 
 @Composable
@@ -236,7 +227,7 @@ private fun MetadataRow(label: String, value: String) {
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+            style = MaterialTheme.typography.chatMonoLabel,
             color = MaterialTheme.colorScheme.onSurface,
         )
     }

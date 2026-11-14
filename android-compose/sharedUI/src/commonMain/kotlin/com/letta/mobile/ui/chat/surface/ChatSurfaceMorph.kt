@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -40,6 +39,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.theme.chatPanelMorphShape
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -208,7 +208,7 @@ internal fun MorphPageLayer(
             }
             .then(if (morph.morphing) Modifier.testTag(SURFACE_MORPH_TAG) else Modifier)
             .graphicsLayer {
-                shape = RoundedCornerShape(if (rounded) LettaDimens.Radius.lg.toPx() * (1f - fraction()) else 0f)
+                shape = chatPanelMorphShape(if (rounded) 1f - fraction() else 0f)
                 clip = true
             }
             // Like the opaque Surface it replaces: nothing under the page takes a touch.

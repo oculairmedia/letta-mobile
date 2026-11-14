@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_command_options
@@ -43,7 +41,11 @@ import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.ChatCardShape
+import com.letta.mobile.ui.theme.ChatChipShape
+import com.letta.mobile.ui.theme.LettaCheckGlyph
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.chatRowName
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -98,7 +100,7 @@ private fun ComposerCommandSuggestions(
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .testTag(ComposerTestTags.COMMAND_SUGGESTIONS),
-        shape = RoundedCornerShape(LettaDimens.Radius.md),
+        shape = ChatCardShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
@@ -119,7 +121,7 @@ private fun CommandSuggestionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onChoose(command) }
+            .clickable(role = Role.Button) { onChoose(command) }
             .testTag(ComposerTestTags.COMMAND_ROW + command.id)
             .padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.xs),
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
@@ -127,8 +129,7 @@ private fun CommandSuggestionRow(
     ) {
         Text(
             text = slashed(command.label),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.chatRowName,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(vertical = LettaDimens.Space.sm),
         )
@@ -204,14 +205,14 @@ private fun TouchCommandChip(
     Box {
         Surface(
             modifier = Modifier
-                .clip(RoundedCornerShape(LettaDimens.Radius.sm))
+                .clip(ChatChipShape)
                 .combinedClickable(
                     role = Role.Button,
                     onClick = { onChoose(command) },
                     onLongClick = if (command.removable) ({ menuOpen = true }) else null,
                 )
                 .testTag(ComposerTestTags.COMMAND_ROW + command.id),
-            shape = RoundedCornerShape(LettaDimens.Radius.sm),
+            shape = ChatChipShape,
             color = if (command.removable) scheme.secondaryContainer else scheme.surface,
             contentColor = if (command.removable) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
             border = BorderStroke(LettaDimens.Stroke.hairline, scheme.outlineVariant),
@@ -221,11 +222,11 @@ private fun TouchCommandChip(
                 horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = if (command.removable) LettaIcons.Check else LettaIcons.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(LettaDimens.Control.icon),
-                )
+                if (command.removable) {
+                    LettaCheckGlyph()
+                } else {
+                    Icon(imageVector = LettaIcons.Add, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
+                }
                 Text(text = slashed(command.label), style = MaterialTheme.typography.bodySmall)
             }
         }

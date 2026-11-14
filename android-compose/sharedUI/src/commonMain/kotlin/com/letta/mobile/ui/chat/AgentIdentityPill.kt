@@ -7,9 +7,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
@@ -19,11 +18,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.mascot.mascotAtWork
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaMenuIndicator
 
 internal object AgentIdentityPillTestTags {
     /** The pill's surface: one per screen, wherever it is drawn. */
@@ -43,7 +44,7 @@ internal object AgentIdentityPillTestTags {
 fun AgentPillSurface(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(percent = 50),
+        shape = CircleShape,
         color = Color.Black,
         contentColor = Color.White,
     ) {
@@ -79,7 +80,7 @@ fun AgentIdentityPill(identity: AgentIdentity, modifier: Modifier = Modifier) {
         Row(
             modifier = Modifier
                 .testTag(AgentIdentityPillTestTags.TRIGGER)
-                .combinedClickable(onClick = identity.onClick, onLongClick = identity.onLongClick)
+                .combinedClickable(role = Role.Button, onClick = identity.onClick, onLongClick = identity.onLongClick)
                 .padding(end = LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
@@ -116,12 +117,7 @@ fun AgentIdentityPill(identity: AgentIdentity, modifier: Modifier = Modifier) {
                     tint = MaterialTheme.colorScheme.tertiary,
                 )
             }
-            Icon(
-                LettaIcons.ArrowDropDown,
-                contentDescription = "Switch agent",
-                modifier = Modifier.size(MarkSize),
-                tint = LocalContentColor.current,
-            )
+            LettaMenuIndicator(contentDescription = "Switch agent")
         }
     }
 }

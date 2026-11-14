@@ -7,7 +7,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.subagents.SubagentRoster
 import com.letta.mobile.data.subagents.SubagentRosterItem
 import com.letta.mobile.ui.components.list.RosterSection
@@ -60,7 +59,6 @@ private fun SectionAction(label: String, onClick: () -> Unit) {
     Text(
         text = label,
         style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.Medium,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.clickable(role = Role.Button, onClick = onClick),
     )

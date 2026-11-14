@@ -7,11 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,8 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.subagents.SubagentRosterItem
 import com.letta.mobile.data.subagents.SubagentRosterStatus
@@ -37,7 +30,10 @@ import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterRowSlots
 import com.letta.mobile.ui.components.list.RosterRowState
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.theme.LettaDoneGlyph
+import com.letta.mobile.ui.theme.LettaFailedGlyph
+import com.letta.mobile.ui.theme.chatCardTitle
+import com.letta.mobile.ui.theme.chatMonoBody
 
 @Composable
 internal fun RunningCard(
@@ -111,14 +107,7 @@ private fun StatusGlyph(status: SubagentRosterStatus) {
         return
     }
     val failed = status == SubagentRosterStatus.FAILED || status == SubagentRosterStatus.CANCELLED
-    val icon = if (failed) Icons.Outlined.ErrorOutline else Icons.Outlined.CheckCircle
-    val tint = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.customColors.successColor
-    Icon(
-        imageVector = icon,
-        contentDescription = statusWord(status),
-        tint = tint,
-        modifier = Modifier.size(LettaDimens.Control.icon),
-    )
+    if (failed) LettaFailedGlyph(contentDescription = statusWord(status)) else LettaDoneGlyph(contentDescription = statusWord(status))
 }
 
 @Composable
@@ -130,8 +119,7 @@ private fun TitleBlock(item: SubagentRosterItem, modifier: Modifier = Modifier) 
         ) {
             Text(
                 text = item.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.chatCardTitle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
@@ -153,7 +141,7 @@ private fun TitleBlock(item: SubagentRosterItem, modifier: Modifier = Modifier) 
 private fun ActivityLine(text: String) {
     Text(
         text = "› $text",
-        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+        style = MaterialTheme.typography.chatMonoBody,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,

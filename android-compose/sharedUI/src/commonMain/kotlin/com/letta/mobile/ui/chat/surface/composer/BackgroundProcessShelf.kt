@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Icon
@@ -26,13 +25,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.transport.appserver.AppServerBackgroundProcess
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
+import com.letta.mobile.ui.theme.ChatCardShape
+import com.letta.mobile.ui.theme.ChatChipShape
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.chatLabelEmphasis
 import com.letta.mobile.ui.theme.customColors
 
 /**
@@ -54,16 +55,15 @@ fun BackgroundProcessShelf(
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .testTag("background_process_shelf"),
-        shape = RoundedCornerShape(LettaDimens.Radius.md),
+        shape = ChatCardShape,
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(modifier = Modifier.padding(LettaDimens.Space.sm)) {
             Text(
                 text = "Background processes (${processes.size})",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.chatLabelEmphasis,
                 color = MaterialTheme.customColors.runningColor,
-                fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(bottom = LettaDimens.Space.xs),
             )
             LazyRow(
@@ -100,7 +100,7 @@ private fun BackgroundProcessItem(
 ) {
     Surface(
         modifier = modifier.testTag("process_item_${process.id}"),
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        shape = ChatChipShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
@@ -112,8 +112,7 @@ private fun BackgroundProcessItem(
             val label = process.type?.uppercase() ?: "PROCESS"
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.chatLabelEmphasis,
                 color = MaterialTheme.colorScheme.primary,
             )
             val desc = process.description ?: process.id

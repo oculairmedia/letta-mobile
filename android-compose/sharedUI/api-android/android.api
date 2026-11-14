@@ -1700,6 +1700,7 @@ public final class com/letta/mobile/ui/chat/subagents/ComposableSingletons$Subag
 public final class com/letta/mobile/ui/chat/subagents/ComposableSingletons$SubagentTodoSheetKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/subagents/ComposableSingletons$SubagentTodoSheetKt;
 	public fun <init> ()V
+	public final fun getLambda$1324139675$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1328555247$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
@@ -2051,7 +2052,6 @@ public final class com/letta/mobile/ui/chat/surface/ChatSurfacePlatform$Companio
 public final class com/letta/mobile/ui/chat/surface/ComposableSingletons$CanvasBubbleCardKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/ComposableSingletons$CanvasBubbleCardKt;
 	public fun <init> ()V
-	public final fun getLambda$-705164010$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$1806481190$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
@@ -2077,15 +2077,8 @@ public final class com/letta/mobile/ui/chat/surface/ComposableSingletons$ChatSur
 public final class com/letta/mobile/ui/chat/surface/ComposableSingletons$CollapsedDockKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/ComposableSingletons$CollapsedDockKt;
 	public fun <init> ()V
-	public final fun getLambda$-633404448$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$1803747838$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$90012944$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-}
-
-public final class com/letta/mobile/ui/chat/surface/ComposableSingletons$DockedChatPanelKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/ComposableSingletons$DockedChatPanelKt;
-	public fun <init> ()V
-	public final fun getLambda$-264637791$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/chat/surface/ComposableSingletons$TouchCanvasDockKt {
@@ -2513,6 +2506,12 @@ public final class com/letta/mobile/ui/components/LettaCatalogKt {
 public final class com/letta/mobile/ui/components/LettaChipTabKt {
 	public static final fun LettaChipTab-ZDkf97M (Ljava/lang/String;ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;ILkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaChipTabRow (Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/components/LettaDisclosureControlsKt {
+	public static final fun LettaDisclosureHeader (ZLkotlin/jvm/functions/Function0;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaFoldButton (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaUnfoldButton--jt2gSs (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/Modifier;FLandroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/components/LettaFadingEdgesKt {
@@ -11834,6 +11833,15 @@ public final class com/letta/mobile/ui/theme/LettaSectionLabelKt {
 	public static final fun LettaSectionHeader (Ljava/lang/String;Landroidx/compose/ui/Modifier;Ljava/lang/Integer;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaSectionLabel (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/runtime/Composer;II)V
 	public static final fun lettaSectionTitle (Ljava/lang/String;Ljava/lang/Integer;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/theme/LettaStatusGlyphsKt {
+	public static final fun LettaCheckGlyph (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaDoneGlyph (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaFailedGlyph (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaInProgressGlyph (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaMenuIndicator-FNF3uiM (Landroidx/compose/ui/Modifier;Ljava/lang/String;JLandroidx/compose/runtime/Composer;II)V
+	public static final fun LettaPendingGlyph (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/theme/ReducedMotionKt {

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -24,6 +23,7 @@ import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.theme.ChatComposerDimens
+import com.letta.mobile.ui.theme.ChatPanelShape
 import com.letta.mobile.ui.theme.LettaDimens
 
 private val FullFieldStyle = ComposerFieldStyle(
@@ -41,7 +41,7 @@ private val DockedFieldStyle = ComposerFieldStyle(
 )
 
 /** The prompt card's and the docked bar's shape; voice mode's outline follows it. */
-private val PromptShape = RoundedCornerShape(LettaDimens.Radius.lg)
+private val PromptShape = ChatPanelShape
 
 /** The keyboard is up (always false on desktop, where there is no IME inset). */
 @Composable

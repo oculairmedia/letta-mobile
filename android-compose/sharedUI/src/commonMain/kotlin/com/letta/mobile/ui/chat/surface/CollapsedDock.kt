@@ -86,7 +86,7 @@ import com.letta.mobile.ui.chat.AgentSphere
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
-import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.LettaUnfoldButton
 import com.letta.mobile.ui.components.movePointerIcon
 import com.letta.mobile.ui.markdown.LocalSharedRichMarkdownRenderer
 import com.letta.mobile.ui.markdown.MarkdownPaint
@@ -105,6 +105,7 @@ import com.letta.mobile.ui.chat.surface.timeline.ActiveRunActivity
 import com.letta.mobile.ui.chat.surface.timeline.activeRunActivity
 import com.letta.mobile.ui.chat.surface.timeline.rows.formatElapsedClock
 import com.letta.mobile.ui.chat.surface.timeline.rows.rememberElapsedSeconds
+import com.letta.mobile.ui.theme.BubbleLayoutControlSize
 import com.letta.mobile.ui.theme.ChatMascotDimens
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -246,7 +247,7 @@ internal fun CollapsedDock(
         Box(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg)) {
             // Even insets on both sides keep the mascot over the bar's centre and the bubble clear
             // of the restore control. The mascot's own motion is the thinking cue: no glow here.
-            val sides = maxOf(LettaDimens.Control.iconButtonLg, BubbleLayoutDimens.control) + LettaDimens.Space.sm
+            val sides = maxOf(LettaDimens.Control.iconButtonLg, BubbleLayoutControlSize) + LettaDimens.Space.sm
             CollapsedTurnColumn(
                 CollapsedSeat(state, content, seated, mascotHover),
                 Modifier.align(Alignment.BottomCenter).padding(horizontal = sides),
@@ -374,7 +375,7 @@ private fun CollapsedOwnSeat(content: CollapsedDockContent, size: Dp) {
                 val open = content.openAgent
                 AgentSphere(
                     size = collapsedFallbackSize(size),
-                    modifier = if (open != null) Modifier.clip(CircleShape).clickable(onClick = open) else Modifier,
+                    modifier = if (open != null) Modifier.clip(CircleShape).clickable(role = Role.Button, onClick = open) else Modifier,
                 )
             }
             MascotSeatVacancy.SEATED_ELSEWHERE -> CollapsedStandIn(content, size)
@@ -606,16 +607,11 @@ private fun RestoreButton(state: ChatDockState, modifier: Modifier) {
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline),
         ),
     ) {
-        IconButton(
+        LettaUnfoldButton(
             onClick = state::restore,
+            contentDescription = stringResource(Res.string.chat_surface_dock_restore),
             modifier = Modifier.size(LettaDimens.Control.iconButtonLg).testTag(DOCK_RESTORE_TAG),
-        ) {
-            DisclosureChevron(
-                expanded = false,
-                contentDescription = stringResource(Res.string.chat_surface_dock_restore),
-                opensUpward = true,
-            )
-        }
+        )
     }
 }
 

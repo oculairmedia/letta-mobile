@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,7 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import com.composables.icons.lucide.ChartPie
 import com.composables.icons.lucide.Lucide
 import com.letta.mobile.data.context.ContextWindowUsage
@@ -40,12 +39,14 @@ import com.letta.mobile.sharedui.resources.composer_context_total
 import com.letta.mobile.sharedui.resources.composer_context_total_share
 import com.letta.mobile.sharedui.resources.composer_context_unknown_total
 import com.letta.mobile.sharedui.resources.composer_context_unknown_value
+import com.letta.mobile.ui.theme.ChatChipShape
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.context.ContextUsageBar
 import com.letta.mobile.ui.context.ContextUsageRows
 import com.letta.mobile.ui.context.animatedContextUsage
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.chatPanelTitle
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -87,8 +88,8 @@ private fun ContextIndicator(text: String, onClick: () -> Unit) {
     val tint = MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
-            .clickable(onClickLabel = stringResource(Res.string.composer_context_show_breakdown), onClick = onClick)
+            .clip(ChatChipShape)
+            .clickable(onClickLabel = stringResource(Res.string.composer_context_show_breakdown), role = Role.Button, onClick = onClick)
             .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.hair)
             .testTag(ComposerTestTags.CONTEXT_CHIP),
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
@@ -153,8 +154,7 @@ private fun ContextUsageHeader(usage: ContextWindowUsage?) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = stringResource(Res.string.composer_context_title),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.chatPanelTitle,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )

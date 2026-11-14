@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -94,18 +93,20 @@ import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchor
 import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
 import com.letta.mobile.ui.chat.surface.composer.LocalMinimisedBarLayout
-import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.LettaFoldButton
 import com.letta.mobile.ui.components.ResizeDirection
 import com.letta.mobile.ui.components.movePointerIcon
 import com.letta.mobile.ui.components.resizePointerIcon
 import com.letta.mobile.ui.mascot.LocalMascotTransport
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAvailable
+import com.letta.mobile.ui.theme.ChatChipShape
 import com.letta.mobile.ui.theme.ChatMascotDimens
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.theme.chatPanelMorphShape
 import org.jetbrains.compose.resources.stringResource
 
 /*
@@ -636,7 +637,7 @@ private fun PanelChrome(
     val panel = scheme.surfaceContainer
     val outline = scheme.outlineVariant
     val corners = Modifier.graphicsLayer {
-        shape = RoundedCornerShape(LettaDimens.Radius.lg.toPx() * (1f - fraction()))
+        shape = chatPanelMorphShape(1f - fraction())
         clip = true
     }
     Box(modifier) {
@@ -657,7 +658,7 @@ private fun PanelChrome(
                     val open = openness()
                     alpha = open
                     shadowElevation = ChatSurfaceDimens.dockedReplyElevation.toPx() * rest * open
-                    shape = RoundedCornerShape(LettaDimens.Radius.lg.toPx() * rest)
+                    shape = chatPanelMorphShape(rest)
                     clip = true
                 }
                 .drawBehind { drawRect(lerp(panel, page, fraction())) }
@@ -771,21 +772,16 @@ private fun PanelHeader(state: ChatDockState, badged: Boolean, recents: BubbleRe
                 Modifier
                     .align(Alignment.Center)
                     .size(ChatSurfaceDimens.dockGripWidth, ChatSurfaceDimens.dockGripHeight)
-                    .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(LettaDimens.Radius.sm)),
+                    .background(MaterialTheme.colorScheme.outlineVariant, ChatChipShape),
             )
         }
         if (recents != null) RecentsToggle(recents.state, Modifier.align(Alignment.CenterStart).padding(start = LettaDimens.Space.sm))
         Box(Modifier.align(Alignment.CenterEnd).padding(end = LettaDimens.Space.sm)) {
-            IconButton(
+            LettaFoldButton(
                 onClick = state::toggleCollapsed,
+                contentDescription = stringResource(Res.string.chat_surface_dock_collapse),
                 modifier = Modifier.size(LettaDimens.Control.iconButton).testTag(DOCK_COLLAPSE_TAG),
-            ) {
-                DisclosureChevron(
-                    expanded = true,
-                    contentDescription = stringResource(Res.string.chat_surface_dock_collapse),
-                    opensUpward = true,
-                )
-            }
+            )
         }
     }
 }

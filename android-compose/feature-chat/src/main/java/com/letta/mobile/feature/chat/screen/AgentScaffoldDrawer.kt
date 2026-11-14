@@ -1,16 +1,13 @@
 package com.letta.mobile.feature.chat.screen
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -20,7 +17,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -48,7 +44,7 @@ import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MarkdownText
-import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.LettaDisclosureHeader
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaMotion
 import com.letta.mobile.ui.theme.listItemHeadline
@@ -411,7 +407,7 @@ internal fun ProjectBugReportSheet(
     ) {
         ActionSheetItem(
             text = stringResource(R.string.screen_project_bug_report_attachment_camera),
-            icon = LettaIcons.Error,
+            icon = LettaIcons.Camera,
             onClick = {
                 attachments = attachments + "camera://capture-${System.currentTimeMillis()}"
                 showAttachmentSheet = false
@@ -677,14 +673,12 @@ internal fun ProjectContextCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onExpandedChange(!expanded) }
             .padding(LettaDimens.Space.lg),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+        LettaDisclosureHeader(
+            expanded = expanded,
+            onToggle = { onExpandedChange(!expanded) },
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -702,16 +696,11 @@ internal fun ProjectContextCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-
-            FilledTonalButton(
-                onClick = { onExpandedChange(!expanded) },
-            ) {
-                DisclosureChevron(expanded = expanded)
-                Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
-                Text(
-                    text = if (expanded) stringResource(R.string.common_hide) else stringResource(R.string.common_details),
-                )
-            }
+            Text(
+                text = if (expanded) stringResource(R.string.common_hide) else stringResource(R.string.common_details),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         AnimatedVisibility(

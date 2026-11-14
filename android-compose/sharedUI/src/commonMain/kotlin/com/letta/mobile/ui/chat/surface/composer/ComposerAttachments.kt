@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +35,8 @@ import com.letta.mobile.sharedui.resources.composer_preview_attachment
 import com.letta.mobile.sharedui.resources.composer_remove_attachment
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.chat.surface.rememberDecodedImage
+import com.letta.mobile.ui.theme.ChatCardShape
+import com.letta.mobile.ui.theme.ChatChipShape
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -75,7 +76,7 @@ private fun AttachmentThumbnail(
         Surface(
             onClick = onPreview,
             modifier = Modifier.size(ChatComposerDimens.attachmentThumbnail),
-            shape = RoundedCornerShape(LettaDimens.Radius.sm),
+            shape = ChatChipShape,
             color = MaterialTheme.colorScheme.surfaceVariant,
         ) {
             AttachmentImage(bitmap = bitmap, contentScale = ContentScale.Crop)
@@ -123,7 +124,7 @@ private fun AttachmentPreviewDialog(image: MessageContentPart.Image, onDismiss: 
         ) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(LettaDimens.Radius.md),
+                shape = ChatCardShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
                 AttachmentImage(bitmap = bitmap, contentScale = ContentScale.Fit)

@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -31,8 +30,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.letta.mobile.ui.theme.ChatCardShape
+import com.letta.mobile.ui.theme.ChatChipShape
+import com.letta.mobile.ui.theme.LettaMenuIndicator
 import com.letta.mobile.ui.theme.LettaSectionLabel
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -59,7 +60,7 @@ internal fun ComposerActionChip(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier,
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        shape = ChatChipShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
@@ -91,10 +92,8 @@ internal fun ComposerActionChip(
                     maxLines = 1,
                 )
             }
-            Icon(
-                imageVector = LettaIcons.KeyboardArrowDown,
-                contentDescription = null,
-                modifier = Modifier.size(LettaDimens.Control.iconSm).testTag(ComposerTestTags.CHIP_CHEVRON),
+            LettaMenuIndicator(
+                modifier = Modifier.testTag(ComposerTestTags.CHIP_CHEVRON),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -124,7 +123,7 @@ internal fun ComposerPopover(
     ) {
         Surface(
             modifier = Modifier.width(width).testTag(testTag),
-            shape = RoundedCornerShape(LettaDimens.Radius.md),
+            shape = ChatCardShape,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
             shadowElevation = LettaDimens.Space.sm,
