@@ -37,4 +37,31 @@ class PairLinkTest {
     fun toStringNeverContainsTheSecretEnvelope() {
         assertFalse(envelope in PairLink(envelope, ticket).toString())
     }
+
+    @Test
+    fun aLinkThatFitsIsDrawnWhole() {
+        val link = PairLink(envelope, ticket)
+        assertEquals(link.encode(), link.forQr())
+    }
+
+    /**
+     * A host ticket as the dial hint is far longer than the envelope, and the two together overflow
+     * even a version 40 symbol — which is what made the inviter render no code at all. The code keeps
+     * the invite and drops the hint instead.
+     */
+    @Test
+    fun aLinkPastTheSymbolCapacityKeepsTheInviteAndDropsTheDialHint() {
+        val ticket = "endpoint" + "a".repeat(2_400)
+        val link = PairLink(envelope, ticket)
+        assertEquals(true, link.encode().length > PairLink.QR_MAX_CHARS)
+        val drawn = link.forQr()
+        assertEquals(PairLink(envelope, null).encode(), drawn)
+        assertEquals(PairLink(envelope, null), drawn?.let(PairLink::parse))
+    }
+
+    @Test
+    fun aBareInvitePastTheCapacityIsNotDrawnAtAll() {
+        val huge = PairLink.QR_SCHEME_PREFIX + "x".repeat(PairLink.QR_MAX_CHARS)
+        assertNull(PairLink(huge, null).forQr())
+    }
 }

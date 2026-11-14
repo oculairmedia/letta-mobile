@@ -38325,6 +38325,7 @@ public final class com/letta/mobile/data/pairing/PairInviteUiState {
 
 public final class com/letta/mobile/data/pairing/PairLink {
 	public static final field Companion Lcom/letta/mobile/data/pairing/PairLink$Companion;
+	public static final field QR_MAX_CHARS I
 	public static final field QR_SCHEME_PREFIX Ljava/lang/String;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
@@ -38333,6 +38334,8 @@ public final class com/letta/mobile/data/pairing/PairLink {
 	public static synthetic fun copy$default (Lcom/letta/mobile/data/pairing/PairLink;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/pairing/PairLink;
 	public final fun encode ()Ljava/lang/String;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun forQr (I)Ljava/lang/String;
+	public static synthetic fun forQr$default (Lcom/letta/mobile/data/pairing/PairLink;IILjava/lang/Object;)Ljava/lang/String;
 	public final fun getDial ()Ljava/lang/String;
 	public final fun getQrInvite ()Ljava/lang/String;
 	public fun hashCode ()I

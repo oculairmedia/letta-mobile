@@ -124,7 +124,11 @@ object PairingAdminHandlers {
                 signature = signature,
             )
             val dial = runCatching { config?.dialHint?.invoke() }.getOrNull()?.takeIf { it.isNotBlank() }
-            return envelope to PairLink(qrInvite = envelope, dial = dial).encode()
+            val link = PairLink(qrInvite = envelope, dial = dial)
+            // The link is printed under the code and must fit a QR symbol: a host ticket as the
+            // dial hint overflows one, so the code drops the hint rather than failing to render.
+            val qrLink = link.forQr() ?: return null
+            return envelope to qrLink
         }
     }
 

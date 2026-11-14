@@ -18,6 +18,7 @@ import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.PairingAdminHandlers
 import com.letta.mobile.data.controller.node.iroh.PairingQrConfig
+import com.letta.mobile.data.pairing.PairLink
 import com.letta.mobile.qr.QrCode
 import com.letta.mobile.qr.QrRenderer
 import kotlinx.coroutines.runBlocking
@@ -150,7 +151,7 @@ class PairCommand : CliktCommand(name = "pair") {
             inviteStore = PairingStorePaths.inviteStore(Path.of(storePath), pairingInviteStoreFile),
             dial = dial,
         )
-        val minted = mintInvite(router, inviteParams())
+        val minted = mintInvite(router, inviteParams(), requestedDial = dial)
         render(minted)
     }
 
@@ -177,6 +178,9 @@ class PairCommand : CliktCommand(name = "pair") {
             println("Revoke before use: meridian peer invite-revoke --invite-id ${minted.inviteId}")
         }
         if (showLink) println("Pair link: ${minted.pairLink}")
+        if (minted.dialDroppedForQr && quiet != "true") {
+            println("The dial address was left out of the code: it would not fit a QR symbol. The scanner dials the host's NodeId over Iroh's relay.")
+        }
     }
 
     private fun fail(message: String): Nothing {
@@ -192,6 +196,8 @@ internal data class MintedInvite(
     val name: String,
     val capabilities: String,
     val expiresAtMs: Long,
+    /** The dial hint was left out of [pairLink] so it fits a QR symbol (see `PairLink.forQr`). */
+    val dialDroppedForQr: Boolean = false,
 ) {
     override fun toString(): String = "MintedInvite(id=$inviteId, <redacted>)"
 }
@@ -215,7 +221,7 @@ internal fun buildPairRouter(
     }
 }
 
-internal suspend fun mintInvite(router: AdminRpcRouter, params: JsonObject): MintedInvite {
+internal suspend fun mintInvite(router: AdminRpcRouter, params: JsonObject, requestedDial: String? = null): MintedInvite {
     val response = router.dispatch(
         AdminRpcInvocation(
             requestId = "pair-cli-${System.nanoTime()}",
@@ -230,12 +236,14 @@ internal suspend fun mintInvite(router: AdminRpcRouter, params: JsonObject): Min
     }
     val result = obj["result"]?.jsonObject ?: error("pair.invite.create returned no result")
     fun field(key: String) = (result[key] as? JsonPrimitive)?.contentOrNull
+    val link = field("pair_link") ?: error("pair.invite.create returned no pair_link (signer misconfigured?)")
     return MintedInvite(
-        pairLink = field("pair_link") ?: error("pair.invite.create returned no pair_link (signer misconfigured?)"),
+        pairLink = link,
         inviteId = field("invite_id").orEmpty(),
         name = field("suggested_name").orEmpty(),
         capabilities = result["capabilities"].toString(),
         expiresAtMs = field("expires_at_ms")?.toLongOrNull() ?: 0L,
+        dialDroppedForQr = PairLink.parse(link)?.dial == null && requestedDial?.isNotBlank() == true,
     )
 }
 

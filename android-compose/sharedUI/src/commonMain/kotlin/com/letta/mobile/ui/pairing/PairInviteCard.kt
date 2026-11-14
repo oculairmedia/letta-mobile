@@ -187,7 +187,9 @@ private fun LiveInvite(code: LiveCode, qr: QrModules?, actions: PairDeviceAction
     Text(PairingStrings.INVITE_STEP_1)
     Text(PairingStrings.INVITE_STEP_2)
     Text(PairingStrings.INVITE_STEP_3)
-    if (showLink || qr == null) PairLinkBlock(code.invite) else QrCard(qr, remainingMs = code.remainingMs)
+    // A host whose link cannot be drawn (no encoder, or a link past a QR symbol's capacity) still
+    // gets a usable invite: the link itself, saying why there is no code.
+    if (showLink || qr == null) PairLinkBlock(code.invite, noCode = qr == null) else QrCard(qr, remainingMs = code.remainingMs)
     Countdown(code)
     LinkActions(code.invite, toggle = qr?.let { LinkToggle(showLink) { showLink = !showLink } }, onShare = actions.onShareLink)
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
@@ -219,11 +221,15 @@ private fun QrCard(qr: QrModules, remainingMs: Long?) {
 
 /** The full pairing link (product decision: the fallback is the link, not a short code — a code cannot carry the host). */
 @Composable
-private fun PairLinkBlock(invite: MintedPairInvite) {
+private fun PairLinkBlock(invite: MintedPairInvite, noCode: Boolean = false) {
     Surface(shape = MaterialTheme.shapes.medium, tonalElevation = LettaDimens.Space.hair, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(LettaDimens.Space.md), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             Text(invite.pairLink, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag(PairingTags.INVITE_LINK))
-            Text(PairingStrings.LINK_SECRET_NOTE, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                if (noCode) PairingStrings.LINK_ONLY_NO_QR else PairingStrings.LINK_SECRET_NOTE,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

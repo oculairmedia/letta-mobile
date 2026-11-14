@@ -54558,10 +54558,13 @@ final class com.letta.mobile.data.pairing/PairLink { // com.letta.mobile.data.pa
     final fun copy(kotlin/String = ..., kotlin/String? = ...): com.letta.mobile.data.pairing/PairLink // com.letta.mobile.data.pairing/PairLink.copy|copy(kotlin.String;kotlin.String?){}[0]
     final fun encode(): kotlin/String // com.letta.mobile.data.pairing/PairLink.encode|encode(){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.pairing/PairLink.equals|equals(kotlin.Any?){}[0]
+    final fun forQr(kotlin/Int = ...): kotlin/String? // com.letta.mobile.data.pairing/PairLink.forQr|forQr(kotlin.Int){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.pairing/PairLink.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.pairing/PairLink.toString|toString(){}[0]
 
     final object Companion { // com.letta.mobile.data.pairing/PairLink.Companion|null[0]
+        final const val QR_MAX_CHARS // com.letta.mobile.data.pairing/PairLink.Companion.QR_MAX_CHARS|{}QR_MAX_CHARS[0]
+            final fun <get-QR_MAX_CHARS>(): kotlin/Int // com.letta.mobile.data.pairing/PairLink.Companion.QR_MAX_CHARS.<get-QR_MAX_CHARS>|<get-QR_MAX_CHARS>(){}[0]
         final const val QR_SCHEME_PREFIX // com.letta.mobile.data.pairing/PairLink.Companion.QR_SCHEME_PREFIX|{}QR_SCHEME_PREFIX[0]
             final fun <get-QR_SCHEME_PREFIX>(): kotlin/String // com.letta.mobile.data.pairing/PairLink.Companion.QR_SCHEME_PREFIX.<get-QR_SCHEME_PREFIX>|<get-QR_SCHEME_PREFIX>(){}[0]
 
