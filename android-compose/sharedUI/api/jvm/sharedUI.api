@@ -2326,6 +2326,10 @@ public final class com/letta/mobile/ui/chat/surface/timeline/ComposableSingleton
 	public final fun getLambda$-333157253$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
+public final class com/letta/mobile/ui/chat/surface/timeline/PendingToolAnnouncementKt {
+	public static final fun PendingToolAnnouncementEffect (Ljava/util/List;Lkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;I)V
+}
+
 public final class com/letta/mobile/ui/chat/surface/timeline/TimelineDeferredBodyKt {
 	public static final fun TimelineDeferredBody (Ljava/lang/String;Lkotlin/jvm/functions/Function3;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
