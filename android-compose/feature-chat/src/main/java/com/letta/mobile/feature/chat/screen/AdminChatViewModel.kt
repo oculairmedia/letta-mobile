@@ -287,8 +287,8 @@ internal class AdminChatViewModel @Inject constructor(
     private var screenSelected = false
     private var pipelineLifetime = com.letta.mobile.feature.chat.coordination.ChatPipelineLifetime(viewModelScope)
 
-    private val sendPipeline: AdminChatSendPipeline
-        get() = ensureSendPipeline()
+    private val sendPipeline: AdminChatSendPipeline get() = ensureSendPipeline()
+    internal val identifiedSend get() = sendPipeline.wsChatSendCoordinator.identifiedSend // voice mode's sender
 
     private fun ensureSendPipeline(): AdminChatSendPipeline {
         if (!runtimeCollectorStarted) {

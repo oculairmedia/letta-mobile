@@ -40,6 +40,9 @@ private val DockedFieldStyle = ComposerFieldStyle(
     maxLines = 1,
 )
 
+/** The prompt card's and the docked bar's shape; voice mode's outline follows it. */
+private val PromptShape = RoundedCornerShape(LettaDimens.Radius.lg)
+
 /** The keyboard is up (always false on desktop, where there is no IME inset). */
 @Composable
 internal fun keyboardOpen(): Boolean = WindowInsets.ime.getBottom(LocalDensity.current) > 0
@@ -59,8 +62,9 @@ internal fun ComposerPromptCard(model: ComposerModel, onAttachImage: () -> Unit)
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .swipeUpToCanvas(enabled = swipeEnabled, onTrigger = { model.onIntent(ChatSurfaceIntent.OpenCanvas) })
+            .voiceOutline(PromptShape)
             .testTag(ComposerTestTags.CARD),
-        shape = RoundedCornerShape(LettaDimens.Radius.lg),
+        shape = PromptShape,
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
         // Low-contrast hairline: the fill alone is barely a step off the page background.
@@ -120,8 +124,9 @@ private fun DockedBarRow(model: ComposerModel, onAttachImage: () -> Unit, fieldH
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .voiceOutline(PromptShape)
             .testTag(ComposerTestTags.DOCKED_BAR),
-        shape = RoundedCornerShape(LettaDimens.Radius.lg),
+        shape = PromptShape,
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(
@@ -154,27 +159,38 @@ private fun DockedBarRow(model: ComposerModel, onAttachImage: () -> Unit, fieldH
 }
 
 /**
- * The trailing action slot of the card and of the docked bar, in their top-end corner: Send, or
- * Stop while a run streams. It is the one place a trailing action goes.
+ * The trailing action slot of the card and of the docked bar, in their top-end corner: the voice-mode
+ * button where the page has voice mode, then Send (or Stop while a run streams), one round cluster
+ * spaced like the bar's other controls. It is the one place a trailing action goes.
  *
- * An additional trailing action (a voice-mode button beside Send) is added to this row, before
- * [ComposerActionButton], and its width to [trailingActionsWidth], which the prompt field and the
- * docked row reserve so nothing slides under the slot. The Touch bar's counterpart is its
- * TouchTrailingSlot.
+ * Another trailing action goes in this row, before [ComposerActionButton], and its width into
+ * [trailingActionsWidth], which the prompt field and the docked row reserve so nothing slides under
+ * the slot. The Touch bar's counterpart is its TouchTrailingSlot.
  */
 @Composable
 private fun ComposerTrailingActions(model: ComposerModel, modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier.padding(top = LettaDimens.Space.sm, end = LettaDimens.Space.sm),
+        modifier = modifier
+            .padding(top = LettaDimens.Space.sm, end = LettaDimens.Space.sm)
+            .testTag(ComposerTestTags.TRAILING_ACTIONS),
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        ComposerVoiceModeButton(size = LettaDimens.Control.actionButton)
         ComposerActionButton(model)
     }
 }
 
-/** The width [ComposerTrailingActions] takes: its actions, its inset and the gap before what precedes it. */
-private fun trailingActionsWidth(): Dp = LettaDimens.Control.actionButton + LettaDimens.Space.sm * 2
+/**
+ * The width [ComposerTrailingActions] takes: Send, the voice-mode button and its gap where the page
+ * has voice mode, the slot's inset and the gap before what precedes it.
+ */
+@Composable
+private fun trailingActionsWidth(): Dp {
+    val send = LettaDimens.Control.actionButton + LettaDimens.Space.sm * 2
+    return if (hasVoiceMode()) send + LettaDimens.Control.actionButton + LettaDimens.Space.sm else send
+}
 
 // The column already has md end padding; reserve the rest of the trailing slot.
+@Composable
 private fun cornerContentPadding(): Dp = trailingActionsWidth() - LettaDimens.Space.md

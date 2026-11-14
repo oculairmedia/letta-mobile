@@ -28,6 +28,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -64,6 +65,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.lerp
+import com.composables.icons.lucide.AudioLines
+import com.composables.icons.lucide.Lucide
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_actions_open
 import com.letta.mobile.sharedui.resources.composer_attach_image
@@ -71,6 +74,8 @@ import com.letta.mobile.sharedui.resources.composer_open_canvas
 import com.letta.mobile.sharedui.resources.composer_send
 import com.letta.mobile.sharedui.resources.composer_stop
 import com.letta.mobile.sharedui.resources.composer_stopping
+import com.letta.mobile.sharedui.resources.voice_mode_sheet_row
+import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
@@ -117,19 +122,52 @@ internal fun TouchComposerBar(
 ) {
     var sheetOpen by remember { mutableStateOf(false) }
     val modePicker = remember { TouchModePicker() }
-    val sheetItems = touchSheetItems(model, onAttachImage, onPermissionMode = { modePicker.open = true })
-    Column(modifier.fillMaxWidth().then(touchBarSwipe(model))) {
-        TouchAttachments(model)
-        TouchBarSurface(model) {
-            leading?.invoke()
-            TouchPlus(model, sheetItems, modePicker, onOpenSheet = { sheetOpen = true })
-            Box(Modifier.weight(1f).padding(horizontal = TouchComposerDimens.fieldPadding, vertical = TouchComposerDimens.fieldPadding)) {
-                ComposerTextField(model = model, style = touchFieldStyle(model))
+    val baseItems = touchSheetItems(model, onAttachImage, onPermissionMode = { modePicker.open = true })
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val voiceInSlot = touchVoiceModeInSlot(maxWidth, otherControls = listOf(leading != null, baseItems.isNotEmpty()).count { it })
+        val sheetItems = baseItems + listOfNotNull(touchVoiceModeSheetItem().takeUnless { voiceInSlot })
+        Column(Modifier.fillMaxWidth().then(touchBarSwipe(model))) {
+            TouchAttachments(model)
+            TouchBarSurface(model) {
+                leading?.invoke()
+                TouchPlus(model, sheetItems, modePicker, onOpenSheet = { sheetOpen = true })
+                Box(Modifier.weight(1f).padding(TouchComposerDimens.fieldPadding)) {
+                    ComposerTextField(model = model, style = touchFieldStyle(model))
+                }
+                TouchTrailingSlot(model, voiceMode = voiceInSlot)
             }
-            TouchTrailingSlot(model)
         }
+        if (sheetOpen) TouchComposerActionSheet(items = sheetItems, onDismiss = { sheetOpen = false })
     }
-    if (sheetOpen) TouchComposerActionSheet(items = sheetItems, onDismiss = { sheetOpen = false })
+}
+
+/**
+ * The voice-mode button rides the trailing slot where the page has voice mode and the field keeps at
+ * least [TouchComposerDimens.minFieldWidth] beside it; otherwise it is the "+" sheet's "Voice
+ * conversation" row ([touchVoiceModeSheetItem]).
+ */
+@Composable
+private fun touchVoiceModeInSlot(barWidth: Dp, otherControls: Int): Boolean {
+    if (!hasVoiceMode()) return false
+    // The other controls (the leading one, the "+"), the voice-mode button and the trailing Send or mic.
+    return touchFieldWidth(barWidth, otherControls + 2) >= TouchComposerDimens.minFieldWidth
+}
+
+/**
+ * The prompt field's own width in a Touch bar [barWidth] wide with [controls] action targets beside
+ * it (the leading control, the "+", the voice-mode button, the trailing Send or mic), each one target
+ * and one item gap wide, less the bar's side padding and the field's inner padding.
+ */
+internal fun touchFieldWidth(barWidth: Dp, controls: Int): Dp =
+    barWidth - TouchComposerDimens.horizontalPadding * 2 -
+        (TouchComposerDimens.actionTarget + TouchComposerDimens.itemSpacing) * controls -
+        TouchComposerDimens.fieldPadding * 2
+
+/** Voice mode as a row of the "+" sheet, for a bar too narrow to give it a trailing target. */
+@Composable
+private fun touchVoiceModeSheetItem(): TouchSheetItem? {
+    val voice = LocalVoiceMode.current ?: return null
+    return TouchSheetItem(stringResource(Res.string.voice_mode_sheet_row), Lucide.AudioLines, onClick = voice::press)
 }
 
 /** Swipe the bar up: on the canvas it opens the chat; on the chat page, the canvas (legacy). */
@@ -194,9 +232,12 @@ private fun TouchBarSurface(model: ComposerModel, content: @Composable androidx.
     var focused by remember { mutableStateOf(false) }
     val look = animatedTouchBarLook(model, focused)
     val padding = touchBarPadding()
+    val shape = RoundedCornerShape(topStart = look.corner, topEnd = look.corner)
     Surface(
-        modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.hasFocus }.testTag(ComposerTestTags.TOUCH_BAR),
-        shape = RoundedCornerShape(topStart = look.corner, topEnd = look.corner),
+        // Voice mode's outline follows the bar's shape: the bar runs flush to the screen's sides and
+        // bottom, so what shows is a glowing top edge and its rounded corners.
+        modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.hasFocus }.voiceOutline(shape).testTag(ComposerTestTags.TOUCH_BAR),
+        shape = shape,
         color = look.color,
         contentColor = scheme.onSurface,
         tonalElevation = look.elevation,
@@ -342,30 +383,37 @@ private fun touchSlotDictates(model: ComposerModel): Boolean {
  * or Stop while a run streams with nothing to queue. While the keyboard is up Send steps aside
  * (the keyboard's own action key sends), but Stop and the mic stay.
  *
- * It is the Touch bar's one trailing slot: an additional trailing action (a voice-mode button beside
- * Send) is added here, after the field, not elsewhere in the bar's row. The pointer card's
- * counterpart is its ComposerTrailingActions.
+ * It is the Touch bar's one trailing slot: the voice-mode button (when [voiceMode]) comes first, then
+ * the mic or Send / Stop, one item gap apart. Another trailing action goes here too, not elsewhere in
+ * the bar's row. The pointer card's counterpart is its ComposerTrailingActions.
  */
 @Composable
-private fun TouchTrailingSlot(model: ComposerModel) {
+private fun TouchTrailingSlot(model: ComposerModel, voiceMode: Boolean) {
     val dictates = touchSlotDictates(model)
     val keyboard = keyboardOpen()
     val visible = dictates || model.streaming || !keyboard
     val shown = rememberRetainedTrailingContent(visible, if (dictates) TouchTrailingContent.Voice else TouchTrailingContent.Action)
-    AnimatedVisibility(
-        visible = visible,
-        enter = touchSlotEnter(),
-        exit = touchSlotExit(),
-        label = "touchTrailingSlot",
+    Row(
+        modifier = Modifier.testTag(ComposerTestTags.TRAILING_ACTIONS),
+        horizontalArrangement = Arrangement.spacedBy(TouchComposerDimens.itemSpacing),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        when (shown) {
-            TouchTrailingContent.Voice -> Box(
-                Modifier.size(TouchComposerDimens.actionTarget).testTag(ComposerTestTags.TOUCH_VOICE),
-                contentAlignment = Alignment.Center,
-            ) {
-                ComposerVoiceButton(model)
+        if (voiceMode) ComposerVoiceModeButton(size = TouchComposerDimens.actionTarget, iconSize = TouchComposerDimens.actionIcon)
+        AnimatedVisibility(
+            visible = visible,
+            enter = touchSlotEnter(),
+            exit = touchSlotExit(),
+            label = "touchTrailingSlot",
+        ) {
+            when (shown) {
+                TouchTrailingContent.Voice -> Box(
+                    Modifier.size(TouchComposerDimens.actionTarget).testTag(ComposerTestTags.TOUCH_VOICE),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ComposerVoiceButton(model)
+                }
+                TouchTrailingContent.Action -> TouchActionButton(model)
             }
-            TouchTrailingContent.Action -> TouchActionButton(model)
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.voice.vad.ear
 
+import com.letta.mobile.data.voice.AudioLevel
 import com.letta.mobile.data.voice.CapturedAudioHandle
 import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoiceErrorCode
@@ -9,6 +10,7 @@ import com.letta.mobile.data.voice.VoiceUtterance
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioEncoding
 import com.letta.mobile.data.voice.audio.AudioFrame
+import com.letta.mobile.data.voice.audio.AudioFrameFormat
 import com.letta.mobile.data.voice.audio.AudioFrameSource
 import com.letta.mobile.data.voice.audio.PcmFormat
 import com.letta.mobile.data.voice.audio.pcm.PcmAudio
@@ -22,6 +24,7 @@ import com.letta.mobile.data.voice.vad.Hop
 import com.letta.mobile.data.voice.vad.HopObservation
 import com.letta.mobile.data.voice.vad.HopSplitter
 import com.letta.mobile.data.voice.vad.SpeechDetector
+import com.letta.mobile.data.voice.vad.TurnDiscardReason
 import com.letta.mobile.data.voice.vad.TurnEndReason
 import com.letta.mobile.data.voice.vad.TurnSignal
 import com.letta.mobile.data.voice.vad.TurnTracker
@@ -189,9 +192,11 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
     private val detector = parts.config.detectorFactory().create(format)
     private val tracker = TurnTracker(parts.config.policy, format, detector.hop)
     private val splitter = HopSplitter(detector.hop)
-    private val recorder = CaptureRecorder(samplesOf(parts.config.policy.preRoll), limit())
+    private val recorder = CaptureRecorder(samplesOf(parts.config.policy.preRoll, format), limit())
     private val pending = PendingTurns()
     private val observer = parts.config.observer
+    private val halfDuplex = parts.config.halfDuplex
+    private val gate = OutputGate(samplesOf(parts.config.outputTail, format), limit())
     private var started = false
     private var peakDb = SILENT_DB
 
@@ -243,12 +248,16 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
             started = true
             out.send(VoiceEarEvent.ListeningStarted)
         }
-        out.send(VoiceEarEvent.InputLevel(PcmLevels.level(frame.samples)))
+        val ignored = halfDuplex && gate.closed(memory.outputActive.value)
+        out.send(VoiceEarEvent.InputLevel(if (ignored) AudioLevel.Silent else PcmLevels.level(frame.samples)))
         splitter.split(frame).forEach { hop -> onHop(hop) }
     }
 
     private suspend fun onHop(hop: Hop) {
         val outputActive = memory.outputActive.value
+        val verdict = gate.judge(hop.end.value, hop.samples.size, outputActive)
+        if (halfDuplex && verdict == GateVerdict.MUTE_STARTED) muteForOutput()
+        if (halfDuplex && verdict != GateVerdict.OPEN) return
         detector.setOutputActive(outputActive)
         val probability = detector.probability(hop.samples)
         val signal = tracker.onHop(HopObservation(probability, hop.end, outputActive))
@@ -285,12 +294,45 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
         out.send(VoiceEarEvent.SpeechStarted)
     }
 
+    /**
+     * The turn is closed: the loop hears [VoiceEarEvent.SpeechEnded] at once, and the audio goes to
+     * transcription unless, half-duplex, it overlaps the app's output (then it is wiped and the turn
+     * ends as an empty utterance).
+     */
     private suspend fun endTurn(hop: Hop?, reason: TurnEndReason) {
         record(hop)
         val report = turnReport(tracker, peakDb, detector, format.sampleRateHz)
         observer.turnClosed(report, reason)
-        val turn = CapturedTurn(memory.nextHandle(), recorder.finish(), report, memory.speechGeneration)
+        out.send(VoiceEarEvent.SpeechEnded)
+        val samples = recorder.finish()
+        val end = gate.position
+        if (halfDuplex && gate.overlaps(end - samples.size, end, memory.outputActive.value)) {
+            samples.fill(0)
+            observer.turnDiscarded(report, TurnDiscardReason.OUTPUT_ACTIVE)
+            out.send(VoiceEarEvent.EndOfTurn(VoiceUtterance(VoiceText.Empty)))
+            return
+        }
+        val turn = CapturedTurn(memory.nextHandle(), samples, report, memory.speechGeneration)
         if (!pending.offer(turn)) out.send(VoiceEarEvent.Failed(VoiceError(VoiceErrorCode.TRANSCRIPTION_FAILED, VoicePort.EAR)))
+    }
+
+    /**
+     * Half-duplex: output started. Whatever turn was open is dropped (a confirmed one ends as an
+     * empty utterance, so the loop is not left waiting for it) and the pre-roll is wiped.
+     */
+    private suspend fun muteForOutput() {
+        if (tracker.recording) {
+            val confirmed = tracker.confirmed
+            tracker.drop()
+            val report = turnReport(tracker, peakDb, detector, format.sampleRateHz)
+            observer.turnDiscarded(report, TurnDiscardReason.OUTPUT_ACTIVE)
+            // The loop heard this turn start; it must hear it end, or it would wait for it forever.
+            if (confirmed) {
+                out.send(VoiceEarEvent.SpeechEnded)
+                out.send(VoiceEarEvent.EndOfTurn(VoiceUtterance(VoiceText.Empty)))
+            }
+        }
+        recorder.wipe()
     }
 
     private suspend fun fail(code: VoiceErrorCode): Nothing {
@@ -304,9 +346,71 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
         else -> VoiceErrorCode.ENGINE_FAILED
     }
 
-    private fun limit(): Long = samplesOf(parts.config.policy.maxTurn) + samplesOf(parts.config.policy.preRoll) + detector.hop.samples
+    private fun limit(): Long =
+        samplesOf(parts.config.policy.maxTurn, format) + samplesOf(parts.config.policy.preRoll, format) + detector.hop.samples
+}
 
-    private fun samplesOf(duration: Duration): Long = (duration.toDouble(DurationUnit.SECONDS) * format.sampleRateHz).toLong()
+private fun samplesOf(duration: Duration, format: AudioFrameFormat): Long =
+    (duration.toDouble(DurationUnit.SECONDS) * format.sampleRateHz).toLong()
+
+/** How [OutputGate] judged one hop. */
+internal enum class GateVerdict {
+    /** Input counts. */
+    OPEN,
+
+    /** Output has just started: input is ignored from this hop on. */
+    MUTE_STARTED,
+
+    /** Input is ignored (output active, or the tail after it). */
+    MUTED,
+}
+
+/**
+ * Half-duplex bookkeeping, all in sample positions: while output is active and for [tail] samples
+ * after it ends, hops are muted; each such window is remembered (back to [keep] samples ago) so a
+ * captured turn can be checked for overlap before it is handed to transcription.
+ */
+internal class OutputGate(private val tail: Long, private val keep: Long) {
+    private var since: Long? = null
+    private var until: Long? = null
+    private val windows = ArrayDeque<LongRange>()
+
+    /** Where the last hop judged ends: "now". */
+    var position: Long = 0
+        private set
+
+    /** Output is active ([reported], or seen by a hop and not yet over) or its tail is running. */
+    fun closed(reported: Boolean): Boolean = reported || since != null || until != null
+
+    /** Judges the hop ending at [end] ([samples] long), with output [active] or not. */
+    fun judge(end: Long, samples: Int, active: Boolean): GateVerdict {
+        position = end
+        val start = end - samples
+        if (active) {
+            val started = since == null
+            if (started) since = start
+            until = null
+            return if (started) GateVerdict.MUTE_STARTED else GateVerdict.MUTED
+        }
+        since?.let { from ->
+            since = null
+            until = start + tail
+            remember(from..start + tail)
+        }
+        val mutedUntil = until ?: return GateVerdict.OPEN
+        if (end <= mutedUntil) return GateVerdict.MUTED
+        until = null
+        return GateVerdict.OPEN
+    }
+
+    /** Whether audio from [start] to [end] overlaps output: active now ([reported]), its tail, or a past window. */
+    fun overlaps(start: Long, end: Long, reported: Boolean): Boolean =
+        closed(reported) || windows.any { it.first < end && it.last > start }
+
+    private fun remember(window: LongRange) {
+        windows.addLast(window)
+        while (windows.isNotEmpty() && windows.first().last < position - keep) windows.removeFirst()
+    }
 }
 
 /** Transcribes finished turns and retries in order, one at a time, and reports the outcome. */

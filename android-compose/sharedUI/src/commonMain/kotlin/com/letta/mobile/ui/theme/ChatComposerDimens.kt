@@ -97,6 +97,12 @@ object TouchComposerDimens {
     /** The field's own inner padding (Material's TextField: 16 dp on each side). */
     val fieldPadding: Dp = LettaDimens.Space.lg
 
+    /**
+     * The narrowest the prompt field may get beside the bar's trailing actions; a bar that would
+     * squeeze it further moves the voice-mode button into the "+" sheet.
+     */
+    val minFieldWidth: Dp = 150.dp
+
     /** The "+" shrinks a touch while pressed. */
     const val pressedScale: Float = 0.96f
 

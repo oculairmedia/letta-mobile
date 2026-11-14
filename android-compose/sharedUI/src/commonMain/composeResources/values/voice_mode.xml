@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The chat bar's voice mode button. -->
+    <string name="voice_mode_start">Start voice conversation</string>
+    <string name="voice_mode_stop">Stop voice conversation</string>
+    <string name="voice_mode_interrupt">Stop speaking and listen</string>
+    <string name="voice_mode_sheet_row">Voice conversation</string>
+    <string name="voice_mode_state_off">Off</string>
+    <string name="voice_mode_state_setup">Needs setup</string>
+    <string name="voice_mode_state_permission">Microphone not allowed</string>
+    <string name="voice_mode_state_listening">On, listening</string>
+    <string name="voice_mode_state_hearing">On, hearing you</string>
+    <string name="voice_mode_state_thinking">On, waiting for the reply</string>
+    <string name="voice_mode_state_speaking">On, speaking the reply</string>
+    <string name="voice_mode_state_error">Stopped on an error</string>
+
+    <!-- The one-line status strip above the chat bar while voice mode is on. -->
+    <string name="voice_status_listening">Listening…</string>
+    <string name="voice_status_hearing">Hearing you…</string>
+    <string name="voice_status_thinking">Thinking…</string>
+    <string name="voice_status_speaking">Speaking… — talk to interrupt</string>
+    <string name="voice_status_speaking_press">Speaking… — press to interrupt</string>
+    <string name="voice_status_setup">Voice mode needs a speech server and your consent.</string>
+    <string name="voice_status_permission">Voice mode needs the microphone. Allow it when asked, or in system settings.</string>
+    <string name="voice_action_retry">Retry</string>
+    <string name="voice_action_interrupt">Interrupt</string>
+    <string name="voice_action_setup">Set up</string>
+    <string name="voice_action_dismiss">Close voice mode</string>
+
+    <!-- Failures, shared by the status strip and the Voice settings. -->
+    <string name="voice_error_unreachable">Couldn't reach the speech server.</string>
+    <string name="voice_error_timed_out">The speech server took too long to answer.</string>
+    <string name="voice_error_unauthorized">The speech server refused the API key.</string>
+    <string name="voice_error_insecure">An API key needs an https address or this device's own address.</string>
+    <string name="voice_error_invalid">Use a plain http or https address, without a query or a login.</string>
+    <string name="voice_error_rejected">The speech server refused the request.</string>
+    <string name="voice_error_no_conversation">Open a conversation to talk in it.</string>
+    <string name="voice_error_not_delivered">Your message didn't reach the agent.</string>
+    <string name="voice_error_unattributed">The reply is in the chat but couldn't be spoken.</string>
+    <string name="voice_error_run_failed">The agent's reply failed.</string>
+    <string name="voice_error_audio">The microphone or speaker isn't available.</string>
+    <string name="voice_error_generic">Voice mode stopped on an error.</string>
+
+    <!-- The Voice settings section. -->
+    <string name="voice_settings_title">Voice</string>
+    <string name="voice_settings_supporting">Talk with the agent hands-free. A speech server you choose turns what you say into text and the agent's replies into speech.</string>
+    <string name="voice_settings_url">Speech server URL</string>
+    <string name="voice_settings_url_placeholder">https://speech.example.net</string>
+    <string name="voice_settings_url_help">An OpenAI-compatible server, without /v1.</string>
+    <string name="voice_settings_key">API key (optional)</string>
+    <string name="voice_settings_key_saved">A key is saved. Leave this empty to keep it, or type a new one.</string>
+    <string name="voice_settings_key_remove">Remove saved key</string>
+    <string name="voice_settings_consent">Send my voice and the replies to this server</string>
+    <string name="voice_settings_consent_help">While voice mode is on, recordings of what you say and the text of the agent's replies go to this server to be transcribed and spoken. Nothing is sent until you turn voice mode on.</string>
+    <string name="voice_settings_interrupt">Interrupt by speaking (use headphones)</string>
+    <string name="voice_settings_interrupt_help">Without headphones the microphone hears the replies, and they would interrupt themselves. While this is off, press the voice button to interrupt a reply.</string>
+    <string name="voice_settings_interrupt_builtin">Speaking over a reply interrupts it: this device cancels its own echo.</string>
+    <string name="voice_settings_save">Save</string>
+    <string name="voice_settings_test">Test</string>
+    <string name="voice_settings_testing">Testing…</string>
+    <string name="voice_settings_saved">Saved.</string>
+    <string name="voice_settings_reachable">The server answered.</string>
+    <string name="voice_setup_title">Set up voice mode</string>
+</resources>

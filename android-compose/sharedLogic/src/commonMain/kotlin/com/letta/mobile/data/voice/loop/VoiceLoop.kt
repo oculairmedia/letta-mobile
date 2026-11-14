@@ -29,14 +29,26 @@ import kotlinx.coroutines.plus
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.time.Clock
 
 /**
  * The hands-free voice loop: listen, send the utterance, speak the answer, listen again.
  *
  * Phases: IDLE -> LISTENING -> THINKING (waiting for answer text) -> SPEAKING -> LISTENING
- * (continuous) or IDLE (single shot). Speech while the app is thinking or speaking interrupts it
- * (barge-in, when enabled). [stop] works in every phase. Failures settle in FAILED with a tagged
- * error; activating again starts over.
+ * (continuous) or IDLE (single shot). Speech while the app is speaking interrupts it (barge-in, when
+ * enabled): playback stops, the rest of that answer is dropped and its run is asked to stop, and
+ * what the person then says is sent only once that stop has settled (bounded by
+ * [VoiceLoopConfig.releaseTimeout]). Speech while the app only waits for an answer interrupts
+ * nothing: it is sent as a follow-up, and every answer is spoken in the order its utterance was
+ * sent (at most [VoiceLoopConfig.maxPendingReplies] at once). A tap or a key while answering drops
+ * every pending answer. With [VoiceLoopConfig.voiceInterrupts] off (half-duplex, a microphone
+ * without echo cancellation) speech reported over the app's output never interrupts it; a tap or a
+ * key does. Answer text is held only while the person's turn is open
+ * ([com.letta.mobile.data.voice.engine.VoiceEarEvent.SpeechEnded] releases it), never while that
+ * turn is only being transcribed. [stop] works in every phase. A failed answer, an answer that produced no
+ * text in time, or a failed segment of speech is reported in [VoiceLoopState.turnFailure] and the
+ * loop goes on; microphone failures and engines that end or will not let go settle in FAILED with a
+ * tagged error, and activating again starts over.
  *
  * Rules the loop guarantees:
  * - Every turn carries a generation token. Reply text from an older, interrupted or stopped turn,
@@ -51,7 +63,8 @@ import kotlinx.coroutines.withContext
  *   awaited) before the ear opens, and a step that starts speech without barge-in closes the ear
  *   first; the ear stays open during speech only while barge-in keeps it open on purpose. A mouth
  *   that will not stop keeps the ear closed. The ear is told when output is playing
- *   ([com.letta.mobile.data.voice.engine.VoiceEar.setOutputActive]).
+ *   ([com.letta.mobile.data.voice.engine.VoiceEar.setOutputActive]): before the mouth is handed
+ *   speech, and that it ended only once a stop has returned (or the speech finished).
  * - Mouth failures name their segment; a failure for output already stopped is ignored.
  * - End of turn is the ear's decision; the loop has no silence timer. The only timer is the
  *   first-text timeout: it runs while an answer is open and has produced no text, in any phase
@@ -77,7 +90,7 @@ class VoiceLoop(
     private val scope = runtime.scope + job + runtime.dispatcher
     // overflow: one consumer that only pauses for bounded release waits; blocking or dropping here would lose stops.
     private val inputs = Channel<LoopInput>(Channel.UNLIMITED)
-    private val runner = LoopEffectRunner(LoopWiring(engines, config, scope, inputs))
+    private val runner = LoopEffectRunner(LoopWiring(engines, config, scope, inputs, runtime.observer))
     private var model = LoopModel(config)
     private val mutableState = MutableStateFlow(VoiceLoopState(phaseSince = runtime.clock.now()))
     private val closing = MutableStateFlow(false)
@@ -116,6 +129,11 @@ class VoiceLoop(
     /** Retries the capture named by [VoiceLoopState.retryableCapture]. Ignored once shutdown began. */
     fun retryCapture() {
         offer(LoopInput.RetryCapture)
+    }
+
+    /** Sends again the utterance whose answer failed ([VoiceLoopState.replyRetryable]). Ignored once shutdown began. */
+    fun retryReply() {
+        offer(LoopInput.RetryReply)
     }
 
     /** Applies a key classifier [decision] raised by [kind]. */
@@ -190,7 +208,7 @@ class VoiceLoop(
             pending += runner.apply(step)
             if (input.isTerminalStop()) pending += runner.releaseAll().also { released = true }
         }
-        publish()
+        mutableState.publish(model, runtime.clock)
         acknowledgements.forEach { it.complete(Unit) }
     }
 
@@ -204,7 +222,7 @@ class VoiceLoop(
         val stopped = VoiceLoopMachine.reduce(model, LoopInput.Stop()).model
         released = true
         model = runner.releaseAll().fold(stopped) { current, fault -> VoiceLoopMachine.reduce(current, fault).model }
-        publish()
+        mutableState.publish(model, runtime.clock)
     }
 
     /** Stale ear events, and everything but stops and faults after the terminal stop, change nothing. */
@@ -214,12 +232,14 @@ class VoiceLoop(
         else -> input !is LoopInput.Stop && input !is LoopInput.Fault
     }
 
-    private fun publish() {
-        val previous = mutableState.value
-        val since = if (previous.phase == model.phase) previous.phaseSince else runtime.clock.now()
-        mutableState.value = LoopStateProjection.project(model, since)
-    }
 
+}
+
+/** Publishes [model]'s state; the phase's start time changes only when the phase does. */
+private fun MutableStateFlow<VoiceLoopState>.publish(model: LoopModel, clock: Clock) {
+    val previous = value
+    val since = if (previous.phase == model.phase) previous.phaseSince else clock.now()
+    value = LoopStateProjection.project(model, since)
 }
 
 /** The stop [VoiceLoop.shutdown] sends: after it the loop releases every engine and accepts only stops and faults. */

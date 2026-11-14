@@ -1,6 +1,8 @@
 package com.letta.mobile.ui.chat.surface
 
-
+import com.letta.mobile.data.voice.session.VoiceChatSessions
+import com.letta.mobile.ui.chat.voice.LocalVoiceMode
+import com.letta.mobile.ui.chat.voice.VoiceSetupPaneHost
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -37,6 +39,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.LocalAmbientGlowShaders
 import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
+import com.letta.mobile.ui.ambient.LocalAmbientVoice
 import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.chat.surface.ambient.rememberAmbientGlowShaders
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbient
@@ -115,6 +118,9 @@ import org.jetbrains.compose.resources.stringResource
  *   at all until it is known, so it never appears at the default spot and then jumps.
  * @param recents this agent's conversations, for the canvas bubble's (phone)
  *   and the docked panel's (desktop) "+" to hop between or start a new thread; null hides the "+".
+ * @param voiceSessions opens the chat session voice mode talks through (the host's port and
+ *   identified sends, for the conversation open now); null leaves voice mode off the chat bar, as it
+ *   is wherever the platform or the shell offers no voice setup.
  */
 @Composable
 fun ChatSurface(
@@ -130,8 +136,10 @@ fun ChatSurface(
     dockGeometry: ChatDockGeometry? = ChatDockGeometry.Default,
     onDockGeometryChange: (ChatDockGeometry) -> Unit = {},
     recents: ChatRecentInteractions? = null,
+    voiceSessions: VoiceChatSessions? = null,
 ) {
     val viewedPort = rememberLaneTranscriptPort(port, recents)
+    val voiceMode = rememberVoiceMode(voiceSessions)
     // Lifecycle-aware on Android: a backgrounded app stops collecting, so the owner's
     // WhileSubscribed flows (the composer projection) can stop with it.
     // Held as a State and read only where a value is used: the page itself never reads it, so a
@@ -157,7 +165,6 @@ fun ChatSurface(
     AcknowledgeLaneTranscript(uiState)
     ReleaseImagesOnConversationChange(conversationId)
     val listState = remember(conversationId, pagedTimeline) { LazyListState() }
-    val dockReady = dockGeometry != null
     val dock = rememberChatDockState(dockGeometry ?: ChatDockGeometry.Default, onDockGeometryChange)
     // Picked images encode in the page's scope: a mode switch composes a different composer
     // panel, and the encode must outlive the one that started it.
@@ -175,7 +182,7 @@ fun ChatSurface(
         appearance = appearance,
         platform = stablePlatform,
         companionAnchors = companionAnchors,
-        dock = dock.takeIf { dockReady },
+        dock = dock.takeIf { dockGeometry != null },
         recents = recents,
     )
     val focusHandoff = remember { ComposerFocusHandoff() }
@@ -194,11 +201,14 @@ fun ChatSurface(
             LocalAmbientGlowShaders provides glowShaders,
             LocalThinkingGlowStyle provides appearance.displayOptions.thinkingGlow,
             LocalChatImageActions provides stablePlatform.imageActions,
+            LocalVoiceMode provides voiceMode,
+            LocalAmbientVoice provides rememberAmbientVoice(voiceMode),
         ) {
             // letta-mobile-ckmub.1 (S4): the page's insets are owned once, by its LettaPageScaffold.
             ChatSurfacePageFrame(modifier) {
                 ChatSurfaceLayers(frame, rememberBoardOnShow(canvas, canvasActions, frame.mode))
             }
+            VoiceSetupPaneHost(voiceMode)
         }
     }
 }

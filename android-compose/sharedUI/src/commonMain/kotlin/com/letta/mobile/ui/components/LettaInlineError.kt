@@ -40,6 +40,37 @@ fun LettaInlineError(
     retrying: Boolean = false,
     onDismiss: (() -> Unit)? = null,
 ) {
+    LettaInlineNotice(
+        message = message,
+        modifier = modifier,
+        title = title,
+        actionLabel = if (retrying) "Retrying…" else "Retry",
+        onAction = onRetry,
+        actionEnabled = !retrying,
+        dismissLabel = "Dismiss",
+        onDismiss = onDismiss,
+    )
+}
+
+/**
+ * [LettaInlineError] with the caller's own action and dismiss labels ("Set up", "Retry" in the
+ * caller's language) and, where it needs them, its own button tags ([actionTag], [dismissTag]): the
+ * same surface and layout, for a notice whose action is not a retry. A button shows when its
+ * handler is given.
+ */
+@Composable
+internal fun LettaInlineNotice(
+    message: String,
+    modifier: Modifier = Modifier,
+    title: String? = null,
+    actionLabel: String = "",
+    onAction: (() -> Unit)? = null,
+    actionEnabled: Boolean = true,
+    actionTag: String = LettaInlineErrorTags.RETRY,
+    dismissLabel: String = "",
+    onDismiss: (() -> Unit)? = null,
+    dismissTag: String = LettaInlineErrorTags.DISMISS,
+) {
     Surface(
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -62,13 +93,13 @@ fun LettaInlineError(
                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = if (title == null) 1f else MESSAGE_ALPHA),
                 )
             }
-            if (onRetry != null) {
-                OutlinedButton(onClick = onRetry, enabled = !retrying, modifier = Modifier.testTag(LettaInlineErrorTags.RETRY)) {
-                    Text(if (retrying) "Retrying…" else "Retry")
+            if (onAction != null) {
+                OutlinedButton(onClick = onAction, enabled = actionEnabled, modifier = Modifier.testTag(actionTag)) {
+                    Text(actionLabel)
                 }
             }
             if (onDismiss != null) {
-                TextButton(onClick = onDismiss, modifier = Modifier.testTag(LettaInlineErrorTags.DISMISS)) { Text("Dismiss") }
+                TextButton(onClick = onDismiss, modifier = Modifier.testTag(dismissTag)) { Text(dismissLabel) }
             }
         }
     }

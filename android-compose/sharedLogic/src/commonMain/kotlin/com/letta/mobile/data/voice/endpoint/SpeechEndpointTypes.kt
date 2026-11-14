@@ -53,6 +53,9 @@ enum class SpeechOperation {
 
     /** `POST /v1/audio/speech`. */
     SPEECH,
+
+    /** `GET /v1/models`, only to learn whether the server answers; carries no audio or text. */
+    REACHABILITY,
 }
 
 /**

@@ -42,8 +42,13 @@ private class FakeSpeaker(private val script: SpeakerScript) : PcmOutputDevice {
     val written = Collections.synchronizedList(mutableListOf<Short>())
     val events = Collections.synchronizedList(mutableListOf<String>())
     val writing = CountDownLatch(1)
+    val draining = CountDownLatch(1)
     private val aborted = CountDownLatch(1)
     private val playedSoFar = AtomicLong()
+
+    /** Writes that queued audio after the line was aborted; must stay 0. */
+    @Volatile
+    var writesAfterAbort = 0
     var opens = 0
         private set
 
@@ -54,6 +59,7 @@ private class FakeSpeaker(private val script: SpeakerScript) : PcmOutputDevice {
             override val format = opened
 
             override fun write(samples: ShortArray, count: Int): Int {
+                if (aborted.count == 0L) writesAfterAbort++
                 writing.countDown()
                 val jammed = script.jamAfterFirstWrite && written.isNotEmpty()
                 if (script.blockWrites || jammed) return if (aborted.await(5, TimeUnit.SECONDS)) 0 else count
@@ -77,6 +83,7 @@ private class FakeSpeaker(private val script: SpeakerScript) : PcmOutputDevice {
             }
 
             override fun endOfStream() {
+                draining.countDown()
                 if (script.blockEndOfStream) aborted.await(5, TimeUnit.SECONDS)
             }
 
@@ -233,5 +240,33 @@ class LinePcmPlayerTest {
         val error = assertFailsWith<VoiceAudioException> { LinePcmPlayer(speaker, options).play(wavClip(480)) { } }
         assertEquals(VoiceErrorCode.PLAYBACK_FAILED, error.code)
         assertEquals(listOf("release"), speaker.events)
+    }
+}
+
+/** Stopping playback discards what the line still holds and writes nothing after the abort. */
+class LinePcmPlayerCancellationTest {
+    @Test
+    fun cancellingWhileQueuedAudioPlaysOutDiscardsItInsteadOfDraining() = runBlocking {
+        // Everything is written and the line is still playing it out (the barge-in case).
+        val speaker = FakeSpeaker(SpeakerScript(stuck = true))
+        val patient = options.copy(stallTimeout = 5_000.milliseconds)
+        val playing = launch(Dispatchers.IO) { LinePcmPlayer(speaker, patient).play(wavClip(2_400)) { } }
+        assertTrue(speaker.draining.await(5, TimeUnit.SECONDS))
+        val writtenBeforeStop = speaker.written.size
+        playing.cancelAndJoin()
+        assertEquals(listOf("abort", "release"), speaker.events.toList())
+        assertEquals(writtenBeforeStop, speaker.written.size)
+        assertEquals(0, speaker.writesAfterAbort)
+    }
+
+    @Test
+    fun cancellingMidWriteWritesNothingAfterTheAbort() = runBlocking {
+        val speaker = FakeSpeaker(SpeakerScript(blockWrites = true))
+        val patient = options.copy(stallTimeout = 5_000.milliseconds)
+        val playing = launch(Dispatchers.IO) { LinePcmPlayer(speaker, patient).play(wavClip(24_000)) { } }
+        assertTrue(speaker.writing.await(5, TimeUnit.SECONDS))
+        playing.cancelAndJoin()
+        assertEquals("abort", speaker.events.first())
+        assertEquals(0, speaker.writesAfterAbort)
     }
 }

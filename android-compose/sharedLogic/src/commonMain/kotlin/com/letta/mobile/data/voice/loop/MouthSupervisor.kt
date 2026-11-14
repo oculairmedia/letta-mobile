@@ -1,5 +1,6 @@
 package com.letta.mobile.data.voice.loop
 
+import com.letta.mobile.data.voice.SpeechStopReason
 import com.letta.mobile.data.voice.VoicePort
 import com.letta.mobile.data.voice.engine.SpeechSegment
 import com.letta.mobile.data.voice.loop.machine.LoopInput
@@ -7,6 +8,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration
+import kotlin.time.TimeSource
 
 /**
  * Drives the mouth. A stop runs in its own coroutine and only a clean return confirms the release.
@@ -31,14 +34,29 @@ internal class MouthSupervisor(private val wiring: LoopWiring) {
     /** Tells the mouth no more text is coming for now. */
     fun flush(): LoopInput? = wiring.call(VoicePort.MOUTH) { wiring.engines.mouth.flush() }
 
-    /** Stops the mouth and waits, bounded, for a clean return; it stays held until one. */
-    suspend fun stop(): LoopInput? {
+    /** True while a stop has not been confirmed: the speaker may still be playing. */
+    val holding: Boolean get() = held
+
+    /**
+     * Stops the mouth for [reason] and waits, bounded, for a clean return; it stays held until one.
+     * A confirmed stop is reported with the time from the request until the mouth returned (its
+     * output released, so the speaker is silent).
+     */
+    suspend fun stop(reason: SpeechStopReason? = null): LoopInput? {
+        val requested = TimeSource.Monotonic.markNow()
         val running = attempt ?: startAttempt()
         val clean = withTimeoutOrNull(wiring.config.releaseTimeout) { running.await() }
         if (clean != null) attempt = null
         held = clean != true
         quiet = !held
+        if (!held && reason != null) report(reason, requested.elapsedNow())
         return if (held) wiring.unresponsive(VoicePort.MOUTH) else null
+    }
+
+    /** Tells the observer; an observer that throws is ignored (diagnostics never stop the loop). */
+    private fun report(reason: SpeechStopReason, silentAfter: Duration) {
+        val error = runCatching { wiring.observer.speechStopped(reason, silentAfter) }.exceptionOrNull()
+        if (error is CancellationException) throw error
     }
 
     /**

@@ -65,10 +65,14 @@ internal class EarSupervisor(private val wiring: LoopWiring) {
     /** Closes the ear for good, waiting (bounded) for it to let go; null when it has (or none was open). */
     suspend fun close(): LoopInput? = job?.let { release(it) }
 
-    /** Tells the ear whether the app's own speech is playing, on change. */
-    fun reportOutput(model: LoopModel): LoopInput? {
-        if (model.outputActive == outputHint) return null
-        outputHint = model.outputActive
+    /**
+     * Tells the ear whether the app's own speech may be audible ([active]: queued, playing, or a
+     * mouth that has not confirmed its stop), on change. It turns false only after a stop has
+     * returned, that is once the speaker is silent.
+     */
+    fun reportOutput(active: Boolean): LoopInput? {
+        if (active == outputHint) return null
+        outputHint = active
         return wiring.call(VoicePort.EAR) { wiring.engines.ear.setOutputActive(outputHint) }
     }
 

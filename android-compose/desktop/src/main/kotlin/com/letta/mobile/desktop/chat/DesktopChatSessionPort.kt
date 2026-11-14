@@ -56,7 +56,7 @@ internal data class DesktopChatSessionBindings(
 
 /** Map controller effects and workspace focus to the shared chat session. */
 internal class DesktopChatSessionPort(
-    private val controller: DesktopChatController,
+    internal val controller: DesktopChatController,
     private val scope: CoroutineScope,
     private val bindings: DesktopChatSessionBindings = DesktopChatSessionBindings(),
 ) : ChatSessionPort {

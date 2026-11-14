@@ -57,6 +57,13 @@ interface AudioFrameSource {
     /** The format this source produces. */
     val format: AudioFrameFormat
 
+    /**
+     * Whether the platform cancels the app's own playback out of this microphone path (acoustic
+     * echo cancellation), so the person can be heard over the app's speech. False unless the
+     * platform says so: a plain microphone also hears the speakers.
+     */
+    val echoCancelled: Boolean get() = false
+
     /** Frames until cancelled. */
     fun frames(): Flow<AudioFrame>
 }

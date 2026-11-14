@@ -198,6 +198,9 @@ internal class WsChatSendCoordinator(
         attachments: List<MessageContentPart.Image> = emptyList(),
     ): Job = delegate.send(text, attachments)
 
+    /** Sends that publish their identity and the runs they start (voice mode follows its replies by them). */
+    val identifiedSend: com.letta.mobile.data.chat.sentruns.IdentifiedChatSend get() = delegate.identifiedSend
+
     fun cancel(): Boolean = delegate.cancel()
 
     /** letta-mobile-1n5py: the send queue; the UI reads the visible one from [ChatUiState.sendQueue]. */

@@ -23,6 +23,11 @@ import com.letta.mobile.data.skills.SkillsCatalogController
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.shell.EmptyShellPage
 import com.letta.mobile.ui.chat.tools.ProvideToolStepExpansions
+import com.letta.mobile.ui.chat.voice.LocalVoiceSetup
+import com.letta.mobile.ui.chat.voice.LocalVoiceSetupPane
+import com.letta.mobile.ui.chat.voice.VoiceSetupAccess
+import com.letta.mobile.ui.chat.voice.rememberVoiceSetupAccess
+import com.letta.mobile.ui.settings.VoiceSetupPane
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageOptions
@@ -87,22 +92,34 @@ fun rememberShellPageDeps(
     host: ShellPageHost,
 ): ShellPageDeps {
     ShellLibraryFocusEffects(controllers, host.navigator.state.page.kind, host.navigator.state.currentFocus.agentId)
-    return shellPageDeps(graph, controllers, host)
+    return shellPageDeps(graph, controllers, host, rememberVoiceSetupAccess(host.settings))
 }
 
-/** [rememberShellPageDeps]'s pages, without the focus effects. */
+/**
+ * [rememberShellPageDeps]'s pages, without the focus effects. [voice] is voice mode's setup, shared by
+ * the chat and the Settings page (one store, so a save on either is seen by both); null where voice
+ * mode is not offered.
+ */
 fun shellPageDeps(
     graph: SessionRepositoryGraph,
     controllers: ShellLibraryControllers,
     host: ShellPageHost,
+    voice: VoiceSetupAccess? = null,
 ): ShellPageDeps {
     // The chat remembers which tool steps the person opened, across reloads, in the device's settings,
     // and its memory steps open the shell's own Memory view.
     val chat = host.pages.chat?.let { page ->
         ShellPageContent<ShellDestination.Chat> { destination, modifier ->
             ProvideToolStepExpansions(host.settings) {
-                ProvideShellMemoryPreview(controllers, host.navigator.state) { page.Content(destination, modifier) }
+                ProvideVoiceSetup(voice) {
+                    ProvideShellMemoryPreview(controllers, host.navigator.state) { page.Content(destination, modifier) }
+                }
             }
+        }
+    }
+    val settings = host.pages.settings.let { page ->
+        ShellPageContent<ShellDestination.Settings> { destination, modifier ->
+            ProvideVoiceSetup(voice) { page.Content(destination, modifier) }
         }
     }
     return ShellPageDeps(
@@ -114,13 +131,24 @@ fun shellPageDeps(
         schedules = schedulesPage(graph, controllers.schedules, host),
         channels = channelsPage(controllers, host.pages.slots),
         skills = skillsPage(controllers, host),
-        settings = host.pages.settings,
+        settings = settings,
         agentEditor = shellAgentEditorBinding(graph, host),
         providers = host.modelControl?.let(::shellProvidersPage),
         admin = shellAdminPages(graph, host),
         fallback = host.pages.fallback,
     )
 }
+
+/** [content] with voice mode's setup, and the Voice settings pane a chat press opens when it is incomplete. */
+@Composable
+private fun ProvideVoiceSetup(voice: VoiceSetupAccess?, content: @Composable () -> Unit) {
+    if (voice == null) return content()
+    val pane = remember(voice) { voiceSetupPane(voice) }
+    CompositionLocalProvider(LocalVoiceSetup provides voice, LocalVoiceSetupPane provides pane, content = content)
+}
+
+private fun voiceSetupPane(voice: VoiceSetupAccess): @Composable (onDone: (Boolean) -> Unit) -> Unit =
+    { onDone -> VoiceSetupPane(voice, onDone) }
 
 /** [content] whose memory tool steps open the Memory view over [controllers], for the focused agent. */
 @Composable

@@ -90,7 +90,9 @@ class EarTranscriptGateTest {
     fun aStockPhraseFromAShortQuietTurnEndsAsAnEmptyUtteranceAndTheEarListensOn() = runTest {
         val observer = RecordingObserver()
         val transcriber = ScriptedTranscriber(heard(" you"), heard("what time is it"))
-        ear(ScriptedSource(turn() + turn()), transcriber, observer).listen().filterNot { it is VoiceEarEvent.InputLevel }.test {
+        ear(ScriptedSource(turn() + turn()), transcriber, observer).listen()
+            .filterNot { it is VoiceEarEvent.InputLevel || it == VoiceEarEvent.SpeechEnded }
+            .test {
             assertEquals(VoiceEarEvent.ListeningStarted, awaitItem())
             // Transcription runs beside listening, so the second turn may start before the first is judged.
             val events = List(4) { awaitItem() }

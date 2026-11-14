@@ -21,6 +21,9 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.focus.focusRequester
@@ -275,15 +278,21 @@ private fun composerFieldTextColor(enabled: Boolean): Color {
     return if (enabled) color else color.copy(alpha = LettaDimens.Alpha.disabled)
 }
 
-/** The owner's placeholder, else the platform's own copy; faded with the field while it is off. */
+/**
+ * The owner's placeholder, else the platform's own copy; faded with the field while it is off. While
+ * voice mode is on it says what voice mode is doing instead ([voicePlaceholder]), announced politely
+ * when that changes.
+ */
 @Composable
 private fun FieldPlaceholder(model: ComposerModel, style: ComposerFieldStyle, textStyle: TextStyle) {
     val color = MaterialTheme.colorScheme.onSurfaceVariant
+    val voice = voicePlaceholder()
     Text(
-        text = model.composer.placeholder ?: stringResource(style.placeholderRes()),
+        text = voice ?: model.composer.placeholder ?: stringResource(style.placeholderRes()),
         style = textStyle,
         color = if (model.composer.acceptsInput) color else color.copy(alpha = LettaDimens.Alpha.disabled),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
+        modifier = if (voice == null) Modifier else Modifier.semantics { liveRegion = LiveRegionMode.Polite },
     )
 }
