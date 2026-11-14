@@ -27,18 +27,29 @@ private val canvasJson = Json {
 
 
 /**
- * [agentId] is the transport-authenticated caller: the runtime scope the App Server stamped on
- * the tool-call frame. It is never read from the tool input, which the model controls, so a
- * caller cannot name a different agent to read or write as it. [kinds] are the plugin kinds whose
- * props a plugin element write is held to.
+ * One call of [tool]. [agentId] is the transport-authenticated caller: the runtime scope the App
+ * Server stamped on the tool-call frame. It is never read from the tool input, which the model
+ * controls, so a caller cannot name a different agent to read or write as it.
  */
-private data class CanvasToolContext(
-    val store: CanvasDocumentStore,
-    val sessions: CanvasSessionRegistry,
-    val agentId: String,
-    val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
-) {
+private class CanvasToolContext(private val tool: BaseCanvasTool, val agentId: String) {
+    val store: CanvasDocumentStore get() = tool.store
+    val sessions: CanvasSessionRegistry get() = tool.sessions
+
+    /** The plugin kinds whose props a plugin element write is held to. */
+    val kinds: PluginKindCatalog get() = tool.kinds
+
+    /** The canvas mounted for a conversation; null keeps every conversation on its own board. */
+    val mounts: (suspend (AgentId, ConversationId) -> CanvasId?)? get() = tool.mounts
+
     fun resolveCallerId(): CanvasActorId = CanvasActorId(agentId)
+}
+
+/**
+ * The board [conversationId] shows the person: the canvas mounted for it when the host has one,
+ * else its own. The tools default to this board, so the agent draws on the board the person sees.
+ */
+private suspend fun conversationCanvasId(context: CanvasToolContext, conversationId: ConversationId): CanvasId? {
+    return context.mounts?.invoke(AgentId(context.agentId), conversationId) ?: context.store.getForConversation(conversationId)?.id
 }
 
 private fun canRead(doc: CanvasDocument, callerId: CanvasActorId): Boolean =
@@ -263,7 +274,8 @@ private suspend fun executeListCanvases(
     val conversationId = input["conversation_id"]?.jsonPrimitive?.contentOrNull
     val callerAgentId = context.resolveCallerId()
     return if (conversationId != null) {
-        context.store.getForConversation(ConversationId(conversationId))
+        conversationCanvasId(context, ConversationId(conversationId))
+            ?.let { context.sessions.get(it)?.document?.value ?: context.store.get(it) }
             ?.takeIf { canRead(it, callerAgentId) }
             ?.let { listOf(it.id.value) }
             .orEmpty()
@@ -290,7 +302,7 @@ private suspend fun executeCompose(
     fun refused(code: ComposeErrorCode, message: String) = hosting.refused(code, message)
     val named = (input["canvas_id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
     val canvasId = named?.let(::CanvasId)
-        ?: caller.conversationId?.let { context.store.getForConversation(ConversationId(it))?.id }
+        ?: caller.conversationId?.let { conversationCanvasId(context, ConversationId(it)) }
         ?: return refused(ComposeErrorCode.CANVAS_NOT_FOUND, NO_CONVERSATION_CANVAS)
     val session = context.sessions.get(canvasId)
     val doc = session?.document?.value ?: context.store.get(canvasId)
@@ -344,6 +356,8 @@ abstract class BaseCanvasTool(
     val store: CanvasDocumentStore,
     val sessions: CanvasSessionRegistry,
     val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
+    /** The canvas mounted for a conversation (its host mount); null keeps every conversation on its own board. */
+    val mounts: (suspend (AgentId, ConversationId) -> CanvasId?)? = null,
 ) : HostExternalTool {
     override val capability: Capability = Capability.ImageHydration
 }
@@ -361,7 +375,7 @@ private inline fun BaseCanvasTool.runWithContext(
         return ExternalToolResult.Error("$failurePrefix: canvas tools require an authenticated agent identity")
     }
     return runCatching {
-        action(CanvasToolContext(store, sessions, agentId, kinds))
+        action(CanvasToolContext(this, agentId))
     }.getOrElse { ExternalToolResult.Error("$failurePrefix: ${it.message}") }
 }
 
@@ -523,7 +537,8 @@ class CanvasExportSvgTool(
 class CanvasListTool(
     store: CanvasDocumentStore,
     sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
-) : BaseCanvasTool(store, sessions) {
+    mounts: (suspend (AgentId, ConversationId) -> CanvasId?)? = null,
+) : BaseCanvasTool(store, sessions, mounts = mounts) {
     override val name: String = NAME
     override val description: String = CanvasToolContract.list.description
     override val inputSchema: JsonObject = CanvasToolContract.list.inputSchema
@@ -546,7 +561,8 @@ class CanvasListTool(
 class CanvasComposeTool(
     store: CanvasDocumentStore,
     sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
-) : BaseCanvasTool(store, sessions) {
+    mounts: (suspend (AgentId, ConversationId) -> CanvasId?)? = null,
+) : BaseCanvasTool(store, sessions, mounts = mounts) {
     override val name: String = NAME
     override val description: String = CanvasToolContract.compose.description
     override val inputSchema: JsonObject = CanvasToolContract.compose.inputSchema
@@ -561,7 +577,7 @@ class CanvasComposeTool(
             return ExternalToolResult.Error("$FAILURE: canvas tools require an authenticated agent identity")
         }
         return try {
-            executeCompose(CanvasToolContext(store, sessions, agentId), input, caller)
+            executeCompose(CanvasToolContext(this, agentId), input, caller)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {
@@ -602,20 +618,23 @@ object CanvasExternalTools {
     /**
      * [sessions] must be the same registry the canvas UI registers into, or every tool falls back
      * to the store and an agent's edits never reach the session the user is looking at. [kinds]
-     * are the plugin kinds this app holds plugin element props to.
+     * are the plugin kinds this app holds plugin element props to. [mounts] answers from the window's
+     * resolver (`ConversationCanvasResolver::mountedCanvas`), so a conversation's default board is the
+     * one its page shows (null: its own board).
      */
     fun all(
         store: CanvasDocumentStore,
         sessions: CanvasSessionRegistry,
         kinds: PluginKindCatalog = PluginKindCatalog.Empty,
+        mounts: (suspend (AgentId, ConversationId) -> CanvasId?)? = null,
     ): List<HostExternalTool> = listOf(
         CanvasCreateTool(store, sessions),
         CanvasGetSceneTool(store, sessions),
         CanvasGetLayoutTool(store, sessions),
         CanvasReplaceSceneTool(store, sessions),
         CanvasApplyOpsTool(store, sessions, kinds),
-        CanvasListTool(store, sessions),
-        CanvasComposeTool(store, sessions),
+        CanvasListTool(store, sessions, mounts),
+        CanvasComposeTool(store, sessions, mounts),
         CanvasComposeGuideTool(store, sessions),
     )
 }

@@ -62,8 +62,7 @@ import kotlinx.coroutines.launch
  * back act on that page (attach to the draft, expand the chat), not on navigation.
  */
 private val AppChatCanvasSlot = ChatCanvasSlot { target, actions, chromeTopInset ->
-    // No board for a chat without a conversation yet; once the first send creates one, the
-    // board is that conversation's own, held by its destination through the window's retained board owner.
+    // No board before the first send; then the shared frame picks it (the host's mount by id, else the conversation's own).
     val canvasKey = com.letta.mobile.ui.chat.surface.chatCanvasKey(
         target.conversationId, com.letta.mobile.ui.canvas.boards.LocalCanvasBoardGeneration.current,
     )
@@ -71,21 +70,22 @@ private val AppChatCanvasSlot = ChatCanvasSlot { target, actions, chromeTopInset
         com.letta.mobile.ui.chat.surface.ChatCanvasPlaceholder()
     } else {
         androidx.compose.runtime.key(canvasKey) {
-            com.letta.mobile.ui.screens.canvas.CanvasScreen(
-                canvasId = "",
-                conversationId = target.conversationId,
-                agentId = target.agentId,
-                // The canvas is the page: no title bar or back arrow, just its actions pill.
-                onNavigateBack = null,
-                onShareToChat = actions::shareToChat,
-                viewModel = hiltViewModel(key = canvasKey),
-                showTitle = false,
-                // Under the chat's floating header, where one shows: the board runs behind it. In the
-                // phone's canvas mode the header steps aside and the board's actions sit at its foot.
-                chromeTopInset = chromeTopInset,
-                // A chat card's "Show on canvas" frames its artifact on this board (bglj6.13).
-                cameraRequest = actions.camera,
-            )
+            com.letta.mobile.ui.canvas.mount.ConversationCanvasFrame(target.mountTarget) { mounted ->
+                com.letta.mobile.ui.screens.canvas.CanvasScreen(
+                    canvasId = mounted?.value.orEmpty(),
+                    conversationId = target.conversationId,
+                    agentId = target.agentId,
+                    // The canvas is the page: no title bar or back arrow, just its actions pill.
+                    onNavigateBack = null,
+                    onShareToChat = actions::shareToChat,
+                    viewModel = hiltViewModel(key = mounted?.let { "$canvasKey:${it.value}" } ?: canvasKey),
+                    showTitle = false,
+                    // Under the chat's floating header (where one shows); in the phone's canvas mode its actions sit at its foot.
+                    chromeTopInset = chromeTopInset,
+                    // A chat card's "Show on canvas" frames its artifact on this board (bglj6.13).
+                    cameraRequest = actions.camera,
+                )
+            }
         }
     }
 }

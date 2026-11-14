@@ -9,16 +9,16 @@ import com.letta.mobile.data.canvas.references.NotebookReferenceLoad
 import com.letta.mobile.data.canvas.workspace.SharedNote
 import com.letta.mobile.data.canvas.workspace.SharedNoteListing
 import com.letta.mobile.data.canvas.workspace.SharedNotesCursor
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.attr
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
 
 /**
  * The `notebook.*` admin_rpc result shapes, shared by the host routes and the remote client so the
@@ -147,6 +147,21 @@ object SharedNotesWire {
     /** The reason a host gives for a cursor it cannot read; the caller starts again from the first page. */
     const val INVALID_CURSOR = SharedNoteListing.Unavailable.INVALID_CURSOR
 
+    /** The reason a host gives while it is already listing for the same caller; the caller asks again later. */
+    const val BUSY = SharedNoteListing.Unavailable.BUSY
+
+    /**
+     * The longest title an entry carries, in UTF-16 code units. A longer title is cut there (never inside a
+     * surrogate pair) by the host before sending and by the reader after reading.
+     */
+    const val MAX_TITLE_CHARS = 512
+
+    /**
+     * The most bytes of encoded entries one page carries, well under the 1 MiB admin_rpc frame: a host
+     * stops adding notes before passing it and hands back a cursor, so no page is too large to send.
+     */
+    const val MAX_PAGE_BYTES = 512 * 1024
+
     /** The request for the page starting at [from], or the first page when it is null. */
     fun request(from: SharedNotesCursor?): JsonObject = buildJsonObject { from?.let { put(CURSOR, it.value) } }
 
@@ -164,18 +179,34 @@ object SharedNotesWire {
         require(result.notes.size <= MAX_LISTED) { "A shared-notes page holds at most $MAX_LISTED notes" }
         return response(LISTED) {
             result.next?.let { put(NEXT_CURSOR, it.value) }
-            putJsonArray("notes") {
-                result.notes.forEach { note ->
-                    addJsonObject {
-                        put("document_id", note.id.value)
-                        put("title", note.title)
-                    }
-                }
-            }
+            put("notes", JsonArray(result.notes.map(::entry)))
         }
     }
 
-    /** Read a page; an entry without an id or a title, or an unreadable cursor, makes the whole answer malformed. */
+    /** One listed note as sent, its title cut to [MAX_TITLE_CHARS]. */
+    private fun entry(note: SharedNote): JsonObject = buildJsonObject {
+        put("document_id", note.id.value)
+        put("title", boundedTitle(note.title))
+    }
+
+    /** The UTF-8 size of [note]'s entry as [sharedNotes] sends it, with the comma that separates it from the next. */
+    internal fun entryBytes(note: SharedNote): Int = entry(note).toString().encodeToByteArray().size + 1
+
+    /** [title] cut to [MAX_TITLE_CHARS], dropping a high surrogate the cut would leave alone at the end. */
+    internal fun boundedTitle(title: String): String {
+        if (title.length <= MAX_TITLE_CHARS) return title
+        val cut = title.take(MAX_TITLE_CHARS)
+        return if (cut.last().isHighSurrogate()) cut.dropLast(1) else cut
+    }
+
+    /** Whether [id] has the only form a host's note id takes: 32 lowercase hex digits. */
+    internal fun listable(id: String): Boolean = id.matches(LISTED_DOCUMENT_ID)
+
+    /**
+     * Read a page; an entry without a string id or title, or an unreadable cursor, makes the whole answer
+     * malformed. An entry whose id is not a host note id (32 lowercase hex digits) is dropped and counted
+     * in telemetry, and every title is cut to [MAX_TITLE_CHARS].
+     */
     fun readSharedNotes(result: JsonElement?): SharedNoteListing {
         val body = result as? JsonObject ?: return SharedNoteListing.Unavailable(NO_RESULT)
         return when (body.status()) {
@@ -217,13 +248,22 @@ private fun JsonObject.listing(): SharedNoteListing.Listed? {
 private fun JsonObject.notes(): List<SharedNote>? {
     val entries = (get("notes") as? JsonArray)?.takeIf { it.size <= SharedNotesWire.MAX_LISTED } ?: return null
     val notes = entries.mapNotNull { entry -> (entry as? JsonObject)?.sharedNote() }
-    return notes.takeIf { it.size == entries.size }
+    if (notes.size != entries.size) return null
+    val listable = notes.filter { SharedNotesWire.listable(it.id.value) }
+    reportDropped(notes.size - listable.size)
+    return listable
+}
+
+/** Counts entries left out because their id is not one a host issues; never the ids or titles themselves. */
+private fun reportDropped(count: Int) {
+    if (count == 0) return
+    Telemetry.event("NotebookAccess", "shared_list.entries_dropped", "count" attr count, level = Telemetry.Level.WARN)
 }
 
 private fun JsonObject.sharedNote(): SharedNote? {
-    val id = text("document_id")?.takeIf { it.isNotBlank() } ?: return null
+    val id = text("document_id") ?: return null
     val title = text("title") ?: return null
-    return SharedNote(NotebookDocumentId(id), title)
+    return SharedNote(NotebookDocumentId(id), SharedNotesWire.boundedTitle(title))
 }
 
 private fun JsonObject.snapshotAt(key: String, id: NotebookDocumentId): NotebookNoteSnapshot? {
@@ -247,3 +287,4 @@ private const val PENDING_DURABILITY = "pending_durability"
 private const val NO_RESULT = "The host returned no result"
 private const val MALFORMED = "The host returned a malformed note"
 private const val MALFORMED_LIST = "The host returned a malformed list of notes"
+private val LISTED_DOCUMENT_ID = Regex("[0-9a-f]{32}")

@@ -1,12 +1,8 @@
 package com.letta.mobile.ui.shell.pages.memory
 
-import androidx.compose.foundation.layout.Column
+import com.letta.mobile.ui.memory.MemoryViewSwitch
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -22,7 +18,6 @@ import com.letta.mobile.ui.memory.MemoryPage
 import com.letta.mobile.ui.memory.MemoryPageOptions
 import com.letta.mobile.ui.shell.pages.memfs.MemfsPage
 import com.letta.mobile.ui.shell.pages.memfs.MemfsPageOptions
-import com.letta.mobile.ui.theme.LettaDimens
 
 /** The Memory destination's two views of the same agent. */
 enum class MemoryWorkspaceView(val label: String) { Blocks("Blocks"), Files("Files") }
@@ -61,21 +56,21 @@ object MemoryWorkspaceTags {
 fun MemoryWorkspacePage(binding: MemoryWorkspaceBinding, modifier: Modifier = Modifier) {
     val agentId = binding.memory.parity.memory.selectedAgentId
     LaunchedEffect(agentId) { binding.onFilesAgentChange(agentId) }
-    Column(modifier.fillMaxSize().testTag(MemoryWorkspaceTags.PAGE)) {
-        MemoryWorkspaceSwitch(binding.view, binding.onViewChange)
+    // Both views draw the same page header with this switch on its controls row, so the title, the
+    // switch and the actions hold their place when the view changes.
+    val switch: @Composable () -> Unit = { MemoryWorkspaceSwitch(binding.view, binding.onViewChange) }
+    Box(modifier.fillMaxSize().testTag(MemoryWorkspaceTags.PAGE)) {
         if (binding.view == MemoryWorkspaceView.Files) {
             MemfsPage(
                 state = binding.files,
                 actions = binding.filesActions,
-                options = binding.filesOptions,
-                modifier = Modifier.weight(1f),
+                options = binding.filesOptions.copy(title = PAGE_TITLE, headerControls = switch),
             )
         } else {
             MemoryPage(
                 state = binding.memory,
                 actions = binding.memoryActions,
-                options = binding.memoryOptions,
-                modifier = Modifier.weight(1f),
+                options = binding.memoryOptions.copy(headerControls = switch),
             )
         }
     }
@@ -83,14 +78,13 @@ fun MemoryWorkspacePage(binding: MemoryWorkspaceBinding, modifier: Modifier = Mo
 
 @Composable
 private fun MemoryWorkspaceSwitch(view: MemoryWorkspaceView, onSelect: (MemoryWorkspaceView) -> Unit) {
-    SingleChoiceSegmentedButtonRow(Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm)) {
-        MemoryWorkspaceView.entries.forEachIndexed { index, option ->
-            SegmentedButton(
-                selected = view == option,
-                onClick = { onSelect(option) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = MemoryWorkspaceView.entries.size),
-                modifier = Modifier.testTag(MemoryWorkspaceTags.view(option)),
-            ) { Text(option.label) }
-        }
-    }
+    val views = MemoryWorkspaceView.entries
+    MemoryViewSwitch(
+        labels = views.map { it.label },
+        tags = views.map(MemoryWorkspaceTags::view),
+        selected = views.indexOf(view),
+        onSelect = { onSelect(views[it]) },
+    )
 }
+
+private const val PAGE_TITLE = "Memory"

@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.shell.pages.schedules
 
+import com.letta.mobile.ui.components.LETTA_PAGE_PRIMARY_ACTION_TAG
+import com.letta.mobile.ui.components.LETTA_PAGE_CAPTION_TAG
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -136,13 +138,13 @@ data class SchedulesPageOptions(
 /** Test tags for the shared Schedules page. */
 object SchedulesPageTags {
     const val PAGE = "schedules_page"
-    const val NEW = "schedules_new"
+    const val NEW = LETTA_PAGE_PRIMARY_ACTION_TAG
     /** Pages the calendar back / forward by the view's range (a week, a month, an agenda page). */
     const val PREVIOUS_WEEK = "schedules_previous_week"
     const val NEXT_WEEK = "schedules_next_week"
     const val RANGE = "schedules_range"
     const val TODAY = "schedules_today"
-    const val ZONE = "schedules_zone"
+    const val ZONE = LETTA_PAGE_CAPTION_TAG
     const val VIEW_BAR = "schedules_view_bar"
     const val PAUSED_FILTER = "schedules_paused_filter"
     const val EMPTY = "schedules_empty"

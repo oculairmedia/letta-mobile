@@ -6,17 +6,22 @@ import com.letta.mobile.ui.components.ObjectVerbMenus
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.components.list.RosterActions
+import com.letta.mobile.ui.components.list.RosterLayout
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterListTag
 import com.letta.mobile.ui.components.list.RosterOptions
@@ -25,6 +30,7 @@ import com.letta.mobile.ui.components.list.RosterRowState
 import com.letta.mobile.ui.components.list.RosterSection
 import com.letta.mobile.ui.components.list.RosterSelection
 import com.letta.mobile.ui.components.list.RosterSpec
+import com.letta.mobile.ui.components.list.rememberRosterListState
 import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -39,76 +45,142 @@ internal sealed interface ShellPanelItem {
         override val selected: Boolean get() = model.selected
     }
 
+    /** Selected while open in a pane, or while it is the board mounted for the conversation on screen. */
     data class Canvas(val model: ShellCanvasRowModel) : ShellPanelItem {
         override val key: String get() = "canvas-${model.id.value}"
-        override val selected: Boolean get() = model.selected
+        override val selected: Boolean get() = model.selected || model.mounted
     }
 }
 
-/** The panel's two sections: the conversations (their header sits above, with the filter), then the canvases. */
-internal fun shellPanelSections(state: ShellAgentPanelState): List<RosterSection<ShellPanelItem>> = listOf(
+/**
+ * The panel's two sections: the conversations (their header sits above, with the filter), then
+ * the canvases, which end their header with [canvasHeaderEnd] (New canvas) when the host has one.
+ */
+internal fun shellPanelSections(
+    state: ShellAgentPanelState,
+    canvasHeaderEnd: (@Composable () -> Unit)? = null,
+): List<RosterSection<ShellPanelItem>> = listOf(
     RosterSection(key = "chats", items = state.conversations.map(ShellPanelItem::Chat), emptyHint = "No chats"),
-    RosterSection(key = "canvases", items = state.canvases.map(ShellPanelItem::Canvas), title = "Canvases", emptyHint = "No canvases"),
+    RosterSection(
+        key = CANVASES_SECTION,
+        items = state.canvases.map(ShellPanelItem::Canvas),
+        title = "Canvases",
+        emptyHint = "No canvases",
+        headerEnd = canvasHeaderEnd,
+    ),
 )
+
+/** Where the Canvases header sits in the one list, for the jump; -1 when it is not drawn. */
+internal fun canvasesLine(sections: List<RosterSection<ShellPanelItem>>): Int =
+    RosterLayout.of(sections, key = ShellPanelItem::key).lines.indexOfFirst { it.key == "section:$CANVASES_SECTION" }
 
 /**
  * The conversations under their Active / Archived / All filter, then the canvases: one
- * [RosterList]. A pinned or settled chat that moves glides to its place.
+ * [RosterList]. A pinned or settled chat that moves glides to its place. With a conversation on
+ * screen a canvas pick mounts it for that conversation ([ShellCanvasPicks]: in place in canvas mode,
+ * and opened as before too in chat mode); the mounted one is marked current and offers the way back
+ * to the conversation's own canvas (the Canvases header offers it when the mounted canvas has no
+ * row). A canvas's menu can open it in a side panel without mounting it.
  */
 @Composable
 internal fun ColumnScope.ShellPanelLibrary(state: ShellAgentPanelState, actions: ShellAgentPanelActions) {
+    val picker = rememberCanvasMountState()
+    val picks = rememberCanvasPicks(actions)
+    val canvases = remember(state.canvases, picker) { markMounted(state.canvases, picker) }
+    val wayBack = remember(canvases, picker, picks) { strayWayBack(canvases, picker, picks) }
+    val sections = remember(state.conversations, canvases, actions.onNewCanvas, wayBack) {
+        shellPanelSections(state.copy(canvases = canvases), canvasHeaderEnd(actions.onNewCanvas, wayBack))
+    }
+    val rosterState = rememberRosterListState()
+    val scope = rememberCoroutineScope()
     LettaSectionLabel(WorkPlayLens.conversationsHeader(state.mode))
-    Row(
-        modifier = Modifier.padding(start = LettaDimens.Space.xs, top = LettaDimens.Space.hair, bottom = LettaDimens.Space.sm),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        ShellArchiveFilter.entries.forEach { filter ->
-            LettaChipTab(text = filter.label, active = state.archiveFilter == filter, onClick = { actions.onArchiveFilterChange(filter) })
+    ShellLibraryFilters(state, actions) {
+        if (state.conversations.isNotEmpty()) {
+            CanvasJumpButton {
+                val line = canvasesLine(sections)
+                if (line >= 0) scope.launch { rosterState.lazy.animateScrollToItem(line) }
+            }
         }
     }
     val verbs = LocalObjectVerbs.current
     val ui = remember { ShellConversationListUi() }
-    val sections = remember(state.conversations, state.canvases) { shellPanelSections(state) }
+    val rows = ShellPanelRows(actions, picks, ui, rememberCanvasMenu(picker, actions))
     RosterList(
         RosterSpec(
             sections = sections,
             key = ShellPanelItem::key,
-            selection = RosterSelection(isSelected = ShellPanelItem::selected, onSelect = { openPanelItem(it, actions) }),
+            selection = RosterSelection(isSelected = ShellPanelItem::selected, onSelect = rows::open),
             actions = RosterActions(
-                menu = { item, row -> item.panelItemMenu(row, actions, ui, verbs) },
+                menu = { item, row -> item.panelItemMenu(row, rows, verbs) },
                 rename = actions.onRenameConversation?.let(::chatRename),
             ),
             options = RosterOptions(testTag = RosterListTag(ShellAgentPanelTags.LIBRARY)),
         ),
         modifier = Modifier.fillMaxWidth().weight(1f),
-    ) { item, row -> ShellPanelItemRow(item, row, actions, ui) }
+        state = rosterState,
+    ) { item, row -> ShellPanelItemRow(item, row, rows) }
     ShellConversationDialogs(ui, state.conversations) { conversationRowActions(it, actions) }
 }
 
+/** The Active / Archived / All chips, then [end] (the jump to the canvases). */
 @Composable
-private fun ShellPanelItemRow(item: ShellPanelItem, row: RosterRowState, actions: ShellAgentPanelActions, ui: ShellConversationListUi) {
-    when (item) {
-        is ShellPanelItem.Chat -> ShellConversationRow(item.model, conversationRowActions(item.model, actions), row, ui)
-        is ShellPanelItem.Canvas -> ShellCanvasRow(item.model, row, canvasArchiveToggle(item.model, actions))
+private fun ShellLibraryFilters(state: ShellAgentPanelState, actions: ShellAgentPanelActions, end: @Composable () -> Unit) {
+    Row(
+        modifier = Modifier.padding(start = LettaDimens.Space.xs, top = LettaDimens.Space.hair, bottom = LettaDimens.Space.sm),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ShellArchiveFilter.entries.forEach { filter ->
+            LettaChipTab(text = filter.label, active = state.archiveFilter == filter, onClick = { actions.onArchiveFilterChange(filter) })
+        }
+        Spacer(Modifier.weight(1f))
+        end()
     }
 }
 
-private fun openPanelItem(item: ShellPanelItem, actions: ShellAgentPanelActions) {
+/** What the library's rows do: the host's actions, the window's canvas picks, and the list's dialogs. */
+private class ShellPanelRows(
+    val actions: ShellAgentPanelActions,
+    val picks: ShellCanvasPicks,
+    val ui: ShellConversationListUi,
+    val menu: ShellCanvasMenu,
+) {
+    fun open(item: ShellPanelItem) {
+        when (item) {
+            is ShellPanelItem.Chat -> actions.onConversationSelected(item.model.id)
+            is ShellPanelItem.Canvas -> picks.open(item.model.id)
+        }
+    }
+
+    /** The mounted row's way back to the conversation's own canvas; null on every other row. */
+    fun useOwn(canvas: ShellCanvasRowModel): (() -> Unit)? =
+        menu.own?.takeIf { canvas.mounted && menu.useOwnLabel != null }?.let { own -> { picks.useOwn(own) } }
+
+    /** A canvas's menu entries before archive: the mounted row's way back, then "Open in side panel" where offered. */
+    fun menuExtras(canvas: ShellCanvasRowModel): List<LettaMenuItem> = listOfNotNull(useOwnItem(canvas), paneItem(canvas))
+
+    private fun useOwnItem(canvas: ShellCanvasRowModel): LettaMenuItem? =
+        useOwn(canvas)?.let { action -> menu.useOwnLabel?.let { LettaMenuItem(it, onClick = action) } }
+
+    private fun paneItem(canvas: ShellCanvasRowModel): LettaMenuItem? =
+        menu.paneLabel?.takeIf { canvas.id !in menu.notForPane }?.let { LettaMenuItem(it) { picks.openInPane(canvas.id) } }
+}
+
+@Composable
+private fun ShellPanelItemRow(item: ShellPanelItem, row: RosterRowState, rows: ShellPanelRows) {
     when (item) {
-        is ShellPanelItem.Chat -> actions.onConversationSelected(item.model.id)
-        is ShellPanelItem.Canvas -> actions.onOpenCanvas(item.model.id)
+        is ShellPanelItem.Chat -> ShellConversationRow(item.model, conversationRowActions(item.model, rows.actions), row, rows.ui)
+        is ShellPanelItem.Canvas -> ShellCanvasRow(
+            item.model, row, ShellCanvasRowActions(canvasArchiveToggle(item.model, rows.actions), rows.useOwn(item.model)),
+        )
     }
 }
 
-private fun ShellPanelItem.panelItemMenu(
-    row: RosterRowState,
-    actions: ShellAgentPanelActions,
-    ui: ShellConversationListUi,
-    verbs: ObjectVerbMenus?,
-): List<LettaMenuItem> = when (this) {
-    is ShellPanelItem.Chat -> model.shellConversationMenu(conversationRowActions(model, actions), ui, row, verbs)
-    is ShellPanelItem.Canvas -> ShellRowMenus.canvas(model.archived, canvasArchiveToggle(model, actions))
-}
+private fun ShellPanelItem.panelItemMenu(row: RosterRowState, rows: ShellPanelRows, verbs: ObjectVerbMenus?): List<LettaMenuItem> =
+    when (this) {
+        is ShellPanelItem.Chat -> model.shellConversationMenu(conversationRowActions(model, rows.actions), rows.ui, row, verbs)
+        is ShellPanelItem.Canvas -> ShellRowMenus.canvas(model.archived, canvasArchiveToggle(model, rows.actions), rows.menuExtras(model))
+    }
 
 /** Rename in place: the chat's own menu entry ("Rename chat") opens it, as F2 does. */
 private fun chatRename(rename: (id: String, title: String) -> Unit) = RosterRename<ShellPanelItem>(
