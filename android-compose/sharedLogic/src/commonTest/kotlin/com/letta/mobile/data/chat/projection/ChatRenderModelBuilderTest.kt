@@ -979,8 +979,7 @@ class ChatRenderModelBuilderTest {
         id = id,
         ts = ts,
         toolCalls = listOf(
-            UiToolCall(name = "Bash", arguments = "{\"command\":\"pwd\"}", result = "/tmp
-", executionTimeMs = executionMs),
+            UiToolCall(name = "Bash", arguments = "{\"command\":\"pwd\"}", result = "/tmp\n", executionTimeMs = executionMs),
         ),
     ).copy(runId = runId)
 
