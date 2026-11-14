@@ -46,16 +46,54 @@ class TimelineRunKeyAcrossPagesTest {
         ),
     )
 
+    /**
+     * I7: the same record set always presents the same keys, so a page prepared again (a new
+     * generation over unchanged rows) remounts nothing, wherever the page edge cuts the run.
+     */
+    @Test fun theSameRecordsAlwaysPresentTheSameKeys() = runBlocking {
+        val turn = listOf(
+            prompt, thought, call, callReturn, narration, usage("u-1", 5), stop("s-1", 5), followUp,
+            secondCall, secondReturn, reply, usage("u-2", 10), stop("s-2", 10),
+        )
+        val rows = rowsOf(turn)
+        for (cut in 1 until rows.size) {
+            val first = presentCutAt(turn, rows, cut) { it.settledKeys() }
+            val second = presentCutAt(turn, rows, cut) { it.settledKeys() }
+            assertEquals(first, second, "cut before ${rows[cut]}: the same records presented different keys")
+        }
+    }
+
     private fun assertEveryCutIsUnique(turn: List<LettaMessage>) = runBlocking {
-        // Tool returns fold into their call's row, so they are no row of their own. The ledger
-        // orders rows by time, then identity (TimelinePageKey).
-        val rows = turn.filterNot { it is ToolReturnMessage }.sortedWith(compareBy({ Instant.parse(it.date) }, { it.id })).map { it.id }
+        val rows = rowsOf(turn)
         val violations = (1 until rows.size).flatMap { cut -> duplicatesWhenCutAt(turn, rows, cut) }
         assertTrue(violations.isEmpty(), "duplicate settled keys (sources=settled+settled):\n" + violations.joinToString("\n"))
     }
 
-    /** The run's first [cut] rows sit on the older page, the rest on the newest one. */
-    private suspend fun duplicatesWhenCutAt(turn: List<LettaMessage>, rows: List<String>, cut: Int): List<String> {
+    /**
+     * Tool returns fold into their call's row, so they are no row of their own. The ledger
+     * orders rows by time, then identity (TimelinePageKey).
+     */
+    private fun rowsOf(turn: List<LettaMessage>): List<String> =
+        turn.filterNot { it is ToolReturnMessage }.sortedWith(compareBy({ Instant.parse(it.date) }, { it.id })).map { it.id }
+
+    private suspend fun duplicatesWhenCutAt(turn: List<LettaMessage>, rows: List<String>, cut: Int): List<String> =
+        presentCutAt(turn, rows, cut) { recorder ->
+            val keys = recorder.settledKeys()
+            val repeated = keys.filterNotNull().groupingBy { it }.eachCount().filterValues { it > 1 }
+            val blanked = recorder.frames.flatMap { frame ->
+                frame.keys.filter { DUPLICATE_MARK in it }.map { "frame ${frame.index} [${frame.step}] blanked $it" }
+            }.distinct()
+            val where = "cut before ${rows[cut]}"
+            repeated.map { (key, count) -> "$where: $key held by $count settled rows" } + blanked.map { "$where: $it" }
+        }
+
+    /** The run's first [cut] rows sit on the older page, the rest on the newest one; the reader has read both. */
+    private suspend fun <T> presentCutAt(
+        turn: List<LettaMessage>,
+        rows: List<String>,
+        cut: Int,
+        read: (TimelineFrameRecorder) -> T,
+    ): T {
         val recorder = TimelineFrameRecorder.open(scope)
         try {
             recorder.openOnHistory((history + turn).reversed())
@@ -65,13 +103,7 @@ class TimelineRunKeyAcrossPagesTest {
                 "fixture: the newest page must start at row $cut of the run",
             )
             recorder.readAllSettledPages()
-            val keys = recorder.settledKeys()
-            val repeated = keys.filterNotNull().groupingBy { it }.eachCount().filterValues { it > 1 }
-            val blanked = recorder.frames.flatMap { frame ->
-                frame.keys.filter { DUPLICATE_MARK in it }.map { "frame ${frame.index} [${frame.step}] blanked $it" }
-            }.distinct()
-            val where = "cut before ${rows[cut]}"
-            return repeated.map { (key, count) -> "$where: $key held by $count settled rows" } + blanked.map { "$where: $it" }
+            return read(recorder)
         } finally {
             recorder.close()
         }
