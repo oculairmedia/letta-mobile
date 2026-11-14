@@ -147,11 +147,13 @@ internal class TurnTracker(private val policy: EndOfTurnPolicy, format: AudioFra
         if (voiced) voicedSamples += hop.samples
         val lastVoice = if (voiced) end else current.lastVoice
         val withinCap = end - current.start < cap
-        if (withinCap && voicedSamples >= needed(observed)) {
+        // A gap that outlasted what the candidate may bridge abandons it, even if a lower barge-in bar now counts it as enough voice.
+        val withinGap = voiced || bridges(end - lastVoice)
+        if (withinCap && withinGap && voicedSamples >= needed(observed)) {
             phase = TurnPhase.Speaking(current.start, lastVoice)
             return TurnSignal.Confirmed
         }
-        if (withinCap && bridges(end - lastVoice)) {
+        if (withinCap && withinGap) {
             phase = TurnPhase.Candidate(current.start, lastVoice)
             return TurnSignal.None
         }

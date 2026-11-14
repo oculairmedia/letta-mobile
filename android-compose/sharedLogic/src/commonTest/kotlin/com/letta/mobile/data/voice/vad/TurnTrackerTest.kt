@@ -2,6 +2,7 @@ package com.letta.mobile.data.voice.vad
 
 import com.letta.mobile.data.voice.audio.AudioFrame
 import com.letta.mobile.data.voice.audio.SamplePosition
+import kotlin.test.assertTrue
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -137,6 +138,28 @@ class TurnTrackerTest {
     @Test
     fun everyPolicyRowHolds() {
         cases.forEach { case -> assertEquals(case.expected, replay(case), case.name) }
+    }
+
+    /**
+     * CodeRabbit's case: 21 voiced hops while the app speaks (barge-in needs more voice), then 56 silent
+     * hops, then the app stops speaking. The lower bar would now count the candidate as enough voice,
+     * but its silence has outlasted the trailing gap, so it is abandoned, never confirmed in silence.
+     */
+    @Test
+    fun aCandidateWhoseSilenceOutlastedTheGapIsNotConfirmedWhenTheBarDrops() {
+        val tracker = TurnTracker(EndOfTurnPolicy(), VadSignals.format, hop)
+        val signals = mutableListOf<TurnSignal>()
+        var index = 0
+        fun feed(probability: Float, outputActive: Boolean) {
+            index++
+            val at = SamplePosition(index * hop.samples.toLong())
+            signals += tracker.onHop(HopObservation(SpeechProbability(probability), at, outputActive))
+        }
+        repeat(21) { feed(0.95f, outputActive = true) }
+        repeat(56) { feed(0f, outputActive = true) }
+        feed(0f, outputActive = false)
+        assertTrue(TurnSignal.Confirmed !in signals, "confirmed during silence: $signals")
+        assertEquals(false, tracker.recording)
     }
 
     @Test
