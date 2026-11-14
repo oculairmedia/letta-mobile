@@ -391,9 +391,15 @@ private fun stepPosition(index: Int, count: Int): GroupPosition {
  * take the grouped beat, as do the middle and last of a run's steps; the first takes the section break.
  */
 internal fun runStepTop(message: UiMessage, position: GroupPosition): Dp {
-    if (message.isReasoning || !message.toolCalls.isNullOrEmpty() || message.isFoldedCommandReport()) return ChatRowSpacing.grouped
+    if (message.takesGroupedBeat()) return ChatRowSpacing.grouped
     if (position == GroupPosition.Middle || position == GroupPosition.Last) return ChatRowSpacing.grouped
     return ChatRowSpacing.ungrouped
+}
+
+/** A reasoning, a tool-bearing message or a completed command report: a work step's grouped beat wherever it sits. */
+private fun UiMessage.takesGroupedBeat(): Boolean {
+    if (isReasoning || isFoldedCommandReport()) return true
+    return !toolCalls.isNullOrEmpty()
 }
 
 /** A run step and its place among the run's visible steps (the legacy row's group position). */
