@@ -478,7 +478,11 @@ object ConversationAdminHandlers {
                 // Read from the transcript's end: a full parse cost grew with the conversation and
                 // ran again after every append during a live turn.
                 val local = localStore
-                    ?.let { store -> timedPhase(AdminRpcPhase.LocalStore) { store.newestMessageContents(ConversationId(convId), ENRICHMENT_WINDOW) } }
+                    ?.let { store ->
+                        timedPhase(AdminRpcPhase.LocalStore) {
+                            store.newestMessageContents(ConversationId(convId), ENRICHMENT_WINDOW)
+                        }
+                    }
                     ?.filterIsInstance<JsonObject>()?.associateBy { it["id"] } ?: return@let wire
                 JsonArray(rows.map { element ->
                     val row = element as? JsonObject ?: return@map element

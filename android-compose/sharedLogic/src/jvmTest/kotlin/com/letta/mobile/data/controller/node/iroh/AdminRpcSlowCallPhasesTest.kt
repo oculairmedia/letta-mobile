@@ -11,9 +11,10 @@ import java.util.Base64
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -27,13 +28,15 @@ class AdminRpcSlowCallPhasesTest {
             override suspend fun conversationMessagesList(command: AppServerCommand.ConversationMessagesList):
                 AppServerInboundFrame.ConversationMessagesListResponse {
                 Thread.sleep(SLOW_MS)
-                return AppServerInboundFrame.ConversationMessagesListResponse(command.requestId, true, kotlinx.serialization.json.JsonArray(emptyList()))
+                return AppServerInboundFrame.ConversationMessagesListResponse(
+                    command.requestId, true, JsonArray(emptyList()),
+                )
             }
         }
         val slow = slowCall("message.list", client, null) { put("conversation_id", "conv-1") }
         assertTrue(slow.millis("appServerMs") >= SLOW_MS, "the App Server wait is reported")
         assertTrue(slow.millis("wrapperMs") < SLOW_MS, "the rest of the call is reported as wrapper work")
-        assertNull(slow.attrs["discoveryMs"], "message.list runs no discovery")
+        assertEquals(0L, slow.millis("discoveryMs"), "message.list runs no discovery")
     }
 
     @Test
@@ -73,7 +76,9 @@ class AdminRpcSlowCallPhasesTest {
         try {
             Telemetry.enabled.set(true)
             val router = AdminRpcRouter()
-            ConversationAdminHandlers.register(router, NativeReadTiers(nativeClient = client, localBackendStore = store))
+            ConversationAdminHandlers.register(
+                router, NativeReadTiers(nativeClient = client, localBackendStore = store),
+            )
             router.dispatch(AdminRpcInvocation("test", method, buildJsonObject(params)))
             return recorder.snapshot().single { it.tag == "AdminRpc" && it.name == "handler.slow" }
         } finally {

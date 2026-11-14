@@ -95,12 +95,16 @@ class ConversationDiscoveryNoticeTest {
             val onDisk = (1..3).map { "on-disk-$it" }
             onDisk.forEach { record(root, it, """{"id":"$it","agent_id":"agent-1"}""") }
             val frames = mutableListOf<String>()
-            val notifier = ConversationChangeNotifier(backgroundScope, windowMs = 10).also { n -> n.attach { frames += it } }
+            val notifier = ConversationChangeNotifier(backgroundScope, windowMs = 10)
+            notifier.attach { frames += it }
             val client = ScanOnceClient(root)
             val router = AdminRpcRouter().also {
-                ConversationAdminHandlers.register(it, NativeReadTiers(
-                    nativeClient = client, localBackendStore = LocalBackendAdminStore(root), conversationChanges = notifier,
-                ))
+                val tiers = NativeReadTiers(
+                    nativeClient = client,
+                    localBackendStore = LocalBackendAdminStore(root),
+                    conversationChanges = notifier,
+                )
+                ConversationAdminHandlers.register(it, tiers)
             }
             router.dispatch(AdminRpcInvocation("test", "conversation.list", null))
             advanceTimeBy(11)
@@ -148,7 +152,8 @@ class ConversationDiscoveryNoticeTest {
                     readValidTestConversation(dir)?.let { loaded[(it["id"] as JsonPrimitive).content] = it }
                 }
             }
-            return AppServerInboundFrame.ConversationListResponse(command.requestId, true, JsonArray(loaded.values.toList()))
+            val rows = JsonArray(loaded.values.toList())
+            return AppServerInboundFrame.ConversationListResponse(command.requestId, true, rows)
         }
 
         override suspend fun conversationRetrieve(command: AppServerCommand.ConversationRetrieve):
