@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -88,13 +89,16 @@ fun LettaDisclosureHeader(
 
 /**
  * The mark at the end of a control that opens a menu or a picker (a composer chip): the
- * [DisclosureChevron] in its still, sheet-opening form at the small glyph size.
+ * [DisclosureChevron] in its still, sheet-opening form at the small glyph size. Decorative unless
+ * [contentDescription] is given: the control it sits in already says what it opens.
  */
 @Composable
 fun LettaMenuIndicator(modifier: Modifier = Modifier, contentDescription: String? = null) {
+    // The chevron would otherwise speak its own "Open details" inside the control's label.
+    val decorative = if (contentDescription == null) Modifier.clearAndSetSemantics {} else Modifier
     DisclosureChevron(
         expanded = false,
-        modifier = modifier,
+        modifier = modifier.then(decorative),
         indicates = ChevronIndication.Sheet,
         compact = true,
         contentDescription = contentDescription,
