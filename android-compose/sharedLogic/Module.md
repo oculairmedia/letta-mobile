@@ -67,6 +67,8 @@ Serializable wire models for pinned bd serve mutation operations and their reque
 
 # Package com.letta.mobile.data.backend
 
+`ConversationListingFactory` binds session conversation read paths to the shared listing; the cached repository consumes `ConversationListing` without depending on its implementation package. Hosts supply the factory at composition time.
+
 Session capabilities and explicit route availability. Bound sources and absent routes let repositories report unsupported operations without silently choosing another backend. Keep unsupported routes explicit rather than silently falling back; session factories describe available operations through [SessionCapabilities](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.backend/-session-capabilities/index.html) and [SessionRouteMatrix](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.backend/-session-route-matrix/index.html).
 
 # Package com.letta.mobile.data.canvas

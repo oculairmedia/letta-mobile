@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.chat.conversations.listing.repositoryConversationListingFactory
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.GatedDao
@@ -59,6 +60,7 @@ class SessionCacheGateTest {
         }
 
         private val assembler = SessionGraphAssembler(
+            listingFactory = repositoryConversationListingFactory(),
             agentDao = dagger.Lazy { heldAgentDao },
             conversationDao = dagger.Lazy { countingConversationDao },
         )
