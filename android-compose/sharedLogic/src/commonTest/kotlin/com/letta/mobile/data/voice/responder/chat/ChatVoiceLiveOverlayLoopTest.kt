@@ -106,21 +106,30 @@ internal class ChatVoiceLiveOverlayLoopTest : ChatSendCoordinatorConversationFix
     private fun row(message: LettaMessage, turn: String) =
         WsTimelineEvent.MessageDelta(message = message, conversationId = CONV, turnId = turn)
 
-    private fun reply(text: String, run: String, turn: String) =
-        row(AssistantMessage(id = "$prefix-reply", contentRaw = JsonPrimitive(text), date = DATE, runId = run, turnId = turn), turn)
+    /** A frame's run and the turn (the send's otid) it is stamped with. */
+    private data class Stamp(val run: String, val turn: String)
 
-    private fun toolStep(run: String, turn: String) =
-        row(ToolCallMessage(id = "$prefix-tool", date = DATE, runId = run, turnId = turn), turn)
+    /** The runs the live overlay draws: the reply's, and the tool step's before it, if any. */
+    private data class OverlayRuns(val reply: String, val tool: String? = null)
 
-    private fun echo(otid: String, run: String) = row(
-        UserMessage(id = "$prefix-echo", contentRaw = JsonPrimitive("hi"), date = DATE, otid = otid, runId = run, turnId = otid),
-        otid,
+    private fun reply(text: String, stamp: Stamp) = row(
+        AssistantMessage(id = "$prefix-reply", contentRaw = JsonPrimitive(text), date = DATE, runId = stamp.run, turnId = stamp.turn),
+        stamp.turn,
+    )
+
+    private fun toolStep(stamp: Stamp) =
+        row(ToolCallMessage(id = "$prefix-tool", date = DATE, runId = stamp.run, turnId = stamp.turn), stamp.turn)
+
+    /** The send's echo on [stamp]'s run; its turn is the send's otid. */
+    private fun echo(stamp: Stamp) = row(
+        UserMessage(id = "$prefix-echo", contentRaw = JsonPrimitive("hi"), date = DATE, otid = stamp.turn, runId = stamp.run, turnId = stamp.turn),
+        stamp.turn,
     )
 
     /** The live overlay shows the reply row (and the tool step before it), as the canonical route draws it. */
-    private fun Rig.overlay(text: String, run: String, toolRun: String? = null) {
-        val tool = toolRun?.let { UiMessage(id = "$prefix-tool", role = "assistant", content = "", timestamp = "t", runId = it, isReasoning = true) }
-        live.update { listOfNotNull(tool, assistantRow("$prefix-reply", text, run)) }
+    private fun Rig.overlay(text: String, runs: OverlayRuns) {
+        val tool = runs.tool?.let { UiMessage(id = "$prefix-tool", role = "assistant", content = "", timestamp = "t", runId = it, isReasoning = true) }
+        live.update { listOfNotNull(tool, assistantRow(RowId("$prefix-reply"), text, RowRun(runs.reply))) }
     }
 
     private fun completedCharacters(): Int = recorder.events.value
@@ -133,13 +142,13 @@ internal class ChatVoiceLiveOverlayLoopTest : ChatSendCoordinatorConversationFix
         val otid = ask(rig)
 
         rig.coordinator.handleEvent(WsTimelineEvent.TurnStarted(TURN, AGENT, CONV, "iroh-run-8b6e"))
-        rig.coordinator.handleEvent(echo(otid, run = "iroh-run-8b6e"))
+        rig.coordinator.handleEvent(echo(Stamp("iroh-run-8b6e", otid)))
         rig.coordinator.handleEvent(WsTimelineEvent.TurnStarted(TURN, AGENT, CONV, "local-run-543"))
-        rig.coordinator.handleEvent(toolStep(run = "local-run-543", turn = otid))
-        rig.overlay("", run = "local-run-544", toolRun = "local-run-543")
+        rig.coordinator.handleEvent(toolStep(Stamp("local-run-543", otid)))
+        rig.overlay("", OverlayRuns("local-run-544", tool = "local-run-543"))
         advanceUntilIdle()
-        rig.coordinator.handleEvent(reply("It is noon. It is sunny.", run = "local-run-544", turn = otid))
-        rig.overlay("It is noon. It is sunny.", run = "local-run-544", toolRun = "local-run-543")
+        rig.coordinator.handleEvent(reply("It is noon. It is sunny.", Stamp("local-run-544", otid)))
+        rig.overlay("It is noon. It is sunny.", OverlayRuns("local-run-544", tool = "local-run-543"))
         advanceUntilIdle()
         rig.coordinator.handleEvent(WsTimelineEvent.TurnDone(TURN, "local-run-543", BridgeTurnStatus.Completed))
         advanceUntilIdle()
@@ -154,10 +163,10 @@ internal class ChatVoiceLiveOverlayLoopTest : ChatSendCoordinatorConversationFix
         val otid = ask(rig)
 
         rig.coordinator.handleEvent(WsTimelineEvent.TurnStarted(TURN, AGENT, CONV, "local-run-537", dequeued = true))
-        rig.coordinator.handleEvent(toolStep(run = "local-run-537", turn = otid))
+        rig.coordinator.handleEvent(toolStep(Stamp("local-run-537", otid)))
         advanceUntilIdle()
-        rig.coordinator.handleEvent(reply("Noon.", run = "local-run-538", turn = otid))
-        rig.overlay("Noon.", run = "local-run-538", toolRun = "local-run-537")
+        rig.coordinator.handleEvent(reply("Noon.", Stamp("local-run-538", otid)))
+        rig.overlay("Noon.", OverlayRuns("local-run-538", tool = "local-run-537"))
         advanceUntilIdle()
         rig.coordinator.handleEvent(WsTimelineEvent.TurnDone(TURN, "local-run-537", BridgeTurnStatus.Completed))
         advanceUntilIdle()

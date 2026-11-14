@@ -73888,6 +73888,49 @@ public final class com/letta/mobile/data/voice/session/telemetry/VoiceTelemetryS
 	public final fun getNone ()Lcom/letta/mobile/data/voice/session/telemetry/VoiceTelemetrySink;
 }
 
+public abstract interface class com/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue {
+}
+
+public final class com/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue$Flag : com/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue {
+	public fun <init> (Z)V
+	public final fun component1 ()Z
+	public final fun copy (Z)Lcom/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue$Flag;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue$Flag;ZILjava/lang/Object;)Lcom/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue$Flag;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue$Missing : com/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue$Missing;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue$Numeric : com/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue {
+	public fun <init> (Ljava/lang/Number;)V
+	public final fun component1 ()Ljava/lang/Number;
+	public final fun copy (Ljava/lang/Number;)Lcom/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue$Numeric;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue$Numeric;Ljava/lang/Number;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue$Numeric;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Ljava/lang/Number;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue$Text : com/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue$Text;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue$Text;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/session/telemetry/VoiceTelemetryValue$Text;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/voice/speech/SentenceChunker {
 	public static final field Companion Lcom/letta/mobile/data/voice/speech/SentenceChunker$Companion;
 	public static final field DEFAULT_MAX_SEGMENT_LENGTH I

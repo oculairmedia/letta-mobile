@@ -19,6 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -60,7 +61,15 @@ internal class LinePcmPlayer(
         try {
             coroutineScope {
                 val progress = WriteProgress()
-                val writer = launch(options.dispatcher) { LineWriter(line, options, onLevel, progress).playAll(pcm) }
+                val writerFailed = AtomicBoolean()
+                val writer = launch(options.dispatcher) {
+                    try {
+                        LineWriter(line, options, onLevel, progress).playAll(pcm)
+                    } catch (failure: VoiceAudioException) {
+                        writerFailed.set(true)
+                        throw failure
+                    }
+                }
                 val watchdog = launch { watchWrites(line, progress, options) }
                 var ended = false
                 try {
@@ -69,7 +78,8 @@ internal class LinePcmPlayer(
                 } finally {
                     // A writer cancelled while waiting for the queue to play out may already have
                     // completed here: the queued audio must still be discarded, not left to drain.
-                    if (!ended) line.abort()
+                    // A writer that failed on its own has nothing left to discard.
+                    if (!ended && !writerFailed.get()) line.abort()
                 }
                 watchdog.cancel()
             }

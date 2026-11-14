@@ -124,7 +124,7 @@ internal fun TouchComposerBar(
     val modePicker = remember { TouchModePicker() }
     val baseItems = touchSheetItems(model, onAttachImage, onPermissionMode = { modePicker.open = true })
     BoxWithConstraints(modifier.fillMaxWidth()) {
-        val voiceInSlot = touchVoiceModeInSlot(maxWidth, leading = leading != null, plus = baseItems.isNotEmpty())
+        val voiceInSlot = touchVoiceModeInSlot(maxWidth, otherControls = listOf(leading != null, baseItems.isNotEmpty()).count { it })
         val sheetItems = baseItems + listOfNotNull(touchVoiceModeSheetItem().takeUnless { voiceInSlot })
         Column(Modifier.fillMaxWidth().then(touchBarSwipe(model))) {
             TouchAttachments(model)
@@ -147,10 +147,10 @@ internal fun TouchComposerBar(
  * conversation" row ([touchVoiceModeSheetItem]).
  */
 @Composable
-private fun touchVoiceModeInSlot(barWidth: Dp, leading: Boolean, plus: Boolean): Boolean {
+private fun touchVoiceModeInSlot(barWidth: Dp, otherControls: Int): Boolean {
     if (!hasVoiceMode()) return false
-    val controls = listOf(leading, plus, true, true).count { it }
-    return touchFieldWidth(barWidth, controls) >= TouchComposerDimens.minFieldWidth
+    // The other controls (the leading one, the "+"), the voice-mode button and the trailing Send or mic.
+    return touchFieldWidth(barWidth, otherControls + 2) >= TouchComposerDimens.minFieldWidth
 }
 
 /**

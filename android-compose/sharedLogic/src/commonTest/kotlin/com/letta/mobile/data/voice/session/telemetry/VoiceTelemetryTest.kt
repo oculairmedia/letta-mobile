@@ -75,6 +75,21 @@ class VoiceTelemetryTest {
         assertTrue(values.none { SECRET in it || REPLY in it }, "$values")
     }
 
+    /** Asks a responder that answers with [events], through the telemetry wrapper, and collects the answer. */
+    private suspend fun answer(vararg events: VoiceReplyEvent) {
+        val responder = TelemetryResponder(
+            object : VoiceResponder {
+                override fun respond(utterance: VoiceUtterance): VoiceReply = object : VoiceReply {
+                    override val events: Flow<VoiceReplyEvent> = flowOf(*events)
+
+                    override suspend fun cancel() = VoiceCancelOutcome.ALREADY_FINISHED
+                }
+            },
+            telemetry,
+        ) { ClientMessageId("otid-1") }
+        responder.respond(VoiceUtterance(VoiceText(SECRET))).events.toList()
+    }
+
     private class FakeSession : VoiceChatSession {
         override val state = MutableStateFlow(VoiceChatState())
 
@@ -100,18 +115,7 @@ class VoiceTelemetryTest {
 
     @Test
     fun anUnattributedReplyIsReportedWithItsReasonAndMessageId() = runTest {
-        val responder = TelemetryResponder(
-            object : VoiceResponder {
-                override fun respond(utterance: VoiceUtterance): VoiceReply = object : VoiceReply {
-                    override val events: Flow<VoiceReplyEvent> =
-                        flowOf(VoiceReplyEvent.Failed(VoiceError(VoiceErrorCode.UNATTRIBUTED, VoicePort.RESPONDER)))
-
-                    override suspend fun cancel() = VoiceCancelOutcome.ALREADY_FINISHED
-                }
-            },
-            telemetry,
-        ) { ClientMessageId("otid-1") }
-        responder.respond(VoiceUtterance(VoiceText(SECRET))).events.toList()
+        answer(VoiceReplyEvent.Failed(VoiceError(VoiceErrorCode.UNATTRIBUTED, VoicePort.RESPONDER)))
 
         val event = named("reply.unattributed")
         assertEquals("UNATTRIBUTED", attr(event, "reason"))
@@ -121,18 +125,7 @@ class VoiceTelemetryTest {
 
     @Test
     fun aCompletedReplyReportsOnlyItsCharacterCount() = runTest {
-        val responder = TelemetryResponder(
-            object : VoiceResponder {
-                override fun respond(utterance: VoiceUtterance): VoiceReply = object : VoiceReply {
-                    override val events: Flow<VoiceReplyEvent> =
-                        flowOf(VoiceReplyEvent.Text(VoiceText(REPLY)), VoiceReplyEvent.Completed)
-
-                    override suspend fun cancel() = VoiceCancelOutcome.ALREADY_FINISHED
-                }
-            },
-            telemetry,
-        ) { ClientMessageId("otid-1") }
-        responder.respond(VoiceUtterance(VoiceText(SECRET))).events.toList()
+        answer(VoiceReplyEvent.Text(VoiceText(REPLY)), VoiceReplyEvent.Completed)
 
         assertEquals(REPLY.length.toString(), attr(named("reply.completed"), "characters"))
         assertNoText()

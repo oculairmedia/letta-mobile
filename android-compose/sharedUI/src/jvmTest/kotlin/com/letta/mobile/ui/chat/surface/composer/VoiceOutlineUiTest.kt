@@ -190,85 +190,109 @@ class VoiceOutlineUiTest {
         if (style == LettaInput.Pointer) add(ComposerTestTags.PERMISSION_MODE_LINE)
     }
 
+    /** Where the composer's fixed parts and the conversation sit with voice mode off, with and without text. */
+    private class Baseline(val where: String, val bar: String, val fixed: List<String>) {
+        lateinit var off: Map<String, DpRect>
+        lateinit var typedOff: Map<String, DpRect>
+        lateinit var timeline: DpRect
+    }
+
     /** Walks voice mode on through every state at [width] in [style]: bounds, placeholder, outline, clicks, notices. */
     private fun arrangementHolds(width: Dp, style: LettaInput) = runComposeUiTest {
         val page = Page()
         showPage(width, style, page)
         waitForIdle()
-        val bar = barTag(style)
-        val fixed = fixedTags(style)
-        val off = fixed.associateWith { bounds(it) }
-        val timelineOff = bounds(TIMELINE)
+        val base = measureBaseline(page, Baseline("at $width ($style)", barTag(style), fixedTags(style)))
+        assertEquals(VoiceGlowRole.Idle, semantic(base.bar, VoiceOutlineRoleKey), "no outline while voice mode is off ${base.where}")
+        runningStatesHold(page, base)
+        clicksGetThrough(page, base)
+        failuresUseTheNotice(page, base)
+        page.state.value = VoiceModeState.Off
+        waitForIdle()
+        onNodeWithTag(VoiceModeTags.STRIP).assertDoesNotExist()
+        assertFixed(base, base.off, "once voice mode is off")
+    }
+
+    private fun ComposeUiTest.measureBaseline(page: Page, base: Baseline): Baseline {
+        base.off = base.fixed.associateWith { bounds(it) }
+        base.timeline = bounds(TIMELINE)
         // Typed text changes Send's own look (enabled), so with text the baseline is voice mode off with text.
         page.text = "typed"
         waitForIdle()
-        val typedOff = fixed.associateWith { bounds(it) }
+        base.typedOff = base.fixed.associateWith { bounds(it) }
         page.text = ""
         waitForIdle()
-        assertEquals(VoiceGlowRole.Idle, semantic(bar, VoiceOutlineRoleKey), "no outline while voice mode is off at $width ($style)")
+        return base
+    }
 
+    private fun ComposeUiTest.assertFixed(base: Baseline, expected: Map<String, DpRect>, context: String) =
+        base.fixed.forEach { tag -> assertEquals(expected.getValue(tag), bounds(tag), "$tag keeps its bounds $context ${base.where}") }
+
+    /** Every running state keeps every bound, shows its placeholder until text is typed and its colour role either way. */
+    private fun ComposeUiTest.runningStatesHold(page: Page, base: Baseline) {
         val roles = mutableMapOf<VoiceModeState, VoiceGlowRole>()
         for ((shown, placeholder, role) in running) {
             page.text = ""
             page.state.value = shown
             waitForIdle()
-            val where = "at $width ($style) while $shown"
-            fixed.forEach { tag -> assertEquals(off.getValue(tag), bounds(tag), "$tag keeps its bounds $where") }
-            assertEquals(timelineOff, bounds(TIMELINE), "the conversation keeps its bounds $where")
+            assertFixed(base, base.off, "while $shown")
+            assertEquals(base.timeline, bounds(TIMELINE), "the conversation keeps its bounds while $shown ${base.where}")
             onNodeWithTag(VoiceModeTags.STRIP).assertDoesNotExist()
             onNodeWithText(placeholder, useUnmergedTree = true).assertExists()
-            assertEquals(role, semantic(bar, VoiceOutlineRoleKey), "the outline's colour role $where")
+            assertEquals(role, semantic(base.bar, VoiceOutlineRoleKey), "the outline's colour role while $shown ${base.where}")
             roles[shown] = role
 
             page.text = "typed"
             waitForIdle()
             onNodeWithText(placeholder, useUnmergedTree = true).assertDoesNotExist()
-            assertEquals(role, semantic(bar, VoiceOutlineRoleKey), "the outline carries the state once text is typed $where")
-            fixed.forEach { tag -> assertEquals(typedOff.getValue(tag), bounds(tag), "$tag keeps its bounds with text $where") }
+            assertEquals(role, semantic(base.bar, VoiceOutlineRoleKey), "the outline carries $shown once text is typed ${base.where}")
+            assertFixed(base, base.typedOff, "with text while $shown")
         }
-        assertNotEquals(roles[VoiceModeState.Hearing], roles[VoiceModeState.WaitingForReply], "hearing and thinking differ in colour at $width ($style)")
-        assertNotEquals(roles[VoiceModeState.Hearing], roles[VoiceModeState.Speaking], "hearing and speaking differ in colour at $width ($style)")
+        assertNotEquals(roles[VoiceModeState.Hearing], roles[VoiceModeState.WaitingForReply], "hearing and thinking differ in colour ${base.where}")
+        assertNotEquals(roles[VoiceModeState.Hearing], roles[VoiceModeState.Speaking], "hearing and speaking differ in colour ${base.where}")
+    }
 
-        // The outline only draws: the last row, the field and the voice button still take their clicks.
+    /** The outline only draws: the last row, the field and the voice button still take their clicks. */
+    private fun ComposeUiTest.clicksGetThrough(page: Page, base: Baseline) {
         page.state.value = VoiceModeState.Hearing
         page.text = ""
         waitForIdle()
         onNodeWithTag(LAST_ROW).performClick()
         waitForIdle()
-        assertEquals(1, page.lastRowClicks, "the last row takes its click at $width ($style)")
+        assertEquals(1, page.lastRowClicks, "the last row takes its click ${base.where}")
         onNodeWithTag(ComposerTestTags.INPUT).performClick()
         waitForIdle()
         onNodeWithTag(ComposerTestTags.INPUT).assertIsFocused()
         onNodeWithTag(VoiceModeTags.BUTTON).performClick()
         waitForIdle()
-        assertTrue(page.handle!!.setupOpen, "the voice button takes its click at $width ($style)")
+        assertTrue(page.handle!!.setupOpen, "the voice button takes its click ${base.where}")
         page.handle!!.setupOpen = false
+    }
 
-        // Failures use the composer's notice slot; the prompt and its controls stay where they were.
-        listOf(
-            Triple(VoiceModeState.TurnFailed(VoiceErrorCode.TRANSCRIPTION_FAILED, retryable = true), "Retry", VoiceGlowRole.Error),
-            Triple(VoiceModeState.Error(VoiceErrorCode.ENGINE_FAILED), "Retry", VoiceGlowRole.Error),
-            Triple(VoiceModeState.NeedsSetup(VoiceSetupGap.NO_ENDPOINT), "Set up", VoiceGlowRole.Idle),
-        ).forEach { (shown, action, role) ->
+    /** Failures use the composer's notice slot; the prompt and its controls stay where they were. */
+    private fun ComposeUiTest.failuresUseTheNotice(page: Page, base: Baseline) {
+        failures.forEach { (shown, action, role) ->
             page.state.value = shown
             waitForIdle()
-            val where = "at $width ($style) while $shown"
+            val where = "while $shown ${base.where}"
             onNodeWithTag(VoiceModeTags.STRIP, useUnmergedTree = true).assertExists()
             onNodeWithTag(VoiceModeTags.STRIP_ACTION, useUnmergedTree = true).assertExists()
             onNodeWithText(action, useUnmergedTree = true).assertExists()
-            assertEquals(role, semantic(bar, VoiceOutlineRoleKey), "the outline $where")
-            fixed.forEach { tag -> assertEquals(off.getValue(tag), bounds(tag), "$tag keeps its bounds $where") }
-            assertEquals(timelineOff.top, bounds(TIMELINE).top, "the conversation keeps its top $where")
-            assertTrue(bounds(VoiceModeTags.STRIP).bottom <= off.getValue(bar).top, "the notice sits above the prompt $where")
+            assertEquals(role, semantic(base.bar, VoiceOutlineRoleKey), "the outline $where")
+            assertFixed(base, base.off, "while $shown")
+            assertEquals(base.timeline.top, bounds(TIMELINE).top, "the conversation keeps its top $where")
+            assertTrue(bounds(VoiceModeTags.STRIP).bottom <= base.off.getValue(base.bar).top, "the notice sits above the prompt $where")
         }
         onNodeWithTag(VoiceModeTags.STRIP_CLOSE, useUnmergedTree = true).performClick()
         waitForIdle()
-
-        page.state.value = VoiceModeState.Off
-        waitForIdle()
-        onNodeWithTag(VoiceModeTags.STRIP).assertDoesNotExist()
-        fixed.forEach { tag -> assertEquals(off.getValue(tag), bounds(tag), "$tag is back where it was once voice mode is off at $width ($style)") }
     }
+
+    /** The failure states, with the notice action and outline role each shows. */
+    private val failures: List<Triple<VoiceModeState, String, VoiceGlowRole>> = listOf(
+        Triple(VoiceModeState.TurnFailed(VoiceErrorCode.TRANSCRIPTION_FAILED, retryable = true), "Retry", VoiceGlowRole.Error),
+        Triple(VoiceModeState.Error(VoiceErrorCode.ENGINE_FAILED), "Retry", VoiceGlowRole.Error),
+        Triple(VoiceModeState.NeedsSetup(VoiceSetupGap.NO_ENDPOINT), "Set up", VoiceGlowRole.Idle),
+    )
 
     @Test
     fun theTouchArrangementHoldsAt360() = arrangementHolds(360.dp, LettaInput.Touch)

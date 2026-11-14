@@ -4,6 +4,7 @@ import com.letta.mobile.data.chat.send.ChatSendCoordinator
 import com.letta.mobile.data.chat.send.ChatSendCoordinatorConversationFixture
 import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.chat.send.QueueConversationId
+import com.letta.mobile.data.chat.sentruns.SentMessageId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ToolCallMessage
@@ -43,16 +44,19 @@ internal class ChatVoiceFollowUpOverCoordinatorTest : ChatSendCoordinatorConvers
     // The bridge deduplicates message frames process-wide, so this test's frames need their own ids.
     private val prefix = "voice-follow-up-${Random.nextLong()}"
 
-    private fun assistant(id: String, text: String, run: String, turn: String) = WsTimelineEvent.MessageDelta(
-        message = AssistantMessage(id = "$prefix-$id", contentRaw = JsonPrimitive(text), date = DATE, runId = run, turnId = turn),
+    /** A frame's run and the turn (the send's otid) it is stamped with. */
+    private data class Stamp(val run: String, val turn: String)
+
+    private fun assistant(id: String, text: String, stamp: Stamp) = WsTimelineEvent.MessageDelta(
+        message = AssistantMessage(id = "$prefix-$id", contentRaw = JsonPrimitive(text), date = DATE, runId = stamp.run, turnId = stamp.turn),
         conversationId = CONV,
-        turnId = turn,
+        turnId = stamp.turn,
     )
 
-    private fun toolCall(run: String, turn: String) = WsTimelineEvent.MessageDelta(
-        message = ToolCallMessage(id = "$prefix-tc", date = DATE, runId = run, turnId = turn),
+    private fun toolCall(stamp: Stamp) = WsTimelineEvent.MessageDelta(
+        message = ToolCallMessage(id = "$prefix-tc", date = DATE, runId = stamp.run, turnId = stamp.turn),
         conversationId = CONV,
-        turnId = turn,
+        turnId = stamp.turn,
     )
 
     private class Rig(
@@ -96,8 +100,8 @@ internal class ChatVoiceFollowUpOverCoordinatorTest : ChatSendCoordinatorConvers
     private suspend fun TestScope.answer(rig: Rig, host: HostTurn, words: String) {
         val (turn, otid, run) = host
         rig.coordinator.handleEvent(WsTimelineEvent.TurnStarted(turn, AGENT, CONV, run))
-        rig.coordinator.handleEvent(assistant("$turn-m", words, run = run, turn = otid))
-        rig.page.add(assistantRow("$turn-m", words, run = run))
+        rig.coordinator.handleEvent(assistant("$turn-m", words, Stamp(run, otid)))
+        rig.page.add(assistantRow(RowId("$turn-m"), words, run = RowRun(run)))
         advanceUntilIdle()
         rig.transport.activeChatTurn = false
         rig.coordinator.handleEvent(WsTimelineEvent.TurnDone(turn, run, BridgeTurnStatus.Completed))
@@ -115,9 +119,9 @@ internal class ChatVoiceFollowUpOverCoordinatorTest : ChatSendCoordinatorConvers
         val rig = rig()
         val first = collect(rig.ask("what is the weather like in town today"))
         val firstOtid = timeline.externalLocals.single().otid
-        rig.page.show(userRow(firstOtid, "what is the weather like in town today", sentAs = firstOtid))
+        rig.page.show(userRow(RowId(firstOtid), "what is the weather like in town today", sentAs = SentMessageId(firstOtid)))
         rig.coordinator.handleEvent(WsTimelineEvent.TurnStarted(TURN_1, AGENT, CONV, "iroh-run-1"))
-        rig.coordinator.handleEvent(toolCall(run = "local-run-400", turn = firstOtid))
+        rig.coordinator.handleEvent(toolCall(Stamp("local-run-400", firstOtid)))
 
         val second = collect(rig.ask("hey"))
         val secondOtid = rig.queued().single()
@@ -128,7 +132,7 @@ internal class ChatVoiceFollowUpOverCoordinatorTest : ChatSendCoordinatorConvers
         answer(rig, HostTurn(TURN_1, firstOtid, "local-run-401"), "Sunny and mild.")
         assertEquals(emptyList(), rig.queued())
         assertEquals(secondOtid, timeline.externalLocals.last().otid)
-        rig.page.add(userRow(secondOtid, "hey", sentAs = secondOtid))
+        rig.page.add(userRow(RowId(secondOtid), "hey", sentAs = SentMessageId(secondOtid)))
         rig.transport.activeChatTurn = true
         answer(rig, HostTurn(TURN_2, secondOtid, "local-run-402"), "Hello again.")
 
@@ -157,7 +161,7 @@ internal class ChatVoiceFollowUpOverCoordinatorTest : ChatSendCoordinatorConvers
         val secondOtid = timeline.externalLocals.last().otid
         assertTrue(secondOtid != firstOtid)
         assertEquals(emptyList(), rig.queued())
-        rig.page.add(userRow(secondOtid, "never mind", sentAs = secondOtid))
+        rig.page.add(userRow(RowId(secondOtid), "never mind", sentAs = SentMessageId(secondOtid)))
         rig.transport.activeChatTurn = true
         answer(rig, HostTurn(TURN_2, secondOtid, "local-run-8"), "Okay.")
         assertEquals(listOf("Okay."), texts(second))
@@ -187,7 +191,7 @@ internal class ChatVoiceFollowUpOverCoordinatorTest : ChatSendCoordinatorConvers
         assertEquals(emptyList(), rig.queued())
         assertEquals(secondOtid, timeline.externalLocals.last().otid)
         assertEquals(listOf("never mind", "never mind"), rig.transport.sentTexts.drop(1))
-        rig.page.add(userRow(secondOtid, "never mind", sentAs = secondOtid))
+        rig.page.add(userRow(RowId(secondOtid), "never mind", sentAs = SentMessageId(secondOtid)))
         rig.transport.activeChatTurn = true
         answer(rig, HostTurn(TURN_2, secondOtid, "local-run-8"), "Okay.")
         assertEquals(listOf("Okay."), texts(second))
@@ -199,11 +203,11 @@ internal class ChatVoiceFollowUpOverCoordinatorTest : ChatSendCoordinatorConvers
         val first = rig.ask("tell me a story")
         val events = collect(first)
         val otid = timeline.externalLocals.single().otid
-        rig.page.show(userRow(otid, "tell me a story", sentAs = otid))
+        rig.page.show(userRow(RowId(otid), "tell me a story", sentAs = SentMessageId(otid)))
         rig.coordinator.handleEvent(WsTimelineEvent.TurnStarted(TURN_1, AGENT, CONV, "iroh-run-1"))
         rig.coordinator.handleEvent(WsTimelineEvent.TurnStarted(TURN_1, AGENT, CONV, "local-run-7"))
-        rig.coordinator.handleEvent(assistant("story", "Once upon a time.", run = "local-run-7", turn = otid))
-        rig.page.add(assistantRow("story", "Once upon a time.", run = "local-run-7"))
+        rig.coordinator.handleEvent(assistant("story", "Once upon a time.", Stamp("local-run-7", otid)))
+        rig.page.add(assistantRow(RowId("story"), "Once upon a time.", run = RowRun("local-run-7")))
         advanceUntilIdle()
         assertEquals(listOf("Once upon a time."), texts(events))
         return first to otid

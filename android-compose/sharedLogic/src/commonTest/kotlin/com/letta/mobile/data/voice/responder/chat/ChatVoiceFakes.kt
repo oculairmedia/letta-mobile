@@ -79,10 +79,3 @@ internal fun userRow(id: RowId, text: String, sentAs: SentMessageId? = null) =
 
 internal fun assistantRow(id: RowId, text: String, run: RowRun?) =
     UiMessage(id = id.value, role = "assistant", content = text, timestamp = "t", runId = run?.value)
-
-/** [userRow] by plain ids, for the voice-mode tests that name rows and otids as strings. */
-internal fun userRow(id: String, text: String, sentAs: String? = null) =
-    userRow(RowId(id), text, sentAs?.let(::SentMessageId))
-
-/** [assistantRow] by plain ids, for the voice-mode tests that name rows and runs as strings. */
-internal fun assistantRow(id: String, text: String, run: String?) = assistantRow(RowId(id), text, run?.let(::RowRun))

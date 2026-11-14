@@ -4996,7 +4996,7 @@ abstract fun interface com.letta.mobile.data.voice.endpoint/SpeechClientDiagnost
 }
 
 abstract fun interface com.letta.mobile.data.voice.session.telemetry/VoiceTelemetrySink { // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetrySink|null[0]
-    abstract fun event(kotlin/String, kotlin/String, kotlin.collections/List<kotlin/Pair<kotlin/String, kotlin/Any?>>) // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetrySink.event|event(kotlin.String;kotlin.String;kotlin.collections.List<kotlin.Pair<kotlin.String,kotlin.Any?>>){}[0]
+    abstract fun event(kotlin/String, kotlin/String, kotlin.collections/List<kotlin/Pair<kotlin/String, com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue>>) // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetrySink.event|event(kotlin.String;kotlin.String;kotlin.collections.List<kotlin.Pair<kotlin.String,com.letta.mobile.data.voice.session.telemetry.VoiceTelemetryValue>>){}[0]
 
     final object Companion { // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetrySink.Companion|null[0]
         final val None // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetrySink.Companion.None|{}None[0]
@@ -25830,6 +25830,53 @@ sealed interface com.letta.mobile.data.voice.engine/VoiceReplyEvent { // com.let
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.engine/VoiceReplyEvent.PartEnded.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.engine/VoiceReplyEvent.PartEnded.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.voice.engine/VoiceReplyEvent.PartEnded.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue { // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue|null[0]
+    final class Flag : com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue { // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Flag|null[0]
+        constructor <init>(kotlin/Boolean) // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Flag.<init>|<init>(kotlin.Boolean){}[0]
+
+        final val value // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Flag.value|{}value[0]
+            final fun <get-value>(): kotlin/Boolean // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Flag.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): kotlin/Boolean // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Flag.component1|component1(){}[0]
+        final fun copy(kotlin/Boolean = ...): com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Flag // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Flag.copy|copy(kotlin.Boolean){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Flag.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Flag.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Flag.toString|toString(){}[0]
+    }
+
+    final class Numeric : com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue { // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Numeric|null[0]
+        constructor <init>(kotlin/Number) // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Numeric.<init>|<init>(kotlin.Number){}[0]
+
+        final val value // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Numeric.value|{}value[0]
+            final fun <get-value>(): kotlin/Number // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Numeric.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): kotlin/Number // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Numeric.component1|component1(){}[0]
+        final fun copy(kotlin/Number = ...): com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Numeric // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Numeric.copy|copy(kotlin.Number){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Numeric.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Numeric.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Numeric.toString|toString(){}[0]
+    }
+
+    final class Text : com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue { // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Text|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Text.<init>|<init>(kotlin.String){}[0]
+
+        final val value // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Text.value|{}value[0]
+            final fun <get-value>(): kotlin/String // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Text.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Text.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Text // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Text.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Text.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Text.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Text.toString|toString(){}[0]
+    }
+
+    final object Missing : com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue { // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Missing|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Missing.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Missing.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.voice.session.telemetry/VoiceTelemetryValue.Missing.toString|toString(){}[0]
     }
 }
 

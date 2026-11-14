@@ -151,19 +151,26 @@ class VoiceModeComposerUiTest {
         }
     }
 
+    /** Whether the voice setup is complete, whether the page offers voice mode, and who hears of its handle. */
+    private class VoiceOptions(
+        val configured: Boolean = true,
+        val shown: () -> Boolean = { true },
+        val onHandle: (VoiceModeHandle) -> Unit = {},
+    )
+
     /**
-     * The composer at [width] in [style] and [mode], with voice mode while [withVoice] says so,
+     * The composer at [width] in [style] and [mode], with voice mode while [voice] offers it,
      * anchored to the bottom of a fixed-height page as the chat page anchors it.
      */
     private fun ComposeUiTest.showComposer(
         width: Dp,
         style: LettaInput,
         mode: ChatSurfaceMode = ChatSurfaceMode.FullScreen,
-        configured: Boolean = true,
-        withVoice: () -> Boolean = { true },
-        onHandle: (VoiceModeHandle) -> Unit = {},
+        voice: VoiceOptions = VoiceOptions(),
     ) = setContent {
-        val handle = rememberVoice(configured).also(onHandle)
+        val configured = voice.configured
+        val withVoice = voice.shown
+        val handle = rememberVoice(configured).also(voice.onHandle)
         MaterialTheme {
             CompositionLocalProvider(
                 LocalLettaHost provides LettaHost(input = style),
@@ -199,7 +206,7 @@ class VoiceModeComposerUiTest {
      */
     private fun sitsBeforeSend(width: Dp, layout: Layout, minimumField: Dp) = runComposeUiTest {
         var voice by mutableStateOf(false)
-        showComposer(width, layout.style, layout.mode, withVoice = { voice })
+        showComposer(width, layout.style, layout.mode, VoiceOptions(shown = { voice }))
         onNodeWithTag(VoiceModeTags.BUTTON).assertDoesNotExist()
         val sendBefore = bounds(ComposerTestTags.SEND)
         val fieldBefore = bounds(layout.field)
@@ -273,7 +280,7 @@ class VoiceModeComposerUiTest {
     fun theCanvasTouchBarAt360OffersVoiceModeInThePlusSheet() = runComposeUiTest {
         var voice by mutableStateOf(false)
         var handle: VoiceModeHandle? = null
-        showComposer(360.dp, LettaInput.Touch, ChatSurfaceMode.Docked, withVoice = { voice }, onHandle = { handle = it })
+        showComposer(360.dp, LettaInput.Touch, ChatSurfaceMode.Docked, VoiceOptions(shown = { voice }, onHandle = { handle = it }))
         val sendBefore = bounds(ComposerTestTags.SEND)
         voice = true
         waitForIdle()
@@ -288,7 +295,7 @@ class VoiceModeComposerUiTest {
     @Test
     fun aTapTurnsVoiceModeOnAndASecondTapTurnsItOff() = runComposeUiTest {
         var handle: VoiceModeHandle? = null
-        showComposer(360.dp, LettaInput.Touch, onHandle = { handle = it })
+        showComposer(360.dp, LettaInput.Touch, voice = VoiceOptions(onHandle = { handle = it }))
         onNodeWithTag(VoiceModeTags.BUTTON)
             .assertContentDescriptionEquals("Start voice conversation")
             .assert(stateDescription("Off"))
@@ -312,7 +319,7 @@ class VoiceModeComposerUiTest {
     @Test
     fun withoutASetupATapOpensTheVoiceSettingsAndStartsNothing() = runComposeUiTest {
         var handle: VoiceModeHandle? = null
-        showComposer(360.dp, LettaInput.Touch, configured = false, onHandle = { handle = it })
+        showComposer(360.dp, LettaInput.Touch, voice = VoiceOptions(configured = false, onHandle = { handle = it }))
         onNodeWithTag(VoiceModeTags.BUTTON).performClick()
         waitForIdle()
         onNodeWithText("voice setup pane").assertExists()

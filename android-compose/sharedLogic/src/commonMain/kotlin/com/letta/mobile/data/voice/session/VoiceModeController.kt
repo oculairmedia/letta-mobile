@@ -200,10 +200,18 @@ class VoiceModeController(
             is Command.Start -> begin(command.session)
             is Command.Stop -> end(VoiceModeState.Off, command.reason)
             is Command.Retry -> retryOrBegin(command.session)
+            is Command.Close -> end(VoiceModeState.Off, SHUTDOWN).also { command.done.complete(Unit) }
+            else -> applyQuick(command)
+        }
+    }
+
+    /** The commands that neither start nor end a session. */
+    private fun applyQuick(command: Command) {
+        when (command) {
             Command.Interrupt -> live?.interruptSpeech()
             Command.SetupChanged -> clearResolvedSetup()
             is Command.Idle -> showIdle(command.state)
-            is Command.Close -> end(VoiceModeState.Off, SHUTDOWN).also { command.done.complete(Unit) }
+            else -> Unit
         }
     }
 

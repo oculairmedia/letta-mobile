@@ -62,7 +62,7 @@ internal class VoiceTelemetry(
     private var since: TimeMark? = null
 
     /** Reports [name] with [attrs] and the time since the session started. */
-    fun event(name: String, vararg attrs: Pair<String, Any?>) =
+    fun event(name: String, vararg attrs: VoiceTelemetryField) =
         sink.event(TAG, name, attrs.asList() + ("tMs" attr since?.elapsedNow()?.inWholeMilliseconds))
 
     /**
@@ -414,14 +414,41 @@ private class ReplyRowTelemetry(private val telemetry: VoiceTelemetry) {
     }
 }
 
+/** One telemetry field: its name and its value. */
+typealias VoiceTelemetryField = Pair<String, VoiceTelemetryValue>
+
+/** A telemetry field's value: some text, a number, a flag, or nothing. */
+sealed interface VoiceTelemetryValue {
+    /** Text: a state, a reason, an id. */
+    data class Text(
+        /** The text. */
+        val value: String,
+    ) : VoiceTelemetryValue
+
+    /** A count, a level or a duration. */
+    data class Numeric(
+        /** The number. */
+        val value: Number,
+    ) : VoiceTelemetryValue
+
+    /** A yes or no. */
+    data class Flag(
+        /** The flag. */
+        val value: Boolean,
+    ) : VoiceTelemetryValue
+
+    /** No value. */
+    data object Missing : VoiceTelemetryValue
+}
+
 /**
- * Where voice mode's diagnostics go: one event named [event]'s `name` under `tag`, with its fields
- * (names to a string, a number, a flag or null). Voice mode reports only states, reasons, ids, counts,
- * levels and timings through it, never audio, transcript or reply text, an API key or an address.
+ * Where voice mode's diagnostics go: one event named `name` under `tag`, with its fields. Voice mode
+ * reports only states, reasons, ids, counts, levels and timings through it, never audio, transcript
+ * or reply text, an API key or an address.
  */
 fun interface VoiceTelemetrySink {
     /** Reports the event [name] under [tag] with [fields]. */
-    fun event(tag: String, name: String, fields: List<Pair<String, Any?>>)
+    fun event(tag: String, name: String, fields: List<VoiceTelemetryField>)
 
     /** Sinks. */
     companion object {
@@ -430,5 +457,14 @@ fun interface VoiceTelemetrySink {
     }
 }
 
-/** One telemetry field: this name with [value] (a string, a number, a flag or null). */
-internal infix fun String.attr(value: Any?): Pair<String, Any?> = this to value
+/** A text field; missing when [value] is null. */
+internal infix fun String.attr(value: String?): VoiceTelemetryField =
+    this to (value?.let { VoiceTelemetryValue.Text(it) } ?: VoiceTelemetryValue.Missing)
+
+/** A numeric field; missing when [value] is null. */
+internal infix fun String.attr(value: Number?): VoiceTelemetryField =
+    this to (value?.let { VoiceTelemetryValue.Numeric(it) } ?: VoiceTelemetryValue.Missing)
+
+/** A flag field; missing when [value] is null. */
+internal infix fun String.attr(value: Boolean?): VoiceTelemetryField =
+    this to (value?.let { VoiceTelemetryValue.Flag(it) } ?: VoiceTelemetryValue.Missing)

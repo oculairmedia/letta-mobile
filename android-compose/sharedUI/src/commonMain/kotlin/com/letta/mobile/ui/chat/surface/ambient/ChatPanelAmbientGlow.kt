@@ -195,11 +195,11 @@ internal fun ChatPanelAmbientGlow(
     val shaders = LocalAmbientGlowShaders.current ?: rememberAmbientGlowShaders()
     // Voice mode: while it follows a voice the glow runs in that voice's colour at its level.
     val voice = LocalAmbientVoice.current
-    val status = if (voice != null) AmbientMotionStatus.Running else ambient.status
+    val status = glowStatus(voice, ambient)
     val spec = AmbientMotion.spec(status)
     val glide = if (reducedMotion) 0 else ChatMotionTokens.AmbientGlow.GLIDE_MILLIS
     val tint = animateColorAsState(
-        targetValue = voice?.let { voiceTint(it, MaterialTheme.colorScheme) } ?: ambientTint(status, MaterialTheme.colorScheme),
+        targetValue = glowTint(voice, status, MaterialTheme.colorScheme),
         animationSpec = tween(durationMillis = glide, easing = EaseInOutCubic),
         label = "chatAmbientTint",
     )
@@ -235,8 +235,7 @@ internal fun ChatPanelAmbientGlow(
             agitation = agitation,
             envelope = envelope.asState(),
             streamPulse = ambient.streamPulse,
-            // Under reduced motion only the colour follows the voice: the still tint, no level.
-            voice = voice.takeUnless { reducedMotion },
+            voice = voice,
         ),
         animate = !reducedMotion,
         placement = placement,
@@ -254,7 +253,13 @@ private class GlowInputs(
     val envelope: State<Float>,
     val streamPulse: Long,
     val voice: AmbientVoice? = null,
-)
+) {
+    /** The envelope to draw; scaled by the voice's level while the glow moves (under reduced motion only the colour follows it). */
+    fun envelopeFor(animate: Boolean): Float = voice?.takeIf { animate }?.envelope(envelope.value) ?: envelope.value
+
+    /** The stream energy to draw, lifted by the voice's level while the glow moves. */
+    fun streamEnergyFor(animate: Boolean, energy: Float): Float = voice?.takeIf { animate }?.streamEnergy(energy) ?: energy
+}
 
 @Composable
 private fun GlowLayer(
@@ -281,8 +286,8 @@ private fun GlowLayer(
                 val uniforms = AmbientGlowUniforms(
                     phase = motion.phase.floatValue,
                     agitation = inputs.agitation.value,
-                    envelope = inputs.voice?.envelope(inputs.envelope.value) ?: inputs.envelope.value,
-                    streamEnergy = inputs.voice?.streamEnergy(motion.streamEnergy.floatValue) ?: motion.streamEnergy.floatValue,
+                    envelope = inputs.envelopeFor(animate),
+                    streamEnergy = inputs.streamEnergyFor(animate, motion.streamEnergy.floatValue),
                     band = if (placement is AmbientGlowPlacement.Halo) HALO_BAND else PANEL_BAND,
                     tint = inputs.tint.value,
                     fieldHeight = fieldHeightFor(placement),
@@ -411,6 +416,14 @@ internal fun ambientTint(status: AmbientMotionStatus, scheme: ColorScheme): Colo
     AmbientMotionStatus.Failed -> scheme.error
     AmbientMotionStatus.Completed -> scheme.secondary
 }
+
+/** The glow's status: running while it follows a [voice], else the run's. */
+private fun glowStatus(voice: AmbientVoice?, ambient: ChatAmbient): AmbientMotionStatus =
+    if (voice != null) AmbientMotionStatus.Running else ambient.status
+
+/** The glow's colour: the [voice]'s while it follows one, else [status]'s tint. */
+private fun glowTint(voice: AmbientVoice?, status: AmbientMotionStatus, scheme: ColorScheme): Color =
+    if (voice != null) voiceTint(voice, scheme) else ambientTint(status, scheme)
 
 /**
  * The glow's colour while it follows a voice: the person's own colour, or the agent's running tint

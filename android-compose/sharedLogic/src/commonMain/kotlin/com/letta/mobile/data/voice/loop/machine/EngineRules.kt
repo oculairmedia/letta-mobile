@@ -13,16 +13,23 @@ import com.letta.mobile.data.voice.engine.VoiceMouthEvent
 /** What the ear reports. Its failures stop the loop: without the microphone there is nothing to go on with. */
 internal object EarRules {
     fun on(model: LoopModel, event: VoiceEarEvent): Step = when (event) {
+        is VoiceEarEvent.InputLevel, is VoiceEarEvent.PartialTranscript -> Step(shown(model, event))
         VoiceEarEvent.ListeningStarted -> listening(model)
-        is VoiceEarEvent.InputLevel -> Step(model.withView { copy(inputLevel = event.level) })
-        is VoiceEarEvent.PartialTranscript -> Step(model.withView { copy(transcript = event.text) })
         VoiceEarEvent.SpeechStarted -> speechStarted(model)
         VoiceEarEvent.SpeechEnded -> speechEnded(model)
         is VoiceEarEvent.EndOfTurn -> endOfTurn(model, event.utterance)
-        is VoiceEarEvent.Failed -> Transitions.fail(model, event.error).let { step ->
-            step.copy(model = step.model.withView { copy(retryable = event.retry) })
-        }
+        is VoiceEarEvent.Failed -> failed(model, event)
     }
+
+    /** What the ear reports only for display: the input level and a partial transcript. */
+    private fun shown(model: LoopModel, event: VoiceEarEvent): LoopModel = when (event) {
+        is VoiceEarEvent.InputLevel -> model.withView { copy(inputLevel = event.level) }
+        is VoiceEarEvent.PartialTranscript -> model.withView { copy(transcript = event.text) }
+        else -> model
+    }
+
+    private fun failed(model: LoopModel, event: VoiceEarEvent.Failed): Step =
+        Transitions.fail(model, event.error).let { step -> step.copy(model = step.model.withView { copy(retryable = event.retry) }) }
 
     private fun listening(model: LoopModel): Step {
         val open = model.withView { copy(micOpen = true) }
@@ -68,13 +75,16 @@ internal object EarRules {
         val heard = model.withTurn { if (transcribing > 0) copy(transcribing = transcribing - 1) else copy(userSpeaking = false) }
         return when (model.phase) {
             VoicePhase.LISTENING, VoicePhase.THINKING -> Turns.start(heard, utterance)
-            VoicePhase.SPEAKING -> if (model.config.voiceInterrupts && unannounced) {
-                Interrupts.bargeIn(heard).let { step -> Turns.start(step.model.withTurn { copy(userSpeaking = false) }, utterance).after(step.effects) }
-            } else {
-                Turns.start(heard, utterance)
-            }
+            VoicePhase.SPEAKING -> overSpeech(heard, utterance, interrupts = model.config.voiceInterrupts && unannounced)
             else -> Step(model)
         }
+    }
+
+    /** A transcript while the app speaks: a follow-up, or a barge-in first where it [interrupts]. */
+    private fun overSpeech(heard: LoopModel, utterance: VoiceUtterance, interrupts: Boolean): Step {
+        if (!interrupts) return Turns.start(heard, utterance)
+        val stop = Interrupts.bargeIn(heard)
+        return Turns.start(stop.model.withTurn { copy(userSpeaking = false) }, utterance).after(stop.effects)
     }
 }
 
