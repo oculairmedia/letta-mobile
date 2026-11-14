@@ -14,7 +14,7 @@ import com.letta.mobile.data.voice.audio.SamplePosition
 import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointException
 import com.letta.mobile.data.voice.endpoint.SpeechOperation
-import com.letta.mobile.data.voice.endpoint.Transcript
+import com.letta.mobile.data.voice.endpoint.SpeechTranscript
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -146,7 +146,7 @@ class VadVoiceEarTest {
 
     @Test
     fun aFailureAfterTheNextSpeechStartedOffersNoRetry() = runTest {
-        val gate = CompletableDeferred<Transcript>()
+        val gate = CompletableDeferred<SpeechTranscript>()
         val ear = valueEar(ScriptedSource(turn() + openTurn()), SpeechTranscriber { gate.await() })
         ear.turns().test {
             assertEquals(VoiceEarEvent.ListeningStarted, awaitItem())

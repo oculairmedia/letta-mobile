@@ -18,7 +18,7 @@ import com.letta.mobile.data.voice.audio.pcm.PcmLevels
 import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
 import com.letta.mobile.data.voice.audio.pcm.WavCodec
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointException
-import com.letta.mobile.data.voice.endpoint.Transcript
+import com.letta.mobile.data.voice.endpoint.SpeechTranscript
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.vad.CaptureRecorder
 import com.letta.mobile.data.voice.vad.Hop
@@ -460,7 +460,7 @@ private class TranscriptionWorker(
     }
 
     /** The transcript as the turn's utterance, or an empty one (the loop listens on) when the policy drops it. */
-    private fun judged(transcript: Transcript, report: EarTurnReport): VoiceUtterance {
+    private fun judged(transcript: SpeechTranscript, report: EarTurnReport): VoiceUtterance {
         val text = transcript.text
         val reason = parts.config.transcripts.discardReason(text, report, transcript.confidence)
         if (reason != null) {

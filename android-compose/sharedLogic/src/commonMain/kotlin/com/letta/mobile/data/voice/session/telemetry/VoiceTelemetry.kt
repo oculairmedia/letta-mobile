@@ -10,7 +10,7 @@ import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.VoiceUtterance
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointException
-import com.letta.mobile.data.voice.endpoint.Transcript
+import com.letta.mobile.data.voice.endpoint.SpeechTranscript
 import com.letta.mobile.data.voice.engine.SpeechSegment
 import com.letta.mobile.data.voice.engine.VoiceCancelOutcome
 import com.letta.mobile.data.voice.engine.VoiceMouth
@@ -150,7 +150,7 @@ internal class TelemetryTranscriber(
     private val delegate: SpeechTranscriber,
     private val telemetry: VoiceTelemetry,
 ) : SpeechTranscriber {
-    override suspend fun transcribe(audio: AudioClip): Transcript = try {
+    override suspend fun transcribe(audio: AudioClip): SpeechTranscript = try {
         delegate.transcribe(audio)
     } catch (cancelled: CancellationException) {
         throw cancelled

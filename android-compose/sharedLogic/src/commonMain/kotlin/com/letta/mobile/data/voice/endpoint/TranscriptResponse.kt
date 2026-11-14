@@ -21,11 +21,11 @@ internal object TranscriptResponse {
     private const val AVG_LOGPROB = "avg_logprob"
 
     /** The transcript in [body], or null when it is not a JSON object with a string `text`. */
-    fun parse(body: String): Transcript? {
+    fun parse(body: String): SpeechTranscript? {
         val root = runCatching { Json.parseToJsonElement(body) }.getOrNull() as? JsonObject ?: return null
         val text = root[TEXT] as? JsonPrimitive
         if (text == null || !text.isString) return null
-        return Transcript(VoiceText(text.content.trim()), confidenceOf(root[SEGMENTS]))
+        return SpeechTranscript(VoiceText(text.content.trim()), confidenceOf(root[SEGMENTS]))
     }
 
     private fun confidenceOf(segments: JsonElement?): RecognizerConfidence? {

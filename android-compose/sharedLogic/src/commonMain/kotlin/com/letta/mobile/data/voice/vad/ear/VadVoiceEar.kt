@@ -5,7 +5,7 @@ import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioFrameFormat
 import com.letta.mobile.data.voice.audio.AudioFrameSource
 import com.letta.mobile.data.voice.endpoint.EndpointTranscriber
-import com.letta.mobile.data.voice.endpoint.Transcript
+import com.letta.mobile.data.voice.endpoint.SpeechTranscript
 import com.letta.mobile.data.voice.engine.VoiceEar
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
@@ -26,7 +26,7 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 fun interface SpeechTranscriber {
     /** The words spoken in [audio] (a WAVE clip), with the recogniser's confidence when it has one. */
-    suspend fun transcribe(audio: AudioClip): Transcript
+    suspend fun transcribe(audio: AudioClip): SpeechTranscript
 
     /** Adapters. */
     companion object {

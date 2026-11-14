@@ -77,11 +77,11 @@ class SpeechEndpointClient(
 
     /**
      * Transcribes [request]'s audio. Asks for `verbose_json`, whose segments carry the recogniser's
-     * own no-speech evidence ([Transcript.confidence]). A server that refuses that format (400 or
+     * own no-speech evidence ([SpeechTranscript.confidence]). A server that refuses that format (400 or
      * 422) but accepts plain `json` gets plain `json` from then on, and its transcripts carry no
      * confidence.
      */
-    suspend fun transcribe(request: TranscriptionRequest): Transcript = call(SpeechOperation.TRANSCRIPTION) {
+    suspend fun transcribe(request: TranscriptionRequest): SpeechTranscript = call(SpeechOperation.TRANSCRIPTION) {
         val target = requestUrl(TRANSCRIPTIONS_ROUTE, SpeechOperation.TRANSCRIPTION)
         val verbose = !verboseRefused
         var response = postTranscription(target, request, verbose)

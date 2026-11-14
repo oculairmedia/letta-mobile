@@ -12,7 +12,7 @@ import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
 import com.letta.mobile.data.voice.audio.pcm.WavCodec
 import com.letta.mobile.data.voice.audio.pcm.WavParse
 import com.letta.mobile.data.voice.endpoint.RecognizerConfidence
-import com.letta.mobile.data.voice.endpoint.Transcript
+import com.letta.mobile.data.voice.endpoint.SpeechTranscript
 import com.letta.mobile.data.voice.vad.DetectorHop
 import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
 import com.letta.mobile.data.voice.vad.SpeechDetector
@@ -94,11 +94,11 @@ internal class ScriptedTranscriber(vararg outcomes: Outcome) : SpeechTranscriber
     private val queue = ArrayDeque(outcomes.toList())
     val clips = mutableListOf<PcmAudio>()
 
-    override suspend fun transcribe(audio: AudioClip): Transcript {
+    override suspend fun transcribe(audio: AudioClip): SpeechTranscript {
         clips += (WavCodec.parse(audio.bytes) as WavParse.Decoded).audio
         val next = queue.removeFirst()
         next.error?.let { throw it }
-        return Transcript(checkNotNull(next.words), next.confidence)
+        return SpeechTranscript(checkNotNull(next.words), next.confidence)
     }
 }
 

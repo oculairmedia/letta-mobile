@@ -123,7 +123,7 @@ data class RecognizerConfidence(
 )
 
 /** One transcription: the text, and the recogniser's own [confidence] when the server reported it. */
-data class Transcript(
+data class SpeechTranscript(
     /** The words heard. */
     val text: VoiceText,
     /** Null when the server sent no usable segments (plain `json`, or a server that ignores `verbose_json`). */
