@@ -19,7 +19,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -61,15 +60,7 @@ internal class LinePcmPlayer(
         try {
             coroutineScope {
                 val progress = WriteProgress()
-                val writerFailed = AtomicBoolean()
-                val writer = launch(options.dispatcher) {
-                    try {
-                        LineWriter(line, options, onLevel, progress).playAll(pcm)
-                    } catch (failure: VoiceAudioException) {
-                        writerFailed.set(true)
-                        throw failure
-                    }
-                }
+                val writer = launch(options.dispatcher) { LineWriter(line, options, onLevel, progress).playAll(pcm) }
                 val watchdog = launch { watchWrites(line, progress, options) }
                 var ended = false
                 try {
@@ -79,7 +70,7 @@ internal class LinePcmPlayer(
                     // A writer cancelled while waiting for the queue to play out may already have
                     // completed here: the queued audio must still be discarded, not left to drain.
                     // A writer that failed on its own has nothing left to discard.
-                    if (!ended && !writerFailed.get()) line.abort()
+                    if (!ended && !progress.failed) line.abort()
                 }
                 watchdog.cancel()
             }
@@ -112,6 +103,17 @@ private class WriteProgress {
 
     @Volatile
     var inCall = false
+
+    /** Whether the writer failed on its own (the line stopped playing): it has nothing left to discard. */
+    @Volatile
+    var failed = false
+        private set
+
+    /** The writer fails: the line stopped taking or playing audio. */
+    fun fail(): Nothing {
+        failed = true
+        throw VoiceAudioException(VoiceErrorCode.PLAYBACK_FAILED)
+    }
 
     /** Runs one blocking line call, marked as in progress until it returns. */
     inline fun <T> blocking(call: () -> T): T {
@@ -177,7 +179,7 @@ private class LineWriter(
             currentCoroutineContext().ensureActive()
             val remaining = if (offset == 0) samples else samples.copyOfRange(offset, samples.size)
             val count = progress.blocking { line.write(remaining, remaining.size) }
-            if (count < 0) throw VoiceAudioException(VoiceErrorCode.PLAYBACK_FAILED)
+            if (count < 0) progress.fail()
             if (count == 0) delay(options.drainPoll)
             offset += count
             progress.queued.addAndGet(count.toLong())
@@ -193,7 +195,7 @@ private class LineWriter(
             delay(options.drainPoll)
             val played = line.playedFrames()
             stalled = if (played == lastPlayed) stalled + options.drainPoll else Duration.ZERO
-            if (stalled >= options.stallTimeout) throw VoiceAudioException(VoiceErrorCode.PLAYBACK_FAILED)
+            if (stalled >= options.stallTimeout) progress.fail()
             lastPlayed = played
         }
     }

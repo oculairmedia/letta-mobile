@@ -236,8 +236,8 @@ internal fun ChatPanelAmbientGlow(
             envelope = envelope.asState(),
             streamPulse = ambient.streamPulse,
             voice = voice,
+            animate = !reducedMotion,
         ),
-        animate = !reducedMotion,
         placement = placement,
         shader = shader,
         modifier = modifier,
@@ -253,22 +253,24 @@ private class GlowInputs(
     val envelope: State<Float>,
     val streamPulse: Long,
     val voice: AmbientVoice? = null,
+    /** Whether the glow moves (false under reduced motion: a still tint). */
+    val animate: Boolean = true,
 ) {
     /** The envelope to draw; scaled by the voice's level while the glow moves (under reduced motion only the colour follows it). */
-    fun envelopeFor(animate: Boolean): Float = voice?.takeIf { animate }?.envelope(envelope.value) ?: envelope.value
+    fun envelopeNow(): Float = voice?.takeIf { animate }?.envelope(envelope.value) ?: envelope.value
 
     /** The stream energy to draw, lifted by the voice's level while the glow moves. */
-    fun streamEnergyFor(animate: Boolean, energy: Float): Float = voice?.takeIf { animate }?.streamEnergy(energy) ?: energy
+    fun streamEnergyNow(energy: Float): Float = voice?.takeIf { animate }?.streamEnergy(energy) ?: energy
 }
 
 @Composable
 private fun GlowLayer(
     inputs: GlowInputs,
-    animate: Boolean,
     placement: AmbientGlowPlacement,
     shader: AmbientGlowShader?,
     modifier: Modifier,
 ) {
+    val animate = inputs.animate
     val motion = rememberGlowMotion(animate, inputs.speed, inputs.streamPulse)
     val settledFrames = rememberSettledRedraw(inputs, motion)
     Spacer(
@@ -286,8 +288,8 @@ private fun GlowLayer(
                 val uniforms = AmbientGlowUniforms(
                     phase = motion.phase.floatValue,
                     agitation = inputs.agitation.value,
-                    envelope = inputs.envelopeFor(animate),
-                    streamEnergy = inputs.streamEnergyFor(animate, motion.streamEnergy.floatValue),
+                    envelope = inputs.envelopeNow(),
+                    streamEnergy = inputs.streamEnergyNow(motion.streamEnergy.floatValue),
                     band = if (placement is AmbientGlowPlacement.Halo) HALO_BAND else PANEL_BAND,
                     tint = inputs.tint.value,
                     fieldHeight = fieldHeightFor(placement),
