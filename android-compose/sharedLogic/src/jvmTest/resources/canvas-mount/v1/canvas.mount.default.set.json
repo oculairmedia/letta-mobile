@@ -1,0 +1,45 @@
+{
+  "method": "canvas.mount.default.set",
+  "capability": "canvas.mount.v1",
+  "cases": [
+    {
+      "name": "default-set",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "canvas_id": "canvas-3f9a"
+      },
+      "result": {
+        "status": "default_set",
+        "canvas_id": "canvas-3f9a",
+        "durability": "durable"
+      }
+    },
+    {
+      "name": "denied-canvas-not-visible-or-no-mount-write",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "canvas_id": "canvas-3f9a"
+      },
+      "error": "canvas.mount.denied"
+    },
+    {
+      "name": "outcome-unknown",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "canvas_id": "canvas-3f9a"
+      },
+      "result": {
+        "status": "outcome_unknown"
+      }
+    },
+    {
+      "name": "conversation-is-not-a-default-field",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a"
+      },
+      "error": "canvas.mount.invalid_input:params:unknown_field"
+    }
+  ]
+}

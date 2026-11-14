@@ -63,6 +63,12 @@ internal class IrohViewerHandle(
     private val conversationActivityGate: (String) -> Boolean = { false },
     private val conversationEventsGate: () -> Boolean = { false },
 ) : ViewerHandle {
+    /**
+     * The connection's admin RPC context while it is authenticated, null otherwise; evaluated at send time for
+     * method-scoped pushes. Set by the owning connection before the handle is shared. Default: none.
+     */
+    @Volatile
+    var adminContextGate: () -> AdminRpcRequestContext? = { null }
 
     override fun receivesAgentEvents(): Boolean = agentEventsGate()
 
@@ -70,6 +76,8 @@ internal class IrohViewerHandle(
         receivesConversationEvents() && conversationActivityGate(agentId.value)
 
     override fun receivesConversationEvents(): Boolean = conversationEventsGate()
+
+    override fun adminContext(): AdminRpcRequestContext? = adminContextGate()
 
     /**
      * Re-wrap an already-cumulated + cm-stream-tagged assistant/tool/terminal

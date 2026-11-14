@@ -1,5 +1,9 @@
 package com.letta.mobile.cli.commands
 
+import com.letta.mobile.cli.commands.mounts.CanvasMountOptions
+import com.letta.mobile.cli.commands.mounts.CanvasMountWiring
+import com.letta.mobile.cli.commands.mounts.HostCanvasRecords
+import com.letta.mobile.cli.commands.mounts.upgradePairedDevicesForCanvasMounts
 import com.letta.mobile.cli.commands.network.NetworkInterfaceFlags
 import com.letta.mobile.cli.process.LinuxAppServerProcessIdentity
 
@@ -170,6 +174,14 @@ class AppServerServeIrohCommand : CliktCommand(
             "(default ~/.letta/canvas-relay/topics): each conversation's canvas binding and op log. " +
             "Apps that were offline catch up from it.",
     )
+
+    private val enableCanvasMounts by option(
+        "--enable-canvas-mounts",
+        envvar = "LETTA_ENABLE_CANVAS_MOUNTS",
+        help = "Serve the canvas mount routes (canvas.mount.*) and let the host canvas tools follow a conversation's " +
+            "mounted canvas. Off by default. NOT for use until the security review of the canvas mount routes " +
+            "passes. Requires --iroh-secret-key-file; mount records live beside host-canvases.json.",
+    ).flag(default = false)
 
     private val canvasAssetsDir by option(
         "--canvas-assets-dir",
@@ -381,7 +393,7 @@ class AppServerServeIrohCommand : CliktCommand(
             val identityRows = com.letta.mobile.data.controller.node.iroh.LateBoundConversationRows()
             val turnIdentity = newTurnIdentityLedger(identityRows)
 
-            val pairingService = access.pairingService(::println)
+            val pairingService = access.pairingService(::println, canvasMountsEnabled = enableCanvasMounts)
 
             println("[iroh-app-server] Starting Iroh endpoint...")
             
@@ -389,6 +401,8 @@ class AppServerServeIrohCommand : CliktCommand(
             notebookStore = store
             notebookProtocol = protocol
             val canvasRelay = startCanvasRelay(scope)
+            upgradePairedDevicesForCanvasMounts(CanvasMountOptions(enableCanvasMounts, irohSecretKeyPath), access.pairedPeerStorePath())
+                ?.let { println("[iroh-app-server] Canvas mounts: paired-device capability upgrade $it") }
             pluginHost = startPluginHost(PluginHostFlags(pluginsMode, pluginsDir), pluginCanvas, productionToolRegistry, scope)
             // The a2a protocol must be registered before the endpoint binds (ALPNs are fixed at
             // bind); its App Server client is created after, so the receiver reads it late.
@@ -422,6 +436,7 @@ class AppServerServeIrohCommand : CliktCommand(
             val (controller, nativeAdminClient) = createController(appServerEndpoint, requestTimeout.toLong(), scope)
             a2aClient.set(nativeAdminClient)
 
+            canvasMountRoutes = canvasMounts?.routes(authPolicy, nativeAdminClient, endpoint.conversationViewers())
             setupAdminRpc(
                 endpoint = endpoint,
                 admin = AdminContext(controller, nativeAdminClient, pairingService, turnIdentity, identityRows),
@@ -618,6 +633,7 @@ class AppServerServeIrohCommand : CliktCommand(
             },
             permissionModes = permissionModes,
             pluginRoutes = pluginRoutes,
+            canvasMountRoutes = canvasMountRoutes,
         )
         notebookGrantsFile?.let { file ->
             val store = requireNotNull(notebooks) { "Notebook grants require a notebook store" }
@@ -841,7 +857,7 @@ class AppServerServeIrohCommand : CliktCommand(
      * every runtime the host starts, app connected or not. Called in [run] before the controller is
      * built, so its registry carries the tools.
      */
-    private fun startCanvasRelay(scope: CoroutineScope): com.letta.mobile.data.transport.iroh.IrohCanvasRelay {
+    private suspend fun startCanvasRelay(scope: CoroutineScope): com.letta.mobile.data.transport.iroh.IrohCanvasRelay {
         val home = System.getProperty("user.home") ?: "."
         val canvasOps = canvasOpsDir?.let { java.nio.file.Path.of(it) } ?: java.nio.file.Path.of(home, ".letta", "canvas-relay", "topics")
         val canvasAssets = canvasAssetsDir?.let { java.nio.file.Path.of(it) } ?: java.nio.file.Path.of(home, ".letta", "canvas-relay", "assets")
@@ -850,15 +866,25 @@ class AppServerServeIrohCommand : CliktCommand(
         val canvasRelay = com.letta.mobile.data.transport.iroh.IrohCanvasRelay(scope = scope, store = canvasStore, assets = assetStore)
         val canvasDirectory = canvasOps.resolveSibling("host-canvases.json")
         val pluginKinds = com.letta.mobile.data.plugin.host.LateBoundPluginKinds()
+        val hostCanvases = com.letta.mobile.data.canvas.FileHostCanvasDirectory(canvasDirectory)
+        canvasMounts = CanvasMountWiring.of(
+            CanvasMountOptions(enableCanvasMounts, irohSecretKeyPath),
+            canvasDirectory.toAbsolutePath().parent,
+            HostCanvasRecords(hostCanvases, canvasStore),
+            scope,
+        )
         val backend = com.letta.mobile.data.canvas.HostCanvasBackend(
             relay = canvasRelay.host,
             store = canvasStore,
-            directory = com.letta.mobile.data.canvas.FileHostCanvasDirectory(canvasDirectory),
+            directory = hostCanvases,
             kinds = pluginKinds,
+            mounts = canvasMounts?.toolLookupFor(meridianTools.config(cliServed = agentToolsPolicy.servesCli()).binding, ::println)
+                ?: com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup.none(),
         )
         hostCanvasTools = com.letta.mobile.data.canvas.HostCanvasTools.all(backend)
         pluginCanvas = PluginHostCanvas(backend, assetStore, pluginKinds)
         println("[iroh-app-server] Canvas relay: ON (ops: $canvasOps, assets: $canvasAssets, agent tools: ${hostCanvasTools.size}, directory: $canvasDirectory)")
+        println("[iroh-app-server] Canvas mounts: ${if (canvasMounts != null) "ON (pending security review)" else "OFF"}")
         return canvasRelay
     }
 
@@ -873,6 +899,12 @@ class AppServerServeIrohCommand : CliktCommand(
      * conversation; its tools join the host tools, and the endpoint routes their calls.
      */
     private val appToolRelay = com.letta.mobile.data.shell.layout.edit.ShellLayoutRelay.host()
+
+    /** Canvas mounts, built by [startCanvasRelay] only with `--enable-canvas-mounts`. */
+    private var canvasMounts: CanvasMountWiring? = null
+
+    /** The canvas mount routes, built in [run] once the App Server client exists; null keeps them unregistered. */
+    private var canvasMountRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null
 
     /** The host's canvas_* tools, set by [startCanvasRelay]. */
     private var hostCanvasTools: List<com.letta.mobile.data.controller.extras.HostExternalTool> = emptyList()

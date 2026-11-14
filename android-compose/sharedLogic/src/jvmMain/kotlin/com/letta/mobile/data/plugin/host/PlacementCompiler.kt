@@ -29,7 +29,8 @@ import kotlin.uuid.Uuid
  * The boards a plugin may place on. The host runtime binds it to the board of the call [call] names
  * ([CallerBoard]); [requestedCanvas] is what the emit named, if anything.
  * Null refuses the emit. Being handed a board is the plugin's write grant on it: a board's ACL lists
- * agents and users, never plugins.
+ * agents and users, never plugins. A board the call's caller reaches only through its conversation's
+ * canvas mount is handed over too, so placement inherits the mount grant.
  */
 fun interface PluginCanvasAccess {
     suspend fun boardFor(requestedCanvas: String?, call: PluginCallId?): HostCanvasEntry?

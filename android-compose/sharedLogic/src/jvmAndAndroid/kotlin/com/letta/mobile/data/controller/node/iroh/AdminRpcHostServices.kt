@@ -19,6 +19,11 @@ class AdminRpcHostServices(
     /** Host-specific plugin routes; null registers capability-unavailable responses for plugin methods. */
     val pluginRoutes: AdminRpcRoutes? = null,
     /**
+     * Authenticated canvas mount routes; null registers and advertises none. The routes
+     * themselves register nothing under the anonymous test policy.
+     */
+    val canvasMountRoutes: AdminRpcRoutes? = null,
+    /**
      * The secret request routes; null registers and advertises none. Only the JVM host can
      * build them, and only with a paired-peers-only auth policy and a keystore provider; they register nothing otherwise.
      */

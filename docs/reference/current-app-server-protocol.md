@@ -26,7 +26,7 @@ The upstream source commit is distinct from the Git blob identities below. Hashe
 | Authoritative fixture | SHA-256 (LF-normalized bytes) | Git blob SHA-1 (LF-normalized bytes) |
 | --- | --- | --- |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json | 8497018ab5029688fb39e12649cb23eb590579e4089d23c953f7328f43e7dd48 | 084ee402a409222c1fddc297f3a9e2f2af1bbb0d |
-| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 7fce32ef8e2e737ddd142581af0e8767ce9ba994ef6b5226b297c3c707139546 | 65007678b4954956c7e06af69758d181c7437371 |
+| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 04b988d7e640ff16c9d21edf8b2c521fe1d4955a3b61407ee1f11125b231e548 | fae41ccd0fff7307048a7c3170cd55eaaefdab77 |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json | 68d58b33f8c43e2f576c401895964a7ba3c0b9a2c4f0feef05ce769c063bcfc1 | ab8544019a9bc743793d7405cb93d4c1248e465d |
 
 Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json), [admin ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json) and [contract matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json). These source files may contain dated annotations; this generator does not upgrade their evidence dates.
@@ -295,7 +295,7 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | write&#95;file&#95;response |
 | write&#95;memory&#95;file&#95;response |
 
-## Admin ownership (160 methods)
+## Admin ownership (166 methods)
 
 These are declared ownership decisions, not newly observed production execution. Method-registration parity remains enforced by [IrohAdminOwnershipMatrixTest](../../android-compose/sharedLogic/src/jvmTest/kotlin/com/letta/mobile/data/controller/node/iroh/IrohAdminOwnershipMatrixTest.kt); the generator does not parse Kotlin or replace that test.
 
@@ -304,14 +304,14 @@ These are declared ownership decisions, not newly observed production execution.
 | app&#95;server&#95;v2 | 57 |
 | beads&#95;service | 21 |
 | capability&#95;gated&#95;unsupported | 17 |
-| controller&#95;native | 38 |
+| controller&#95;native | 44 |
 | local&#95;backend&#95;store | 9 |
 | plugin&#95;host | 10 |
 | vibesync&#95;service | 8 |
 
 | Fallback | Method count |
 | --- | --- |
-| deny&#95;fail&#95;closed | 52 |
+| deny&#95;fail&#95;closed | 58 |
 | none | 108 |
 
 | Method | Owner | Fallback | Authorization | Handler | Public contract |
@@ -357,6 +357,12 @@ These are declared ownership decisions, not newly observed production execution.
 | block.list&#95;agent | local&#95;backend&#95;store | deny&#95;fail&#95;closed | admin&#95;read | ToolAdminHandlers.kt | controller-owned agent-scoped memory-block projection over the letta-code on-disk backend |
 | block.update | capability&#95;gated&#95;unsupported | deny&#95;fail&#95;closed | admin&#95;write | ToolAdminHandlers.kt | explicit capability denial pending a native global-block command |
 | block.update&#95;agent | app&#95;server&#95;v2 | none | admin&#95;write | ToolAdminHandlers.kt | write&#95;memory&#95;file |
+| canvas.mount.binding.bind | controller&#95;native | deny&#95;fail&#95;closed | admin&#95;write | CanvasMountRoutes.kt | docs/reference/contracts/canvas-mount-v1.md |
+| canvas.mount.binding.replace | controller&#95;native | deny&#95;fail&#95;closed | admin&#95;write | CanvasMountRoutes.kt | docs/reference/contracts/canvas-mount-v1.md |
+| canvas.mount.candidates | controller&#95;native | deny&#95;fail&#95;closed | admin&#95;read | CanvasMountRoutes.kt | docs/reference/contracts/canvas-mount-v1.md |
+| canvas.mount.default.clear | controller&#95;native | deny&#95;fail&#95;closed | admin&#95;write | CanvasMountRoutes.kt | docs/reference/contracts/canvas-mount-v1.md |
+| canvas.mount.default.set | controller&#95;native | deny&#95;fail&#95;closed | admin&#95;write | CanvasMountRoutes.kt | docs/reference/contracts/canvas-mount-v1.md |
+| canvas.mount.resolve | controller&#95;native | deny&#95;fail&#95;closed | admin&#95;read | CanvasMountRoutes.kt | docs/reference/contracts/canvas-mount-v1.md |
 | conversation.archive | app&#95;server&#95;v2 | none | admin&#95;write | ConversationAdminHandlers.kt | conversation&#95;update |
 | conversation.compact | app&#95;server&#95;v2 | none | admin&#95;write | ConversationCompactHandlers.kt | execute&#95;command |
 | conversation.context&#95;limit | app&#95;server&#95;v2 | none | admin&#95;write | ConversationContextLimitHandlers.kt | execute&#95;command |

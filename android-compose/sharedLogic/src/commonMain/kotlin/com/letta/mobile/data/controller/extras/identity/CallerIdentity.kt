@@ -23,4 +23,8 @@ enum class CallerIdentity {
      * `invoke(input, agentId)` entry, or a scope relayed from another host.
      */
     CLAIMED,
+    ;
+
+    /** Whether the host or runtime vouched for the scope ([VERIFIED]); reading it decides nothing. */
+    val isVerified: Boolean get() = this == VERIFIED
 }

@@ -1,8 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.model.CanvasId
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import com.letta.mobile.data.model.ConversationId
 
 /**
  * Where the host keeps shared canvases: the canvas each topic is bound to, and each topic's
@@ -16,6 +15,13 @@ interface CanvasRelayStore {
      * already bound. Atomic - two apps opening the same conversation at once get one canvas.
      */
     suspend fun bind(topic: String, proposed: CanvasId): CanvasId
+
+    /**
+     * Whether [canvas] is already bound under its own canvas topic or, with [via], under that
+     * conversation's topic ([CanvasRelayProtocol.bindingTopic]). Read-only: unlike [bind] it never creates a binding,
+     * so a lookup cannot bring a canvas into existence.
+     */
+    suspend fun isBound(canvas: CanvasId, via: ConversationId? = null): Boolean
 
     /**
      * Appends [op] to [topic]'s log, received from [origin], and returns its cursor. Idempotent by
@@ -38,33 +44,3 @@ data class CanvasRelayAppend(val cursor: Long, val duplicate: Boolean)
 
 /** One op in a topic's log: [cursor] counts from 1, [origin] is who the host received it from. */
 data class CanvasRelayEntry(val cursor: Long, val op: CanvasOp, val origin: String)
-
-/** The host store for tests and hosts that need no durability. */
-class InMemoryCanvasRelayStore : CanvasRelayStore {
-    private val mutex = Mutex()
-    private val bindings = mutableMapOf<String, CanvasId>()
-    private val logs = mutableMapOf<String, MutableList<CanvasRelayEntry>>()
-    private val cursorsByOp = mutableMapOf<String, MutableMap<String, Long>>()
-
-    override suspend fun bind(topic: String, proposed: CanvasId): CanvasId = mutex.withLock {
-        bindings.getOrPut(topic) { proposed }
-    }
-
-    override suspend fun append(topic: String, op: CanvasOp, origin: String): CanvasRelayAppend = mutex.withLock {
-        val seen = cursorsByOp.getOrPut(topic) { mutableMapOf() }
-        seen[op.opId]?.let { return@withLock CanvasRelayAppend(it, duplicate = true) }
-        val log = logs.getOrPut(topic) { mutableListOf() }
-        val cursor = log.size + 1L
-        log += CanvasRelayEntry(cursor, op, origin)
-        seen[op.opId] = cursor
-        CanvasRelayAppend(cursor, duplicate = false)
-    }
-
-    override suspend fun readAfter(topic: String, afterCursor: Long, limit: Int): List<CanvasRelayEntry> = mutex.withLock {
-        val log = logs[topic].orEmpty()
-        val from = afterCursor.coerceIn(0L, log.size.toLong()).toInt()
-        log.subList(from, minOf(log.size, from + limit)).toList()
-    }
-
-    override suspend fun head(topic: String): Long = mutex.withLock { logs[topic]?.size?.toLong() ?: 0L }
-}

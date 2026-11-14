@@ -147,6 +147,9 @@ class IrohNodeEndpoint(
         connectionRegistry.broadcast(frame) { it.receivesConversationActivity(AgentId(activity.agentId)) }
     }
 
+    /** The live viewers of each conversation, for pushes that must reach only that conversation's viewers. */
+    fun conversationViewers(): ConversationViewers = { conversation -> connectionRegistry.viewersFor(conversation.value) }
+
     /**
      * Wires [publisher] to this endpoint. Its
      * `subagents_updated` frames go to the connections viewing the frame's

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
 import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 import com.letta.mobile.data.secrets.wire.SecretRequestRouteWire
 import com.letta.mobile.data.transport.appserver.WorkspaceRelayAccess
@@ -40,6 +41,31 @@ object IrohPeerCapabilities {
     const val SUBAGENT_SPAWN = "subagent.spawn"
     const val WORKACTIVITY_REPORT = "workactivity.report"
 
+    // letta-mobile-n2stx.5: canvas mount routes. The chat, desktop and vibesync roles hold both only on a host that runs
+    // with canvas mounts enabled (IrohPairingService.rolesFor); the handler still checks agent and conversation scope, conversation
+    // ownership and canvas visibility.
+    /** Admits the read-only `canvas.mount.resolve` and `canvas.mount.candidates`. */
+    const val CANVAS_MOUNT_READ = CanvasMountWire.READ_CAPABILITY
+
+    /**
+     * Admits the canvas mount writes: bind, replace, default.set and default.clear. The handler re-checks it for the
+     * agent default, together with the agent scope and the proposed canvas's visibility.
+     */
+    const val CANVAS_MOUNT_WRITE = CanvasMountWire.WRITE_CAPABILITY
+
+    /** The two canvas mount capabilities, granted with a role only while canvas mounts are enabled. */
+    val MOUNT_CAPABILITIES: Set<String> = setOf(CANVAS_MOUNT_READ, CANVAS_MOUNT_WRITE)
+
+    /**
+     * The desktop role as it was before canvas mounts, frozen: what a paired-peer record stored without a
+     * `capabilities` field means. Never edit it; a record that predates a later capability must not gain it by
+     * being read back.
+     */
+    val LEGACY_DESKTOP_ROLE: Set<String> = setOf(
+        CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE, MEMORY_READ, MEMORY_WRITE,
+        SCHEDULE_MANAGE, SKILLS_MANAGE, TOOLS_MANAGE, PROJECTS_MANAGE,
+    )
+
     // Secret request routes. Granted to no role: the human side's handler still requires a
     // paired device holding admin.full, and no connection is ever an agent (the agent side is the secret_request tool).
     /** Admits `secret.request.list`, `.get`, `.submit` and `.cancel` at the gate. */
@@ -52,6 +78,7 @@ object IrohPeerCapabilities {
         CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE, MEMORY_READ, MEMORY_WRITE,
         SCHEDULE_MANAGE, SKILLS_MANAGE, TOOLS_MANAGE, PROJECTS_MANAGE, ADMIN_FULL,
         SUBAGENT_SPAWN, WORKACTIVITY_REPORT, BEADS_READ, BEADS_WRITE,
+        CANVAS_MOUNT_READ, CANVAS_MOUNT_WRITE,
         SECRET_REQUEST_ANSWER, SECRET_REQUEST_AGENT,
     )
 
@@ -60,7 +87,8 @@ object IrohPeerCapabilities {
      * (chat, conversation management, memory, schedules, skills, tools,
      * projects) WITHOUT admin.full — server administration (agent CRUD,
      * identities, runs/jobs, providers, goals, pairing management, health)
-     * must be granted explicitly.
+     * must be granted explicitly. The canvas mount capabilities are added only while mounts are enabled
+     * ([IrohPairingService.rolesFor]).
      */
     val DEFAULT_DESKTOP_ROLE: Set<String> = setOf(
         CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE, MEMORY_READ, MEMORY_WRITE,
@@ -75,7 +103,10 @@ object IrohPeerCapabilities {
      */
     val CHAT_ROLE: Set<String> = setOf(CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE)
 
-    /** Named roles an inviter may request instead of an explicit capability list. */
+    /** The roles that gain [MOUNT_CAPABILITIES] while canvas mounts are enabled. */
+    val MOUNT_ROLE_NAMES: Set<String> = setOf("chat", "desktop", "vibesync")
+
+    /** Named roles an inviter may request instead of an explicit capability list, as on a host without mounts. */
     val ROLES: Map<String, Set<String>> by lazy {
         mapOf(
             "chat" to CHAT_ROLE,
@@ -118,6 +149,8 @@ object IrohPeerCapabilities {
      */
     fun forAdminMethod(method: String): String = when {
         method in NOTEBOOK_METHODS -> NOTEBOOK_AUTHENTICATED
+        method == CanvasMountWire.RESOLVE || method == CanvasMountWire.CANDIDATES -> CANVAS_MOUNT_READ
+        method in CanvasMountWire.METHODS -> CANVAS_MOUNT_WRITE
         method in SecretRequestRouteWire.HUMAN_METHODS -> SECRET_REQUEST_ANSWER
         method in SecretRequestRouteWire.AGENT_METHODS -> SECRET_REQUEST_AGENT
         method in BEADS_READ_METHODS -> BEADS_READ

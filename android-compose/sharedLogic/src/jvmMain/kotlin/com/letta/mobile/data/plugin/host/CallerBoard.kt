@@ -30,6 +30,11 @@ value class PluginCallId(val value: String) {
  * last caller (a plugin's background work after its call ended). With two or more calls in flight
  * it is ambiguous and refused (no board) rather than guessed. A call stays known for
  * [RECENT_CALLS] calls after it ends, so a late tagged emit still finds its board.
+ *
+ * The board is resolved as that caller through [HostCanvasBackend.open] and
+ * [HostCanvasBackend.ownConversation], so it follows the caller's live canvas mount and inherits the
+ * mount's grant: a call from a conversation mounted on another agent's board places there, and so do
+ * that call's late and background emits for as long as the mount stays.
  */
 class CallerBoard(private val backend: HostCanvasBackend) : PluginCanvasAccess {
     private val lock = SynchronizedObject()

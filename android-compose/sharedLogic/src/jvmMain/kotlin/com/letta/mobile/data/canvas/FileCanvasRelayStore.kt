@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -46,6 +47,11 @@ class FileCanvasRelayStore(private val root: Path) : CanvasRelayStore {
         Files.writeString(temp, proposed.value)
         Files.move(temp, file, StandardCopyOption.ATOMIC_MOVE)
         proposed
+    }
+
+    override suspend fun isBound(canvas: CanvasId, via: ConversationId?): Boolean = io {
+        val file = dirOf(CanvasRelayProtocol.bindingTopic(canvas, via)).resolve(BINDING)
+        Files.isRegularFile(file) && Files.readString(file).trim() == canvas.value
     }
 
     override suspend fun append(topic: String, op: CanvasOp, origin: String): CanvasRelayAppend = io {

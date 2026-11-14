@@ -1,0 +1,107 @@
+{
+  "method": "canvas.mount.candidates",
+  "capability": "canvas.mount.v1",
+  "cases": [
+    {
+      "name": "own-canvas-first-then-visible-directory-canvases",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0"
+      },
+      "result": {
+        "status": "listed",
+        "canvases": [
+          {
+            "canvas_id": "canvas-conversation-conv-41d0",
+            "title": "Conversation canvas",
+            "owner_kind": "conversation"
+          },
+          {
+            "canvas_id": "canvas-3f9a",
+            "title": "Roadmap",
+            "owner_kind": "agent"
+          },
+          {
+            "canvas_id": "canvas-conversation-conv-9b22",
+            "owner_kind": "conversation"
+          }
+        ],
+        "truncated": false
+      }
+    },
+    {
+      "name": "capped",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0"
+      },
+      "result": {
+        "status": "listed",
+        "canvases": [
+          {
+            "canvas_id": "canvas-conversation-conv-41d0",
+            "owner_kind": "conversation"
+          }
+        ],
+        "truncated": true
+      }
+    },
+    {
+      "name": "denied-scope",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0"
+      },
+      "error": "canvas.mount.denied"
+    },
+    {
+      "name": "authority-unavailable",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0"
+      },
+      "result": {
+        "status": "unavailable",
+        "reason": "authority"
+      }
+    },
+    {
+      "name": "deadline",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0"
+      },
+      "result": {
+        "status": "unavailable",
+        "reason": "timeout_before_commit"
+      }
+    },
+    {
+      "name": "no-verified-identity",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0"
+      },
+      "result": {
+        "status": "unavailable",
+        "reason": "identity"
+      }
+    },
+    {
+      "name": "unknown-field",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a"
+      },
+      "error": "canvas.mount.invalid_input:params:unknown_field"
+    },
+    {
+      "name": "missing-conversation",
+      "params": {
+        "agent_id": "agent-7c1e"
+      },
+      "error": "canvas.mount.invalid_input:conversation_id:missing"
+    }
+  ]
+}

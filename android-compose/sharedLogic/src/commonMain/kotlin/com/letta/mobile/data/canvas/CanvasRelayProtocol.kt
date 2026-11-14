@@ -37,6 +37,9 @@ object CanvasRelayProtocol {
     /** The topic of a canvas that belongs to no conversation, shared by its id. */
     fun canvasTopic(canvasId: CanvasId): String = "canvas:${canvasId.value}"
 
+    /** The topic [canvasId] is bound under: [via]'s conversation topic, else the canvas's own topic. */
+    fun bindingTopic(canvasId: CanvasId, via: ConversationId?): String = via?.let(this::conversationTopic) ?: canvasTopic(canvasId)
+
     /**
      * The topic an app puts an asset on outside any canvas (a plugin package
      * before `plugins.install`). It is never joined. The host takes `asset_put` on it from any app

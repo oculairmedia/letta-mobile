@@ -1,0 +1,61 @@
+{
+  "method": "canvas.mount.binding.replace",
+  "capability": "canvas.mount.v1",
+  "cases": [
+    {
+      "name": "replaced",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a"
+      },
+      "result": {
+        "status": "replaced",
+        "canvas_id": "canvas-3f9a",
+        "durability": "durable"
+      }
+    },
+    {
+      "name": "replaced-on-windows-host",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a"
+      },
+      "result": {
+        "status": "replaced",
+        "canvas_id": "canvas-3f9a",
+        "durability": "entry_unconfirmed"
+      }
+    },
+    {
+      "name": "denied",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a"
+      },
+      "error": "canvas.mount.denied"
+    },
+    {
+      "name": "outcome-unknown",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a"
+      },
+      "result": {
+        "status": "outcome_unknown"
+      }
+    },
+    {
+      "name": "blank-agent",
+      "params": {
+        "agent_id": " ",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a"
+      },
+      "error": "canvas.mount.invalid_input:agent_id:blank"
+    }
+  ]
+}

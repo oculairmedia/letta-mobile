@@ -233,6 +233,9 @@ class IrohNodeConnection(
                     IrohPeerCapabilities.conversationScope(capabilities, viewedConversationId = null) == null
             },
         )
+        // Method-scoped pushes (canvas mounts) check the method's capability against the context's granted
+        // capabilities and re-run the method's own checks on it; it is given only while authenticated.
+        handle.adminContextGate = { currentAdminRpcRequestContext().takeIf { it.authenticated } }
         selfViewer = handle
         return handle
     }

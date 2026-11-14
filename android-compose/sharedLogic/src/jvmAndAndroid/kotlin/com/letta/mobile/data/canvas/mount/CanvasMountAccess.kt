@@ -68,7 +68,7 @@ enum class CanvasMountDecision {
 }
 
 /**
- * Host-supplied policy behind [AuthorizedCanvasMounts]. The three questions are distinct and asked in a
+ * Host-supplied policy behind [AuthorizedCanvasMounts]. The questions are distinct and asked in a
  * fixed order; an implementation must answer each on its own terms and must not infer one from another.
  * Default deny: [CanvasMountDecision.ABSTAIN], [CanvasMountDecision.DENY] and any exception all deny.
  */
@@ -81,6 +81,9 @@ interface CanvasMountAuthority {
 
     /** May this principal learn that [winner] is the canvas the addressed record holds? */
     suspend fun maySee(request: CanvasMountRequest<CanvasMountScope>, winner: CanvasId): CanvasMountDecision
+
+    /** May this principal remove the addressed record (no canvas is proposed)? Denies unless an authority decides. */
+    suspend fun mayClear(request: CanvasMountRequest<CanvasMountScope>): CanvasMountDecision = CanvasMountDecision.DENY
 }
 
 internal fun isBoundedMountId(value: String): Boolean =

@@ -16,7 +16,8 @@ import java.nio.file.Path
  * 2. Scope: [CanvasMountAuthority.mayAddress], before storage is touched, so a denied caller gets the
  *    same [CanvasMountResult.Denied] whether or not a record exists.
  * 3. Proposal (mutations only): [CanvasMountAuthority.mayPropose] for the canvas the caller would store,
- *    before any mutation; a denied proposal never reaches storage.
+ *    before any mutation; a denied proposal never reaches storage. A removal ([clearDefault]) proposes no
+ *    canvas and asks [CanvasMountAuthority.mayClear] instead.
  * 4. Storage. A failure before anything changed becomes [CanvasMountResult.StorageFailure]; a mutation
  *    failure at or after its commit point becomes [CanvasMountResult.OutcomeUnknown], and the caller must
  *    read back. Cancellation before the commit point propagates; once the record was replaced the store
@@ -32,7 +33,7 @@ import java.nio.file.Path
  * authorized in step 3) is durably stored and becomes the winner; if the authority then refuses to let the
  * caller see it the result is still [CanvasMountResult.Denied], with that proposal stored.
  *
- * Replace and set return the caller's own authorized canvas, so step 5 does not apply to them.
+ * Replace and set return the caller's own authorized canvas and clear returns none, so step 5 does not apply to them.
  */
 class AuthorizedCanvasMounts internal constructor(
     private val storage: CanvasMountStorage,
@@ -79,6 +80,15 @@ class AuthorizedCanvasMounts internal constructor(
             store.setDefault(request.scope.agent, canvas)
         })
 
+    /**
+     * Removes the addressed agent default: [CanvasMountResult.DefaultCleared], whether or not one existed. Asks
+     * [CanvasMountAuthority.mayClear] in place of a proposal, since no canvas is stored.
+     */
+    suspend fun clearDefault(request: CanvasMountRequest<CanvasMountScope.AgentDefault>): CanvasMountResult =
+        execute(request, MountStep(null, revealsStored = false, outcome = { CanvasMountResult.DefaultCleared }, clears = true) { store ->
+            store.clearDefault(request.scope.agent)
+        })
+
     private suspend fun execute(request: CanvasMountRequest<CanvasMountScope>, step: MountStep): CanvasMountResult =
         refusal(request, step) ?: stored(request, step)
 
@@ -89,6 +99,7 @@ class AuthorizedCanvasMounts internal constructor(
         !request.isBounded() || step.proposal?.value?.let(::isBoundedMountId) == false -> CanvasMountResult.InvalidInput
         !allows { mayAddress(request) } -> CanvasMountResult.Denied
         !proposalAllowed(request, step.proposal) -> CanvasMountResult.Denied
+        step.clears && !allows { mayClear(request) } -> CanvasMountResult.Denied
         else -> null
     }
 
@@ -102,6 +113,7 @@ class AuthorizedCanvasMounts internal constructor(
             is CanvasMountMutation.NotApplied -> CanvasMountResult.StorageFailure(CanvasMountFailure.of(stored.cause))
             CanvasMountMutation.OutcomeUnknown -> CanvasMountResult.OutcomeUnknown
             is CanvasMountMutation.Applied -> revealed(request, step, stored.canvas)
+            is CanvasMountMutation.Removed -> CanvasMountResult.DefaultCleared
         }
     }
 
@@ -134,6 +146,8 @@ private class MountStep(
     val proposal: CanvasId?,
     val revealsStored: Boolean,
     val outcome: (CanvasId) -> CanvasMountResult,
+    /** Whether the step removes the record: it then asks [CanvasMountAuthority.mayClear] before storage. */
+    val clears: Boolean = false,
     /** Null means the addressed record is absent; a read's value is wrapped as an unwritten [CanvasMountMutation.Applied]. */
     val action: suspend (CanvasMountStorage) -> CanvasMountMutation?,
 )
@@ -145,6 +159,7 @@ internal interface CanvasMountStorage {
     suspend fun bindIfAbsent(agentId: AgentId, conversationId: ConversationId, proposed: CanvasId): CanvasMountMutation
     suspend fun replaceBinding(agentId: AgentId, conversationId: ConversationId, canvasId: CanvasId): CanvasMountMutation
     suspend fun setDefault(agentId: AgentId, canvasId: CanvasId): CanvasMountMutation
+    suspend fun clearDefault(agentId: AgentId): CanvasMountMutation
 }
 
 /** Where one raw mutation ended relative to its commit point, the atomic replacement of the record. */
@@ -157,6 +172,14 @@ internal sealed interface CanvasMountMutation {
         /** The durable canvas: the caller's own, or an existing bind winner. */
         val canvas: CanvasId,
         /** False when an existing record was confirmed without being rewritten. */
+        val written: Boolean,
+    ) : CanvasMountMutation {
+        override val mayHaveChanged: Boolean get() = written
+    }
+
+    /** The record is durably absent; [written] says whether this call removed it (false: there was none). */
+    data class Removed(
+        /** False when no record existed, so nothing was removed. */
         val written: Boolean,
     ) : CanvasMountMutation {
         override val mayHaveChanged: Boolean get() = written
