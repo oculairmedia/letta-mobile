@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.chat.conversations.listing.repositoryConversationListingFactory
 import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.Agent
@@ -60,6 +61,7 @@ class ConversationInvalidationTest {
         val transport = remote
         var rosterCalls = 0
         val repository = CachedAllConversationsRepository(
+            listingFactory = repositoryConversationListingFactory(),
             roster = { rosterCalls++; roster }, remote = RemoteRoute.Absent(SessionRoute.CONVERSATIONS), repositoryScope = backgroundScope,
             irohConversationListSource = remote.source(), transport = transport,
         )
@@ -96,6 +98,7 @@ class ConversationInvalidationTest {
     fun aTurnsPushesReReadOnlyThePushedConversationsABurstAtATime() = runTest {
         val remote = Backend(listOf(row("a1"), row("a2"), row("b1", b)))
         val repository = CachedAllConversationsRepository(
+            listingFactory = repositoryConversationListingFactory(),
             roster = { roster }, remote = RemoteRoute.Absent(SessionRoute.CONVERSATIONS), repositoryScope = backgroundScope,
             irohConversationListSource = remote.source(), transport = remote,
         )
@@ -126,6 +129,7 @@ class ConversationInvalidationTest {
         val transport = remote
         remote.supportsGet = false
         val repository = CachedAllConversationsRepository(
+            listingFactory = repositoryConversationListingFactory(),
             roster = { roster }, remote = RemoteRoute.Absent(SessionRoute.CONVERSATIONS), repositoryScope = backgroundScope,
             irohConversationListSource = remote.source(), transport = transport,
         )

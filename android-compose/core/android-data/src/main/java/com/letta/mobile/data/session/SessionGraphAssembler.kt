@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.backend.ConversationListingFactory
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.context.ContextReadingSnapshots
@@ -45,6 +46,7 @@ import javax.inject.Singleton
 // happens lazily on the first dao.get() (inside clearCachesForNewSession /
 // repositoryScope.launch), not on the main thread during Hilt graph resolution.
 class SessionGraphAssembler @Inject constructor(
+    private val listingFactory: ConversationListingFactory,
     private val agentDao: Lazy<AgentDao>,
     private val conversationDao: Lazy<ConversationDao>,
     /** letta-mobile-ckmub.4: the backend seam; production binds [SessionRemoteSources.None]. */
@@ -124,6 +126,7 @@ class SessionGraphAssembler @Inject constructor(
         val irohConversationListSource = request.irohSource(::IrohAdminRpcConversationListSource)
         return ConversationRepos(
             allConversations = AllConversationsRepository(
+                listingFactory = listingFactory,
                 // letta-mobile-fyo4s: the list reads each roster agent's own conversations.
                 roster = { agentRepository.rosterForLists() },
                 remote = remoteSources.conversations,

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.chat.conversations.listing.repositoryConversationListingFactory
 import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.Agent
@@ -66,6 +67,7 @@ class RecentsFirstAllConversationsTest {
             }
 
     private fun repository(host: Host, scope: kotlinx.coroutines.CoroutineScope) = CachedAllConversationsRepository(
+        listingFactory = repositoryConversationListingFactory(),
         roster = { roster }, remote = RemoteRoute.Absent(SessionRoute.CONVERSATIONS), repositoryScope = scope,
         irohConversationListSource = host.source(), transport = host, pinnedAgents = { pins },
     )

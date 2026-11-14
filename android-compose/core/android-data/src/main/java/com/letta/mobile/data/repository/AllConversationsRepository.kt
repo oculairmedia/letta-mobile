@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.ConversationListingFactory
 import com.letta.mobile.data.backend.bound
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.RemoteRoute
@@ -29,6 +30,7 @@ internal fun defaultAllConversationsScope(): CoroutineScope =
  */
 open class AllConversationsRepository(
     roster: suspend () -> List<Agent>,
+    listingFactory: ConversationListingFactory,
     remote: RemoteRoute<ConversationRemoteSource> = RemoteRoute.Absent(SessionRoute.CONVERSATIONS),
     conversationDao: Lazy<ConversationDao>? = null,
     repositoryScope: CoroutineScope,
@@ -40,6 +42,7 @@ open class AllConversationsRepository(
     pinnedAgents: suspend () -> Set<AgentId> = { emptySet() },
 ) : CachedAllConversationsRepository(
     roster = roster,
+    listingFactory = listingFactory,
     remote = remote,
     localCache = conversationDao?.let { GatedDao(it, cacheGate) }?.let { dao -> { RoomAllConversationsLocalCache(dao) } },
     repositoryScope = repositoryScope,
@@ -51,12 +54,14 @@ open class AllConversationsRepository(
     constructor(
         remote: ConversationRemoteSource,
         roster: suspend () -> List<Agent>,
+        listingFactory: ConversationListingFactory,
         conversationDao: Lazy<ConversationDao>? = null,
         repositoryScope: CoroutineScope = defaultAllConversationsScope(),
         irohConversationListSource: IrohAdminRpcConversationListSource? = null,
         transport: IChannelTransport? = null,
     ) : this(
         roster = roster,
+        listingFactory = listingFactory,
         remote = remote.bound(),
         conversationDao = conversationDao,
         repositoryScope = repositoryScope,

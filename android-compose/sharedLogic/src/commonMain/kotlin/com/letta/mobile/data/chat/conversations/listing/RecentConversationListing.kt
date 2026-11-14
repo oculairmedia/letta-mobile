@@ -1,6 +1,9 @@
 package com.letta.mobile.data.chat.conversations.listing
 
+import com.letta.mobile.data.backend.ConversationListing
+import com.letta.mobile.data.backend.ConversationListingFactory
 import com.letta.mobile.data.chat.runtime.ChatConversationStore
+import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.chat.runtime.agentConversationReader
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
@@ -20,6 +23,20 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+/** Adapts the repository's existing read paths to the shared listing without coupling packages. */
+private class RepositoryConversationStore(
+    private val listAgent: suspend (AgentConversationPage) -> List<Conversation>,
+    private val listRecents: suspend (Int, ConversationId?) -> List<Conversation>,
+    private val getConversation: suspend (ConversationId) -> Conversation,
+) : ChatConversationStore {
+    override suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> = listAgent(page)
+
+    override suspend fun listRecentConversations(limit: Int, after: ConversationId?): List<Conversation> =
+        listRecents(limit, after)
+
+    override suspend fun getConversation(id: ConversationId): Conversation = getConversation.invoke(id)
+}
+
 /**
  * Session-local recents plus explicitly requested agent pages; legacy hosts retain their eager policy.
  * Every conversation list (web and desktop timelines, Android's fleet list) reads through this one listing.
@@ -28,7 +45,7 @@ internal class RecentConversationListing(
     private val gateway: ChatConversationStore,
     /** How a host without visible recents is read agent by agent; the caller keeps its own legacy paging. */
     legacyPaging: AgentConversationFleetPaging = AgentConversationFleetPaging(eagerPagesPerAgent = READ_THROUGH_PAGES),
-) {
+) : ConversationListing {
     private val mutex = Mutex()
     private val fleet = AgentConversationFleet(gateway.agentConversationReader())
     private val legacy = AgentConversationFleet(gateway.agentConversationReader(), legacyPaging)
@@ -48,13 +65,13 @@ internal class RecentConversationListing(
     fun hasMore(agent: AgentId): Boolean = !legacyMode && fleet.hasMore(agent)
 
     /** Some listed agent (any agent on a legacy host) has pages not read yet; recents alone never page. */
-    val hasMore: Boolean get() = if (legacyMode) legacy.hasMore else fleet.hasMore
+    override val hasMore: Boolean get() = if (legacyMode) legacy.hasMore else fleet.hasMore
 
     /**
      * Rows already re-read one by one (a push's `conversation.get`), folded in without listing any
      * agent: a loaded agent's row joins its pages, any other visible row joins the recents.
      */
-    suspend fun record(rows: List<Conversation>, roster: List<Agent>): List<Conversation> = mutex.withLock {
+    override suspend fun record(rows: List<Conversation>, roster: List<Agent>): List<Conversation> = mutex.withLock {
         for (row in rows) {
             when {
                 legacyMode -> legacy.record(row)
@@ -65,7 +82,7 @@ internal class RecentConversationListing(
         conversations
     }
 
-    suspend fun refresh(roster: List<Agent>, pins: Set<AgentId>, publish: (List<Conversation>) -> Unit) = mutex.withLock {
+    override suspend fun refresh(roster: List<Agent>, pins: Set<AgentId>, publish: (List<Conversation>) -> Unit) = mutex.withLock {
         knownHiddenAgents = knownHiddenAgents + hiddenAgentsIn(roster)
         if (!legacyMode) refreshRecents()
         if (legacyMode) {
@@ -125,7 +142,7 @@ internal class RecentConversationListing(
     }
 
     /** The next page of just [agent], or of every listed agent that has one; never reads an unlisted agent. */
-    suspend fun loadMore(agent: AgentId? = null): List<Conversation> = mutex.withLock {
+    override suspend fun loadMore(agent: AgentId?): List<Conversation> = mutex.withLock {
         when {
             agent != null -> if (!legacyMode) fleet.loadMore(agent)
             legacyMode -> legacy.loadMore()
@@ -158,7 +175,7 @@ internal class RecentConversationListing(
         if (failures.size == agents.size) failures.values.firstOrNull()?.let { throw it }
     }
 
-    suspend fun changed(dirty: Map<ConversationId, AgentId?>, roster: List<Agent>): List<Conversation> = mutex.withLock {
+    override suspend fun changed(dirty: Map<ConversationId, AgentId?>, roster: List<Agent>): List<Conversation> = mutex.withLock {
         if (legacyMode) return@withLock legacy.refreshForInvalidations(dirty, { roster }) {
             gateway.getConversation(it.value)
         }.first
@@ -216,4 +233,17 @@ private fun hiddenAgentsIn(roster: List<Agent>): Set<AgentId> =
 private fun isHiddenOwner(owner: AgentId, roster: List<Agent>): Boolean {
     val known = roster.firstOrNull { it.id == owner } ?: return false
     return listOf(known).visibleInLists().isEmpty()
+}
+
+/** The shared listing with the cached repository's existing one-page-per-agent legacy policy. */
+fun repositoryConversationListingFactory(): ConversationListingFactory = ConversationListingFactory {
+        listAgent, listRecents, getConversation ->
+    RecentConversationListing(
+        RepositoryConversationStore(
+            listAgent = { page -> listAgent(page.agent, page.after, page.limit) },
+            listRecents = listRecents,
+            getConversation = getConversation,
+        ),
+        AgentConversationFleetPaging(),
+    )
 }

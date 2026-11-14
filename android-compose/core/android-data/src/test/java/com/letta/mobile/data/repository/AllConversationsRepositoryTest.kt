@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.chat.conversations.listing.repositoryConversationListingFactory
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.model.LettaConfig
@@ -44,7 +45,7 @@ class AllConversationsRepositoryTest {
     @Before
     fun setup() {
         fakeApi = FakeConversationApi()
-        repository = AllConversationsRepository(fakeApi, roster)
+        repository = AllConversationsRepository(fakeApi, roster, listingFactory = repositoryConversationListingFactory())
     }
 
     @Test
@@ -64,7 +65,13 @@ class AllConversationsRepositoryTest {
     @Test
     fun `conversation_updated push refreshes a loaded list`() = runTest {
         val transport = FakeChannelTransport()
-        val pushed = AllConversationsRepository(fakeApi, roster, repositoryScope = backgroundScope, transport = transport)
+        val pushed = AllConversationsRepository(
+            fakeApi,
+            roster,
+            listingFactory = repositoryConversationListingFactory(),
+            repositoryScope = backgroundScope,
+            transport = transport,
+        )
         fakeApi.conversations.add(TestData.conversation(id = "1"))
         pushed.refresh()
         runCurrent()
@@ -80,7 +87,13 @@ class AllConversationsRepositoryTest {
     @Test
     fun `conversation_updated push before the list ever loaded fetches nothing`() = runTest {
         val transport = FakeChannelTransport()
-        AllConversationsRepository(fakeApi, roster, repositoryScope = backgroundScope, transport = transport)
+        AllConversationsRepository(
+            fakeApi,
+            roster,
+            listingFactory = repositoryConversationListingFactory(),
+            repositoryScope = backgroundScope,
+            transport = transport,
+        )
         runCurrent()
 
         transport.events.emit(conversationPush("from-phone"))
@@ -93,7 +106,13 @@ class AllConversationsRepositoryTest {
     @Test
     fun `reconnect re-reads a loaded list since pushes sent while offline are lost`() = runTest {
         val transport = FakeChannelTransport()
-        val pushed = AllConversationsRepository(fakeApi, roster, repositoryScope = backgroundScope, transport = transport)
+        val pushed = AllConversationsRepository(
+            fakeApi,
+            roster,
+            listingFactory = repositoryConversationListingFactory(),
+            repositoryScope = backgroundScope,
+            transport = transport,
+        )
         runCurrent()
         pushed.refresh()
         val callsAfterLoad = fakeApi.calls.count { it == "listConversations" }
@@ -154,6 +173,7 @@ class AllConversationsRepositoryTest {
             initialActiveConfig = LettaConfig(id = "iroh", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://EndpointTicket"),
         )
         val pushed = AllConversationsRepository(
+            listingFactory = repositoryConversationListingFactory(),
             roster = roster,
             remote = armedConversationApi(),
             conversationDao = null,
@@ -274,6 +294,7 @@ class AllConversationsRepositoryTest {
             initialActiveConfig = LettaConfig(id = "iroh", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://EndpointTicket"),
         )
         val listed = AllConversationsRepository(
+            listingFactory = repositoryConversationListingFactory(),
             roster = roster,
             remote = armedConversationApi(),
             conversationDao = null,
