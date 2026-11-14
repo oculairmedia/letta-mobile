@@ -4571,6 +4571,14 @@ final enum class com.letta.mobile.ui.haptics/LettaHapticPlayback : kotlin/Enum<c
     final fun values(): kotlin/Array<com.letta.mobile.ui.haptics/LettaHapticPlayback> // com.letta.mobile.ui.haptics/LettaHapticPlayback.values|values#static(){}[0]
 }
 
+abstract fun interface <#A: in kotlin/Any?> com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup { // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup|null[0]
+    abstract suspend fun mounted(#A): com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup.mounted|mounted(1:0){}[0]
+
+    final object Companion { // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup.Companion|null[0]
+        final fun <#A2: kotlin/Any?> none(): com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup<#A2> // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup.Companion.none|none(){0§<kotlin.Any?>}[0]
+    }
+}
+
 abstract fun interface <#A: kotlin/Any> com.letta.mobile.data.chat.runtime/ChatRunInterruptHost { // com.letta.mobile.data.chat.runtime/ChatRunInterruptHost|null[0]
     abstract fun onForcedClear(#A, kotlin/String) // com.letta.mobile.data.chat.runtime/ChatRunInterruptHost.onForcedClear|onForcedClear(1:0;kotlin.String){}[0]
     open fun onAbortFailed(#A, kotlin/Exception) // com.letta.mobile.data.chat.runtime/ChatRunInterruptHost.onAbortFailed|onAbortFailed(1:0;kotlin.Exception){}[0]
@@ -5192,6 +5200,7 @@ abstract interface com.letta.mobile.data.canvas/CanvasRelayStore { // com.letta.
     abstract suspend fun append(kotlin/String, com.letta.mobile.data.canvas/CanvasOp, kotlin/String): com.letta.mobile.data.canvas/CanvasRelayAppend // com.letta.mobile.data.canvas/CanvasRelayStore.append|append(kotlin.String;com.letta.mobile.data.canvas.CanvasOp;kotlin.String){}[0]
     abstract suspend fun bind(kotlin/String, com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.model/CanvasId // com.letta.mobile.data.canvas/CanvasRelayStore.bind|bind(kotlin.String;com.letta.mobile.data.model.CanvasId){}[0]
     abstract suspend fun head(kotlin/String): kotlin/Long // com.letta.mobile.data.canvas/CanvasRelayStore.head|head(kotlin.String){}[0]
+    abstract suspend fun isBound(com.letta.mobile.data.model/CanvasId, com.letta.mobile.data.model/ConversationId? = ...): kotlin/Boolean // com.letta.mobile.data.canvas/CanvasRelayStore.isBound|isBound(com.letta.mobile.data.model.CanvasId;com.letta.mobile.data.model.ConversationId?){}[0]
     abstract suspend fun readAfter(kotlin/String, kotlin/Long, kotlin/Int = ...): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasRelayEntry> // com.letta.mobile.data.canvas/CanvasRelayStore.readAfter|readAfter(kotlin.String;kotlin.Long;kotlin.Int){}[0]
 
     final object Companion { // com.letta.mobile.data.canvas/CanvasRelayStore.Companion|null[0]
@@ -8401,6 +8410,33 @@ sealed interface com.letta.mobile.data.canvas.mount.client/ConversationCanvasSta
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.mount.client/ConversationCanvasState.Resolving.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.mount.client/ConversationCanvasState.Resolving.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.canvas.mount.client/ConversationCanvasState.Resolving.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount { // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount|null[0]
+    final class Mounted : com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount { // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.Mounted|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.Mounted.<init>|<init>(kotlin.String){}[0]
+
+        final val canvasId // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.Mounted.canvasId|{}canvasId[0]
+            final fun <get-canvasId>(): kotlin/String // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.Mounted.canvasId.<get-canvasId>|<get-canvasId>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.Mounted.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.Mounted // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.Mounted.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.Mounted.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.Mounted.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.Mounted.toString|toString(){}[0]
+    }
+
+    final object None : com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount { // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.None|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.None.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.None.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.None.toString|toString(){}[0]
+    }
+
+    final object Unavailable : com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount { // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.Unavailable|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.Unavailable.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.Unavailable.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount.Unavailable.toString|toString(){}[0]
     }
 }
 
@@ -34074,11 +34110,12 @@ final class com.letta.mobile.data.canvas/CanvasToolDefinition { // com.letta.mob
 }
 
 final class com.letta.mobile.data.canvas/HostCanvasBackend { // com.letta.mobile.data.canvas/HostCanvasBackend|null[0]
-    constructor <init>(com.letta.mobile.data.canvas/CanvasRelayHost, com.letta.mobile.data.canvas/CanvasRelayStore, com.letta.mobile.data.canvas/HostCanvasDirectory, kotlin/Function0<com.letta.mobile.data.model/CanvasOpId> = ..., kotlin.time/Duration = ..., com.letta.mobile.data.canvas.plugin/PluginKindCatalog = ...) // com.letta.mobile.data.canvas/HostCanvasBackend.<init>|<init>(com.letta.mobile.data.canvas.CanvasRelayHost;com.letta.mobile.data.canvas.CanvasRelayStore;com.letta.mobile.data.canvas.HostCanvasDirectory;kotlin.Function0<com.letta.mobile.data.model.CanvasOpId>;kotlin.time.Duration;com.letta.mobile.data.canvas.plugin.PluginKindCatalog){}[0]
+    constructor <init>(com.letta.mobile.data.canvas/CanvasRelayHost, com.letta.mobile.data.canvas/CanvasRelayStore, com.letta.mobile.data.canvas/HostCanvasDirectory, kotlin/Function0<com.letta.mobile.data.model/CanvasOpId> = ..., kotlin.time/Duration = ..., com.letta.mobile.data.canvas.plugin/PluginKindCatalog = ..., com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup<com.letta.mobile.data.canvas/HostCanvasCaller> = ...) // com.letta.mobile.data.canvas/HostCanvasBackend.<init>|<init>(com.letta.mobile.data.canvas.CanvasRelayHost;com.letta.mobile.data.canvas.CanvasRelayStore;com.letta.mobile.data.canvas.HostCanvasDirectory;kotlin.Function0<com.letta.mobile.data.model.CanvasOpId>;kotlin.time.Duration;com.letta.mobile.data.canvas.plugin.PluginKindCatalog;com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup<com.letta.mobile.data.canvas.HostCanvasCaller>){}[0]
 
     final suspend fun check(com.letta.mobile.data.canvas/HostCanvasCaller, com.letta.mobile.data.canvas/HostCanvasEntry, kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp>): com.letta.mobile.data.canvas/HostCanvasCheck // com.letta.mobile.data.canvas/HostCanvasBackend.check|check(com.letta.mobile.data.canvas.HostCanvasCaller;com.letta.mobile.data.canvas.HostCanvasEntry;kotlin.collections.List<com.letta.mobile.data.canvas.CanvasOp>){}[0]
     final suspend fun conversation(com.letta.mobile.data.canvas/HostCanvasCaller, com.letta.mobile.data.model/ConversationId, kotlin/Boolean): com.letta.mobile.data.canvas/HostCanvasAccess? // com.letta.mobile.data.canvas/HostCanvasBackend.conversation|conversation(com.letta.mobile.data.canvas.HostCanvasCaller;com.letta.mobile.data.model.ConversationId;kotlin.Boolean){}[0]
     final suspend fun create(com.letta.mobile.data.canvas/HostCanvasCaller, kotlin/String): com.letta.mobile.data.canvas/HostCanvasEntry // com.letta.mobile.data.canvas/HostCanvasBackend.create|create(com.letta.mobile.data.canvas.HostCanvasCaller;kotlin.String){}[0]
+    final suspend fun currentCanvas(com.letta.mobile.data.canvas/HostCanvasCaller): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.data.canvas/HostCanvasBackend.currentCanvas|currentCanvas(com.letta.mobile.data.canvas.HostCanvasCaller){}[0]
     final suspend fun list(com.letta.mobile.data.canvas/HostCanvasCaller): kotlin.collections/List<com.letta.mobile.data.canvas/HostCanvasEntry> // com.letta.mobile.data.canvas/HostCanvasBackend.list|list(com.letta.mobile.data.canvas.HostCanvasCaller){}[0]
     final suspend fun open(com.letta.mobile.data.canvas/HostCanvasCaller, com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.canvas/HostCanvasAccess // com.letta.mobile.data.canvas/HostCanvasBackend.open|open(com.letta.mobile.data.canvas.HostCanvasCaller;com.letta.mobile.data.model.CanvasId){}[0]
     final suspend fun ownConversation(com.letta.mobile.data.canvas/HostCanvasCaller): com.letta.mobile.data.canvas/HostCanvasAccess? // com.letta.mobile.data.canvas/HostCanvasBackend.ownConversation|ownConversation(com.letta.mobile.data.canvas.HostCanvasCaller){}[0]
@@ -34218,6 +34255,7 @@ final class com.letta.mobile.data.canvas/InMemoryCanvasRelayStore : com.letta.mo
     final suspend fun append(kotlin/String, com.letta.mobile.data.canvas/CanvasOp, kotlin/String): com.letta.mobile.data.canvas/CanvasRelayAppend // com.letta.mobile.data.canvas/InMemoryCanvasRelayStore.append|append(kotlin.String;com.letta.mobile.data.canvas.CanvasOp;kotlin.String){}[0]
     final suspend fun bind(kotlin/String, com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.model/CanvasId // com.letta.mobile.data.canvas/InMemoryCanvasRelayStore.bind|bind(kotlin.String;com.letta.mobile.data.model.CanvasId){}[0]
     final suspend fun head(kotlin/String): kotlin/Long // com.letta.mobile.data.canvas/InMemoryCanvasRelayStore.head|head(kotlin.String){}[0]
+    final suspend fun isBound(com.letta.mobile.data.model/CanvasId, com.letta.mobile.data.model/ConversationId?): kotlin/Boolean // com.letta.mobile.data.canvas/InMemoryCanvasRelayStore.isBound|isBound(com.letta.mobile.data.model.CanvasId;com.letta.mobile.data.model.ConversationId?){}[0]
     final suspend fun readAfter(kotlin/String, kotlin/Long, kotlin/Int): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasRelayEntry> // com.letta.mobile.data.canvas/InMemoryCanvasRelayStore.readAfter|readAfter(kotlin.String;kotlin.Long;kotlin.Int){}[0]
 }
 
@@ -75833,6 +75871,100 @@ final object com.letta.mobile.data.canvas.compose/CanvasComposeService { // com.
     final suspend fun compose(kotlinx.serialization.json/JsonElement, com.letta.mobile.data.canvas.compose/ComposeTarget, kotlin/Function1<kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp>, com.letta.mobile.data.canvas/CanvasBatchCheck> = ..., kotlin.coroutines/SuspendFunction1<kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp>, kotlin/Long>): com.letta.mobile.data.canvas.compose/ComposeOutcome // com.letta.mobile.data.canvas.compose/CanvasComposeService.compose|compose(kotlinx.serialization.json.JsonElement;com.letta.mobile.data.canvas.compose.ComposeTarget;kotlin.Function1<kotlin.collections.List<com.letta.mobile.data.canvas.CanvasOp>,com.letta.mobile.data.canvas.CanvasBatchCheck>;kotlin.coroutines.SuspendFunction1<kotlin.collections.List<com.letta.mobile.data.canvas.CanvasOp>,kotlin.Long>){}[0]
 }
 
+final object com.letta.mobile.data.canvas.mount.wire/CanvasMountWire { // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire|null[0]
+    final const val AGENT_ID // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.AGENT_ID|{}AGENT_ID[0]
+        final fun <get-AGENT_ID>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.AGENT_ID.<get-AGENT_ID>|<get-AGENT_ID>(){}[0]
+    final const val BIND // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.BIND|{}BIND[0]
+        final fun <get-BIND>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.BIND.<get-BIND>|<get-BIND>(){}[0]
+    final const val BOUND // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.BOUND|{}BOUND[0]
+        final fun <get-BOUND>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.BOUND.<get-BOUND>|<get-BOUND>(){}[0]
+    final const val CANDIDATES // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.CANDIDATES|{}CANDIDATES[0]
+        final fun <get-CANDIDATES>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.CANDIDATES.<get-CANDIDATES>|<get-CANDIDATES>(){}[0]
+    final const val CANVASES // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.CANVASES|{}CANVASES[0]
+        final fun <get-CANVASES>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.CANVASES.<get-CANVASES>|<get-CANVASES>(){}[0]
+    final const val CANVAS_ID // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.CANVAS_ID|{}CANVAS_ID[0]
+        final fun <get-CANVAS_ID>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.CANVAS_ID.<get-CANVAS_ID>|<get-CANVAS_ID>(){}[0]
+    final const val CAPABILITY // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.CAPABILITY|{}CAPABILITY[0]
+        final fun <get-CAPABILITY>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.CAPABILITY.<get-CAPABILITY>|<get-CAPABILITY>(){}[0]
+    final const val CLEAR_DEFAULT // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.CLEAR_DEFAULT|{}CLEAR_DEFAULT[0]
+        final fun <get-CLEAR_DEFAULT>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.CLEAR_DEFAULT.<get-CLEAR_DEFAULT>|<get-CLEAR_DEFAULT>(){}[0]
+    final const val CONVERSATION_ID // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.CONVERSATION_ID|{}CONVERSATION_ID[0]
+        final fun <get-CONVERSATION_ID>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.CONVERSATION_ID.<get-CONVERSATION_ID>|<get-CONVERSATION_ID>(){}[0]
+    final const val DEFAULT_CLEARED // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.DEFAULT_CLEARED|{}DEFAULT_CLEARED[0]
+        final fun <get-DEFAULT_CLEARED>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.DEFAULT_CLEARED.<get-DEFAULT_CLEARED>|<get-DEFAULT_CLEARED>(){}[0]
+    final const val DEFAULT_SET // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.DEFAULT_SET|{}DEFAULT_SET[0]
+        final fun <get-DEFAULT_SET>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.DEFAULT_SET.<get-DEFAULT_SET>|<get-DEFAULT_SET>(){}[0]
+    final const val DENIED // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.DENIED|{}DENIED[0]
+        final fun <get-DENIED>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.DENIED.<get-DENIED>|<get-DENIED>(){}[0]
+    final const val DURABILITY // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.DURABILITY|{}DURABILITY[0]
+        final fun <get-DURABILITY>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.DURABILITY.<get-DURABILITY>|<get-DURABILITY>(){}[0]
+    final const val DURABLE // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.DURABLE|{}DURABLE[0]
+        final fun <get-DURABLE>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.DURABLE.<get-DURABLE>|<get-DURABLE>(){}[0]
+    final const val ENTRY_UNCONFIRMED // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.ENTRY_UNCONFIRMED|{}ENTRY_UNCONFIRMED[0]
+        final fun <get-ENTRY_UNCONFIRMED>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.ENTRY_UNCONFIRMED.<get-ENTRY_UNCONFIRMED>|<get-ENTRY_UNCONFIRMED>(){}[0]
+    final const val EVENT_TYPE // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.EVENT_TYPE|{}EVENT_TYPE[0]
+        final fun <get-EVENT_TYPE>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.EVENT_TYPE.<get-EVENT_TYPE>|<get-EVENT_TYPE>(){}[0]
+    final const val FOUND // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.FOUND|{}FOUND[0]
+        final fun <get-FOUND>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.FOUND.<get-FOUND>|<get-FOUND>(){}[0]
+    final const val INVALID_INPUT_PREFIX // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.INVALID_INPUT_PREFIX|{}INVALID_INPUT_PREFIX[0]
+        final fun <get-INVALID_INPUT_PREFIX>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.INVALID_INPUT_PREFIX.<get-INVALID_INPUT_PREFIX>|<get-INVALID_INPUT_PREFIX>(){}[0]
+    final const val LISTED // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.LISTED|{}LISTED[0]
+        final fun <get-LISTED>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.LISTED.<get-LISTED>|<get-LISTED>(){}[0]
+    final const val MAX_CANDIDATES // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.MAX_CANDIDATES|{}MAX_CANDIDATES[0]
+        final fun <get-MAX_CANDIDATES>(): kotlin/Int // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.MAX_CANDIDATES.<get-MAX_CANDIDATES>|<get-MAX_CANDIDATES>(){}[0]
+    final const val NONE // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.NONE|{}NONE[0]
+        final fun <get-NONE>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.NONE.<get-NONE>|<get-NONE>(){}[0]
+    final const val OUTCOME_UNKNOWN // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.OUTCOME_UNKNOWN|{}OUTCOME_UNKNOWN[0]
+        final fun <get-OUTCOME_UNKNOWN>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.OUTCOME_UNKNOWN.<get-OUTCOME_UNKNOWN>|<get-OUTCOME_UNKNOWN>(){}[0]
+    final const val OWNER_AGENT // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.OWNER_AGENT|{}OWNER_AGENT[0]
+        final fun <get-OWNER_AGENT>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.OWNER_AGENT.<get-OWNER_AGENT>|<get-OWNER_AGENT>(){}[0]
+    final const val OWNER_CONVERSATION // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.OWNER_CONVERSATION|{}OWNER_CONVERSATION[0]
+        final fun <get-OWNER_CONVERSATION>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.OWNER_CONVERSATION.<get-OWNER_CONVERSATION>|<get-OWNER_CONVERSATION>(){}[0]
+    final const val OWNER_KIND // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.OWNER_KIND|{}OWNER_KIND[0]
+        final fun <get-OWNER_KIND>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.OWNER_KIND.<get-OWNER_KIND>|<get-OWNER_KIND>(){}[0]
+    final const val READ_CAPABILITY // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.READ_CAPABILITY|{}READ_CAPABILITY[0]
+        final fun <get-READ_CAPABILITY>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.READ_CAPABILITY.<get-READ_CAPABILITY>|<get-READ_CAPABILITY>(){}[0]
+    final const val REASON // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.REASON|{}REASON[0]
+        final fun <get-REASON>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.REASON.<get-REASON>|<get-REASON>(){}[0]
+    final const val REASON_AUTHORITY // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.REASON_AUTHORITY|{}REASON_AUTHORITY[0]
+        final fun <get-REASON_AUTHORITY>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.REASON_AUTHORITY.<get-REASON_AUTHORITY>|<get-REASON_AUTHORITY>(){}[0]
+    final const val REASON_IDENTITY // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.REASON_IDENTITY|{}REASON_IDENTITY[0]
+        final fun <get-REASON_IDENTITY>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.REASON_IDENTITY.<get-REASON_IDENTITY>|<get-REASON_IDENTITY>(){}[0]
+    final const val REASON_STORAGE // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.REASON_STORAGE|{}REASON_STORAGE[0]
+        final fun <get-REASON_STORAGE>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.REASON_STORAGE.<get-REASON_STORAGE>|<get-REASON_STORAGE>(){}[0]
+    final const val REASON_TIMEOUT_BEFORE_COMMIT // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.REASON_TIMEOUT_BEFORE_COMMIT|{}REASON_TIMEOUT_BEFORE_COMMIT[0]
+        final fun <get-REASON_TIMEOUT_BEFORE_COMMIT>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.REASON_TIMEOUT_BEFORE_COMMIT.<get-REASON_TIMEOUT_BEFORE_COMMIT>|<get-REASON_TIMEOUT_BEFORE_COMMIT>(){}[0]
+    final const val REPLACE // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.REPLACE|{}REPLACE[0]
+        final fun <get-REPLACE>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.REPLACE.<get-REPLACE>|<get-REPLACE>(){}[0]
+    final const val REPLACED // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.REPLACED|{}REPLACED[0]
+        final fun <get-REPLACED>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.REPLACED.<get-REPLACED>|<get-REPLACED>(){}[0]
+    final const val RESOLVE // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.RESOLVE|{}RESOLVE[0]
+        final fun <get-RESOLVE>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.RESOLVE.<get-RESOLVE>|<get-RESOLVE>(){}[0]
+    final const val SET_DEFAULT // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.SET_DEFAULT|{}SET_DEFAULT[0]
+        final fun <get-SET_DEFAULT>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.SET_DEFAULT.<get-SET_DEFAULT>|<get-SET_DEFAULT>(){}[0]
+    final const val SOURCE // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.SOURCE|{}SOURCE[0]
+        final fun <get-SOURCE>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.SOURCE.<get-SOURCE>|<get-SOURCE>(){}[0]
+    final const val SOURCE_BINDING // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.SOURCE_BINDING|{}SOURCE_BINDING[0]
+        final fun <get-SOURCE_BINDING>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.SOURCE_BINDING.<get-SOURCE_BINDING>|<get-SOURCE_BINDING>(){}[0]
+    final const val SOURCE_DEFAULT // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.SOURCE_DEFAULT|{}SOURCE_DEFAULT[0]
+        final fun <get-SOURCE_DEFAULT>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.SOURCE_DEFAULT.<get-SOURCE_DEFAULT>|<get-SOURCE_DEFAULT>(){}[0]
+    final const val STATUS // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.STATUS|{}STATUS[0]
+        final fun <get-STATUS>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.STATUS.<get-STATUS>|<get-STATUS>(){}[0]
+    final const val TITLE // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.TITLE|{}TITLE[0]
+        final fun <get-TITLE>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.TITLE.<get-TITLE>|<get-TITLE>(){}[0]
+    final const val TRUNCATED // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.TRUNCATED|{}TRUNCATED[0]
+        final fun <get-TRUNCATED>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.TRUNCATED.<get-TRUNCATED>|<get-TRUNCATED>(){}[0]
+    final const val UNAVAILABLE // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.UNAVAILABLE|{}UNAVAILABLE[0]
+        final fun <get-UNAVAILABLE>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.UNAVAILABLE.<get-UNAVAILABLE>|<get-UNAVAILABLE>(){}[0]
+    final const val WON // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.WON|{}WON[0]
+        final fun <get-WON>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.WON.<get-WON>|<get-WON>(){}[0]
+    final const val WRITE_CAPABILITY // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.WRITE_CAPABILITY|{}WRITE_CAPABILITY[0]
+        final fun <get-WRITE_CAPABILITY>(): kotlin/String // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.WRITE_CAPABILITY.<get-WRITE_CAPABILITY>|<get-WRITE_CAPABILITY>(){}[0]
+
+    final val METHODS // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.METHODS|{}METHODS[0]
+        final fun <get-METHODS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.canvas.mount.wire/CanvasMountWire.METHODS.<get-METHODS>|<get-METHODS>(){}[0]
+}
+
 final object com.letta.mobile.data.canvas.names/CanvasToolNames { // com.letta.mobile.data.canvas.names/CanvasToolNames|null[0]
     final const val APPLY_OPS // com.letta.mobile.data.canvas.names/CanvasToolNames.APPLY_OPS|{}APPLY_OPS[0]
         final fun <get-APPLY_OPS>(): kotlin/String // com.letta.mobile.data.canvas.names/CanvasToolNames.APPLY_OPS.<get-APPLY_OPS>|<get-APPLY_OPS>(){}[0]
@@ -75999,6 +76131,7 @@ final object com.letta.mobile.data.canvas/CanvasRelayProtocol { // com.letta.mob
     final const val VERSION // com.letta.mobile.data.canvas/CanvasRelayProtocol.VERSION|{}VERSION[0]
         final fun <get-VERSION>(): kotlin/Int // com.letta.mobile.data.canvas/CanvasRelayProtocol.VERSION.<get-VERSION>|<get-VERSION>(){}[0]
 
+    final fun bindingTopic(com.letta.mobile.data.model/CanvasId, com.letta.mobile.data.model/ConversationId?): kotlin/String // com.letta.mobile.data.canvas/CanvasRelayProtocol.bindingTopic|bindingTopic(com.letta.mobile.data.model.CanvasId;com.letta.mobile.data.model.ConversationId?){}[0]
     final fun canvasTopic(com.letta.mobile.data.model/CanvasId): kotlin/String // com.letta.mobile.data.canvas/CanvasRelayProtocol.canvasTopic|canvasTopic(com.letta.mobile.data.model.CanvasId){}[0]
     final fun conversationTopic(com.letta.mobile.data.model/ConversationId): kotlin/String // com.letta.mobile.data.canvas/CanvasRelayProtocol.conversationTopic|conversationTopic(com.letta.mobile.data.model.ConversationId){}[0]
     final fun decode(kotlin/String): com.letta.mobile.data.canvas/CanvasRelayDecoded // com.letta.mobile.data.canvas/CanvasRelayProtocol.decode|decode(kotlin.String){}[0]
