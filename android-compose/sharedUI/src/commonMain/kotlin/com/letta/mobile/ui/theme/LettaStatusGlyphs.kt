@@ -9,7 +9,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.composables.icons.lucide.Check
-import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.Circle
 import com.composables.icons.lucide.CircleAlert
 import com.composables.icons.lucide.CircleCheck
@@ -17,7 +16,7 @@ import com.composables.icons.lucide.Clock
 import com.composables.icons.lucide.Lucide
 
 /*
- * The small state marks every page shares, beside the pills (they take the same glyphs as LettaIcons,
+ * The small status marks every page shares, beside the pills (they take the same glyphs as LettaIcons,
  * read straight from Lucide so the theme does not depend on the icon catalogue):
  *
  *   LettaPendingGlyph     not started: an empty ring
@@ -25,7 +24,6 @@ import com.composables.icons.lucide.Lucide
  *   LettaDoneGlyph        finished well: a ringed check in the success colour
  *   LettaFailedGlyph      ended badly (failed, cancelled): a ringed alert in the error colour
  *   LettaCheckGlyph       chosen or included (the selected option, an installed command): a bare check
- *   LettaMenuIndicator    the still "opens a menu" mark at the end of a chip or a switcher
  *
  * The status glyphs are drawn at the standard glyph size. The pending, in-progress and check glyphs
  * are decorative (their rows say the state in words); the done and failed glyphs take an optional
@@ -61,24 +59,6 @@ fun LettaFailedGlyph(modifier: Modifier = Modifier, contentDescription: String? 
 @Composable
 fun LettaCheckGlyph(modifier: Modifier = Modifier) {
     StatusGlyph(Lucide.Check, LocalContentColor.current, modifier, contentDescription = null)
-}
-
-/**
- * The mark at the end of a control that opens a menu or a picker (a composer chip, the agent
- * switcher): a still downward chevron at the small glyph size, in [tint].
- */
-@Composable
-fun LettaMenuIndicator(
-    modifier: Modifier = Modifier,
-    contentDescription: String? = null,
-    tint: Color = LocalContentColor.current,
-) {
-    Icon(
-        imageVector = Lucide.ChevronDown,
-        contentDescription = contentDescription,
-        modifier = modifier.size(LettaDimens.Control.iconSm),
-        tint = tint,
-    )
 }
 
 @Composable

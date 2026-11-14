@@ -21,8 +21,7 @@ import com.letta.mobile.ui.theme.LettaDimens
  *   LettaFoldButton        folds a dock, card or chat down toward the bottom of the screen
  *   LettaUnfoldButton      opens it back up from there
  *   LettaDisclosureHeader  a header line that toggles what it discloses, chevron at its end
- *
- * The still "opens a menu" mark is LettaMenuIndicator, beside the pills in the theme.
+ *   LettaMenuIndicator     the still "opens a menu" mark at the end of a chip
  */
 
 /**
@@ -85,4 +84,19 @@ fun LettaDisclosureHeader(
         content()
         DisclosureChevron(expanded = expanded, contentDescription = chevronDescription)
     }
+}
+
+/**
+ * The mark at the end of a control that opens a menu or a picker (a composer chip): the
+ * [DisclosureChevron] in its still, sheet-opening form at the small glyph size.
+ */
+@Composable
+fun LettaMenuIndicator(modifier: Modifier = Modifier, contentDescription: String? = null) {
+    DisclosureChevron(
+        expanded = false,
+        modifier = modifier,
+        indicates = ChevronIndication.Sheet,
+        compact = true,
+        contentDescription = contentDescription,
+    )
 }

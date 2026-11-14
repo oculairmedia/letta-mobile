@@ -2511,6 +2511,7 @@ public final class com/letta/mobile/ui/components/LettaChipTabKt {
 public final class com/letta/mobile/ui/components/LettaDisclosureControlsKt {
 	public static final fun LettaDisclosureHeader (ZLkotlin/jvm/functions/Function0;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaFoldButton (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaMenuIndicator (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaUnfoldButton--jt2gSs (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/Modifier;FLandroidx/compose/runtime/Composer;II)V
 }
 
@@ -11840,7 +11841,6 @@ public final class com/letta/mobile/ui/theme/LettaStatusGlyphsKt {
 	public static final fun LettaDoneGlyph (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaFailedGlyph (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaInProgressGlyph (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaMenuIndicator-FNF3uiM (Landroidx/compose/ui/Modifier;Ljava/lang/String;JLandroidx/compose/runtime/Composer;II)V
 	public static final fun LettaPendingGlyph (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
 

@@ -85,7 +85,7 @@ class ChatSurfaceSharedControlsGeometryUiTest {
     }
 
     @Test
-    fun agentPillEndsInTheMenuIndicatorInsideThePill() = atEveryWidth { width ->
+    fun agentPillKeepsItsSwitcherMarkInsideThePill() = atEveryWidth { width ->
         show(width) {
             AgentIdentityPill(
                 AgentIdentity(agentId = "agent-geometry", name = LONG_NAME, isFavorite = true, isPinned = true, onClick = {}, onLongClick = {}),
@@ -96,7 +96,7 @@ class ChatSurfaceSharedControlsGeometryUiTest {
         val indicator = onNodeWithContentDescription("Switch agent", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertTrue(pill.right <= frame.right + TOLERANCE, "pill $pill overflows frame $frame")
         assertTrue(indicator.right <= pill.right && indicator.left >= pill.left, "indicator $indicator outside pill $pill")
-        assertNear(LettaDimens.Control.iconSm, indicator.right - indicator.left)
+        assertNear(LettaDimens.Space.lg, indicator.right - indicator.left)
     }
 
     @Test

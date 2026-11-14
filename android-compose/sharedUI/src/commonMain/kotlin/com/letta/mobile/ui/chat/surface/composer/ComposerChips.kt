@@ -32,7 +32,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.letta.mobile.ui.theme.ChatCardShape
 import com.letta.mobile.ui.theme.ChatChipShape
-import com.letta.mobile.ui.theme.LettaMenuIndicator
+import com.letta.mobile.ui.components.LettaMenuIndicator
 import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -92,10 +92,7 @@ internal fun ComposerActionChip(
                     maxLines = 1,
                 )
             }
-            LettaMenuIndicator(
-                modifier = Modifier.testTag(ComposerTestTags.CHIP_CHEVRON),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            LettaMenuIndicator(modifier = Modifier.testTag(ComposerTestTags.CHIP_CHEVRON))
         }
     }
 }

@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.model.AppTheme
@@ -148,7 +150,8 @@ class AgentScaffoldProjectContextTest {
 
         composeRule.onNodeWithText("Details").performClick()
         composeRule.onNodeWithText("Path").assertIsDisplayed()
-        composeRule.onNodeWithText("Unknown").assertIsDisplayed()
+        // Each missing value reads "Unknown" on its own line now the details are not merged into a toggle.
+        composeRule.onAllNodesWithText("Unknown").onFirst().assertIsDisplayed()
     }
 
     @Test

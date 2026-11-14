@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
@@ -24,7 +25,6 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.mascot.mascotAtWork
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaMenuIndicator
 
 internal object AgentIdentityPillTestTags {
     /** The pill's surface: one per screen, wherever it is drawn. */
@@ -117,7 +117,12 @@ fun AgentIdentityPill(identity: AgentIdentity, modifier: Modifier = Modifier) {
                     tint = MaterialTheme.colorScheme.tertiary,
                 )
             }
-            LettaMenuIndicator(contentDescription = "Switch agent")
+            Icon(
+                LettaIcons.ArrowDropDown,
+                contentDescription = "Switch agent",
+                modifier = Modifier.size(MarkSize),
+                tint = LocalContentColor.current,
+            )
         }
     }
 }
