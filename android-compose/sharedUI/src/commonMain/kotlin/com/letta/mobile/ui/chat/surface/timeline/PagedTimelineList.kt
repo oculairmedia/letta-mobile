@@ -273,7 +273,7 @@ private fun LazyItemScope.RenderPagedSlot(scope: PagedRowsScope, index: Int) {
         when {
             item == null -> Box(modifier.height(ChatTimelineDimens.placeholderRowHeight))
             deferred != null -> DeferredSettledRow(scope, deferred, index, modifier)
-            else -> PagedRow(item, scope.rows.itemAt(index + 1), scope, modifier)
+            else -> PagedRow(item, scope.rows.itemAt(index + 1) to scope.rows.itemAt(index - 1), scope, modifier)
         }
     }
 }
@@ -299,14 +299,18 @@ private fun DeferredSettledRow(scope: PagedRowsScope, row: CanonicalTimelinePres
     }
 }
 
-/** A row plus the divider that begins its day, decided against its older neighbour only. */
+/**
+ * A row plus the divider that begins its day, decided against its older neighbour; its spacing reads
+ * both neighbours (older first, then newer).
+ */
 @Composable
-private fun PagedRow(item: ChatRenderItem, older: ChatRenderItem?, scope: PagedRowsScope, modifier: Modifier) {
+private fun PagedRow(item: ChatRenderItem, neighbours: Pair<ChatRenderItem?, ChatRenderItem?>, scope: PagedRowsScope, modifier: Modifier) {
+    val older = neighbours.first
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         pagedBoundaryDate(item, older)?.let { date ->
             DayDividerRow(date, scope.today)
         }
-        TimelineItemRow(item, scope.bindings)
+        TimelineItemRow(item, scope.bindings, older = older, newer = neighbours.second)
         PendingPromptActions(item, scope.params.presentation)
     }
 }

@@ -34,6 +34,9 @@ import com.letta.mobile.ui.chat.surface.sendflight.LocalSendFlight
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRenderItemRow
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowCallbacks
 import com.letta.mobile.ui.chat.surface.timeline.rows.LocalDockedPromptCompaction
+import com.letta.mobile.ui.chat.surface.timeline.rows.LocalNoticeContinued
+import com.letta.mobile.ui.chat.surface.timeline.rows.isBareStepRow
+import com.letta.mobile.ui.chat.surface.timeline.rows.isCompletedNotice
 import com.letta.mobile.ui.mascot.MascotGazeSurface
 import com.letta.mobile.ui.mascot.mascotAttention
 import com.letta.mobile.ui.mascot.mascotGazeTarget
@@ -203,7 +206,9 @@ private fun PinnedPromptCopy(prompt: ChatRenderItem, pinned: PinnedPrompt, bindi
 
 /**
  * One render item, at the chat column's width, through the shared row seam. In the list it
- * carries its own leading space ([timelineLeadingSpace]); the pinned copy does not.
+ * carries its own leading space ([timelineLeadingSpace], decided against the [older] row above it);
+ * the pinned copy does not. A completed report whose work the [newer] row continues gives up its
+ * line's floor ([LocalNoticeContinued]), as a run header does over its body.
  */
 @Composable
 internal fun TimelineItemRow(
@@ -211,6 +216,8 @@ internal fun TimelineItemRow(
     bindings: TimelineRowBindings,
     modifier: Modifier = Modifier,
     leadingSpace: Boolean = true,
+    older: ChatRenderItem? = null,
+    newer: ChatRenderItem? = null,
 ) {
     val sticky = LocalStickyPrompt.current.takeIf { item.isUserPrompt() }
     val context = bindings.contexts.forItem(item)
@@ -219,21 +226,38 @@ internal fun TimelineItemRow(
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .hiddenUnderStickyCopy(sticky, item.key)
-            .padding(top = if (leadingSpace) timelineLeadingSpace(item) else 0.dp)
+            .padding(top = if (leadingSpace) timelineLeadingSpace(item, older) else 0.dp)
             // The newest message (your prompt as it lands, then the reply as it streams) draws the
             // mascot's eyes (te3n1.2); only the list's own row, never the pinned copy.
             .mascotAttention(AttentionKey("message:${item.key}"), AttentionKind.MESSAGE, enabled = leadingSpace && context.isNewest),
     ) {
-        ChatRenderItemRow(item = item, context = context, callbacks = bindings.callbacks)
+        val continued = leadingSpace && newer != null && continuesNotice(item, newer)
+        CompositionLocalProvider(LocalNoticeContinued provides continued) {
+            ChatRenderItemRow(item = item, context = context, callbacks = bindings.callbacks)
+        }
     }
 }
+
+/** [next] is the bare tool step that carries on [notice]'s completed report: the report's body, not a new block. */
+private fun continuesNotice(notice: ChatRenderItem, next: ChatRenderItem): Boolean =
+    notice.isCompletedNotice() && next.isBareStepRow()
 
 /**
  * The space above an item (feature-chat RenderChatMessage / ChatMessageListRenderRunItem): a
  * lone reasoning or tool row, or the continuation of one speaker's group, takes the tight beat;
  * anything that starts a new speaker or a new run takes the section break.
  */
-internal fun timelineLeadingSpace(item: ChatRenderItem): Dp = when (item) {
+internal fun timelineLeadingSpace(item: ChatRenderItem, older: ChatRenderItem? = null): Dp = when {
+    // The work a completed report woke sits under the report's label as a run's first step sits under
+    // its header: the report already gave up its floor, so no leading space either.
+    older != null && continuesNotice(older, item) -> 0.dp
+    // A notice (a report, a Monitor event, a task's state) is a run header's sibling on the header
+    // rail: it opens a block, so it takes the section break a run takes, wherever it falls in a group.
+    item is ChatRenderItem.Single && item.message.subagentNotification != null -> ChatRowSpacing.ungrouped
+    else -> blockLeadingSpace(item)
+}
+
+private fun blockLeadingSpace(item: ChatRenderItem): Dp = when (item) {
     // A run is a new turn: the section break above it, the same one the next speaker takes
     // below it, so its summary line sits evenly between the two (letta-mobile-bglj6.1.11). A run
     // of nothing but tool calls continues the turn above it and takes the tight beat, as the

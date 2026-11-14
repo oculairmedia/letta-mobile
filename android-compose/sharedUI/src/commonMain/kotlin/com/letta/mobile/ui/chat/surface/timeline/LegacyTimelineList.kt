@@ -161,7 +161,9 @@ private fun LazyListScope.legacyRows(
     if (edges.thinking) item(key = THINKING_KEY) { ThinkingRow(edges.messages) }
     items(count = rows.size, key = { rows[it].key }, contentType = { rows[it]::class.simpleName }) { index ->
         val row = rows[index]
-        TimelineRowContent(row, bindings, today, timelineRowMotion(fadesIn = !row.isUserPrompt()))
+        // Newest first: the row above this one is the next index, the row below it the previous.
+        val neighbours = (rows.getOrNull(index + 1) as? TimelineRow.Item)?.item to (rows.getOrNull(index - 1) as? TimelineRow.Item)?.item
+        TimelineRowContent(row, bindings, today, timelineRowMotion(fadesIn = !row.isUserPrompt()), neighbours)
     }
     if (edges.loadingOlder) {
         item(key = LOADING_OLDER_KEY) { TimelineOlderHistoryLoading(edges.agentId) }
@@ -169,9 +171,15 @@ private fun LazyListScope.legacyRows(
 }
 
 @Composable
-private fun TimelineRowContent(row: TimelineRow, bindings: TimelineRowBindings, today: LocalDate, modifier: Modifier) {
+private fun TimelineRowContent(
+    row: TimelineRow,
+    bindings: TimelineRowBindings,
+    today: LocalDate,
+    modifier: Modifier,
+    neighbours: Pair<ChatRenderItem?, ChatRenderItem?>,
+) {
     when (row) {
-        is TimelineRow.Item -> TimelineItemRow(row.item, bindings, modifier)
+        is TimelineRow.Item -> TimelineItemRow(row.item, bindings, modifier, older = neighbours.first, newer = neighbours.second)
         is TimelineRow.ToolGroup -> ToolGroupRow(row, bindings.contexts, bindings.callbacks, modifier)
         is TimelineRow.DayDivider -> DayDividerRow(row.date, today, modifier)
     }

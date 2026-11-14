@@ -99,7 +99,10 @@ internal fun RunBlockRow(
  */
 @Composable
 private fun RunLoneStep(positioned: PositionedRunStep, header: RunHeaderState, row: RunRowScope) {
-    val top = positioned.top()
+    // A notice line alone in its block is the block's header-rail line: the list's leading space is
+    // its whole gap, as it is a run header's; a step beat on top of it doubled the space above it.
+    val notice = !header.visible && (positioned.step as? RunStep.Message)?.message?.subagentNotification != null
+    val top = if (notice) 0.dp else positioned.top()
     val lift by animateRunBodyLift(if (header.visible) runHeaderFloor(header) + top else 0.dp)
     RunStepRow(positioned, row, Modifier.pullUp { lift }.padding(top = top))
 }

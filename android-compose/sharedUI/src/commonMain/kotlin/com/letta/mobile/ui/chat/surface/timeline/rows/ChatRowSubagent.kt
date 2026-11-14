@@ -1,5 +1,14 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Dp
+import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.monitorEvent
+import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.ui.components.LocalLineRail
+import com.letta.mobile.ui.components.line.LineRail
+import com.letta.mobile.ui.theme.ChatRowSpacing
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -112,7 +121,8 @@ internal fun UiSubagentNotification.isSuccessfulCompletion(): Boolean =
  * behind a disclosure. In-flight, failed or unknown statuses keep their evidence visible.
  * Every state heads with the shared [SummaryLine] (completed, failed, in flight), on the rail where the
  * card is drawn: the header rail between runs, the step rail among a run's work steps, flush with the
- * step's label inside a tool step's details. A completed card adds no vertical padding of its own.
+ * step's label inside a tool step's details. No state adds vertical padding of its own: the line's
+ * floor is its rhythm, the same as a run header's.
  */
 @Composable
 internal fun SubagentNotificationCard(
@@ -134,11 +144,14 @@ internal fun SubagentNotificationCard(
         onOpen = model.target?.let { target -> openSubagent?.let { open -> { open(target) } } },
         onToggleDetails = { detailsExpanded = !detailsExpanded },
     )
+    // Under a run header the run's body rises into the header's floor; a report that the next row's
+    // work step continues does the same, so that step sits under its label exactly as under a header.
+    val continued = LocalNoticeContinued.current && !detailsExpanded && LocalLineRail.current == LineRail.Header
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(ChatRowTestTags.SUBAGENT_NOTIFICATION)
-            .then(if (model.isSuccessfulCompletion) Modifier else Modifier.padding(vertical = LettaDimens.Space.sm)),
+            .then(if (continued) Modifier.dropBottom(ChatRowSpacing.runHeaderToggleFloor) else Modifier),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         if (model.isSuccessfulCompletion) {
@@ -325,4 +338,35 @@ private fun detailsLabels(model: NotificationModel): LineDisclosureLabels {
 @Composable
 private fun MetaChip(text: String) {
     LettaTonalPill(text, LettaPillColors(MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer))
+}
+
+/**
+ * The row under this one continues a completed report's work (the next row is a bare tool step), so
+ * the report gives up its line's floor below the label, the way a run's body rises into its header's.
+ */
+internal val LocalNoticeContinued = staticCompositionLocalOf { false }
+
+/** A row whose one message is a completed task or command report: a header-rail notice line. */
+internal fun ChatRenderItem.isCompletedNotice(): Boolean {
+    val notification = soleMessage()?.subagentNotification ?: return false
+    return notification.monitorEvent() == null && notification.isSuccessfulCompletion()
+}
+
+/** A run-less row of tool steps and nothing else: what a report's woken work draws as on its own. */
+internal fun ChatRenderItem.isBareStepRow(): Boolean {
+    val single = this as? ChatRenderItem.Single ?: return false
+    if (single.stableRunId != null || single.stableRunKey != null) return false
+    return !single.message.toolCalls.isNullOrEmpty() && single.message.content.isBlank()
+}
+
+private fun ChatRenderItem.soleMessage(): UiMessage? = when (this) {
+    is ChatRenderItem.Single -> message
+    is ChatRenderItem.RunBlock -> messages.singleOrNull()?.first
+}
+
+/** Reports [distance] less height at the bottom, drawing the content where it was. */
+private fun Modifier.dropBottom(distance: Dp): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    val cut = distance.roundToPx().coerceIn(0, placeable.height)
+    layout(placeable.width, placeable.height - cut) { placeable.place(0, 0) }
 }
