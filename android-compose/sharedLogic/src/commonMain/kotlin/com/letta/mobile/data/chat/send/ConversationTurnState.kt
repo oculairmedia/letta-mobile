@@ -1,5 +1,10 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.data.chat.sentruns.SentMessageId
+import com.letta.mobile.data.chat.sentruns.SentRunLedger
+import com.letta.mobile.data.chat.sentruns.SentRunTail
+import com.letta.mobile.data.chat.sentruns.SentRunTracker
+import com.letta.mobile.data.chat.sentruns.SentTurnMove
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.timeline.IROH_SYNTHETIC_RUN_ID_PREFIXES
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -10,8 +15,19 @@ import kotlin.concurrent.Volatile
  * the coordinator mutex (every send / transport-event / redial entry point takes
  * it); the fields are volatile so a read from another dispatcher thread
  * still observes the published value.
+ *
+ * The run this conversation's own send started is published to the pipeline's [SentRunLedger] by
+ * identity ([ownRun]): the send's echo pairs its otid with the run ([bindOwnRun]); every later id
+ * the same turn takes (a durable id promoting a provisional one) is added to it; the turn ending,
+ * failing or being replaced ends it.
  */
-internal class ConversationTurnState(val conversationId: String) {
+internal class ConversationTurnState(
+    val conversationId: String,
+    sentRuns: SentRunLedger = SentRunLedger(),
+) {
+    /** The run this conversation's own send started, published by identity. */
+    val ownRun = SentRunTracker(sentRuns)
+
     /** Terminal fence + generation ownership for THIS conversation only. */
     val identity = TurnIdentityLifecycle()
     @Volatile var otid: String? = null
@@ -28,7 +44,15 @@ internal class ConversationTurnState(val conversationId: String) {
     // are first-wins per turn on the shim. We capture once and drop later
     // duplicates defensively (drop with telemetry rather than overwriting).
     @Volatile var turnId: String? = null
+        set(value) {
+            ownRun.leave(SentTurnMove(field, value))
+            field = value
+        }
     @Volatile var runId: String? = null
+        set(value) {
+            field = value
+            ownRun.alias(SentRunTail(turnId, value))
+        }
     val activeAssistantMessageRunIds = linkedSetOf<String>()
     @Volatile var stopReason: String? = null
     @Volatile var usageRecorded: Boolean = false
@@ -71,6 +95,9 @@ internal class ConversationTurnState(val conversationId: String) {
      */
     fun acceptSend(pending: QueuedChatSend, send: () -> Boolean, onAccepted: () -> Unit): Boolean =
         identity.acceptSend(pending.conversationId.value, send) {
+            val sent = SentMessageId(pending.id.value)
+            ownRun.endUnless(sent)
+            ownRun.accepted(sent)
             otid = pending.id.value
             inFlightSend = pending
             localConversationId = pending.conversationId.value.takeIf { it.isNotBlank() }
@@ -185,6 +212,12 @@ internal class ConversationTurnState(val conversationId: String) {
 }
 
 private const val MAX_SETTLED_RUN_IDS = 8
+
+/** The echo of this conversation's own send named [tail]'s run: it is the run the send behind its otid started. */
+internal fun ConversationTurnState.bindOwnRun(tail: TurnTail) {
+    val sent = otid ?: return
+    ownRun.bind(SentMessageId(sent), SentRunTail(tail.turnId, tail.runId), SentRunTail(turnId, runId))
+}
 
 internal fun shouldAdoptPassiveDelta(
     event: WsTimelineEvent.MessageDelta,
