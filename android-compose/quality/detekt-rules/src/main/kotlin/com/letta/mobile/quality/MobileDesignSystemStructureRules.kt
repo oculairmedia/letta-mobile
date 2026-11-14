@@ -231,7 +231,10 @@ internal class BareClickable(config: Config = Config.empty) : MobileRule(
     }
 
     private fun KtCallExpression.isBareClickable(): Boolean =
-        calleeName() == "clickable" && roleArgument().let { it == null || it == "null" }
+        calleeName() == "clickable" && roleArgument() in NOT_A_ROLE
+
+    // A literal in the role slot is no role: null, or the `enabled` flag of the interactionSource
+    // overload, as in `clickable(source, null, true)`.
 
     /**
      * The role argument's text: named, or positional at the role slot of the two overloads,
@@ -250,5 +253,6 @@ internal class BareClickable(config: Config = Config.empty) : MobileRule(
     private companion object {
         const val ENABLED_ROLE_SLOT = 2
         const val INDICATION_ROLE_SLOT = 4
+        val NOT_A_ROLE = setOf(null, "null", "true", "false")
     }
 }
