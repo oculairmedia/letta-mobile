@@ -56,7 +56,7 @@ interface EarObserver {
  * The second gate, after transcription: a transcript that is not the person's words is dropped
  * and the ear goes on listening. A transcript is dropped when it is empty; when it holds fewer than
  * [minWords] letters or digits (punctuation, a stray letter); when the recogniser's own
- * [RecognizerConfidence] says no segment is speech ([notSpeech]); when the turn had less than
+ * numbers say every segment is not speech ([notSpeech]); when the turn had less than
  * [shortVoice] of voice and the transcript is one of [stockPhrases], what recognisers like Whisper
  * write for noise, however loud the turn was (a loud room makes noise loud); or when the turn had
  * less than [fillerVoice] of voice and the transcript is a lone [fillerWords] word. Short answers
@@ -77,14 +77,14 @@ data class TranscriptPolicy(
     val notSpeech: NotSpeechThresholds = NotSpeechThresholds(),
 ) {
     /**
-     * Why [text], transcribed from a turn measured as [report] with the recogniser's [confidence]
-     * (null when the server reported none), is dropped; null when it is kept.
+     * Why [text], transcribed from a turn measured as [report] with the recogniser's numbers for each
+     * of its [segments] (empty when the server reported none), is dropped; null when it is kept.
      */
-    fun discardReason(text: VoiceText, report: EarTurnReport, confidence: RecognizerConfidence? = null): TurnDiscardReason? =
+    fun discardReason(text: VoiceText, report: EarTurnReport, segments: List<RecognizerConfidence> = emptyList()): TurnDiscardReason? =
         when {
             text.isBlank -> TurnDiscardReason.EMPTY_TRANSCRIPT
             text.value.count { it.isLetterOrDigit() } < minWords -> TurnDiscardReason.NO_WORDS
-            confidence != null && notSpeech.matches(confidence) -> TurnDiscardReason.NOT_SPEECH
+            segments.isNotEmpty() && segments.all(notSpeech::matches) -> TurnDiscardReason.NOT_SPEECH
             else -> phraseReason(normalized(text.value), report.voiced)
         }
 
@@ -114,7 +114,7 @@ data class TranscriptPolicy(
 }
 
 /**
- * When a [RecognizerConfidence] means the audio was not speech: its no-speech probability is at
+ * When a segment's [RecognizerConfidence] means its audio was not speech: its no-speech probability is at
  * least [certainNoSpeech]; or its log probability is at most [veryLowLogProbability]; or, Whisper's
  * own silence rule, its no-speech probability is above [likelyNoSpeech] while its log probability
  * is below [lowLogProbability]. The defaults of the last pair are Whisper's own.

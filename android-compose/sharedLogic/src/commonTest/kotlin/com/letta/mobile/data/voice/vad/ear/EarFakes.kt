@@ -87,8 +87,8 @@ internal class ValueDetector : SpeechDetector {
 }
 
 /** Answers transcriptions from [outcomes] in order, keeping a decoded copy of every clip. */
-/** One scripted transcription: the words (with the recogniser's confidence, if any), or the failure to throw. */
-internal class Outcome(val words: VoiceText?, val error: Throwable?, val confidence: RecognizerConfidence? = null)
+/** One scripted transcription: the words (with the recogniser's segment numbers, if any), or the failure to throw. */
+internal class Outcome(val words: VoiceText?, val error: Throwable?, val segments: List<RecognizerConfidence> = emptyList())
 
 internal class ScriptedTranscriber(vararg outcomes: Outcome) : SpeechTranscriber {
     private val queue = ArrayDeque(outcomes.toList())
@@ -98,13 +98,13 @@ internal class ScriptedTranscriber(vararg outcomes: Outcome) : SpeechTranscriber
         clips += (WavCodec.parse(audio.bytes) as WavParse.Decoded).audio
         val next = queue.removeFirst()
         next.error?.let { throw it }
-        return SpeechTranscript(checkNotNull(next.words), next.confidence)
+        return SpeechTranscript(checkNotNull(next.words), next.segments)
     }
 }
 
 internal fun heard(words: String): Outcome = Outcome(VoiceText(words), null)
 
-internal fun heard(words: String, confidence: RecognizerConfidence): Outcome = Outcome(VoiceText(words), null, confidence)
+internal fun heard(words: String, confidence: RecognizerConfidence): Outcome = Outcome(VoiceText(words), null, listOf(confidence))
 
 internal fun failing(error: Throwable): Outcome = Outcome(null, error)
 

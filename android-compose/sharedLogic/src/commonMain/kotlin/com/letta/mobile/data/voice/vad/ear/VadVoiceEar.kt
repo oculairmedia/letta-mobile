@@ -25,7 +25,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * reported as TRANSCRIPTION_FAILED.
  */
 fun interface SpeechTranscriber {
-    /** The words spoken in [audio] (a WAVE clip), with the recogniser's confidence when it has one. */
+    /** The words spoken in [audio] (a WAVE clip), with the recogniser's numbers when it has them. */
     suspend fun transcribe(audio: AudioClip): SpeechTranscript
 
     /** Adapters. */

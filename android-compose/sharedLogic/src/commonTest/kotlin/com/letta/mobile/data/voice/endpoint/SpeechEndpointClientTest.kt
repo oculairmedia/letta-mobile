@@ -68,7 +68,7 @@ class SpeechEndpointClientTest {
     fun transcriptionSendsMultipartWithModelLanguageAndFile() = realTimeTest {
         val transcript = client { json("""{"text":"  what time is it "}""") }.transcribe(transcription)
         assertEquals("what time is it", transcript.text.value)
-        assertNull(transcript.confidence, "a plain json answer carries no confidence")
+        assertTrue(transcript.segments.isEmpty(), "a plain json answer carries no segment numbers")
         val request = recorded.single()
         assertEquals(HttpMethod.Post, request.method)
         assertEquals("/v1/audio/transcriptions", request.url.encodedPath)
@@ -79,21 +79,21 @@ class SpeechEndpointClientTest {
     }
 
     @Test
-    fun verboseSegmentsGiveTheMostSpeechLikeSegmentsConfidence() = realTimeTest {
+    fun verboseSegmentsKeepEachSegmentsNumbers() = realTimeTest {
         val body = """{"text":" So.","segments":[""" +
             """{"text":" So.","no_speech_prob":0.92,"avg_logprob":-1.4},""" +
             """{"text":"","no_speech_prob":0.7,"avg_logprob":-0.8}]}"""
         val transcript = client { json(body) }.transcribe(transcription)
         assertEquals("So.", transcript.text.value)
-        assertEquals(RecognizerConfidence(noSpeechProbability = 0.7, averageLogProbability = -0.8), transcript.confidence)
+        assertEquals(listOf(RecognizerConfidence(0.92, -1.4), RecognizerConfidence(0.7, -0.8)), transcript.segments)
     }
 
     @Test
     fun segmentsWithoutBothNumbersGiveNoConfidence() = realTimeTest {
         val partial = """{"text":"hi","segments":[{"text":"hi","avg_logprob":-0.2}]}"""
-        assertNull(client { json(partial) }.transcribe(transcription).confidence)
-        assertNull(client { json("""{"text":"hi","segments":[]}""") }.transcribe(transcription).confidence)
-        assertNull(client { json("""{"text":"hi","segments":"none"}""") }.transcribe(transcription).confidence)
+        assertTrue(client { json(partial) }.transcribe(transcription).segments.isEmpty())
+        assertTrue(client { json("""{"text":"hi","segments":[]}""") }.transcribe(transcription).segments.isEmpty())
+        assertTrue(client { json("""{"text":"hi","segments":"none"}""") }.transcribe(transcription).segments.isEmpty())
     }
 
     @Test

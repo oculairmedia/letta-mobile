@@ -32,8 +32,8 @@ class TranscriptPolicyTest {
     /** What a recogniser reports for clear speech. */
     private val confidentSpeech = RecognizerConfidence(noSpeechProbability = 0.05, averageLogProbability = -0.3)
 
-    private fun reason(text: String, report: EarTurnReport = shortLoud, confidence: RecognizerConfidence? = null) =
-        policy.discardReason(VoiceText(text), report, confidence)
+    private fun reason(text: String, report: EarTurnReport = shortLoud, vararg segments: RecognizerConfidence) =
+        policy.discardReason(VoiceText(text), report, segments.toList())
 
     @Test
     fun emptyAndWordlessTranscriptsAreDroppedWhateverTheTurn() {
@@ -78,6 +78,8 @@ class TranscriptPolicyTest {
         assertEquals(TurnDiscardReason.NOT_SPEECH, reason("what time is it", longQuiet, garbled))
         val unsureButSpeech = RecognizerConfidence(noSpeechProbability = 0.7, averageLogProbability = -0.6)
         assertNull(reason("what time is it", longQuiet, unsureButSpeech), "Whisper keeps a confident transcript")
+        assertEquals(TurnDiscardReason.NOT_SPEECH, reason("what time is it", longQuiet, certain, garbled), "each segment by its own rule")
+        assertNull(reason("what time is it", longQuiet, certain, confidentSpeech), "one speech segment keeps the transcript")
     }
 
     @Test

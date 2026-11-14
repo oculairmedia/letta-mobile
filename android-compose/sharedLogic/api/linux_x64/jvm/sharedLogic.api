@@ -73367,14 +73367,14 @@ public final class com/letta/mobile/data/voice/endpoint/SpeechTimeouts {
 }
 
 public final class com/letta/mobile/data/voice/endpoint/SpeechTranscript {
-	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/voice/endpoint/RecognizerConfidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/voice/endpoint/RecognizerConfidence;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-WHRWuv8 ()Ljava/lang/String;
-	public final fun component2 ()Lcom/letta/mobile/data/voice/endpoint/RecognizerConfidence;
-	public final fun copy-iyX4eW4 (Ljava/lang/String;Lcom/letta/mobile/data/voice/endpoint/RecognizerConfidence;)Lcom/letta/mobile/data/voice/endpoint/SpeechTranscript;
-	public static synthetic fun copy-iyX4eW4$default (Lcom/letta/mobile/data/voice/endpoint/SpeechTranscript;Ljava/lang/String;Lcom/letta/mobile/data/voice/endpoint/RecognizerConfidence;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/endpoint/SpeechTranscript;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy-iyX4eW4 (Ljava/lang/String;Ljava/util/List;)Lcom/letta/mobile/data/voice/endpoint/SpeechTranscript;
+	public static synthetic fun copy-iyX4eW4$default (Lcom/letta/mobile/data/voice/endpoint/SpeechTranscript;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/endpoint/SpeechTranscript;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getConfidence ()Lcom/letta/mobile/data/voice/endpoint/RecognizerConfidence;
+	public final fun getSegments ()Ljava/util/List;
 	public final fun getText-WHRWuv8 ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -74469,8 +74469,8 @@ public final class com/letta/mobile/data/voice/vad/ear/TranscriptPolicy {
 	public final fun component6 ()Lcom/letta/mobile/data/voice/vad/ear/NotSpeechThresholds;
 	public final fun copy-FbhrOv8 (IJJLjava/util/Set;Ljava/util/Set;Lcom/letta/mobile/data/voice/vad/ear/NotSpeechThresholds;)Lcom/letta/mobile/data/voice/vad/ear/TranscriptPolicy;
 	public static synthetic fun copy-FbhrOv8$default (Lcom/letta/mobile/data/voice/vad/ear/TranscriptPolicy;IJJLjava/util/Set;Ljava/util/Set;Lcom/letta/mobile/data/voice/vad/ear/NotSpeechThresholds;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/vad/ear/TranscriptPolicy;
-	public final fun discardReason-7rVrHbI (Ljava/lang/String;Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;Lcom/letta/mobile/data/voice/endpoint/RecognizerConfidence;)Lcom/letta/mobile/data/voice/vad/TurnDiscardReason;
-	public static synthetic fun discardReason-7rVrHbI$default (Lcom/letta/mobile/data/voice/vad/ear/TranscriptPolicy;Ljava/lang/String;Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;Lcom/letta/mobile/data/voice/endpoint/RecognizerConfidence;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/vad/TurnDiscardReason;
+	public final fun discardReason-7rVrHbI (Ljava/lang/String;Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;Ljava/util/List;)Lcom/letta/mobile/data/voice/vad/TurnDiscardReason;
+	public static synthetic fun discardReason-7rVrHbI$default (Lcom/letta/mobile/data/voice/vad/ear/TranscriptPolicy;Ljava/lang/String;Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/vad/TurnDiscardReason;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getFillerVoice-UwyO8pc ()J
 	public final fun getFillerWords ()Ljava/util/Set;

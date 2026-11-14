@@ -462,7 +462,7 @@ private class TranscriptionWorker(
     /** The transcript as the turn's utterance, or an empty one (the loop listens on) when the policy drops it. */
     private fun judged(transcript: SpeechTranscript, report: EarTurnReport): VoiceUtterance {
         val text = transcript.text
-        val reason = parts.config.transcripts.discardReason(text, report, transcript.confidence)
+        val reason = parts.config.transcripts.discardReason(text, report, transcript.segments)
         if (reason != null) {
             parts.config.observer.turnDiscarded(report, reason)
             return VoiceUtterance(VoiceText.Empty)

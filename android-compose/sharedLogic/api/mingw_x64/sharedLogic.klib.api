@@ -70009,16 +70009,16 @@ final class com.letta.mobile.data.voice.endpoint/SpeechTimeouts { // com.letta.m
 }
 
 final class com.letta.mobile.data.voice.endpoint/SpeechTranscript { // com.letta.mobile.data.voice.endpoint/SpeechTranscript|null[0]
-    constructor <init>(com.letta.mobile.data.voice/VoiceText, com.letta.mobile.data.voice.endpoint/RecognizerConfidence? = ...) // com.letta.mobile.data.voice.endpoint/SpeechTranscript.<init>|<init>(com.letta.mobile.data.voice.VoiceText;com.letta.mobile.data.voice.endpoint.RecognizerConfidence?){}[0]
+    constructor <init>(com.letta.mobile.data.voice/VoiceText, kotlin.collections/List<com.letta.mobile.data.voice.endpoint/RecognizerConfidence> = ...) // com.letta.mobile.data.voice.endpoint/SpeechTranscript.<init>|<init>(com.letta.mobile.data.voice.VoiceText;kotlin.collections.List<com.letta.mobile.data.voice.endpoint.RecognizerConfidence>){}[0]
 
-    final val confidence // com.letta.mobile.data.voice.endpoint/SpeechTranscript.confidence|{}confidence[0]
-        final fun <get-confidence>(): com.letta.mobile.data.voice.endpoint/RecognizerConfidence? // com.letta.mobile.data.voice.endpoint/SpeechTranscript.confidence.<get-confidence>|<get-confidence>(){}[0]
+    final val segments // com.letta.mobile.data.voice.endpoint/SpeechTranscript.segments|{}segments[0]
+        final fun <get-segments>(): kotlin.collections/List<com.letta.mobile.data.voice.endpoint/RecognizerConfidence> // com.letta.mobile.data.voice.endpoint/SpeechTranscript.segments.<get-segments>|<get-segments>(){}[0]
     final val text // com.letta.mobile.data.voice.endpoint/SpeechTranscript.text|{}text[0]
         final fun <get-text>(): com.letta.mobile.data.voice/VoiceText // com.letta.mobile.data.voice.endpoint/SpeechTranscript.text.<get-text>|<get-text>(){}[0]
 
     final fun component1(): com.letta.mobile.data.voice/VoiceText // com.letta.mobile.data.voice.endpoint/SpeechTranscript.component1|component1(){}[0]
-    final fun component2(): com.letta.mobile.data.voice.endpoint/RecognizerConfidence? // com.letta.mobile.data.voice.endpoint/SpeechTranscript.component2|component2(){}[0]
-    final fun copy(com.letta.mobile.data.voice/VoiceText = ..., com.letta.mobile.data.voice.endpoint/RecognizerConfidence? = ...): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.endpoint/SpeechTranscript.copy|copy(com.letta.mobile.data.voice.VoiceText;com.letta.mobile.data.voice.endpoint.RecognizerConfidence?){}[0]
+    final fun component2(): kotlin.collections/List<com.letta.mobile.data.voice.endpoint/RecognizerConfidence> // com.letta.mobile.data.voice.endpoint/SpeechTranscript.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.voice/VoiceText = ..., kotlin.collections/List<com.letta.mobile.data.voice.endpoint/RecognizerConfidence> = ...): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.endpoint/SpeechTranscript.copy|copy(com.letta.mobile.data.voice.VoiceText;kotlin.collections.List<com.letta.mobile.data.voice.endpoint.RecognizerConfidence>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.endpoint/SpeechTranscript.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.endpoint/SpeechTranscript.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.endpoint/SpeechTranscript.toString|toString(){}[0]
@@ -70490,7 +70490,7 @@ final class com.letta.mobile.data.voice.vad.ear/TranscriptPolicy { // com.letta.
     final fun component5(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.component5|component5(){}[0]
     final fun component6(): com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.component6|component6(){}[0]
     final fun copy(kotlin/Int = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin.collections/Set<kotlin/String> = ..., com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds = ...): com.letta.mobile.data.voice.vad.ear/TranscriptPolicy // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.copy|copy(kotlin.Int;kotlin.time.Duration;kotlin.time.Duration;kotlin.collections.Set<kotlin.String>;kotlin.collections.Set<kotlin.String>;com.letta.mobile.data.voice.vad.ear.NotSpeechThresholds){}[0]
-    final fun discardReason(com.letta.mobile.data.voice/VoiceText, com.letta.mobile.data.voice.vad.ear/EarTurnReport, com.letta.mobile.data.voice.endpoint/RecognizerConfidence? = ...): com.letta.mobile.data.voice.vad/TurnDiscardReason? // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.discardReason|discardReason(com.letta.mobile.data.voice.VoiceText;com.letta.mobile.data.voice.vad.ear.EarTurnReport;com.letta.mobile.data.voice.endpoint.RecognizerConfidence?){}[0]
+    final fun discardReason(com.letta.mobile.data.voice/VoiceText, com.letta.mobile.data.voice.vad.ear/EarTurnReport, kotlin.collections/List<com.letta.mobile.data.voice.endpoint/RecognizerConfidence> = ...): com.letta.mobile.data.voice.vad/TurnDiscardReason? // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.discardReason|discardReason(com.letta.mobile.data.voice.VoiceText;com.letta.mobile.data.voice.vad.ear.EarTurnReport;kotlin.collections.List<com.letta.mobile.data.voice.endpoint.RecognizerConfidence>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.toString|toString(){}[0]

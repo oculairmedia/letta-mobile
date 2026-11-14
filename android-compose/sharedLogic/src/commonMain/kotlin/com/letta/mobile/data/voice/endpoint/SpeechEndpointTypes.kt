@@ -109,23 +109,18 @@ data class SpeechRequest(
     val encoding: AudioEncoding = AudioEncoding.MP3,
 )
 
-/**
- * What the recogniser itself reported about whether a transcript is speech: numbers only, never
- * text. Taken from the most speech-like segment (the lowest no-speech probability and the highest
- * average log probability over all segments), so a transcript is judged not speech only when no
- * segment looks like speech.
- */
+/** What the recogniser itself reported about whether one segment is speech: numbers only, never text. */
 data class RecognizerConfidence(
-    /** The lowest `no_speech_prob` of any segment, 0..1: how sure the recogniser is nothing was said. */
+    /** The segment's `no_speech_prob`, 0..1: how sure the recogniser is nothing was said. */
     val noSpeechProbability: Double,
-    /** The highest `avg_logprob` of any segment (natural log; 0 is certain, lower is less sure). */
+    /** The segment's `avg_logprob` (natural log; 0 is certain, lower is less sure). */
     val averageLogProbability: Double,
 )
 
-/** One transcription: the text, and the recogniser's own [confidence] when the server reported it. */
+/** One transcription: the text, and the recogniser's own numbers for each segment when the server reported them. */
 data class SpeechTranscript(
     /** The words heard. */
     val text: VoiceText,
-    /** Null when the server sent no usable segments (plain `json`, or a server that ignores `verbose_json`). */
-    val confidence: RecognizerConfidence? = null,
+    /** One entry per segment; empty when the server sent no usable segments (plain `json`, or `verbose_json` ignored). */
+    val segments: List<RecognizerConfidence> = emptyList(),
 )
