@@ -133,9 +133,13 @@ fun backfillMissingAssistantRunIds(messages: List<UiMessage>): List<UiMessage> {
  * the assistant's (the next prompt, a sub-agent's report, a Monitor event), so separate turns never merge.
  *
  * A background command's report is the exception: the agent started the command as part of the
- * work and wakes on its report to carry on, so a report arriving while the chain is open takes the
- * chain's id and leaves it open, whatever run id the report carries. The work before and after it is
- * one run with one step count. A report that arrives with no chain open stays its own row.
+ * work and wakes on its report to carry on, so a report that follows the assistant's own messages
+ * takes the chain's id and hands the chain on, whatever run id the report carries, whether the run
+ * before it called a tool or ended in prose or reasoning (the agent said "started it" and waited).
+ * The work before and after it is one run with one step count. Only a message that is not the
+ * assistant's (the next prompt, a sub-agent's report, a Monitor event) still ends the chain, so a
+ * report never joins work across a real prompt; a report with no assistant message before it stays
+ * its own row.
  *
  * [messages] must be in chronological order. Returns [messages] itself when nothing chains.
  */
@@ -157,7 +161,7 @@ private class ToolRoundChain {
     private var handsOn = false
 
     fun shown(message: UiMessage): UiMessage {
-        if (message.isCommandReport() && continuesChain()) return message.underRun(shownRunId)
+        if (message.isCommandReport() && serverRunId != null) return wake(message)
         val runId = message.assistantRunId() ?: return breakChain(message)
         if (runId != serverRunId) startRound(runId)
         handsOn = message.callsTool()
@@ -170,6 +174,12 @@ private class ToolRoundChain {
     }
 
     private fun continuesChain(): Boolean = serverRunId != null && handsOn
+
+    /** A command's report wakes the agent to carry on: it joins the chain and hands it to the next run. */
+    private fun wake(report: UiMessage): UiMessage {
+        handsOn = true
+        return report.underRun(shownRunId)
+    }
 
     private fun breakChain(message: UiMessage): UiMessage {
         shownRunId = null
