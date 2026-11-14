@@ -20,7 +20,7 @@ class AdminRpcHostServices(
     val pluginRoutes: AdminRpcRoutes? = null,
     /**
      * The secret request routes; null registers and advertises none. Only the JVM host can
-     * build them, and only with a secure auth policy and a keystore provider; they register nothing otherwise.
+     * build them, and only with a paired-peers-only auth policy and a keystore provider; they register nothing otherwise.
      */
     val secretRequestRoutes: AdminRpcRoutes? = null,
 )
