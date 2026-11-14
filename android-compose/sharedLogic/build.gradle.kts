@@ -335,3 +335,15 @@ listOf("check" to "checkContractReferenceDocs", "write" to "writeContractReferen
         if (mode == "check") mustRunAfter("writeContractReferenceDocs")
     }
 }
+
+// Headless voice device smoke runner. Opens the real microphone and
+// speakers, so it is never part of a build or test run; a person runs it by hand:
+//   ./gradlew :sharedLogic:voiceSmoke --args="record"
+//   ./gradlew :sharedLogic:voiceSmoke --args="loop http://127.0.0.1:8880"
+tasks.register<JavaExec>("voiceSmoke") {
+    group = "verification"
+    description = "Records and plays back, or runs the voice-activity ear and endpoint mouth in a loop, on real devices."
+    mainClass.set("com.letta.mobile.data.voice.smoke.VoiceSmokeKt")
+    val smoke = kotlin.jvm().compilations.getByName("test")
+    classpath = files(listOfNotNull(smoke.output.allOutputs, smoke.runtimeDependencyFiles))
+}

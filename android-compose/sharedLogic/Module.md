@@ -715,6 +715,26 @@ What starts or ends a voice turn: push-to-talk, tap, hotkey and wake word as act
 
 Small platform ports for capturing and playing audio, including fixed-size PCM frame sources with sample positions for wake-word engines, used by engines that handle raw audio themselves, with audio containers whose descriptions report sizes only. Platforms implement [AudioCapture](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio/-audio-capture/index.html) and [AudioPlayer](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio/-audio-player/index.html); cancelling either must return only after the device is released.
 
+# Package com.letta.mobile.data.voice.audio.android
+
+Android microphone and speaker behind the voice audio ports: [AndroidAudio](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio.android/-android-audio/index.html) opens `AudioRecord` frame sources on the voice-recognition path or the communication path with echo cancellation and noise suppression attached when the device has them (reported as [CaptureEffects](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio.android/-capture-effects/index.html)), and plays clips on a streaming `AudioTrack` with assistant usage under transient, duck-allowing audio focus. It never requests a permission: capture fails with PERMISSION_REQUIRED until the app holds `RECORD_AUDIO`.
+
+# Package com.letta.mobile.data.voice.audio.desktop
+
+Desktop microphone and speaker on Java Sound behind the voice audio ports: [DesktopAudio](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio.desktop/-desktop-audio/index.html) opens `TargetDataLine` frame sources in exactly the engine format (or fails typed), plays WAVE and raw PCM clips on a `SourceDataLine`, resampling when the device refuses the clip's rate, and lists and polls mixers for device selection and change detection.
+
+# Package com.letta.mobile.data.voice.audio.device
+
+Device selection and recovery shared by every platform: typed device identifiers with a system-default choice, a frame source that reports dropped frames, an [AudioCapture](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio/-audio-capture/index.html) built on frame sources, and [RecoveringFrameSource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio.device/-recovering-frame-source/index.html), which reopens a lost device with bounded exponential backoff, ends the wait early on a debounced device change, keeps sample positions monotonic, and never retries a missing permission or a wrong format.
+
+# Package com.letta.mobile.data.voice.audio.line
+
+The blocking line layer under the Android and desktop audio implementations: minimal microphone and speaker line interfaces that `TargetDataLine`, `AudioRecord`, `SourceDataLine` and `AudioTrack` sit behind, a capture thread that hands fixed-size frames to a bounded drop-oldest buffer and releases the line before a cancelled collection completes, and a player that decodes, resamples, paces and aborts at once on cancellation. Internal; tested with fake lines and no devices.
+
+# Package com.letta.mobile.data.voice.audio.pcm
+
+Pure PCM utilities for voice audio: a robust WAVE reader and writer ([WavCodec](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio.pcm/-wav-codec/index.html)) that skips unknown chunks and tolerates streaming placeholder sizes, a clip decoder that judges audio by its bytes and refuses compressed formats instead of playing noise, a chunk-independent windowed-sinc [StreamingResampler](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio.pcm/-streaming-resampler/index.html), loudness levels for meters and the avatar, and the typed [VoiceAudioException](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio.pcm/-voice-audio-exception/index.html).
+
 # Package com.letta.mobile.data.voice.consent
 
 Per-destination consent for remote speech endpoints: a grant names one exact origin (scheme, host and port) and what may be sent there, audio for transcription or text for synthesis. Grants are a stored value of their own, apart from the voice settings, so an export or backup never carries them; endpoint engines check them before every request.
@@ -746,6 +766,14 @@ The app's chat session as a [VoiceChatSession](https://oculairmedia.github.io/le
 # Package com.letta.mobile.data.voice.speech
 
 Turns streamed reply text into speakable sentences so speech starts before the reply is complete. Sentence ends respect abbreviations, initials, decimals and list numbers; fenced code is skipped; markdown, links, URLs and HTML are stripped; overlong text is cut at a clause break and the remainder is flushed when the reply completes.
+
+# Package com.letta.mobile.data.voice.vad
+
+Voice-activity detection for the voice ear: the [SpeechDetector](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad/-speech-detector/index.html) seam (one hop of PCM in, a speech probability out) so a model-based detector can replace the built-in [EnergySpeechDetector](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad/-energy-speech-detector/index.html) (energy and zero-crossing rate over a calibrated, slowly tracked noise floor, with a separate floor for the app's own echo and a low/normal/high sensitivity), and the [EndOfTurnPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad/-end-of-turn-policy/index.html) with hysteresis, a sustained onset, a minimum of voiced audio below which a sound is dropped untranscribed, trailing silence, pre-roll, a hard cap and an echo guard, all measured in audio time from sample positions.
+
+# Package com.letta.mobile.data.voice.vad.ear
+
+[VadVoiceEar](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad.ear/-vad-voice-ear/index.html), a hearing engine composed of a frame source, a speech detector, the end-of-turn policy and a [SpeechTranscriber](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad.ear/-speech-transcriber/index.html): it decides end of turn itself, transcribes each turn with its pre-roll, drops transcripts that are not words (a [TranscriptPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad.ear/-transcript-policy/index.html) for empty text and stock noise phrases from short quiet turns), reports its turn decisions to an [EarObserver](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad.ear/-ear-observer/index.html), offers a failed turn for one retry from memory only, and releases the microphone before a cancelled listen completes.
 
 # Package com.letta.mobile.data.voice.wake
 
