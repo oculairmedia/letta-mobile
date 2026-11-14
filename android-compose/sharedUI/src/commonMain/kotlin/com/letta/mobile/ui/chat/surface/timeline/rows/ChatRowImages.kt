@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.theme.ChatRowInsetShape
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -11,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -84,7 +85,7 @@ internal fun ChatImageAttachmentsGrid(
                 cellHeight = cellHeight,
                 modifier = Modifier
                     .weight(1f)
-                    .clickable(onClickLabel = openLabel) { tap.open(index) },
+                    .clickable(role = Role.Image, onClickLabel = openLabel) { tap.open(index) },
             )
         }
     }
@@ -114,7 +115,7 @@ internal fun ChatPromptImageGrid(
                 cellHeight = if (single) null else ChatRowDimens.promptGridCellHeight,
                 modifier = Modifier
                     .weight(1f)
-                    .clickable(onClickLabel = openLabel) { tap.open(index) },
+                    .clickable(role = Role.Image, onClickLabel = openLabel) { tap.open(index) },
             )
         }
     }
@@ -142,7 +143,7 @@ internal fun ChatImageThumbnailStrip(
                 cellHeight = ChatRowDimens.thumbnailHeight,
                 modifier = Modifier
                     .size(width = ChatRowDimens.thumbnailWidth, height = ChatRowDimens.thumbnailHeight)
-                    .clickable(onClickLabel = openLabel) { tap.open(index) },
+                    .clickable(role = Role.Image, onClickLabel = openLabel) { tap.open(index) },
             )
         }
         val hidden = images.size - ChatRowDimens.stripMaxImages
@@ -175,7 +176,7 @@ internal fun ChatAttachmentImage(
     Surface(
         modifier = modifier.then(size),
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = if (touch) RoundedCornerShape(LettaDimens.Radius.sm) else MaterialTheme.shapes.medium,
+        shape = if (touch) ChatRowInsetShape else MaterialTheme.shapes.medium,
         border = if (touch) null else BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
         if (bitmap != null) {

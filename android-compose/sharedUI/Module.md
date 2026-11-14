@@ -136,6 +136,10 @@ Reusable menus, list parts, chips, errors, refresh and pane primitives. Supply m
 # Package com.letta.mobile.ui.components.row
 
 The one list row every roster, recents and history list uses. [LettaListRow] owns the row's interaction source, hover, focus and press states, the rounded background ladder, the pointer cursor, muting and the tooltip entry point, so callers describe a row with [LettaListRowSpec] and never re-implement any of it. The tooltip is injected by the host, so this package depends on no host, shell or chat package.
+
+# Package com.letta.mobile.ui.components.line
+
+The plain values the shared line components in `ui.components` draw from: a status glyph's tone, the rail a line sits on (a run's header, a run's work step, or inside an open step), a line's label, tags and disclosure, and a pager's steps. Describe a summary, notice, step or divider line with these and draw it with the shared components; never hand-build the row, glyph, chevron or toggle. The package imports nothing of the UI, so any row package can name its values without joining an import cycle.
 # Package com.letta.mobile.ui.components.list
 
 Roster models, sections, row parts and drag/reorder affordances. Extend through roster models, row-content slots and action callbacks; ordering persistence and deletion policy belong to the owner of the list.

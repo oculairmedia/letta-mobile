@@ -29,6 +29,8 @@ import com.letta.mobile.data.model.isCommand
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatRunId
 import com.letta.mobile.ui.common.GroupPosition
+import com.letta.mobile.ui.components.LocalLineRail
+import com.letta.mobile.ui.components.line.LineRail
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -52,7 +54,7 @@ import kotlinx.collections.immutable.toImmutableList
  * the run open.
  *
  * one disclosure per level. The run's tool calls list as step rows
- * ([RunToolSteps]: LettaListRow, the summary line's own status glyph, one chevron per step with
+ * ([RunToolSteps]: the shared step line, the summary line's own status glyph, one chevron per step with
  * details) straight under the summary line; there is no intermediate disclosure row. Several calls
  * read under a plain, non-disclosing group label ("Ran commands") at the same inset as the steps.
  * Prose that more visible steps follow sits one grouped beat above them: on a pointer host it
@@ -371,11 +373,14 @@ private fun RunWorkStep(positioned: PositionedRunStep, body: RunBodyState, row: 
         exit = motion.expansionExit(),
         label = "runWorkStep",
     ) {
-        RunStepRow(
-            positioned,
-            row,
-            Modifier.testTag(ChatRowTestTags.RUN_WORK_STEP).then(positioned.workPadding(body, row.context.runWidthPx)),
-        )
+        // A work step's lines (a folded command report among them) sit on the step rail, under the header.
+        CompositionLocalProvider(LocalLineRail provides LineRail.Step) {
+            RunStepRow(
+                positioned,
+                row,
+                Modifier.testTag(ChatRowTestTags.RUN_WORK_STEP).then(positioned.workPadding(body, row.context.runWidthPx)),
+            )
+        }
     }
 }
 

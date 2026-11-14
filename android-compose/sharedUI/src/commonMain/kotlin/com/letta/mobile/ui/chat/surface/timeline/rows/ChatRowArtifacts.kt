@@ -1,5 +1,10 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.components.StatusGlyph
+import com.letta.mobile.ui.components.line.StatusTone
+import com.letta.mobile.ui.theme.ChatRowCardShape
+import com.letta.mobile.ui.theme.ChatRowInsetShape
+import com.letta.mobile.ui.theme.ChatRowType
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -33,8 +37,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.LayoutGrid
 import com.composables.icons.lucide.Lucide
@@ -82,11 +84,13 @@ internal fun ArtifactCard(
     icon: ImageVector?,
     title: String,
     modifier: Modifier = Modifier,
+    /** A status card (an approval's request or verdict) leads with the shared status glyph instead of [icon]. */
+    tone: StatusTone? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LettaDimens.Radius.md),
+        shape = ChatRowCardShape,
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
@@ -98,7 +102,9 @@ internal fun ArtifactCard(
                 horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (icon != null) {
+                if (tone != null) {
+                    StatusGlyph(tone, size = LettaDimens.Control.icon)
+                } else if (icon != null) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
@@ -108,8 +114,7 @@ internal fun ArtifactCard(
                 }
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    style = ChatRowType.cardTitle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -124,13 +129,13 @@ internal fun ArtifactCard(
 internal fun CodeBlock(text: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        shape = ChatRowInsetShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         SelectionContainer {
             Text(
                 text = text,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                style = ChatRowType.monoBody,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
             )
@@ -274,8 +279,7 @@ private fun CanvasArtifactStatusLine(receipt: CanvasArtifactReceipt, status: Str
         }
         Text(
             text = status,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Medium,
+            style = ChatRowType.itemTitle,
             color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

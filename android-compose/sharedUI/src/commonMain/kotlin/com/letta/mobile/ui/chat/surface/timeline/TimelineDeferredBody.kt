@@ -1,12 +1,10 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
-import androidx.compose.foundation.layout.Arrangement
+import com.letta.mobile.ui.chat.surface.timeline.rows.TimelinePager
+import com.letta.mobile.ui.components.line.PagerStep
+import com.letta.mobile.ui.theme.ChatRowInsetShape
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -21,13 +19,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.timeline.TimelineSemanticField
 import com.letta.mobile.data.timeline.TimelineSemanticWindowResult
 import com.letta.mobile.data.timeline.resolveDeferredBody
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -156,7 +152,7 @@ fun TimelineDeferredBody(rowKey: String, read: DeferredBodyRead, modifier: Modif
     // stray link on the page.
     Surface(
         modifier = modifier.testTag(TimelineDeferredBodyTags.ROOT),
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        shape = ChatRowInsetShape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm)) {
@@ -189,18 +185,11 @@ private fun DeferredBodyContent(reader: DeferredPageReader) {
 
 @Composable
 private fun DeferredPageBar(reader: DeferredPageReader) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-    ) {
-        IconButton(enabled = reader.canGoBack, onClick = reader::back) {
-            Icon(LettaIcons.ChevronLeft, contentDescription = "Previous page")
-        }
-        Text("Page ${reader.page}", style = MaterialTheme.typography.bodySmall)
-        IconButton(enabled = reader.canGoForward, onClick = reader::forward) {
-            Icon(LettaIcons.ChevronRight, contentDescription = "Next page")
-        }
-    }
+    TimelinePager(
+        label = "Page ${reader.page}",
+        back = PagerStep("Previous page", reader.canGoBack, reader::back),
+        forward = PagerStep("Next page", reader.canGoForward, reader::forward),
+    )
 }
 
 object TimelineDeferredBodyTags {

@@ -1,31 +1,25 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.chat.projection.monitorEvent
 import com.letta.mobile.data.chat.projection.monitorDisplayLines
 import com.letta.mobile.data.chat.projection.monitorEventCount
@@ -40,8 +34,11 @@ import com.letta.mobile.sharedui.resources.rows_monitor_watching
 import com.letta.mobile.sharedui.resources.rows_monitor_show_raw
 import com.letta.mobile.sharedui.resources.rows_monitor_hide_raw
 import com.letta.mobile.sharedui.resources.rows_task_id
-import com.letta.mobile.ui.components.DisclosureChevron
-import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.components.SummaryLine
+import com.letta.mobile.ui.components.line.LineDisclosure
+import com.letta.mobile.ui.components.line.LineSpec
+import com.letta.mobile.ui.components.line.LineTags
+import com.letta.mobile.ui.components.line.StatusTone
 import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.pluralStringResource
@@ -53,7 +50,9 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * One Monitor line that opens to the event in full and the task id. A [watcher] is the watch's
- * chip, labelled and counted; otherwise it is a single actionable event.
+ * chip, labelled and counted; otherwise it is a single actionable event. Either is the shared
+ * [SummaryLine] on the header rail: a Monitor event is a sibling of a run's header, never one of its
+ * work steps, so it keeps the header's glyph, label and chevron column wherever it is drawn.
  */
 @Composable
 internal fun MonitorRow(notification: UiSubagentNotification, watcher: Boolean) {
@@ -63,49 +62,40 @@ internal fun MonitorRow(notification: UiSubagentNotification, watcher: Boolean) 
     val lines = remember(raw) { monitorDisplayLines(raw) }
     val event = lines.firstOrNull().orEmpty()
     val chip = if (watcher) monitorChipText(notification, event) else null
-    val failed = notification.status.equals("failed", ignoreCase = true)
-    val tint = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
     Column(
-        modifier = Modifier.fillMaxWidth()
-            .testTag(monitorTag(watcher))
-            .padding(vertical = LettaDimens.Space.xs),
+        modifier = Modifier.fillMaxWidth().testTag(monitorTag(watcher)),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
-        Surface(
-            shape = MaterialTheme.shapes.small,
-            color = monitorBackground(watcher),
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.clickable { expanded = !expanded }
-                .semantics { chip?.let { contentDescription = it.third } },
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-            ) {
-                Icon(
-                    imageVector = monitorIcon(watcher),
-                    contentDescription = null,
-                    modifier = Modifier.size(LettaDimens.Control.icon),
-                    tint = tint,
-                )
-                chip?.let { OneLine(it.first, MaterialTheme.typography.labelMedium, Modifier.weight(1f, fill = false)) }
-                OneLine(event, MaterialTheme.typography.bodySmall, Modifier.weight(1f, fill = watcher.not()))
-                chip?.let { Text(text = it.second, style = MaterialTheme.typography.labelSmall, color = tint, maxLines = 1) }
-                DisclosureChevron(expanded = expanded, compact = true, contentDescription = null)
-            }
-        }
+        SummaryLine(
+            spec = LineSpec(
+                title = chip?.first ?: event,
+                tone = monitorTone(notification, watcher),
+                tags = LineTags(row = monitorLineTag(watcher), glyph = ChatRowTestTags.MONITOR_GLYPH),
+            ),
+            disclosure = LineDisclosure(expanded) { expanded = !expanded },
+            modifier = monitorChrome(watcher).semantics { chip?.let { contentDescription = it.third } },
+            detail = event.takeIf { watcher },
+            meta = chip?.second,
+        )
         if (expanded) MonitorDetails(raw, lines, notification)
     }
 }
 
+/** A watch's chip keeps its tonal fill (on the line's own bounds, so its column does not move); an event has none. */
+@Composable
+private fun monitorChrome(watcher: Boolean): Modifier =
+    if (watcher) Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.shapes.small) else Modifier
+
 private fun monitorTag(watcher: Boolean) = if (watcher) ChatRowTestTags.MONITOR_WATCHER else ChatRowTestTags.MONITOR_EVENT
 
-private fun monitorIcon(watcher: Boolean) = if (watcher) LettaIcons.Visibility else LettaIcons.Info
+private fun monitorLineTag(watcher: Boolean) = if (watcher) ChatRowTestTags.MONITOR_WATCHER_LINE else ChatRowTestTags.MONITOR_EVENT_LINE
 
-@Composable
-private fun monitorBackground(watcher: Boolean): Color =
-    if (watcher) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent
+/** A failed watch or event in the error tone; a watch's eye; an event's info mark. */
+private fun monitorTone(notification: UiSubagentNotification, watcher: Boolean): StatusTone = when {
+    notification.status.equals("failed", ignoreCase = true) -> StatusTone.Failed
+    watcher -> StatusTone.Watching
+    else -> StatusTone.Info
+}
 
 /** The chip's label, its trailing count and state, and its content description. */
 @Composable
@@ -128,11 +118,6 @@ private fun monitorChipText(notification: UiSubagentNotification, event: String)
 }
 
 @Composable
-private fun OneLine(text: String, style: TextStyle, modifier: Modifier) {
-    Text(text = text, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = modifier)
-}
-
-@Composable
 private fun MonitorDetails(raw: String, lines: List<String>, notification: UiSubagentNotification) {
     var showRaw by remember(raw) { mutableStateOf(false) }
     SelectionContainer {
@@ -145,7 +130,7 @@ private fun MonitorDetails(raw: String, lines: List<String>, notification: UiSub
     Text(
         text = stringResource(if (showRaw) Res.string.rows_monitor_hide_raw else Res.string.rows_monitor_show_raw),
         style = MaterialTheme.typography.labelSmall,
-        modifier = Modifier.clickable { showRaw = !showRaw }.padding(LettaDimens.Space.xs),
+        modifier = Modifier.clickable(role = Role.Button) { showRaw = !showRaw }.padding(LettaDimens.Space.xs),
     )
     notification.taskId?.let {
         Text(

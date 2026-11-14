@@ -4,7 +4,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -35,6 +37,30 @@ object ChatRowType {
     /** A run's summary line ("Worked · 1.2s · 2 tools"): legacy RunActivityDisclosure's labelMedium. */
     val runHeaderTitle: TextStyle
         @Composable @ReadOnlyComposable get() = MaterialTheme.typography.labelMedium
+
+    /** A work step's line ("Ran  ./gradlew test"), the label every step-rail line shares. */
+    internal val stepTitle: TextStyle
+        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.bodyMedium
+
+    /** Command lines, output and arguments: the body size in monospace. */
+    internal val monoBody: TextStyle
+        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+
+    /** A path or a stream label: the small label size in monospace. */
+    internal val monoLabel: TextStyle
+        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace)
+
+    /** A card's title (an approval, a question, generated UI). */
+    internal val cardTitle: TextStyle
+        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+
+    /** A named item inside a card (a tool's name, a diff's path, an artifact's status). */
+    internal val itemTitle: TextStyle
+        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium)
+
+    /** The headline of a whole-timeline panel (the failure panel, the welcome). */
+    internal val panelHeadline: TextStyle
+        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold)
 
     /** The "You" label on a prompt bubble: ChatTypography.roleLabel. */
     val roleLabel: TextStyle
@@ -100,6 +126,21 @@ object ChatRowSpacing {
     /** The run summary line's status glyph (check, spinner, warning). */
     val runGlyphSize: Dp = LettaDimens.Control.iconSm
 
+    /** The working glyph's ring and spinner stroke. */
+    internal val runGlyphStroke: Dp = 1.5.dp
+
+    /** A step-rail line's start inset (a tool call, a reasoning): its glyph sits this far in. */
+    internal val stepHorizontal: Dp = LettaDimens.Space.sm
+
+    /** A step-rail line's top and bottom inset, so a step with a preview under its label keeps air around it. */
+    internal val stepVertical: Dp = LettaDimens.Space.xs
+
+    /** Every line's end inset, so the header's chevron and every step's chevron share one edge. */
+    internal val lineEnd: Dp = LettaDimens.Space.sm
+
+    /** Between a line's glyph, its words and its chevron. */
+    internal val lineGap: Dp = LettaDimens.Space.sm
+
     /**
      * An expanded run's work steps (reasoning, the tool line) sit indented
      * under its summary line, flush with the summary's label (past its inset and glyph).
@@ -119,6 +160,12 @@ object ChatRowSpacing {
     val thinkingRowHeight: Dp = LettaDimens.Space.xxl
     val thinkingTextMinHeight: Dp = LettaDimens.Space.xl
 }
+
+/** A card in the timeline (an approval, generated UI, a loading bubble): the rounded container's corners. */
+internal val ChatRowCardShape: Shape = RoundedCornerShape(LettaDimens.Radius.md)
+
+/** An inset inside a row (a code block, a tool's output, a small control): the tighter corners. */
+internal val ChatRowInsetShape: Shape = RoundedCornerShape(LettaDimens.Radius.sm)
 
 /** Prompt bubble geometry (designsystem MessageBubbleShape): rounded, with a tight corner at the speaker's top. */
 object ChatBubbleShapes {

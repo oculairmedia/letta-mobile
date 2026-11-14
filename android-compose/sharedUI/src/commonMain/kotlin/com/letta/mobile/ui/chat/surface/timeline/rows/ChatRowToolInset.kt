@@ -1,5 +1,8 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.theme.ChatRowInsetShape
+import com.letta.mobile.ui.theme.ChatRowType
+import com.letta.mobile.ui.components.successTint
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -10,7 +13,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -28,7 +30,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import com.letta.mobile.data.chat.tools.ToolArgumentField
@@ -70,7 +71,7 @@ internal fun ToolInsetView(inset: ToolInset, modifier: Modifier = Modifier, live
 private fun InsetPanel(modifier: Modifier, live: Boolean, content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = modifier.fillMaxWidth().testTag(ChatRowTestTags.TOOL_OUTPUT),
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        shape = ChatRowInsetShape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         BoundedScroll(Modifier, live) {
@@ -206,7 +207,7 @@ private fun HoverCopy(text: String, label: StringResource, content: @Composable 
 }
 
 @Composable
-private fun monoStyle(): TextStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+private fun monoStyle(): TextStyle = ChatRowType.monoBody
 
 /**
  * The inks an inset's text reads in: muted output, muted red for stderr, and the before / after of

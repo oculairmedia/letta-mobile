@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -15,10 +14,8 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -31,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -52,7 +50,10 @@ import com.letta.mobile.ui.chat.branch.rememberMessageMenu
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightTarget
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.common.GroupPosition
-import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.DisclosureButton
+import com.letta.mobile.ui.components.line.DefaultDisclosureLabels
+import com.letta.mobile.ui.components.line.LineDisclosure
+import com.letta.mobile.ui.components.line.LineDisclosureLabels
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.theme.ChatBubbleShapes
@@ -213,6 +214,7 @@ private fun Modifier.promptBubbleClicks(state: PromptCardState, openMenu: (() ->
     val actionsLabel = stringResource(Res.string.rows_message_actions)
     val haptics = LocalHaptics.current
     return combinedClickable(
+        role = Role.Button,
         onClickLabel = null,
         onLongClickLabel = actionsLabel,
         onLongClick = openMenu?.let { open -> { haptics.play(LettaHapticCue.LongPress); open() } },
@@ -314,14 +316,13 @@ private fun PromptText(content: String, state: PromptCardState) {
 @Composable
 private fun PromptExpandToggle(state: PromptCardState) {
     if (!state.canToggle) return
-    val description = stringResource(if (state.expanded) Res.string.rows_collapse_prompt else Res.string.rows_expand_prompt)
-    Box(
-        modifier = Modifier
-            .sizeIn(minWidth = LettaDimens.Space.xxl, minHeight = LettaDimens.Space.xxl)
-            .clip(CircleShape)
-            .clickable { state.expanded = !state.expanded },
-        contentAlignment = Alignment.Center,
-    ) {
-        DisclosureChevron(expanded = state.expanded, contentDescription = description)
-    }
+    DisclosureButton(LineDisclosure(state.expanded, PromptDisclosureLabels) { state.expanded = !state.expanded })
 }
+
+/** A long prompt's "show all": "Expand prompt" / "Collapse prompt", spoken open / closed. */
+private val PromptDisclosureLabels = LineDisclosureLabels(
+    Res.string.rows_expand_prompt,
+    Res.string.rows_collapse_prompt,
+    DefaultDisclosureLabels.expandedState,
+    DefaultDisclosureLabels.collapsedState,
+)

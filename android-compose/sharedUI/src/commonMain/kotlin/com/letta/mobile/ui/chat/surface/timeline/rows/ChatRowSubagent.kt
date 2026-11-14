@@ -6,11 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,7 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.semantics.Role
 import com.letta.mobile.data.chat.display.parseBackgroundCommandReport
 import com.letta.mobile.data.chat.display.toInset
 import com.letta.mobile.data.chat.display.TaskActivity
@@ -50,14 +47,16 @@ import com.letta.mobile.sharedui.resources.rows_task_id
 import com.letta.mobile.sharedui.resources.rows_transcript
 import com.letta.mobile.sharedui.resources.rows_view_conversation
 import com.letta.mobile.ui.chat.subagents.ExternalAgentBadge
-import com.letta.mobile.ui.components.ChevronEmphasis
-import com.letta.mobile.ui.components.DisclosureChevron
-import com.letta.mobile.ui.haptics.LettaHapticCue
-import com.letta.mobile.ui.haptics.LocalHaptics
-import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.components.SummaryLine
+import com.letta.mobile.ui.components.line.DefaultDisclosureLabels
+import com.letta.mobile.ui.components.line.LineDisclosure
+import com.letta.mobile.ui.components.line.LineDisclosureLabels
+import com.letta.mobile.ui.components.line.LineSpec
+import com.letta.mobile.ui.components.line.LineTags
+import com.letta.mobile.ui.components.line.StatusTone
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.theme.ChatRowAlpha
-import com.letta.mobile.ui.theme.ChatRowSpacing
+import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaTonalPill
 import com.letta.mobile.ui.theme.pill.LettaPillColors
@@ -83,6 +82,14 @@ private data class NotificationModel(
 
     val isSuccessfulCompletion: Boolean = notification.isSuccessfulCompletion()
 
+    /** What the line's glyph says: failed, still running, done, or a state the protocol does not name. */
+    val tone: StatusTone = when (status) {
+        in NOTIFICATION_FAILURE_STATUSES -> StatusTone.Failed
+        in NOTIFICATION_RUNNING_STATUSES -> StatusTone.Working
+        in NOTIFICATION_SUCCESS_STATUSES -> StatusTone.Done
+        else -> StatusTone.Info
+    }
+
     /** A report, or a transcript to point at: what the details disclosure has to show. */
     fun hasDetails(): Boolean {
         return report != null || notification.transcriptUri != null
@@ -91,6 +98,7 @@ private data class NotificationModel(
 
 private val NOTIFICATION_FAILURE_STATUSES = setOf("failed", "error")
 private val NOTIFICATION_SUCCESS_STATUSES = setOf("completed", "success")
+private val NOTIFICATION_RUNNING_STATUSES = setOf("running", "pending", "queued", "started", "in_progress")
 
 /**
  * The protocol names `completed` as its successful terminal state; older producers said `success`.
@@ -102,8 +110,9 @@ internal fun UiSubagentNotification.isSuccessfulCompletion(): Boolean =
 /**
  * A completed subagent contributes one compact row; its report, metadata and actions stay
  * behind a disclosure. In-flight, failed or unknown statuses keep their evidence visible.
- * A completed card adds no vertical padding of its own: its compact row is a [SummaryLine] with a
- * run header's floor, so it keeps a run header's rhythm in the timeline and inside a tool step's details.
+ * Every state heads with the shared [SummaryLine] (completed, failed, in flight), on the rail where the
+ * card is drawn: the header rail between runs, the step rail among a run's work steps, flush with the
+ * step's label inside a tool step's details. A completed card adds no vertical padding of its own.
  */
 @Composable
 internal fun SubagentNotificationCard(
@@ -136,7 +145,7 @@ internal fun SubagentNotificationCard(
             CompletedSummaryRow(model, detailsExpanded, actions.onToggleDetails)
             if (detailsExpanded) NotificationBody(model, detailsExpanded, actions)
         } else {
-            NotificationHeader(model, actions.onOpen)
+            NotificationHeader(model, detailsExpanded, actions.onToggleDetails)
             NotificationBody(model, detailsExpanded, actions)
         }
     }
@@ -154,52 +163,40 @@ private fun UiSubagentNotification.activityLabel(): StringResource = when (activ
     TaskActivity.Task -> Res.string.rows_activity_task
 }
 
-/** The completed report's one line: a run header's [SummaryLine], its chevron opening the details. */
+/** The completed report's one line: the shared [SummaryLine], its chevron opening the details. */
 @Composable
 private fun CompletedSummaryRow(model: NotificationModel, expanded: Boolean, onToggle: () -> Unit) {
     val summary = model.notification.summary ?: stringResource(Res.string.rows_activity_subagent)
     SummaryLine(
-        spec = RunStepRowSpec(
+        spec = LineSpec(
             title = summary,
-            subtitle = null,
-            tone = RunSummaryTone.Done,
+            tone = StatusTone.Done,
             glyphLabel = stringResource(Res.string.rows_completed),
-            tags = RunStepRowTags(row = ChatRowTestTags.COMPLETED_ACTIVITY_SUMMARY, glyph = ChatRowTestTags.COMPLETED_ACTIVITY_GLYPH),
+            tags = LineTags(row = ChatRowTestTags.COMPLETED_ACTIVITY_SUMMARY, glyph = ChatRowTestTags.COMPLETED_ACTIVITY_GLYPH),
         ),
-        disclosure = RunStepDisclosure(expanded = expanded, labels = detailsLabels(model), onToggle = onToggle),
-        modifier = Modifier.heightIn(min = ChatRowSpacing.runHeaderToggleMinHeight),
+        disclosure = LineDisclosure(expanded = expanded, labels = detailsLabels(model), onToggle = onToggle),
         trailing = { ExternalAgentBadge(model.identity) },
     )
 }
 
+/**
+ * An in-flight, failed or unknown report's line ("Subagent failed"): the same [SummaryLine] as a
+ * completed one, its glyph saying the state, its chevron opening the report or transcript when there
+ * is one. Opening the conversation is the "View conversation" action under it.
+ */
 @Composable
-private fun NotificationHeader(model: NotificationModel, onOpen: (() -> Unit)?) {
+private fun NotificationHeader(model: NotificationModel, expanded: Boolean, onToggle: () -> Unit) {
     val notification = model.notification
     val headline = notification.status.trim().ifBlank { stringResource(Res.string.rows_status_unknown) }
-    val color = if (model.isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-    Row(
-        modifier = Modifier.fillMaxWidth().then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        Icon(
-            imageVector = if (model.isFailure) LettaIcons.Error else LettaIcons.CheckCircle,
-            contentDescription = null,
-            modifier = Modifier.size(LettaDimens.Control.icon),
-            tint = if (model.isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = stringResource(
-                Res.string.rows_notification_headline,
-                stringResource(notification.activityLabel()),
-                headline,
-            ),
-            style = MaterialTheme.typography.labelLarge,
-            color = color,
-            modifier = Modifier.weight(1f),
-        )
-        ExternalAgentBadge(model.identity)
-    }
+    SummaryLine(
+        spec = LineSpec(
+            title = stringResource(Res.string.rows_notification_headline, stringResource(notification.activityLabel()), headline),
+            tone = model.tone,
+            tags = LineTags(row = ChatRowTestTags.NOTIFICATION_HEADER, glyph = ChatRowTestTags.NOTIFICATION_GLYPH),
+        ),
+        disclosure = LineDisclosure(expanded = expanded, labels = detailsLabels(model), onToggle = onToggle).takeIf { model.hasDetails() },
+        trailing = { ExternalAgentBadge(model.identity) },
+    )
 }
 
 @Composable
@@ -221,7 +218,7 @@ private fun NotificationBody(model: NotificationModel, expanded: Boolean, action
             notification.durationMs?.let { MetaChip(formatDuration(it)) }
         }
     }
-    NotificationActionRow(model, expanded, actions)
+    NotificationActionRow(actions)
     if (expanded && model.hasDetails()) {
         if (model.report != null) NotificationReport(model)
         NotificationFooter(notification)
@@ -248,7 +245,7 @@ private fun NotificationFooter(notification: UiSubagentNotification) {
             SelectionContainer(Modifier.weight(1f)) {
                 Text(
                     text = stringResource(Res.string.rows_transcript, transcript),
-                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                    style = ChatRowType.monoLabel,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag(ChatRowTestTags.NOTIFICATION_TRANSCRIPT),
                 )
@@ -300,68 +297,29 @@ private fun CommandReport(model: NotificationModel) {
     }
 }
 
+/** "View conversation" for a subagent the host can open; the line above is the details' one disclosure. */
 @Composable
-private fun NotificationActionRow(model: NotificationModel, expanded: Boolean, actions: NotificationActions) {
-    val onOpen = actions.onOpen
-    // A completed card's summary row is already the disclosure (row and chevron); a second link here
-    // toggled the same state, so an expanded card showed two collapse controls.
-    val detailsLink = model.hasDetails() && !model.isSuccessfulCompletion
-    if (onOpen == null && !detailsLink) return
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
-    ) {
-        if (onOpen != null) {
-            Text(
-                text = stringResource(Res.string.rows_view_conversation),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .defaultMinSize(minHeight = LettaDimens.Space.xxl)
-                    .clickable(onClick = onOpen)
-                    .padding(vertical = LettaDimens.Space.sm),
-            )
-        }
-        if (detailsLink) {
-            val haptics = LocalHaptics.current
-            DisclosureLink(label = detailsLabel(model, expanded), expanded = expanded, onToggle = {
-                haptics.play(LettaHapticCue.SegmentTick)
-                actions.onToggleDetails()
-            })
-        }
-    }
-}
-
-@Composable
-private fun detailsLabel(model: NotificationModel, expanded: Boolean): String {
-    val labels = detailsLabels(model)
-    return stringResource(if (expanded) labels.collapse else labels.expand)
+private fun NotificationActionRow(actions: NotificationActions) {
+    val onOpen = actions.onOpen ?: return
+    Text(
+        text = stringResource(Res.string.rows_view_conversation),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .defaultMinSize(minHeight = LettaDimens.Space.xxl)
+            .clickable(role = Role.Button, onClick = onOpen)
+            .padding(vertical = LettaDimens.Space.sm),
+    )
 }
 
 /** What the details disclosure says: the full report, the details, or the transcript. */
-private fun detailsLabels(model: NotificationModel): RunStepDisclosureLabels {
+private fun detailsLabels(model: NotificationModel): LineDisclosureLabels {
     val (show, hide) = when {
         model.report != null -> Res.string.rows_show_full_report to Res.string.rows_hide_full_report
         model.isSuccessfulCompletion -> Res.string.rows_show_details to Res.string.rows_hide_details
         else -> Res.string.rows_show_transcript to Res.string.rows_hide_transcript
     }
-    return RunStepDisclosureLabels(show, hide, RunStepDisclosureLabels.Step.expandedState, RunStepDisclosureLabels.Step.collapsedState)
-}
-
-@Composable
-private fun DisclosureLink(label: String, expanded: Boolean, onToggle: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .defaultMinSize(minHeight = LettaDimens.Space.xxl)
-            .clickable(onClick = onToggle)
-            .padding(vertical = LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-    ) {
-        Text(text = label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-        DisclosureChevron(expanded = expanded, emphasis = ChevronEmphasis.Emphasized, compact = true, contentDescription = label)
-    }
+    return LineDisclosureLabels(show, hide, DefaultDisclosureLabels.expandedState, DefaultDisclosureLabels.collapsedState)
 }
 
 @Composable

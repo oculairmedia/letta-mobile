@@ -1,24 +1,13 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.NonRestartableComposable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -26,9 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
@@ -37,164 +23,35 @@ import androidx.compose.ui.unit.offset
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.sharedui.resources.Res
-import com.letta.mobile.sharedui.resources.rows_collapse
-import com.letta.mobile.sharedui.resources.rows_expand
 import com.letta.mobile.sharedui.resources.rows_run_collapse
 import com.letta.mobile.sharedui.resources.rows_run_expand
 import com.letta.mobile.sharedui.resources.rows_run_state_collapsed
 import com.letta.mobile.sharedui.resources.rows_run_state_expanded
-import com.letta.mobile.sharedui.resources.rows_state_collapsed
-import com.letta.mobile.sharedui.resources.rows_state_expanded
 import com.letta.mobile.data.chat.tools.steps.activity
 import com.letta.mobile.ui.chat.tools.LocalToolPresenters
 import com.letta.mobile.ui.chat.tools.groupLabel
-import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
-import com.letta.mobile.ui.components.DisclosureChevron
-import com.letta.mobile.ui.components.row.LettaListRow
-import com.letta.mobile.ui.components.row.LettaListRowSpec
-import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.components.line.LineDisclosureLabels
+import com.letta.mobile.ui.components.line.StatusTone
 import com.letta.mobile.ui.theme.ChatRowDimens
-import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaSizingTokens
-import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.ImmutableList
-import org.jetbrains.compose.resources.StringResource
-import org.jetbrains.compose.resources.stringResource
 
-/*
- * letta-mobile-ckmub.1.2: a run's reasoning steps are built from the shared primitives, so they read like
- * every other list row in the app: one [LettaListRow] per step, led by the same [RunStatusGlyph] the run's
- * summary line carries, with the shared [DisclosureChevron] only when the step has details to show
- * (tool calls read as [ToolStep] lines instead). An expanded run lists its steps straight under its
- * summary line: there is no "Ran 2 commands" group row with a second chevron of its own.
- */
-
-/**
- * The run's status glyph, one component at one size ([ChatRowSpacing.runGlyphSize]) for the summary
- * line and every step: a spinner while working, then a check, a warning or an error. In a fixed slot,
- * cross-fading as the tone changes, so a step or a run settling never moves its label. Decorative
- * unless [contentDescription] names the state.
- */
-@Composable
-internal fun RunStatusGlyph(tone: RunSummaryTone, modifier: Modifier = Modifier, contentDescription: String? = null) {
-    val reducedMotion = LocalReducedMotion.current
-    val described = if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier
-    Crossfade(
-        targetState = tone,
-        animationSpec = if (reducedMotion) snap() else tween(RUN_GLYPH_FADE_MILLIS),
-        modifier = modifier.size(ChatRowSpacing.runGlyphSize).then(described),
-        label = "runStatusGlyph",
-    ) { shown ->
-        val glyph = Modifier.size(ChatRowSpacing.runGlyphSize)
-        when (shown) {
-            RunSummaryTone.Working -> WorkingGlyph(reducedMotion, glyph)
-            RunSummaryTone.Attention -> Icon(LettaIcons.Warning, contentDescription = null, modifier = glyph, tint = MaterialTheme.colorScheme.secondary)
-            RunSummaryTone.Failed -> Icon(LettaIcons.Error, contentDescription = null, modifier = glyph, tint = MaterialTheme.colorScheme.error)
-            RunSummaryTone.Done -> Icon(LettaIcons.Check, contentDescription = null, modifier = glyph, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
+/** One tool step's state in the status glyph's tones (success, attention, failure, working). */
+internal fun ToolTimelineState.glyphTone(): StatusTone = when (this) {
+    ToolTimelineState.Running -> StatusTone.Working
+    ToolTimelineState.AwaitingApproval, ToolTimelineState.Warning -> StatusTone.Attention
+    ToolTimelineState.Failed, ToolTimelineState.Rejected -> StatusTone.Failed
+    ToolTimelineState.Succeeded -> StatusTone.Done
 }
 
-/**
- * A small spinner while the work runs; a still ring under reduced motion, or docked over the canvas
- * where the panel's ambient glow is the working cue.
- */
-@Composable
-private fun WorkingGlyph(reducedMotion: Boolean, modifier: Modifier) {
-    val tint = MaterialTheme.colorScheme.tertiary
-    if (reducedMotion || !LocalChatWorkingCueAnimated.current) {
-        Box(modifier.border(RUN_GLYPH_STROKE, tint, CircleShape))
-    } else {
-        CircularProgressIndicator(modifier = modifier, color = tint, strokeWidth = RUN_GLYPH_STROKE)
-    }
-}
-
-/** One tool step's state in the run glyph's four tones (success, attention, failure, working). */
-internal fun ToolTimelineState.glyphTone(): RunSummaryTone = when (this) {
-    ToolTimelineState.Running -> RunSummaryTone.Working
-    ToolTimelineState.AwaitingApproval, ToolTimelineState.Warning -> RunSummaryTone.Attention
-    ToolTimelineState.Failed, ToolTimelineState.Rejected -> RunSummaryTone.Failed
-    ToolTimelineState.Succeeded -> RunSummaryTone.Done
-}
-
-/** The test tags a step row carries: on the row (its toggle) and on its glyph. */
-@Immutable
-internal class RunStepRowTags(val row: String, val glyph: String)
-
-/** What one step row shows: its label, its one-line preview, its glyph and the glyph's spoken state. */
-@Immutable
-internal class RunStepRowSpec(
-    val title: String,
-    val subtitle: String?,
-    val tone: RunSummaryTone,
-    val glyphLabel: String?,
-    val tags: RunStepRowTags,
+/** A run's steps, under its summary line: "Show steps" / "Hide steps", spoken open / closed. */
+internal val RunDisclosureLabels = LineDisclosureLabels(
+    Res.string.rows_run_expand,
+    Res.string.rows_run_collapse,
+    Res.string.rows_run_state_expanded,
+    Res.string.rows_run_state_collapsed,
 )
-
-/** What a step's disclosure says: its chevron's action labels and the row's spoken open / closed state. */
-@Immutable
-internal class RunStepDisclosureLabels(
-    val expand: StringResource,
-    val collapse: StringResource,
-    val expandedState: StringResource,
-    val collapsedState: StringResource,
-) {
-    companion object {
-        /** A tool call's details. */
-        val Step = RunStepDisclosureLabels(Res.string.rows_expand, Res.string.rows_collapse, Res.string.rows_state_expanded, Res.string.rows_state_collapsed)
-
-        /** A run's steps, under its summary line. */
-        val Run = RunStepDisclosureLabels(
-            Res.string.rows_run_expand,
-            Res.string.rows_run_collapse,
-            Res.string.rows_run_state_expanded,
-            Res.string.rows_run_state_collapsed,
-        )
-    }
-}
-
-/** A step's disclosure: whether its details are open, how to flip them, and what it says. */
-@Immutable
-internal class RunStepDisclosure(
-    val expanded: Boolean,
-    val labels: RunStepDisclosureLabels = RunStepDisclosureLabels.Step,
-    val onToggle: () -> Unit,
-)
-
-/**
- * One step of a run as a [LettaListRow]: the shared [RunStatusGlyph] leading, the label in the list
- * row's title style, a one-line preview under it, and the shared [DisclosureChevron] trailing only
- * when [disclosure] has details to open. Its height never depends on its state: open or closed,
- * working or settled, it is the list row's height. A tool call and a reasoning step both draw
- * through here, so the run's rows read alike.
- */
-@Composable
-@NonRestartableComposable
-internal fun RunStepListRow(spec: RunStepRowSpec, disclosure: RunStepDisclosure?, modifier: Modifier = Modifier) {
-    val stateText = disclosure?.let { stringResource(if (it.expanded) it.labels.expandedState else it.labels.collapsedState) }
-    LettaListRow(
-        spec = LettaListRowSpec(title = spec.title, subtitle = spec.subtitle, enabled = disclosure != null),
-        onClick = { disclosure?.onToggle?.invoke() },
-        modifier = modifier
-            .testTag(spec.tags.row)
-            .semantics { stateText?.let { stateDescription = it } },
-        leading = { RunStatusGlyph(spec.tone, Modifier.testTag(spec.tags.glyph), spec.glyphLabel) },
-        end = if (disclosure != null) {
-            { RunStepChevron(disclosure) }
-        } else {
-            null
-        },
-    )
-}
-
-@Composable
-private fun RunStepChevron(disclosure: RunStepDisclosure) {
-    DisclosureChevron(
-        expanded = disclosure.expanded,
-        contentDescription = stringResource(if (disclosure.expanded) disclosure.labels.collapse else disclosure.labels.expand),
-    )
-}
 
 /**
  * An expanded run's tool calls, listed straight under its summary line: one [ToolStep] line per
@@ -290,5 +147,3 @@ internal fun Modifier.runWidthPadding(
     ) { placeable.placeRelative(startPx, topPx) }
 }
 
-private val RUN_GLYPH_STROKE = 1.5.dp
-private const val RUN_GLYPH_FADE_MILLIS = 150

@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -105,7 +106,7 @@ internal fun ChatImageViewerContent(
                 .fillMaxSize()
                 .testTag(ChatRowTestTags.IMAGE_VIEWER)
                 .background(if (touch) Color.Black else MaterialTheme.colorScheme.scrim.copy(alpha = ChatRowAlpha.viewerScrim))
-                .then(if (touch) Modifier else Modifier.clickable(onClickLabel = closeLabel, onClick = onDismiss))
+                .then(if (touch) Modifier else Modifier.clickable(role = Role.Button, onClickLabel = closeLabel, onClick = onDismiss))
                 .onPreviewKeyEvent { event -> handleViewerKey(event, ViewerKeyTarget(pagerState, scope, onDismiss)) }
                 .focusRequester(focusRequester)
                 .focusable(),
