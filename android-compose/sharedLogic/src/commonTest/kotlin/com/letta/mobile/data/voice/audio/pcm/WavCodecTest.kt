@@ -11,7 +11,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.fail
 
 /** A `fmt ` chunk body. */
-private data class FmtSpec(val tag: Int = 1, val channels: Int = 1, val rate: Int = 16_000, val bits: Int = 16)
+private data class FmtSpec(val tag: Int = 1, val channels: Int = 1, val rate: Long = 16_000, val bits: Int = 16)
 
 /** One RIFF chunk; [declared] overrides the size field (streaming placeholders, truncation). */
 private class Chunk(val id: String, val body: ByteArray, val declared: Long = body.size.toLong())
@@ -22,12 +22,15 @@ private fun le32(value: Long) = le16((value and 0xFFFF).toInt()) + le16(((value 
 
 private fun fmtBody(spec: FmtSpec): ByteArray {
     val block = spec.channels * spec.bits / 8
-    val rates = le32(spec.rate.toLong()) + le32(spec.rate.toLong() * block)
+    val rates = le32(spec.rate) + le32(spec.rate * block)
     return le16(spec.tag) + le16(spec.channels) + rates + le16(block) + le16(spec.bits)
 }
 
-private fun extensibleFmt(subFormat: Int): ByteArray =
-    fmtBody(FmtSpec(tag = 0xFFFE)) + le16(22) + le16(16) + le32(4) + le16(subFormat) + ByteArray(14)
+/** The GUID bytes after Data1 (Data2, Data3, Data4) of the standard PCM and IEEE-float sub-formats. */
+private val STANDARD_GUID_SUFFIX = byteArrayOf(0, 0, 0x10, 0, 0x80.toByte(), 0, 0, 0xAA.toByte(), 0, 0x38, 0x9B.toByte(), 0x71)
+
+private fun extensibleFmt(subFormat: Int, guidSuffix: ByteArray = STANDARD_GUID_SUFFIX): ByteArray =
+    fmtBody(FmtSpec(tag = 0xFFFE)) + le16(22) + le16(16) + le32(4) + le32(subFormat.toLong()) + guidSuffix
 
 private fun samplesBody(vararg samples: Int): ByteArray = samples.fold(ByteArray(0)) { bytes, sample -> bytes + le16(sample) }
 
@@ -86,6 +89,13 @@ class WavCodecTest {
         WavCase("32-bit float", riff(fmtOf(FmtSpec(tag = 3, bits = 32)), Chunk("data", ByteArray(8))), unsupported),
         WavCase("8-bit PCM", riff(fmtOf(FmtSpec(bits = 8)), Chunk("data", ByteArray(4))), unsupported),
         WavCase("extensible float sub-format", riff(Chunk("fmt ", extensibleFmt(3)), Chunk("data", ByteArray(4))), unsupported),
+        WavCase("extensible PCM tag with a non-PCM GUID", riff(Chunk("fmt ", extensibleFmt(1, ByteArray(12))), data(5)), unsupported),
+        WavCase("extensible header cut inside the GUID", riff(Chunk("fmt ", extensibleFmt(1).copyOf(26)), data(5)), badResponse),
+        WavCase("zero sample rate", riff(fmtOf(FmtSpec(rate = 0)), data(1)), unsupported),
+        WavCase("sample rate above 384 kHz", riff(fmtOf(FmtSpec(rate = 384_001)), data(1)), unsupported),
+        WavCase("sample rate of Int.MAX_VALUE", riff(fmtOf(FmtSpec(rate = Int.MAX_VALUE.toLong())), data(1)), unsupported),
+        WavCase("sample rate above 2^31", riff(fmtOf(FmtSpec(rate = 0x80000000L)), data(1)), unsupported),
+        WavCase("384 kHz is accepted", riff(fmtOf(FmtSpec(rate = 384_000)), data(2)), Expect.Samples(listOf(2))),
     )
 
     @Test

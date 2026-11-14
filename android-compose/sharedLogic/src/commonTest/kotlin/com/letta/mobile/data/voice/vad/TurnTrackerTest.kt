@@ -2,10 +2,12 @@ package com.letta.mobile.data.voice.vad
 
 import com.letta.mobile.data.voice.audio.AudioFrame
 import com.letta.mobile.data.voice.audio.SamplePosition
+import kotlin.test.assertTrue
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 /** [hops] hops at [probability]. */
 private data class Run(val hops: Int, val probability: Float)
@@ -74,6 +76,23 @@ class TurnTrackerTest {
             listOf(At(0, TurnSignal.Candidate), At(19, TurnSignal.Confirmed), At(146, ended(TurnEndReason.SILENCE))),
         ),
         PolicyCase(
+            "a candidate that reaches the hard cap unconfirmed is dropped",
+            listOf(Run(12, 0.9f), Run(50, 0f), Run(8, 0.9f), Run(10, 0f)),
+            listOf(
+                At(0, TurnSignal.Candidate),
+                At(62, abandoned(TurnDiscardReason.TOO_LITTLE_VOICE)),
+                At(63, TurnSignal.Candidate),
+                At(76, abandoned(TurnDiscardReason.NO_ONSET)),
+            ),
+            policy = EndOfTurnPolicy(maxTurn = 1.seconds),
+        ),
+        PolicyCase(
+            "while the app speaks a confirmed turn ends when only echo-level sound remains",
+            listOf(Run(40, 0.9f), Run(100, 0.5f)),
+            listOf(At(0, TurnSignal.Candidate), At(24, TurnSignal.Confirmed), At(96, ended(TurnEndReason.SILENCE))),
+            outputActive = true,
+        ),
+        PolicyCase(
             "below the enter threshold nothing starts",
             listOf(Run(200, 0.45f)),
             emptyList(),
@@ -119,6 +138,28 @@ class TurnTrackerTest {
     @Test
     fun everyPolicyRowHolds() {
         cases.forEach { case -> assertEquals(case.expected, replay(case), case.name) }
+    }
+
+    /**
+     * CodeRabbit's case: 21 voiced hops while the app speaks (barge-in needs more voice), then 56 silent
+     * hops, then the app stops speaking. The lower bar would now count the candidate as enough voice,
+     * but its silence has outlasted the trailing gap, so it is abandoned, never confirmed in silence.
+     */
+    @Test
+    fun aCandidateWhoseSilenceOutlastedTheGapIsNotConfirmedWhenTheBarDrops() {
+        val tracker = TurnTracker(EndOfTurnPolicy(), VadSignals.format, hop)
+        val signals = mutableListOf<TurnSignal>()
+        var index = 0
+        fun feed(probability: Float, outputActive: Boolean) {
+            index++
+            val at = SamplePosition(index * hop.samples.toLong())
+            signals += tracker.onHop(HopObservation(SpeechProbability(probability), at, outputActive))
+        }
+        repeat(21) { feed(0.95f, outputActive = true) }
+        repeat(56) { feed(0f, outputActive = true) }
+        feed(0f, outputActive = false)
+        assertTrue(TurnSignal.Confirmed !in signals, "confirmed during silence: $signals")
+        assertEquals(false, tracker.recording)
     }
 
     @Test

@@ -7,16 +7,22 @@ import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoicePort
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.VoiceUtterance
+import com.letta.mobile.data.voice.audio.AudioFrame
 import com.letta.mobile.data.voice.audio.AudioFrameFormat
+import com.letta.mobile.data.voice.audio.AudioFrameSource
+import com.letta.mobile.data.voice.audio.SamplePosition
 import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointException
 import com.letta.mobile.data.voice.endpoint.SpeechOperation
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNot
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -133,6 +139,56 @@ class VadVoiceEarTest {
             assertEquals(VoiceEarEvent.ListeningStarted, awaitItem())
             assertEquals(VoiceEarEvent.SpeechStarted, awaitItem())
             assertFalse(ear.retry(handle))
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun aFailureAfterTheNextSpeechStartedOffersNoRetry() = runTest {
+        val gate = CompletableDeferred<VoiceText>()
+        val ear = valueEar(ScriptedSource(turn() + openTurn()), SpeechTranscriber { gate.await() })
+        ear.turns().test {
+            assertEquals(VoiceEarEvent.ListeningStarted, awaitItem())
+            assertEquals(VoiceEarEvent.SpeechStarted, awaitItem())
+            assertEquals(VoiceEarEvent.SpeechStarted, awaitItem())
+            gate.completeExceptionally(unreachable)
+            assertEquals(failed(VoiceErrorCode.UNREACHABLE), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun turnsBeyondTheTranscriptionBacklogAreRefused() = runTest {
+        val script = List(PendingTurns.MAX_PENDING_TURNS + 3) { turn() }.flatten()
+        val ear = valueEar(ScriptedSource(script), SpeechTranscriber { awaitCancellation() })
+        ear.turns().test {
+            var event = awaitItem()
+            while (event !is VoiceEarEvent.Failed) event = awaitItem()
+            assertEquals(failed(VoiceErrorCode.TRANSCRIPTION_FAILED), event)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun aSourceThatReusesItsFrameArrayIsStillHeardCorrectly() = runTest {
+        val reused = ShortArray(512)
+        val script = turn()
+        val source = object : AudioFrameSource {
+            override val format = AudioFrameFormat()
+
+            override fun frames(): Flow<AudioFrame> = flow {
+                script.forEachIndexed { index, samples ->
+                    samples.copyInto(reused)
+                    emit(AudioFrame(reused, SamplePosition(index * 512L)))
+                    reused.fill(0)
+                }
+                awaitCancellation()
+            }
+        }
+        valueEar(source, ScriptedTranscriber(heard("hello"))).turns().test {
+            assertEquals(VoiceEarEvent.ListeningStarted, awaitItem())
+            assertEquals(VoiceEarEvent.SpeechStarted, awaitItem())
+            assertEquals(said("hello"), awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -316,11 +372,70 @@ class EarMemoryTest {
     }
 
     @Test
+    fun aCaptureFromBeforeTheLatestSpeechIsNotKept() {
+        val memory = EarMemory()
+        val stale = captured(8)
+        memory.speechStarted()
+        assertFalse(memory.retain(stale))
+        assertTrue(stale.samples.all { it.toInt() == 0 })
+        assertNull(memory.take(CapturedAudioHandle(8)))
+        val current = CapturedTurn(CapturedAudioHandle(9), ShortArray(4) { 5 }, generation = memory.speechGeneration)
+        assertTrue(memory.retain(current))
+    }
+
+    @Test
+    fun aRetryRequestedAfterCloseIsWipedAndRefused() {
+        val memory = EarMemory()
+        val late = captured(10)
+        memory.close()
+        assertFalse(memory.requestRetry(late))
+        assertTrue(late.samples.all { it.toInt() == 0 })
+        assertTrue(memory.retries.tryReceive().isFailure)
+    }
+
+    @Test
+    fun newSpeechExpiresAQueuedRetry() {
+        val memory = EarMemory()
+        val queued = captured(11)
+        assertTrue(memory.requestRetry(queued))
+        memory.speechStarted()
+        assertTrue(queued.samples.all { it.toInt() == 0 })
+        assertTrue(memory.retries.tryReceive().isFailure)
+        assertTrue(memory.isExpired(queued))
+    }
+
+    @Test
     fun forgetWipes() {
         val memory = EarMemory()
         val kept = captured(7)
         memory.retain(kept)
         memory.forget()
         assertTrue(kept.samples.all { it.toInt() == 0 })
+    }
+}
+
+class PendingTurnsTest {
+    private fun captured(handle: Long) = CapturedTurn(CapturedAudioHandle(handle), ShortArray(4) { 5 })
+
+    @Test
+    fun aTurnBeyondTheCapacityIsRefusedAndWiped() {
+        val pending = PendingTurns(capacity = 2)
+        assertTrue(pending.offer(captured(1)))
+        assertTrue(pending.offer(captured(2)))
+        val third = captured(3)
+        assertFalse(pending.offer(third))
+        assertTrue(third.samples.all { it.toInt() == 0 })
+    }
+
+    @Test
+    fun discardWipesTheQueuedTurns() {
+        val pending = PendingTurns(capacity = 2)
+        val queued = listOf(captured(4), captured(5))
+        queued.forEach { pending.offer(it) }
+        pending.discard()
+        assertTrue(queued.all { turn -> turn.samples.all { it.toInt() == 0 } })
+        val late = captured(6)
+        assertFalse(pending.offer(late))
+        assertTrue(late.samples.all { it.toInt() == 0 })
     }
 }

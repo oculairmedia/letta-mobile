@@ -14,7 +14,7 @@ sealed interface WavParse {
     /**
      * The file was refused: BAD_RESPONSE when it is not a readable WAVE file (no RIFF header, no
      * `fmt ` before `data`, a header cut short), UNSUPPORTED_FORMAT when it is valid but not 16-bit
-     * integer PCM.
+     * integer PCM at a sample rate from 1 Hz to 384 kHz.
      */
     data class Refused(
         /** Why. */
@@ -32,12 +32,14 @@ object WavCodec {
     private const val RIFF_HEADER = 12
     private const val CHUNK_HEADER = 8
     private const val FMT_MIN = 16
-    private const val EXTENSIBLE_MIN = 26
+    private const val EXTENSIBLE_MIN = 40
+    private const val SUB_FORMAT_OFFSET = 24
     private const val FORMAT_PCM = 1
     private const val FORMAT_EXTENSIBLE = 0xFFFE
     private const val BITS_16 = 16
     private const val BYTES_PER_SAMPLE = 2
     private const val MAX_CHANNELS = 8
+    private const val MAX_SAMPLE_RATE_HZ = 384_000L
     private const val PLACEHOLDER_SIZE = 0xFFFFFFFFL
     private const val HEADER_BYTES = 44
 
@@ -77,12 +79,12 @@ object WavCodec {
         val block = format.channels * BYTES_PER_SAMPLE
         val usable = minOf(declared, present) / block * block
         val samples = ShortArray((usable / BYTES_PER_SAMPLE).toInt()) { reader.s16(chunk.body.toInt() + it * BYTES_PER_SAMPLE) }
-        return WavParse.Decoded(PcmAudio(samples, PcmFormat(format.sampleRateHz, format.channels)))
+        return WavParse.Decoded(PcmAudio(samples, PcmFormat(format.sampleRateHz.toInt(), format.channels)))
     }
 
     private fun WavFmt.isSupported(): Boolean {
         val pcm16 = formatTag == FORMAT_PCM && bitsPerSample == BITS_16
-        return pcm16 && channels in 1..MAX_CHANNELS
+        return pcm16 && channels in 1..MAX_CHANNELS && sampleRateHz in 1L..MAX_SAMPLE_RATE_HZ
     }
 
     private fun LittleEndianReader.hasRiffWave(): Boolean {
@@ -99,20 +101,29 @@ object WavCodec {
         val tag = u16(at)
         val effective = if (tag == FORMAT_EXTENSIBLE) extensibleTag(chunk) else tag
         if (effective < 0) return null
-        return WavFmt(effective, u16(at + 2), u32(at + 4).toInt(), u16(at + 14))
+        return WavFmt(effective, u16(at + 2), u32(at + 4), u16(at + 14))
     }
 
-    /** The sub-format's leading tag of an extensible header; -1 when the header is cut short. */
+    /**
+     * PCM when an extensible header's whole 16-byte sub-format GUID is the PCM GUID, the extensible
+     * tag (refused later as unsupported) for any other GUID, and -1 when the header is cut short.
+     */
     private fun LittleEndianReader.extensibleTag(chunk: WavChunk): Int {
-        val subFormat = chunk.body.toInt() + 24
-        val complete = chunk.size >= EXTENSIBLE_MIN && subFormat + 2 <= size
-        return if (complete) u16(subFormat) else -1
+        val subFormat = chunk.body.toInt() + SUB_FORMAT_OFFSET
+        val complete = chunk.size >= EXTENSIBLE_MIN && subFormat + PCM_SUB_FORMAT.size <= size
+        if (!complete) return -1
+        val isPcm = PCM_SUB_FORMAT.indices.all { u8(subFormat + it) == PCM_SUB_FORMAT[it] }
+        return if (isPcm) FORMAT_PCM else FORMAT_EXTENSIBLE
     }
 }
 
 private class WavChunk(val id: String, val size: Long, val body: Long)
 
-private class WavFmt(val formatTag: Int, val channels: Int, val sampleRateHz: Int, val bitsPerSample: Int)
+/** A `fmt ` chunk; the rate stays unsigned (a Long) until it has been checked. */
+private class WavFmt(val formatTag: Int, val channels: Int, val sampleRateHz: Long, val bitsPerSample: Int)
+
+/** KSDATAFORMAT_SUBTYPE_PCM, {00000001-0000-0010-8000-00aa00389b71}, as it is laid out in the file. */
+private val PCM_SUB_FORMAT = intArrayOf(0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71)
 
 private class LittleEndianReader(private val bytes: ByteArray) {
     val size: Int get() = bytes.size

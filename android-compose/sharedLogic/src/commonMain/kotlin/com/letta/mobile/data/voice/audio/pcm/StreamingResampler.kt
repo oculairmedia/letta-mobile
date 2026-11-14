@@ -57,20 +57,30 @@ class StreamingResampler(
         return produce(total)
     }
 
+    /** Every output sample computable from the buffered input, up to [limit] in total. */
     private fun produce(limit: Long): ShortArray {
-        val end = bufferStart + length
-        val estimate = ((end - kernel.halfWidth).coerceAtLeast(0) * outRate / inRate - produced + 2).coerceIn(0, MAX_CHUNK)
-        val out = ShortArray(estimate.toInt())
-        var count = 0
-        while (produced < limit && count < out.size) {
-            val position = produced * inRate
-            val whole = position / outRate
-            if (whole + kernel.halfWidth >= end) break
-            out[count++] = sampleAt(whole, (position % outRate).toDouble() / outRate)
-            produced++
-        }
+        val count = minOf(readyCount(), limit) - produced
+        if (count <= 0) return ShortArray(0)
+        check(count <= Int.MAX_VALUE) { "Resampler output exceeds one array" }
+        val out = ShortArray(count.toInt()) { nextSample() }
         compact()
-        return if (count == out.size) out else out.copyOf(count)
+        return out
+    }
+
+    /**
+     * How many output samples the buffered input covers: sample n needs input up to
+     * floor(n * from / to) + halfWidth, so every n below (end - halfWidth) * to / from is ready.
+     */
+    private fun readyCount(): Long {
+        val covered = bufferStart + length - kernel.halfWidth
+        if (covered <= 0) return 0
+        return (covered * outRate + inRate - 1) / inRate
+    }
+
+    private fun nextSample(): Short {
+        val position = produced * inRate
+        produced++
+        return sampleAt(position / outRate, (position % outRate).toDouble() / outRate)
     }
 
     private fun sampleAt(whole: Long, fraction: Double): Short {
@@ -103,7 +113,6 @@ class StreamingResampler(
     private companion object {
         const val ROLL_OFF = 0.92
         const val INITIAL_CAPACITY = 4_096
-        const val MAX_CHUNK = 1L shl 24
     }
 }
 

@@ -123,16 +123,19 @@ private suspend fun loop(args: LoopArgs) {
     val source = RecoveringFrameSource(DesktopAudio.frameSource(), deviceChanges = DesktopAudio.deviceChanges())
     val ear = VadVoiceEar(source, transcriber)
     println("listening for ${args.minutes} min against ${origin.value}; speak, pause, and hear it back")
-    withTimeoutOrNull(args.minutes.minutes) {
-        val synthesizer = EndpointSpeechSynthesizer(client, { grants }, args.settings, AudioEncoding.WAV)
-        val mouth = EndpointVoiceMouth(synthesizer, DesktopAudio.player(), this)
-        val echo = EchoTurns(ear, mouth)
-        launch { mouth.events.collect { echo.onMouth(it) } }
-        ear.listen().collect { echo.onEar(it) }
+    try {
+        withTimeoutOrNull(args.minutes.minutes) {
+            val synthesizer = EndpointSpeechSynthesizer(client, { grants }, args.settings, AudioEncoding.WAV)
+            val mouth = EndpointVoiceMouth(synthesizer, DesktopAudio.player(), this)
+            val echo = EchoTurns(ear, mouth)
+            launch { mouth.events.collect { echo.onMouth(it) } }
+            ear.listen().collect { echo.onEar(it) }
+        }
+    } finally {
+        runCatching { ear.close() }
+        client.close()
+        println("stopped")
     }
-    ear.close()
-    client.close()
-    println("stopped")
 }
 
 /** Prints state changes and speaks each transcript back; barge-in stops the mouth. */
@@ -155,11 +158,18 @@ private class EchoTurns(private val ear: VadVoiceEar, private val mouth: Endpoin
     suspend fun onEar(event: VoiceEarEvent) {
         when (event) {
             VoiceEarEvent.ListeningStarted -> println("ear: listening")
-            VoiceEarEvent.SpeechStarted -> println("ear: speech started").also { mouth.stop() }
+            VoiceEarEvent.SpeechStarted -> bargeIn()
             is VoiceEarEvent.EndOfTurn -> heard(event.utterance.text)
             is VoiceEarEvent.Failed -> failed(event)
             else -> Unit
         }
+    }
+
+    /** Speech started: stop the mouth, which reports nothing when stopped, so the echo guard is lifted here. */
+    private suspend fun bargeIn() {
+        println("ear: speech started")
+        mouth.stop()
+        ear.setOutputActive(false)
     }
 
     private fun heard(text: VoiceText) {
