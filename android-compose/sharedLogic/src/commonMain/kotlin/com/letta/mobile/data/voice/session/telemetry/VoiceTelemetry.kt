@@ -1,4 +1,4 @@
-package com.letta.mobile.data.voice.session
+package com.letta.mobile.data.voice.session.telemetry
 
 import com.letta.mobile.data.flow.DerivedStateFlow
 import com.letta.mobile.data.voice.InterruptStatus
@@ -32,9 +32,6 @@ import com.letta.mobile.data.voice.vad.TurnEndReason
 import com.letta.mobile.data.voice.vad.ear.EarObserver
 import com.letta.mobile.data.voice.vad.ear.EarTurnReport
 import com.letta.mobile.data.voice.vad.ear.SpeechTranscriber
-import com.letta.mobile.util.Telemetry
-import com.letta.mobile.util.TelemetryValue
-import com.letta.mobile.util.attr
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
@@ -54,15 +51,19 @@ import kotlin.time.TimeSource
  * Voice mode's diagnostics, as `VoiceMode` telemetry events. Every event carries `tMs`, the
  * milliseconds since the session's `mode.started` on [timeSource] (monotonic; null before the
  * first start), and otherwise states, reasons, ids, counts and levels only: never audio,
- * transcript or reply text, an API key or a server address.
+ * transcript or reply text, an API key or a server address. They go to [sink] (none by default;
+ * the chat page passes the app's telemetry).
  */
-internal class VoiceTelemetry(private val timeSource: TimeSource = TimeSource.Monotonic) {
+internal class VoiceTelemetry(
+    private val timeSource: TimeSource = TimeSource.Monotonic,
+    private val sink: VoiceTelemetrySink = VoiceTelemetrySink.None,
+) {
     @Volatile
     private var since: TimeMark? = null
 
     /** Reports [name] with [attrs] and the time since the session started. */
-    fun event(name: String, vararg attrs: Pair<String, TelemetryValue>) =
-        Telemetry.event(TAG, name, *attrs, "tMs" attr since?.elapsedNow()?.inWholeMilliseconds)
+    fun event(name: String, vararg attrs: Pair<String, Any?>) =
+        sink.event(TAG, name, attrs.asList() + ("tMs" attr since?.elapsedNow()?.inWholeMilliseconds))
 
     /**
      * Voice mode started a session: the session's clock starts here. Reports whether the microphone
@@ -412,3 +413,22 @@ private class ReplyRowTelemetry(private val telemetry: VoiceTelemetry) {
         const val MAX_PENDING = 8
     }
 }
+
+/**
+ * Where voice mode's diagnostics go: one event named [event]'s `name` under `tag`, with its fields
+ * (names to a string, a number, a flag or null). Voice mode reports only states, reasons, ids, counts,
+ * levels and timings through it, never audio, transcript or reply text, an API key or an address.
+ */
+fun interface VoiceTelemetrySink {
+    /** Reports the event [name] under [tag] with [fields]. */
+    fun event(tag: String, name: String, fields: List<Pair<String, Any?>>)
+
+    /** Sinks. */
+    companion object {
+        /** Reports nothing. */
+        val None: VoiceTelemetrySink = VoiceTelemetrySink { _, _, _ -> }
+    }
+}
+
+/** One telemetry field: this name with [value] (a string, a number, a flag or null). */
+internal infix fun String.attr(value: Any?): Pair<String, Any?> = this to value

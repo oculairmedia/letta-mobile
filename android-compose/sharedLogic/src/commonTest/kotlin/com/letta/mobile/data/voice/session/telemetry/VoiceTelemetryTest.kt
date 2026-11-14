@@ -1,4 +1,4 @@
-package com.letta.mobile.data.voice.session
+package com.letta.mobile.data.voice.session.telemetry
 
 import com.letta.mobile.data.voice.SpeechSkipReason
 import com.letta.mobile.data.voice.SpeechStopReason
@@ -27,6 +27,7 @@ import com.letta.mobile.data.voice.responder.VoiceRunId
 import com.letta.mobile.data.voice.vad.TurnDiscardReason
 import com.letta.mobile.data.voice.vad.ear.EarTurnReport
 import com.letta.mobile.data.voice.vad.ear.SpeechTranscriber
+import com.letta.mobile.ui.chat.session.VoiceModeTelemetry
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryRecorder
 import kotlinx.coroutines.flow.Flow
@@ -60,7 +61,7 @@ class VoiceTelemetryTest {
     }
 
     private val clock = TestTimeSource()
-    private val telemetry = VoiceTelemetry(clock)
+    private val telemetry = VoiceTelemetry(clock, VoiceModeTelemetry)
 
     private fun voiceEvents(): List<Telemetry.Event> = recorder.events.value.filter { it.tag == "VoiceMode" }.reversed()
 

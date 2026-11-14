@@ -13,6 +13,12 @@ import com.letta.mobile.data.voice.endpoint.SpeechEndpointConfig
 import com.letta.mobile.data.voice.loop.VoiceEngines
 import com.letta.mobile.data.voice.responder.VoiceChatResponder
 import com.letta.mobile.data.voice.responder.VoiceChatSession
+import com.letta.mobile.data.voice.session.telemetry.TelemetryMouth
+import com.letta.mobile.data.voice.session.telemetry.TelemetryResponder
+import com.letta.mobile.data.voice.session.telemetry.TelemetryTranscriber
+import com.letta.mobile.data.voice.session.telemetry.TelemetryVoiceChatSession
+import com.letta.mobile.data.voice.session.telemetry.VoiceEarTelemetry
+import com.letta.mobile.data.voice.session.telemetry.VoiceTelemetry
 import com.letta.mobile.data.voice.vad.ear.SpeechTranscriber
 import com.letta.mobile.data.voice.vad.ear.VadEarConfig
 import com.letta.mobile.data.voice.vad.ear.VadVoiceEar

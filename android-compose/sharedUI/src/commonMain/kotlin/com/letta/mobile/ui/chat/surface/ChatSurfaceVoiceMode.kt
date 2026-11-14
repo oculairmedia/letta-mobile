@@ -16,6 +16,7 @@ import com.letta.mobile.ui.ambient.AmbientVoice
 import com.letta.mobile.ui.ambient.AmbientVoiceRole
 import com.letta.mobile.ui.ambient.LocalAmbientVoice
 import com.letta.mobile.ui.chat.surface.composer.voiceYouColor
+import com.letta.mobile.ui.chat.session.VoiceModeTelemetry
 import com.letta.mobile.ui.chat.voice.LocalVoiceSetup
 import com.letta.mobile.ui.chat.voice.VoiceModeHandle
 import com.letta.mobile.ui.chat.voice.newSpeechHttpEngine
@@ -42,7 +43,7 @@ internal fun rememberVoiceMode(sessions: VoiceChatSessions?): VoiceModeHandle? {
     val handle = remember(sessions, setup, audio, microphone, scope) {
         val engines = EndpointVoiceEngineFactory(audio, ::newSpeechHttpEngine)
         val runtime = VoiceLoopRuntime(scope, Dispatchers.Default)
-        VoiceModeHandle(VoiceModeController(sessions, setup.store, engines, microphone, runtime))
+        VoiceModeHandle(VoiceModeController(sessions, setup.store, engines, microphone, runtime, telemetrySink = VoiceModeTelemetry))
     }
     // The page's scope is still active here (it is forgotten after this effect); the teardown is
     // bounded by the loop's release budget and must outlive the page, so it is not its child.

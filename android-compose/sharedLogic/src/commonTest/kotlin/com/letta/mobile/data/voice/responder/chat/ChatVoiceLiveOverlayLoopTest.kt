@@ -20,9 +20,10 @@ import com.letta.mobile.data.voice.loop.VoiceEngines
 import com.letta.mobile.data.voice.loop.VoiceLoop
 import com.letta.mobile.data.voice.loop.VoiceLoopRuntime
 import com.letta.mobile.data.voice.responder.VoiceChatResponder
-import com.letta.mobile.data.voice.session.TelemetryResponder
-import com.letta.mobile.data.voice.session.TelemetryVoiceChatSession
-import com.letta.mobile.data.voice.session.VoiceTelemetry
+import com.letta.mobile.data.voice.session.telemetry.TelemetryResponder
+import com.letta.mobile.data.voice.session.telemetry.TelemetryVoiceChatSession
+import com.letta.mobile.data.voice.session.telemetry.VoiceTelemetry
+import com.letta.mobile.ui.chat.session.VoiceModeTelemetry
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryRecorder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -84,7 +85,7 @@ internal class ChatVoiceLiveOverlayLoopTest : ChatSendCoordinatorConversationFix
         val coordinator = coordinator(timeline, RecordingUiSink(), transport) { CONV }
         val live = MutableStateFlow<List<UiMessage>>(emptyList())
         val chat = ChatVoiceChatSession(FakeChatPage(), coordinator.identifiedSend, MutableStateFlow(ConversationId(CONV)), live)
-        val telemetry = VoiceTelemetry()
+        val telemetry = VoiceTelemetry(sink = VoiceModeTelemetry)
         val session = TelemetryVoiceChatSession(chat, telemetry)
         val log = EngineLog()
         val ear = FakeEar(log)

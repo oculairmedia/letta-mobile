@@ -8,6 +8,9 @@ import com.letta.mobile.data.voice.audio.pcm.VoiceLevelMeter
 import com.letta.mobile.data.voice.loop.VoiceLoop
 import com.letta.mobile.data.voice.loop.VoiceLoopRuntime
 import com.letta.mobile.data.voice.responder.VoiceChatSession
+import com.letta.mobile.data.voice.session.telemetry.VoiceTelemetry
+import com.letta.mobile.data.voice.session.telemetry.VoiceTelemetrySink
+import com.letta.mobile.data.voice.session.telemetry.diagnosticKey
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
@@ -75,7 +78,7 @@ enum class VoicePress {
  * Commands are applied in order by one coroutine in [runtime]'s scope and dispatcher; [sessions] is
  * opened on the thread that presses (the UI thread), so a host may read its own UI state there.
  * Nothing here logs audio, transcripts, addresses or keys; every `VoiceMode` event is timed on
- * [timeSource] from the session's `mode.started`.
+ * [timeSource] from the session's `mode.started` and goes to [telemetrySink].
  */
 class VoiceModeController(
     private val sessions: VoiceChatSessions,
@@ -85,8 +88,9 @@ class VoiceModeController(
     private val runtime: VoiceLoopRuntime,
     private val config: VoiceLoopConfig = VoiceLoopConfig(),
     timeSource: TimeSource = TimeSource.Monotonic,
+    telemetrySink: VoiceTelemetrySink = VoiceTelemetrySink.None,
 ) {
-    private val telemetry = VoiceTelemetry(timeSource)
+    private val telemetry = VoiceTelemetry(timeSource, telemetrySink)
     // overflow: one consumer applying presses in order; dropping one could lose a stop.
     private val commands = Channel<Command>(Channel.UNLIMITED)
     private val mutableState = MutableStateFlow<VoiceModeState>(VoiceModeState.Off)

@@ -68,8 +68,7 @@ internal fun DesktopAmbientChatBackground(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    // Voice mode: while it follows a voice (LocalAmbientVoice) the glow runs in that voice's colour
-    // at its level; without one, everything below is exactly the run's glow.
+    // Voice mode (LocalAmbientVoice): the glow takes that voice's colour and level; without one it is exactly the run's glow.
     val voice = LocalAmbientVoice.current
     val glowStatus = if (voice != null) AmbientMotionStatus.Running else status
     val spec = remember(glowStatus) { AmbientMotion.spec(glowStatus) }
@@ -134,16 +133,12 @@ internal fun DesktopAmbientChatBackground(
         }
     }
 
-    // Compiled once; null only if SkSL compilation fails, in which case the
-    // gradient fallback below takes over. Builder and paint are reused across
-    // frames (uniform writes overwrite) — only the per-frame Shader handle
-    // allocates. Drawn via the native Skia canvas because this Compose
-    // version's Shader type does not accept a raw skia Shader.
+    // Compiled once; null only if SkSL compilation fails, in which case the gradient fallback below takes over. Builder and paint are
+    // reused across frames (uniform writes overwrite) — only the per-frame Shader handle allocates. Drawn via the native Skia canvas
+    // because this Compose version's Shader type does not accept a raw skia Shader.
     //
-    // The failure branch is LOUD on purpose: a broken SkSL edit and "this GPU
-    // cannot run the shader" otherwise look identical from the outside — a
-    // subtly flatter glow that could ship unnoticed. Degradation is
-    // safe-direction, but it must still be greppable.
+    // The failure branch is LOUD on purpose: a broken SkSL edit and "this GPU cannot run the shader" otherwise look identical from the
+    // outside — a subtly flatter glow that could ship unnoticed. Degradation is safe-direction, but it must still be greppable.
     val glowStyle = LocalThinkingGlowStyle.current
     val shaderBuilder = remember(glowStyle) {
         val source = ambientGlowShaderSource(glowStyle) + AMBIENT_GLOW_MAIN_PREMULTIPLIED
@@ -160,10 +155,9 @@ internal fun DesktopAmbientChatBackground(
     }
     // Keyed with the builder: a style change disposes both together (the effect below).
     val shaderPaint = remember(glowStyle) { SkiaPaint() }
-    // The builder outlives individual frames, but not the composition: leaving
-    // and returning to Conversations disposes and recreates this pane, and each
-    // mount compiles another native-backed effect. Released explicitly rather
-    // than left to the cleaner, for the same reason the per-frame handles are.
+    // The builder outlives individual frames, but not the composition: leaving and returning to Conversations disposes and recreates this
+    // pane, and each mount compiles another native-backed effect. Released explicitly rather than left to the cleaner, for the same reason
+    // the per-frame handles are.
     DisposableEffect(shaderBuilder, shaderPaint) {
         onDispose {
             shaderPaint.shader = null
@@ -186,10 +180,8 @@ internal fun DesktopAmbientChatBackground(
                     shaderBuilder.uniform("uBandTop", AmbientMotion.PANE_EDGE_BAND.top)
                     shaderBuilder.uniform("uBandPeak", AmbientMotion.PANE_EDGE_BAND.peak)
                     shaderBuilder.uniform("uColor", tint.red, tint.green, tint.blue, tint.alpha)
-                    // One native Shader per frame is unavoidable (uniforms bake
-                    // in at makeShader time), but leaving it to the cleaner is
-                    // not: a long turn draws ~60/s, so the handles must be
-                    // released as soon as the draw that used them returns.
+                    // One native Shader per frame is unavoidable (uniforms bake in at makeShader time), but leaving it to the cleaner is
+                    // not: a long turn draws ~60/s, so the handles must be released as soon as the draw that used them returns.
                     val frameShader = shaderBuilder.makeShader(null)
                     shaderPaint.shader = frameShader
                     drawIntoCanvas { canvas ->

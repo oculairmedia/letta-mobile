@@ -47,12 +47,10 @@ import com.letta.mobile.util.Telemetry
 import kotlin.math.PI
 import kotlin.math.sin
 
-// Status drives BEHAVIOR here, not just tint (see AmbientMotion): uTime arrives
-// pre-integrated with the status speed, uAgitation scales the noise
-// displacement, uEnvelope scales intensity (bloom→settle for transient states).
-// The shader SOURCE lives in sharedLogic (AMBIENT_GLOW_SHADER_SOURCE) and is
-// compiled as AGSL here and as SkSL by the desktop renderer — one string, two
-// platforms, pixel-equivalent by construction.
+// Status drives BEHAVIOR here, not just tint (see AmbientMotion): uTime arrives pre-integrated with the status speed, uAgitation scales the
+// noise displacement, uEnvelope scales intensity (bloom→settle for transient states). The shader SOURCE lives in sharedLogic
+// (AMBIENT_GLOW_SHADER_SOURCE) and is compiled as AGSL here and as SkSL by the desktop renderer — one string, two platforms,
+// pixel-equivalent by construction.
 
 @Immutable
 enum class AmbientAgentStatus {
@@ -103,17 +101,15 @@ fun AmbientShaderAgentBackground(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val reducedMotion = rememberReducedMotionEnabled()
-    // Voice mode: while it follows a voice (LocalAmbientVoice) the glow runs in that voice's colour
-    // at its level; without one, everything below is exactly the run's glow.
+    // Voice mode (LocalAmbientVoice): the glow takes that voice's colour and level; without one it is exactly the run's glow.
     val voice = LocalAmbientVoice.current
     val following = voice != null
     val status = remember(agentStatus, following) { if (following) AmbientAgentStatus.Running else AmbientAgentStatus.from(agentStatus) }
     val spec = remember(status) { AmbientMotion.spec(status.toMotionStatus()) }
     val colorScheme = MaterialTheme.colorScheme
-    // The tint used to be a Material *container* role, which is low-chroma and lightish
-    // by construction, so the glow read as a wash rather than a colour. It is now built
-    // in HCT at an explicit tone and chroma from the hue the status already implies:
-    // dark and vivid, and adjacent to the theme rather than a palette of its own.
+    // The tint used to be a Material *container* role, which is low-chroma and lightish by construction, so the glow read as a wash rather
+    // than a colour. It is now built in HCT at an explicit tone and chroma from the hue the status already implies: dark and vivid, and
+    // adjacent to the theme rather than a palette of its own.
     val onDark = colorScheme.background.luminance() <= 0.5f
     val targetColor = remember(status, colorScheme, identitySeed, onDark, voice) {
         val hueSource = if (voice?.role == AmbientVoiceRole.You) Color(voice.youTintArgb) else when (status) {
@@ -139,9 +135,8 @@ fun AmbientShaderAgentBackground(
         label = "ambientAgentTint",
     )
 
-    // Speed glides between statuses so the breath rate never pops; the phase
-    // below integrates it continuously, so there is no wrap discontinuity the
-    // way scaling a looping 0..2π value would have.
+    // Speed glides between statuses so the breath rate never pops; the phase below integrates it continuously, so there is no wrap
+    // discontinuity the way scaling a looping 0..2π value would have.
     val speed by animateFloatAsState(
         targetValue = spec.speed,
         animationSpec = tween(durationMillis = if (reducedMotion) 0 else 600),
@@ -155,31 +150,27 @@ fun AmbientShaderAgentBackground(
         label = "ambientAgitation",
     )
 
-    // Intensity envelope: transient states snap to their bloom and decay to
-    // their settled value; continuous states ease to steady. Reduced motion
-    // jumps straight to settled — no bloom.
+    // Intensity envelope: transient states snap to their bloom and decay to their settled value; continuous states ease to steady. Reduced
+    // motion jumps straight to settled — no bloom.
     val envelope = remember { Animatable(spec.settledEnvelope) }
     LaunchedEffect(status, reducedMotion) {
-        // The ramp comes from the shared table, and it never steps the intensity: the
-        // bloom is climbed from wherever the glow already is. Snapping to it turned the
-        // end of a turn into a flash (AmbientMotion.ramp carries the measurement).
+        // The ramp comes from the shared table, and it never steps the intensity: the bloom is climbed from wherever the glow already is.
+        // Snapping to it turned the end of a turn into a flash (AmbientMotion.ramp carries the measurement).
         val ramp = AmbientMotion.ramp(current = envelope.value, status = status.toMotionStatus())
         if (reducedMotion) {
             envelope.snapTo(ramp.settledEnvelope)
             return@LaunchedEffect
         }
         if (ramp.risesFirst) {
-            // Ease IN to the bloom: an ease-out climb puts most of the brightening in its
-            // first frames, which is the flash again in miniature (measured at 39% of the
-            // whole climb in one frame). The decay below keeps its ease-out.
+            // Ease IN to the bloom: an ease-out climb puts most of the brightening in its first frames, which is the flash again in
+            // miniature (measured at 39% of the whole climb in one frame). The decay below keeps its ease-out.
             envelope.animateTo(ramp.bloomEnvelope, tween(durationMillis = ramp.riseMillis, easing = EaseInOutCubic))
         }
         envelope.animateTo(ramp.settledEnvelope, tween(durationMillis = ramp.settleMillis, easing = EaseOutCubic))
     }
 
-    // What colour the glow is actually handed, and whether the AGSL path or the gradient
-    // fallback is drawing it. A silent fallback looks exactly like "the colour did not
-    // change" on screen, and pixels alone cannot tell the two apart.
+    // What colour the glow is actually handed, and whether the AGSL path or the gradient fallback is drawing it. A silent fallback looks
+    // exactly like "the colour did not change" on screen, and pixels alone cannot tell the two apart.
     val shaderAvailable = rememberAmbientShader() != null
     LaunchedEffect(status, targetColor, shaderAvailable, onDark) {
         val hct = runCatching { Hct.fromInt(targetColor.toOpaqueArgbForTelemetry()) }.getOrNull()
@@ -327,14 +318,11 @@ private fun DrawScope.drawAmbientFallback(
     streamEnergy: Float,
 ) {
     val breath = 0.5f + 0.5f * sin(TwoPi * 0.0146f * phase)
-    // No noise field here; a second sine at an unrelated frequency scaled by
-    // agitation approximates the shader's drift so the fallback still gets
-    // livelier when the shader would.
+    // No noise field here; a second sine at an unrelated frequency scaled by agitation approximates the shader's drift so the fallback
+    // still gets livelier when the shader would.
     val wobble = sin(TwoPi * 0.0394f * phase) * 0.03f * agitation
-    // letta-mobile-shader-position-2026-08-06: anchor pushed from 0.92 to
-    // 0.985 so the bright zone sits at the very bottom edge; radius
-    // tightened (0.56 -> 0.46) so the band is short and subtle rather
-    // than broad — pairs with shader-side alpha narrowing for a thin
+    // letta-mobile-shader-position-2026-08-06: anchor pushed from 0.92 to 0.985 so the bright zone sits at the very bottom edge; radius
+    // tightened (0.56 -> 0.46) so the band is short and subtle rather than broad — pairs with shader-side alpha narrowing for a thin
     // under-composer glow.
     val radius = size.maxDimension * (0.46f + 0.12f * breath + wobble)
     val center = Offset(size.width * 0.5f, size.height * 0.985f)
