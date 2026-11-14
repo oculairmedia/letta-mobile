@@ -25,6 +25,7 @@ data class HostCanvasCaller(
     val agentId: String,
     val conversationId: String? = null,
     val toolCallId: String? = null,
+    /** Whether the host or runtime vouched for this scope; only a verified caller follows its conversation's mount. */
     val identity: CallerIdentity = CallerIdentity.CLAIMED,
 ) {
     /** [agentId] as the actor its canvas ops are stamped with. */
