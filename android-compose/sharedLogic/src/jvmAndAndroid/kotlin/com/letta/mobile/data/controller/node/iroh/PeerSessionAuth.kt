@@ -52,6 +52,14 @@ internal class PeerSessionAuth(
      */
     val authenticated = AtomicBoolean(policy.preAuthenticates(remoteId) || initiallyPaired)
 
+    /**
+     * Whether this connection was ever authenticated by bootstrap means: a bearer token, or the
+     * policy vouching for the NodeId (static allowlist, anonymous test mode) without a pairing
+     * record. It never clears, so redeeming an invite later on the same connection (one a
+     * bootstrap session could have minted itself) does not make this connection a paired device.
+     */
+    private val bootstrapped = AtomicBoolean(policy.preAuthenticates(remoteId) && !initiallyPaired)
+
     fun authenticate(token: String?, peerName: String?): Decision {
         val inviteSecret = inviteSecretOf(token)
         if (pairing != null && inviteSecret != null) return redeem(pairing, inviteSecret, peerName)
@@ -59,6 +67,7 @@ internal class PeerSessionAuth(
         return when (val outcome = verifier.verify(remoteId, token)) {
             IrohBearerAuthVerifier.Outcome.Authenticated -> {
                 pairedSession.set(false)
+                bootstrapped.set(true)
                 accept(Decision.Accepted(method = "bootstrap"))
             }
             else -> reject(outcome)
@@ -120,6 +129,19 @@ internal class PeerSessionAuth(
         return authenticated.get() && (required == IrohPeerCapabilities.NOTEBOOK_AUTHENTICATED ||
             IrohPeerCapabilities.isAllowed(capabilities, required))
     }
+
+    /**
+     * Whether this session is a paired device whose pairing record still exists: never a bootstrap
+     * session (bearer token, static allowlist or anonymous test mode), so a host-local process
+     * holding an admin token is not a paired device, and never a connection that began as one,
+     * even after it redeemed an invite.
+     */
+    fun isPairedDevice(): Boolean = listOf(
+        authenticated.get(),
+        pairedSession.get(),
+        !bootstrapped.get(),
+        pairing?.peer(remoteId) != null,
+    ).all { it }
 
     /** Agents this session may address; null = every agent (bootstrap sessions, unscoped peers). */
     fun agentScope(): Set<String>? =

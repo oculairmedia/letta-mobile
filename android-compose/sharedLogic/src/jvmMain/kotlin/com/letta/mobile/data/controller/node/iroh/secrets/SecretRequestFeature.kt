@@ -1,0 +1,129 @@
+package com.letta.mobile.data.controller.node.iroh.secrets
+
+import com.letta.mobile.data.controller.extras.HostExternalTool
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
+import com.letta.mobile.data.controller.node.iroh.adminError
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
+import com.letta.mobile.data.secrets.host.SecretItemScope
+import com.letta.mobile.data.secrets.host.SecretRequestService
+import com.letta.mobile.data.secrets.host.SecretRequestSettings
+import com.letta.mobile.data.secrets.journal.SecretRequestJournal
+import com.letta.mobile.data.secrets.wire.SecretRequestRouteWire
+import com.letta.mobile.plugin.keystore.KeystoreProvider
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.attr
+import kotlinx.serialization.json.JsonElement
+
+/**
+ * The secure secret-input flow on a JVM host (`docs/reference/contracts/secret-request-v1.md`):
+ * the admin RPC [routes] for the person's device and the `secret_request`
+ * tool for agents ([hostTools]), both over one [SecretRequestService].
+ *
+ * Built only by [forHost], which answers null (the host registers, advertises and offers nothing)
+ * unless the auth policy it is given is a secure one and a keystore provider is configured. Nothing
+ * in production calls [forHost] yet (no keystore provider exists), which is what keeps the feature
+ * inert today. The class lives in `jvmMain` because the keystore SPI does (owner decision 8): no
+ * other host can build it.
+ */
+class SecretRequestFeature internal constructor(policy: IrohAuthPolicy, internal val handlers: SecretRequestHandlers) {
+    /** The six routes; pass to [com.letta.mobile.data.controller.node.iroh.AdminRpcHostServices.secretRequestRoutes]. */
+    val routes: AdminRpcRoutes = SecretRequestRoutes(policy, handlers)
+
+    /** The agent-facing tool; offer it with the host's other tools, exactly when [routes] is registered. */
+    val hostTools: List<HostExternalTool> = listOf(SecretRequestTool(handlers))
+
+    /** The gated factory. */
+    companion object {
+        /**
+         * The feature for a host whose endpoint enforces [policy], writing through the keystore of
+         * [storage] and recording requests in its journal; null unless [policy] is paired peers
+         * only (bearer-token, allowlist and anonymous endpoints get nothing) or without a keystore.
+         *
+         * [itemScope] has no default on purpose: the host must say which items agents may name.
+         * [SecretItemScope.PerAgent] (each agent only under `agents/<its id>`) is the recommended
+         * choice; a [SecretItemScope.Shared] root is a deliberate, wider choice of the host owner.
+         * It replaces the scope in [settings].
+         *
+         * [policy] must be the very policy the serving endpoint enforces: this factory cannot see
+         * the endpoint, so the anonymous-policy check here and in [routes] is only as good as the
+         * value the wiring passes. The backstop does not depend on it: the human principal also
+         * needs a paired device by its stored record on every call, which no session of an
+         * anonymous endpoint without pairing ever is.
+         */
+        fun forHost(
+            policy: IrohAuthPolicy,
+            storage: SecretRequestStorage,
+            itemScope: SecretItemScope,
+            settings: SecretRequestSettings = SecretRequestSettings(),
+        ): SecretRequestFeature? {
+            val keystore = storage.keystore
+            if (keystore == null || !policy.admitsSecretRequests()) {
+                val reason = if (keystore == null) "no_keystore" else "insecure_policy"
+                Telemetry.event(SECRET_ROUTE_TAG, "feature.withheld", "reason" attr reason)
+                return null
+            }
+            val scoped = settings.copy(policy = settings.policy.copy(itemScope = itemScope))
+            return SecretRequestFeature(policy, SecretRequestHandlers(SecretRequestService(storage.journal, keystore, scoped)))
+        }
+    }
+}
+
+/**
+ * Where the feature writes values ([keystore]: none exists on any host yet) and keeps its
+ * requests ([journal]).
+ */
+data class SecretRequestStorage(
+    /** The keystore provider values are written through, or null when the host has none. */
+    val keystore: KeystoreProvider?,
+    /** The journal requests are recorded in. */
+    val journal: SecretRequestJournal,
+)
+
+/**
+ * Installs all six routes and advertises [SecretRequestRouteWire.CAPABILITY] under a secure
+ * [policy]; under the anonymous policy, nothing. Each call's principal comes from the request
+ * context the serving connection built ([SecretRequestCaller.Connection]); a refusal is a fixed
+ * code through [adminError]. No route logs its params or result.
+ */
+internal class SecretRequestRoutes(
+    private val policy: IrohAuthPolicy,
+    private val handlers: SecretRequestHandlers,
+) : AdminRpcRoutes {
+    override fun register(router: AdminRpcRouter) {
+        if (!policy.admitsSecretRequests()) {
+            Telemetry.event(SECRET_ROUTE_TAG, "routes.withheld", "reason" attr "insecure_policy")
+            return
+        }
+        SecretRequestRoute.entries.forEach { route ->
+            router.registerScoped(route.method) { params, context ->
+                handlers.handle(route, params, SecretRequestCaller.Connection(context), VIA_ADMIN_RPC).toAdminResult()
+            }
+        }
+        router.featureCapabilities += SecretRequestRouteWire.CAPABILITY
+        Telemetry.event(SECRET_ROUTE_TAG, "routes.registered")
+    }
+
+    private companion object {
+        const val VIA_ADMIN_RPC = "admin_rpc"
+    }
+}
+
+/** The admin RPC result, or the refusal as the router's failure envelope (`{"success": false, "error": <code>}`). */
+private fun SecretRouteAnswer.toAdminResult(): JsonElement = when (this) {
+    is SecretRouteAnswer.Ok -> result
+    is SecretRouteAnswer.Refused -> adminError(text)
+}
+
+/**
+ * Exhaustive on purpose: a new policy kind must decide here whether it may serve secret requests.
+ * Only a paired-peers-only endpoint does. A bearer-token or allowlist endpoint has bootstrap
+ * sessions holding `admin.full`, which can mint pairing invites, so on such a host "a paired
+ * device answered" would prove nothing about a person.
+ */
+internal fun IrohAuthPolicy.admitsSecretRequests(): Boolean = when (this) {
+    IrohAuthPolicy.PairedPeersOnly -> true
+    is IrohAuthPolicy.BearerToken -> false
+    is IrohAuthPolicy.PeerAllowlist -> false
+    IrohAuthPolicy.InsecureAnonymousForTestOnly -> false
+}

@@ -18,4 +18,9 @@ class AdminRpcHostServices(
     val beadsRoutes: AdminRpcRoutes? = null,
     /** Host-specific plugin routes; null registers capability-unavailable responses for plugin methods. */
     val pluginRoutes: AdminRpcRoutes? = null,
+    /**
+     * The secret request routes; null registers and advertises none. Only the JVM host can
+     * build them, and only with a paired-peers-only auth policy and a keystore provider; they register nothing otherwise.
+     */
+    val secretRequestRoutes: AdminRpcRoutes? = null,
 )

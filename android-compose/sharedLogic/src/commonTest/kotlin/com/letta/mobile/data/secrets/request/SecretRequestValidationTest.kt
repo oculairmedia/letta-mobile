@@ -48,6 +48,29 @@ class SecretRequestValidationTest {
     }
 
     @Test
+    fun aWordMixingLatinWithGreekOrCyrillicLookAlikesIsRefused() {
+        val lookAlikes = listOf("Key for p\u0430ypal", "\u0420ay the bill", "token for \u03bfpenai", "latency in \u03bcs")
+        for (purpose in lookAlikes) {
+            assertEquals(SecretRequestProblem.PURPOSE_NOT_PLAIN_TEXT, problemOf(request(purpose)), purpose)
+        }
+    }
+
+    @Test
+    fun sentencesInOneOrSeveralScriptsAndBareDomainsStayAccepted() {
+        val ordinary = listOf(
+            "\u041a\u043b\u044e\u0447 API \u0434\u043b\u044f \u0437\u0430\u043c\u0435\u0442\u043e\u043a",
+            "\u039a\u03bb\u03b5\u03b9\u03b4\u03af for the Greek office",
+            "na\u00efve caf\u00e9 r\u00e9sum\u00e9 token",
+            "latency budget in \u00b5s",
+            "Embeddings (notes index): token for api.openai.com",
+            "e.g. the GitHub token for ASP.NET, v2.1",
+        )
+        for (purpose in ordinary) {
+            assertEquals(null, problemOf(request(purpose)), purpose)
+        }
+    }
+
+    @Test
     fun itemNamesFollowTheKeystorePathGrammar() {
         val valid = listOf("openai", "team/openai", "a.b-c_d/e", "x/".repeat(15) + "y", "a".repeat(SecretRequestLimits.MAX_ITEM_LENGTH))
         valid.forEach { assertEquals(null, problemOf(withItem(it)), it) }

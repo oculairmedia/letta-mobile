@@ -64,7 +64,7 @@ class SecretRequestServiceTest {
         val id = harness.pending()
         assertEquals(SecretServiceResult.Ok(saved), harness.service.submit(HUMAN, id, secretOf("new-value")))
         assertEquals("new-value", harness.provider.storedText(TARGET_REF))
-        assertEquals(2, harness.provider.lent.size)
+        assertEquals(3, harness.provider.lent.size, "the creation-time check, the previous value and the read-back")
         assertTrue(harness.provider.lent.all(SecretValue::isWiped))
     }
 

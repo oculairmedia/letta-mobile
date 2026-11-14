@@ -42,14 +42,20 @@ class IrohAdminOwnershipMatrixTest {
         )
         val registered = router.registeredMethods
         val allDeclared = operations.map { it.requiredString("method") }.toSet()
-        val declared = allDeclared.filterNot { it.startsWith("beads.") }.toSet()
+        val secretMethods = com.letta.mobile.data.secrets.wire.SecretRequestRouteWire.METHODS
+        val declared = allDeclared.filterNot { it.startsWith("beads.") || it in secretMethods }.toSet()
 
         assertEquals(operations.size, allDeclared.size, "Duplicate method rows in the ownership matrix")
         assertEquals(
             com.letta.mobile.data.controller.node.iroh.beads.BeadsRoutes.reads.keys +
                 com.letta.mobile.data.controller.node.iroh.beads.BeadsRoutes.writes.keys,
-            allDeclared - declared,
+            allDeclared.filter { it.startsWith("beads.") }.toSet(),
             "Conditional Beads routes must all have ownership decisions",
+        )
+        assertEquals(
+            secretMethods,
+            allDeclared.filter { it.startsWith("secret.request") }.toSet(),
+            "Conditional secret request routes must all have ownership decisions",
         )
         assertEquals(
             emptySet(),

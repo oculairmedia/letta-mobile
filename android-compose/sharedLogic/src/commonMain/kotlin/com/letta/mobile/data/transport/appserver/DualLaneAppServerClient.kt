@@ -24,6 +24,9 @@ class DualLaneAppServerClient(
     override val isConnected: Flow<Boolean> = runtime.isConnected
     override val serverInfo: StateFlow<AppServerInfoData?> = runtime.serverInfo
 
+    /** The runtime lane delivers the tool call frames, so its trust is the one that counts. */
+    override val vouchesForRuntimeScope: Boolean get() = runtime.vouchesForRuntimeScope
+
     override suspend fun auth(command: AppServerCommand.Auth) = runtime.auth(command)
     override suspend fun appServerInfo(command: AppServerCommand.AppServerInfo) = runtime.appServerInfo(command)
     override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) = runtime.runtimeStart(command)

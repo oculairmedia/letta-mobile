@@ -159,6 +159,13 @@ enum class SecretFailureReason {
     /** The host stopped while the write was in progress. */
     @SerialName("interrupted")
     INTERRUPTED,
+
+    /**
+     * The slot held no value when the request was made but holds one now, so writing would replace
+     * a value the person was never told about; nothing was written.
+     */
+    @SerialName("target_changed")
+    TARGET_CHANGED,
 }
 
 /** What the agent learns about its request once it ends: never a value or a value's length. */
@@ -194,6 +201,14 @@ data class SecretRequestDetails(
     val target: SecretRequestTarget,
     /** The agent's purpose text. */
     val purpose: AuthoredPurpose,
+    /**
+     * Whether the target slot already held a value when the host created the request, as the host
+     * itself found out (never as the agent claimed). A client shows it as "this replaces an
+     * existing value". Only such a request may replace a value; a slot that appears after the
+     * request was made is never replaced ([SecretFailureReason.TARGET_CHANGED]). Never sent to the
+     * agent. Omitted on the wire when false.
+     */
+    val replacesExisting: Boolean = false,
 )
 
 /** When a request was made and when it expires, in epoch milliseconds. */

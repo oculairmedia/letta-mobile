@@ -130,6 +130,7 @@ class WireContractsTest {
         val inputs = mapOf(
             AdminRpcHostServices::class.java to setOf(
                 "controller", "subagentRegistrySource", "vibesyncBaseUrl", "beadsBaseUrl", "beadsTokenFile", "beadsRoutes", "pluginRoutes",
+                "secretRequestRoutes",
             ),
             AdminRpcNativeSources::class.java to setOf(
                 "nativeClient", "localBackendDir", "skillsListing", "slashCommands", "modelExposureFile", "wrapperRecords",
@@ -235,14 +236,7 @@ class WireContractsTest {
         try {
             runtime.start()
             val router = AdminRpcRegistry.buildRouter(
-                services = AdminRpcHostServices(
-                    controller = controller(state),
-                    subagentRegistrySource = rejectSubagentCalls(),
-                    vibesyncBaseUrl = "http://127.0.0.1:9",
-                    beadsBaseUrl = "http://127.0.0.1:9",
-                    beadsRoutes = beadsRoutes(),
-                    pluginRoutes = PluginAdminHandlers(runtime, InMemoryAssetStore()),
-                ),
+                services = fullServices(state, PluginAdminHandlers(runtime, InMemoryAssetStore())),
                 pairing = AdminRpcPairing(
                     pairingService = IrohPairingService(InMemoryPairedPeerStore()),
                     pairingQr = PairingQrConfig(PairQrSigner { _, _, _ -> error("Unexpected QR mint") }, "0".repeat(64)),
@@ -275,6 +269,29 @@ class WireContractsTest {
             dir.deleteRecursively()
         }
     }
+
+    private fun fullServices(state: AppServerControllerState, pluginRoutes: AdminRpcRoutes): AdminRpcHostServices =
+        AdminRpcHostServices(
+            controller = controller(state),
+            subagentRegistrySource = rejectSubagentCalls(),
+            vibesyncBaseUrl = "http://127.0.0.1:9",
+            beadsBaseUrl = "http://127.0.0.1:9",
+            beadsRoutes = beadsRoutes(),
+            pluginRoutes = pluginRoutes,
+            secretRequestRoutes = secretRequestRoutes(),
+        )
+
+    /** The real secret request routes under a secure policy over a test keystore; no fixture reaches a vault. */
+    private fun secretRequestRoutes(): AdminRpcRoutes = checkNotNull(
+        com.letta.mobile.data.controller.node.iroh.secrets.SecretRequestFeature.forHost(
+            com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy.PairedPeersOnly,
+            com.letta.mobile.data.controller.node.iroh.secrets.SecretRequestStorage(
+                com.letta.mobile.data.secrets.host.TestKeystoreProvider(),
+                com.letta.mobile.data.secrets.journal.InMemorySecretRequestJournal(),
+            ),
+            com.letta.mobile.data.secrets.host.SecretItemScope.PerAgent,
+        ),
+    ).routes
 
     private fun rejectSubagentCalls(): SubagentRegistrySource = object : SubagentRegistrySource {
         override suspend fun list(conversationId: String, includeTerminal: Boolean) = error("Unexpected subagent read")

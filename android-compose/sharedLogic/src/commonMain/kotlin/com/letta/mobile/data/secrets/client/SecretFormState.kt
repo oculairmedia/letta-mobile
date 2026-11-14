@@ -42,7 +42,7 @@ sealed interface SecretFormFailure {
 
     private companion object {
         /** Refusals after which the request is still pending and nothing was written. */
-        val RETRYABLE_REFUSALS = setOf(SecretServiceError.INVALID_VALUE, SecretServiceError.JOURNAL_UNAVAILABLE)
+        val RETRYABLE_REFUSALS = setOf(SecretServiceError.INVALID_VALUE, SecretServiceError.JOURNAL_UNAVAILABLE, SecretServiceError.BUSY)
     }
 }
 

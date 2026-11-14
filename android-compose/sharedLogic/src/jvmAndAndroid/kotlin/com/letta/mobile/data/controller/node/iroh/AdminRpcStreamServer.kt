@@ -295,7 +295,9 @@ internal class AdminRpcStreamServer(
         } catch (ce: CancellationException) {
             throw ce
         } catch (error: Exception) {
-            errorEnvelope("", "Failed to parse admin_rpc frame: ${error.message ?: error.toString()}")
+            // Fixed text: a JSON parser's message quotes the frame, and a frame can carry a secret
+            // (secret.request.submit).
+            errorEnvelope("", "Failed to parse admin_rpc frame (${error::class.simpleName})")
         }
     }
 

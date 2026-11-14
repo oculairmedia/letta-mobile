@@ -151,6 +151,15 @@ object SecretRequestLimits {
     /** The most requests one agent may have pending at once. */
     const val MAX_PENDING_PER_AGENT: Int = 8
 
+    /** The most requests one agent may create within [CREATION_WINDOW_MS] (a sliding window). */
+    const val MAX_CREATED_PER_WINDOW: Int = 8
+
+    /** The sliding window of [MAX_CREATED_PER_WINDOW], in milliseconds (15 minutes). */
+    const val CREATION_WINDOW_MS: Long = 15L * 60 * 1000
+
+    /** The most settled requests the journal keeps per agent; older ones are pruned first. */
+    const val MAX_SETTLED_PER_AGENT: Int = 16
+
     /** The most records a journal holds; a write that would exceed it is refused. */
     const val MAX_JOURNAL_RECORDS: Int = 512
 
