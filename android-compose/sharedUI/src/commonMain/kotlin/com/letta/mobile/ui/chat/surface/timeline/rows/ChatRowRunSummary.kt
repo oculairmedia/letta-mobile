@@ -123,7 +123,7 @@ internal fun SummaryLine(
         RunStatusGlyph(spec.tone, Modifier.testTag(spec.tags.glyph), spec.glyphLabel)
         RunSummaryTitleText(spec.title, runSummaryColor(spec.tone), reducedMotion, Modifier.weight(1f))
         trailing?.invoke(this)
-        if (disclosure != null) DisclosureChevron(expanded = disclosure.expanded)
+        if (disclosure != null) DisclosureChevron(expanded = disclosure.expanded, contentDescription = toggleLabel)
     }
 }
 

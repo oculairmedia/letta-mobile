@@ -109,16 +109,16 @@ private fun List<UiMessage>.turnLatencyMs(): Long? = asReversed()
     ?.takeIf { it >= 0L }
 
 /**
- * The idle time before each background command's report in the run: from when the work before the
- * report last finished (its message's time plus its longest tool's execution) to the report. A report
- * or neighbour without a timestamp counts no wait.
+ * The idle time before each background command's report in the run: from when the message right
+ * before the report finished (its time plus its longest tool's execution) to the report. A report, or
+ * a predecessor, without a timestamp counts no wait, so the run keeps its plain duration.
  */
 private fun List<UiMessage>.backgroundCommandWaitMs(): Long = indices.sumOf { commandWaitBefore(it) }
 
 private fun List<UiMessage>.commandWaitBefore(index: Int): Long {
     if (index == 0 || this[index].subagentNotification?.isCommand() != true) return 0L
     val reportedAt = parseTimestampEpochMillis(this[index].timestamp) ?: return 0L
-    val workedUntil = subList(0, index).asReversed().firstNotNullOfOrNull { it.finishedAtEpochMillis() } ?: return 0L
+    val workedUntil = this[index - 1].finishedAtEpochMillis() ?: return 0L
     return (reportedAt - workedUntil).coerceAtLeast(0L)
 }
 

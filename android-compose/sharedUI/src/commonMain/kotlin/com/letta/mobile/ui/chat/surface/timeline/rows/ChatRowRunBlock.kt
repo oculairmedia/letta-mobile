@@ -483,8 +483,8 @@ internal sealed interface RunStep {
  * Compacts a run into steps (feature-chat compactRunToolCallSteps): all of the run's tool calls
  * fold into ONE [RunStep.ToolCalls] at the first tool call's position; a message carrying both
  * prose and tool calls contributes its calls there and keeps its prose as its own step. A background
- * command's completed report starts a new group, so the open run lists the work before the report,
- * the report, then the work it woke, in that order.
+ * command's report (completed or failed) starts a new group, so the open run lists the work before the
+ * report, the report, then the work it woke, in that order.
  */
 internal fun compactRunSteps(messages: List<UiMessage>): List<RunStep> {
     if (messages.isEmpty()) return emptyList()
@@ -493,9 +493,9 @@ internal fun compactRunSteps(messages: List<UiMessage>): List<RunStep> {
     return steps
 }
 
-/** [this] cut before each completed command report, each report opening its own segment. */
+/** [this] cut before each command report, each report opening its own segment. */
 private fun List<UiMessage>.splitAtCommandReports(): List<List<UiMessage>> {
-    val starts = indices.filter { it == 0 || this[it].isFoldedCommandReport() }
+    val starts = indices.filter { it == 0 || this[it].subagentNotification?.isCommand() == true }
     return starts.mapIndexed { index, start -> subList(start, starts.getOrNull(index + 1) ?: size) }
 }
 
