@@ -144,46 +144,81 @@ object ConversationAdminHandlers {
         hiddenAgents: HiddenAgentIndex?,
         discovery: ConversationDiscovery?,
     ) {
-        val heldList = discovery?.heldList
         router.registerScoped("conversation.list") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
-            if (nativeClient != null && discovery != null) {
-                timedPhase(AdminRpcPhase.Discovery) {
-                    discovery.prime(context.authenticated, ::reportDiscoveryWarning) { id, remaining ->
-                        NativeAdmin.retrieveForDiscovery(nativeClient, ConversationId(id), remaining.milliseconds)
-                    }
-                }
-            }
+            primeDiscovery(nativeClient, discovery, context)
             val conversations = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationList) { c ->
                 if (wantsVisibleConversationPage(params)) {
-                    return@require hiddenAgents.visibleRecents(c, params, context, discovery)
+                    hiddenAgents.visibleRecents(c, params, context, discovery)
+                } else {
+                    requestedConversationList(c, params, discovery)
                 }
-                val own = suspend { listConversations(c, params)?.also { discovery?.remember(it) } }
-                // One agent's page (no summary search) is cut from the held full list: the App Server
-                // re-reads every conversation record per list call, so per-agent calls cost the same as
-                // a full one and a client listing agent by agent paid that once per agent.
-                // An empty or all-digit agent_id makes the App Server drop the filter, so those pass through.
-                val sliceable = !agentId.isNullOrEmpty() && agentId.toLongOrNull() == null &&
-                    param(params, AdminParamKey("summary_search")) == null
-                val held = heldList?.takeIf { sliceable }
-                if (held == null) own() else held.serve(
-                    fetchAll = { listAgentConversations(c)?.also { discovery.remember(it) } },
-                    fromFull = { full ->
-                        agentConversationPage(
-                            full,
-                            agent = AgentId(checkNotNull(agentId)),
-                            after = param(params, AdminParamKey("after"))?.let(::ConversationId),
-                            limit = param(params, AdminParamKey("limit")),
-                        )
-                    },
-                    fetchOwn = own,
-                )
             }
-            val scoped = scopeConversationList(conversations, context)
-            // letta-mobile-fxoew.9: the agent-wide chat list drops conversations owned by hidden
-            // (subagent) agents. A list asked for one agent explicitly is served as is.
-            if (agentId == null && hiddenAgents != null) dropHiddenAgentConversations(scoped, hiddenAgents) else scoped
+            scopeForCaller(conversations, context, agentWide = agentId == null, hiddenAgents)
         }
+    }
+
+    /** Surfaces conversations other processes created since the last pass, before the list is served. */
+    private suspend fun primeDiscovery(
+        nativeClient: AppServerClient?,
+        discovery: ConversationDiscovery?,
+        context: AdminRpcRequestContext,
+    ) {
+        if (nativeClient == null || discovery == null) return
+        timedPhase(AdminRpcPhase.Discovery) {
+            discovery.prime(context.authenticated, ::reportDiscoveryWarning) { id, remaining ->
+                NativeAdmin.retrieveForDiscovery(nativeClient, ConversationId(id), remaining.milliseconds)
+            }
+        }
+    }
+
+    /** The list the client asked for: one agent's page from the held full list where it can be, else the App Server's. */
+    private suspend fun requestedConversationList(
+        client: AppServerClient,
+        params: JsonObject?,
+        discovery: ConversationDiscovery?,
+    ): JsonArray? {
+        val own = suspend { listConversations(client, params)?.also { discovery?.remember(it) } }
+        val agent = heldListAgent(params) ?: return own()
+        val held = discovery?.heldList ?: return own()
+        return held.serve(
+            fetchAll = { listAgentConversations(client)?.also { discovery.remember(it) } },
+            fromFull = { full ->
+                agentConversationPage(
+                    full,
+                    agent = agent,
+                    after = param(params, AdminParamKey("after"))?.let(::ConversationId),
+                    limit = param(params, AdminParamKey("limit")),
+                )
+            },
+            fetchOwn = own,
+        )
+    }
+
+    /**
+     * One agent's page (no summary search) is cut from the held full list: the App Server
+     * re-reads every conversation record per list call, so per-agent calls cost the same as
+     * a full one and a client listing agent by agent paid that once per agent.
+     * An empty or all-digit agent_id makes the App Server drop the filter, so those pass through.
+     */
+    private fun heldListAgent(params: JsonObject?): AgentId? {
+        val agentId = param(params, AdminParamKey("agent_id"))
+        val sliceable = !agentId.isNullOrEmpty() && agentId.toLongOrNull() == null &&
+            param(params, AdminParamKey("summary_search")) == null
+        return if (sliceable) AgentId(agentId) else null
+    }
+
+    /** The list cut to the caller's scope; the agent-wide list also drops hidden agents' conversations. */
+    private fun scopeForCaller(
+        conversations: JsonElement,
+        context: AdminRpcRequestContext,
+        agentWide: Boolean,
+        hiddenAgents: HiddenAgentIndex?,
+    ): JsonElement {
+        val scoped = scopeConversationList(conversations, context)
+        // letta-mobile-fxoew.9: the agent-wide chat list drops conversations owned by hidden
+        // (subagent) agents. A list asked for one agent explicitly is served as is.
+        return if (agentWide && hiddenAgents != null) dropHiddenAgentConversations(scoped, hiddenAgents) else scoped
     }
 
     /**
@@ -456,54 +491,9 @@ object ConversationAdminHandlers {
         router.registerScoped("message.list") { params, context ->
             val convId = params.requireParam(AdminParamKey("conversation_id"))
             requireConversationAccess(context, convId)
-            val effectiveLimit = param(params, AdminParamKey("limit")) ?: MessageListPageGuard.DEFAULT_PAGE_LIMIT.toString()
-            val response = NativeAdmin.require(nativeClient, NativeAdminOp.MessageList) { c ->
-                val native = timedPhase(AdminRpcPhase.AppServer) {
-                    c.conversationMessagesList(
-                        nativeMessageList(
-                            ConversationId(convId),
-                            "limit" to effectiveLimit,
-                            "after" to param(params, AdminParamKey("after")),
-                            "before" to param(params, AdminParamKey("before")),
-                            "order" to param(params, AdminParamKey("order")),
-                        ),
-                    )
-                }
-                if (native.success) native.messages else null
-            }
-            val projected = MessageListWireProjection.projectMessageList(response, convId).let { wire ->
-                // Keep App Server membership, ordering and text authoritative. Enrich only
-                // exact user IDs already returned by this authorized page.
-                val rows = wire as? JsonArray ?: return@let wire
-                // Read from the transcript's end: a full parse cost grew with the conversation and
-                // ran again after every append during a live turn.
-                val local = localStore
-                    ?.let { store ->
-                        timedPhase(AdminRpcPhase.LocalStore) {
-                            store.newestMessageContents(ConversationId(convId), ENRICHMENT_WINDOW)
-                        }
-                    }
-                    ?.filterIsInstance<JsonObject>()?.associateBy { it["id"] } ?: return@let wire
-                JsonArray(rows.map { element ->
-                    val row = element as? JsonObject ?: return@map element
-                    if (row["message_type"]?.jsonPrimitive?.content != "user_message") return@map row
-                    val content = row["content"]
-                    if (content is JsonArray && content.any { (it as? JsonObject)?.get("type")?.jsonPrimitive?.content == "image" }) return@map row
-                    var imageBudget = 16_384
-                    val images = (local[row["id"]]?.get("content") as? JsonArray)?.filter {
-                        val image = it as? JsonObject
-                        val source = image?.get("source") as? JsonObject
-                        val size = source?.get("data")?.jsonPrimitive?.content?.length ?: 0
-                        val accepted = image?.get("type")?.jsonPrimitive?.content == "image" && size in 1..imageBudget
-                        if (accepted) imageBudget -= size
-                        accepted
-                    }.orEmpty()
-                    if (images.isEmpty()) row else {
-                        val textParts = if (content is JsonArray) content.toList() else listOf(JsonObject(mapOf("type" to JsonPrimitive("text"), "text" to (content ?: JsonPrimitive("")))))
-                        JsonObject(row + ("content" to JsonArray(textParts + images)))
-                    }
-                })
-            }
+            val conversation = ConversationId(convId)
+            val response = fetchMessagePage(nativeClient, params, conversation)
+            val projected = withLocalImages(MessageListWireProjection.projectMessageList(response, convId), localStore, conversation)
             MessageListPageGuard.bound(
                 MessageListIdentity.enrich(turnIdentity, convId, projected),
                 newestLast = param(params, AdminParamKey("order"))?.lowercase() != "desc",
@@ -521,6 +511,78 @@ object ConversationAdminHandlers {
             val msgId = params.requireParam(AdminParamKey("message_id"))
             retrieveMessageNative(nativeClient, convId, msgId, op = NativeAdminOp.ToolReturnGet)
         }
+    }
+
+    /** The App Server's page of [conversation] as the client asked for it, the default page size when it gave none. */
+    private suspend fun fetchMessagePage(
+        nativeClient: AppServerClient?,
+        params: JsonObject?,
+        conversation: ConversationId,
+    ): JsonElement {
+        val effectiveLimit = param(params, AdminParamKey("limit")) ?: MessageListPageGuard.DEFAULT_PAGE_LIMIT.toString()
+        return NativeAdmin.require(nativeClient, NativeAdminOp.MessageList) { c ->
+            val native = timedPhase(AdminRpcPhase.AppServer) {
+                c.conversationMessagesList(
+                    nativeMessageList(
+                        conversation,
+                        "limit" to effectiveLimit,
+                        "after" to param(params, AdminParamKey("after")),
+                        "before" to param(params, AdminParamKey("before")),
+                        "order" to param(params, AdminParamKey("order")),
+                    ),
+                )
+            }
+            if (native.success) native.messages else null
+        }
+    }
+
+    /**
+     * The projected page with images restored from the local transcript. Keep App Server
+     * membership, ordering and text authoritative. Enrich only exact user IDs already returned
+     * by this authorized page.
+     */
+    private suspend fun withLocalImages(
+        wire: JsonElement,
+        localStore: LocalBackendAdminStore?,
+        conversation: ConversationId,
+    ): JsonElement {
+        val rows = wire as? JsonArray ?: return wire
+        // Read from the transcript's end: a full parse cost grew with the conversation and
+        // ran again after every append during a live turn.
+        val local = localStore
+            ?.let { store ->
+                timedPhase(AdminRpcPhase.LocalStore) {
+                    store.newestMessageContents(conversation, ENRICHMENT_WINDOW)
+                }
+            }
+            ?.filterIsInstance<JsonObject>()?.associateBy { it["id"] } ?: return wire
+        return JsonArray(rows.map { element -> rowWithLocalImages(element, local) })
+    }
+
+    /** One row with the images its local copy holds, when it is a user message the App Server sent without any. */
+    private fun rowWithLocalImages(element: JsonElement, local: Map<JsonElement?, JsonObject>): JsonElement {
+        val row = element as? JsonObject ?: return element
+        if (!isUserMessageWithoutImages(row)) return row
+        val content = row["content"]
+        var imageBudget = 16_384
+        val images = (local[row["id"]]?.get("content") as? JsonArray)?.filter {
+            val image = it as? JsonObject
+            val source = image?.get("source") as? JsonObject
+            val size = source?.get("data")?.jsonPrimitive?.content?.length ?: 0
+            val accepted = image?.get("type")?.jsonPrimitive?.content == "image" && size in 1..imageBudget
+            if (accepted) imageBudget -= size
+            accepted
+        }.orEmpty()
+        if (images.isEmpty()) return row
+        val textParts = if (content is JsonArray) content.toList() else listOf(JsonObject(mapOf("type" to JsonPrimitive("text"), "text" to (content ?: JsonPrimitive("")))))
+        return JsonObject(row + ("content" to JsonArray(textParts + images)))
+    }
+
+    /** A user message the App Server sent without any image part. */
+    private fun isUserMessageWithoutImages(row: JsonObject): Boolean {
+        if (row["message_type"]?.jsonPrimitive?.content != "user_message") return false
+        val content = row["content"]
+        return !(content is JsonArray && content.any { (it as? JsonObject)?.get("type")?.jsonPrimitive?.content == "image" })
     }
 
     /**
