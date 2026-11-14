@@ -189,36 +189,33 @@ class LinePcmPlayerTest {
 
     @Test
     fun aFirstWriteThatNeverReturnsFailsWithinTheStallBudget() = runBlocking {
-        val speaker = FakeSpeaker(SpeakerScript(blockWrites = true))
-        val elapsed = measureTime {
-            val error = assertFailsWith<VoiceAudioException> { LinePcmPlayer(speaker, options).play(wavClip(2_400)) { } }
-            assertEquals(VoiceErrorCode.PLAYBACK_FAILED, error.code)
-        }
-        assertTrue(elapsed < 2.seconds, "took $elapsed")
-        assertEquals(listOf("abort", "release"), speaker.events.toList())
+        val speaker = assertFailsWithinTheStallBudget(SpeakerScript(blockWrites = true))
     }
 
     @Test
     fun aWriteThatBlocksAfterEverythingEarlierPlayedFails() = runBlocking {
-        val speaker = FakeSpeaker(SpeakerScript(jamAfterFirstWrite = true))
-        val elapsed = measureTime {
-            val error = assertFailsWith<VoiceAudioException> { LinePcmPlayer(speaker, options).play(wavClip(2_400)) { } }
-            assertEquals(VoiceErrorCode.PLAYBACK_FAILED, error.code)
-        }
-        assertTrue(elapsed < 2.seconds, "took $elapsed")
-        assertEquals(listOf("abort", "release"), speaker.events.toList())
+        val speaker = assertFailsWithinTheStallBudget(SpeakerScript(jamAfterFirstWrite = true))
     }
 
     @Test
     fun anEndOfStreamThatBlocksAfterTheClipPlayedFails() = runBlocking {
-        val speaker = FakeSpeaker(SpeakerScript(blockEndOfStream = true))
+        val speaker = assertFailsWithinTheStallBudget(SpeakerScript(blockEndOfStream = true))
+        assertEquals(2_400, speaker.written.size)
+    }
+
+    /**
+     * Plays a short clip on a speaker following [script] and asserts it fails with PLAYBACK_FAILED well
+     * inside the stall budget, the line aborted then released; returns the speaker for further checks.
+     */
+    private suspend fun assertFailsWithinTheStallBudget(script: SpeakerScript): FakeSpeaker {
+        val speaker = FakeSpeaker(script)
         val elapsed = measureTime {
             val error = assertFailsWith<VoiceAudioException> { LinePcmPlayer(speaker, options).play(wavClip(2_400)) { } }
             assertEquals(VoiceErrorCode.PLAYBACK_FAILED, error.code)
         }
         assertTrue(elapsed < 2.seconds, "took $elapsed")
-        assertEquals(2_400, speaker.written.size)
         assertEquals(listOf("abort", "release"), speaker.events.toList())
+        return speaker
     }
 
     @Test
