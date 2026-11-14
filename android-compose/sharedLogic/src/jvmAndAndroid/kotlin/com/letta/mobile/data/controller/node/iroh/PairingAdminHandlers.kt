@@ -129,7 +129,7 @@ object PairingAdminHandlers {
     }
 
     private fun createInvite(pairing: IrohPairingService, qr: QrMinting, params: JsonObject?): JsonElement {
-        val request = readInviteRequest(params)
+        val request = readInviteRequest(pairing, params)
         val wantQr = params?.get("qr")?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() == true
         pairing.pruneExpired()
         val invite = pairing.createInvite(request)
@@ -152,7 +152,7 @@ object PairingAdminHandlers {
         }
     }
 
-    private fun readInviteRequest(params: JsonObject?): IrohPairingService.InviteRequest {
+    private fun readInviteRequest(pairing: IrohPairingService, params: JsonObject?): IrohPairingService.InviteRequest {
         val name = params?.get("name")?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotBlank() }
             ?: "paired-peer"
         val ttlMs = params?.get("ttl_ms")?.jsonPrimitive?.contentOrNull?.toLongOrNull()
@@ -162,22 +162,22 @@ object PairingAdminHandlers {
         return IrohPairingService.InviteRequest(
             suggestedName = name,
             ttlMs = IrohPairingService.effectiveTtl(ttlMs),
-            capabilities = readGrant(params),
+            capabilities = readGrant(pairing.roles(), params),
             agentIds = agents,
         )
     }
 
-    /** Explicit `capabilities` win over `role`; neither => least-privilege chat. */
-    private fun readGrant(params: JsonObject?): Set<String> {
+    /** Explicit `capabilities` win over `role` (one of this host's [roles]); neither => least-privilege chat. */
+    private fun readGrant(roles: Map<String, Set<String>>, params: JsonObject?): Set<String> {
         readStringSet(params?.get("capabilities"))?.let { explicit ->
             if (explicit.isEmpty()) adminError("capabilities must not be empty")
             requireKnownCapabilities(explicit)
             return explicit
         }
         val role = params?.get("role")?.jsonPrimitive?.contentOrNull?.trim()?.lowercase()
-            ?: return IrohPeerCapabilities.CHAT_ROLE
-        return IrohPeerCapabilities.ROLES[role]
-            ?: adminError("unknown role: $role (expected ${IrohPeerCapabilities.ROLES.keys.sorted().joinToString("|")})")
+            ?: return roles.getValue("chat")
+        return roles[role]
+            ?: adminError("unknown role: $role (expected ${roles.keys.sorted().joinToString("|")})")
     }
 
     private fun requireKnownCapabilities(capabilities: Set<String>) {

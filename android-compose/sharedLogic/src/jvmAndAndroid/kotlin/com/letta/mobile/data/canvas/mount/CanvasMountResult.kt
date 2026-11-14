@@ -33,6 +33,9 @@ sealed interface CanvasMountResult {
         val canvas: CanvasId,
     ) : CanvasMountResult
 
+    /** The addressed agent default is durably absent: its conversations without a binding show their own canvas. */
+    data object DefaultCleared : CanvasMountResult
+
     /** Authorized for the scope, and the addressed record does not exist. Never returned before scope authorization. */
     data object None : CanvasMountResult
 

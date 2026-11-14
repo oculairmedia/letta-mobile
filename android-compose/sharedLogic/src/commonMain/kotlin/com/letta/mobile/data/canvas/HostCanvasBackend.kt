@@ -1,22 +1,33 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMount
+import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup
 import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.model.CanvasActorId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.model.ConversationId
-import kotlinx.coroutines.channels.Channel
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.channels.Channel
 
 /**
- * Who is calling a host canvas tool: the runtime scope the App Server stamped, never the input.
- * [toolCallId] is the call's own id in the run, for a tool that must answer
- * a retried call the same way.
+ * Who is calling a host canvas tool, never read from the tool input. [toolCallId] is the call's own id in the run,
+ * for a tool that must answer a retried call the same way. [identity] says whether [agentId] and [conversationId]
+ * are vouched for by the host or runtime or merely claimed: grants derived from the conversation's canvas
+ * mount apply only to a [CallerIdentity.VERIFIED] caller. It is copied from the tool caller a call arrives as, never
+ * decided here.
  */
-data class HostCanvasCaller(val agentId: String, val conversationId: String? = null, val toolCallId: String? = null) {
+data class HostCanvasCaller(
+    val agentId: String,
+    val conversationId: String? = null,
+    val toolCallId: String? = null,
+    /** Whether the host or runtime vouched for this scope; only a verified caller follows its conversation's mount. */
+    val identity: CallerIdentity = CallerIdentity.CLAIMED,
+) {
     /** [agentId] as the actor its canvas ops are stamped with. */
     val actor: CanvasActorId get() = CanvasActorId(agentId)
 }
@@ -44,6 +55,13 @@ sealed interface HostCanvasAccess {
  *   the canvas of the conversation its runtime is in, and no other: the App Server's runtime scope
  *   is the proof that the conversation is its own.
  * - A plugin element's props are held to [kinds], the plugin kinds this host has installed.
+ * - A call that names no canvas acts on the canvas [mounts] says the caller's own conversation is mounted on,
+ *   else that conversation's own canvas.
+ * - Owner decision D5: the canvas the caller's own conversation is mounted on NOW may also be read and written by
+ *   the caller, whatever its ACL says and even when only the relay holds it ([mountedHere], [relayOnlyEntry]). The grant is derived from the live mount at each check and never stored. A plugin's
+ *   placement resolves its board through [open] and [ownConversation] as the call it is attributed to, so it
+ *   inherits this grant too, background and late emits of that call included
+ *   (the plugin host's `CallerBoard`).
  */
 @OptIn(ExperimentalUuidApi::class)
 class HostCanvasBackend(
@@ -53,12 +71,17 @@ class HostCanvasBackend(
     private val newOpId: () -> CanvasOpId = { CanvasOpId("agent-op-${Uuid.random()}") },
     private val ackTimeout: Duration = DEFAULT_ACK_TIMEOUT,
     private val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
+    private val mounts: HostCanvasMountLookup<HostCanvasCaller> = HostCanvasMountLookup.none(),
 ) {
-    /** The canvas [canvasId] for [caller]: known to the directory, or its own conversation's. */
+    /**
+     * The canvas [canvasId] for [caller]: known to the directory, its own conversation's, or a canvas only the relay
+     * holds that the caller's own conversation is mounted on now (never created by asking).
+     */
     suspend fun open(caller: HostCanvasCaller, canvasId: CanvasId): HostCanvasAccess {
         directory.get(canvasId)?.let { return readable(caller, it) }
         val own = caller.conversationId?.let(::ConversationId)
         if (own != null && canvasId == CanvasId.forConversation(own)) return claimConversation(caller, own)
+        if (mounts.mountedHere(caller, canvasId)) relayOnlyEntry(store, canvasId)?.let { return HostCanvasAccess.Granted(it) }
         return HostCanvasAccess.Denied("Canvas not found: $canvasId")
     }
 
@@ -74,11 +97,32 @@ class HostCanvasBackend(
     }
 
     /**
-     * The canvas of the conversation [caller] runs in (claimed, so created, on first use), for a
-     * call that names no canvas; null when the caller is in no conversation.
+     * The canvas a call that names none acts on: the one the caller's own conversation is mounted on, else
+     * that conversation's own canvas (claimed, so created, on first use); null when the caller is in no
+     * conversation. The mount itself grants the caller access (D5); a mount that cannot be read, or a mounted
+     * canvas the host does not have, is refused, never swapped for another board.
      */
-    suspend fun ownConversation(caller: HostCanvasCaller): HostCanvasAccess? =
-        caller.conversationId?.let { conversation(caller, ConversationId(it), claim = true) }
+    suspend fun ownConversation(caller: HostCanvasCaller): HostCanvasAccess? {
+        val own = caller.conversationId?.let(::ConversationId) ?: return null
+        return when (val mounted = mounts.mountOf(caller)) {
+            HostCanvasMount.None -> conversation(caller, own, claim = true)
+            is HostCanvasMount.Mounted -> when (mounted.canvas) {
+                CanvasId.forConversation(own) -> conversation(caller, own, claim = true)
+                else -> open(caller, mounted.canvas)
+            }
+            HostCanvasMount.Unavailable -> HostCanvasAccess.Denied(MOUNT_UNAVAILABLE)
+        }
+    }
+
+    /** The canvas [caller]'s own conversation shows now (see [ownConversation]), or null when it is unknown. */
+    suspend fun currentCanvas(caller: HostCanvasCaller): CanvasId? {
+        val own = caller.conversationId?.let(::ConversationId) ?: return null
+        return when (val mounted = mounts.mountOf(caller)) {
+            HostCanvasMount.None -> CanvasId.forConversation(own)
+            is HostCanvasMount.Mounted -> mounted.canvas
+            HostCanvasMount.Unavailable -> null
+        }
+    }
 
     /** A new canvas of no conversation, owned by the local user, the caller its writer. */
     suspend fun create(caller: HostCanvasCaller, title: String): HostCanvasEntry {
@@ -88,11 +132,18 @@ class HostCanvasBackend(
         return directory.putIfAbsent(HostCanvasEntry(bound.value, topic, title, acl = aclFor(caller)))
     }
 
-    /** Every canvas [caller] may read, its own conversation's included. */
+    /** Every canvas [caller] may read, its own conversation's and the one it is mounted on now included. */
     suspend fun list(caller: HostCanvasCaller): List<HostCanvasEntry> {
         caller.conversationId?.let { conversation(caller, ConversationId(it), claim = false) }
-        return directory.all().filter { it.acl.canRead(caller.agentId) }
+        val known = directory.all()
+        // One mount lookup for the whole list; the grant covers only the canvas it names.
+        val mounted = (mounts.mountOf(caller) as? HostCanvasMount.Mounted)?.canvas
+        val readable = known.filter { it.acl.canRead(caller.agentId) || it.id == mounted }
+        return readable + listOfNotNull(relayOnlyMount(store, caller, mounted, known))
     }
+
+    /** Whether [caller] may write [entry] now: its ACL, or the live mount of its own conversation (D5). */
+    internal suspend fun mayWrite(caller: HostCanvasCaller, entry: HostCanvasEntry): Boolean = mounts.mayWrite(caller, entry)
 
     /** [entry]'s scene, projected from its whole log. */
     suspend fun scene(entry: HostCanvasEntry): HostCanvasScene {
@@ -146,7 +197,7 @@ class HostCanvasBackend(
      * with this; [publish] refuses on it.
      */
     suspend fun check(caller: HostCanvasCaller, entry: HostCanvasEntry, ops: List<CanvasOp>): HostCanvasCheck {
-        if (!entry.acl.canWrite(caller.agentId)) {
+        if (!mounts.mayWrite(caller, entry)) {
             return HostCanvasCheck.Denied("Unauthorized: actor '${caller.agentId}' cannot write to canvas '${entry.canvasId}'")
         }
         val scene = scene(entry)
@@ -174,17 +225,24 @@ class HostCanvasBackend(
         }
     }
 
+    /**
+     * Claims [conversationId]'s canonical canvas for [caller]. A relay that already bound the conversation's topic to
+     * any other id (any signed-in app may propose one) is refused as not found and nothing is recorded: adopting it
+     * would let a canvas id that names another conversation be stored as this one's.
+     */
     private suspend fun claimConversation(caller: HostCanvasCaller, conversationId: ConversationId): HostCanvasAccess {
         val topic = CanvasRelayProtocol.conversationTopic(conversationId)
-        val bound = store.bind(topic, CanvasId.forConversation(conversationId))
+        val canonical = CanvasId.forConversation(conversationId)
+        val bound = store.bind(topic, canonical)
+        if (bound != canonical) return HostCanvasAccess.Denied("Canvas not found: $canonical")
         val entry = directory.putIfAbsent(
             HostCanvasEntry(bound.value, topic, CONVERSATION_CANVAS_TITLE, conversationId.value, aclFor(caller)),
         )
         return readable(caller, entry)
     }
 
-    private fun readable(caller: HostCanvasCaller, entry: HostCanvasEntry): HostCanvasAccess =
-        if (entry.acl.canRead(caller.agentId)) {
+    private suspend fun readable(caller: HostCanvasCaller, entry: HostCanvasEntry): HostCanvasAccess =
+        if (mounts.mayRead(caller, entry)) {
             HostCanvasAccess.Granted(entry)
         } else {
             HostCanvasAccess.Denied("Unauthorized: actor '${caller.agentId}' cannot read canvas '${entry.canvasId}'")
@@ -195,6 +253,7 @@ class HostCanvasBackend(
 
     private companion object {
         const val CONVERSATION_CANVAS_TITLE = "Conversation canvas"
+        const val MOUNT_UNAVAILABLE = "The canvas mounted for this conversation could not be read; name a canvas_id"
 
         /** Generous: the relay acknowledges as soon as the op is durable, normally in the same call. */
         val DEFAULT_ACK_TIMEOUT: Duration = 10.seconds

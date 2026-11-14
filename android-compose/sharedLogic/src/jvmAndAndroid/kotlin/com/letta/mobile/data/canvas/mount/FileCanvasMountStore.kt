@@ -45,7 +45,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * package reach it only through [AuthorizedCanvasMounts], which authorizes scope, proposal and winner.
  *
  * Mutations never throw for storage failures; they return a [CanvasMountMutation] split at the record's
- * commit point (the atomic move inside [DurableHostFile.replace]):
+ * commit point (the atomic move inside [DurableHostFile.replace], or the delete inside [DurableHostFile.remove]):
  * - any failure before it, validation and directory barriers included, is [CanvasMountMutation.NotApplied];
  * - a failure at or after it, including a failure to release the stripe lock, is
  *   [CanvasMountMutation.OutcomeUnknown];
@@ -124,6 +124,17 @@ internal class FileCanvasMountStore internal constructor(
             write(file, Record(VERSION, hostId, agentId, null, canvasId.value))
         }
 
+    /**
+     * Durably removes only this agent's default, so its conversations without a binding fall back to their own
+     * canvas. [CanvasMountMutation.Removed.written] is false when there was no default; bindings are untouched.
+     */
+    override suspend fun clearDefault(agentId: AgentId): CanvasMountMutation =
+        mutation(agentId, null, null) { file ->
+            val existing = read(file, agentId, null)
+            syncDirectories()
+            if (existing == null) CanvasMountMutation.Removed(written = false) else remove(file)
+        }
+
     private suspend fun readKey(agent: AgentId, conversation: ConversationId?): CanvasId? = withContext(Dispatchers.IO) {
         validate(agent, conversation)
         val attributes = attributesOrNull(directory) ?: return@withContext null
@@ -141,7 +152,7 @@ internal class FileCanvasMountStore internal constructor(
     private suspend fun mutation(
         agent: AgentId,
         conversation: ConversationId?,
-        canvas: CanvasId,
+        canvas: CanvasId?,
         action: suspend (DurableHostFile) -> CanvasMountMutation,
     ): CanvasMountMutation {
         // Set once the record may have been replaced, so nothing later can report "not applied" or lose it.
@@ -173,15 +184,6 @@ internal class FileCanvasMountStore internal constructor(
         val kind = if (conversation == null) DEFAULT_RECORD else BINDING_RECORD
         val lock = lockDirectory.resolve("${hash.take(STRIPE_HEX_CHARS)}.lock")
         return DurableHostFile(directory.resolve("$kind-$hash.json"), lock, directorySync, hooks)
-    }
-
-    private fun ensureDirectory(path: Path) {
-        try {
-            Files.createDirectory(path)
-        } catch (_: FileAlreadyExistsException) {
-            // Existing directories are validated without following a substituted symlink.
-        }
-        require(attributesOrNull(path)?.isDirectory == true) { "Mount directory is not a directory" }
     }
 
     private fun syncDirectories() {
@@ -246,6 +248,22 @@ internal class FileCanvasMountStore internal constructor(
         const val DEFAULT_RECORD = "default"
         const val BINDING_RECORD = "binding"
     }
+}
+
+private fun ensureDirectory(path: Path) {
+    try {
+        Files.createDirectory(path)
+    } catch (_: FileAlreadyExistsException) {
+        // Existing directories are validated without following a substituted symlink.
+    }
+    require(attributesOrNull(path)?.isDirectory == true) { "Mount directory is not a directory" }
+}
+
+/** Removes [file]'s record, split at the delete as [DurableHostFile.remove] reports it. */
+private suspend fun remove(file: DurableHostFile): CanvasMountMutation = when (val outcome = file.remove()) {
+    DurableReplacement.Applied -> CanvasMountMutation.Removed(written = true)
+    is DurableReplacement.NotApplied -> CanvasMountMutation.NotApplied(outcome.cause)
+    is DurableReplacement.Unknown -> CanvasMountMutation.OutcomeUnknown
 }
 
 private fun attributesOrNull(path: Path): BasicFileAttributes? = try {

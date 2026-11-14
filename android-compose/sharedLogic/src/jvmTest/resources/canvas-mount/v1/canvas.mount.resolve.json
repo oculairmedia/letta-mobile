@@ -1,0 +1,110 @@
+{
+  "method": "canvas.mount.resolve",
+  "capability": "canvas.mount.v1",
+  "cases": [
+    {
+      "name": "binding",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0"
+      },
+      "result": {
+        "status": "found",
+        "canvas_id": "canvas-3f9a",
+        "source": "binding",
+        "durability": "durable"
+      }
+    },
+    {
+      "name": "agent-default-on-windows-host",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0"
+      },
+      "result": {
+        "status": "found",
+        "canvas_id": "canvas-3f9a",
+        "source": "default",
+        "durability": "entry_unconfirmed"
+      }
+    },
+    {
+      "name": "none",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0"
+      },
+      "result": {
+        "status": "none"
+      }
+    },
+    {
+      "name": "denied-scope-or-hidden-winner",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0"
+      },
+      "error": "canvas.mount.denied"
+    },
+    {
+      "name": "storage-failure",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0"
+      },
+      "result": {
+        "status": "unavailable",
+        "reason": "storage"
+      }
+    },
+    {
+      "name": "authority-unavailable",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0"
+      },
+      "result": {
+        "status": "unavailable",
+        "reason": "authority"
+      }
+    },
+    {
+      "name": "deadline",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0"
+      },
+      "result": {
+        "status": "unavailable",
+        "reason": "timeout_before_commit"
+      }
+    },
+    {
+      "name": "no-verified-identity",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0"
+      },
+      "result": {
+        "status": "unavailable",
+        "reason": "identity"
+      }
+    },
+    {
+      "name": "unknown-field",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a"
+      },
+      "error": "canvas.mount.invalid_input:params:unknown_field"
+    },
+    {
+      "name": "missing-conversation",
+      "params": {
+        "agent_id": "agent-7c1e"
+      },
+      "error": "canvas.mount.invalid_input:conversation_id:missing"
+    }
+  ]
+}

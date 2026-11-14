@@ -93,6 +93,29 @@ internal class DurableHostFile(
         return replace(text) { context.ensureActive() }
     }
 
+    /**
+     * Removes [path] under the same commit-point rules as [replace], the delete being the commit point: a failure
+     * before it (the parent sync, [DurableHostFileHooks.beforeMove], cancellation) or a delete that left the file in
+     * place is [DurableReplacement.NotApplied]; a failure after it (the directory sync) is [DurableReplacement.Unknown].
+     * An already absent file counts as removed.
+     */
+    suspend fun remove(): DurableReplacement {
+        val context = currentCoroutineContext()
+        runCatching {
+            directorySync(path.parent)
+            hooks.beforeMove()
+        }.exceptionOrNull()?.let { return notApplied(it) }
+        context.ensureActive()
+        runCatching { Files.deleteIfExists(path) }.exceptionOrNull()?.let { failure ->
+            return if (Files.exists(path, NOFOLLOW_LINKS)) notApplied(failure) else unknown(failure)
+        }
+        val confirmed = runCatching {
+            hooks.afterMove()
+            directorySync(path.parent)
+        }
+        return confirmed.exceptionOrNull()?.let(::unknown) ?: DurableReplacement.Applied
+    }
+
     private fun replace(text: String, checkpoint: () -> Unit): DurableReplacement {
         val temp = runCatching { stage(text) }.getOrElse { return notApplied(it) }
         return try {

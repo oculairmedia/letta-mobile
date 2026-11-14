@@ -17,11 +17,12 @@ data class PairedPeer(
     val name: String,
     val pairedAtMs: Long,
     /**
-     * Explicit capability grants. Records without the field keep the
-     * least-privilege desktop role they were paired under; admin.full is never
+     * Explicit capability grants. Records without the field keep the frozen
+     * pre-mount desktop role ([IrohPeerCapabilities.LEGACY_DESKTOP_ROLE]) they
+     * were paired under, never a later, wider desktop role; admin.full is never
      * implicit and must be granted deliberately.
      */
-    val capabilities: Set<String> = IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE,
+    val capabilities: Set<String> = IrohPeerCapabilities.LEGACY_DESKTOP_ROLE,
     /**
      * Agents this peer may address. Null = every agent
      * on the host (records paired before agent scoping keep that meaning); a
@@ -33,7 +34,7 @@ data class PairedPeer(
 )
 
 interface PairedPeerStore {
-    fun isPaired(nodeId: String): Boolean
+    fun isPaired(nodeId: String): Boolean = get(nodeId) != null
 
     fun get(nodeId: String): PairedPeer?
 
@@ -42,12 +43,16 @@ interface PairedPeerStore {
     fun save(peer: PairedPeer)
 
     fun remove(nodeId: String): Boolean
+
+    /**
+     * Applies [change] to every stored peer in ONE read-modify-write, so a concurrent pair or revoke is never lost
+     * or undone; writes only when some record changed and answers how many did.
+     */
+    fun updateEach(change: (PairedPeer) -> PairedPeer): Int
 }
 
 class InMemoryPairedPeerStore : PairedPeerStore {
     private val peers = mutableMapOf<String, PairedPeer>()
-
-    @Synchronized override fun isPaired(nodeId: String): Boolean = nodeId in peers
 
     @Synchronized override fun get(nodeId: String): PairedPeer? = peers[nodeId]
 
@@ -58,7 +63,21 @@ class InMemoryPairedPeerStore : PairedPeerStore {
     }
 
     @Synchronized override fun remove(nodeId: String): Boolean = peers.remove(nodeId) != null
+
+    @Synchronized override fun updateEach(change: (PairedPeer) -> PairedPeer): Int {
+        val changed = changedPeers(peers.values, change)
+        changed.forEach { peers[it.nodeId] = it }
+        return changed.size
+    }
 }
+
+/** [change] applied to [peer]; a change may never re-key a record (its node id is its identity). */
+private fun changedPeer(peer: PairedPeer, change: (PairedPeer) -> PairedPeer): PairedPeer =
+    change(peer).also { require(it.nodeId == peer.nodeId) { "a paired peer update may not change its node id" } }
+
+/** The peers [change] alters; a change may never re-key a record (its node id is its identity). */
+private fun changedPeers(peers: Collection<PairedPeer>, change: (PairedPeer) -> PairedPeer): List<PairedPeer> =
+    peers.mapNotNull { peer -> changedPeer(peer, change).takeIf { it != peer } }
 
 /**
  * JSON-file-backed store with atomic writes ([AtomicJsonFile]); the file holds
@@ -75,8 +94,6 @@ class InMemoryPairedPeerStore : PairedPeerStore {
 class FilePairedPeerStore(private val path: Path) : PairedPeerStore {
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
-    override fun isPaired(nodeId: String): Boolean = load().containsKey(nodeId)
-
     override fun get(nodeId: String): PairedPeer? = load()[nodeId]
 
     override fun list(): List<PairedPeer> = load().values.sortedBy { it.pairedAtMs }
@@ -90,6 +107,13 @@ class FilePairedPeerStore(private val path: Path) : PairedPeerStore {
         val present = nodeId in current
         if (present) persist(current - nodeId)
         present
+    }
+
+    override fun updateEach(change: (PairedPeer) -> PairedPeer): Int = AtomicJsonFile.withProcessLock(path) {
+        val current = load()
+        val changed = changedPeers(current.values, change)
+        if (changed.isNotEmpty()) persist(current + changed.associateBy { it.nodeId })
+        changed.size
     }
 
     private fun load(): Map<String, PairedPeer> {

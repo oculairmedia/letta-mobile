@@ -1,0 +1,51 @@
+{
+  "method": "canvas.mount.default.set",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountRoutes.kt",
+  "cases": [
+    {
+      "name": "no-verified-identity",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected"
+      },
+      "params": {
+        "agent_id": "agent-7c1e",
+        "canvas_id": "canvas-3f9a"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "status": "unavailable",
+          "reason": "identity"
+        }
+      }
+    },
+    {
+      "name": "agent-outside-peer-scope",
+      "context": {
+        "authenticated": true,
+        "authorized_agent_ids": [
+          "agent-other"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected"
+      },
+      "params": {
+        "agent_id": "agent-7c1e",
+        "canvas_id": "canvas-3f9a"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "forbidden: agent not in this device's scope"
+      }
+    }
+  ]
+}

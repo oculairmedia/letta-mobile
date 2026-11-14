@@ -80,12 +80,18 @@ class IrohAccessOptions : OptionGroup(name = "Iroh access control (d6e8g / dpv7m
         pairingEnabled = !pairingStoreFile.isNullOrBlank(),
     )
 
-    /** The pairing service over the shared on-disk stores, or null when pairing is off. */
-    fun pairingService(log: (String) -> Unit): IrohPairingService? {
-        val peers = pairingStoreFile?.takeIf { it.isNotBlank() }?.let { Path.of(it) } ?: return null
+    /** The paired-peer store file, or null when pairing is off. */
+    fun pairedPeerStorePath(): Path? = pairingStoreFile?.takeIf { it.isNotBlank() }?.let { Path.of(it) }
+
+    /**
+     * The pairing service over the shared on-disk stores, or null when pairing is off. Its roles carry the canvas
+     * mount capabilities only when [canvasMountsEnabled] (`--enable-canvas-mounts`).
+     */
+    fun pairingService(log: (String) -> Unit, canvasMountsEnabled: Boolean = false): IrohPairingService? {
+        val peers = pairedPeerStorePath() ?: return null
         val invites = PairingStorePaths.inviteStore(peers, pairingInviteStoreFile)
         log("[iroh-app-server] Pairing enabled (store: $peers, invites: $invites)")
-        return IrohPairingService(FilePairedPeerStore(peers), FilePairingInviteStore(invites))
+        return IrohPairingService(FilePairedPeerStore(peers), FilePairingInviteStore(invites), mountsEnabled = canvasMountsEnabled)
     }
 
     /**

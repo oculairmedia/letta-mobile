@@ -1,0 +1,76 @@
+package com.letta.mobile.data.controller.node.iroh
+
+import com.letta.mobile.data.controller.node.iroh.mounts.upgrade.CanvasMountDeviceUpgrade
+import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+
+/**
+ * The pairing service's per-device mutators change the record under the store's lock, so a concurrent writer in
+ * another process (the one-time mount capability upgrade, the host `pair` command) is never overwritten by a stale copy.
+ */
+class PairedPeerLockedUpdateTest {
+    private val node = "d".repeat(64)
+
+    @Test
+    fun aRenameRacingTheCapabilityUpgradeKeepsBothChanges() {
+        repeat(RACES) { round ->
+            val file = Files.createTempDirectory("paired-peer-race").resolve("paired-peers.json")
+            FilePairedPeerStore(file).save(PairedPeer(node, "before", 1L, capabilities = IrohPeerCapabilities.CHAT_ROLE))
+            val pairing = IrohPairingService(FilePairedPeerStore(file))
+            val upgrade = CanvasMountDeviceUpgrade.forPairingStore(file)
+            val start = CountDownLatch(1)
+            val renamer = thread { start.await(); pairing.rename(node, "after-$round") }
+            val upgrader = thread { start.await(); upgrade.runOnce() }
+            start.countDown()
+            renamer.join()
+            upgrader.join()
+
+            val stored = checkNotNull(FilePairedPeerStore(file).get(node))
+            assertEquals("after-$round", stored.name, "round $round lost the rename")
+            val upgraded = IrohPeerCapabilities.CHAT_ROLE + IrohPeerCapabilities.MOUNT_CAPABILITIES
+            assertEquals(upgraded, stored.capabilities, "round $round lost the upgrade")
+        }
+    }
+
+    @Test
+    fun aLockedChangeWritesOnlyAChangeAndNeverCreatesARecord() {
+        val file = Files.createTempDirectory("paired-peer-update").resolve("paired-peers.json")
+        val store = FilePairedPeerStore(file)
+        val pairing = IrohPairingService(store)
+        assertNull(pairing.rename(node, "ghost"), "an unpaired node is not created")
+        assertFalse(Files.exists(file), "nothing is written for an unpaired node")
+        store.save(PairedPeer(node, "name", 1L))
+        val written = Files.getLastModifiedTime(file)
+        assertEquals("name", pairing.rename(node, "name")?.name)
+        assertEquals(written, Files.getLastModifiedTime(file), "an unchanged record is not rewritten")
+        assertEquals(listOf(node), store.list().map { it.nodeId })
+    }
+
+    @Test
+    fun touchSetAgentsAndSetCapabilitiesGoThroughTheLockedUpdate() {
+        val store = InMemoryPairedPeerStore()
+        store.save(PairedPeer(node, "name", 1L, capabilities = IrohPeerCapabilities.CHAT_ROLE))
+        var now = 10_000_000L
+        val pairing = IrohPairingService(store, nowMs = { now })
+        pairing.touch(node)
+        assertEquals(now, store.get(node)?.lastSeenAtMs)
+        val seen = now
+        now += 1
+        pairing.touch(node)
+        assertEquals(seen, store.get(node)?.lastSeenAtMs, "a touch within the interval is throttled")
+        assertEquals(setOf("agent-a"), pairing.setAgentScope(node, setOf("agent-a"))?.agentIds)
+        val narrowed = setOf(IrohPeerCapabilities.CHAT_READ)
+        assertEquals(narrowed, pairing.setCapabilities(node, narrowed)?.capabilities)
+        assertNull(pairing.rename("e".repeat(64), "nobody"))
+        assertEquals(setOf("agent-a"), store.get(node)?.agentIds)
+    }
+
+    private companion object {
+        const val RACES = 20
+    }
+}

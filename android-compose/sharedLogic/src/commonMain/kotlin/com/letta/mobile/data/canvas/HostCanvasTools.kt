@@ -99,8 +99,9 @@ object HostCanvasTools {
     }
 
     /**
-     * The canvases [caller] may read, its own conversation's first and marked `current`: an agent
-     * picking the first entry used to draw on another conversation's board.
+     * The canvases [caller] may read, the one its own conversation shows first and marked `current` (the
+     * conversation's mounted canvas, else its own): an agent picking the first entry used to draw on another
+     * conversation's board.
      */
     private suspend fun list(backend: HostCanvasBackend, caller: HostCanvasCaller, input: JsonObject): ExternalToolResult {
         val conversationId = HostCanvasToolInputs.string(input, "conversation_id")
@@ -109,7 +110,13 @@ object HostCanvasTools {
         } else {
             listOfNotNull((backend.conversation(caller, ConversationId(conversationId), claim = false) as? HostCanvasAccess.Granted)?.entry)
         }
-        val listed = entries.map { it.listed(current = it.conversationId != null && it.conversationId == caller.conversationId) }
+        val current = backend.currentCanvas(caller)
+        val ownCanvas = caller.conversationId?.let { CanvasId.forConversation(ConversationId(it)) }
+        val listed = entries.map { entry ->
+            // The conversation's own canvas is found by its conversation, as before mounts: its bound id may differ.
+            val isCurrent = if (current == ownCanvas) entry.conversationId == caller.conversationId else entry.id == current
+            entry.listed(current = current != null && isCurrent)
+        }
             .sortedByDescending { it.current }
         return success(CanvasListResult(ids = listed.map { it.canvasId }, canvases = listed))
     }
@@ -118,7 +125,7 @@ object HostCanvasTools {
 
     /**
      * `canvas_compose` on the host: the canvas resolved as every other tool
-     * resolves it ([withCanvas]'s rules), the caller held to its ACL, then [CanvasComposeHosting]
+     * resolves it ([withCanvas]'s rules), the caller held to its ACL or its live mount, then [CanvasComposeHosting]
      * compiles, checks against the log's scene and publishes through [HostCanvasBackend.publish],
      * which checks again, stamps the ops as the caller's and sends them to the relay as ONE batch
      * op, so the artifact lands whole or not at all.
@@ -137,7 +144,7 @@ object HostCanvasTools {
                 return hosting.refused(CanvasComposeHosting.deniedCode(access.reason), access.reason)
             null -> return hosting.refused(ComposeErrorCode.CANVAS_NOT_FOUND, NO_DEFAULT_CANVAS)
         }
-        if (!entry.acl.canWrite(caller.agentId)) {
+        if (!backend.mayWrite(caller, entry)) {
             val reason = "Unauthorized: actor '${caller.agentId}' cannot write to canvas '${entry.canvasId}'"
             return hosting.refused(ComposeErrorCode.UNAUTHORIZED, reason)
         }
@@ -224,7 +231,7 @@ private class HostCanvasTool(
             return ExternalToolResult.Error("$failurePrefix: canvas tools require an authenticated agent identity")
         }
         return try {
-            run(HostCanvasCaller(agentId, caller.conversationId, caller.toolCallId), input)
+            run(HostCanvasCaller(agentId, caller.conversationId, caller.toolCallId, caller.identity), input)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {
