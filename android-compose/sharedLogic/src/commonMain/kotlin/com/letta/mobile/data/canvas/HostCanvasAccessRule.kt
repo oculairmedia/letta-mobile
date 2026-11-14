@@ -37,7 +37,7 @@ internal suspend fun HostCanvasMountLookup<HostCanvasCaller>.mountOf(caller: Hos
 
 /** Whether [this] caller's scope may follow its conversation's mount: stamped by the runtime, in a conversation. */
 private val HostCanvasCaller.followsMounts: Boolean
-    get() = conversationId != null && identity == CallerIdentity.VERIFIED
+    get() = conversationId != null && identity.isVerified
 
 /** The mounted canvas, typed. */
 internal val HostCanvasMount.Mounted.canvas: CanvasId get() = CanvasId(canvasId)
