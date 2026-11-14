@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.components.foundation
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -43,7 +44,7 @@ import kotlin.test.assertTrue
 
 class LettaFoundationPartsTest {
     @Test
-    fun aStatusDotIsOneSizeAndEachToneOneDistinctColour() = runDesktopComposeUiTest {
+    fun aStatusDotIsOneSizeAndEachToneOneDistinctColour() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
         val colours = mutableMapOf<LettaStatusTone, Color>()
         setFoundationContent {
             Row {
@@ -60,13 +61,13 @@ class LettaFoundationPartsTest {
     }
 
     @Test
-    fun aStatusLabelCarriesItsWords() = runDesktopComposeUiTest {
+    fun aStatusLabelCarriesItsWords() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
         setFoundationContent { LettaStatusLabel("Syncing", LettaStatusTone.Running) }
         onNodeWithText("Syncing").assertExists()
     }
 
     @Test
-    fun aSwatchIsARadioChoiceWithAFullTouchTarget() = runDesktopComposeUiTest {
+    fun aSwatchIsARadioChoiceWithAFullTouchTarget() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
         var picked = 0
         setFoundationContent {
             LettaColorSwatch(Color.Red, selected = true, modifier = Modifier.testTag(SWATCH), contentDescription = "Color red", onClick = { picked++ })
@@ -84,7 +85,7 @@ class LettaFoundationPartsTest {
     @Test
     fun anEmptyStateCentresItsWordsAndAction() {
         FOUNDATION_WIDTHS.forEach { width ->
-            runDesktopComposeUiTest {
+            runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
                 var acted = false
                 setFoundationContent(width) {
                     LettaEmptyState(
@@ -105,13 +106,13 @@ class LettaFoundationPartsTest {
     }
 
     @Test
-    fun aNavChevronIsADecorativeGlyphAtTheScale() = runDesktopComposeUiTest {
+    fun aNavChevronIsADecorativeGlyphAtTheScale() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
         setFoundationContent { LettaNavChevron(Modifier.testTag(CHEVRON)) }
         onNodeWithTag(CHEVRON).assertWidthIsEqualTo(LettaControlTokens.icon).assertHeightIsEqualTo(LettaControlTokens.icon)
     }
 
     @Test
-    fun dividersAreOneHairline() = runDesktopComposeUiTest {
+    fun dividersAreOneHairline() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
         setFoundationContent(FOUNDATION_WIDTHS.last()) {
             Column {
                 LettaDivider(Modifier.testTag(HORIZONTAL))
@@ -123,12 +124,16 @@ class LettaFoundationPartsTest {
     }
 
     @Test
-    fun aClickableRowAnnouncesItsRoleAndIsATouchTargetTall() = runDesktopComposeUiTest {
+    fun aClickableRowAnnouncesItsRoleAndIsATouchTargetTall() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
         var clicks = 0
         setFoundationContent {
-            Text("Runs", Modifier.testTag(ROW).lettaClickable(role = Role.Tab, onClickLabel = "Open runs") { clicks++ })
+            // The box measures the row's layout, touch target included.
+            Box(Modifier.testTag(ROW)) {
+                Text("Runs", Modifier.lettaClickable(role = Role.Tab, onClickLabel = "Open runs") { clicks++ })
+            }
         }
-        onNodeWithTag(ROW).assert(hasRole(Role.Tab)).assert(hasClickAction()).assertHeightIsEqualTo(LettaControlTokens.minTouchTarget).performClick()
+        onNodeWithTag(ROW).assertHeightIsEqualTo(LettaControlTokens.minTouchTarget)
+        onNodeWithText("Runs").assert(hasRole(Role.Tab)).assert(hasClickAction()).performClick()
         assertEquals(1, clicks)
     }
 

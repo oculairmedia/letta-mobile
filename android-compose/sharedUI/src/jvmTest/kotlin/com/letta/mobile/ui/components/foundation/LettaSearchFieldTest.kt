@@ -28,7 +28,7 @@ class LettaSearchFieldTest {
     @Test
     fun theFieldFillsItsWidthAndClearsWhatWasTyped() {
         FOUNDATION_WIDTHS.forEach { width ->
-            runDesktopComposeUiTest {
+            runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
                 var query by mutableStateOf("")
                 setFoundationContent(width) {
                     LettaSearchField(query = query, onQueryChange = { query = it }, modifier = Modifier.testTag(FIELD))
@@ -47,7 +47,7 @@ class LettaSearchFieldTest {
     @Test
     fun theInlineFieldFillsItsWidthAndKeepsItsHeightWhileTyping() {
         FOUNDATION_WIDTHS.forEach { width ->
-            runDesktopComposeUiTest {
+            runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
                 setFoundationContent(width) {
                     var query by remember { mutableStateOf("") }
                     LettaInlineSearchField(

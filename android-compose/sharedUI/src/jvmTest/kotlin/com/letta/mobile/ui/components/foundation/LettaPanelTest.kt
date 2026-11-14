@@ -21,7 +21,7 @@ import kotlin.test.assertEquals
 
 class LettaPanelTest {
     @Test
-    fun eachToneSetsItsOwnContentColour() = runDesktopComposeUiTest {
+    fun eachToneSetsItsOwnContentColour() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
         val seen = mutableMapOf<LettaPanelTone, Pair<Color, Color>>()
         setFoundationContent {
             LettaPanelTone.entries.forEach { tone ->
@@ -37,7 +37,7 @@ class LettaPanelTest {
     }
 
     @Test
-    fun theErrorPanelUsesTheErrorContainer() = runDesktopComposeUiTest {
+    fun theErrorPanelUsesTheErrorContainer() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
         var expected = Color.Unspecified
         var actual = Color.Unspecified
         setFoundationContent {
@@ -51,7 +51,7 @@ class LettaPanelTest {
     @Test
     fun aNoticeFillsItsWidthAndOffersItsActions() {
         FOUNDATION_WIDTHS.forEach { width ->
-            runDesktopComposeUiTest {
+            runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
                 var acted = 0
                 var dismissed = 0
                 setFoundationContent(width) {

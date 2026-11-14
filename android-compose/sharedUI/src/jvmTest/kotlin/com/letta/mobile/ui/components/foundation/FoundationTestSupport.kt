@@ -19,6 +19,10 @@ import com.letta.mobile.ui.theme.SharedMaterialTheme
 /** The phone and desktop widths every width-dependent foundation component is checked at. */
 internal val FOUNDATION_WIDTHS: List<Dp> = listOf(360.dp, 1200.dp)
 
+/** A test window wider and taller than the widest checked width, so a 1200 dp box is not clipped to the default window. */
+internal const val FOUNDATION_WINDOW_WIDTH = 1400
+internal const val FOUNDATION_WINDOW_HEIGHT = 900
+
 /** Sets [content] in the shared theme inside a box [width] wide, as a page would host it. */
 internal fun ComposeUiTest.setFoundationContent(width: Dp = FOUNDATION_WIDTHS.first(), content: @Composable () -> Unit) {
     setContent {

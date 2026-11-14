@@ -27,7 +27,7 @@ class LettaToggleRowTest {
     @Test
     fun theWholeRowIsOneSwitchAtLeastATouchTargetTall() {
         FOUNDATION_WIDTHS.forEach { width ->
-            runDesktopComposeUiTest {
+            runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
                 var checked by mutableStateOf(false)
                 setFoundationContent(width) {
                     LettaToggleRow(
@@ -48,7 +48,7 @@ class LettaToggleRowTest {
     }
 
     @Test
-    fun aDisabledRowIgnoresTaps() = runDesktopComposeUiTest {
+    fun aDisabledRowIgnoresTaps() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
         var checked by mutableStateOf(false)
         setFoundationContent {
             LettaToggleRow("Sync", checked, { checked = it }, Modifier.testTag(ROW), enabled = false)

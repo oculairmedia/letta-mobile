@@ -23,7 +23,7 @@ import kotlin.test.assertEquals
 
 class LettaIconTest {
     @Test
-    fun anIconDrawsAtTheScalesGlyphSizeByDefault() = runDesktopComposeUiTest {
+    fun anIconDrawsAtTheScalesGlyphSizeByDefault() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
         setFoundationContent {
             Row {
                 LettaIcon(LettaIcons.Search, contentDescription = null, modifier = Modifier.testTag("default"))
@@ -35,7 +35,7 @@ class LettaIconTest {
     }
 
     @Test
-    fun anIconButtonIsAButtonDrawnCompactWithAFullTouchTarget() = runDesktopComposeUiTest {
+    fun anIconButtonIsAButtonDrawnCompactWithAFullTouchTarget() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
         var clicks = 0
         setFoundationContent {
             LettaIconButton(LettaIcons.Close, contentDescription = "Close", onClick = { clicks++ })
