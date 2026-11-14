@@ -7,6 +7,7 @@ import com.letta.mobile.ui.components.ArrowGlyph
 import com.letta.mobile.ui.components.PagerBar
 import com.letta.mobile.ui.components.StatusGlyph
 import com.letta.mobile.ui.components.line.ArrowDirection
+import com.letta.mobile.ui.components.line.PagerLabel
 import com.letta.mobile.ui.components.line.PagerStep
 import com.letta.mobile.ui.components.line.StatusTone
 
@@ -30,6 +31,6 @@ internal fun TimelineStatusGlyph(tone: StatusTone, size: Dp, modifier: Modifier 
 
 /** The shared [PagerBar], for the timeline's chrome. */
 @Composable
-internal fun TimelinePager(label: String, back: PagerStep, forward: PagerStep, modifier: Modifier = Modifier) {
+internal fun TimelinePager(label: PagerLabel, back: PagerStep, forward: PagerStep, modifier: Modifier = Modifier) {
     PagerBar(label, back, forward, modifier)
 }

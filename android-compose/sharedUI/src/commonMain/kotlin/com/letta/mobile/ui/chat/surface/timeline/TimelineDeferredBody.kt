@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
 import com.letta.mobile.ui.chat.surface.timeline.rows.TimelinePager
+import com.letta.mobile.ui.components.line.PagerLabel
 import com.letta.mobile.ui.components.line.PagerStep
 import com.letta.mobile.ui.theme.ChatRowInsetShape
 import androidx.compose.foundation.layout.Column
@@ -186,7 +187,7 @@ private fun DeferredBodyContent(reader: DeferredPageReader) {
 @Composable
 private fun DeferredPageBar(reader: DeferredPageReader) {
     TimelinePager(
-        label = "Page ${reader.page}",
+        label = PagerLabel("Page ${reader.page}"),
         back = PagerStep("Previous page", reader.canGoBack, reader::back),
         forward = PagerStep("Next page", reader.canGoForward, reader::forward),
     )

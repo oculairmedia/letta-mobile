@@ -104,6 +104,10 @@ internal enum class ArrowDirection {
     Forward,
 }
 
+/** Where a pager is ("Approval 2 of 3", "Page 4"), and its test tag. */
+@Immutable
+internal class PagerLabel(val text: String, val tag: String = "")
+
 /** One of a pager's two steps: what it says, whether it can go, where it goes, and its test tag. */
 @Immutable
 internal class PagerStep(

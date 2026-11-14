@@ -33,108 +33,131 @@ import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.math.abs
 import kotlin.test.Test
-import kotlin.test.assertTrue
+import kotlin.test.assertEquals
 
 /**
  * Every disclosure and notice line sits on one of two rails, at every width and on touch and pointer.
  * On the header rail (a run's header and its siblings: a background command's report between runs, a
- * Monitor event or watch, between runs or inside one, and a task notification completed, failed or in
- * flight) each line has the run header's glyph start and size, label start, chevron edge and size and
- * height. On the step rail (an open run's work steps: a reasoning, a tool call, a folded command report)
- * each line matches every other step. A report inside an open tool step's details sits flush with the
- * step's details, inside its chevron's edge.
+ * Monitor event or watch, between runs or inside one, and a task notification failed or in flight)
+ * each line has the run header's line start, glyph start and size, label start, chevron edge and size
+ * and height. On the step rail (an open run's work steps: a reasoning, a tool call, a folded command
+ * report) each line matches every other step. A report inside an open tool step's details sits flush
+ * with the step's details, inside its chevron's edge.
  */
 class ChatRowLineRailAlignmentUiTest {
     @Test
-    fun everyHeaderRailLineSharesTheRunHeadersColumn() = forEachEnvironment { width, host ->
+    fun everyHeaderRailLineSharesTheRunHeadersColumn() = forEachEnvironment { environment ->
         runDesktopComposeUiTest(width = 1400, height = 1600) {
             setContent {
-                Host(host, width) {
-                    val context = rowContext(newestMessageId = "after")
-                    RenderRow(foldedRun(), context)
-                    RenderRow(single(report(id = "report", runId = null)), context)
-                    RenderRow(single(monitor(id = "event", status = "event")), context)
-                    RenderRow(single(monitor(id = "watch", status = "running")), context)
-                    RenderRow(single(task(id = "failed", status = "failed")), context)
-                    RenderRow(single(task(id = "running", status = "running")), context)
-                    RenderRow(runWithMonitorEvent(), context)
+                Host(environment) {
+                    val context = rowContext(newestMessageId = AFTER_ID)
+                    listOf(foldedRun, standaloneReport, monitorEvent, monitorWatch, failedTask, runningTask, runWithMonitorEvent)
+                        .forEach { RenderRow(it, context) }
                 }
             }
-            awaitText("Done.")
             awaitText("All green.")
-            val label = "at $width on $host"
-            val header = line(ChatRowTestTags.RUN_HEADER, ChatRowTestTags.RUN_GLYPH, index = 0)
-            val siblings = mapOf(
-                "command report" to line(ChatRowTestTags.COMPLETED_ACTIVITY_SUMMARY, ChatRowTestTags.COMPLETED_ACTIVITY_GLYPH),
-                "Monitor event" to line(ChatRowTestTags.MONITOR_EVENT_LINE, ChatRowTestTags.MONITOR_GLYPH, index = 0),
-                "Monitor watch" to line(ChatRowTestTags.MONITOR_WATCHER_LINE, ChatRowTestTags.MONITOR_GLYPH),
-                "failed notification" to line(ChatRowTestTags.NOTIFICATION_HEADER, ChatRowTestTags.NOTIFICATION_GLYPH, index = 0),
-                "in-flight notification" to line(ChatRowTestTags.NOTIFICATION_HEADER, ChatRowTestTags.NOTIFICATION_GLYPH, index = 1),
-                "Monitor event inside a run" to line(ChatRowTestTags.MONITOR_EVENT_LINE, ChatRowTestTags.MONITOR_GLYPH, index = 1),
+            val header = measure(Line.RunHeader)
+            val siblings = listOf(
+                measure(Line.Report),
+                measure(Line.MonitorEvent),
+                measure(Line.MonitorWatch),
+                measure(Line.Notification),
+                measure(Line.Notification, index = 1),
+                measure(Line.MonitorEvent, index = 1),
             )
-            siblings.forEach { (name, geometry) -> assertSameLine(header, geometry, "$name vs run header $label") }
-            val runInnerHeader = line(ChatRowTestTags.RUN_HEADER, ChatRowTestTags.RUN_GLYPH, index = 1)
-            assertSameLine(runInnerHeader, siblings.getValue("Monitor event inside a run"), "Monitor event vs its own run's header $label")
+            siblings.forEach { assertMatches(header, it, Rail.Header.measures, environment) }
+            // The Monitor event inside a run also sits on that run's own header's column.
+            assertMatches(measure(Line.RunHeader, index = 1), siblings.last(), Rail.Header.measures, environment)
         }
     }
 
     @Test
-    fun everyStepRailLineInAnOpenRunMatchesEveryOtherStep() = forEachEnvironment { width, host ->
+    fun everyStepRailLineInAnOpenRunMatchesEveryOtherStep() = forEachEnvironment { environment ->
         runDesktopComposeUiTest(width = 1400, height = 1600) {
             setContent {
-                Host(host, width) {
+                Host(environment) {
                     // A settled run folds by default; the owner's toggle opens it.
-                    RenderRow(openRun(), rowContext(itemState = renderState(collapsedRunIds = setOf(RUN_ID)), newestMessageId = "after"))
+                    RenderRow(openRun, rowContext(itemState = renderState(collapsedRunIds = setOf(RUN_ID)), newestMessageId = AFTER_ID))
                 }
             }
             awaitText("All green.")
-            val label = "at $width on $host"
-            val reasoning = line(ChatRowTestTags.REASONING_TOGGLE, ChatRowTestTags.REASONING_GLYPH)
-            val report = line(ChatRowTestTags.COMPLETED_ACTIVITY_SUMMARY, ChatRowTestTags.COMPLETED_ACTIVITY_GLYPH)
-            assertSameGlyph(reasoning, report, "folded report vs reasoning $label")
-            assertNear(reasoning.titleHeight, report.titleHeight, "label line height, folded report vs reasoning $label")
-            val tools = listOf(line(ChatRowTestTags.TOOL_CARD_TOGGLE, null, 0), line(ChatRowTestTags.TOOL_CARD_TOGGLE, null, 1))
-            val steps = listOf(reasoning, report) + tools
-            steps.drop(1).forEach { step ->
-                assertNear(reasoning.bounds.left, step.bounds.left, "line start, step rail $label")
-                assertSameColumns(reasoning, step, "step rail $label")
-            }
+            val reasoning = measure(Line.Reasoning)
+            val report = measure(Line.Report)
+            val tools = listOf(measure(Line.ToolStep), measure(Line.ToolStep, index = 1))
+            assertMatches(reasoning, report, Rail.Step.measures + Measure.GlyphStart + Measure.GlyphSize, environment)
+            tools.forEach { assertMatches(reasoning, it, Rail.Step.measures, environment) }
             // The one-line steps share the step line's height; the reasoning's preview makes it taller by design.
-            tools.forEach { step -> assertNear(report.bounds.height(), step.bounds.height(), "line height, tool step vs report $label") }
+            tools.forEach { assertMatches(report, it, setOf(Measure.Height), environment) }
         }
     }
 
     @Test
-    fun aReportInsideAnOpenToolStepSitsFlushWithTheStepsDetails() = forEachEnvironment { width, host ->
+    fun aReportInsideAnOpenToolStepSitsFlushWithTheStepsDetails() = forEachEnvironment { environment ->
         runDesktopComposeUiTest(width = 1400, height = 1600) {
-            setContent {
-                Host(host, width) { RenderRow(single(toolWithReport()), rowContext()) }
-            }
+            setContent { Host(environment) { RenderRow(toolWithReport, rowContext()) } }
             onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
             awaitText(NESTED_SUMMARY)
-            val label = "at $width on $host"
-            val step = line(ChatRowTestTags.TOOL_CARD_TOGGLE, null)
-            val nested = line(ChatRowTestTags.COMPLETED_ACTIVITY_SUMMARY, ChatRowTestTags.COMPLETED_ACTIVITY_GLYPH)
-            val detailIndent = if (width < COMPACT_BREAKPOINT) 0.dp else ChatRowSpacing.runStepDetailIndent
-            assertNear(step.bounds.left + detailIndent, nested.glyph!!.left, "glyph start at the details' start $label")
-            if (width >= COMPACT_BREAKPOINT) assertNear(step.labelStart, nested.glyph.left, "glyph under the step's label $label")
-            assertNear(ChatRowSpacing.runGlyphSize, nested.glyph.width(), "glyph width $label")
-            assertNear(ChatRowSpacing.runGlyphSize, nested.glyph.height(), "glyph height $label")
-            assertNear(step.chevron.right, nested.chevron.right, "chevron edge $label")
-            assertNear(step.chevron.width(), nested.chevron.width(), "chevron size $label")
-            assertNear(step.bounds.height(), nested.bounds.height(), "line height $label")
+            val step = measure(Line.ToolStep)
+            val nested = measure(Line.Report)
+            val wide = environment.width >= COMPACT_BREAKPOINT
+            val detailsStart = step.bounds.left + if (wide) ChatRowSpacing.runStepDetailIndent else 0.dp
+            val glyph = nested.glyph!!
+            val labelStart = if (wide) step.labelStart else detailsStart
+            val expected = listOf(detailsStart, labelStart, ChatRowSpacing.runGlyphSize, ChatRowSpacing.runGlyphSize)
+            assertNearAll(expected, listOf(glyph.left, glyph.left, glyph.right - glyph.left, glyph.bottom - glyph.top), environment)
+            assertMatches(step, nested, setOf(Measure.ChevronEdge, Measure.ChevronSize, Measure.Height), environment)
         }
     }
 
-    private class LineGeometry(val bounds: DpRect, val glyph: DpRect?, val labelStart: Dp, val titleHeight: Dp, val chevron: DpRect)
+    /** A line under test: its row's tag and its glyph's (null for a tool step, whose glyph shows only while it runs). */
+    private enum class Line(val row: String, val glyph: String?) {
+        RunHeader(ChatRowTestTags.RUN_HEADER, ChatRowTestTags.RUN_GLYPH),
+        Report(ChatRowTestTags.COMPLETED_ACTIVITY_SUMMARY, ChatRowTestTags.COMPLETED_ACTIVITY_GLYPH),
+        MonitorEvent(ChatRowTestTags.MONITOR_EVENT_LINE, ChatRowTestTags.MONITOR_GLYPH),
+        MonitorWatch(ChatRowTestTags.MONITOR_WATCHER_LINE, ChatRowTestTags.MONITOR_GLYPH),
+        Notification(ChatRowTestTags.NOTIFICATION_HEADER, ChatRowTestTags.NOTIFICATION_GLYPH),
+        Reasoning(ChatRowTestTags.REASONING_TOGGLE, ChatRowTestTags.REASONING_GLYPH),
+        ToolStep(ChatRowTestTags.TOOL_CARD_TOGGLE, null),
+    }
 
-    private fun ComposeUiTest.line(rowTag: String, glyphTag: String?, index: Int = 0): LineGeometry {
-        val bounds = onAllNodes(hasTestTag(rowTag), useUnmergedTree = true)[index].getUnclippedBoundsInRoot()
-        val glyph = glyphTag?.let { inside(hasTestTag(it) and hasAnyAncestor(hasTestTag(rowTag)), bounds).single() }
-        val chevron = inside(hasTestTag(DisclosureChevronDefaults.TestTag) and hasAnyAncestor(hasTestTag(rowTag)), bounds).single()
-        val texts = inside(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text) and hasAnyAncestor(hasTestTag(rowTag)), bounds)
-        val title = texts.minBy { it.left }
-        return LineGeometry(bounds, glyph, title.left, title.height(), chevron)
+    /** One edge or size two lines on a rail share. */
+    private enum class Measure(val of: (LineGeometry) -> Dp) {
+        LineStart({ it.bounds.left }),
+        GlyphStart({ it.glyph!!.left - it.bounds.left }),
+        GlyphSize({ it.glyph!!.right - it.glyph.left }),
+        LabelStart({ it.labelStart - it.bounds.left }),
+        LabelHeight({ it.labelHeight }),
+        ChevronEdge({ it.chevron.right }),
+        ChevronSize({ it.chevron.right - it.chevron.left }),
+        Height({ it.bounds.bottom - it.bounds.top }),
+    }
+
+    /** What every line on a rail shares. */
+    private enum class Rail(val measures: Set<Measure>) {
+        Header(Measure.entries.toSet()),
+        Step(setOf(Measure.LineStart, Measure.LabelStart, Measure.LabelHeight, Measure.ChevronEdge, Measure.ChevronSize)),
+    }
+
+    private class Environment(val width: Dp, val host: LettaHost) {
+        override fun toString() = "at $width on $host"
+    }
+
+    private class LineGeometry(
+        val line: Line,
+        val bounds: DpRect,
+        val glyph: DpRect?,
+        val labelStart: Dp,
+        val labelHeight: Dp,
+        val chevron: DpRect,
+    )
+
+    private fun ComposeUiTest.measure(line: Line, index: Int = 0): LineGeometry {
+        val bounds = onAllNodes(hasTestTag(line.row), useUnmergedTree = true)[index].getUnclippedBoundsInRoot()
+        val under = hasAnyAncestor(hasTestTag(line.row))
+        val glyph = line.glyph?.let { inside(hasTestTag(it) and under, bounds).single() }
+        val chevron = inside(hasTestTag(DisclosureChevronDefaults.TestTag) and under, bounds).single()
+        val label = inside(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text) and under, bounds).minBy { it.left }
+        return LineGeometry(line, bounds, glyph, label.left, label.bottom - label.top, chevron)
     }
 
     /** The bounds of the nodes [matcher] finds that lie within [row] (one row of several with the same tag). */
@@ -146,136 +169,135 @@ class ChatRowLineRailAlignmentUiTest {
     private fun DpRect.within(row: DpRect): Boolean =
         left >= row.left - TOLERANCE && right <= row.right + TOLERANCE && top >= row.top - TOLERANCE && bottom <= row.bottom + TOLERANCE
 
-    private fun assertSameLine(expected: LineGeometry, actual: LineGeometry, what: String) {
-        assertNear(expected.bounds.left, actual.bounds.left, "line start, $what")
-        assertSameGlyph(expected, actual, what)
-        assertSameColumns(expected, actual, what)
-        assertNear(expected.bounds.height(), actual.bounds.height(), "line height, $what")
+    private fun assertMatches(expected: LineGeometry, actual: LineGeometry, measures: Set<Measure>, environment: Environment) {
+        val off = measures.filterNot { near(it.of(expected), it.of(actual)) }
+            .map { "$it: ${it.of(expected)} vs ${it.of(actual)}" }
+        assertEquals(emptyList(), off, "${actual.line} vs ${expected.line} $environment")
     }
 
-    private fun assertSameGlyph(expected: LineGeometry, actual: LineGeometry, what: String) {
-        val a = expected.glyph!!
-        val b = actual.glyph!!
-        assertNear(a.left - expected.bounds.left, b.left - actual.bounds.left, "glyph start, $what")
-        assertNear(a.width(), b.width(), "glyph width, $what")
-        assertNear(a.height(), b.height(), "glyph height, $what")
+    private fun assertNearAll(expected: List<Dp>, actual: List<Dp>, environment: Environment) {
+        val off = expected.zip(actual).filterNot { (a, b) -> near(a, b) }
+        assertEquals(emptyList(), off, "nested report's glyph (details start, label start, width, height) $environment")
     }
 
-    private fun assertSameColumns(expected: LineGeometry, actual: LineGeometry, what: String) {
-        assertNear(expected.labelStart - expected.bounds.left, actual.labelStart - actual.bounds.left, "label start, $what")
-        assertNear(expected.chevron.right, actual.chevron.right, "chevron edge, $what")
-        assertNear(expected.chevron.width(), actual.chevron.width(), "chevron width, $what")
-        assertNear(expected.chevron.height(), actual.chevron.height(), "chevron height, $what")
-    }
+    private fun near(a: Dp, b: Dp): Boolean = abs(a.value - b.value) <= TOLERANCE.value
 
-    private fun DpRect.width(): Dp = right - left
-
-    private fun DpRect.height(): Dp = bottom - top
-
-    private fun assertNear(expected: Dp, actual: Dp, what: String) {
-        val near = abs(expected.value - actual.value) <= TOLERANCE.value
-        assertTrue(near, "$what: expected $expected, actual $actual (tolerance $TOLERANCE)")
-    }
-
-    private fun forEachEnvironment(check: (Dp, LettaHost) -> Unit) {
+    private fun forEachEnvironment(check: (Environment) -> Unit) {
         for (width in listOf(360.dp, 700.dp, 760.dp, 1200.dp)) {
-            for (host in listOf(LettaHost.Touch, LettaHost.Pointer)) check(width, host)
+            for (host in listOf(LettaHost.Touch, LettaHost.Pointer)) check(Environment(width, host))
         }
     }
 
     @Composable
-    private fun Host(host: LettaHost, width: Dp, content: @Composable () -> Unit) {
-        CompositionLocalProvider(LocalReducedMotion provides true, LocalLettaHost provides host) {
+    private fun Host(environment: Environment, content: @Composable () -> Unit) {
+        CompositionLocalProvider(LocalReducedMotion provides true, LocalLettaHost provides environment.host) {
             MaterialTheme {
-                Column(Modifier.width(width)) { content() }
+                Column(Modifier.width(environment.width)) { content() }
             }
         }
     }
 
-    private fun foldedRun() = ChatRenderItem.RunBlock(
+    private val bash = UiToolCall(name = "Bash", arguments = """{"command":"ls"}""", result = "ok", status = "success")
+
+    private fun step(id: String, runId: String) =
+        UiMessage(
+            id = id, role = "assistant", content = "", timestamp = T0, runId = runId,
+            toolCalls = listOf(bash.copy(toolCallId = "call-$id")),
+        )
+
+    private fun notice(id: String, notification: UiSubagentNotification) =
+        UiMessage(id = id, role = "assistant", content = "", timestamp = T1, subagentNotification = notification)
+
+    private val foldedRun = ChatRenderItem.RunBlock(
         runId = RUN_ID,
         messages = listOf(
-            toolStep("tool", "2026-10-11T16:00:00Z"),
-            UiMessage(id = "answer", role = "assistant", content = "Done.", timestamp = "2026-10-11T16:00:09Z", runId = RUN_ID),
+            step("tool", RUN_ID),
+            UiMessage(id = "answer", role = "assistant", content = "Done.", timestamp = T1, runId = RUN_ID),
         ).map { it to GroupPosition.None },
+    )
+
+    private val reportNotification = UiSubagentNotification(
+        status = "completed",
+        summary = "Background command \"Fetch origin/main\" completed",
+        result = "$ git fetch origin main\n\n[stdout]\nok",
+        usage = null,
+        transcriptUri = null,
+        taskId = "bash_12",
+    )
+
+    private val standaloneReport = single(notice("report", reportNotification))
+
+    private val eventNotification =
+        UiSubagentNotification("event", "Watch PR", "<event>#178 unresolved threads: 1</event>", null, null, "monitor_1")
+
+    private val monitorEvent = single(notice("event", eventNotification))
+
+    private val monitorWatch = single(
+        UiMessage(
+            id = "watch", role = "assistant", content = "", timestamp = T1,
+            subagentNotification = eventNotification.copy(status = "running", usage = "events: 2", taskId = "monitor_2"),
+        ),
+    )
+
+    private val taskNotification = UiSubagentNotification("failed", "Review the diff", "Found two issues.", null, null, "task_1")
+
+    private val failedTask = single(notice("failed", taskNotification))
+
+    private val runningTask = single(
+        UiMessage(
+            id = "running", role = "assistant", content = "", timestamp = T1,
+            subagentNotification = taskNotification.copy(status = "running", taskId = "task_2"),
+        ),
     )
 
     /** A run whose Monitor event arrived mid-run: prose, not a work step, so it shows with the run folded. */
-    private fun runWithMonitorEvent() = ChatRenderItem.RunBlock(
+    private val runWithMonitorEvent = ChatRenderItem.RunBlock(
         runId = OTHER_RUN_ID,
         messages = listOf(
-            toolStep("watch-tool", "2026-10-11T16:02:00Z", runId = OTHER_RUN_ID),
-            monitor(id = "inner-event", status = "event").copy(runId = OTHER_RUN_ID),
-            UiMessage(id = "after", role = "assistant", content = "All green.", timestamp = "2026-10-11T16:02:09Z", runId = OTHER_RUN_ID),
+            step("watch-tool", OTHER_RUN_ID),
+            UiMessage(
+                id = "inner-event", role = "assistant", content = "", timestamp = T1, runId = OTHER_RUN_ID,
+                subagentNotification = eventNotification.copy(taskId = "monitor_3"),
+            ),
+            UiMessage(id = AFTER_ID, role = "assistant", content = "All green.", timestamp = T2, runId = OTHER_RUN_ID),
         ).map { it to GroupPosition.None },
     )
 
-    private fun openRun() = ChatRenderItem.RunBlock(
+    private val openRun = ChatRenderItem.RunBlock(
         runId = RUN_ID,
         messages = listOf(
             UiMessage(
-                id = "thought", role = "assistant", content = "Check the remote first.", timestamp = "2026-10-11T16:00:00Z",
-                runId = RUN_ID, isReasoning = true,
+                id = "thought", role = "assistant", content = "Check the remote first.", timestamp = T0, runId = RUN_ID,
+                isReasoning = true,
             ),
-            toolStep("before", "2026-10-11T16:00:01Z"),
-            report(id = "report", runId = RUN_ID),
-            toolStep("again", "2026-10-11T16:01:02Z"),
-            UiMessage(id = "after", role = "assistant", content = "All green.", timestamp = "2026-10-11T16:01:09Z", runId = RUN_ID),
+            step("before", RUN_ID),
+            notice("report", reportNotification).copy(runId = RUN_ID),
+            step("again", RUN_ID),
+            UiMessage(id = AFTER_ID, role = "assistant", content = "All green.", timestamp = T2, runId = RUN_ID),
         ).map { it to GroupPosition.None },
     )
 
-    private fun toolStep(id: String, timestamp: String, runId: String = RUN_ID) = UiMessage(
-        id = id, role = "assistant", content = "", timestamp = timestamp, runId = runId,
-        toolCalls = listOf(
-            UiToolCall(name = "Bash", arguments = """{"command":"ls"}""", result = "ok", status = "success", toolCallId = "call-$id"),
-        ),
-    )
-
-    private fun toolWithReport() = UiMessage(
-        id = "nested", role = "assistant", content = "", timestamp = "2026-10-11T16:03:00Z",
-        toolCalls = listOf(
-            UiToolCall(
-                name = "Bash",
-                arguments = """{"command":"wait-for-agent"}""",
-                result = "<task-notification><task-id>task_7</task-id><status>completed</status>" +
-                    "<summary>$NESTED_SUMMARY</summary><result>All done.</result></task-notification>",
-                status = "success",
-                toolCallId = "call-nested",
+    private val toolWithReport = single(
+        UiMessage(
+            id = "nested", role = "assistant", content = "", timestamp = T0,
+            toolCalls = listOf(
+                bash.copy(
+                    arguments = """{"command":"wait-for-agent"}""",
+                    result = "<task-notification><task-id>task_7</task-id><status>completed</status>" +
+                        "<summary>$NESTED_SUMMARY</summary><result>All done.</result></task-notification>",
+                ),
             ),
         ),
-    )
-
-    private fun report(id: String, runId: String?) = notificationMessage(
-        id, runId,
-        UiSubagentNotification(
-            status = "completed",
-            summary = "Background command \"Fetch origin/main\" completed",
-            result = "$ git fetch origin main\n\n[stdout]\nok",
-            usage = null,
-            transcriptUri = null,
-            taskId = "bash_12",
-        ),
-    )
-
-    private fun monitor(id: String, status: String) = notificationMessage(
-        id, null,
-        UiSubagentNotification(status, "Watch PR", "<event>#178 unresolved threads: 1</event>", "events: 2", null, "monitor_$id"),
-    )
-
-    private fun task(id: String, status: String) = notificationMessage(
-        id, null,
-        UiSubagentNotification(status, "Review the diff", "Found two issues.", null, null, "task_$id"),
-    )
-
-    private fun notificationMessage(id: String, runId: String?, notification: UiSubagentNotification) = UiMessage(
-        id = id, role = "assistant", content = "", timestamp = "2026-10-11T16:01:00Z", runId = runId,
-        subagentNotification = notification,
     )
 
     private companion object {
         const val RUN_ID = "run-rails"
         const val OTHER_RUN_ID = "run-rails-monitor"
+        const val AFTER_ID = "after"
         const val NESTED_SUMMARY = "Agent finished the review"
+        const val T0 = "2026-10-11T16:00:00Z"
+        const val T1 = "2026-10-11T16:01:00Z"
+        const val T2 = "2026-10-11T16:02:00Z"
         val COMPACT_BREAKPOINT = 600.dp
         val TOLERANCE = 0.5.dp
     }

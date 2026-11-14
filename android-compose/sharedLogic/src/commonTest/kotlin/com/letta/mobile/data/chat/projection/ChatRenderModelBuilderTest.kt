@@ -951,51 +951,22 @@ class ChatRenderModelBuilderTest {
     }
 
     @Test
-    fun `a command report after the turn's reasoning joins its run`() {
-        val messages = listOf(
-            user("prompt", ts = "2026-04-19T12:00:00Z"),
-            toolRound("t1", runId = "run-1", ts = "2026-04-19T12:00:05Z"),
-            reasoning("thought", ts = "2026-04-19T12:00:06Z").copy(runId = "run-2"),
-            commandReport("report", runId = null, ts = "2026-04-19T12:01:00Z"),
-            toolRound("t2", runId = "run-3", ts = "2026-04-19T12:01:02Z"),
+    fun `a command report joins the chain only when the assistant spoke last and never across a prompt`() {
+        val prompt = user("prompt", ts = "2026-04-19T12:00:00Z")
+        val report = commandReport("report", runId = null, ts = "2026-04-19T12:01:00Z")
+        val woken = toolRound("woken", runId = "run-3", ts = "2026-04-19T12:01:02Z")
+        // Each case: what came before the report, the run the report shows under, the run the woken work shows under.
+        val cases = listOf(
+            Triple(listOf(toolRound("t1", "run-1", "2026-04-19T12:00:05Z"), reasoning("thought").copy(runId = "run-2")), "run-1", "run-1"),
+            Triple(emptyList(), null, "run-3"),
+            Triple(listOf(assistant("answer", content = "Done.", runId = "run-1"), user("next")), null, "run-3"),
         )
+        for ((before, reportRun, wokenRun) in cases) {
+            val chained = chainToolRoundRunIds(listOf(prompt) + before + report + woken).associate { it.id to it.runId }
 
-        val chained = chainToolRoundRunIds(messages).associate { it.id to it.runId }
-
-        assertEquals("run-1", chained["report"], "the report joins the run the reasoning closed")
-        assertEquals("run-1", chained["t2"], "the work the report wakes joins it too")
-    }
-
-    @Test
-    fun `a command report straight after a prompt stays its own row`() {
-        for (reportRunId in listOf(null, "run-9")) {
-            val messages = listOf(
-                user("prompt", ts = "2026-04-19T12:00:00Z"),
-                commandReport("report", runId = reportRunId, ts = "2026-04-19T12:01:00Z"),
-                toolRound("t1", runId = "run-1", ts = "2026-04-19T12:01:05Z"),
-            )
-
-            val chained = chainToolRoundRunIds(messages).associate { it.id to it.runId }
-
-            assertEquals(reportRunId, chained["report"], "no assistant message before it, so nothing to join")
-            assertEquals("run-1", chained["t1"])
+            assertEquals(reportRun, chained["report"], "report after ${before.map { it.id }}")
+            assertEquals(wokenRun, chained["woken"], "woken work after ${before.map { it.id }}")
         }
-    }
-
-    @Test
-    fun `a command report never joins work across a prompt`() {
-        val messages = listOf(
-            user("prompt", ts = "2026-04-19T12:00:00Z"),
-            assistant("answer", content = "Done.", runId = "run-1", ts = "2026-04-19T12:00:05Z"),
-            user("next", ts = "2026-04-19T12:00:10Z"),
-            commandReport("report", runId = null, ts = "2026-04-19T12:01:00Z"),
-            toolRound("t1", runId = "run-2", ts = "2026-04-19T12:01:05Z"),
-        )
-
-        val chained = chainToolRoundRunIds(messages).associate { it.id to it.runId }
-
-        assertEquals(null, chained["report"], "the prompt between them ends the earlier run")
-        assertEquals("run-2", chained["t1"])
     }
 
     @Test

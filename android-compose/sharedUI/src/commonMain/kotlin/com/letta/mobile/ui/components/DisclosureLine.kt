@@ -156,8 +156,8 @@ internal fun StepLine(spec: LineSpec, disclosure: LineDisclosure?, modifier: Mod
  * chevron at the end when it opens something.
  */
 @Composable
-internal fun DividerLine(label: String, tag: String, rail: LineRail, disclosure: LineDisclosure?, modifier: Modifier = Modifier) {
-    LineFrame(rail = rail, tag = tag, disclosure = disclosure, modifier = modifier) {
+internal fun DividerLine(label: String, tag: String, rail: LineRail, disclosure: LineDisclosure?) {
+    LineFrame(rail = rail, tag = tag, disclosure = disclosure) {
         HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
         LineText(label, rail.titleStyle(), MaterialTheme.colorScheme.onSurfaceVariant, Modifier)
         HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)

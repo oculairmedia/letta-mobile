@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import com.letta.mobile.ui.components.PagerBar
+import com.letta.mobile.ui.components.line.PagerLabel
 import com.letta.mobile.ui.components.line.PagerStep
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -95,7 +96,10 @@ internal fun rememberApprovalStepper(messages: List<UiMessage>, actions: ChatAct
 @Composable
 internal fun ApprovalStepHeader(steps: ApprovalSteps, onBack: () -> Unit, onForward: () -> Unit) {
     PagerBar(
-        label = stringResource(Res.string.rows_approval_step, steps.position, steps.total),
+        label = PagerLabel(
+            stringResource(Res.string.rows_approval_step, steps.position, steps.total),
+            ChatRowTestTags.APPROVAL_STEP_COUNTER,
+        ),
         back = PagerStep(
             stringResource(Res.string.rows_approval_step_back),
             steps.canGoBack(),
@@ -109,7 +113,6 @@ internal fun ApprovalStepHeader(steps: ApprovalSteps, onBack: () -> Unit, onForw
             ChatRowTestTags.APPROVAL_STEP_NEXT,
         ),
         modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.APPROVAL_STEP_HEADER),
-        labelTag = ChatRowTestTags.APPROVAL_STEP_COUNTER,
     )
 }
 

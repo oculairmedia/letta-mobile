@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.components.line.ArrowDirection
+import com.letta.mobile.ui.components.line.PagerLabel
 import com.letta.mobile.ui.components.line.PagerStep
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
@@ -43,7 +44,7 @@ private fun ArrowDirection.icon(): ImageVector = when (this) {
  * with the shared [ArrowGlyph]; a step that cannot go is disabled, not hidden, so the label never moves.
  */
 @Composable
-internal fun PagerBar(label: String, back: PagerStep, forward: PagerStep, modifier: Modifier = Modifier, labelTag: String = "") {
+internal fun PagerBar(label: PagerLabel, back: PagerStep, forward: PagerStep, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
@@ -51,10 +52,10 @@ internal fun PagerBar(label: String, back: PagerStep, forward: PagerStep, modifi
     ) {
         PagerButton(back, ArrowDirection.Back)
         Text(
-            text = label,
+            text = label.text,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = tagged(labelTag),
+            modifier = tagged(label.tag),
         )
         PagerButton(forward, ArrowDirection.Forward)
     }
