@@ -59,7 +59,7 @@ internal fun ChatScreenEffects(params: ChatScreenEffectsParams) {
     ChatScreenPendingToolHapticEffect(
         pendingTools = params.state.pendingTools,
         hapticsEnabled = params.hapticsEnabled,
-        view = view,
+        onToolStarted = { HapticEffects.toolCallStarted(view, enabled = true) },
     )
 
     ChatScreenResolvedToolHapticEffect(
@@ -134,20 +134,23 @@ private fun ChatScreenStreamingHapticEffect(
     }
 }
 
+/**
+ * [onToolStarted] once per tool call that turns pending. letta-mobile-09m53: the greeted ids are
+ * saved, so a recreated Activity (rotation, dark mode) does not greet a pending call again; they
+ * are trimmed to the calls still pending, which keeps the saved list small.
+ */
 @Composable
-private fun ChatScreenPendingToolHapticEffect(
+internal fun ChatScreenPendingToolHapticEffect(
     pendingTools: kotlinx.collections.immutable.ImmutableList<com.letta.mobile.ui.chat.render.PendingToolCall>,
     hapticsEnabled: Boolean,
-    view: android.view.View,
+    onToolStarted: () -> Unit,
 ) {
-    val greetedToolIds = remember { HashSet<String>() }
+    var greetedToolIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
     LaunchedEffect(pendingTools, hapticsEnabled) {
         if (!hapticsEnabled) return@LaunchedEffect
-        pendingTools.forEach { pending ->
-            if (greetedToolIds.add(pending.id)) {
-                HapticEffects.toolCallStarted(view, enabled = true)
-            }
-        }
+        val pendingIds = pendingTools.map { it.id }.distinct()
+        repeat(pendingIds.count { it !in greetedToolIds }) { onToolStarted() }
+        greetedToolIds = pendingIds
     }
 }
 
