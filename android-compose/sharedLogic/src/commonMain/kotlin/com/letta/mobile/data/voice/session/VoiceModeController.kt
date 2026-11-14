@@ -210,16 +210,12 @@ class VoiceModeController(
         when (command) {
             Command.Interrupt -> live?.interruptSpeech()
             Command.SetupChanged -> clearResolvedSetup()
-            is Command.Idle -> showIdle(command.state)
+            // Shows why nothing started, unless a session started meanwhile.
+            is Command.Idle -> if (live == null) mutableState.value = command.state
             else -> Unit
         }
     }
 
-
-    /** Shows why nothing started, unless a session started meanwhile. */
-    private fun showIdle(next: VoiceModeState) {
-        if (live == null) mutableState.value = next
-    }
 
     private fun clearResolvedSetup() {
         val waitingForSetup = mutableState.value is VoiceModeState.NeedsSetup && live == null

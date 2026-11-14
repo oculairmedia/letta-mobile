@@ -13,6 +13,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -103,8 +104,7 @@ fun AmbientShaderAgentBackground(
     val reducedMotion = rememberReducedMotionEnabled()
     // Voice mode (LocalAmbientVoice): the glow takes that voice's colour and level; without one it is exactly the run's glow.
     val voice = LocalAmbientVoice.current
-    val following = voice != null
-    val status = remember(agentStatus, following) { if (following) AmbientAgentStatus.Running else AmbientAgentStatus.from(agentStatus) }
+    val status = remember(agentStatus, voice) { voice?.let { AmbientAgentStatus.Running } ?: AmbientAgentStatus.from(agentStatus) }
     val spec = remember(status) { AmbientMotion.spec(status.toMotionStatus()) }
     val colorScheme = MaterialTheme.colorScheme
     // The tint used to be a Material *container* role, which is low-chroma and lightish by construction, so the glow read as a wash rather
@@ -112,13 +112,7 @@ fun AmbientShaderAgentBackground(
     // adjacent to the theme rather than a palette of its own.
     val onDark = colorScheme.background.luminance() <= 0.5f
     val targetColor = remember(status, colorScheme, identitySeed, onDark, voice) {
-        val hueSource = youHue(voice) ?: when (status) {
-            AmbientAgentStatus.Idle -> Color.Transparent
-            AmbientAgentStatus.Running,
-            AmbientAgentStatus.Active -> identitySeed ?: colorScheme.primary
-            AmbientAgentStatus.Failed -> colorScheme.error
-            AmbientAgentStatus.Completed -> colorScheme.secondary
-        }
+        val hueSource = statusHue(status, voice, colorScheme, identitySeed)
         if (hueSource == Color.Transparent) {
             hueSource
         } else {
@@ -339,7 +333,13 @@ private fun DrawScope.drawAmbientFallback(
     )
 }
 
-private fun youHue(voice: AmbientVoice?): Color? = voice?.takeIf { it.role == AmbientVoiceRole.You }?.let { Color(it.youTintArgb) }
+private fun statusHue(status: AmbientAgentStatus, voice: AmbientVoice?, scheme: ColorScheme, identitySeed: Color?): Color = when {
+    voice?.role == AmbientVoiceRole.You -> Color(voice.youTintArgb)
+    status == AmbientAgentStatus.Idle -> Color.Transparent
+    status == AmbientAgentStatus.Running || status == AmbientAgentStatus.Active -> identitySeed ?: scheme.primary
+    status == AmbientAgentStatus.Failed -> scheme.error
+    else -> scheme.secondary
+}
 
 private fun Color.toOpaqueArgbForTelemetry(): Int = copy(alpha = 1f).toArgb()
 
