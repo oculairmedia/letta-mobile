@@ -7,10 +7,12 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import java.io.File
 import java.util.Base64
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
@@ -24,6 +26,7 @@ import kotlinx.serialization.json.put
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ConversationDiscoveryBoundsTest {
     @Test
@@ -52,6 +55,35 @@ class ConversationDiscoveryBoundsTest {
             discovery.prime(server, true)
             assertEquals(40, server.ids.size)
             assertEquals(1, watched.reads)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun baselineDrainedOverPassesAndRereadIsNeverAnnounced() = runTest {
+        val root = createTempDirectory("discovery-baseline").toFile()
+        try {
+            repeat(40) { directory(root, "conversation:local-conv-$it") }
+            val announced = mutableListOf<String>()
+            var now = 0L
+            val discovery = ConversationDiscovery(
+                root, null, ::decodeTestKey, onPrimed = { id, _ -> announced += id }, clock = { now },
+            )
+            val server = RecordingClient(root)
+            discovery.prime(server, true)
+            now += 5_000
+            discovery.prime(server, true)
+            // A full re-read of the same directory finds nothing new.
+            now += 60_000
+            discovery.prime(server, true)
+            assertEquals(40, server.ids.size, "the baseline is still primed, over two capped passes")
+            assertEquals(emptyList(), announced)
+            directory(root, "conversation:local-conv-new")
+            check(root.setLastModified(root.lastModified() + 10_000))
+            now += 5_000
+            discovery.prime(server, true)
+            assertEquals(listOf("local-conv-new"), announced)
         } finally {
             root.deleteRecursively()
         }
@@ -184,12 +216,44 @@ class ConversationDiscoveryBoundsTest {
         }
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun concurrentCallsShareOnePass() = runTest {
-        val root = createTempDirectory("discovery-single-flight").toFile()
+        withOverlappingPasses("discovery-single-flight", "local-conv-one") {
+            assertEquals(1, server.ids.size)
+            gate.complete(Unit)
+            first.await()
+            second.await()
+            assertEquals(1, server.ids.size)
+        }
+    }
+
+    /**
+     * After a restart every list request ran into the same pass: the ones arriving while it retrieved
+     * waited for it on the scanning lock, then found the interval not elapsed and did nothing.
+     */
+    @Test
+    fun aCallArrivingDuringAPassDoesNotWaitForIt() = runTest {
+        withOverlappingPasses("discovery-no-wait", "local-conv-slow") {
+            assertTrue(second.isCompleted, "a list never waits on another request's discovery pass")
+            gate.complete(Unit)
+            first.await()
+            assertEquals(listOf("local-conv-slow"), server.ids)
+        }
+    }
+
+    /** Two passes over one conversation, the second started while the first's retrieval is held at [gate]. */
+    private class OverlappingPasses(
+        val server: RecordingClient,
+        val gate: CompletableDeferred<Unit>,
+        val first: Deferred<Unit>,
+        val second: Deferred<Unit>,
+    )
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun TestScope.withOverlappingPasses(prefix: String, id: String, check: suspend OverlappingPasses.() -> Unit) {
+        val root = createTempDirectory(prefix).toFile()
         try {
-            directory(root, "conversation:local-conv-one")
+            directory(root, "conversation:$id")
             val gate = CompletableDeferred<Unit>()
             val server = RecordingClient(root, gate = gate)
             val discovery = ConversationDiscovery(root, null, ::decodeTestKey) { 0L }
@@ -197,11 +261,7 @@ class ConversationDiscoveryBoundsTest {
             runCurrent()
             val second = async { discovery.prime(server, true) }
             runCurrent()
-            assertEquals(1, server.ids.size)
-            gate.complete(Unit)
-            first.await()
-            second.await()
-            assertEquals(1, server.ids.size)
+            OverlappingPasses(server, gate, first, second).check()
         } finally {
             root.deleteRecursively()
         }

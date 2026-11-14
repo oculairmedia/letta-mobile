@@ -29,7 +29,7 @@ class PluginToolInvoker(private val live: (PluginId) -> LivePlugin?) : PluginAct
     override suspend fun invoke(definition: PluginToolDefinition, input: kotlinx.serialization.json.JsonObject, caller: ExternalToolCaller): ExternalToolResult {
         val plugin = live(PluginId(definition.pluginId)) ?: return ExternalToolResult.Error("${definition.pluginId} is not running; enable it on the host")
         val agentId = caller.agentId ?: UNKNOWN_AGENT
-        val callId = plugin.board.begin(HostCanvasCaller(agentId, caller.conversationId, caller.toolCallId, caller.scopeTrust))
+        val callId = plugin.board.begin(HostCanvasCaller(agentId, caller.conversationId, caller.toolCallId, caller.identity))
         val origin = ActionOrigin.Agent(agentId, caller.conversationId, caller.toolCallId)
         val call = ActionCall(definition.action, input, ActionContext(origin, callId = callId.value))
         return try {

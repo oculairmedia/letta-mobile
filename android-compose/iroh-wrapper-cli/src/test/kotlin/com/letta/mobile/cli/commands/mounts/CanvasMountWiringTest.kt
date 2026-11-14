@@ -5,7 +5,7 @@ import com.letta.mobile.data.canvas.InMemoryCanvasRelayStore
 import com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory
 import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMount
 import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
-import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.node.iroh.AdminRpcHostServices
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
@@ -95,7 +95,7 @@ class CanvasMountWiringTest {
     fun withTheFlagAndEnvScopedMeridianBindingTheToolsFollowNoMountAndSaySo() = runBlocking {
         val wiring = enabled()
         val logged = mutableListOf<String>()
-        val claimedPair = HostCanvasCaller("agent-a", "conv-a", scopeTrust = CallerScopeTrust.RUNTIME_STAMPED)
+        val claimedPair = HostCanvasCaller("agent-a", "conv-a", identity = CallerIdentity.VERIFIED)
 
         val envScoped = wiring.toolLookupFor(MeridianCallerBindingMode.ENV_SCOPED, logged::add)
         val liveCall = wiring.toolLookupFor(MeridianCallerBindingMode.LIVE_CALL, logged::add)

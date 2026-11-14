@@ -9,7 +9,7 @@ import com.letta.mobile.data.canvas.InMemoryCanvasRelayStore
 import com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory
 import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMount
 import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup
-import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.PLUGIN_ID
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.catalog
@@ -22,7 +22,7 @@ import kotlinx.coroutines.test.runTest
 
 /**
  * Documents CURRENT behaviour, pending an owner decision: plugin placement inherits the canvas mount grant of the
- * call it is attributed to, when that call's scope was stamped by the runtime. A plugin called by agent A in
+ * call it is attributed to, when that call is verified (its scope vouched for by the host or runtime). A plugin called by agent A in
  * conversation A, which is mounted on agent B's board, places on B's board, and so does that plugin's later
  * background emit (attributed to the last caller once no call is in flight). The grant still follows the live mount:
  * once the mount is gone, the same emit lands on A's own board. A call whose scope is only claimed inherits nothing.
@@ -52,7 +52,7 @@ class PluginPlacementMountGrantTest {
         val othersBoard = backend.create(HostCanvasCaller(AGENT_B, CONVERSATION_B), "Agent B's board")
         mounted = othersBoard.id
 
-        val call = board.begin(HostCanvasCaller(AGENT_A, CONVERSATION_A, scopeTrust = CallerScopeTrust.RUNTIME_STAMPED))
+        val call = board.begin(HostCanvasCaller(AGENT_A, CONVERSATION_A, identity = CallerIdentity.VERIFIED))
         placement.emit(PluginEmit(place = listOf(place()), callId = call.value))
         board.end(call)
         assertEquals(1, placedOn(othersBoard), "the call's emit lands on the board mounted for its conversation")
@@ -74,7 +74,7 @@ class PluginPlacementMountGrantTest {
         val othersBoard = backend.create(HostCanvasCaller(AGENT_B, CONVERSATION_B), "Agent B's board")
         mounted = othersBoard.id
 
-        val call = board.begin(HostCanvasCaller(AGENT_A, CONVERSATION_A, scopeTrust = CallerScopeTrust.CLAIMED))
+        val call = board.begin(HostCanvasCaller(AGENT_A, CONVERSATION_A, identity = CallerIdentity.CLAIMED))
         placement.emit(PluginEmit(place = listOf(place()), callId = call.value))
         board.end(call)
 

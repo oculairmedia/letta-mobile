@@ -1,10 +1,12 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.canvas.compose.ComposeErrorCode
 import com.letta.mobile.data.canvas.compose.ComposePublishException
 import com.letta.mobile.data.canvas.compose.ComposeTarget
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.claimedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
 import com.letta.mobile.data.model.CanvasId
@@ -221,7 +223,7 @@ private class HostCanvasTool(
     override val capability: Capability = Capability.ImageHydration
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
-        invoke(input, ExternalToolCaller(agentId))
+        invoke(input, claimedToolCaller(ToolCallScope(agentId)))
 
     override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
         val agentId = caller.agentId
@@ -229,7 +231,7 @@ private class HostCanvasTool(
             return ExternalToolResult.Error("$failurePrefix: canvas tools require an authenticated agent identity")
         }
         return try {
-            run(HostCanvasCaller(agentId, caller.conversationId, caller.toolCallId, caller.scopeTrust), input)
+            run(HostCanvasCaller(agentId, caller.conversationId, caller.toolCallId, caller.identity), input)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {

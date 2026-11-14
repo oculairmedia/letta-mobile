@@ -2,7 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMount
 import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup
-import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 
@@ -30,14 +30,14 @@ internal suspend fun HostCanvasMountLookup<HostCanvasCaller>.mountedHere(caller:
 
 /**
  * The mount of [caller]'s own conversation. A caller in no conversation, or whose scope is only claimed
- * ([CallerScopeTrust.CLAIMED]), has none: the lookup is not even asked.
+ * ([CallerIdentity.CLAIMED]), has none: the lookup is not even asked.
  */
 internal suspend fun HostCanvasMountLookup<HostCanvasCaller>.mountOf(caller: HostCanvasCaller): HostCanvasMount =
     if (caller.followsMounts) mounted(caller) else HostCanvasMount.None
 
 /** Whether [this] caller's scope may follow its conversation's mount: stamped by the runtime, in a conversation. */
 private val HostCanvasCaller.followsMounts: Boolean
-    get() = conversationId != null && scopeTrust == CallerScopeTrust.RUNTIME_STAMPED
+    get() = conversationId != null && identity == CallerIdentity.VERIFIED
 
 /** The mounted canvas, typed. */
 internal val HostCanvasMount.Mounted.canvas: CanvasId get() = CanvasId(canvasId)

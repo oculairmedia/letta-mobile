@@ -933,6 +933,8 @@ class AppServerServeIrohCommand : CliktCommand(
                 transport,
                 requestTimeoutMs = requestTimeoutMs,
                 parentScope = generationScope,
+                // This host's own socket to its local App Server, which stamps the runtime scopes.
+                vouchesForRuntimeScope = true,
             ),
             connectionState = transport.connectionState,
             close = { reason -> generationJob.cancel(kotlinx.coroutines.CancellationException(reason)) },

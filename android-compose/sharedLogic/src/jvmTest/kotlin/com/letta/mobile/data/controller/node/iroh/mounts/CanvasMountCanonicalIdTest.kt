@@ -12,10 +12,10 @@ import com.letta.mobile.data.canvas.HostCanvasEntry
 import com.letta.mobile.data.canvas.HostCanvasTools
 import com.letta.mobile.data.canvas.mount.AuthorizedCanvasMounts
 import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
-import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
-import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
+import com.letta.mobile.data.controller.extras.verifiedToolCaller
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
@@ -112,7 +112,7 @@ class CanvasMountCanonicalIdTest {
     }
 
     private suspend fun tool(name: String, input: JsonObject, agent: AgentId, conversation: ConversationId): ExternalToolResult =
-        tools.invoke(name, input, ExternalToolCaller(agent.value, conversation.value, scopeTrust = CallerScopeTrust.RUNTIME_STAMPED))
+        tools.invoke(name, input, verifiedToolCaller(ToolCallScope(agent.value, conversation.value)))
 
     private fun ops(text: String) = buildJsonObject {
         put(

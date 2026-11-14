@@ -352,6 +352,30 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [Wrapper run records and leases v1](reference/contracts/run.record/wrapper-records-v1.md)
 
+### reference/contracts/secret.request
+
+- [secret.request: Secret Request v1](reference/contracts/secret.request/secret-request-v1.md)
+
+### reference/contracts/secret.request.cancel
+
+- [secret.request.cancel: Secret Request v1](reference/contracts/secret.request.cancel/secret-request-v1.md)
+
+### reference/contracts/secret.request.get
+
+- [secret.request.get: Secret Request v1](reference/contracts/secret.request.get/secret-request-v1.md)
+
+### reference/contracts/secret.request.list
+
+- [secret.request.list: Secret Request v1](reference/contracts/secret.request.list/secret-request-v1.md)
+
+### reference/contracts/secret.request.status
+
+- [secret.request.status: Secret Request v1](reference/contracts/secret.request.status/secret-request-v1.md)
+
+### reference/contracts/secret.request.submit
+
+- [secret.request.submit: Secret Request v1](reference/contracts/secret.request.submit/secret-request-v1.md)
+
 ### testing
 
 - [5s9lq.1 Chat Hydration Trace Baseline](testing/5s9lq-1-chat-hydration-trace.md)

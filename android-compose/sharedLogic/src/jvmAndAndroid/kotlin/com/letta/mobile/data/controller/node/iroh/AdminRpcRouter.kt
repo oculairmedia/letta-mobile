@@ -2,9 +2,11 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.node.iroh.errors.AdminRpcClientError
+import com.letta.mobile.data.controller.node.iroh.timing.AdminRpcPhaseTimings
 import com.letta.mobile.data.transport.iroh.AdminRpcErrors
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -48,10 +50,14 @@ data class AdminRpcRequestContext(
     /** Iroh endpoint identity established by the serving connection, never request parameters. */
     val authenticatedEndpointId: String? = null,
     /**
-     * Capabilities the serving connection read from the peer's own record for this request, for handlers that
-     * re-check a grant themselves; null = not established (treat as none). Never request parameters.
+     * Whether the serving connection authenticated a paired device by its stored pairing record
+     * (the human principal of the secret request routes). False for bootstrap sessions (bearer token, static allowlist,
+     * anonymous test mode), which is how a host-local process holding an admin token is told apart
+     * from a person's device. Only the serving connection sets it.
      */
-    val grantedCapabilities: Set<String>? = null,
+    val pairedDevice: Boolean = false,
+    /** The capabilities the serving connection granted this session, as it verified them; empty unless it set them. */
+    val grantedCapabilities: Set<String> = emptySet(),
 ) {
     fun canAccessConversation(conversationId: String): Boolean =
         authenticated && (authorizedConversationIds == null || conversationId in authorizedConversationIds)
@@ -68,7 +74,11 @@ data class AdminRpcInvocation(
     val method: String,
     val params: JsonObject?,
     val context: AdminRpcRequestContext = AdminRpcRequestContext.Authenticated,
-)
+) {
+    /** Never the params' values (a call may carry a secret, as `secret.request.submit` does): only their names. */
+    override fun toString(): String =
+        "AdminRpcInvocation(requestId=$requestId, method=$method, paramNames=${params?.keys}, context=$context)"
+}
 
 class AdminRpcRouter(
     private val json: Json = Json { ignoreUnknownKeys = true },
@@ -159,11 +169,12 @@ class AdminRpcRouter(
         val handler = checkNotNull(handlers[invocation.method])
         val agentScope = invocation.context.authorizedAgentIds
         val startedNs = System.nanoTime()
+        val phases = AdminRpcPhaseTimings()
         return try {
             val result = AgentScopeGuard.filterResult(
                 agentScope,
                 invocation.method,
-                handler(invocation.params, invocation.context),
+                withContext(phases) { handler(invocation.params, invocation.context) },
             )
             json.encodeToString(
                 kotlinx.serialization.serializer(),
@@ -173,7 +184,7 @@ class AdminRpcRouter(
                     put("success", true)
                     put("result", result)
                 },
-            ).also { response -> reportIfSlow(invocation, startedNs, response.length) }
+            ).also { response -> reportIfSlow(invocation, startedNs, response.length, phases) }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {

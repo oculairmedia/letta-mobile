@@ -1,8 +1,10 @@
 package com.letta.mobile.data.runtime
 
-import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
+import com.letta.mobile.data.controller.extras.claimedToolCaller
+import com.letta.mobile.data.controller.extras.verifiedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
@@ -174,6 +176,22 @@ internal class ExternalToolDispatcher(
      * generation, so a successor-generation replay reuses it and a non-idempotent
      * tool never runs twice for one request identity.
      */
+    /**
+     * The scope of [request] as a tool caller. The model cannot choose it, but only a client that
+     * owns its App Server connection can vouch that the App Server stamped it; otherwise it is
+     * claimed. [AppServerInboundFrame.ExternalToolCallRequest.toolCallId] is the key the timeline
+     * files the call's return under (canvas_compose's receipt).
+     */
+    private fun callerOf(request: AppServerInboundFrame.ExternalToolCallRequest): ExternalToolCaller {
+        val agentId = request.runtime?.agentId
+        val conversationId = request.runtime?.conversationId
+        return if (client.vouchesForRuntimeScope) {
+            verifiedToolCaller(ToolCallScope(agentId, conversationId, request.toolCallId))
+        } else {
+            claimedToolCaller(ToolCallScope(agentId, conversationId, request.toolCallId))
+        }
+    }
+
     private suspend fun computeAndCacheResult(
         request: AppServerInboundFrame.ExternalToolCallRequest,
     ): AppServerExternalToolResult {
@@ -194,15 +212,7 @@ internal class ExternalToolDispatcher(
                     externalToolRegistry.invoke(
                         toolName = request.toolName,
                         input = request.input,
-                        caller = ExternalToolCaller(
-                            agentId = request.runtime?.agentId,
-                            conversationId = request.runtime?.conversationId,
-                            // letta-mobile-bglj6.12: the model's tool call id, the key the
-                            // timeline files this call's return under (canvas_compose's receipt).
-                            toolCallId = request.toolCallId,
-                            // The scope is the App Server's own stamp on the frame; without one, nothing is stamped.
-                            scopeTrust = if (request.runtime != null) CallerScopeTrust.RUNTIME_STAMPED else CallerScopeTrust.CLAIMED,
-                        ),
+                        caller = callerOf(request),
                     )
                 } ?: run {
                     Telemetry.event(

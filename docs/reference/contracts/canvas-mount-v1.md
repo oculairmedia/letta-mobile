@@ -210,9 +210,9 @@ behaviour, pending an owner decision); a call whose scope is only claimed passes
 mount that cannot be read, or a mounted canvas the host does not have, is a refusal, never another
 board.
 
-Only a caller whose agent and conversation scope the host itself established follows a mount: the
-App Server's runtime stamp on the tool-call frame, or a Meridian live-call token this host issued for
-that one call. A claimed scope (Meridian's env-scoped binding, which takes the ids from the agent's
+Only a verified caller (`CallerIdentity.VERIFIED`: a scope the host itself established) follows a
+mount: the App Server's runtime stamp on the tool-call frame, delivered by the host that owns its App
+Server connection, or a Meridian live-call token this host issued for that one call. A claimed scope (Meridian's env-scoped binding, which takes the ids from the agent's
 shell environment, tool arguments, a client) gets no mount at all: no read or write grant, no
 mount-based board choice, no mounted canvas in `canvas_list`, exactly as on a host without mounts.
 The same holds for a plugin placing for such a call. As defence in depth, a host running

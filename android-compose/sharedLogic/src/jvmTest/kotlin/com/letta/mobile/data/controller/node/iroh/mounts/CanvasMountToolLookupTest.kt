@@ -1,6 +1,5 @@
 package com.letta.mobile.data.controller.node.iroh.mounts
 
-import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
 import com.letta.mobile.data.canvas.CanvasRelayHost
 import com.letta.mobile.data.canvas.HostCanvasAccess
 import com.letta.mobile.data.canvas.HostCanvasBackend
@@ -12,16 +11,17 @@ import com.letta.mobile.data.canvas.mount.CanvasMountRequest
 import com.letta.mobile.data.canvas.mount.CanvasMountResult
 import com.letta.mobile.data.canvas.mount.CanvasMountScope
 import com.letta.mobile.data.canvas.mount.FileCanvasMountStore
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.hoststate.HostDirectoryDurability
 import com.letta.mobile.data.model.CanvasId
 import java.nio.file.Files
-import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.runBlocking
 
 /** S1: the host canvas tools follow the mount of their own runtime-stamped conversation and can never change it. */
 class CanvasMountToolLookupTest {
@@ -39,8 +39,8 @@ class CanvasMountToolLookupTest {
         mounts = lookup,
     )
     // These model tool calls the App Server stamped with their scope; a claimed scope follows no mount.
-    private val callerA = HostCanvasCaller(AGENT_A.value, CONV_A.value, scopeTrust = CallerScopeTrust.RUNTIME_STAMPED)
-    private val callerB = HostCanvasCaller(AGENT_B.value, CONV_B.value, scopeTrust = CallerScopeTrust.RUNTIME_STAMPED)
+    private val callerA = HostCanvasCaller(AGENT_A.value, CONV_A.value, identity = CallerIdentity.VERIFIED)
+    private val callerB = HostCanvasCaller(AGENT_B.value, CONV_B.value, identity = CallerIdentity.VERIFIED)
 
     @Test
     fun withoutABindingAToolActsOnItsOwnConversationsCanvas() = runBlocking {

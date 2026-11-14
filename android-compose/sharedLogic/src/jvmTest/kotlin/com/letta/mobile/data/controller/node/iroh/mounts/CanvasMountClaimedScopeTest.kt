@@ -12,11 +12,17 @@ import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
-import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
+import com.letta.mobile.data.controller.extras.verifiedToolCaller
 import com.letta.mobile.data.meridian.endpoint.MeridianCallerBinder
 import com.letta.mobile.data.meridian.endpoint.MeridianCallerBindingMode
 import com.letta.mobile.data.meridian.endpoint.MeridianLiveCalls
 import com.letta.mobile.data.model.CanvasId
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -25,10 +31,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 /** A canvas only the relay holds (made by an app): its ACL admits no agent, so only a mount grant could reach it. */
 private val APP_BOARD = CanvasId("canvas-app-only-board")
@@ -64,7 +66,7 @@ class CanvasMountClaimedScopeTest {
         records.canvas(APP_BOARD, owner = null)
         assertEquals(CanvasMountWire.REPLACED, mount(APP_BOARD).status)
         val claimed = envScoped.bind(null, AGENT_A.value, CONV_A.value).getOrThrow()
-        assertEquals(CallerScopeTrust.CLAIMED, claimed.scopeTrust)
+        assertEquals(CallerIdentity.CLAIMED, claimed.identity)
 
         assertTrue("Canvas not found" in refusal(CanvasToolContract.GET_SCENE, named(APP_BOARD), claimed))
         assertTrue("Canvas not found" in refusal(CanvasToolContract.APPLY_OPS, ops("claimed-write", APP_BOARD), claimed))
@@ -88,10 +90,10 @@ class CanvasMountClaimedScopeTest {
     }
 
     @Test
-    fun aRuntimeStampedCallerForTheSamePairStillGetsTheGrant() = runBlocking {
+    fun aVerifiedCallerForTheSamePairStillGetsTheGrant() = runBlocking {
         records.canvas(APP_BOARD, owner = null)
         mount(APP_BOARD)
-        val stamped = ExternalToolCaller(AGENT_A.value, CONV_A.value, scopeTrust = CallerScopeTrust.RUNTIME_STAMPED)
+        val stamped = verifiedToolCaller(ToolCallScope(AGENT_A.value, CONV_A.value))
 
         success(CanvasToolContract.APPLY_OPS, ops("stamped-write"), stamped)
         assertTrue("stamped-write" in success(CanvasToolContract.GET_SCENE, named(APP_BOARD), stamped))

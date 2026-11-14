@@ -263,9 +263,9 @@ Enabled-channel account caching and restoration across App Server connection gen
 
 External-tool registries, offers and dynamic tool-source contracts. Platform CLI runners bind execution while the shared registry describes which tools can be offered to a runtime. Keep platform execution behind host adapters rather than discovery metadata; contribute tools through [ToolSource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras/-tool-source/index.html) and execution through [HostExternalTool](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras/-host-external-tool/index.html) or [IrohCliRunner](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras/-iroh-cli-runner/index.html).
 
-# Package com.letta.mobile.data.controller.extras.scope
+# Package com.letta.mobile.data.controller.extras.identity
 
-`CallerScopeTrust` says where a tool caller's agent and conversation scope came from: `RUNTIME_STAMPED` (the App Server's runtime stamp on the tool-call frame, or a Meridian live-call token this host issued for one in-flight call) or `CLAIMED` (shell environment, arguments, a client). `ExternalToolCaller` and the host canvas caller carry it, `CLAIMED` unless built from a runtime stamp. A claimed scope still names the caller for ACL checks, but grants derived from the scope, such as a conversation's canvas mount, never apply to it. The package imports nothing, so the tool and canvas packages can both depend on it without joining an import cycle.
+Provenance of a tool caller's agent id. [CallerIdentity](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras.identity/-caller-identity/index.html) says whether a tool caller's agent id was vouched for. Anyone can build a claimed caller (`claimedToolCaller`); a verified one is made only inside sharedLogic, by the App Server dispatcher when its client owns the App Server connection (`AppServerClient.vouchesForRuntimeScope`) and by the Meridian live-call binder, and a guard test pins those two. Changing a verified caller's agent or conversation makes it claimed. Security-sensitive tools serve only verified callers.
 
 # Package com.letta.mobile.data.controller.extras.relay
 
@@ -295,9 +295,17 @@ Host construction separates endpoint network/identity binding (`IrohEndpointBind
 
 `conversation.list` supports opt-in `visible_only: true` for unfiltered requests without `summary_search`. It shares the held full list with per-agent pages, removes agent-free, hidden-agent, hidden-conversation, archived and unauthorized rows before pagination, and returns newest-first recents (default 30). `after` names a visible conversation; unknown cursors restart from the top. Limits retain App Server integer/negative-prefix semantics; absent or invalid limits default to 30 in this mode. Legacy unfiltered, per-agent and search requests are unchanged. Visible mode requires the host's local agent visibility index; without it the opt-in request fails with `capability_unavailable` rather than return potentially hidden-agent rows. Above the held-list cap or without a usable signature, recents fetch the full list without retaining it rather than filter a truncated raw page.
 
+# Package com.letta.mobile.data.controller.node.iroh.secrets
+
+The secret request admin RPC routes and the agent's `secret_request` tool on the JVM host. [SecretRequestFeature](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh.secrets/-secret-request-feature/index.html) builds both only for a paired-peers-only auth policy (as the caller passes it) with a keystore provider and an explicit item scope, and nothing in production calls it yet; the human principal comes from the serving connection (a paired device holding `admin.full`), the agent principal only from the runtime-stamped tool call, and no route returns or logs a value.
+
 # Package com.letta.mobile.data.controller.node.iroh.discovery
 
 JVM/Android host discovery primes externally created local conversations before wrapper list requests. It bounds and throttles retrievals, invalidates held lists after successful priming, and leaves authorization and output filtering to the owning admin handler.
+
+# Package com.letta.mobile.data.controller.node.iroh.timing
+
+Per-call phase timing for the JVM/Android host's admin RPC router. A handler marks the time it spends waiting on the App Server, discovering conversations or reading the local backend, and a slow call's `handler.slow` event reports those phases and the remaining wrapper work separately. Timing never changes a response.
 
 # Package com.letta.mobile.data.controller.node.iroh.auth
 
@@ -557,7 +565,7 @@ Agent secret sources and vault state/controller logic. Secret values have redact
 
 # Package com.letta.mobile.data.secrets.client
 
-Client side of the secure secret-input flow. `SecretRequestClient` is the port the form uses to list pending requests, submit a value and decline; no implementation here talks to a host. `SecretBuffer` is the one place a typed value lives and `SecretInput` carries it to the port once: both redact themselves, are never saved or logged, and are zeroed on every exit path. `SecretFormMachine` is the pure state machine and `SecretFormController` applies it. Nothing in this package registers a route or a tool.
+Client side of the secure secret-input flow. `SecretRequestClient` is the port the form uses to list pending requests, submit a value and decline; [AdminRpcSecretRequestClient](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.client/-admin-rpc-secret-request-client/index.html) implements it over the host's admin RPC routes, inert when the host does not advertise them. `SecretBuffer` is the one place a typed value lives and `SecretInput` carries it to the port once: both redact themselves, are never saved or logged, and are zeroed on every exit path. `SecretFormMachine` is the pure state machine and `SecretFormController` applies it. Nothing in this package registers a route or a tool.
 
 # Package com.letta.mobile.data.secrets.host
 
@@ -570,6 +578,10 @@ Durable storage of secret requests so single use and expiry survive a host resta
 # Package com.letta.mobile.data.secrets.request
 
 Shared models of the secret request contract: typed ids and names with the keystore grammar, the agent request and receipt, the request record clients see, validation of agent-authored purposes, and the lifecycle as pure functions in [SecretRequestLifecycle](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.request/-secret-request-lifecycle/index.html). Nothing here carries a secret value; clients and the host share these types.
+
+# Package com.letta.mobile.data.secrets.wire
+
+The admin RPC wire of the secret request routes, shared by host and client: method sets, capabilities and params fields in [SecretRequestRouteWire](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.wire/-secret-request-route-wire/index.html), and the submitted value's base64 codec in [SecretValueBase64](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.wire/-secret-value-base64/index.html), which encodes into and decodes from arrays its caller zeroes and never makes a string of a value.
 
 # Package com.letta.mobile.data.serialization
 
@@ -715,6 +727,26 @@ What starts or ends a voice turn: push-to-talk, tap, hotkey and wake word as act
 
 Small platform ports for capturing and playing audio, including fixed-size PCM frame sources with sample positions for wake-word engines, used by engines that handle raw audio themselves, with audio containers whose descriptions report sizes only. Platforms implement [AudioCapture](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio/-audio-capture/index.html) and [AudioPlayer](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio/-audio-player/index.html); cancelling either must return only after the device is released.
 
+# Package com.letta.mobile.data.voice.audio.android
+
+Android microphone and speaker behind the voice audio ports: [AndroidAudio](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio.android/-android-audio/index.html) opens `AudioRecord` frame sources on the voice-recognition path or the communication path with echo cancellation and noise suppression attached when the device has them (reported as [CaptureEffects](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio.android/-capture-effects/index.html)), and plays clips on a streaming `AudioTrack` with assistant usage under transient, duck-allowing audio focus. It never requests a permission: capture fails with PERMISSION_REQUIRED until the app holds `RECORD_AUDIO`.
+
+# Package com.letta.mobile.data.voice.audio.desktop
+
+Desktop microphone and speaker on Java Sound behind the voice audio ports: [DesktopAudio](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio.desktop/-desktop-audio/index.html) opens `TargetDataLine` frame sources in exactly the engine format (or fails typed), plays WAVE and raw PCM clips on a `SourceDataLine`, resampling when the device refuses the clip's rate, and lists and polls mixers for device selection and change detection.
+
+# Package com.letta.mobile.data.voice.audio.device
+
+Device selection and recovery shared by every platform: typed device identifiers with a system-default choice, a frame source that reports dropped frames, an [AudioCapture](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio/-audio-capture/index.html) built on frame sources, and [RecoveringFrameSource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio.device/-recovering-frame-source/index.html), which reopens a lost device with bounded exponential backoff, ends the wait early on a debounced device change, keeps sample positions monotonic, and never retries a missing permission or a wrong format.
+
+# Package com.letta.mobile.data.voice.audio.line
+
+The blocking line layer under the Android and desktop audio implementations: minimal microphone and speaker line interfaces that `TargetDataLine`, `AudioRecord`, `SourceDataLine` and `AudioTrack` sit behind, a capture thread that hands fixed-size frames to a bounded drop-oldest buffer and releases the line before a cancelled collection completes, and a player that decodes, resamples, paces and aborts at once on cancellation. Internal; tested with fake lines and no devices.
+
+# Package com.letta.mobile.data.voice.audio.pcm
+
+Pure PCM utilities for voice audio: a robust WAVE reader and writer ([WavCodec](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio.pcm/-wav-codec/index.html)) that skips unknown chunks and tolerates streaming placeholder sizes, a clip decoder that judges audio by its bytes and refuses compressed formats instead of playing noise, a chunk-independent windowed-sinc [StreamingResampler](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio.pcm/-streaming-resampler/index.html), loudness levels for meters and the avatar, and the typed [VoiceAudioException](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio.pcm/-voice-audio-exception/index.html).
+
 # Package com.letta.mobile.data.voice.consent
 
 Per-destination consent for remote speech endpoints: a grant names one exact origin (scheme, host and port) and what may be sent there, audio for transcription or text for synthesis. Grants are a stored value of their own, apart from the voice settings, so an export or backup never carries them; endpoint engines check them before every request.
@@ -746,6 +778,14 @@ The app's chat session as a [VoiceChatSession](https://oculairmedia.github.io/le
 # Package com.letta.mobile.data.voice.speech
 
 Turns streamed reply text into speakable sentences so speech starts before the reply is complete. Sentence ends respect abbreviations, initials, decimals and list numbers; fenced code is skipped; markdown, links, URLs and HTML are stripped; overlong text is cut at a clause break and the remainder is flushed when the reply completes.
+
+# Package com.letta.mobile.data.voice.vad
+
+Voice-activity detection for the voice ear: the [SpeechDetector](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad/-speech-detector/index.html) seam (one hop of PCM in, a speech probability out) so a model-based detector can replace the built-in [EnergySpeechDetector](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad/-energy-speech-detector/index.html) (energy and zero-crossing rate over a calibrated, slowly tracked noise floor, with a separate floor for the app's own echo and a low/normal/high sensitivity), and the [EndOfTurnPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad/-end-of-turn-policy/index.html) with hysteresis, a sustained onset, a minimum of voiced audio below which a sound is dropped untranscribed, trailing silence, pre-roll, a hard cap and an echo guard, all measured in audio time from sample positions.
+
+# Package com.letta.mobile.data.voice.vad.ear
+
+[VadVoiceEar](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad.ear/-vad-voice-ear/index.html), a hearing engine composed of a frame source, a speech detector, the end-of-turn policy and a [SpeechTranscriber](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad.ear/-speech-transcriber/index.html): it decides end of turn itself, transcribes each turn with its pre-roll, drops transcripts that are not words (a [TranscriptPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad.ear/-transcript-policy/index.html) for empty text and stock noise phrases from short quiet turns), reports its turn decisions to an [EarObserver](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad.ear/-ear-observer/index.html), offers a failed turn for one retry from memory only, and releases the microphone before a cancelled listen completes.
 
 # Package com.letta.mobile.data.voice.wake
 

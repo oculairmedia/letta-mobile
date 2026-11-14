@@ -5,7 +5,7 @@ import com.letta.mobile.data.canvas.HostCanvasBackend
 import com.letta.mobile.data.canvas.HostCanvasCaller
 import com.letta.mobile.data.canvas.mount.AuthorizedCanvasMounts
 import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
-import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import kotlin.test.Test
@@ -75,7 +75,7 @@ class CanvasMountResolutionOrderTest {
         val expectedStatus = if (resolved == null) CanvasMountWire.NONE else CanvasMountWire.FOUND
         val answered = listOf(reply.status, reply.canvas, reply.source)
         assertEquals(listOf(expectedStatus, resolved?.value, source), answered, "$conversation resolve")
-        val stamped = HostCanvasCaller(AGENT_A.value, conversation.value, scopeTrust = CallerScopeTrust.RUNTIME_STAMPED)
+        val stamped = HostCanvasCaller(AGENT_A.value, conversation.value, identity = CallerIdentity.VERIFIED)
         assertEquals(tools, backend.currentCanvas(stamped), "$conversation tools")
     }
 }

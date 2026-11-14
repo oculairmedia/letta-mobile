@@ -18,14 +18,14 @@ import com.letta.mobile.util.runCatchingCancellable
 /**
  * What the serving connection itself established about the caller; nothing here comes from request params.
  * [agents] is the paired peer's agent scope and [conversations] its conversation-content scope (null = all), and
- * [capabilities] the grants the connection read from the peer's own record (null = none established), exactly as the
+ * [capabilities] the grants the connection read from the peer's own record (empty = none established), exactly as the
  * connection put them in [AdminRpcRequestContext].
  */
 internal class CanvasMountConnection private constructor(
     val principal: CanvasMountPrincipal,
     private val agents: Set<String>?,
     private val conversations: Set<String>?,
-    private val capabilities: Set<String>?,
+    private val capabilities: Set<String>,
 ) {
     fun allowsAgent(agent: AgentId): Boolean = agents == null || agent.value in agents
 
@@ -45,7 +45,7 @@ internal class CanvasMountConnection private constructor(
      * table, so an agent default can never be changed by a caller whose connection did not establish the grant.
      */
     val writesMounts: Boolean
-        get() = capabilities?.let { IrohPeerCapabilities.isAllowed(it, IrohPeerCapabilities.CANVAS_MOUNT_WRITE) } == true
+        get() = IrohPeerCapabilities.isAllowed(capabilities, IrohPeerCapabilities.CANVAS_MOUNT_WRITE)
 
     companion object {
         private val ENDPOINT_ID = Regex("[0-9a-f]{64}")

@@ -3,28 +3,29 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMount
 import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup
 import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
-import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.model.CanvasActorId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.model.ConversationId
-import kotlinx.coroutines.channels.Channel
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.channels.Channel
 
 /**
  * Who is calling a host canvas tool, never read from the tool input. [toolCallId] is the call's own id in the run,
- * for a tool that must answer a retried call the same way. [scopeTrust] says whether [agentId] and [conversationId]
- * are the runtime's stamp (or a live-call token's) or merely claimed: grants derived from the conversation's canvas
- * mount apply only to a [CallerScopeTrust.RUNTIME_STAMPED] caller.
+ * for a tool that must answer a retried call the same way. [identity] says whether [agentId] and [conversationId]
+ * are vouched for by the host or runtime or merely claimed: grants derived from the conversation's canvas
+ * mount apply only to a [CallerIdentity.VERIFIED] caller. It is copied from the tool caller a call arrives as, never
+ * decided here.
  */
 data class HostCanvasCaller(
     val agentId: String,
     val conversationId: String? = null,
     val toolCallId: String? = null,
-    val scopeTrust: CallerScopeTrust = CallerScopeTrust.CLAIMED,
+    val identity: CallerIdentity = CallerIdentity.CLAIMED,
 ) {
     /** [agentId] as the actor its canvas ops are stamped with. */
     val actor: CanvasActorId get() = CanvasActorId(agentId)

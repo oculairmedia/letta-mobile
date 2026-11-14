@@ -69,7 +69,7 @@ internal data class Peer(
         authorizedConversationIds = conversations,
         authorizedAgentIds = agents,
         authenticatedEndpointId = endpoint,
-        grantedCapabilities = capabilities,
+        grantedCapabilities = capabilities.orEmpty(),
     )
 
     companion object {

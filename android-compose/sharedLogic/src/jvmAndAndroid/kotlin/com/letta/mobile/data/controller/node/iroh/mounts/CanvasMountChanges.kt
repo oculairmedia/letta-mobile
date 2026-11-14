@@ -56,7 +56,7 @@ internal class CanvasMountChanges(
 
     /** Whether the capabilities the connection established admit [method], as the admin RPC gate would. */
     private fun AdminRpcRequestContext.admits(method: String): Boolean =
-        grantedCapabilities?.let { IrohPeerCapabilities.isAllowed(it, IrohPeerCapabilities.forAdminMethod(method)) } == true
+        IrohPeerCapabilities.isAllowed(grantedCapabilities, IrohPeerCapabilities.forAdminMethod(method))
 
     private fun frameOf(change: CanvasMountChange): String = buildJsonObject {
         put("type", CanvasMountWire.EVENT_TYPE)

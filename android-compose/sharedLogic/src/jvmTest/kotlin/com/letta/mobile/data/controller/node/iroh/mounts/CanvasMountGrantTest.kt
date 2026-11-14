@@ -9,10 +9,10 @@ import com.letta.mobile.data.canvas.HostCanvasCaller
 import com.letta.mobile.data.canvas.HostCanvasTools
 import com.letta.mobile.data.canvas.mount.AuthorizedCanvasMounts
 import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
-import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
-import com.letta.mobile.data.controller.extras.scope.CallerScopeTrust
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
+import com.letta.mobile.data.controller.extras.verifiedToolCaller
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
@@ -147,7 +147,7 @@ class CanvasMountGrantTest {
         harness.call(CanvasMountRoute.REPLACE, bindingParams(AGENT_A, conversation, canvas), PEER)
 
     private suspend fun call(tool: String, input: JsonObject, agent: AgentId, conversation: ConversationId?): ExternalToolResult =
-        tools.invoke(tool, input, ExternalToolCaller(agent.value, conversation?.value, scopeTrust = CallerScopeTrust.RUNTIME_STAMPED))
+        tools.invoke(tool, input, verifiedToolCaller(ToolCallScope(agent.value, conversation?.value)))
 
     private fun named(canvas: CanvasId) = buildJsonObject { put("canvas_id", canvas.value) }
 

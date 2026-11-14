@@ -130,7 +130,7 @@ class WireContractsTest {
         val inputs = mapOf(
             AdminRpcHostServices::class.java to setOf(
                 "controller", "subagentRegistrySource", "vibesyncBaseUrl", "beadsBaseUrl", "beadsTokenFile", "beadsRoutes", "pluginRoutes",
-                "canvasMountRoutes",
+                "canvasMountRoutes", "secretRequestRoutes",
             ),
             AdminRpcNativeSources::class.java to setOf(
                 "nativeClient", "localBackendDir", "skillsListing", "slashCommands", "modelExposureFile", "wrapperRecords",
@@ -282,8 +282,8 @@ class WireContractsTest {
         beadsRoutes = beadsRoutes(),
         pluginRoutes = pluginRoutes,
         canvasMountRoutes = canvasMountRoutes(dir),
+        secretRequestRoutes = secretRequestRoutes(),
     )
-
     /** The real canvas mount routes under a secure policy; no fixture may reach the host's records. */
     private fun canvasMountRoutes(dir: File): AdminRpcRoutes = com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountRoutes(
         com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy.PairedPeersOnly,
@@ -300,6 +300,18 @@ class WireContractsTest {
         ),
         com.letta.mobile.data.controller.node.iroh.mounts.TEST_CALL_SCOPE,
     )
+
+    /** The real secret request routes under a secure policy over a test keystore; no fixture reaches a vault. */
+    private fun secretRequestRoutes(): AdminRpcRoutes = checkNotNull(
+        com.letta.mobile.data.controller.node.iroh.secrets.SecretRequestFeature.forHost(
+            com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy.PairedPeersOnly,
+            com.letta.mobile.data.controller.node.iroh.secrets.SecretRequestStorage(
+                com.letta.mobile.data.secrets.host.TestKeystoreProvider(),
+                com.letta.mobile.data.secrets.journal.InMemorySecretRequestJournal(),
+            ),
+            com.letta.mobile.data.secrets.host.SecretItemScope.PerAgent,
+        ),
+    ).routes
 
     private fun rejectSubagentCalls(): SubagentRegistrySource = object : SubagentRegistrySource {
         override suspend fun list(conversationId: String, includeTerminal: Boolean) = error("Unexpected subagent read")
