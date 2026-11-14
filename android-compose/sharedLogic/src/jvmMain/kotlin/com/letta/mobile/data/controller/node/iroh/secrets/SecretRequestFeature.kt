@@ -37,8 +37,8 @@ class SecretRequestFeature internal constructor(policy: IrohAuthPolicy, internal
     companion object {
         /**
          * The feature for a host whose endpoint enforces [policy], writing through the keystore of
-         * [storage] and recording requests in its journal; null under the anonymous test policy or
-         * without a keystore.
+         * [storage] and recording requests in its journal; null unless [policy] is paired peers
+         * only (bearer-token, allowlist and anonymous endpoints get nothing) or without a keystore.
          *
          * [itemScope] has no default on purpose: the host must say which items agents may name.
          * [SecretItemScope.PerAgent] (each agent only under `agents/<its id>`) is the recommended
@@ -115,10 +115,15 @@ private fun SecretRouteAnswer.toAdminResult(): JsonElement = when (this) {
     is SecretRouteAnswer.Refused -> adminError(text)
 }
 
-/** Exhaustive on purpose: a new policy kind must decide here whether it may serve secret requests. */
+/**
+ * Exhaustive on purpose: a new policy kind must decide here whether it may serve secret requests.
+ * Only a paired-peers-only endpoint does. A bearer-token or allowlist endpoint has bootstrap
+ * sessions holding `admin.full`, which can mint pairing invites, so on such a host "a paired
+ * device answered" would prove nothing about a person.
+ */
 internal fun IrohAuthPolicy.admitsSecretRequests(): Boolean = when (this) {
-    is IrohAuthPolicy.BearerToken -> true
-    is IrohAuthPolicy.PeerAllowlist -> true
     IrohAuthPolicy.PairedPeersOnly -> true
+    is IrohAuthPolicy.BearerToken -> false
+    is IrohAuthPolicy.PeerAllowlist -> false
     IrohAuthPolicy.InsecureAnonymousForTestOnly -> false
 }

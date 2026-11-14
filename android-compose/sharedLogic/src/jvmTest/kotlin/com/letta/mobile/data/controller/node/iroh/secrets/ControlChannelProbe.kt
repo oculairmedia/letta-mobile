@@ -18,20 +18,21 @@ import kotlinx.coroutines.sync.Mutex
 
 /**
  * A node connection serving [routes]' router, built like the endpoint builds one for a peer at
- * [HUMAN_ENDPOINT] under [policy] but over no real QUIC connection: enough to hand frames to its
+ * [HUMAN_ENDPOINT] under [policy] with [pairing] but over no real QUIC connection: enough to hand frames to its
  * control-channel handler and read the request context it builds. Its controller refuses every
  * call, so a frame that reaches a turn fails loudly.
  */
 internal fun controlConnection(
     routes: SecretRouteHarness,
     policy: IrohAuthPolicy = IrohAuthPolicy.PairedPeersOnly,
+    pairing: IrohPairingService = IrohPairingService(InMemoryPairedPeerStore()),
 ): IrohNodeConnection = IrohNodeConnection(
     connection = Connection(NoHandle),
     controller = refusingController(),
     adminRpcRouter = routes.router,
     authentication = IrohConnectionAuthentication(
         authPolicy = policy,
-        pairingService = IrohPairingService(InMemoryPairedPeerStore()),
+        pairingService = pairing,
         remoteEndpointId = HUMAN_ENDPOINT,
     ),
 )

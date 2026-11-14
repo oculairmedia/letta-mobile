@@ -1,7 +1,7 @@
 # secret.request.get: Secret Request v1
 
 - Method: `secret.request.get` over the authenticated Iroh `admin_rpc` channel (human side), registered only on a JVM
-  host with a secure auth policy and a keystore provider, and advertised as host capability `secret.request.v1`.
+  host with a paired-peers-only auth policy and a keystore provider, and advertised as host capability `secret.request.v1`.
   Connection gate capability: `secret.request.answer` (granted to no role; `admin.full` passes).
 - Contract version: 1. The full contract (principals, order of checks, every result and refusal code) is
   [secret-request-v1.md](../secret-request-v1.md), sections Methods, Errors and Routes.

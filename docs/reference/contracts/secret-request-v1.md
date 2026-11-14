@@ -264,13 +264,14 @@ item, field, purpose, path or value.
 *route* Stage 2 (letta-mobile-n2stx.2.4), in `com.letta.mobile.data.controller.node.iroh.secrets`.
 
 - **R1 Registration.** `SecretRequestFeature.forHost` builds the routes and the tool only when the
-  auth policy it is given is secure (bearer token, peer allowlist or paired peers only) and a
-  keystore provider is configured; otherwise it answers null and the host registers, advertises and
-  offers nothing. The routes refuse to register under the anonymous test policy even when handed
-  one. Two limits: the policy is whatever the caller passes, since the factory cannot see the
+  auth policy it is given is paired peers only and a keystore provider is configured; otherwise it
+  answers null and the host registers, advertises and offers nothing. Bearer-token and peer-allowlist
+  endpoints are excluded because their bootstrap sessions hold `admin.full` and can mint pairing
+  invites (independent review, 2026-11-12). The routes refuse to register under any other policy
+  even when handed one. Two limits: the policy is whatever the caller passes, since the factory cannot see the
   endpoint, so this check is only as good as the future wiring; the per-call backstop is R3 (an
-  anonymous endpoint's sessions are never paired devices, so even routes built for a secure policy
-  refuse them, test-pinned). And today the feature is inert because nothing in production calls
+  anonymous endpoint's sessions are never paired devices, so even routes built for a paired-peers
+  policy refuse them, test-pinned). And today the feature is inert because nothing in production calls
   `forHost` at all (no keystore provider exists yet), not because `forHost` answers null on real
   hosts. The classes exist only in the JVM host (decision 8). All six methods register together, and
   only then is host capability `secret.request.v1` advertised.
@@ -279,7 +280,9 @@ item, field, purpose, path or value.
   for every method). No role grants either.
 - **R3 Human principal.** Built from the request context the serving Iroh connection made: it must
   be authenticated, carry a 64-hex verified endpoint id, be a paired device by its stored record
-  (`pairedDevice`; a bootstrap session such as a host-local process holding the admin token is not),
+  (`pairedDevice`; a bootstrap session such as a host-local process holding the admin token is not,
+  and neither is a connection that began as a bootstrap session (bearer token or allowlist) and
+  then redeemed an invite on that same connection: the session keeps its bootstrap provenance),
   and hold `admin.full` (`grantedCapabilities`). The device's agent scope applies: `list` shows only
   requests of agents in scope; `get` of a request outside it answers `unknown_request` and
   `submit`/`cancel` answer `not_pending`, byte for byte as for an unknown id. Byte-identical holds
@@ -382,4 +385,8 @@ Each was settled conservatively for v1 and is listed for the owner:
     live-call token can be requested by any local process running as the same OS user, so
     `CallerIdentity.VERIFIED` does not separate agents that share one OS user; (b) whether a
     record should store which device answered it; (c) whether `secret.request.answer` should be
-    granted to any role (today it is granted to none, so only `admin.full` devices answer).
+    granted to any role (today it is granted to none, so only `admin.full` devices answer); (d)
+    holding a bootstrap admin token lets you pair a device: a bootstrap session can mint an admin
+    invite and redeem it from a second, fresh connection, which is then a paired device. A
+    bearer-token or allowlist host registers no secret routes, but the paired-peer store persists,
+    so a device paired that way can answer once the host runs paired-peers-only. Not closed in v1.

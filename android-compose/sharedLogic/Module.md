@@ -289,7 +289,7 @@ Host construction separates endpoint network/identity binding (`IrohEndpointBind
 
 # Package com.letta.mobile.data.controller.node.iroh.secrets
 
-The secret request admin RPC routes and the agent's `secret_request` tool on the JVM host. [SecretRequestFeature](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh.secrets/-secret-request-feature/index.html) builds both only for a secure auth policy (as the caller passes it) with a keystore provider and an explicit item scope, and nothing in production calls it yet; the human principal comes from the serving connection (a paired device holding `admin.full`), the agent principal only from the runtime-stamped tool call, and no route returns or logs a value.
+The secret request admin RPC routes and the agent's `secret_request` tool on the JVM host. [SecretRequestFeature](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh.secrets/-secret-request-feature/index.html) builds both only for a paired-peers-only auth policy (as the caller passes it) with a keystore provider and an explicit item scope, and nothing in production calls it yet; the human principal comes from the serving connection (a paired device holding `admin.full`), the agent principal only from the runtime-stamped tool call, and no route returns or logs a value.
 
 # Package com.letta.mobile.data.controller.node.iroh.discovery
 

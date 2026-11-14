@@ -17,12 +17,16 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** The routes, the capability and the tool exist only on a secure JVM host with a keystore, and all together. */
+/**
+ * The routes, the capability and the tool exist only on a paired-peers-only JVM host with a
+ * keystore, and all together. Bearer-token and allowlist hosts have bootstrap sessions that can mint
+ * pairing invites, so they get nothing.
+ */
 class SecretRequestRegistrationTest {
-    private val secure: List<IrohAuthPolicy> = listOf(
-        IrohAuthPolicy.PairedPeersOnly,
+    private val bootstrapPolicies: List<IrohAuthPolicy> = listOf(
         IrohAuthPolicy.BearerToken("t".repeat(MIN_TOKEN)),
         IrohAuthPolicy.PeerAllowlist(setOf(HUMAN_ENDPOINT)),
+        IrohAuthPolicy.InsecureAnonymousForTestOnly,
     )
 
     private fun feature(policy: IrohAuthPolicy, keystore: TestKeystoreProvider?): SecretRequestFeature? =
@@ -45,18 +49,27 @@ class SecretRequestRegistrationTest {
     }
 
     @Test
-    fun routesHandedToAnAnonymousEndpointStillRegisterNothing() {
+    fun aBearerTokenAllowlistOrAnonymousHostBuildsNoFeatureEvenWithAKeystore() {
+        for (policy in bootstrapPolicies) {
+            assertNull(feature(policy, TestKeystoreProvider()), policy.toString())
+        }
+    }
+
+    @Test
+    fun routesHandedToABootstrapOrAnonymousEndpointStillRegisterNothing() {
         val handlers = SecretRouteHarness().feature.handlers
-        val router = AdminRpcRouter()
-        SecretRequestRoutes(IrohAuthPolicy.InsecureAnonymousForTestOnly, handlers).register(router)
-        assertEquals(0, router.methodCount)
-        assertTrue(router.featureCapabilities.isEmpty())
+        for (policy in bootstrapPolicies) {
+            val router = AdminRpcRouter()
+            SecretRequestRoutes(policy, handlers).register(router)
+            assertEquals(0, router.methodCount, policy.toString())
+            assertTrue(router.featureCapabilities.isEmpty(), policy.toString())
+        }
     }
 
     /**
      * [SecretRequestFeature.forHost] cannot see the endpoint, so the policy it is given could be
      * wrong. The backstop is per call: a session of an anonymous endpoint is authenticated and holds
-     * admin.full, but is never a paired device, so routes built for a secure policy still refuse it.
+     * admin.full, but is never a paired device, so routes built for a paired-peers policy still refuse it.
      */
     @Test
     fun routesBuiltForASecurePolicyStillRefuseEverySessionOfAnAnonymousEndpoint() = runTest {
@@ -77,14 +90,12 @@ class SecretRequestRegistrationTest {
     }
 
     @Test
-    fun aSecureHostWithAKeystoreRegistersAllSixRoutesTheCapabilityAndTheTool() {
-        for (policy in secure) {
-            val built = assertNotNull(feature(policy, TestKeystoreProvider()), policy.toString())
-            val router = routerWith(built)
-            assertEquals(SecretRequestRouteWire.METHODS, router.registeredMethods.filter { it.startsWith("secret.request") }.toSet())
-            assertTrue(SecretRequestRouteWire.CAPABILITY in router.featureCapabilities)
-            assertEquals(listOf(SecretRequestTool.NAME), built.hostTools.map { it.name })
-        }
+    fun aPairedPeersOnlyHostWithAKeystoreRegistersAllSixRoutesTheCapabilityAndTheTool() {
+        val built = assertNotNull(feature(IrohAuthPolicy.PairedPeersOnly, TestKeystoreProvider()))
+        val router = routerWith(built)
+        assertEquals(SecretRequestRouteWire.METHODS, router.registeredMethods.filter { it.startsWith("secret.request") }.toSet())
+        assertTrue(SecretRequestRouteWire.CAPABILITY in router.featureCapabilities)
+        assertEquals(listOf(SecretRequestTool.NAME), built.hostTools.map { it.name })
     }
 
     @Test
