@@ -1,12 +1,11 @@
 package com.letta.mobile.ui.icons
 
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
 
 object LettaIconSizing {
-    val Toolbar: Dp = LettaDimens.Space.xl
-    val ListLeading: Dp = LettaDimens.Space.xl
-    val Inline: Dp = LettaDimens.Space.lg
-    val Status: Dp = LettaDimens.Space.lg
+    val Toolbar: Dp = LettaSpaceTokens.xl
+    val ListLeading: Dp = LettaSpaceTokens.xl
+    val Inline: Dp = LettaSpaceTokens.lg
+    val Status: Dp = LettaSpaceTokens.lg
 }

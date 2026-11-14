@@ -17,9 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,7 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.components.LettaInlineError
-import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.components.foundation.LettaSearchField
 import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
@@ -72,20 +70,12 @@ internal fun HomeHeader(page: HomePageScope) {
 
 @Composable
 private fun HomeSearchField(page: HomePageScope, modifier: Modifier) {
-    val query = page.state.search.query
-    OutlinedTextField(
-        value = query,
-        onValueChange = page.actions::updateSearchQuery,
-        placeholder = { Text(HomeSearchPlaceholder) },
-        leadingIcon = { Icon(LettaIcons.Search, contentDescription = null) },
-        trailingIcon = {
-            if (query.isNotEmpty()) {
-                IconButton(onClick = page.actions::clearSearch) { Icon(LettaIcons.Close, contentDescription = CLEAR_SEARCH) }
-            }
-        },
-        singleLine = true,
-        shape = MaterialTheme.shapes.medium,
+    LettaSearchField(
+        query = page.state.search.query,
+        onQueryChange = page.actions::updateSearchQuery,
         modifier = modifier.testTag(HomePageTags.SEARCH),
+        placeholder = HomeSearchPlaceholder,
+        onClear = page.actions::clearSearch,
     )
 }
 
@@ -206,7 +196,6 @@ private const val PAGE_TITLE = "Home"
 /** What Home searches, for a host field (desktop's header) that searches the page in its place. */
 const val HomeSearchPlaceholder: String = "Search agents, tools, blocks and messages"
 
-private const val CLEAR_SEARCH = "Clear search"
 private const val SEND_LABEL = "Send message"
 internal const val NO_CONVERSATIONS = "No conversations yet. Start one from the chatbox."
 private const val COMPOSER_MAX_LINES = 5

@@ -1,33 +1,27 @@
 package com.letta.mobile.ui.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
+import com.letta.mobile.ui.components.foundation.LettaControlRow
+import com.letta.mobile.ui.components.foundation.LettaRowWords
+import com.letta.mobile.ui.components.foundation.LettaStatusLabel
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaStatusLabel
 
 /*
  * letta-mobile-ckmub.3.12.1: the one row anatomy every settings row shares. A label, a one-line
@@ -61,42 +55,21 @@ internal fun SettingsRowFrame(
     interaction: Modifier = Modifier,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = LettaDimens.Control.minTouchTarget)
-            .then(interaction)
-            .semantics(mergeDescendants = true) {}
-            .testTag(tag)
-            .padding(vertical = LettaDimens.Space.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-    ) {
-        RowWordsColumn(words, enabled, Modifier.weight(1f))
-        trailing()
-    }
+    LettaControlRow(
+        title = words.title,
+        modifier = Modifier.testTag(tag),
+        supporting = words.helper,
+        enabled = enabled,
+        destructive = words.destructive,
+        interaction = interaction,
+        trailing = trailing,
+    )
 }
 
 /** A row's label over its one-line helper. */
 @Composable
 internal fun RowWordsColumn(words: RowWords, enabled: Boolean, modifier: Modifier = Modifier) {
-    val titleColor = when {
-        words.destructive -> MaterialTheme.colorScheme.error
-        enabled -> MaterialTheme.colorScheme.onSurface
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
-        Text(words.title, style = MaterialTheme.typography.bodyLarge, color = titleColor)
-        words.helper?.let {
-            Text(
-                it,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
+    LettaRowWords(words.title, words.helper, enabled, modifier, words.destructive)
 }
 
 /** A status as a dot, a glyph for its tone and its words: never colour alone. */

@@ -31,11 +31,11 @@ import com.letta.mobile.data.repository.modelcontrol.ProviderConnectMethod
 import com.letta.mobile.data.repository.modelcontrol.ProviderSettingsLists
 import com.letta.mobile.data.repository.modelcontrol.connectMethodOn
 import com.letta.mobile.data.repository.modelcontrol.connectedBaseUrl
+import com.letta.mobile.ui.components.foundation.LettaStatusLabel
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.providers.icons.ProviderIcon
 import com.letta.mobile.ui.providers.icons.ProviderIdentity
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaStatusLabel
 
 private val pagePadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)
 

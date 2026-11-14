@@ -28,6 +28,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
+import com.letta.mobile.ui.components.foundation.LettaStatusLabel
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.pill.LettaPillColors
 import java.io.File
