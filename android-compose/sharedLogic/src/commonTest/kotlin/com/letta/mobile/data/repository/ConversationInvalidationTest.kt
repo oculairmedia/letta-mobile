@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.chat.conversations.listing.repositoryConversationListingFactory
 import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.Agent
@@ -12,6 +13,10 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import com.letta.mobile.data.transport.iroh.WireContractFixture
+import com.letta.mobile.data.transport.iroh.visibleRecentsContractText
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
@@ -56,6 +61,7 @@ class ConversationInvalidationTest {
         val transport = remote
         var rosterCalls = 0
         val repository = CachedAllConversationsRepository(
+            listingFactory = repositoryConversationListingFactory(),
             roster = { rosterCalls++; roster }, remote = RemoteRoute.Absent(SessionRoute.CONVERSATIONS), repositoryScope = backgroundScope,
             irohConversationListSource = remote.source(), transport = transport,
         )
@@ -92,6 +98,7 @@ class ConversationInvalidationTest {
     fun aTurnsPushesReReadOnlyThePushedConversationsABurstAtATime() = runTest {
         val remote = Backend(listOf(row("a1"), row("a2"), row("b1", b)))
         val repository = CachedAllConversationsRepository(
+            listingFactory = repositoryConversationListingFactory(),
             roster = { roster }, remote = RemoteRoute.Absent(SessionRoute.CONVERSATIONS), repositoryScope = backgroundScope,
             irohConversationListSource = remote.source(), transport = remote,
         )
@@ -122,6 +129,7 @@ class ConversationInvalidationTest {
         val transport = remote
         remote.supportsGet = false
         val repository = CachedAllConversationsRepository(
+            listingFactory = repositoryConversationListingFactory(),
             roster = { roster }, remote = RemoteRoute.Absent(SessionRoute.CONVERSATIONS), repositoryScope = backgroundScope,
             irohConversationListSource = remote.source(), transport = transport,
         )
@@ -215,6 +223,8 @@ class ConversationInvalidationTest {
             val result = when (method) {
                 "conversation.list" -> {
                     val params = LettaJson.wire.parseToJsonElement(body.orEmpty()).jsonObject
+                    // A host without a visibility index refuses visible recents; the list keeps its per-agent reads.
+                    if (params["visible_only"] != null) return noIndex()
                     val agent = AgentId(params.getValue("agent_id").jsonPrimitive.content)
                     requests += agent
                     LettaJson.wire.encodeToJsonElement(rows.filter { it.agentId == agent })
@@ -230,6 +240,14 @@ class ConversationInvalidationTest {
                 else -> error("unexpected $method")
             }
             return AppServerInboundFrame.AdminRpcResponse("request", success = true, result = result)
+        }
+
+        private fun noIndex(): AppServerInboundFrame.AdminRpcResponse {
+            val envelope = WireContractFixture(visibleRecentsContractText).response("no-index")
+            return AppServerInboundFrame.AdminRpcResponse(
+                "request", success = envelope.getValue("success").jsonPrimitive.booleanOrNull == true,
+                error = envelope["error"]?.jsonPrimitive?.contentOrNull,
+            )
         }
     }
 }

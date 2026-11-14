@@ -25,6 +25,8 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.decodeConversationList
 import com.letta.mobile.data.repository.conversationListParams
+import com.letta.mobile.data.repository.decodeVisibleRecents
+import com.letta.mobile.data.repository.visibleRecentsParams
 import com.letta.mobile.data.repository.conversationChanges
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
@@ -58,7 +60,6 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -237,38 +238,13 @@ class IrohAdminRpcChatGateway(
     }
 
     override suspend fun listRecentConversations(limit: Int, after: ConversationId?): List<Conversation> {
-        val params = buildJsonObject {
-            put("visible_only", true)
-            put("limit", limit)
-            after?.let { put("after", it.value) }
-        }
         val result = rpc(AdminRpcCall.of(
             method = AdminRpcMethod("conversation.list"),
             path = AdminRpcPath("/v1/conversations"),
-            body = AdminRpcBody(params.toString()),
+            body = AdminRpcBody(visibleRecentsParams(limit, after).toString()),
         )) ?: throw TimelineTransportHttpException(502, "Visible recents returned no result")
-        // Inspect forbidden raw rows before decoding can discard evidence of an ignored opt-in.
-        if (containsLegacyRecentRows(result)) {
-            throw UnsupportedOperationException("Host ignored visible_only")
-        }
-        return json.decodeConversationList(result, ::reportSkippedConversationRows)
-            .onEach { agentIdByConversation[it.id] = it.agentId }
+        return json.decodeVisibleRecents(result).onEach { agentIdByConversation[it.id] = it.agentId }
     }
-
-    private fun containsLegacyRecentRows(result: JsonElement): Boolean {
-        if (result !is JsonArray) return false
-        return result.any { isLegacyRecentRow(it) }
-    }
-
-    private fun isLegacyRecentRow(row: JsonElement): Boolean {
-        if (row !is JsonObject) return false
-        if (com.letta.mobile.data.model.HiddenListFilter.isAgentFreeRow(row)) return true
-        if (recentFlagIsTrue(row, "archived")) return true
-        return recentFlagIsTrue(row, "hidden")
-    }
-
-    private fun recentFlagIsTrue(row: JsonObject, key: String): Boolean =
-        (row[key] as? JsonPrimitive)?.booleanOrNull == true
 
     override suspend fun getConversation(conversationId: String): Conversation {
         val result = rpc(

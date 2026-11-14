@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.chat.conversations.listing.repositoryConversationListingFactory
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.model.LettaConfig
@@ -44,7 +45,7 @@ class AllConversationsRepositoryTest {
     @Before
     fun setup() {
         fakeApi = FakeConversationApi()
-        repository = AllConversationsRepository(fakeApi, roster)
+        repository = AllConversationsRepository(fakeApi, roster, listingFactory = repositoryConversationListingFactory())
     }
 
     @Test
@@ -64,7 +65,13 @@ class AllConversationsRepositoryTest {
     @Test
     fun `conversation_updated push refreshes a loaded list`() = runTest {
         val transport = FakeChannelTransport()
-        val pushed = AllConversationsRepository(fakeApi, roster, repositoryScope = backgroundScope, transport = transport)
+        val pushed = AllConversationsRepository(
+            fakeApi,
+            roster,
+            listingFactory = repositoryConversationListingFactory(),
+            repositoryScope = backgroundScope,
+            transport = transport,
+        )
         fakeApi.conversations.add(TestData.conversation(id = "1"))
         pushed.refresh()
         runCurrent()
@@ -80,7 +87,13 @@ class AllConversationsRepositoryTest {
     @Test
     fun `conversation_updated push before the list ever loaded fetches nothing`() = runTest {
         val transport = FakeChannelTransport()
-        AllConversationsRepository(fakeApi, roster, repositoryScope = backgroundScope, transport = transport)
+        AllConversationsRepository(
+            fakeApi,
+            roster,
+            listingFactory = repositoryConversationListingFactory(),
+            repositoryScope = backgroundScope,
+            transport = transport,
+        )
         runCurrent()
 
         transport.events.emit(conversationPush("from-phone"))
@@ -93,7 +106,13 @@ class AllConversationsRepositoryTest {
     @Test
     fun `reconnect re-reads a loaded list since pushes sent while offline are lost`() = runTest {
         val transport = FakeChannelTransport()
-        val pushed = AllConversationsRepository(fakeApi, roster, repositoryScope = backgroundScope, transport = transport)
+        val pushed = AllConversationsRepository(
+            fakeApi,
+            roster,
+            listingFactory = repositoryConversationListingFactory(),
+            repositoryScope = backgroundScope,
+            transport = transport,
+        )
         runCurrent()
         pushed.refresh()
         val callsAfterLoad = fakeApi.calls.count { it == "listConversations" }
@@ -126,8 +145,14 @@ class AllConversationsRepositoryTest {
     fun `iroh list asks for archived rows and a push refetches only the named conversation`() = runTest {
         val transport = FakeChannelTransport().apply {
             adminRpcHandler = { method, _, body ->
-                when (method) {
-                    "conversation.list" -> {
+                when {
+                    // A host without a visibility index refuses visible recents (conversation.list/visible-recents-v1 "no-index").
+                    "\"visible_only\":true" in body.orEmpty() -> AppServerInboundFrame.AdminRpcResponse(
+                        requestId = "req",
+                        success = false,
+                        error = "capability_unavailable: visible_only requires local agent visibility",
+                    )
+                    method == "conversation.list" -> {
                         assertTrue("fetch must include archived rows: $body", body.orEmpty().contains("\"archive_status\":\"all\""))
                         AppServerInboundFrame.AdminRpcResponse(
                             requestId = "req",
@@ -135,7 +160,7 @@ class AllConversationsRepositoryTest {
                             result = Json.parseToJsonElement(Json.encodeToString(listOf(TestData.conversation(id = "1")))),
                         )
                     }
-                    "conversation.get" -> AppServerInboundFrame.AdminRpcResponse(
+                    method == "conversation.get" -> AppServerInboundFrame.AdminRpcResponse(
                         requestId = "req",
                         success = true,
                         result = Json.parseToJsonElement("""{"id":"1","agent_id":"agent-1","summary":"Archived elsewhere","archived":true}"""),
@@ -148,6 +173,7 @@ class AllConversationsRepositoryTest {
             initialActiveConfig = LettaConfig(id = "iroh", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://EndpointTicket"),
         )
         val pushed = AllConversationsRepository(
+            listingFactory = repositoryConversationListingFactory(),
             roster = roster,
             remote = armedConversationApi(),
             conversationDao = null,
@@ -163,7 +189,8 @@ class AllConversationsRepositoryTest {
         runCurrent()
 
         assertEquals(true, pushed.conversations.value.single().archived)
-        assertEquals(listOf("conversation.list", "conversation.get"), transport.adminRpcCalls.map { it.method })
+        // The refused recents attempt, the agent's own list, then only the pushed conversation.
+        assertEquals(listOf("conversation.list", "conversation.list", "conversation.get"), transport.adminRpcCalls.map { it.method })
     }
 
     @Test
@@ -267,6 +294,7 @@ class AllConversationsRepositoryTest {
             initialActiveConfig = LettaConfig(id = "iroh", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://EndpointTicket"),
         )
         val listed = AllConversationsRepository(
+            listingFactory = repositoryConversationListingFactory(),
             roster = roster,
             remote = armedConversationApi(),
             conversationDao = null,
@@ -282,7 +310,10 @@ class AllConversationsRepositoryTest {
         assertEquals(60, listed.conversations.value.size)
         assertFalse(listed.hasMore.value)
         assertTrue(listed.conversations.value.none { it.id.value.startsWith("worker-") })
-        assertTrue(transport.adminRpcCalls.all { "\"agent_id\":\"agent-1\"" in it.body.orEmpty() })
+        // This host ignores visible_only (it answers its worker rows), so the one recents attempt falls back to agent reads.
+        val (recents, agentReads) = transport.adminRpcCalls.partition { "\"visible_only\":true" in it.body.orEmpty() }
+        assertEquals(1, recents.size)
+        assertTrue(agentReads.all { "\"agent_id\":\"agent-1\"" in it.body.orEmpty() })
     }
 
     @Test

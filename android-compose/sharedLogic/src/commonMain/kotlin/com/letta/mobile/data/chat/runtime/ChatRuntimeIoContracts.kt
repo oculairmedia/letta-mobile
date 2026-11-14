@@ -28,7 +28,12 @@ interface ChatConversationStore {
     suspend fun listRecentConversations(limit: Int = 30, after: ConversationId? = null): List<Conversation> {
         throw UnsupportedOperationException("Visible recents are not supported by this gateway")
     }
-    suspend fun getConversation(conversationId: String): Conversation
+    suspend fun getConversation(conversationId: String): Conversation = getConversation(ConversationId(conversationId))
+
+    /** The typed read that [getConversation] by text defaults to; a store implements one of the two. */
+    suspend fun getConversation(id: ConversationId): Conversation {
+        throw UnsupportedOperationException("getConversation is not supported by this store")
+    }
     suspend fun deleteConversation(conversationId: String) {
         throw UnsupportedOperationException("deleteConversation is not supported by this gateway")
     }

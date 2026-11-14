@@ -12,6 +12,8 @@ import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.ConversationListingFactory
+import com.letta.mobile.data.chat.conversations.listing.repositoryConversationListingFactory
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.IrohAdminRpcApprovalSource
@@ -78,6 +80,9 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 abstract class AppModule {
     companion object {
+        @Provides
+        fun provideConversationListingFactory(): ConversationListingFactory = repositoryConversationListingFactory()
+
         @Provides
         @Singleton
         fun provideWsChatBridge(transport: IChannelTransport): WsChatBridge = WsChatBridge(transport)
