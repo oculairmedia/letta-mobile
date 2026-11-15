@@ -932,3 +932,7 @@ Projects the trusted session graph's backend namespace for a pin binding. Sessio
 # Package com.letta.mobile.data.home.shortcut
 
 Existing Home shortcut identities, separated from Home controllers and storage. The original HomeShortcut source alias remains available; persistence names are unchanged.
+
+# Package com.letta.mobile.data.schedules.control
+
+Internal query-generation tokens for schedule controller work. A captured revision keeps delayed load and mutation results scoped to the selected target.

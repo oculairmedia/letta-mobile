@@ -117,11 +117,11 @@ internal fun SchedulesPageState.deleteTarget(id: String): ScheduleDeleteTarget? 
 }
 
 /** Only live cron tasks have pause/resume operations; native schedule IDs use a different API. */
-internal fun SchedulesPageState.canTogglePause(id: String): Boolean =
+internal fun SchedulesPageState.canTogglePause(id: CronTaskId): Boolean =
     (crons + library.crons).any {
-        it.id == id && (it.status == null || it.status == "active" || it.status == "paused") &&
+        it.id == id.value && (it.status == null || it.status == "active" || it.status == "paused") &&
             (focusedAgentId == null || it.agentId == null || it.agentId == focusedAgentId)
-    } && id !in library.pendingCronIds
+    } && id.value !in library.pendingCronIds
 
 internal fun SchedulesPageActions.delete(target: ScheduleDeleteTarget?) {
     when (target) {

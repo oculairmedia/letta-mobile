@@ -13,6 +13,7 @@ import com.letta.mobile.data.memory.graph.MemoryPageState
 import com.letta.mobile.data.memory.memfs.MemfsNavigation
 import com.letta.mobile.data.memory.memfs.MemfsPageActions
 import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
+import com.letta.mobile.data.schedules.ScheduleCreateRequest
 import com.letta.mobile.data.schedules.ScheduleLibraryController
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.shell.CurrentFocusChatMode
@@ -272,27 +273,40 @@ internal fun shellScheduleActions(
     },
     onSelectAgent = { id -> selectPageAgent(workspace, AgentId(id)) },
     onDeleteSchedule = { ref ->
-        if (workspace.currentFocus.agentId?.value == ref.agentId && schedules.state.value.selectedAgentId == ref.agentId) {
-            schedules.deleteSchedule(ref.scheduleId)
-        }
+        if (scheduleAgent(schedules, workspace) == ref.agentId) schedules.deleteSchedule(ref.scheduleId)
     },
     onDeleteCron = { id ->
-        val agent = workspace.currentFocus.agentId?.value
-        if (agent != null && schedules.state.value.selectedAgentId == agent) schedules.deleteSchedule(id.value)
+        scheduleAgent(schedules, workspace)?.let { schedules.deleteSchedule(id.value) }
     },
-    onTogglePause = { id, resume ->
-        val agent = workspace.currentFocus.agentId?.value
-        if (agent != null && schedules.state.value.selectedAgentId == agent) {
-            schedules.state.value.crons.firstOrNull { it.id == id }?.let { schedules.toggleCronPause(it, resume) }
-        }
-    },
-    onCreate = { request ->
-        val agent = workspace.currentFocus.agentId?.value
-        if (agent != null && schedules.state.value.selectedAgentId == agent && (request.agentId == null || request.agentId == agent)) {
-            schedules.createRecurringSchedule(request.copy(agentId = agent))
-        }
-    },
+    onTogglePause = { id, resume -> toggleFocusedCron(schedules, workspace, id, resume) },
+    onCreate = { request -> createFocusedSchedule(schedules, workspace, request) },
 )
+
+private fun scheduleAgent(schedules: ScheduleLibraryController, workspace: ShellWorkspaceState): String? {
+    val agent = workspace.currentFocus.agentId?.value ?: return null
+    return agent.takeIf { schedules.state.value.selectedAgentId == it }
+}
+
+private fun toggleFocusedCron(
+    schedules: ScheduleLibraryController,
+    workspace: ShellWorkspaceState,
+    id: String,
+    resume: Boolean,
+) {
+    scheduleAgent(schedules, workspace) ?: return
+    schedules.state.value.crons.firstOrNull { it.id == id }?.let { schedules.toggleCronPause(it, resume) }
+}
+
+private fun createFocusedSchedule(
+    schedules: ScheduleLibraryController,
+    workspace: ShellWorkspaceState,
+    request: ScheduleCreateRequest,
+) {
+    val agent = scheduleAgent(schedules, workspace) ?: return
+    if (request.agentId == null || request.agentId == agent) {
+        schedules.createRecurringSchedule(request.copy(agentId = agent))
+    }
+}
 
 private fun channelsPage(controllers: ShellLibraryControllers, slots: ChannelsPageSlots) =
     ShellPageContent<ShellDestination.Channels> { destination, modifier ->

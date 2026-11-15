@@ -325,7 +325,7 @@ private fun railParams(ui: SchedulesPageUi, input: SchedulesPageInput) = Schedul
     onDelete = { ui.pendingDelete = it },
     onTogglePause = input.actions.onTogglePause.takeIf {
         val id = (ui.rail as? ScheduleRailState.Detail)?.scheduleId
-        id != null && input.state.canTogglePause(id)
+        id != null && input.state.canTogglePause(CronTaskId(id))
     },
     agentNames = input.data.agentNames,
 )

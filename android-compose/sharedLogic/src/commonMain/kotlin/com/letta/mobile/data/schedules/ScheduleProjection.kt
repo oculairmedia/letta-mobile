@@ -188,10 +188,6 @@ object ScheduleProjection {
      */
     fun CronTask.toScheduleDef(viewerZone: TimeZone, now: Instant): ScheduleDef {
         val taskZone = timezone?.let { runCatching { TimeZone.of(it) }.getOrNull() } ?: viewerZone
-        val displayName = name?.takeIf { it.isNotBlank() }
-            ?: description?.takeIf { it.isNotBlank() }
-            ?: prompt?.takeIf { it.isNotBlank() }?.take(40)
-            ?: "Schedule"
         val rawCron = cron?.takeIf { it.isNotBlank() }
         // A one-off is persisted as a fully-specified cron with no year, and the
         // slim /v1/crons shape carries no separate timestamp. Keeping the cron
@@ -201,7 +197,7 @@ object ScheduleProjection {
         // materializes exactly once and never recurs.
         val base = ScheduleDef(
             id = id,
-            name = displayName,
+            name = displayName(),
             cron = rawCron,
             oneShotAt = null,
             active = status == null || status == CronTaskStatus.ACTIVE,
@@ -220,6 +216,11 @@ object ScheduleProjection {
             base.copy(cron = null, oneShotAt = CronSchedule.parse(rawCron)?.let { CronSchedule.nextRun(it, now, taskZone) })
         }
     }
+
+    private fun CronTask.displayName(): String = name?.takeIf { it.isNotBlank() }
+            ?: description?.takeIf { it.isNotBlank() }
+            ?: prompt?.takeIf { it.isNotBlank() }?.take(40)
+            ?: "Schedule"
 
     private fun String?.toInstantOrNull(): Instant? = this?.let { runCatching { Instant.parse(it) }.getOrNull() }
 

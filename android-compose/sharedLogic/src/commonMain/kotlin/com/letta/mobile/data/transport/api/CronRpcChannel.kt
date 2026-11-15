@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.api
 
+import kotlin.time.Duration
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlinx.coroutines.CancellationException
@@ -25,15 +26,15 @@ open class CronRpcChannel(
 ) : NoOpChannelTransport() {
     override suspend fun adminRpc(method: String, path: String, body: String?) = rpcCall(method, path, body)
 
-    override suspend fun sendCronList(agentId: String?, conversationId: String?, timeoutMs: Long): ServerFrame.CronListResponse =
+    override suspend fun listCrons(query: CronListQuery, timeout: Duration): ServerFrame.CronListResponse =
         executeCronOp<JsonObject, ServerFrame.CronListResponse>(
             op = "cron.list",
             body = buildJsonObject {
-                agentId?.let { put("agent_id", it) }
+                query.agentId?.let { put("agent_id", it) }
 
-                conversationId?.let { put("conversation_id", it) }
+                query.conversationId?.let { put("conversation_id", it) }
             },
-            timeoutMs = timeoutMs,
+            timeout = timeout,
             onSuccess = { frame, decoded ->
                 decodeFrame<ServerFrame.CronListResponse>(decoded, frame)
             },
@@ -42,37 +43,21 @@ open class CronRpcChannel(
             },
         )
 
-    override suspend fun sendCronAdd(
-        agentId: String,
-        name: String,
-        description: String,
-        prompt: String,
-        recurring: Boolean,
-        cron: String?,
-        every: String?,
-        at: String?,
-        timezone: String?,
-        conversationId: String?,
-        timeoutMs: Long,
-    ) = sendCronAdd(
-        CronAddRequest(agentId, name, description, prompt, recurring, cron, every, at, timezone, conversationId, timeoutMs),
-    )
-
-    internal suspend fun sendCronAdd(request: CronAddRequest): ServerFrame.CronAddResponse =
+    override suspend fun addCron(params: CronAddRequest, timeout: Duration): ServerFrame.CronAddResponse =
         executeCronOp<JsonObject, ServerFrame.CronAddResponse>(
             op = "cron.add",
             body = buildJsonObject {
-                put("agent_id", request.agentId)
-                put("name", request.name)
-                put("description", request.description)
-                put("prompt", request.prompt)
-                put("recurring", request.recurring)
-                request.cron?.let { put("cron", it) }
-                request.timezone?.let { put("timezone", it) }
-                request.conversationId?.let { put("conversation_id", it) }
-                request.at?.let { put("scheduled_for", it) }
+                put("agent_id", params.agentId)
+                put("name", params.name)
+                put("description", params.description)
+                put("prompt", params.prompt)
+                put("recurring", params.recurring)
+                params.cron?.let { put("cron", it) }
+                params.timezone?.let { put("timezone", it) }
+                params.conversationId?.let { put("conversation_id", it) }
+                params.at?.let { put("scheduled_for", it) }
             },
-            timeoutMs = request.timeoutMs,
+            timeout = timeout,
             onSuccess = { frame, decoded ->
                 decodeFrame<ServerFrame.CronAddResponse>(decoded, frame)
             },
@@ -81,11 +66,11 @@ open class CronRpcChannel(
             },
         )
 
-    override suspend fun sendCronGet(taskId: String, timeoutMs: Long): ServerFrame.CronGetResponse =
+    override suspend fun getCron(task: CronTaskRef, timeout: Duration): ServerFrame.CronGetResponse =
         executeCronOp<JsonObject, ServerFrame.CronGetResponse>(
             op = "cron.get",
-            body = buildJsonObject { put("task_id", taskId) },
-            timeoutMs = timeoutMs,
+            body = buildJsonObject { put("task_id", task.value) },
+            timeout = timeout,
             onSuccess = { frame, decoded ->
                 decodeFrame<ServerFrame.CronGetResponse>(decoded, frame)
             },
@@ -94,11 +79,11 @@ open class CronRpcChannel(
             },
         )
 
-    override suspend fun sendCronDelete(taskId: String, timeoutMs: Long): ServerFrame.CronDeleteResponse =
+    override suspend fun deleteCron(task: CronTaskRef, timeout: Duration): ServerFrame.CronDeleteResponse =
         executeCronOp<Unit, ServerFrame.CronDeleteResponse>(
             op = "cron.delete",
-            body = buildJsonObject { put("task_id", taskId) },
-            timeoutMs = timeoutMs,
+            body = buildJsonObject { put("task_id", task.value) },
+            timeout = timeout,
             onSuccess = { frame, _ ->
                 ServerFrame.CronDeleteResponse(id = frame.id, ts = frame.ts, requestId = frame.requestId, success = true)
             },
@@ -107,11 +92,11 @@ open class CronRpcChannel(
             },
         )
 
-    override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long): ServerFrame.CronDeleteAllResponse =
+    override suspend fun deleteAllCrons(agent: CronAgentRef, timeout: Duration): ServerFrame.CronDeleteAllResponse =
         executeCronOp<JsonObject, ServerFrame.CronDeleteAllResponse>(
             op = "cron.delete_all",
-            body = buildJsonObject { put("agent_id", agentId) },
-            timeoutMs = timeoutMs,
+            body = buildJsonObject { put("agent_id", agent.value) },
+            timeout = timeout,
             onSuccess = { frame, decoded ->
                 ServerFrame.CronDeleteAllResponse(
                     id = frame.id, ts = frame.ts, requestId = frame.requestId, success = true,
@@ -127,7 +112,7 @@ open class CronRpcChannel(
         executeCronOp<Unit, ServerFrame.CronPauseResponse>(
             op = "cron.pause",
             body = buildJsonObject { put("task_id", command.taskId) },
-            timeoutMs = command.timeoutMs,
+            timeout = command.timeoutMs.milliseconds,
             onSuccess = { frame, _ ->
                 ServerFrame.CronPauseResponse(id = frame.id, ts = frame.ts, requestId = frame.requestId, success = true)
             },
@@ -143,7 +128,7 @@ open class CronRpcChannel(
                 put("task_id", command.taskId)
                 command.scheduledFor?.let { put("scheduled_for", it) }
             },
-            timeoutMs = command.timeoutMs,
+            timeout = command.timeoutMs.milliseconds,
             onSuccess = { frame, _ ->
                 ServerFrame.CronResumeResponse(id = frame.id, ts = frame.ts, requestId = frame.requestId, success = true)
             },
@@ -157,7 +142,7 @@ open class CronRpcChannel(
     private suspend inline fun <reified R, T> executeCronOp(
         op: String,
         body: JsonObject,
-        timeoutMs: Long,
+        timeout: Duration,
         crossinline onSuccess: (frame: CronFrameIdentity, decoded: R) -> T,
         crossinline onFailure: (frame: CronFrameIdentity, error: String) -> T,
     ): T {
@@ -169,7 +154,7 @@ open class CronRpcChannel(
         )
 
         return try {
-            withTimeoutOrNull(timeoutMs.milliseconds) {
+            withTimeoutOrNull(timeout) {
                 val response = adminRpc(op, CRON_ADMIN_PATH, body.toString())
                 if (!response.success) return@withTimeoutOrNull onFailure(frame, response.error ?: "$op failed")
                 if (R::class == Unit::class) {
@@ -201,19 +186,5 @@ open class CronRpcChannel(
         private val json = LettaJson.wire
     }
 }
-
-internal data class CronAddRequest(
-    val agentId: String,
-    val name: String,
-    val description: String,
-    val prompt: String,
-    val recurring: Boolean,
-    val cron: String?,
-    val every: String?,
-    val at: String?,
-    val timezone: String?,
-    val conversationId: String?,
-    val timeoutMs: Long,
-)
 
 private data class CronFrameIdentity(val id: String, val ts: String, val requestId: String)
