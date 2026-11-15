@@ -34,7 +34,7 @@ class WireContractsTest {
         // Semantic fixtures have their own common tests, not Admin RPC methods.
         .filterNot {
             it.relativeTo(fixtureRoot).invariantSeparatorsPath in setOf(
-                "active-turn/v1.json", "object-verbs/v1.json", "current-focus/v1.json",
+                "active-turn/v1.json", "object-verbs/v1.json", "current-focus/v1.json", "voice-endpoint/v1.json",
             )
         }
         .map { WireContractFixture(it.readText()) }.toList().also {

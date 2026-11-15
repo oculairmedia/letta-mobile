@@ -4109,6 +4109,76 @@ final enum class com.letta.mobile.data.voice.engine/VoiceCancelOutcome : kotlin/
     final fun values(): kotlin/Array<com.letta.mobile.data.voice.engine/VoiceCancelOutcome> // com.letta.mobile.data.voice.engine/VoiceCancelOutcome.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.voice.host/HostVoiceErrorCode : kotlin/Enum<com.letta.mobile.data.voice.host/HostVoiceErrorCode> { // com.letta.mobile.data.voice.host/HostVoiceErrorCode|null[0]
+    enum entry BUSY // com.letta.mobile.data.voice.host/HostVoiceErrorCode.BUSY|null[0]
+    enum entry CANCELLED // com.letta.mobile.data.voice.host/HostVoiceErrorCode.CANCELLED|null[0]
+    enum entry CONSENT_REQUIRED // com.letta.mobile.data.voice.host/HostVoiceErrorCode.CONSENT_REQUIRED|null[0]
+    enum entry INSECURE_TRANSPORT // com.letta.mobile.data.voice.host/HostVoiceErrorCode.INSECURE_TRANSPORT|null[0]
+    enum entry INTERNAL // com.letta.mobile.data.voice.host/HostVoiceErrorCode.INTERNAL|null[0]
+    enum entry INVALID_REQUEST // com.letta.mobile.data.voice.host/HostVoiceErrorCode.INVALID_REQUEST|null[0]
+    enum entry NOT_AUTHORIZED // com.letta.mobile.data.voice.host/HostVoiceErrorCode.NOT_AUTHORIZED|null[0]
+    enum entry NOT_CONFIGURED // com.letta.mobile.data.voice.host/HostVoiceErrorCode.NOT_CONFIGURED|null[0]
+    enum entry PAYLOAD_TOO_LARGE // com.letta.mobile.data.voice.host/HostVoiceErrorCode.PAYLOAD_TOO_LARGE|null[0]
+    enum entry REVISION_CONFLICT // com.letta.mobile.data.voice.host/HostVoiceErrorCode.REVISION_CONFLICT|null[0]
+    enum entry UNSUPPORTED // com.letta.mobile.data.voice.host/HostVoiceErrorCode.UNSUPPORTED|null[0]
+    enum entry UPSTREAM_BAD_RESPONSE // com.letta.mobile.data.voice.host/HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE|null[0]
+    enum entry UPSTREAM_REJECTED // com.letta.mobile.data.voice.host/HostVoiceErrorCode.UPSTREAM_REJECTED|null[0]
+    enum entry UPSTREAM_TIMEOUT // com.letta.mobile.data.voice.host/HostVoiceErrorCode.UPSTREAM_TIMEOUT|null[0]
+    enum entry UPSTREAM_UNAUTHORIZED // com.letta.mobile.data.voice.host/HostVoiceErrorCode.UPSTREAM_UNAUTHORIZED|null[0]
+    enum entry UPSTREAM_UNREACHABLE // com.letta.mobile.data.voice.host/HostVoiceErrorCode.UPSTREAM_UNREACHABLE|null[0]
+
+    final val entries // com.letta.mobile.data.voice.host/HostVoiceErrorCode.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.voice.host/HostVoiceErrorCode> // com.letta.mobile.data.voice.host/HostVoiceErrorCode.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val retryable // com.letta.mobile.data.voice.host/HostVoiceErrorCode.retryable|{}retryable[0]
+        final fun <get-retryable>(): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceErrorCode.retryable.<get-retryable>|<get-retryable>(){}[0]
+    final val voiceCode // com.letta.mobile.data.voice.host/HostVoiceErrorCode.voiceCode|{}voiceCode[0]
+        final fun <get-voiceCode>(): com.letta.mobile.data.voice/VoiceErrorCode // com.letta.mobile.data.voice.host/HostVoiceErrorCode.voiceCode.<get-voiceCode>|<get-voiceCode>(){}[0]
+    final val wire // com.letta.mobile.data.voice.host/HostVoiceErrorCode.wire|{}wire[0]
+        final fun <get-wire>(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceErrorCode.wire.<get-wire>|<get-wire>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.voice.host/HostVoiceErrorCode // com.letta.mobile.data.voice.host/HostVoiceErrorCode.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.voice.host/HostVoiceErrorCode> // com.letta.mobile.data.voice.host/HostVoiceErrorCode.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.voice.host/HostVoiceErrorCode.Companion|null[0]
+        final fun fromWire(kotlin/String?): com.letta.mobile.data.voice.host/HostVoiceErrorCode // com.letta.mobile.data.voice.host/HostVoiceErrorCode.Companion.fromWire|fromWire(kotlin.String?){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceErrorCode> // com.letta.mobile.data.voice.host/HostVoiceErrorCode.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.voice.host/HostVoiceErrorCode.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.data.voice.host/HostVoiceListSource : kotlin/Enum<com.letta.mobile.data.voice.host/HostVoiceListSource> { // com.letta.mobile.data.voice.host/HostVoiceListSource|null[0]
+    enum entry CONFIGURED // com.letta.mobile.data.voice.host/HostVoiceListSource.CONFIGURED|null[0]
+    enum entry UPSTREAM // com.letta.mobile.data.voice.host/HostVoiceListSource.UPSTREAM|null[0]
+
+    final val entries // com.letta.mobile.data.voice.host/HostVoiceListSource.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.voice.host/HostVoiceListSource> // com.letta.mobile.data.voice.host/HostVoiceListSource.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.voice.host/HostVoiceListSource // com.letta.mobile.data.voice.host/HostVoiceListSource.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.voice.host/HostVoiceListSource> // com.letta.mobile.data.voice.host/HostVoiceListSource.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.voice.host/HostVoiceListSource.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceListSource> // com.letta.mobile.data.voice.host/HostVoiceListSource.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.voice.host/HostVoiceListSource.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.data.voice.host/HostVoiceReachabilityState : kotlin/Enum<com.letta.mobile.data.voice.host/HostVoiceReachabilityState> { // com.letta.mobile.data.voice.host/HostVoiceReachabilityState|null[0]
+    enum entry FAILED // com.letta.mobile.data.voice.host/HostVoiceReachabilityState.FAILED|null[0]
+    enum entry REACHABLE // com.letta.mobile.data.voice.host/HostVoiceReachabilityState.REACHABLE|null[0]
+    enum entry UNKNOWN // com.letta.mobile.data.voice.host/HostVoiceReachabilityState.UNKNOWN|null[0]
+
+    final val entries // com.letta.mobile.data.voice.host/HostVoiceReachabilityState.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.voice.host/HostVoiceReachabilityState> // com.letta.mobile.data.voice.host/HostVoiceReachabilityState.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.voice.host/HostVoiceReachabilityState // com.letta.mobile.data.voice.host/HostVoiceReachabilityState.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.voice.host/HostVoiceReachabilityState> // com.letta.mobile.data.voice.host/HostVoiceReachabilityState.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.voice.host/HostVoiceReachabilityState.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceReachabilityState> // com.letta.mobile.data.voice.host/HostVoiceReachabilityState.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.voice.host/HostVoiceReachabilityState.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 final enum class com.letta.mobile.data.voice.responder/VoiceRowKind : kotlin/Enum<com.letta.mobile.data.voice.responder/VoiceRowKind> { // com.letta.mobile.data.voice.responder/VoiceRowKind|null[0]
     enum entry ASSISTANT_TEXT // com.letta.mobile.data.voice.responder/VoiceRowKind.ASSISTANT_TEXT|null[0]
     enum entry ERROR // com.letta.mobile.data.voice.responder/VoiceRowKind.ERROR|null[0]
@@ -7280,6 +7350,16 @@ abstract interface com.letta.mobile.data.voice.engine/VoiceReply { // com.letta.
 
 abstract interface com.letta.mobile.data.voice.engine/VoiceResponder { // com.letta.mobile.data.voice.engine/VoiceResponder|null[0]
     abstract fun respond(com.letta.mobile.data.voice/VoiceUtterance): com.letta.mobile.data.voice.engine/VoiceReply // com.letta.mobile.data.voice.engine/VoiceResponder.respond|respond(com.letta.mobile.data.voice.VoiceUtterance){}[0]
+}
+
+abstract interface com.letta.mobile.data.voice.host/HostVoiceEndpoint { // com.letta.mobile.data.voice.host/HostVoiceEndpoint|null[0]
+    abstract fun synthesize(com.letta.mobile.data.voice/VoiceText): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.voice.audio/PcmChunk> // com.letta.mobile.data.voice.host/HostVoiceEndpoint.synthesize|synthesize(com.letta.mobile.data.voice.VoiceText){}[0]
+    abstract suspend fun clearSetup(kotlin/String? = ...): com.letta.mobile.data.voice.host/HostVoiceSetupStatus // com.letta.mobile.data.voice.host/HostVoiceEndpoint.clearSetup|clearSetup(kotlin.String?){}[0]
+    abstract suspend fun models(): com.letta.mobile.data.voice.host/HostVoiceModels // com.letta.mobile.data.voice.host/HostVoiceEndpoint.models|models(){}[0]
+    abstract suspend fun status(): com.letta.mobile.data.voice.host/HostVoiceSetupStatus // com.letta.mobile.data.voice.host/HostVoiceEndpoint.status|status(){}[0]
+    abstract suspend fun testConnection(com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate? = ...): com.letta.mobile.data.voice.host/HostVoiceTestResult // com.letta.mobile.data.voice.host/HostVoiceEndpoint.testConnection|testConnection(com.letta.mobile.data.voice.host.HostVoiceConnectionCandidate?){}[0]
+    abstract suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip, com.letta.mobile.data.voice/SpeechLanguage? = ...): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.host/HostVoiceEndpoint.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip;com.letta.mobile.data.voice.SpeechLanguage?){}[0]
+    abstract suspend fun writeSetup(com.letta.mobile.data.voice.host/HostVoiceSetupCommand): com.letta.mobile.data.voice.host/HostVoiceSetupStatus // com.letta.mobile.data.voice.host/HostVoiceEndpoint.writeSetup|writeSetup(com.letta.mobile.data.voice.host.HostVoiceSetupCommand){}[0]
 }
 
 abstract interface com.letta.mobile.data.voice.loop/VoiceLoopObserver { // com.letta.mobile.data.voice.loop/VoiceLoopObserver|null[0]
@@ -25885,6 +25965,29 @@ sealed interface com.letta.mobile.data.voice.engine/VoiceReplyEvent { // com.let
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.engine/VoiceReplyEvent.PartEnded.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.engine/VoiceReplyEvent.PartEnded.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.voice.engine/VoiceReplyEvent.PartEnded.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.voice.host/HostVoiceKeyChange { // com.letta.mobile.data.voice.host/HostVoiceKeyChange|null[0]
+    final class Replace : com.letta.mobile.data.voice.host/HostVoiceKeyChange { // com.letta.mobile.data.voice.host/HostVoiceKeyChange.Replace|null[0]
+        constructor <init>(com.letta.mobile.data.model.provider.wire/SecretWriteValue) // com.letta.mobile.data.voice.host/HostVoiceKeyChange.Replace.<init>|<init>(com.letta.mobile.data.model.provider.wire.SecretWriteValue){}[0]
+
+        final val key // com.letta.mobile.data.voice.host/HostVoiceKeyChange.Replace.key|{}key[0]
+            final fun <get-key>(): com.letta.mobile.data.model.provider.wire/SecretWriteValue // com.letta.mobile.data.voice.host/HostVoiceKeyChange.Replace.key.<get-key>|<get-key>(){}[0]
+
+        final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceKeyChange.Replace.toString|toString(){}[0]
+    }
+
+    final object Keep : com.letta.mobile.data.voice.host/HostVoiceKeyChange { // com.letta.mobile.data.voice.host/HostVoiceKeyChange.Keep|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceKeyChange.Keep.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceKeyChange.Keep.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceKeyChange.Keep.toString|toString(){}[0]
+    }
+
+    final object Remove : com.letta.mobile.data.voice.host/HostVoiceKeyChange { // com.letta.mobile.data.voice.host/HostVoiceKeyChange.Remove|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceKeyChange.Remove.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceKeyChange.Remove.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceKeyChange.Remove.toString|toString(){}[0]
     }
 }
 
@@ -70071,6 +70174,373 @@ final class com.letta.mobile.data.voice.engine/SpeechSegment { // com.letta.mobi
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.engine/SpeechSegment.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.voice.host/HostSpeechSetup { // com.letta.mobile.data.voice.host/HostSpeechSetup|null[0]
+    constructor <init>(kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.voice.host/HostSpeechSetup.<init>|<init>(kotlin.Boolean;kotlin.String?;kotlin.String?){}[0]
+
+    final val available // com.letta.mobile.data.voice.host/HostSpeechSetup.available|{}available[0]
+        final fun <get-available>(): kotlin/Boolean // com.letta.mobile.data.voice.host/HostSpeechSetup.available.<get-available>|<get-available>(){}[0]
+    final val model // com.letta.mobile.data.voice.host/HostSpeechSetup.model|{}model[0]
+        final fun <get-model>(): kotlin/String? // com.letta.mobile.data.voice.host/HostSpeechSetup.model.<get-model>|<get-model>(){}[0]
+    final val voice // com.letta.mobile.data.voice.host/HostSpeechSetup.voice|{}voice[0]
+        final fun <get-voice>(): kotlin/String? // com.letta.mobile.data.voice.host/HostSpeechSetup.voice.<get-voice>|<get-voice>(){}[0]
+
+    final fun component1(): kotlin/Boolean // com.letta.mobile.data.voice.host/HostSpeechSetup.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.voice.host/HostSpeechSetup.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.data.voice.host/HostSpeechSetup.component3|component3(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.voice.host/HostSpeechSetup // com.letta.mobile.data.voice.host/HostSpeechSetup.copy|copy(kotlin.Boolean;kotlin.String?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.host/HostSpeechSetup.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.host/HostSpeechSetup.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostSpeechSetup.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.voice.host/HostSpeechSetup> { // com.letta.mobile.data.voice.host/HostSpeechSetup.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.voice.host/HostSpeechSetup.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.voice.host/HostSpeechSetup.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.voice.host/HostSpeechSetup.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.voice.host/HostSpeechSetup // com.letta.mobile.data.voice.host/HostSpeechSetup.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.voice.host/HostSpeechSetup) // com.letta.mobile.data.voice.host/HostSpeechSetup.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.voice.host.HostSpeechSetup){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.voice.host/HostSpeechSetup.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostSpeechSetup> // com.letta.mobile.data.voice.host/HostSpeechSetup.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.voice.host/HostTranscriptionSetup { // com.letta.mobile.data.voice.host/HostTranscriptionSetup|null[0]
+    constructor <init>(kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.voice.host/HostTranscriptionSetup.<init>|<init>(kotlin.Boolean;kotlin.String?;kotlin.String?){}[0]
+
+    final val available // com.letta.mobile.data.voice.host/HostTranscriptionSetup.available|{}available[0]
+        final fun <get-available>(): kotlin/Boolean // com.letta.mobile.data.voice.host/HostTranscriptionSetup.available.<get-available>|<get-available>(){}[0]
+    final val language // com.letta.mobile.data.voice.host/HostTranscriptionSetup.language|{}language[0]
+        final fun <get-language>(): kotlin/String? // com.letta.mobile.data.voice.host/HostTranscriptionSetup.language.<get-language>|<get-language>(){}[0]
+    final val model // com.letta.mobile.data.voice.host/HostTranscriptionSetup.model|{}model[0]
+        final fun <get-model>(): kotlin/String? // com.letta.mobile.data.voice.host/HostTranscriptionSetup.model.<get-model>|<get-model>(){}[0]
+
+    final fun component1(): kotlin/Boolean // com.letta.mobile.data.voice.host/HostTranscriptionSetup.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.voice.host/HostTranscriptionSetup.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.data.voice.host/HostTranscriptionSetup.component3|component3(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.voice.host/HostTranscriptionSetup // com.letta.mobile.data.voice.host/HostTranscriptionSetup.copy|copy(kotlin.Boolean;kotlin.String?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.host/HostTranscriptionSetup.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.host/HostTranscriptionSetup.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostTranscriptionSetup.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.voice.host/HostTranscriptionSetup> { // com.letta.mobile.data.voice.host/HostTranscriptionSetup.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.voice.host/HostTranscriptionSetup.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.voice.host/HostTranscriptionSetup.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.voice.host/HostTranscriptionSetup.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.voice.host/HostTranscriptionSetup // com.letta.mobile.data.voice.host/HostTranscriptionSetup.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.voice.host/HostTranscriptionSetup) // com.letta.mobile.data.voice.host/HostTranscriptionSetup.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.voice.host.HostTranscriptionSetup){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.voice.host/HostTranscriptionSetup.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostTranscriptionSetup> // com.letta.mobile.data.voice.host/HostTranscriptionSetup.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.voice.host/HostVoiceCatalogEntry { // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.<init>|<init>(kotlin.String){}[0]
+
+    final val id // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.id.<get-id>|<get-id>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.component1|component1(){}[0]
+    final fun copy(kotlin/String = ...): com.letta.mobile.data.voice.host/HostVoiceCatalogEntry // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.copy|copy(kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.voice.host/HostVoiceCatalogEntry> { // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.voice.host/HostVoiceCatalogEntry // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.voice.host/HostVoiceCatalogEntry) // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.voice.host.HostVoiceCatalogEntry){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceCatalogEntry> // com.letta.mobile.data.voice.host/HostVoiceCatalogEntry.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate { // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate|null[0]
+    constructor <init>(com.letta.mobile.data.voice/SpeechEndpointUrl, com.letta.mobile.data.model.provider.wire/SecretWriteValue? = ...) // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate.<init>|<init>(com.letta.mobile.data.voice.SpeechEndpointUrl;com.letta.mobile.data.model.provider.wire.SecretWriteValue?){}[0]
+
+    final val apiKey // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate.apiKey|{}apiKey[0]
+        final fun <get-apiKey>(): com.letta.mobile.data.model.provider.wire/SecretWriteValue? // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate.apiKey.<get-apiKey>|<get-apiKey>(){}[0]
+    final val baseUrl // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate.baseUrl|{}baseUrl[0]
+        final fun <get-baseUrl>(): com.letta.mobile.data.voice/SpeechEndpointUrl // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate.baseUrl.<get-baseUrl>|<get-baseUrl>(){}[0]
+
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate> // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.voice.host/HostVoiceConsent { // com.letta.mobile.data.voice.host/HostVoiceConsent|null[0]
+    constructor <init>(kotlin/String? = ..., com.letta.mobile.data.voice.host/HostVoiceGrants = ..., kotlin/Long? = ...) // com.letta.mobile.data.voice.host/HostVoiceConsent.<init>|<init>(kotlin.String?;com.letta.mobile.data.voice.host.HostVoiceGrants;kotlin.Long?){}[0]
+
+    final val grantedAtMs // com.letta.mobile.data.voice.host/HostVoiceConsent.grantedAtMs|{}grantedAtMs[0]
+        final fun <get-grantedAtMs>(): kotlin/Long? // com.letta.mobile.data.voice.host/HostVoiceConsent.grantedAtMs.<get-grantedAtMs>|<get-grantedAtMs>(){}[0]
+    final val grants // com.letta.mobile.data.voice.host/HostVoiceConsent.grants|{}grants[0]
+        final fun <get-grants>(): com.letta.mobile.data.voice.host/HostVoiceGrants // com.letta.mobile.data.voice.host/HostVoiceConsent.grants.<get-grants>|<get-grants>(){}[0]
+    final val origin // com.letta.mobile.data.voice.host/HostVoiceConsent.origin|{}origin[0]
+        final fun <get-origin>(): kotlin/String? // com.letta.mobile.data.voice.host/HostVoiceConsent.origin.<get-origin>|<get-origin>(){}[0]
+
+    final fun component1(): kotlin/String? // com.letta.mobile.data.voice.host/HostVoiceConsent.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.voice.host/HostVoiceGrants // com.letta.mobile.data.voice.host/HostVoiceConsent.component2|component2(){}[0]
+    final fun component3(): kotlin/Long? // com.letta.mobile.data.voice.host/HostVoiceConsent.component3|component3(){}[0]
+    final fun copy(kotlin/String? = ..., com.letta.mobile.data.voice.host/HostVoiceGrants = ..., kotlin/Long? = ...): com.letta.mobile.data.voice.host/HostVoiceConsent // com.letta.mobile.data.voice.host/HostVoiceConsent.copy|copy(kotlin.String?;com.letta.mobile.data.voice.host.HostVoiceGrants;kotlin.Long?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceConsent.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceConsent.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceConsent.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.voice.host/HostVoiceConsent> { // com.letta.mobile.data.voice.host/HostVoiceConsent.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.voice.host/HostVoiceConsent.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.voice.host/HostVoiceConsent.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.voice.host/HostVoiceConsent.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.voice.host/HostVoiceConsent // com.letta.mobile.data.voice.host/HostVoiceConsent.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.voice.host/HostVoiceConsent) // com.letta.mobile.data.voice.host/HostVoiceConsent.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.voice.host.HostVoiceConsent){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.voice.host/HostVoiceConsent.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceConsent> // com.letta.mobile.data.voice.host/HostVoiceConsent.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.voice.host/HostVoiceEndpointChoice { // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice|null[0]
+    constructor <init>(com.letta.mobile.data.voice/SpeechEndpointUrl, com.letta.mobile.data.voice/SpeechModelName? = ..., com.letta.mobile.data.voice/SpeechModelName? = ..., com.letta.mobile.data.voice/SpeechVoiceName? = ..., com.letta.mobile.data.voice/SpeechLanguage? = ...) // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.<init>|<init>(com.letta.mobile.data.voice.SpeechEndpointUrl;com.letta.mobile.data.voice.SpeechModelName?;com.letta.mobile.data.voice.SpeechModelName?;com.letta.mobile.data.voice.SpeechVoiceName?;com.letta.mobile.data.voice.SpeechLanguage?){}[0]
+
+    final val baseUrl // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.baseUrl|{}baseUrl[0]
+        final fun <get-baseUrl>(): com.letta.mobile.data.voice/SpeechEndpointUrl // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.baseUrl.<get-baseUrl>|<get-baseUrl>(){}[0]
+    final val language // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.language|{}language[0]
+        final fun <get-language>(): com.letta.mobile.data.voice/SpeechLanguage? // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.language.<get-language>|<get-language>(){}[0]
+    final val speechModel // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.speechModel|{}speechModel[0]
+        final fun <get-speechModel>(): com.letta.mobile.data.voice/SpeechModelName? // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.speechModel.<get-speechModel>|<get-speechModel>(){}[0]
+    final val transcriptionModel // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.transcriptionModel|{}transcriptionModel[0]
+        final fun <get-transcriptionModel>(): com.letta.mobile.data.voice/SpeechModelName? // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.transcriptionModel.<get-transcriptionModel>|<get-transcriptionModel>(){}[0]
+    final val voice // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.voice|{}voice[0]
+        final fun <get-voice>(): com.letta.mobile.data.voice/SpeechVoiceName? // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.voice.<get-voice>|<get-voice>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.voice/SpeechEndpointUrl // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.voice/SpeechModelName? // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.voice/SpeechModelName? // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.data.voice/SpeechVoiceName? // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.component4|component4(){}[0]
+    final fun component5(): com.letta.mobile.data.voice/SpeechLanguage? // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.component5|component5(){}[0]
+    final fun copy(com.letta.mobile.data.voice/SpeechEndpointUrl = ..., com.letta.mobile.data.voice/SpeechModelName? = ..., com.letta.mobile.data.voice/SpeechModelName? = ..., com.letta.mobile.data.voice/SpeechVoiceName? = ..., com.letta.mobile.data.voice/SpeechLanguage? = ...): com.letta.mobile.data.voice.host/HostVoiceEndpointChoice // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.copy|copy(com.letta.mobile.data.voice.SpeechEndpointUrl;com.letta.mobile.data.voice.SpeechModelName?;com.letta.mobile.data.voice.SpeechModelName?;com.letta.mobile.data.voice.SpeechVoiceName?;com.letta.mobile.data.voice.SpeechLanguage?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceEndpointChoice.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.voice.host/HostVoiceException : kotlin/Exception { // com.letta.mobile.data.voice.host/HostVoiceException|null[0]
+    constructor <init>(com.letta.mobile.data.voice.host/HostVoiceErrorCode) // com.letta.mobile.data.voice.host/HostVoiceException.<init>|<init>(com.letta.mobile.data.voice.host.HostVoiceErrorCode){}[0]
+
+    final val code // com.letta.mobile.data.voice.host/HostVoiceException.code|{}code[0]
+        final fun <get-code>(): com.letta.mobile.data.voice.host/HostVoiceErrorCode // com.letta.mobile.data.voice.host/HostVoiceException.code.<get-code>|<get-code>(){}[0]
+}
+
+final class com.letta.mobile.data.voice.host/HostVoiceGrants { // com.letta.mobile.data.voice.host/HostVoiceGrants|null[0]
+    constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ...) // com.letta.mobile.data.voice.host/HostVoiceGrants.<init>|<init>(kotlin.Boolean;kotlin.Boolean){}[0]
+
+    final val audioForTranscription // com.letta.mobile.data.voice.host/HostVoiceGrants.audioForTranscription|{}audioForTranscription[0]
+        final fun <get-audioForTranscription>(): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceGrants.audioForTranscription.<get-audioForTranscription>|<get-audioForTranscription>(){}[0]
+    final val textForSynthesis // com.letta.mobile.data.voice.host/HostVoiceGrants.textForSynthesis|{}textForSynthesis[0]
+        final fun <get-textForSynthesis>(): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceGrants.textForSynthesis.<get-textForSynthesis>|<get-textForSynthesis>(){}[0]
+
+    final fun component1(): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceGrants.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceGrants.component2|component2(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.data.voice.host/HostVoiceGrants // com.letta.mobile.data.voice.host/HostVoiceGrants.copy|copy(kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceGrants.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceGrants.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceGrants.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.voice.host/HostVoiceGrants> { // com.letta.mobile.data.voice.host/HostVoiceGrants.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.voice.host/HostVoiceGrants.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.voice.host/HostVoiceGrants.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.voice.host/HostVoiceGrants.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.voice.host/HostVoiceGrants // com.letta.mobile.data.voice.host/HostVoiceGrants.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.voice.host/HostVoiceGrants) // com.letta.mobile.data.voice.host/HostVoiceGrants.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.voice.host.HostVoiceGrants){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.voice.host/HostVoiceGrants.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceGrants> // com.letta.mobile.data.voice.host/HostVoiceGrants.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.voice.host/HostVoiceModels { // com.letta.mobile.data.voice.host/HostVoiceModels|null[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.data.voice.host/HostVoiceCatalogEntry>, kotlin.collections/List<com.letta.mobile.data.voice.host/HostVoiceCatalogEntry>, com.letta.mobile.data.voice.host/HostVoiceListSource, kotlin/Long) // com.letta.mobile.data.voice.host/HostVoiceModels.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.voice.host.HostVoiceCatalogEntry>;kotlin.collections.List<com.letta.mobile.data.voice.host.HostVoiceCatalogEntry>;com.letta.mobile.data.voice.host.HostVoiceListSource;kotlin.Long){}[0]
+
+    final val checkedAtMs // com.letta.mobile.data.voice.host/HostVoiceModels.checkedAtMs|{}checkedAtMs[0]
+        final fun <get-checkedAtMs>(): kotlin/Long // com.letta.mobile.data.voice.host/HostVoiceModels.checkedAtMs.<get-checkedAtMs>|<get-checkedAtMs>(){}[0]
+    final val models // com.letta.mobile.data.voice.host/HostVoiceModels.models|{}models[0]
+        final fun <get-models>(): kotlin.collections/List<com.letta.mobile.data.voice.host/HostVoiceCatalogEntry> // com.letta.mobile.data.voice.host/HostVoiceModels.models.<get-models>|<get-models>(){}[0]
+    final val voices // com.letta.mobile.data.voice.host/HostVoiceModels.voices|{}voices[0]
+        final fun <get-voices>(): kotlin.collections/List<com.letta.mobile.data.voice.host/HostVoiceCatalogEntry> // com.letta.mobile.data.voice.host/HostVoiceModels.voices.<get-voices>|<get-voices>(){}[0]
+    final val voicesSource // com.letta.mobile.data.voice.host/HostVoiceModels.voicesSource|{}voicesSource[0]
+        final fun <get-voicesSource>(): com.letta.mobile.data.voice.host/HostVoiceListSource // com.letta.mobile.data.voice.host/HostVoiceModels.voicesSource.<get-voicesSource>|<get-voicesSource>(){}[0]
+
+    final fun component1(): kotlin.collections/List<com.letta.mobile.data.voice.host/HostVoiceCatalogEntry> // com.letta.mobile.data.voice.host/HostVoiceModels.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<com.letta.mobile.data.voice.host/HostVoiceCatalogEntry> // com.letta.mobile.data.voice.host/HostVoiceModels.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.voice.host/HostVoiceListSource // com.letta.mobile.data.voice.host/HostVoiceModels.component3|component3(){}[0]
+    final fun component4(): kotlin/Long // com.letta.mobile.data.voice.host/HostVoiceModels.component4|component4(){}[0]
+    final fun copy(kotlin.collections/List<com.letta.mobile.data.voice.host/HostVoiceCatalogEntry> = ..., kotlin.collections/List<com.letta.mobile.data.voice.host/HostVoiceCatalogEntry> = ..., com.letta.mobile.data.voice.host/HostVoiceListSource = ..., kotlin/Long = ...): com.letta.mobile.data.voice.host/HostVoiceModels // com.letta.mobile.data.voice.host/HostVoiceModels.copy|copy(kotlin.collections.List<com.letta.mobile.data.voice.host.HostVoiceCatalogEntry>;kotlin.collections.List<com.letta.mobile.data.voice.host.HostVoiceCatalogEntry>;com.letta.mobile.data.voice.host.HostVoiceListSource;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceModels.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceModels.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceModels.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.voice.host/HostVoiceModels> { // com.letta.mobile.data.voice.host/HostVoiceModels.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.voice.host/HostVoiceModels.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.voice.host/HostVoiceModels.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.voice.host/HostVoiceModels.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.voice.host/HostVoiceModels // com.letta.mobile.data.voice.host/HostVoiceModels.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.voice.host/HostVoiceModels) // com.letta.mobile.data.voice.host/HostVoiceModels.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.voice.host.HostVoiceModels){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.voice.host/HostVoiceModels.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.voice.host/HostVoiceModels.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceModels> // com.letta.mobile.data.voice.host/HostVoiceModels.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.voice.host/HostVoiceReachability { // com.letta.mobile.data.voice.host/HostVoiceReachability|null[0]
+    constructor <init>(com.letta.mobile.data.voice.host/HostVoiceReachabilityState = ..., kotlin/Long? = ..., com.letta.mobile.data.voice.host/HostVoiceErrorCode? = ...) // com.letta.mobile.data.voice.host/HostVoiceReachability.<init>|<init>(com.letta.mobile.data.voice.host.HostVoiceReachabilityState;kotlin.Long?;com.letta.mobile.data.voice.host.HostVoiceErrorCode?){}[0]
+
+    final val checkedAtMs // com.letta.mobile.data.voice.host/HostVoiceReachability.checkedAtMs|{}checkedAtMs[0]
+        final fun <get-checkedAtMs>(): kotlin/Long? // com.letta.mobile.data.voice.host/HostVoiceReachability.checkedAtMs.<get-checkedAtMs>|<get-checkedAtMs>(){}[0]
+    final val error // com.letta.mobile.data.voice.host/HostVoiceReachability.error|{}error[0]
+        final fun <get-error>(): com.letta.mobile.data.voice.host/HostVoiceErrorCode? // com.letta.mobile.data.voice.host/HostVoiceReachability.error.<get-error>|<get-error>(){}[0]
+    final val state // com.letta.mobile.data.voice.host/HostVoiceReachability.state|{}state[0]
+        final fun <get-state>(): com.letta.mobile.data.voice.host/HostVoiceReachabilityState // com.letta.mobile.data.voice.host/HostVoiceReachability.state.<get-state>|<get-state>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.voice.host/HostVoiceReachabilityState // com.letta.mobile.data.voice.host/HostVoiceReachability.component1|component1(){}[0]
+    final fun component2(): kotlin/Long? // com.letta.mobile.data.voice.host/HostVoiceReachability.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.voice.host/HostVoiceErrorCode? // com.letta.mobile.data.voice.host/HostVoiceReachability.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.data.voice.host/HostVoiceReachabilityState = ..., kotlin/Long? = ..., com.letta.mobile.data.voice.host/HostVoiceErrorCode? = ...): com.letta.mobile.data.voice.host/HostVoiceReachability // com.letta.mobile.data.voice.host/HostVoiceReachability.copy|copy(com.letta.mobile.data.voice.host.HostVoiceReachabilityState;kotlin.Long?;com.letta.mobile.data.voice.host.HostVoiceErrorCode?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceReachability.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceReachability.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceReachability.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.voice.host/HostVoiceReachability> { // com.letta.mobile.data.voice.host/HostVoiceReachability.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.voice.host/HostVoiceReachability.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.voice.host/HostVoiceReachability.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.voice.host/HostVoiceReachability.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.voice.host/HostVoiceReachability // com.letta.mobile.data.voice.host/HostVoiceReachability.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.voice.host/HostVoiceReachability) // com.letta.mobile.data.voice.host/HostVoiceReachability.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.voice.host.HostVoiceReachability){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.voice.host/HostVoiceReachability.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.voice.host/HostVoiceReachability.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceReachability> // com.letta.mobile.data.voice.host/HostVoiceReachability.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.voice.host/HostVoiceSetupCommand { // com.letta.mobile.data.voice.host/HostVoiceSetupCommand|null[0]
+    constructor <init>(com.letta.mobile.data.voice.host/HostVoiceEndpointChoice, com.letta.mobile.data.voice.host/HostVoiceKeyChange = ..., com.letta.mobile.data.voice.host/HostVoiceGrants = ..., kotlin/String? = ...) // com.letta.mobile.data.voice.host/HostVoiceSetupCommand.<init>|<init>(com.letta.mobile.data.voice.host.HostVoiceEndpointChoice;com.letta.mobile.data.voice.host.HostVoiceKeyChange;com.letta.mobile.data.voice.host.HostVoiceGrants;kotlin.String?){}[0]
+
+    final val apiKey // com.letta.mobile.data.voice.host/HostVoiceSetupCommand.apiKey|{}apiKey[0]
+        final fun <get-apiKey>(): com.letta.mobile.data.voice.host/HostVoiceKeyChange // com.letta.mobile.data.voice.host/HostVoiceSetupCommand.apiKey.<get-apiKey>|<get-apiKey>(){}[0]
+    final val endpoint // com.letta.mobile.data.voice.host/HostVoiceSetupCommand.endpoint|{}endpoint[0]
+        final fun <get-endpoint>(): com.letta.mobile.data.voice.host/HostVoiceEndpointChoice // com.letta.mobile.data.voice.host/HostVoiceSetupCommand.endpoint.<get-endpoint>|<get-endpoint>(){}[0]
+    final val expectedRevision // com.letta.mobile.data.voice.host/HostVoiceSetupCommand.expectedRevision|{}expectedRevision[0]
+        final fun <get-expectedRevision>(): kotlin/String? // com.letta.mobile.data.voice.host/HostVoiceSetupCommand.expectedRevision.<get-expectedRevision>|<get-expectedRevision>(){}[0]
+    final val grants // com.letta.mobile.data.voice.host/HostVoiceSetupCommand.grants|{}grants[0]
+        final fun <get-grants>(): com.letta.mobile.data.voice.host/HostVoiceGrants // com.letta.mobile.data.voice.host/HostVoiceSetupCommand.grants.<get-grants>|<get-grants>(){}[0]
+
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceSetupCommand.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.voice.host/HostVoiceSetupCommand.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceSetupCommand> // com.letta.mobile.data.voice.host/HostVoiceSetupCommand.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.voice.host/HostVoiceSetupStatus { // com.letta.mobile.data.voice.host/HostVoiceSetupStatus|null[0]
+    constructor <init>(kotlin/Int, kotlin/Boolean, kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ..., com.letta.mobile.data.voice.host/HostTranscriptionSetup = ..., com.letta.mobile.data.voice.host/HostSpeechSetup = ..., com.letta.mobile.data.voice.host/HostVoiceConsent = ..., com.letta.mobile.data.voice.host/HostVoiceReachability = ...) // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.<init>|<init>(kotlin.Int;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.Boolean;com.letta.mobile.data.voice.host.HostTranscriptionSetup;com.letta.mobile.data.voice.host.HostSpeechSetup;com.letta.mobile.data.voice.host.HostVoiceConsent;com.letta.mobile.data.voice.host.HostVoiceReachability){}[0]
+
+    final val baseUrl // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.baseUrl|{}baseUrl[0]
+        final fun <get-baseUrl>(): kotlin/String? // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.baseUrl.<get-baseUrl>|<get-baseUrl>(){}[0]
+    final val configured // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.configured|{}configured[0]
+        final fun <get-configured>(): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.configured.<get-configured>|<get-configured>(){}[0]
+    final val consent // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.consent|{}consent[0]
+        final fun <get-consent>(): com.letta.mobile.data.voice.host/HostVoiceConsent // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.consent.<get-consent>|<get-consent>(){}[0]
+    final val contractVersion // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.contractVersion|{}contractVersion[0]
+        final fun <get-contractVersion>(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.contractVersion.<get-contractVersion>|<get-contractVersion>(){}[0]
+    final val hasApiKey // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.hasApiKey|{}hasApiKey[0]
+        final fun <get-hasApiKey>(): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.hasApiKey.<get-hasApiKey>|<get-hasApiKey>(){}[0]
+    final val reachability // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.reachability|{}reachability[0]
+        final fun <get-reachability>(): com.letta.mobile.data.voice.host/HostVoiceReachability // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.reachability.<get-reachability>|<get-reachability>(){}[0]
+    final val revision // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.revision|{}revision[0]
+        final fun <get-revision>(): kotlin/String? // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.revision.<get-revision>|<get-revision>(){}[0]
+    final val speech // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.speech|{}speech[0]
+        final fun <get-speech>(): com.letta.mobile.data.voice.host/HostSpeechSetup // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.speech.<get-speech>|<get-speech>(){}[0]
+    final val transcription // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.transcription|{}transcription[0]
+        final fun <get-transcription>(): com.letta.mobile.data.voice.host/HostTranscriptionSetup // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.transcription.<get-transcription>|<get-transcription>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.component4|component4(){}[0]
+    final fun component5(): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.component5|component5(){}[0]
+    final fun component6(): com.letta.mobile.data.voice.host/HostTranscriptionSetup // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.component6|component6(){}[0]
+    final fun component7(): com.letta.mobile.data.voice.host/HostSpeechSetup // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.component7|component7(){}[0]
+    final fun component8(): com.letta.mobile.data.voice.host/HostVoiceConsent // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.component8|component8(){}[0]
+    final fun component9(): com.letta.mobile.data.voice.host/HostVoiceReachability // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.component9|component9(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ..., com.letta.mobile.data.voice.host/HostTranscriptionSetup = ..., com.letta.mobile.data.voice.host/HostSpeechSetup = ..., com.letta.mobile.data.voice.host/HostVoiceConsent = ..., com.letta.mobile.data.voice.host/HostVoiceReachability = ...): com.letta.mobile.data.voice.host/HostVoiceSetupStatus // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.copy|copy(kotlin.Int;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.Boolean;com.letta.mobile.data.voice.host.HostTranscriptionSetup;com.letta.mobile.data.voice.host.HostSpeechSetup;com.letta.mobile.data.voice.host.HostVoiceConsent;com.letta.mobile.data.voice.host.HostVoiceReachability){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.voice.host/HostVoiceSetupStatus> { // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.voice.host/HostVoiceSetupStatus // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.voice.host/HostVoiceSetupStatus) // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.voice.host.HostVoiceSetupStatus){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceSetupStatus> // com.letta.mobile.data.voice.host/HostVoiceSetupStatus.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.voice.host/HostVoiceTestResult { // com.letta.mobile.data.voice.host/HostVoiceTestResult|null[0]
+    constructor <init>(kotlin/Int, kotlin/Long) // com.letta.mobile.data.voice.host/HostVoiceTestResult.<init>|<init>(kotlin.Int;kotlin.Long){}[0]
+
+    final val checkedAtMs // com.letta.mobile.data.voice.host/HostVoiceTestResult.checkedAtMs|{}checkedAtMs[0]
+        final fun <get-checkedAtMs>(): kotlin/Long // com.letta.mobile.data.voice.host/HostVoiceTestResult.checkedAtMs.<get-checkedAtMs>|<get-checkedAtMs>(){}[0]
+    final val modelCount // com.letta.mobile.data.voice.host/HostVoiceTestResult.modelCount|{}modelCount[0]
+        final fun <get-modelCount>(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceTestResult.modelCount.<get-modelCount>|<get-modelCount>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceTestResult.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // com.letta.mobile.data.voice.host/HostVoiceTestResult.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Long = ...): com.letta.mobile.data.voice.host/HostVoiceTestResult // com.letta.mobile.data.voice.host/HostVoiceTestResult.copy|copy(kotlin.Int;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.host/HostVoiceTestResult.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceTestResult.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceTestResult.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.voice.host/HostVoiceTestResult> { // com.letta.mobile.data.voice.host/HostVoiceTestResult.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.voice.host/HostVoiceTestResult.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.voice.host/HostVoiceTestResult.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.voice.host/HostVoiceTestResult.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.voice.host/HostVoiceTestResult // com.letta.mobile.data.voice.host/HostVoiceTestResult.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.voice.host/HostVoiceTestResult) // com.letta.mobile.data.voice.host/HostVoiceTestResult.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.voice.host.HostVoiceTestResult){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.voice.host/HostVoiceTestResult.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceTestResult> // com.letta.mobile.data.voice.host/HostVoiceTestResult.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.voice.loop/VoiceEngines { // com.letta.mobile.data.voice.loop/VoiceEngines|null[0]
     constructor <init>(com.letta.mobile.data.voice.engine/VoiceEar, com.letta.mobile.data.voice.engine/VoiceResponder, com.letta.mobile.data.voice.engine/VoiceMouth) // com.letta.mobile.data.voice.loop/VoiceEngines.<init>|<init>(com.letta.mobile.data.voice.engine.VoiceEar;com.letta.mobile.data.voice.engine.VoiceResponder;com.letta.mobile.data.voice.engine.VoiceMouth){}[0]
 
@@ -80089,6 +80559,58 @@ final object com.letta.mobile.data.voice.audio.pcm/PcmLevels { // com.letta.mobi
 final object com.letta.mobile.data.voice.audio.pcm/WavCodec { // com.letta.mobile.data.voice.audio.pcm/WavCodec|null[0]
     final fun encode(com.letta.mobile.data.voice.audio.pcm/PcmAudio): kotlin/ByteArray // com.letta.mobile.data.voice.audio.pcm/WavCodec.encode|encode(com.letta.mobile.data.voice.audio.pcm.PcmAudio){}[0]
     final fun parse(kotlin/ByteArray): com.letta.mobile.data.voice.audio.pcm/WavParse // com.letta.mobile.data.voice.audio.pcm/WavCodec.parse|parse(kotlin.ByteArray){}[0]
+}
+
+final object com.letta.mobile.data.voice.host/HostVoiceConnectionCandidateSerializer : kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate> { // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidateSerializer|null[0]
+    final val descriptor // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidateSerializer.descriptor|{}descriptor[0]
+        final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidateSerializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+    final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidateSerializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+    final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate) // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidateSerializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.voice.host.HostVoiceConnectionCandidate){}[0]
+}
+
+final object com.letta.mobile.data.voice.host/HostVoiceSetupCommandSerializer : kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceSetupCommand> { // com.letta.mobile.data.voice.host/HostVoiceSetupCommandSerializer|null[0]
+    final val descriptor // com.letta.mobile.data.voice.host/HostVoiceSetupCommandSerializer.descriptor|{}descriptor[0]
+        final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.voice.host/HostVoiceSetupCommandSerializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+    final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.voice.host/HostVoiceSetupCommand // com.letta.mobile.data.voice.host/HostVoiceSetupCommandSerializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+    final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.voice.host/HostVoiceSetupCommand) // com.letta.mobile.data.voice.host/HostVoiceSetupCommandSerializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.voice.host.HostVoiceSetupCommand){}[0]
+}
+
+final object com.letta.mobile.data.voice.host/HostVoiceWire { // com.letta.mobile.data.voice.host/HostVoiceWire|null[0]
+    final const val CANCEL_FRAME_TYPE // com.letta.mobile.data.voice.host/HostVoiceWire.CANCEL_FRAME_TYPE|{}CANCEL_FRAME_TYPE[0]
+        final fun <get-CANCEL_FRAME_TYPE>(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceWire.CANCEL_FRAME_TYPE.<get-CANCEL_FRAME_TYPE>|<get-CANCEL_FRAME_TYPE>(){}[0]
+    final const val CAPABILITY // com.letta.mobile.data.voice.host/HostVoiceWire.CAPABILITY|{}CAPABILITY[0]
+        final fun <get-CAPABILITY>(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceWire.CAPABILITY.<get-CAPABILITY>|<get-CAPABILITY>(){}[0]
+    final const val CONTRACT_VERSION // com.letta.mobile.data.voice.host/HostVoiceWire.CONTRACT_VERSION|{}CONTRACT_VERSION[0]
+        final fun <get-CONTRACT_VERSION>(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceWire.CONTRACT_VERSION.<get-CONTRACT_VERSION>|<get-CONTRACT_VERSION>(){}[0]
+    final const val MAX_SPEECH_TEXT_CHARS // com.letta.mobile.data.voice.host/HostVoiceWire.MAX_SPEECH_TEXT_CHARS|{}MAX_SPEECH_TEXT_CHARS[0]
+        final fun <get-MAX_SPEECH_TEXT_CHARS>(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceWire.MAX_SPEECH_TEXT_CHARS.<get-MAX_SPEECH_TEXT_CHARS>|<get-MAX_SPEECH_TEXT_CHARS>(){}[0]
+    final const val MAX_STREAM_AUDIO_BYTES // com.letta.mobile.data.voice.host/HostVoiceWire.MAX_STREAM_AUDIO_BYTES|{}MAX_STREAM_AUDIO_BYTES[0]
+        final fun <get-MAX_STREAM_AUDIO_BYTES>(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceWire.MAX_STREAM_AUDIO_BYTES.<get-MAX_STREAM_AUDIO_BYTES>|<get-MAX_STREAM_AUDIO_BYTES>(){}[0]
+    final const val MAX_TRANSCRIPTION_AUDIO_BYTES // com.letta.mobile.data.voice.host/HostVoiceWire.MAX_TRANSCRIPTION_AUDIO_BYTES|{}MAX_TRANSCRIPTION_AUDIO_BYTES[0]
+        final fun <get-MAX_TRANSCRIPTION_AUDIO_BYTES>(): kotlin/Int // com.letta.mobile.data.voice.host/HostVoiceWire.MAX_TRANSCRIPTION_AUDIO_BYTES.<get-MAX_TRANSCRIPTION_AUDIO_BYTES>|<get-MAX_TRANSCRIPTION_AUDIO_BYTES>(){}[0]
+    final const val MAX_TRANSCRIPTION_AUDIO_MS // com.letta.mobile.data.voice.host/HostVoiceWire.MAX_TRANSCRIPTION_AUDIO_MS|{}MAX_TRANSCRIPTION_AUDIO_MS[0]
+        final fun <get-MAX_TRANSCRIPTION_AUDIO_MS>(): kotlin/Long // com.letta.mobile.data.voice.host/HostVoiceWire.MAX_TRANSCRIPTION_AUDIO_MS.<get-MAX_TRANSCRIPTION_AUDIO_MS>|<get-MAX_TRANSCRIPTION_AUDIO_MS>(){}[0]
+    final const val MODELS_LIST // com.letta.mobile.data.voice.host/HostVoiceWire.MODELS_LIST|{}MODELS_LIST[0]
+        final fun <get-MODELS_LIST>(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceWire.MODELS_LIST.<get-MODELS_LIST>|<get-MODELS_LIST>(){}[0]
+    final const val SETUP_CLEAR // com.letta.mobile.data.voice.host/HostVoiceWire.SETUP_CLEAR|{}SETUP_CLEAR[0]
+        final fun <get-SETUP_CLEAR>(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceWire.SETUP_CLEAR.<get-SETUP_CLEAR>|<get-SETUP_CLEAR>(){}[0]
+    final const val SETUP_GET // com.letta.mobile.data.voice.host/HostVoiceWire.SETUP_GET|{}SETUP_GET[0]
+        final fun <get-SETUP_GET>(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceWire.SETUP_GET.<get-SETUP_GET>|<get-SETUP_GET>(){}[0]
+    final const val SETUP_SET // com.letta.mobile.data.voice.host/HostVoiceWire.SETUP_SET|{}SETUP_SET[0]
+        final fun <get-SETUP_SET>(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceWire.SETUP_SET.<get-SETUP_SET>|<get-SETUP_SET>(){}[0]
+    final const val SETUP_TEST // com.letta.mobile.data.voice.host/HostVoiceWire.SETUP_TEST|{}SETUP_TEST[0]
+        final fun <get-SETUP_TEST>(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceWire.SETUP_TEST.<get-SETUP_TEST>|<get-SETUP_TEST>(){}[0]
+    final const val SPEECH // com.letta.mobile.data.voice.host/HostVoiceWire.SPEECH|{}SPEECH[0]
+        final fun <get-SPEECH>(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceWire.SPEECH.<get-SPEECH>|<get-SPEECH>(){}[0]
+    final const val STREAM_FRAME_TYPE // com.letta.mobile.data.voice.host/HostVoiceWire.STREAM_FRAME_TYPE|{}STREAM_FRAME_TYPE[0]
+        final fun <get-STREAM_FRAME_TYPE>(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceWire.STREAM_FRAME_TYPE.<get-STREAM_FRAME_TYPE>|<get-STREAM_FRAME_TYPE>(){}[0]
+    final const val TRANSCRIBE // com.letta.mobile.data.voice.host/HostVoiceWire.TRANSCRIBE|{}TRANSCRIBE[0]
+        final fun <get-TRANSCRIBE>(): kotlin/String // com.letta.mobile.data.voice.host/HostVoiceWire.TRANSCRIBE.<get-TRANSCRIBE>|<get-TRANSCRIBE>(){}[0]
+
+    final val METHODS // com.letta.mobile.data.voice.host/HostVoiceWire.METHODS|{}METHODS[0]
+        final fun <get-METHODS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.voice.host/HostVoiceWire.METHODS.<get-METHODS>|<get-METHODS>(){}[0]
 }
 
 final object com.letta.mobile.data.voice.session/VoiceEndpointRules { // com.letta.mobile.data.voice.session/VoiceEndpointRules|null[0]

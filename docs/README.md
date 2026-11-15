@@ -215,6 +215,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Project registry v1: host-owned project record, project file and read methods](reference/contracts/project-registry-v1.md)
 - [Admin RPC Wire Contracts](reference/contracts/README.md)
 - [Secret request v1: secure secret-input flow](reference/contracts/secret-request-v1.md)
+- [Voice endpoint v1: host-stored speech setup and speech through the host](reference/contracts/voice-endpoint-v1.md)
 
 ### reference/contracts/beads.config.get
 
