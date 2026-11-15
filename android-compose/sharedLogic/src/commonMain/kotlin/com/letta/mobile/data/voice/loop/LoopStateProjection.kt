@@ -12,6 +12,7 @@ internal object LoopStateProjection {
         return VoiceLoopState(
             phase = model.phase,
             transcript = view.transcript,
+            partialTranscript = view.partial,
             speaking = view.speaking,
             inputLevel = view.inputLevel,
             outputLevel = view.outputLevel,

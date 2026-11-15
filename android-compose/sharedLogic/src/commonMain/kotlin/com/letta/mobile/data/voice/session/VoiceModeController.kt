@@ -3,8 +3,10 @@ package com.letta.mobile.data.voice.session
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoiceLoopConfig
 import com.letta.mobile.data.voice.VoicePhase
+import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.activation.VoiceActivationKind
 import com.letta.mobile.data.voice.audio.pcm.VoiceLevelMeter
+import com.letta.mobile.data.voice.local.LocalHandoverReason
 import com.letta.mobile.data.voice.loop.VoiceLoop
 import com.letta.mobile.data.voice.loop.VoiceLoopRuntime
 import com.letta.mobile.data.voice.responder.VoiceChatSession
@@ -132,6 +134,28 @@ class VoiceModeController(
      * after replies. A number only.
      */
     val playbackLevel: StateFlow<Float> = mutablePlaybackLevel.asStateFlow()
+
+    private val mutablePartialTranscript = MutableStateFlow<VoiceText?>(null)
+
+    /**
+     * The words the person is saying right now, as the ear recognises them (ears that recognise as
+     * they hear, like the device's own recogniser, report them; others never do); null between
+     * turns and once voice mode stops. For display only: they are the person's words, never log them.
+     */
+    val partialTranscript: StateFlow<VoiceText?> = mutablePartialTranscript.asStateFlow()
+
+    private val mutableHandover = MutableStateFlow<LocalHandoverReason?>(null)
+
+    /**
+     * Why listening moved from the device's recogniser to the speech server in the current session,
+     * until [dismissHandover] or the session ends; null otherwise. The chat bar tells the person once.
+     */
+    val handover: StateFlow<LocalHandoverReason?> = mutableHandover.asStateFlow()
+
+    /** The person has read the hand-over notice. */
+    fun dismissHandover() {
+        mutableHandover.value = null
+    }
 
     init {
         runtime.scope.launch(runtime.dispatcher) { store.setup.collect { offer(Command.SetupChanged) } }
@@ -285,7 +309,11 @@ class VoiceModeController(
             )
         }
         val playing = scope.launch { publishLevel(loop.state.map { it.outputLevel.value }, mutablePlaybackLevel) }
-        return LiveVoice(loop, set, job, listOf(follower, tracer, watcher, hearing, playing))
+        val words = scope.launch {
+            loop.state.map { it.partialTranscript }.distinctUntilChanged().collect { mutablePartialTranscript.value = it }
+        }
+        val handedOver = scope.launch { set.handover.collect { reason -> if (reason != null) mutableHandover.value = reason } }
+        return LiveVoice(loop, set, job, listOf(follower, tracer, watcher, hearing, playing, words, handedOver))
     }
 
     /** Releases the live session, if any (reporting [reason]), and then publishes [next]. Completes even when cancelled. */
@@ -301,6 +329,8 @@ class VoiceModeController(
         }
         mutableMicrophoneLevel.value = 0f
         mutablePlaybackLevel.value = 0f
+        mutablePartialTranscript.value = null
+        mutableHandover.value = null
         mutableState.value = next
     }
 

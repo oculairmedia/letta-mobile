@@ -22,6 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.focus.FocusRequester
@@ -282,12 +284,17 @@ private fun composerFieldTextColor(enabled: Boolean): Color {
 /**
  * The owner's placeholder, else the platform's own copy; faded with the field while it is off. While
  * voice mode is on it says what voice mode is doing instead ([voicePlaceholder]), announced politely
- * when that changes.
+ * when that changes; while voice mode hears the person it shows their words so far instead
+ * ([voicePartial]), in the primary colour, on one line with the oldest words cut off. Those words
+ * are not draft text: they are never typed into the field, and a screen reader hears only the
+ * status, not every update of the words.
  */
 @Composable
 private fun FieldPlaceholder(model: ComposerModel, style: ComposerFieldStyle, textStyle: TextStyle) {
-    val color = MaterialTheme.colorScheme.onSurfaceVariant
     val voice = voicePlaceholder()
+    val words = voicePartial()
+    if (words != null) return VoiceWords(words, voice.orEmpty(), textStyle)
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
     Text(
         text = voice ?: model.composer.placeholder ?: stringResource(style.placeholderRes()),
         style = textStyle,
@@ -295,5 +302,23 @@ private fun FieldPlaceholder(model: ComposerModel, style: ComposerFieldStyle, te
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = if (voice == null) Modifier else Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+    )
+}
+
+/** The person's [words] so far, read to a screen reader as the voice [status] only. */
+@Composable
+private fun VoiceWords(words: String, status: String, textStyle: TextStyle) {
+    Text(
+        text = words,
+        style = textStyle,
+        color = MaterialTheme.colorScheme.primary,
+        maxLines = 1,
+        overflow = TextOverflow.StartEllipsis,
+        modifier = Modifier
+            .testTag(ComposerTestTags.VOICE_WORDS)
+            .clearAndSetSemantics {
+                contentDescription = status
+                liveRegion = LiveRegionMode.Polite
+            },
     )
 }

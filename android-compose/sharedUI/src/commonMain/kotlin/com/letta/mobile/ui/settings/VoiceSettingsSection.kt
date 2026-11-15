@@ -10,11 +10,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.letta.mobile.data.settings.SettingsOption
 import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.session.VoiceEndpointRules
+import com.letta.mobile.data.voice.session.VoiceListening
 import com.letta.mobile.data.voice.session.VoiceSetupDraft
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.voice_settings_consent
@@ -25,6 +27,15 @@ import com.letta.mobile.sharedui.resources.voice_settings_interrupt_help
 import com.letta.mobile.sharedui.resources.voice_settings_key
 import com.letta.mobile.sharedui.resources.voice_settings_key_remove
 import com.letta.mobile.sharedui.resources.voice_settings_key_saved
+import com.letta.mobile.sharedui.resources.voice_settings_listening
+import com.letta.mobile.sharedui.resources.voice_settings_listening_automatic
+import com.letta.mobile.sharedui.resources.voice_settings_listening_automatic_help
+import com.letta.mobile.sharedui.resources.voice_settings_listening_help
+import com.letta.mobile.sharedui.resources.voice_settings_listening_local
+import com.letta.mobile.sharedui.resources.voice_settings_listening_local_help
+import com.letta.mobile.sharedui.resources.voice_settings_listening_local_unavailable
+import com.letta.mobile.sharedui.resources.voice_settings_listening_server
+import com.letta.mobile.sharedui.resources.voice_settings_listening_server_help
 import com.letta.mobile.sharedui.resources.voice_settings_reachable
 import com.letta.mobile.sharedui.resources.voice_settings_save
 import com.letta.mobile.sharedui.resources.voice_settings_saved
@@ -115,6 +126,7 @@ fun VoiceSettingsSection(access: VoiceSetupAccess, modifier: Modifier = Modifier
     SettingsSection(header, modifier) {
         VoiceAddressRows(form, keepsKey = access.store.keepsApiKey, keySaved = keySaved)
         VoiceConsentRow(form)
+        VoiceListeningRow(access, stored.listening)
         VoiceInterruptRow(access, stored.interruptBySpeaking)
         VoiceActionRow(form, keySaved, onSaved)
         form.outcome?.let { NoteRow(SettingsRow.Note(VoiceSettingsKeys.STATUS, SettingsStatus(stringResource(it.message), it.tone))) }
@@ -152,6 +164,42 @@ private fun SettingsScope.VoiceConsentRow(form: VoiceForm) {
     ) { checked -> form.edit { consent = checked } }
     ToggleRow(row)
 }
+
+/**
+ * Which ear voice mode listens with, the same choice on every client: Automatic (this device's own
+ * recognition where it has one, else the speech server), this device only (said to be unavailable
+ * where the device has none), or the speech server. Stored at once, from the next start.
+ */
+@Composable
+private fun SettingsScope.VoiceListeningRow(access: VoiceSetupAccess, listening: VoiceListening) {
+    val localHelp = if (access.localListening.available) {
+        Res.string.voice_settings_listening_local_help
+    } else {
+        Res.string.voice_settings_listening_local_unavailable
+    }
+    val options = listOf(
+        listeningOption(
+            VoiceListening.AUTOMATIC,
+            Res.string.voice_settings_listening_automatic,
+            Res.string.voice_settings_listening_automatic_help,
+        ),
+        listeningOption(VoiceListening.LOCAL, Res.string.voice_settings_listening_local, localHelp),
+        listeningOption(VoiceListening.SERVER, Res.string.voice_settings_listening_server, Res.string.voice_settings_listening_server_help),
+    )
+    val row = SettingsRow.Choice(
+        key = VoiceSettingsKeys.LISTENING,
+        title = stringResource(Res.string.voice_settings_listening),
+        options = options,
+        selected = listening.name,
+        supporting = stringResource(Res.string.voice_settings_listening_help),
+        onSelect = { picked -> access.store.setListening(VoiceListening.valueOf(picked)) },
+    )
+    ChoiceRow(row)
+}
+
+@Composable
+private fun listeningOption(value: VoiceListening, label: StringResource, help: StringResource): SettingsOption =
+    SettingsOption(value.name, stringResource(label), stringResource(help))
 
 /**
  * Whether speaking over a reply interrupts it. Where the microphone cancels its own echo it always

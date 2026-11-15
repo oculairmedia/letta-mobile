@@ -761,6 +761,14 @@ An OpenAI-compatible speech client for `POST /v1/audio/transcriptions` (multipar
 
 The three seams of the voice loop. A [VoiceEar](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.engine/-voice-ear/index.html) owns its audio source and decides end of turn itself, so a realtime audio model can replace a speech recogniser; a [VoiceResponder](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.engine/-voice-responder/index.html) streams reply text and can delegate the rest to arrive later as a late reply; a [VoiceMouth](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.engine/-voice-mouth/index.html) speaks segments in order and stops at once for barge-in. Stops and cancels suspend until the work has actually stopped.
 
+# Package com.letta.mobile.data.voice.local
+
+Local listening for voice mode on every client: the [LocalSpeechRecognizer](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.local/-local-speech-recognizer/index.html) port each platform implements over its own recogniser (no platform types in it), and the one [LocalVoiceEar](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.local/-local-voice-ear/index.html) over it that owns all the policy: words so far as partial transcripts, a final result as one utterance, restarting after silence, retrying a failing recogniser, pausing while the app speaks so its own speech is never transcribed, and handing over to the server ear when the recogniser is unavailable or cannot go on.
+
+# Package com.letta.mobile.data.voice.local.android
+
+Android's binding of the local recognition port: [AndroidLocalSpeechRecognizer](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.local.android/-android-local-speech-recognizer/index.html) drives `SpeechRecognizer` (on-device where the device has it, else the platform service preferring offline, partial results on) from the main thread and maps its callbacks and error codes onto the port. Voice mode and dictation both listen through it.
+
 # Package com.letta.mobile.data.voice.loop
 
 The voice loop driver: idle, listening, thinking, speaking and failed, continuous or single shot, with barge-in, a bounded thinking timeout and a late-reply policy. It serialises every input on one coroutine, drops events from stale generations, publishes a phase only after the engines have let go, never opens the microphone over its own speech unless barge-in needs it, and exposes a [VoiceLoopState](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.loop/-voice-loop-state/index.html) rich enough for a page and the avatar.

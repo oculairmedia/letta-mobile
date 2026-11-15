@@ -44,6 +44,7 @@ import com.letta.mobile.ui.chat.voice.VoiceModeTags
 import com.letta.mobile.ui.chat.voice.voiceErrorText
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.voice_action_dismiss
+import com.letta.mobile.sharedui.resources.voice_action_notice_close
 import com.letta.mobile.sharedui.resources.voice_action_retry
 import com.letta.mobile.sharedui.resources.voice_action_setup
 import com.letta.mobile.sharedui.resources.voice_error_no_conversation
@@ -58,6 +59,7 @@ import com.letta.mobile.sharedui.resources.voice_mode_state_speaking
 import com.letta.mobile.sharedui.resources.voice_mode_state_thinking
 import com.letta.mobile.sharedui.resources.voice_mode_interrupt
 import com.letta.mobile.sharedui.resources.voice_mode_stop
+import com.letta.mobile.sharedui.resources.voice_notice_handover
 import com.letta.mobile.sharedui.resources.voice_status_hearing
 import com.letta.mobile.sharedui.resources.voice_status_listening
 import com.letta.mobile.sharedui.resources.voice_status_permission
@@ -124,6 +126,19 @@ internal fun voicePlaceholder(): String? {
 }
 
 /**
+ * The words the person is saying, as voice mode recognises them, while it listens or hears them;
+ * null otherwise (and with an ear that does not recognise as it hears), so the status shows.
+ */
+@Composable
+internal fun voicePartial(): String? {
+    val handle = LocalVoiceMode.current ?: return null
+    val state by handle.state.collectAsState()
+    val words by handle.partialTranscript.collectAsState()
+    val hearing = state == VoiceModeState.Hearing || state == VoiceModeState.Listening
+    return words?.value?.takeIf { hearing && it.isNotBlank() }
+}
+
+/**
  * Voice mode's notice in the composer's notice slot above the prompt card, when something needs the
  * person: the failure or the missing setup, permission or conversation, with the action that helps
  * (Retry, Set up) and, where voice mode has stopped, a dismiss that turns it off. The page's own
@@ -133,7 +148,7 @@ internal fun voicePlaceholder(): String? {
 internal fun ComposerVoiceNotice() {
     val handle = LocalVoiceMode.current ?: return
     val state by handle.state.collectAsState()
-    val notice = voiceNotice(state) ?: return
+    val notice = voiceNotice(state) ?: return HandoverNotice(handle)
     val kind = notice.action
     LettaInlineNotice(
         message = stringResource(notice.text),
@@ -147,6 +162,26 @@ internal fun ComposerVoiceNotice() {
         dismissLabel = stringResource(Res.string.voice_action_dismiss),
         onDismiss = if (notice.dismissible) handle.controller::stop else null,
         dismissTag = VoiceModeTags.STRIP_CLOSE,
+    )
+}
+
+/**
+ * Said once when listening moved from the device's recogniser to the speech server mid-session:
+ * a polite inline notice the person closes (voice mode keeps going), never a dialog.
+ */
+@Composable
+private fun HandoverNotice(handle: VoiceModeHandle) {
+    val reason by handle.handover.collectAsState()
+    if (reason == null) return
+    LettaInlineNotice(
+        message = stringResource(Res.string.voice_notice_handover),
+        modifier = Modifier
+            .widthIn(max = ChatColumnMaxWidth)
+            .testTag(VoiceModeTags.HANDOVER)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        dismissLabel = stringResource(Res.string.voice_action_notice_close),
+        onDismiss = handle.controller::dismissHandover,
+        dismissTag = VoiceModeTags.HANDOVER_CLOSE,
     )
 }
 
