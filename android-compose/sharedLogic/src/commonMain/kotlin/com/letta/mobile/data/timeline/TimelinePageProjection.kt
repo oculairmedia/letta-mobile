@@ -116,14 +116,14 @@ private fun ChatRenderItem.withReceipts(receipts: List<CanvasArtifactReceipt>?):
  * A single-message run is claimed too: its page-built item carries the turn latency the run
  * disclosure needs, which a per-record projection cannot.
  *
- * A run that may continue past an edge of [page] with more ledger beyond it never claims the
- * bare `run-<id>` key: the neighbouring page could claim it too, and the presented list would
- * hold it twice (letta-mobile-o1hju). Its blocks here key `run-<id>-<firstMessageId>`, the split form one
- * snapshot already uses, which the same records always reproduce.
+ * A claimed block keys `run-<id>-from-<its oldest message id>`: a function of the block's own
+ * records, never of where the page edges fell. A per-page `run-<id>` could be claimed by both pages
+ * a run straddles, and a key chosen from the edges changes when a refresh around the reader moves
+ * one. Only the live overlay names a whole run `run-<id>`; a settled block takes that key over only
+ * by adopting the live row it replaces (SettledLiveAdoptions).
  */
 internal fun TimelinePageProjectionInput.aggregatePreparedRuns(
     prepared: List<TimelineSettledRecord>,
-    page: TimelineMetadataPage,
 ): List<TimelineSettledRecord> {
     val renderable = renderableRecords(prepared)
     if (renderable.size < 2) return prepared
@@ -135,7 +135,7 @@ internal fun TimelinePageProjectionInput.aggregatePreparedRuns(
     val output = prepared.toMutableList()
     grouped.mapNotNull { it.runClaim() }
         .filter { envelope.containsComplete(it.runId) }
-        .map { claim -> if (mayContinuePastPage(claim, page)) claim.splitKeyed() else claim }
+        .map { it.keyedByOwnRecords() }
         .forEach { claim -> claimRun(output, claim, renderable) }
     return output
 }
@@ -158,31 +158,10 @@ private fun TimelinePageProjectionInput.renderableRecords(
 /** A page-built run and the message ids it owns, in chat order. */
 private data class RunClaim(val item: ChatRenderItem.RunBlock, val runId: String, val memberIds: List<String>)
 
-/** This block keyed by its first message, as a run split within one snapshot keys its blocks. */
-private fun RunClaim.splitKeyed(): RunClaim {
-    if (item.key != runKey(runId)) return this
-    val firstMessageId = item.messages.first().first.id
-    return copy(item = ChatRenderItem.RunBlock(runId, item.messages, stableKey = "${runKey(runId)}-$firstMessageId"))
-}
-
-/**
- * Whether [claim]'s run can have records past an edge of [page] with another page beyond it:
- * nothing between the run's outermost record and that edge proves the run over. An opaque record (usage, stop
- * reason, an unread body) can sit inside a run, and a run-less prompt can land inside a running
- * turn (#2460), so neither does. A prompt-owned run has no record carrying its id; only the page
- * holding its prompt can name it, so it never continues.
- */
-private fun TimelinePageProjectionInput.mayContinuePastPage(claim: RunClaim, page: TimelineMetadataPage): Boolean {
-    val members = records.indices.filter { records[it].event?.runId == claim.runId }
-    if (members.isEmpty()) return false
-    val reachesOlder = records.subList(0, members.first()).all { mayLieInsideRun(it) }
-    val reachesNewer = records.subList(members.last() + 1, records.size).all { mayLieInsideRun(it) }
-    return (page.older != null && reachesOlder) || (page.newer != null && reachesNewer)
-}
-
-private fun TimelinePageProjectionInput.mayLieInsideRun(record: TimelineProjectionRecord): Boolean {
-    val event = record.event ?: return true
-    return isRunInterior(record) || (event.messageType == TimelineMessageType.USER && event.runId.isNullOrBlank())
+/** This block keyed by its oldest message, whatever page or snapshot it was cut from. */
+private fun RunClaim.keyedByOwnRecords(): RunClaim {
+    val oldestMessageId = item.messages.first().first.id
+    return copy(item = ChatRenderItem.RunBlock(runId, item.messages, stableKey = "${runKey(runId)}-from-$oldestMessageId"))
 }
 
 private fun ChatRenderItem.runClaim(): RunClaim? = when (this) {
