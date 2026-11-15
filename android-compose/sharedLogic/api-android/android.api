@@ -21403,6 +21403,12 @@ public abstract interface class com/letta/mobile/data/controller/node/iroh/recor
 	public abstract fun upsert (Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput;)Lcom/letta/mobile/data/controller/node/iroh/records/StoredLeaseRecord;
 }
 
+public final class com/letta/mobile/data/controller/node/iroh/voice/VoiceEndpointRoutes {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/voice/VoiceEndpointRoutes;
+	public final fun forHost (Ljava/nio/file/Path;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
+	public static synthetic fun forHost$default (Lcom/letta/mobile/data/controller/node/iroh/voice/VoiceEndpointRoutes;Ljava/nio/file/Path;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
+}
+
 public final class com/letta/mobile/data/controller/reconnect/AppServerClientGeneration {
 	public fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;)V
 	public final fun getClient ()Lcom/letta/mobile/data/transport/appserver/AppServerClient;

@@ -1,0 +1,59 @@
+{
+  "method": "voice.setup.test",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/voice/VoiceSetupHandlers.kt",
+  "contract": "voice-endpoint",
+  "capability": "voice_endpoint_v1",
+  "required_capability": "admin.full",
+  "streamed": false,
+  "spec": "docs/reference/contracts/voice-endpoint-v1.md",
+  "note": "Synthetic values only: example.invalid hosts, a placeholder key, a few bytes of silence and placeholder text.",
+  "cases": [
+    {
+      "name": "stored setup answers",
+      "context": {"authenticated": true, "capabilities": ["admin.full"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "speech_model": "tts-model-a", "voice": "voice-a", "grants": {"audio_for_transcription": false, "text_for_synthesis": true}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"models": ["stt-model-a", "tts-model-a"]}, "clock_ms": 1767225600000}},
+      "params": {},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"model_count": 2, "checked_at_ms": 1767225600000}}
+    },
+    {
+      "name": "candidate with a key the server refuses",
+      "context": {"authenticated": true, "capabilities": ["admin.full"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": null, "upstream": {"status": 401}}},
+      "params": {"base_url": "https://speech.example.invalid", "api_key": "placeholder-key-not-real"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.upstream_unauthorized"},
+      "expected_code": "voice.upstream_unauthorized"
+    },
+    {
+      "name": "candidate on another origin is checked without the stored key",
+      "context": {"authenticated": true, "capabilities": ["admin.full"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "speech_model": "tts-model-a", "voice": "voice-a", "grants": {"audio_for_transcription": false, "text_for_synthesis": true}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"models": ["tts-model-b"], "expect_authorization": false}, "clock_ms": 1767225600000}},
+      "params": {"base_url": "https://other-speech.example.invalid"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"model_count": 1, "checked_at_ms": 1767225600000}}
+    },
+    {
+      "name": "nothing stored and no candidate",
+      "context": {"authenticated": true, "capabilities": ["admin.full"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": null}},
+      "params": {},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.not_configured"},
+      "expected_code": "voice.not_configured"
+    },
+    {
+      "name": "server unreachable",
+      "context": {"authenticated": true, "capabilities": ["admin.full"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": null, "upstream": {"connect": "refused"}}},
+      "params": {"base_url": "https://speech.example.invalid"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.upstream_unreachable"},
+      "expected_code": "voice.upstream_unreachable"
+    },
+    {
+      "name": "server too slow",
+      "context": {"authenticated": true, "capabilities": ["admin.full"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": null, "upstream": {"connect": "stalls"}}},
+      "params": {"base_url": "https://speech.example.invalid"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.upstream_timeout"},
+      "expected_code": "voice.upstream_timeout"
+    }
+  ]
+}

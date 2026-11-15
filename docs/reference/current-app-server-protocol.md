@@ -26,7 +26,7 @@ The upstream source commit is distinct from the Git blob identities below. Hashe
 | Authoritative fixture | SHA-256 (LF-normalized bytes) | Git blob SHA-1 (LF-normalized bytes) |
 | --- | --- | --- |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json | 8497018ab5029688fb39e12649cb23eb590579e4089d23c953f7328f43e7dd48 | 084ee402a409222c1fddc297f3a9e2f2af1bbb0d |
-| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 34ae7e9876c1846751cacb7420fd225848f4ed72a4b83b34c66a7afc066d7bd8 | 3a7d6d269410817a630ae1cf3b7198de930407b5 |
+| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | b38223978642b52bda9ef4de4f17cbabe49235d32cf812447f73e6b557ae5c16 | 5b62240253fd57bb002dbb31cbce65cff126ca48 |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json | 68d58b33f8c43e2f576c401895964a7ba3c0b9a2c4f0feef05ce769c063bcfc1 | ab8544019a9bc743793d7405cb93d4c1248e465d |
 
 Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json), [admin ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json) and [contract matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json). These source files may contain dated annotations; this generator does not upgrade their evidence dates.
@@ -295,7 +295,7 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | write&#95;file&#95;response |
 | write&#95;memory&#95;file&#95;response |
 
-## Admin ownership (170 methods)
+## Admin ownership (177 methods)
 
 These are declared ownership decisions, not newly observed production execution. Method-registration parity remains enforced by [IrohAdminOwnershipMatrixTest](../../android-compose/sharedLogic/src/jvmTest/kotlin/com/letta/mobile/data/controller/node/iroh/IrohAdminOwnershipMatrixTest.kt); the generator does not parse Kotlin or replace that test.
 
@@ -304,14 +304,14 @@ These are declared ownership decisions, not newly observed production execution.
 | app&#95;server&#95;v2 | 61 |
 | beads&#95;service | 21 |
 | capability&#95;gated&#95;unsupported | 17 |
-| controller&#95;native | 44 |
+| controller&#95;native | 51 |
 | local&#95;backend&#95;store | 9 |
 | plugin&#95;host | 10 |
 | vibesync&#95;service | 8 |
 
 | Fallback | Method count |
 | --- | --- |
-| deny&#95;fail&#95;closed | 58 |
+| deny&#95;fail&#95;closed | 65 |
 | none | 112 |
 
 | Method | Owner | Fallback | Authorization | Handler | Public contract |
@@ -484,6 +484,13 @@ These are declared ownership decisions, not newly observed production execution.
 | tool.update | capability&#95;gated&#95;unsupported | deny&#95;fail&#95;closed | admin&#95;write | ToolAdminHandlers.kt | explicit capability denial pending a native tool-library command |
 | tool&#95;return.get | app&#95;server&#95;v2 | none | conversation&#95;scoped | ConversationAdminHandlers.kt | conversation&#95;messages&#95;list |
 | toolset.update | app&#95;server&#95;v2 | none | conversation&#95;scoped | ModelAdminHandlers.kt | docs/reference/contracts/toolset.update/toolset-v1.md |
+| voice.models.list | controller&#95;native | deny&#95;fail&#95;closed | admin&#95;read | VoiceSetupHandlers.kt | docs/reference/contracts/voice-endpoint-v1.md |
+| voice.setup.clear | controller&#95;native | deny&#95;fail&#95;closed | admin&#95;write | VoiceSetupHandlers.kt | docs/reference/contracts/voice-endpoint-v1.md |
+| voice.setup.get | controller&#95;native | deny&#95;fail&#95;closed | admin&#95;read | VoiceSetupHandlers.kt | docs/reference/contracts/voice-endpoint-v1.md |
+| voice.setup.set | controller&#95;native | deny&#95;fail&#95;closed | admin&#95;write | VoiceSetupHandlers.kt | docs/reference/contracts/voice-endpoint-v1.md |
+| voice.setup.test | controller&#95;native | deny&#95;fail&#95;closed | admin&#95;write | VoiceSetupHandlers.kt | docs/reference/contracts/voice-endpoint-v1.md |
+| voice.speech | controller&#95;native | deny&#95;fail&#95;closed | runtime&#95;write | VoiceRequestHandlers.kt | docs/reference/contracts/voice-endpoint-v1.md |
+| voice.transcribe | controller&#95;native | deny&#95;fail&#95;closed | runtime&#95;write | VoiceRequestHandlers.kt | docs/reference/contracts/voice-endpoint-v1.md |
 | workspace.read&#95;file | app&#95;server&#95;v2 | none | admin&#95;read | WorkspaceAdminHandlers.kt | read&#95;file |
 | workspace.search&#95;files | app&#95;server&#95;v2 | none | admin&#95;read | WorkspaceAdminHandlers.kt | search&#95;files |
 

@@ -34,7 +34,7 @@ class WireContractsTest {
         // Semantic fixtures have their own common tests, not Admin RPC methods.
         .filterNot {
             it.relativeTo(fixtureRoot).invariantSeparatorsPath in setOf(
-                "active-turn/v1.json", "object-verbs/v1.json", "current-focus/v1.json", "voice-endpoint/v1.json",
+                "active-turn/v1.json", "object-verbs/v1.json", "current-focus/v1.json",
             )
         }
         .map { WireContractFixture(it.readText()) }.toList().also {
@@ -62,10 +62,18 @@ class WireContractsTest {
                 // New fixture families must supply a real host-state adapter, never be skipped.
                 val known = setOf(
                     "controller_state", "conversations", "hidden_agent_ids", "visibility_index",
-                    "reflection_settings", "toolset_response", "cron_control", "execute_command_response",
+                    "reflection_settings", "toolset_response", "cron_control", "execute_command_response", "voice",
                 )
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
+                if ("voice" in host) {
+                    // Voice cases run through the real stream server, capability gate and voice routes
+                    // (one is streamed, and several are refusals of the transport's gate).
+                    val expected = case["server_frames"]?.jsonArray?.map { it.jsonObject }.orEmpty() + fixture.response(name)
+                    val frames = com.letta.mobile.data.controller.node.iroh.voice.VoiceContractHarness.run(fixture.method, case)
+                    assertEquals(expected, frames, "${fixture.method}/$name wire frames")
+                    continue
+                }
                 val state = when (host.getValue("controller_state").jsonPrimitive.content) {
                     "connected" -> AppServerControllerState.Connected
                     "disconnected" -> AppServerControllerState.Disconnected()
@@ -320,6 +328,8 @@ class WireContractsTest {
                     permissionModes = PermissionModePublisher(plugins.scope),
                 ),
             )
+            // The production wrapper registers the voice routes on the built router; so does this host.
+            voiceRoutes(dir).register(router)
             block(router)
         } finally {
             runtime.close()
@@ -342,6 +352,18 @@ class WireContractsTest {
         canvasMountRoutes = canvasMountRoutes(dir),
         secretRequestRoutes = secretRequestRoutes(),
     )
+
+    /** The real voice routes over file stores in the test's directory; any speech server call fails the test. */
+    private fun voiceRoutes(dir: File): AdminRpcRoutes = com.letta.mobile.data.controller.node.iroh.voice.VoiceRoutes(
+        com.letta.mobile.data.controller.node.iroh.voice.VoiceSetupStore(
+            com.letta.mobile.data.controller.node.iroh.voice.FileVoiceSetupPersistence(File(dir, "voice/voice-setup.json").toPath()),
+            com.letta.mobile.data.controller.node.iroh.voice.FileVoiceKeyStore(File(dir, "voice/voice-speech-key").toPath()),
+        ) { 0L },
+        com.letta.mobile.data.controller.node.iroh.voice.KtorVoiceSpeechUpstream(
+            io.ktor.client.engine.mock.MockEngine { error("Unexpected speech server call") },
+        ),
+        com.letta.mobile.data.controller.node.iroh.voice.VoiceInFlight(),
+    ) { 0L }
     /** The real canvas mount routes under a secure policy; no fixture may reach the host's records. */
     private fun canvasMountRoutes(dir: File): AdminRpcRoutes = com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountRoutes(
         com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy.PairedPeersOnly,

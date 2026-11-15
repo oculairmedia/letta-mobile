@@ -204,7 +204,13 @@ val contractTestFixtures = listOf(
     Triple("ObjectVerbs", "object-verbs/v1.json", "com.letta.mobile.data.objectverbs"),
     Triple("ActiveTurn", "active-turn/v1.json", "com.letta.mobile.data.presence"),
     Triple("CurrentFocus", "current-focus/v1.json", "com.letta.mobile.data.shell"),
-    Triple("VoiceEndpoint", "voice-endpoint/v1.json", "com.letta.mobile.data.voice.host"),
+    Triple("VoiceSetupGet", "voice.setup.get/voice-endpoint-v1.json", "com.letta.mobile.data.voice.host"),
+    Triple("VoiceSetupSet", "voice.setup.set/voice-endpoint-v1.json", "com.letta.mobile.data.voice.host"),
+    Triple("VoiceSetupClear", "voice.setup.clear/voice-endpoint-v1.json", "com.letta.mobile.data.voice.host"),
+    Triple("VoiceSetupTest", "voice.setup.test/voice-endpoint-v1.json", "com.letta.mobile.data.voice.host"),
+    Triple("VoiceModelsList", "voice.models.list/voice-endpoint-v1.json", "com.letta.mobile.data.voice.host"),
+    Triple("VoiceTranscribe", "voice.transcribe/voice-endpoint-v1.json", "com.letta.mobile.data.voice.host"),
+    Triple("VoiceSpeech", "voice.speech/voice-endpoint-v1.json", "com.letta.mobile.data.voice.host"),
 )
 contractTestFixtures.forEach { (name, fixture, packageName) ->
     val generate = tasks.register("generate${name}TestData") {

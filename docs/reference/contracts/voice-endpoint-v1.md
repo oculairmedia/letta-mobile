@@ -1,12 +1,15 @@
 # Voice endpoint v1: host-stored speech setup and speech through the host
 
-Status: **PROPOSED for review; contract-only stage of letta-mobile-ynoyg.** Stage 2 builds the
-host side (store, routes, upstream calls), stage 3 the clients. This stage registers no route,
-tool or RPC handler and changes no host code.
+Status: **accepted; the host side is built, the clients come next.** The owner accepted the seven
+recommendations below on 2026-11-15.
 
-Fixture: `android-compose/sharedLogic/src/commonTest/resources/contracts/voice-endpoint/v1.json`.
+Fixtures: one per method, `android-compose/sharedLogic/src/commonTest/resources/contracts/<method>/voice-endpoint-v1.json`,
+each paired with a short spec in `docs/reference/contracts/<method>/voice-endpoint-v1.md`.
 Client SPI and wire types: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/voice/host/`.
-Contract test: `HostVoiceContractTest` (commonTest) decodes and re-encodes every case.
+Host routes, store and speech server client: `android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/voice/`.
+Contract tests: `HostVoiceContractTest` (commonTest) decodes and re-encodes every case through the
+client types; `WireContractsTest` (jvmTest) runs every case through the real stream server, capability
+gate and voice routes against a fake speech server.
 
 ## Decision this implements
 
@@ -37,7 +40,10 @@ listening and speaking separately, and nothing here assumes a device sends micro
 (Paths are under `android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/` unless shown otherwise.)
 
 Voice differs in one way: the speech server is not an App Server provider, so the host keeps the
-setup in its **own** store (stage 2), not through `connect_provider`. Everything else follows the
+setup in its **own** store, not through `connect_provider`: the setup in `voice-setup.json` and the
+key in `voice-speech-key`, a file only the host's user may read, both beside the host's model exposure
+state. The key file also names the origin the key was entered for, and the host never uses it for
+another origin. Everything else follows the
 same pattern: admin-only writes, broadly readable status without the key, and the key leaves the
 client exactly once, inside a write.
 
@@ -60,7 +66,7 @@ client exactly once, inside a write.
 
 ## Methods and authorisation
 
-| Method | Capability | Native policy (stage 2) | Purpose |
+| Method | Capability | Native policy | Purpose |
 | --- | --- | --- | --- |
 | `voice.setup.get` | `chat.read` | Read | Shared setup status, never the key |
 | `voice.models.list` | `chat.read` | Read | Models and voices of the stored server; refreshes reachability |
@@ -78,9 +84,10 @@ Speech requests use `chat.send`, the capability that already lets a device make 
 it. A capability refusal comes from the transport before dispatch:
 `{"success":false,"error":"forbidden","capability":"<needed>"}`.
 
-Stage 2 adds `voice.setup.get` and `voice.models.list` to `ADMIN_READ_METHODS` (or a `voice.` read
-rule) and `voice.transcribe` / `voice.speech` to `CHAT_SEND_METHODS`; `set`, `clear` and `test`
-stay in the `admin.full` default branch. That change needs its own review.
+The host lists `voice.setup.get` and `voice.models.list` in `ADMIN_READ_METHODS` and
+`voice.transcribe` / `voice.speech` in `CHAT_SEND_METHODS`; `set`, `clear` and `test` stay in the
+`admin.full` default branch. The native policy column is advisory: voice calls never go through the
+App Server, so they have no `NativeAdminOp` entry.
 
 ## Setup status (`voice.setup.get`, and the result of `set` and `clear`)
 
@@ -167,8 +174,9 @@ server answers it with a list; otherwise the list is just the stored voice and t
   `voice.payload_too_large`; the ear's turns end at 20 s. The base64 frame may exceed one 1 MiB
   Iroh frame, so the client sends it with `frame_part` continuation (both sides already advertise it).
 - `language` overrides the stored hint for this request; absent uses the stored hint.
-- The host asks the server for `verbose_json` and falls back to `json` on a 400 or 415, exactly as
-  `SpeechEndpointClient.transcribe` does today, and caches the fallback per stored setup.
+- The host asks the server for `verbose_json` and falls back to `json` on a 400, 415 or 422 (the
+  device-side `SpeechEndpointClient.transcribe` falls back on 400 and 422), and caches the fallback per
+  stored setup revision.
 - Result `{"text": "...", "format": "verbose_json"|"json", "segments": [{"no_speech_prob": 0.02, "avg_logprob": -0.25}]}`.
   Segments carry the recogniser's numbers that the ear's phantom-turn filter relies on, never
   segment text; `json` answers have `segments: []`. The client maps this to `SpeechTranscript`.
@@ -242,6 +250,8 @@ The failure response's `error` is exactly one of these strings; nothing else is 
 | `Unknown method: …` (router) | no | Host predates v1; client maps to `unsupported` | UNAVAILABLE |
 | anything else | yes | Host internal error; client maps to `internal` | ENGINE_FAILED |
 
+HTTP statuses map as: 401/403 `upstream_unauthorized`; 408/504 `upstream_timeout`; 502/503
+`upstream_unreachable`; any other 4xx `upstream_rejected`; any other non-2xx `upstream_bad_response`.
 Upstream response bodies, upstream messages, the server address and the key never appear in an
 error. `HostVoiceErrorCode.fromWire` never echoes the raw string.
 
