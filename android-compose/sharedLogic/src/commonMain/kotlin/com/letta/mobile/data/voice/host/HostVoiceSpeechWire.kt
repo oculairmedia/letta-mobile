@@ -99,17 +99,18 @@ internal data class HostSpeechStreamFrame(
 
     /** The format this frame announces; null unless it is a well-formed format frame. */
     fun format(): PcmFormat? {
-        val rate = sampleRateHz?.takeIf { it > 0 }
-        val count = channels?.takeIf { it > 0 }
-        val valid = event == HostSpeechEvent.FORMAT && sampleFormat == HOST_SPEECH_SAMPLE_FORMAT
-        return if (valid && rate != null && count != null) PcmFormat(rate, count) else null
+        if (event != HostSpeechEvent.FORMAT || sampleFormat != HOST_SPEECH_SAMPLE_FORMAT) return null
+        val rate = sampleRateHz?.takeIf { it > 0 } ?: return null
+        val count = channels?.takeIf { it > 0 } ?: return null
+        return PcmFormat(rate, count)
     }
 
     /** This audio frame's samples in [format]; null unless it holds whole sample frames. */
     fun chunk(format: PcmFormat): PcmChunk? {
-        val bytes = pcm?.takeIf { event == HostSpeechEvent.AUDIO }?.let { runCatching { Base64.decode(it) }.getOrNull() }
+        val encoded = pcm?.takeIf { event == HostSpeechEvent.AUDIO } ?: return null
+        val bytes = runCatching { Base64.decode(encoded) }.getOrNull() ?: return null
         val frameBytes = format.channels * BYTES_PER_SAMPLE
-        if (bytes == null || bytes.isEmpty() || bytes.size % frameBytes != 0) return null
+        if (bytes.isEmpty() || bytes.size % frameBytes != 0) return null
         val samples = ShortArray(bytes.size / BYTES_PER_SAMPLE) { index ->
             val low = bytes[index * BYTES_PER_SAMPLE].toInt() and BYTE_MASK
             val high = bytes[index * BYTES_PER_SAMPLE + 1].toInt()
