@@ -112,6 +112,7 @@ class HostRepositoryAdapters(binding: HostSessionBinding) {
         scope = transportBoundScope,
         snapshots = binding.contextReadingSnapshots,
         subagents = SubagentListing.ALL,
+        clientProvider = appServerClient,
     )
 
     /** Fed by the same transport-bound scope, so it retires with the transport generation. */

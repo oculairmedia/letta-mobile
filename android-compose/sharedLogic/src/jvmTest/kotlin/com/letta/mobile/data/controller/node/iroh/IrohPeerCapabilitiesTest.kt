@@ -46,6 +46,7 @@ class IrohPeerCapabilitiesTest {
             pairing = AdminRpcPairing(pairingService = IrohPairingService(InMemoryPairedPeerStore())),
         )
         val intentionalAdmin = setOf(
+            "slash_command.execute",
             "agent.delete", "conversation.list_agent", "goal.command", "model.exposure.set",
             "provider.connect", "provider.disconnect", "secret.list", "secret.apply",
             "workspace.read_file", "workspace.search_files",

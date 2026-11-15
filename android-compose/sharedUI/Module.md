@@ -387,3 +387,7 @@ The shared DocumentWorkspace composes the existing note editor and bounded refer
 # Package com.letta.mobile.ui.secrets
 
 The request card and the secure form of the secret-input flow. The shell draws the card itself, outside every agent-editable layout, only while a request is pending. The form's text field holds mask characters only; the value stays in the controller's buffer. `SecureSurfaceEffect` is the platform binding: Android marks the hosting window secure and restores it afterwards, desktop and web guarantee only that the value never reaches field state, the clipboard or the semantics tree.
+
+# Package com.letta.mobile.ui.chat.commands
+
+Page-lifetime binding of shared host slash-command submission. Hosts supply their current graph and runtime through `SlashCommandBinding`; `rememberSlashCommandSessionPort` retains one command session as the existing composer changes presentation.

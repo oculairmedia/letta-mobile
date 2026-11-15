@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session.graph
 
+import com.letta.mobile.data.transport.appserver.AppServerSlashCommandApi
 import com.letta.mobile.data.context.ContextReadingSnapshots
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.context.contextTokenReadingsOf
@@ -8,6 +9,7 @@ import com.letta.mobile.data.repository.SelfTodoRepository
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.appserver.AppServerClient
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -33,7 +35,9 @@ object SharedSessionGraph {
         scope: CoroutineScope,
         snapshots: ContextReadingSnapshots? = null,
         subagents: SubagentListing = SubagentListing.ACTIVE,
+        clientProvider: (suspend () -> AppServerClient)? = null,
     ): TransportBoundSessionRepositories = TransportBoundSessionRepositories(
+        slashCommands = sessionSlashCommands(transport, scope, clientProvider),
         cronRepository = CronRepository(transport = transport, scope = scope),
         selfTodoRepository = SelfTodoRepository(transport = transport, scope = scope),
         subagentRepository = SubagentRepository(
@@ -58,6 +62,7 @@ enum class SubagentListing {
 /** What [SharedSessionGraph.transportBound] builds; every member is fed by the graph's transport. */
 class TransportBoundSessionRepositories internal constructor(
     internal val scope: CoroutineScope,
+    val slashCommands: AppServerSlashCommandApi,
     val cronRepository: CronRepository,
     val selfTodoRepository: SelfTodoRepository,
     val subagentRepository: SubagentRepository,

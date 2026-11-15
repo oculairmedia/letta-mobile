@@ -14317,6 +14317,20 @@ public final class com/letta/mobile/data/chat/routing/InterAgentConversationPick
 	public static final fun pickOtherAgentConversation-XsPgFfE (Lcom/letta/mobile/data/repository/api/IConversationRepository;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public abstract interface class com/letta/mobile/data/chat/routing/SlashCommandBinding {
+	public abstract fun capture ()Lkotlin/Pair;
+}
+
+public final class com/letta/mobile/data/chat/routing/SlashCommandSessionPort : com/letta/mobile/ui/chat/session/ChatSessionPort {
+	public fun <init> (Lcom/letta/mobile/ui/chat/session/ChatSessionPort;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/chat/routing/SlashCommandBinding;)V
+	public fun getActions ()Lcom/letta/mobile/ui/chat/session/ChatActions;
+	public fun getCapabilities ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun getComposer ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun getLiveStatus ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun getRecompileStatus ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun getUiState ()Lkotlinx/coroutines/flow/StateFlow;
+}
+
 public final class com/letta/mobile/data/chat/runtime/ActiveRunStatusKt {
 	public static final fun nowActiveStatus (ZZZZ)Lcom/letta/mobile/data/chat/runtime/NowActiveStatus;
 	public static synthetic fun nowActiveStatus$default (ZZZZILjava/lang/Object;)Lcom/letta/mobile/data/chat/runtime/NowActiveStatus;
@@ -16409,58 +16423,10 @@ public final class com/letta/mobile/data/chat/tools/steps/ToolStepExpansions {
 public final class com/letta/mobile/data/chat/tools/steps/ToolStepExpansions$Companion {
 }
 
-public final class com/letta/mobile/data/commands/AgentSlashCommand {
-	public static final field Companion Lcom/letta/mobile/data/commands/AgentSlashCommand$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Ljava/lang/String;
-	public final fun component4 ()Ljava/lang/String;
-	public final fun component5 ()Ljava/lang/String;
-	public final fun component6 ()Z
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)Lcom/letta/mobile/data/commands/AgentSlashCommand;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/commands/AgentSlashCommand;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lcom/letta/mobile/data/commands/AgentSlashCommand;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getCommand ()Ljava/lang/String;
-	public final fun getDescription ()Ljava/lang/String;
-	public final fun getInstalled ()Z
-	public final fun getName ()Ljava/lang/String;
-	public final fun getRawCommand ()Ljava/lang/String;
-	public final fun getSkillName ()Ljava/lang/String;
-	public final fun getSource ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/commands/AgentSlashCommand$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/commands/AgentSlashCommand$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/commands/AgentSlashCommand;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/commands/AgentSlashCommand;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/commands/AgentSlashCommand$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/commands/AppServerCommandDescriptions {
-	public static final field INSTANCE Lcom/letta/mobile/data/commands/AppServerCommandDescriptions;
-	public final fun descriptionFor (Ljava/lang/String;)Ljava/lang/String;
-}
-
-public final class com/letta/mobile/data/commands/AppServerSlashCommandApi : com/letta/mobile/data/commands/SlashCommandsApi {
+public final class com/letta/mobile/data/commands/AppServerSlashCommandApi : com/letta/mobile/data/transport/appserver/AppServerSlashCommandApi {
 	public static final field Companion Lcom/letta/mobile/data/commands/AppServerSlashCommandApi$Companion;
 	public fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun close ()V
-	public final fun executeCommand (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun executeCommand$default (Lcom/letta/mobile/data/commands/AppServerSlashCommandApi;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public fun listAgentSlashCommands (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/commands/AppServerSlashCommandApi$Companion {
@@ -16495,13 +16461,69 @@ public final class com/letta/mobile/data/commands/ClientSlashCommands {
 	public final fun toComposerCommand (Lcom/letta/mobile/data/commands/ClientSlashCommand;)Lcom/letta/mobile/ui/chat/session/ChatComposerCommand;
 }
 
-public abstract interface class com/letta/mobile/data/commands/SlashCommandsApi : java/lang/AutoCloseable {
-	public fun close ()V
-	public abstract fun listAgentSlashCommands (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+public final class com/letta/mobile/data/commands/api/AgentSlashCommand {
+	public static final field Companion Lcom/letta/mobile/data/commands/api/AgentSlashCommand$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)Lcom/letta/mobile/data/commands/api/AgentSlashCommand;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/commands/api/AgentSlashCommand;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lcom/letta/mobile/data/commands/api/AgentSlashCommand;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCommand ()Ljava/lang/String;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getInstalled ()Z
+	public final fun getName ()Ljava/lang/String;
+	public final fun getRawCommand ()Ljava/lang/String;
+	public final fun getSkillName ()Ljava/lang/String;
+	public final fun getSource ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/letta/mobile/data/commands/SlashCommandsApi$DefaultImpls {
-	public static fun close (Lcom/letta/mobile/data/commands/SlashCommandsApi;)V
+public final synthetic class com/letta/mobile/data/commands/api/AgentSlashCommand$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/commands/api/AgentSlashCommand$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/commands/api/AgentSlashCommand;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/commands/api/AgentSlashCommand;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/commands/api/AgentSlashCommand$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/commands/api/AppServerCommandDescriptions {
+	public static final field INSTANCE Lcom/letta/mobile/data/commands/api/AppServerCommandDescriptions;
+	public final fun descriptionFor (Ljava/lang/String;)Ljava/lang/String;
+	public final fun getDEFAULT_SUPPORTED_COMMANDS ()Ljava/util/List;
+}
+
+public final class com/letta/mobile/data/commands/api/SlashCommandQuery {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/commands/api/SlashCommandQuery;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/commands/api/SlashCommandQuery;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/commands/api/SlashCommandQuery;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/commands/api/SlashCommandsApi : java/lang/AutoCloseable {
+	public fun close ()V
+	public abstract fun listAgentSlashCommands (Lcom/letta/mobile/data/commands/api/SlashCommandQuery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/commands/api/SlashCommandsApi$DefaultImpls {
+	public static fun close (Lcom/letta/mobile/data/commands/api/SlashCommandsApi;)V
 }
 
 public final class com/letta/mobile/data/compaction/AdminRpcCompactionRepository : com/letta/mobile/data/compaction/CompactionRepository {
@@ -20819,7 +20841,8 @@ public final class com/letta/mobile/data/controller/node/iroh/SkillsListingSourc
 public final class com/letta/mobile/data/controller/node/iroh/SlashCommandAdminHandlers {
 	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/SlashCommandAdminHandlers;
 	public final fun getMETHODS ()Ljava/util/Set;
-	public final fun register (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/NativeSlashCommandCatalog;)V
+	public final fun register (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/NativeSlashCommandCatalog;Lcom/letta/mobile/data/transport/appserver/AppServerClient;)V
+	public static synthetic fun register$default (Lcom/letta/mobile/data/controller/node/iroh/SlashCommandAdminHandlers;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/NativeSlashCommandCatalog;Lcom/letta/mobile/data/transport/appserver/AppServerClient;ILjava/lang/Object;)V
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/SlashCommandCatalogOrigin : java/lang/Enum {
@@ -38278,6 +38301,7 @@ public final class com/letta/mobile/data/pairing/PairInviteUiState {
 
 public final class com/letta/mobile/data/pairing/PairLink {
 	public static final field Companion Lcom/letta/mobile/data/pairing/PairLink$Companion;
+	public static final field QR_MAX_CHARS I
 	public static final field QR_SCHEME_PREFIX Ljava/lang/String;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
@@ -38286,6 +38310,8 @@ public final class com/letta/mobile/data/pairing/PairLink {
 	public static synthetic fun copy$default (Lcom/letta/mobile/data/pairing/PairLink;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/pairing/PairLink;
 	public final fun encode ()Ljava/lang/String;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun forQr (I)Ljava/lang/String;
+	public static synthetic fun forQr$default (Lcom/letta/mobile/data/pairing/PairLink;IILjava/lang/Object;)Ljava/lang/String;
 	public final fun getDial ()Ljava/lang/String;
 	public final fun getQrInvite ()Ljava/lang/String;
 	public fun hashCode ()I
@@ -45608,10 +45634,14 @@ public final class com/letta/mobile/data/repository/iroh/IrohSkillsApi : com/let
 	public fun uninstallSkill (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
-public final class com/letta/mobile/data/repository/iroh/IrohSlashCommandApi : com/letta/mobile/data/commands/SlashCommandsApi {
+public final class com/letta/mobile/data/repository/iroh/IrohSlashCommandApi : com/letta/mobile/data/commands/api/SlashCommandsApi {
 	public fun <init> (Lcom/letta/mobile/data/repository/iroh/IrohAdminRpcAgentDirectory;)V
 	public fun close ()V
-	public fun listAgentSlashCommands (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun listAgentSlashCommands (Lcom/letta/mobile/data/commands/api/SlashCommandQuery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/repository/iroh/IrohSlashCommandApiKt {
+	public static final fun toSlashCommand (Lcom/letta/mobile/data/commands/api/AgentSlashCommand;)Lcom/letta/mobile/data/model/SlashCommand;
 }
 
 public final class com/letta/mobile/data/repository/iroh/IrohTurnId {
@@ -50937,6 +50967,7 @@ public abstract interface class com/letta/mobile/data/session/SessionRepositoryG
 	public abstract fun getRunRepository ()Lcom/letta/mobile/data/repository/api/IRunRepository;
 	public abstract fun getScheduleRepository ()Lcom/letta/mobile/data/repository/api/IScheduleRepository;
 	public abstract fun getSelfTodoRepository ()Lcom/letta/mobile/data/repository/api/ISelfTodoRepository;
+	public fun getSlashCommands ()Lcom/letta/mobile/data/transport/appserver/AppServerSlashCommandApi;
 	public abstract fun getStepRepository ()Lcom/letta/mobile/data/repository/api/IStepRepository;
 	public abstract fun getSubagentRepository ()Lcom/letta/mobile/data/repository/api/ISubagentRepository;
 	public abstract fun getToolRepository ()Lcom/letta/mobile/data/repository/api/IToolRepository;
@@ -50947,6 +50978,7 @@ public final class com/letta/mobile/data/session/SessionRepositoryGraph$DefaultI
 	public static fun getActiveTurns (Lcom/letta/mobile/data/session/SessionRepositoryGraph;)Lcom/letta/mobile/data/presence/ActiveTurnSession;
 	public static fun getBlockRepository (Lcom/letta/mobile/data/session/SessionRepositoryGraph;)Lcom/letta/mobile/data/repository/api/IAgentBlockRepository;
 	public static fun getConversationLanes (Lcom/letta/mobile/data/session/SessionRepositoryGraph;)Lcom/letta/mobile/data/lanes/ConversationLaneProjection;
+	public static fun getSlashCommands (Lcom/letta/mobile/data/session/SessionRepositoryGraph;)Lcom/letta/mobile/data/transport/appserver/AppServerSlashCommandApi;
 }
 
 public abstract interface class com/letta/mobile/data/session/SessionRepositoryGraphFactory {
@@ -51072,8 +51104,8 @@ public final class com/letta/mobile/data/session/graph/SessionGraphIdentity {
 
 public final class com/letta/mobile/data/session/graph/SharedSessionGraph {
 	public static final field INSTANCE Lcom/letta/mobile/data/session/graph/SharedSessionGraph;
-	public final fun transportBound (Lcom/letta/mobile/data/transport/api/IChannelTransport;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/context/ContextReadingSnapshots;Lcom/letta/mobile/data/session/graph/SubagentListing;)Lcom/letta/mobile/data/session/graph/TransportBoundSessionRepositories;
-	public static synthetic fun transportBound$default (Lcom/letta/mobile/data/session/graph/SharedSessionGraph;Lcom/letta/mobile/data/transport/api/IChannelTransport;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/context/ContextReadingSnapshots;Lcom/letta/mobile/data/session/graph/SubagentListing;ILjava/lang/Object;)Lcom/letta/mobile/data/session/graph/TransportBoundSessionRepositories;
+	public final fun transportBound (Lcom/letta/mobile/data/transport/api/IChannelTransport;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/context/ContextReadingSnapshots;Lcom/letta/mobile/data/session/graph/SubagentListing;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/data/session/graph/TransportBoundSessionRepositories;
+	public static synthetic fun transportBound$default (Lcom/letta/mobile/data/session/graph/SharedSessionGraph;Lcom/letta/mobile/data/transport/api/IChannelTransport;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/context/ContextReadingSnapshots;Lcom/letta/mobile/data/session/graph/SubagentListing;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/letta/mobile/data/session/graph/TransportBoundSessionRepositories;
 }
 
 public final class com/letta/mobile/data/session/graph/SharedSessionRepositoryGraph : com/letta/mobile/data/session/SessionRepositoryGraph {
@@ -51101,6 +51133,7 @@ public final class com/letta/mobile/data/session/graph/SharedSessionRepositoryGr
 	public fun getRunRepository ()Lcom/letta/mobile/data/repository/api/IRunRepository;
 	public fun getScheduleRepository ()Lcom/letta/mobile/data/repository/api/IScheduleRepository;
 	public fun getSelfTodoRepository ()Lcom/letta/mobile/data/repository/api/ISelfTodoRepository;
+	public fun getSlashCommands ()Lcom/letta/mobile/data/transport/appserver/AppServerSlashCommandApi;
 	public fun getStepRepository ()Lcom/letta/mobile/data/repository/api/IStepRepository;
 	public fun getSubagentRepository ()Lcom/letta/mobile/data/repository/api/ISubagentRepository;
 	public fun getToolRepository ()Lcom/letta/mobile/data/repository/api/IToolRepository;
@@ -51120,6 +51153,7 @@ public final class com/letta/mobile/data/session/graph/TransportBoundSessionRepo
 	public final fun getContextTokenReadings ()Lcom/letta/mobile/data/context/ContextTokenReadings;
 	public final fun getCronRepository ()Lcom/letta/mobile/data/repository/CronRepository;
 	public final fun getSelfTodoRepository ()Lcom/letta/mobile/data/repository/SelfTodoRepository;
+	public final fun getSlashCommands ()Lcom/letta/mobile/data/transport/appserver/AppServerSlashCommandApi;
 	public final fun getSubagentRepository ()Lcom/letta/mobile/data/repository/SubagentRepository;
 }
 
@@ -68655,6 +68689,17 @@ public final synthetic class com/letta/mobile/data/transport/appserver/AppServer
 
 public final class com/letta/mobile/data/transport/appserver/AppServerSecretCommand$SecretList$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public class com/letta/mobile/data/transport/appserver/AppServerSlashCommandApi : com/letta/mobile/data/commands/api/SlashCommandsApi {
+	public fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun close ()V
+	public final fun executeCommand (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun executeCommand$default (Lcom/letta/mobile/data/transport/appserver/AppServerSlashCommandApi;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun listAgentSlashCommands (Lcom/letta/mobile/data/commands/api/SlashCommandQuery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/transport/appserver/AppServerStopReason {

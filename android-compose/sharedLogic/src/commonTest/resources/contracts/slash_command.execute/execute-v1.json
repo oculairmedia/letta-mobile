@@ -1,0 +1,134 @@
+{
+  "method": "slash_command.execute",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/SlashCommandAdminHandlers.kt",
+  "cases": [
+    {
+      "name": "confirmed-output",
+      "context": {
+        "authenticated": true,
+        "authorized_agent_ids": [
+          "agent-1"
+        ],
+        "authorized_conversation_ids": [
+          "conversation-1"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "execute_command_response": {
+          "success": true,
+          "output": "diagnostics",
+          "result": {
+            "healthy": true
+          }
+        }
+      },
+      "params": {
+        "agent_id": "agent-1",
+        "conversation_id": "conversation-1",
+        "command_id": "doctor",
+        "args": "--verbose"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "output": "diagnostics",
+          "result": {
+            "healthy": true
+          }
+        }
+      }
+    },
+    {
+      "name": "host-refusal",
+      "context": {
+        "authenticated": true,
+        "authorized_agent_ids": [
+          "agent-1"
+        ],
+        "authorized_conversation_ids": [
+          "conversation-1"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "execute_command_response": {
+          "success": false,
+          "error": "command refused"
+        }
+      },
+      "params": {
+        "agent_id": "agent-1",
+        "conversation_id": "conversation-1",
+        "command_id": "doctor",
+        "args": "--verbose"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "command refused"
+      }
+    },
+    {
+      "name": "missing-command",
+      "context": {
+        "authenticated": true,
+        "authorized_agent_ids": [
+          "agent-1"
+        ],
+        "authorized_conversation_ids": [
+          "conversation-1"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "execute_command_response": {
+          "success": true
+        }
+      },
+      "params": {
+        "agent_id": "agent-1",
+        "conversation_id": "conversation-1",
+        "args": "--verbose"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "command_id required"
+      }
+    },
+    {
+      "name": "conversation-outside-scope",
+      "context": {
+        "authenticated": true,
+        "authorized_agent_ids": [
+          "agent-1"
+        ],
+        "authorized_conversation_ids": []
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "execute_command_response": {
+          "success": true
+        }
+      },
+      "params": {
+        "agent_id": "agent-1",
+        "conversation_id": "conversation-1",
+        "command_id": "doctor",
+        "args": "--verbose"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "forbidden: conversation not in scope"
+      }
+    }
+  ]
+}

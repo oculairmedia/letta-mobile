@@ -42,6 +42,7 @@ internal fun openedChatViewModel(
 internal data class FixtureSession(
     val tag: String,
     val contextReadings: ContextTokenReadings = ContextTokenReadings(),
+    val slashCommands: com.letta.mobile.data.transport.appserver.AppServerSlashCommandApi? = null,
     /** The app-wide run registry the ViewModel publishes into. */
     val runRegistry: ConversationRunRegistry = ConversationRunRegistry(),
     /** The subagent registry the ViewModel's roster reads; relaxed (empty) by default. */
@@ -121,6 +122,7 @@ private fun stubSessionManager(session: FixtureSession, agent: Agent) = mockk<Se
         mockk<SessionGraph>(relaxed = true) {
             every { id } returns (session.focus?.sourceGeneration ?: 0L)
             every { contextTokenReadings } returns session.contextReadings
+            every { slashCommands } returns session.slashCommands
             // A host without `agent.context`: the chip keeps the streamed total.
             val agents = stubAgentRepository(agent).also {
                 coEvery { it.getContextBreakdown(any(), any(), any()) } throws IllegalStateException("capability_unavailable")
