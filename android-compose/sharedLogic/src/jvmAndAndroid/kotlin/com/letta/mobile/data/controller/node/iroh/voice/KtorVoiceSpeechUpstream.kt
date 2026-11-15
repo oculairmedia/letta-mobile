@@ -66,30 +66,41 @@ internal class KtorVoiceSpeechUpstream(
         }
     }
 
-    override suspend fun models(target: VoiceUpstreamTarget): List<String> = guarded(timeouts.reachability.inWholeMilliseconds) {
+    override suspend fun models(target: VoiceUpstreamTarget): List<String> {
+        return guarded(timeouts.reachability.inWholeMilliseconds) { listModels(target) }
+    }
+
+    override suspend fun voices(target: VoiceUpstreamTarget): List<String>? {
+        return guarded(timeouts.reachability.inWholeMilliseconds) { listVoices(target) }
+    }
+
+    override suspend fun transcribe(target: VoiceUpstreamTarget, request: VoiceTranscriptionCall): VoiceTranscriptionAnswer {
+        return guarded(timeouts.transcription.inWholeMilliseconds) { postTranscription(target, request) }
+    }
+
+    private suspend fun listModels(target: VoiceUpstreamTarget): List<String> {
         val response = client.get { aimAt(target, MODELS_ROUTE) }
         requireSuccess(response)
-        ids(parse(response.bodyAsText()), "data", "models") ?: throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE)
+        return ids(parse(response.bodyAsText()), "data", "models") ?: throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE)
     }
 
-    override suspend fun voices(target: VoiceUpstreamTarget): List<String>? = guarded(timeouts.reachability.inWholeMilliseconds) {
+    private suspend fun listVoices(target: VoiceUpstreamTarget): List<String>? {
         val response = client.get { aimAt(target, VOICES_ROUTE) }
-        if (statusFailure(response.status.value) != null) return@guarded null
-        ids(parse(response.bodyAsText()), "voices", "data")?.takeIf { it.isNotEmpty() }
+        if (statusFailure(response.status.value) != null) return null
+        return ids(parse(response.bodyAsText()), "voices", "data")?.takeIf { it.isNotEmpty() }
     }
 
-    override suspend fun transcribe(target: VoiceUpstreamTarget, request: VoiceTranscriptionCall): VoiceTranscriptionAnswer =
-        guarded(timeouts.transcription.inWholeMilliseconds) {
-            val response = client.post {
-                aimAt(target, TRANSCRIPTIONS_ROUTE)
-                setBody(transcriptionBody(request))
-            }
-            if (request.verbose && response.status.value in FORMAT_REFUSED_STATUSES) return@guarded VoiceTranscriptionAnswer.FormatRefused
-            requireSuccess(response)
-            val transcript = TranscriptResponse.parse(response.bodyAsText())
-                ?: throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE, response.status.value)
-            VoiceTranscriptionAnswer.Heard(transcript)
+    private suspend fun postTranscription(target: VoiceUpstreamTarget, request: VoiceTranscriptionCall): VoiceTranscriptionAnswer {
+        val response = client.post {
+            aimAt(target, TRANSCRIPTIONS_ROUTE)
+            setBody(transcriptionBody(request))
         }
+        if (request.verbose && response.status.value in FORMAT_REFUSED_STATUSES) return VoiceTranscriptionAnswer.FormatRefused
+        requireSuccess(response)
+        val transcript = TranscriptResponse.parse(response.bodyAsText())
+            ?: throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE, response.status.value)
+        return VoiceTranscriptionAnswer.Heard(transcript)
+    }
 
     override suspend fun speech(target: VoiceUpstreamTarget, request: VoiceSpeechCall, onBytes: suspend (ByteArray) -> Unit) {
         guarded(timeouts.synthesis.inWholeMilliseconds) {
@@ -142,14 +153,16 @@ internal class KtorVoiceSpeechUpstream(
     }
 
     /** One run of the body into [buffer]: its length, or -1 at the end. A stall is a timeout, a break a bad response. */
-    private suspend fun readRun(channel: ByteReadChannel, buffer: ByteArray, status: Int): Int = try {
-        channel.readAvailable(buffer, 0, buffer.size)
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (timedOut: SocketTimeoutException) {
-        throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT, status)
-    } catch (expectedBreak: Exception) {
-        throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE, status)
+    private suspend fun readRun(channel: ByteReadChannel, buffer: ByteArray, status: Int): Int {
+        try {
+            return channel.readAvailable(buffer, 0, buffer.size)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (timedOut: SocketTimeoutException) {
+            throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT, status)
+        } catch (expectedBreak: Exception) {
+            throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE, status)
+        }
     }
 
     private fun requireSuccess(response: HttpResponse) {
@@ -182,36 +195,44 @@ internal class KtorVoiceSpeechUpstream(
      * Runs [block] within [totalMs], mapping every failure to the closed set ([classify]). Cancellation
      * passes through.
      */
-    private suspend fun <T> guarded(totalMs: Long, block: suspend () -> T): T = try {
-        withTimeout(totalMs) { block() }
-    } catch (expectedFailure: Exception) {
-        throw classify(expectedFailure)
+    private suspend fun <T> guarded(totalMs: Long, block: suspend () -> T): T {
+        try {
+            return withTimeout(totalMs) { block() }
+        } catch (expectedFailure: Exception) {
+            throw classify(expectedFailure)
+        }
     }
 
     /**
      * A timeout of any kind is `voice.upstream_timeout`; anything else that is not already a
      * [VoiceUpstreamFailure] or a cancellation means the server could not be reached.
      */
-    private fun classify(error: Exception): Exception = when (error) {
-        is TimeoutCancellationException -> VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
-        is VoiceUpstreamFailure, is CancellationException -> error
-        is HttpRequestTimeoutException, is ConnectTimeoutException, is SocketTimeoutException ->
-            VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
-        else -> VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_UNREACHABLE)
+    private fun classify(error: Exception): Exception {
+        return when (error) {
+            is TimeoutCancellationException -> VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
+            is VoiceUpstreamFailure, is CancellationException -> error
+            is HttpRequestTimeoutException, is ConnectTimeoutException, is SocketTimeoutException ->
+                VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
+            else -> VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_UNREACHABLE)
+        }
     }
 
     /**
      * The code for an HTTP status, or null for success: 401/403 unauthorized, 408/504 timeout,
      * 502/503 unreachable, any other 4xx rejected, any other answer a bad response.
      */
-    private fun statusFailure(status: Int): HostVoiceErrorCode? = when (status) {
-        in OK_FIRST..OK_LAST -> null
-        in failureByStatus -> failureByStatus.getValue(status)
-        in CLIENT_ERROR_FIRST..CLIENT_ERROR_LAST -> HostVoiceErrorCode.UPSTREAM_REJECTED
-        else -> HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE
+    private fun statusFailure(status: Int): HostVoiceErrorCode? {
+        return when (status) {
+            in OK_FIRST..OK_LAST -> null
+            in failureByStatus -> failureByStatus.getValue(status)
+            in CLIENT_ERROR_FIRST..CLIENT_ERROR_LAST -> HostVoiceErrorCode.UPSTREAM_REJECTED
+            else -> HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE
+        }
     }
 
-    private fun parse(body: String): JsonElement? = runCatching { lenientJson.parseToJsonElement(body) }.getOrNull()
+    private fun parse(body: String): JsonElement? {
+        return runCatching { lenientJson.parseToJsonElement(body) }.getOrNull()
+    }
 
     /**
      * The ids in a listing: a top-level array, or the array under the first of [fields] present; each
