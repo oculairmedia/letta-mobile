@@ -291,7 +291,7 @@ private fun CapabilityHeadline(capability: SystemAccessCapability) {
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )
-            LettaStatusLabel(text = capability.status.label, tone = capability.status.tone)
+            LettaStatusLabel(text = capability.status.label, tone = capability.status.tone())
         }
         Text(
             text = capability.summary,
@@ -450,8 +450,8 @@ private val SystemAccessCapabilityStatus.label: String
         SystemAccessCapabilityStatus.Error -> "Error"
     }
 
-private val SystemAccessCapabilityStatus.tone: LettaStatusTone
-    get() = when (this) {
+private fun SystemAccessCapabilityStatus.tone(): LettaStatusTone =
+    when (this) {
         SystemAccessCapabilityStatus.Granted -> LettaStatusTone.Success
         SystemAccessCapabilityStatus.GrantedLimited, SystemAccessCapabilityStatus.AvailableNeedsSetup -> LettaStatusTone.Warning
         SystemAccessCapabilityStatus.Unavailable -> LettaStatusTone.Idle
