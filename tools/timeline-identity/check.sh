@@ -18,7 +18,9 @@ props="${PROPS:-NoDuplicateKey NoVanishedRow StableKeys StableRowKeysAcrossRecut
 absolute() { echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"; }
 jar="$(absolute "$jar")"
 case "$java" in */*) java="$(absolute "$java")" ;; esac
-cfgs=("$@"); [ ${#cfgs[@]} -gt 0 ] || cfgs=($(cd "$here" && ls *.cfg | sed 's/\.cfg$//'))
+# With no arguments every committed config is checked. A mutation config that able-to-fail.sh has
+# written beside them (_break-*) is never picked up that way: it is checked only when named.
+cfgs=("$@"); [ ${#cfgs[@]} -gt 0 ] || cfgs=($(cd "$here" && ls *.cfg | grep -v '^_break-' | sed 's/\.cfg$//'))
 work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
 cp "$here"/*.tla "$work"/
 out="${OUT:-$here/out}"
