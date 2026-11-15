@@ -29,8 +29,12 @@ internal class WavStreamDecoder(private val headerLimit: Int = DEFAULT_HEADER_LI
     /** Whether the header has been read and samples may follow. */
     val started: Boolean get() = format != null
 
-    /** Bytes of a sample frame still waiting for the rest of it; non-zero at the end means a cut stream. */
-    val pendingBytes: Int get() = carry.size
+    /**
+     * Whether everything the stream promised has arrived: the header, every byte of a declared `data`
+     * size (a streaming placeholder promises none) and no half sample frame. False at the end means a
+     * cut stream.
+     */
+    val complete: Boolean get() = started && (remaining ?: 0L) == 0L && carry.isEmpty()
 
     /** The stream ended. Throws BAD_RESPONSE when it ended before the samples started. */
     fun finish() {

@@ -77,12 +77,23 @@ class VoiceSpeechStreamTest {
     @Test
     fun theSlotIsFreeBeforeTheFinalResponseArrives() = streamTest {
         upstream.finishAfterHeader = true
-        val stream = Client()
+        val stream = Client(onFinalWritten = { heldWhenFinal = inFlight.heldCount })
         val serving = launch { server.handleStream(stream) }
-        val frames = stream.untilFinal { heldWhenFinal = inFlight.heldCount }
+        val frames = stream.untilFinal { }
         serving.join()
         assertEquals(true, frames.last().getValue("success").jsonPrimitive.content.toBoolean())
-        assertEquals(0, heldWhenFinal)
+        assertEquals(0, heldWhenFinal, "the slot was free when the final response was written")
+    }
+
+    @Test
+    fun aStreamShorterThanItsDeclaredDataIsABadResponse() = streamTest {
+        upstream.finishAfterHeader = true
+        upstream.declaredBytes = 100L
+        val stream = Client()
+        val serving = launch { server.handleStream(stream) }
+        val frames = stream.untilFinal { }
+        serving.join()
+        assertEquals("voice.upstream_bad_response", frames.last().getValue("error").jsonPrimitive.content)
     }
 
     @Test
@@ -158,11 +169,14 @@ class VoiceSpeechStreamTest {
         @Volatile
         var payloadBytes = 8
 
+        @Volatile
+        var declaredBytes = 0xFFFFFFFFL
+
         override suspend fun speech(target: VoiceUpstreamTarget, request: VoiceSpeechCall, onBytes: suspend (ByteArray) -> Unit) {
             calls.incrementAndGet()
             var finished = false
             try {
-                onBytes(VoiceContractHarness.wavHeader(24_000, 1) + ByteArray(payloadBytes))
+                onBytes(VoiceContractHarness.wavHeader(24_000, 1, declaredBytes) + ByteArray(payloadBytes))
                 if (!finishAfterHeader) awaitCancellation()
                 finished = true
             } finally {
@@ -180,7 +194,10 @@ class VoiceSpeechStreamTest {
     }
 
     /** The device's end of a `voice.speech` request stream. */
-    private class Client(private val failWritesAfter: Int = Int.MAX_VALUE) : AdminRpcBiStream {
+    private class Client(
+        private val failWritesAfter: Int = Int.MAX_VALUE,
+        private val onFinalWritten: () -> Unit = {},
+    ) : AdminRpcBiStream {
         private val toHost = Channel<ByteArray>(Channel.UNLIMITED)
         private val reset = CompletableDeferred<Unit>()
         private val decoder = IrohFrameCodec.Decoder(IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES)
@@ -230,7 +247,11 @@ class VoiceSpeechStreamTest {
         override fun send(): AdminRpcSendStream = object : AdminRpcSendStream {
             override suspend fun writeAll(bytes: ByteArray) {
                 if (++writes > failWritesAfter) throw java.io.IOException("send failed")
-                decoder.feed(bytes).forEach { received.send(Json.parseToJsonElement(it).jsonObject) }
+                decoder.feed(bytes).forEach { text ->
+                    val frame = Json.parseToJsonElement(text).jsonObject
+                    if (frame["type"]?.jsonPrimitive?.content == "admin_rpc_response") onFinalWritten()
+                    received.send(frame)
+                }
             }
 
             override suspend fun finish() {

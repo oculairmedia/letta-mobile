@@ -27,6 +27,7 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
@@ -102,6 +103,7 @@ internal object VoiceContractHarness {
                 frames
             } finally {
                 upstream.close()
+                fake.writers.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
             }
         }
 
@@ -231,6 +233,9 @@ internal object VoiceContractHarness {
 
     /** A speech server double driven by a case's `upstream` description. */
     private class FakeSpeechServer(private val spec: JsonObject) {
+        /** Owns the body writers so the fixture cancels them with itself. */
+        val writers = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
         @Volatile
         var blockNext = false
         val blockerArrived = CompletableDeferred<Unit>()
@@ -304,7 +309,7 @@ internal object VoiceContractHarness {
                 "wav_header_then_garbage" -> { -> body.writeFully(header + ByteArray(1)); body.close() }
                 else -> error("Unexpected speech body")
             }
-            CoroutineScope(Dispatchers.Default).launch { writer() }
+            writers.launch { writer() }
             return scope.respond(body)
         }
 

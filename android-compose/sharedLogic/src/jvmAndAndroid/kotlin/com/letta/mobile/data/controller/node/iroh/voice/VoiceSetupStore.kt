@@ -71,9 +71,8 @@ internal class VoiceSetupStore(
             grants = command.grants,
             grantedAtMs = grantedAt(previous, command.grants),
         )
-        applyKey(command.apiKey, origin, keepable = previous != null)
         val next = VoiceSetupState(state.revision + 1, setup)
-        persistence.write(next)
+        withKeyRollback { applyKey(command.apiKey, origin, keepable = previous != null) }.persist(next)
         statusOf(next)
     }
 
@@ -81,9 +80,8 @@ internal class VoiceSetupStore(
     suspend fun clear(expectedRevision: String?): HostVoiceSetupStatus = lock.withLock {
         val state = persistence.read()
         requireRevision(state, expectedRevision)
-        keys.delete()
         val next = VoiceSetupState(state.revision + if (state.setup != null) 1 else 0, null)
-        persistence.write(next)
+        withKeyRollback { keys.delete() }.persist(next)
         statusOf(next)
     }
 
@@ -93,6 +91,36 @@ internal class VoiceSetupStore(
         val setup = state.setup ?: return@withLock
         if (state.revision != revision) return@withLock
         persistence.write(state.copy(setup = setup.copy(reachability = reachability)))
+    }
+
+    /**
+     * Applies [change] to the key store and returns how to persist the matching setup: if that write
+     * fails, the key store is put back as it was (the earlier key, or none) and the failure is rethrown,
+     * so the key never changes without its setup.
+     */
+    private fun withKeyRollback(change: () -> Unit): KeyRollback {
+        val before = persistence.read().setup?.origin?.let { origin -> keys.read(origin)?.let { origin to it } }
+        change()
+        return KeyRollback(before)
+    }
+
+    private inner class KeyRollback(private val before: Pair<String, String>?) {
+        fun persist(state: VoiceSetupState) {
+            var written = false
+            try {
+                persistence.write(state)
+                written = true
+            } finally {
+                if (!written) restore()
+            }
+        }
+
+        private fun restore() {
+            val earlier = before
+            if (earlier == null) keys.delete() else keys.write(earlier.first, earlier.second)
+        }
+
+        override fun toString(): String = "KeyRollback(keySet=${before != null})"
     }
 
     private fun requireRevision(state: VoiceSetupState, expected: String?) {

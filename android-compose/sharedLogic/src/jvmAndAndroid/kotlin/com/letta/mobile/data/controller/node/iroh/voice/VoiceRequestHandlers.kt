@@ -132,8 +132,8 @@ internal class VoiceRequestHandlers(
         private var audioFrames = 0
         private var sampleFrames = 0L
 
-        /** Whether the stream started and ended on a whole sample frame. */
-        val complete: Boolean get() = decoder.started && decoder.pendingBytes == 0
+        /** Whether the stream started, delivered every declared byte and ended on a whole sample frame. */
+        val complete: Boolean get() = decoder.complete
 
         suspend fun push(bytes: ByteArray) {
             val chunk = try {

@@ -12,6 +12,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -158,9 +159,9 @@ internal class AdminRpcStreamedExchange(
 
     /** Whether [frame] is this request's `admin_rpc_cancel`; anything else on the cancel channel is ignored. */
     private fun isCancelFor(frame: String, request: AdminRpcStreamedRequest): Boolean {
-        val obj = runCatching { Json.parseToJsonElement(frame).jsonObject }.getOrNull() ?: return false
-        val type = obj["type"]?.jsonPrimitive?.contentOrNull
-        return type == CANCEL_FRAME_TYPE && obj["request_id"]?.jsonPrimitive?.contentOrNull == request.requestId
+        val obj = runCatching { Json.parseToJsonElement(frame) as? JsonObject }.getOrNull() ?: return false
+        val type = (obj["type"] as? JsonPrimitive)?.contentOrNull
+        return type == CANCEL_FRAME_TYPE && (obj["request_id"] as? JsonPrimitive)?.contentOrNull == request.requestId
     }
 
     private fun fields(request: AdminRpcStreamedRequest, vararg extra: Pair<String, String>): Map<String, String> =
