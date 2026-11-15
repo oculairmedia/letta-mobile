@@ -161,7 +161,15 @@ private fun LazyListScope.legacyRows(
     if (edges.thinking) item(key = THINKING_KEY) { ThinkingRow(edges.messages) }
     items(count = rows.size, key = { rows[it].key }, contentType = { rows[it]::class.simpleName }) { index ->
         val row = rows[index]
-        TimelineRowContent(row, bindings, today, timelineRowMotion(fadesIn = !row.isUserPrompt()))
+        val motion = timelineRowMotion(fadesIn = !row.isUserPrompt())
+        if (row is TimelineRow.Item) {
+            // Newest first: the row above this one is the next index, the row below it the previous.
+            val older = (rows.getOrNull(index + 1) as? TimelineRow.Item)?.item
+            val newer = (rows.getOrNull(index - 1) as? TimelineRow.Item)?.item
+            TimelineItemRow(row.item, bindings, motion, rememberRowSpacing(row.item, older, newer))
+        } else {
+            TimelineRowContent(row, bindings, today, motion)
+        }
     }
     if (edges.loadingOlder) {
         item(key = LOADING_OLDER_KEY) { TimelineOlderHistoryLoading(edges.agentId) }

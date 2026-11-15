@@ -14,19 +14,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.data.memory.memfs.MemfsEmptyReason
 import com.letta.mobile.data.memory.memfs.MemfsFile
 import com.letta.mobile.data.memory.memfs.MemfsFileKind
@@ -34,6 +29,14 @@ import com.letta.mobile.data.memory.memfs.MemfsLoad
 import com.letta.mobile.data.memory.memfs.MemfsTab
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaEmptyContent
+import com.letta.mobile.ui.components.foundation.LettaEmptyState
+import com.letta.mobile.ui.components.foundation.LettaInlineNotice
+import com.letta.mobile.ui.components.foundation.LettaNotice
+import com.letta.mobile.ui.components.foundation.LettaNoticeAction
+import com.letta.mobile.ui.components.foundation.LettaSearchField
+import com.letta.mobile.ui.components.foundation.LettaSearchOptions
+import com.letta.mobile.ui.theme.tokens.LettaPanelTone
 import com.letta.mobile.ui.components.LettaChipTabRow
 import com.letta.mobile.ui.components.LettaPageHeader
 import com.letta.mobile.ui.components.list.RosterList
@@ -79,14 +82,11 @@ internal fun MemfsDockedListControls(page: MemfsPageScope) {
 @Composable
 private fun MemfsListControls(page: MemfsPageScope) {
     if (page.state.tab == MemfsTab.Files) {
-        OutlinedTextField(
-            value = page.state.query,
-            onValueChange = page.actions::updateQuery,
-            placeholder = { Text(SEARCH_PLACEHOLDER) },
-            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-            singleLine = true,
-            shape = MaterialTheme.shapes.medium,
+        LettaSearchField(
+            query = page.state.query,
+            onQueryChange = page.actions::updateQuery,
             modifier = Modifier.fillMaxWidth().testTag(MemfsPageTags.SEARCH),
+            options = LettaSearchOptions(placeholder = SEARCH_PLACEHOLDER),
         )
     }
     MemfsTabs(page)
@@ -152,49 +152,43 @@ private fun fileSection(title: String, files: List<MemfsFile>): RosterSection<Me
 
 @Composable
 private fun MemfsEmptyState(reason: MemfsEmptyReason, page: MemfsPageScope) {
-    MemfsMessage(reason.message, Modifier.testTag(MemfsPageTags.EMPTY)) {
-        if (reason == MemfsEmptyReason.MemfsDisabled && !page.options.readOnly) {
-            Button(
-                onClick = page.actions::enableMemfs,
-                enabled = !page.state.enabling,
-                modifier = Modifier.testTag(MemfsPageTags.ENABLE),
-            ) { Text(if (page.state.enabling) ENABLING_LABEL else ENABLE_LABEL) }
-            page.state.enableError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        }
+    val canEnable = reason == MemfsEmptyReason.MemfsDisabled && !page.options.readOnly
+    // Scrolls (with nothing to scroll) so a pull on the message still reaches LettaRefreshable.
+    LettaEmptyState(
+        content = LettaEmptyContent(reason.message),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag(MemfsPageTags.EMPTY),
+        action = if (canEnable) ({ MemfsEnableAction(page) }) else null,
+    )
+}
+
+@Composable
+private fun MemfsEnableAction(page: MemfsPageScope) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+        Button(
+            onClick = page.actions::enableMemfs,
+            enabled = !page.state.enabling,
+            modifier = Modifier.testTag(MemfsPageTags.ENABLE),
+        ) { Text(if (page.state.enabling) ENABLING_LABEL else ENABLE_LABEL) }
+        page.state.enableError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
 @Composable
 private fun MemfsErrorState(message: String, page: MemfsPageScope) {
-    MemfsMessage(message, Modifier.testTag(MemfsPageTags.ERROR), color = MaterialTheme.colorScheme.error) {
-        OutlinedButton(onClick = page.actions::refresh) { Text(RETRY_LABEL) }
-    }
-}
-
-@Composable
-private fun MemfsMessage(
-    message: String,
-    modifier: Modifier,
-    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    actions: @Composable () -> Unit = {},
-) {
     // Scrolls (with nothing to scroll) so a pull on the message still reaches LettaRefreshable.
-    Column(
-        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(LettaDimens.Space.xl),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-    ) {
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = color, textAlign = TextAlign.Center)
-        actions()
+    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(LettaDimens.Space.xl)) {
+        LettaInlineNotice(
+            notice = LettaNotice(message, tone = LettaPanelTone.Error),
+            modifier = Modifier.testTag(MemfsPageTags.ERROR),
+            action = LettaNoticeAction(RETRY_LABEL, page.actions::refresh),
+        )
     }
 }
 
 /** The placeholder in the detail pane before anything is open. */
 @Composable
 internal fun MemfsDetailHint(message: String) {
-    Box(Modifier.fillMaxSize().padding(LettaDimens.Space.xl), contentAlignment = Alignment.Center) {
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-    }
+    LettaEmptyState(LettaEmptyContent(message), Modifier.fillMaxSize())
 }
 
 /** A compact byte count: `512 B`, `3.4 KB`, `1.2 MB`. */

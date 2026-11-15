@@ -60,7 +60,7 @@ import com.letta.mobile.sharedui.resources.chat_surface_bubble_collapse
 import com.letta.mobile.sharedui.resources.chat_surface_recents_close
 import com.letta.mobile.sharedui.resources.chat_surface_recents_open
 import com.letta.mobile.ui.chat.surface.recents.RecentInteractionsList
-import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.LettaFoldButton
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatHeadDimens
 import com.letta.mobile.ui.theme.ChatRowMotion
@@ -68,6 +68,7 @@ import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.theme.headAnchoredShape
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
 
@@ -209,14 +210,12 @@ private fun BubbleCardHeader(agentName: String, onCollapse: () -> Unit) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        IconButton(onClick = onCollapse, modifier = Modifier.size(ChatHeadDimens.cardHeader).testTag(BUBBLE_COLLAPSE_TAG)) {
-            // Open, the chevron points down: folding the card back down into the head.
-            DisclosureChevron(
-                expanded = true,
-                contentDescription = stringResource(Res.string.chat_surface_bubble_collapse),
-                opensUpward = true,
-            )
-        }
+        // Open, the chevron points down: folding the card back down into the head.
+        LettaFoldButton(
+            onClick = onCollapse,
+            contentDescription = stringResource(Res.string.chat_surface_bubble_collapse),
+            modifier = Modifier.size(ChatHeadDimens.cardHeader).testTag(BUBBLE_COLLAPSE_TAG),
+        )
     }
 }
 

@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -44,6 +42,9 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.components.foundation.LettaSwatch
+import com.letta.mobile.ui.components.foundation.LettaColorSwatch
+import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 
 /** The rotation slider's resolution: 24 positions, 0 to 345 degrees. */
 const val MASCOT_ROTATION_STEP: Int = 15
@@ -72,7 +73,7 @@ fun MascotPicker(
         }
         Text("Colour", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         MascotChoiceRows(MascotPalette.ALL, columns = 5) { argb ->
-            MascotColorChoice(argb, shown, accent) { onChange(shown.copy(argb = argb)) }
+            MascotColorChoice(argb, shown) { onChange(shown.copy(argb = argb)) }
         }
         MascotRotationChoice(
             rotationDegrees = shown.rotationDegrees,
@@ -137,10 +138,18 @@ private fun MascotShapeChoice(
     val selected = shape == identity.shape
     Box(
         Modifier
-            .size(52.dp)
-            .clip(RoundedCornerShape(LettaDimens.Radius.md))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (selected) 0.9f else 0.4f))
-            .border(if (selected) LettaDimens.Space.hair else 0.dp, if (selected) accent else Color.Transparent, RoundedCornerShape(LettaDimens.Radius.md))
+            .size(LettaSurfaceSizes.mascotPickerTile)
+            .clip(MaterialTheme.shapes.medium)
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(
+                    alpha = if (selected) LettaSurfaceSizes.mascotTileSelectedAlpha else LettaSurfaceSizes.mascotTileAlpha,
+                ),
+            )
+            .border(
+                if (selected) LettaDimens.Space.hair else 0.dp,
+                if (selected) accent else Color.Transparent,
+                MaterialTheme.shapes.medium,
+            )
             .selectable(
                 selected = selected,
                 onClick = onSelect,
@@ -168,23 +177,13 @@ private fun MascotShapeChoice(
 private fun MascotColorChoice(
     argb: Int,
     identity: MascotIdentity,
-    accent: Color,
     onSelect: () -> Unit,
 ) {
     val selected = argb == identity.argb
     val hex = argb.toUInt().toString(16).padStart(8, '0')
-    Box(
-        Modifier
-            .size(LettaDimens.Control.iconButton)
-            .clip(CircleShape)
-            .background(Color(argb))
-            .border(if (selected) LettaDimens.Space.xs else 1.dp, if (selected) accent else Color.Black.copy(alpha = 0.25f), CircleShape)
-            .selectable(
-                selected = selected,
-                onClick = onSelect,
-                role = Role.RadioButton,
-            )
-            .semantics { contentDescription = "colour $hex" },
+    LettaColorSwatch(
+        LettaSwatch(color = Color(argb), selected = selected, name = "colour $hex", size = LettaDimens.Control.iconButton),
+        onClick = onSelect,
     )
 }
 

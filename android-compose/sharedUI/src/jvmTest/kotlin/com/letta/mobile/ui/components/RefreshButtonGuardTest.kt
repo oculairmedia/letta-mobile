@@ -19,7 +19,7 @@ class RefreshButtonGuardTest {
         /** File name -> why it still shows the refresh glyph. None of these reloads a page's list. */
         val ALLOWLIST: Map<String, String> = mapOf(
             "MessageMenu.kt" to "the message menu's \"Rerun in fork\" item: a rerun, not a reload",
-            "A2uiBasicWidgets.kt" to "the A2UI icon catalog maps the agent-authored name \"Refresh\" to the glyph",
+            "LettaIconsByName.kt" to "the A2UI icon catalog maps the agent-authored name \"Refresh\" to the glyph",
             "ModelPickerContent.kt" to "the model picker's \"Refresh Models\" footer lives in a sheet whose drag dismisses it",
         )
 

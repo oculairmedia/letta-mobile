@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
@@ -32,8 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.schedules.CronSchedule
 import com.letta.mobile.data.schedules.HistorySummary
@@ -56,6 +53,11 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 import kotlinx.datetime.TimeZone
 import kotlin.time.Instant
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
+import com.letta.mobile.ui.theme.LettaPill
+import com.letta.mobile.ui.components.foundation.LettaPanel
+import androidx.compose.ui.semantics.Role
 
 /** What the schedules rail shows: the overview, one schedule's detail, or one run's detail. */
 sealed interface ScheduleRailState {
@@ -154,7 +156,7 @@ private fun ScheduleDetailRail(def: ScheduleDef, params: ScheduleRailParams) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         BackToOverview("Overview", params.onBackToOverview)
         Spacer(Modifier.height(LettaDimens.Space.md))
-        Text(def.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+        Text(def.name, style = LettaTextAccents.titleLargeSemibold, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(LettaDimens.Space.sm))
         StatusBadge(ScheduleRailText.status(def.active), def.active)
         Spacer(Modifier.height(LettaDimens.Space.lg))
@@ -171,24 +173,29 @@ private fun ScheduleDetailRail(def: ScheduleDef, params: ScheduleRailParams) {
 
 @Composable
 private fun StatusBadge(label: String, active: Boolean) {
-    val shape = RoundedCornerShape(LettaDimens.Radius.sm)
     val color = if (active) MaterialTheme.customColors.successColor else MaterialTheme.customColors.onSurfaceMutedColor
-    Box(Modifier.clip(shape).border(1.dp, color, shape).padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs)) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = color)
-    }
+    LettaPill(label, color)
 }
 
 @Composable
 private fun NextRunCard(def: ScheduleDef, now: Instant, zone: TimeZone) {
     val next = ScheduleProjection.nextRun(def, now)
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(LettaDimens.Radius.md)).background(MaterialTheme.colorScheme.surfaceContainer).padding(LettaDimens.Space.lg),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    LettaPanel(Modifier.fillMaxWidth(), border = false) {
+        NextRunContent(def, next, now, zone)
+    }
+}
+
+@Composable
+private fun NextRunContent(def: ScheduleDef, next: Instant?, now: Instant, zone: TimeZone) {
+    Row(Modifier.padding(LettaDimens.Space.lg), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Outlined.Schedule, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.icon))
         Spacer(Modifier.width(LettaDimens.Space.md))
         Column {
-            Text(ScheduleRailText.nextRunHeadline(now, next), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                ScheduleRailText.nextRunHeadline(now, next),
+                style = LettaTextStyles.titleMediumSemibold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             if (next != null) {
                 Text(
                     ScheduleRailText.whenLabel(next, zone, def.zone),
@@ -239,8 +246,7 @@ private fun ScheduleRunDetailRail(run: ScheduleRun, params: ScheduleRailParams) 
             Spacer(Modifier.width(LettaDimens.Space.sm))
             Text(
                 run.scheduleName,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = LettaTextStyles.titleMediumSemibold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
         }
@@ -255,12 +261,12 @@ private fun ScheduleRunDetailRail(run: ScheduleRun, params: ScheduleRailParams) 
             RailLabel("ERROR")
             Spacer(Modifier.height(LettaDimens.Space.xs))
             Box(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(LettaDimens.Radius.sm))
+                Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small)
                     .background(MaterialTheme.colorScheme.surfaceContainerLowest).padding(LettaDimens.Space.md),
             ) {
                 Text(
                     error,
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    style = LettaTextStyles.mono,
                     color = MaterialTheme.colorScheme.error,
                 )
             }
@@ -275,7 +281,7 @@ private fun ScheduleRunDetailRail(run: ScheduleRun, params: ScheduleRailParams) 
 /** The back link at the top of a detail ("Overview" from a schedule, "Back" from a run). */
 @Composable
 private fun BackToOverview(description: String, onBack: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onBack)) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(role = Role.Button, onClick = onBack)) {
         Icon(Icons.Outlined.ArrowBack, description, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(LettaDimens.Control.icon))
         Spacer(Modifier.width(LettaDimens.Space.sm))
         Text("Overview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

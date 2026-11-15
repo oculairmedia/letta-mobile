@@ -8,13 +8,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -23,12 +20,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.data.settings.SettingsGroup
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.components.foundation.LettaSearchOptions
+import com.letta.mobile.ui.components.foundation.LettaSearchField
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 
 /**
  * The Settings page's three form factors. [Phone]: one scrolling list with
@@ -82,14 +84,11 @@ internal val SettingsGroup.icon: ImageVector
 /** The search field: under the title on a phone, on top of the rail on a wide window. */
 @Composable
 internal fun SettingsSearchField(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        singleLine = true,
-        placeholder = { Text(SettingsCopy.SEARCH) },
-        leadingIcon = { Icon(LettaIcons.Search, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
-        shape = MaterialTheme.shapes.extraLarge,
+    LettaSearchField(
+        query = query,
+        onQueryChange = onQueryChange,
         modifier = modifier.fillMaxWidth().testTag(SettingsPageTags.SEARCH),
+        options = LettaSearchOptions(placeholder = SettingsCopy.SEARCH),
     )
 }
 
@@ -116,11 +115,10 @@ internal fun SettingsRail(groups: List<SettingsGroup>, active: SettingsGroup?, o
                     selected -> MaterialTheme.colorScheme.onSecondaryContainer
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
-                Icon(group.icon, contentDescription = null, tint = color, modifier = Modifier.size(LettaDimens.Control.icon))
+                LettaIcon(group.icon, contentDescription = null, style = LettaIconStyle(tint = color))
                 Text(
                     group.title,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    style = if (selected) LettaTextStyles.labelSemibold else LettaTextAccents.labelLargeRegular,
                     color = color,
                 )
             }
@@ -151,8 +149,7 @@ internal fun SettingsChips(groups: List<SettingsGroup>, active: SettingsGroup?, 
 internal fun SettingsGroupHeader(group: SettingsGroup) {
     Text(
         group.title,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.SemiBold,
+        style = LettaTextStyles.labelSemibold,
         color = if (group == SettingsGroup.Danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(start = LettaDimens.Space.xs, top = LettaDimens.Space.sm),
     )

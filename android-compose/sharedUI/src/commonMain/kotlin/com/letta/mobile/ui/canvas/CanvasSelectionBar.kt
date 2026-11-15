@@ -1,10 +1,6 @@
 package com.letta.mobile.ui.canvas
 
-import androidx.compose.foundation.background
 import com.composables.icons.lucide.EllipsisVertical
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -13,11 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -33,7 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.BringToFront
 import com.composables.icons.lucide.Circle
 import com.composables.icons.lucide.Copy
@@ -55,6 +46,11 @@ import com.letta.mobile.data.canvas.CanvasTextStyle
 import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
+import com.letta.mobile.ui.components.foundation.LettaColorSwatch
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaSwatch
+import com.letta.mobile.ui.components.foundation.LettaVerticalDivider
+import com.letta.mobile.ui.host.LettaMenu
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -88,7 +84,7 @@ fun CanvasSelectionBar(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(LettaDimens.Radius.md),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
         tonalElevation = LettaDimens.Space.hair,
         shadowElevation = LettaDimens.Space.sm,
@@ -203,11 +199,11 @@ private fun PhoneSelectionButtons(actions: SelectionActions) {
     var open by remember { mutableStateOf(false) }
     Box {
         BarButton(Lucide.EllipsisVertical, "More shape actions") { open = true }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        LettaMenu(expanded = open, onDismiss = { open = false }) {
             fun item(icon: ImageVector, label: String, onClick: () -> Unit) = @Composable {
                 DropdownMenuItem(
                     text = { Text(label) },
-                    leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
+                    leadingIcon = { LettaIcon(icon, contentDescription = null) },
                     onClick = {
                         open = false
                         onClick()
@@ -236,37 +232,23 @@ private fun PhoneSelectionButtons(actions: SelectionActions) {
 }
 
 /**
- * The text colour, as a row of swatches inside the phone bar's menu. Each is a finger's 48dp
- * target around a 24dp dot: small dots with their own undersized targets overlapped, so a tap
- * between two could pick either. The row scrolls when the palette outgrows the menu.
+ * The text colour, as a row of swatches inside the phone bar's menu. Each swatch's touch bounds
+ * reach the 48dp minimum around its dot, so the dots sit a whole dot apart and a tap between two
+ * never overlaps both targets. The row scrolls when the palette outgrows the menu.
  */
 @Composable
 private fun TextColourSwatches(text: ShapeTextActions) {
     Row(
-        modifier = Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+        modifier = Modifier
+            .horizontalScroll(androidx.compose.foundation.rememberScrollState())
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.md),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xl),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StrokePalette.forEach { swatch ->
             val selected = swatch.color.toHex() == text.color.toHex()
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clickable { text.onColor(swatch.color) }
-                    .semantics { contentDescription = "Text colour ${swatch.name}" },
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(swatch.color)
-                        .border(
-                            if (selected) 3.dp else 1.dp,
-                            MaterialTheme.colorScheme.outline,
-                            androidx.compose.foundation.shape.CircleShape,
-                        ),
-                )
-            }
+            val entry = LettaSwatch(swatch.color, selected, name = "Text colour ${swatch.name}")
+            LettaColorSwatch(entry, onClick = { text.onColor(swatch.color) })
         }
     }
 }
@@ -332,11 +314,11 @@ private fun ShapeTypeButton(reshape: ShapeReshapeActions) {
     var open by remember { mutableStateOf(false) }
     Box {
         BarButton(shapeIcon(reshape.current ?: ShapeType.RECTANGLE), "Change shape") { open = true }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        LettaMenu(expanded = open, onDismiss = { open = false }) {
             CanvasReshape.Types.forEach { type ->
                 DropdownMenuItem(
                     text = { Text(shapeLabel(type)) },
-                    leadingIcon = { Icon(shapeIcon(type), contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
+                    leadingIcon = { LettaIcon(shapeIcon(type), contentDescription = null) },
                     enabled = type != reshape.current,
                     onClick = {
                         open = false
@@ -367,19 +349,13 @@ private fun BarButton(icon: ImageVector, label: String, selected: Boolean = fals
         modifier = Modifier.size(BAR_BUTTON).semantics { contentDescription = label },
         colors = if (selected) IconButtonDefaults.filledTonalIconButtonColors() else IconButtonDefaults.iconButtonColors(),
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
+        LettaIcon(icon, contentDescription = null)
     }
 }
 
 @Composable
 private fun Divider() {
-    Box(
-        modifier = Modifier
-            .padding(horizontal = LettaDimens.Space.hair)
-            .width(1.dp)
-            .height(LettaDimens.Space.xl)
-            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)),
-    )
+    LettaVerticalDivider(Modifier.padding(horizontal = LettaDimens.Space.hair).height(LettaDimens.Space.xl))
 }
 
 private val BAR_BUTTON = LettaDimens.Space.xxl

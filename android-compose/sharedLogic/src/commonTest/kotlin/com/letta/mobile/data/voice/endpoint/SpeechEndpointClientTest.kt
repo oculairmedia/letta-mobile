@@ -66,15 +66,47 @@ class SpeechEndpointClientTest {
 
     @Test
     fun transcriptionSendsMultipartWithModelLanguageAndFile() = realTimeTest {
-        val text = client { json("""{"text":"  what time is it "}""") }.transcribe(transcription)
-        assertEquals("what time is it", text.value)
+        val transcript = client { json("""{"text":"  what time is it "}""") }.transcribe(transcription)
+        assertEquals("what time is it", transcript.text.value)
+        assertTrue(transcript.segments.isEmpty(), "a plain json answer carries no segment numbers")
         val request = recorded.single()
         assertEquals(HttpMethod.Post, request.method)
         assertEquals("/v1/audio/transcriptions", request.url.encodedPath)
         val body = request.body.toByteArray().decodeToString().replace("\"", "")
-        listOf("name=model", "whisper-1", "name=response_format", "name=language", "filename=audio.wav", "audio/wav")
+        listOf("name=model", "whisper-1", "name=response_format", "verbose_json", "name=language", "filename=audio.wav", "audio/wav")
             .forEach { assertTrue(it in body, it) }
         assertEquals("Bearer $secret", request.headers[HttpHeaders.Authorization])
+    }
+
+    @Test
+    fun verboseSegmentsKeepEachSegmentsNumbers() = realTimeTest {
+        val body = """{"text":" So.","segments":[""" +
+            """{"text":" So.","no_speech_prob":0.92,"avg_logprob":-1.4},""" +
+            """{"text":"","no_speech_prob":0.7,"avg_logprob":-0.8}]}"""
+        val transcript = client { json(body) }.transcribe(transcription)
+        assertEquals("So.", transcript.text.value)
+        assertEquals(listOf(RecognizerConfidence(0.92, -1.4), RecognizerConfidence(0.7, -0.8)), transcript.segments)
+    }
+
+    @Test
+    fun segmentsWithoutBothNumbersGiveNoConfidence() = realTimeTest {
+        val partial = """{"text":"hi","segments":[{"text":"hi","avg_logprob":-0.2}]}"""
+        assertTrue(client { json(partial) }.transcribe(transcription).segments.isEmpty())
+        assertTrue(client { json("""{"text":"hi","segments":[]}""") }.transcribe(transcription).segments.isEmpty())
+        assertTrue(client { json("""{"text":"hi","segments":"none"}""") }.transcribe(transcription).segments.isEmpty())
+    }
+
+    @Test
+    fun aServerRefusingVerboseJsonIsAskedForPlainJsonFromThenOn() = realTimeTest {
+        val refusing = client { request ->
+            val verbose = "verbose_json" in request.body.toByteArray().decodeToString()
+            if (verbose) respond("unsupported response_format", HttpStatusCode.BadRequest) else json("""{"text":"yes"}""")
+        }
+        assertEquals("yes", refusing.transcribe(transcription).text.value)
+        assertEquals("yes", refusing.transcribe(transcription).text.value)
+        val formats = recorded.map { "verbose_json" in it.body.toByteArray().decodeToString() }
+        assertEquals(listOf(true, false, false), formats, "refused once, then plain json only")
+        assertTrue(events.all { it.failure == null }, "the fallback is not a failure")
     }
 
     @Test
@@ -192,7 +224,7 @@ class SpeechEndpointClientTest {
     @Test
     fun plainHttpWithoutAKeyIsAllowed() = realTimeTest {
         val config = SpeechEndpointConfig(SpeechEndpointUrl("http://192.168.1.20:8880"))
-        assertEquals("ok", client(config) { json("""{"text":"ok"}""") }.transcribe(transcription).value)
+        assertEquals("ok", client(config) { json("""{"text":"ok"}""") }.transcribe(transcription).text.value)
     }
 
     @Test

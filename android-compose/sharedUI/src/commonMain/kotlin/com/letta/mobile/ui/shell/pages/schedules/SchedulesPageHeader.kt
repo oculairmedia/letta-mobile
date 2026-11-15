@@ -1,19 +1,19 @@
 package com.letta.mobile.ui.shell.pages.schedules
 
+import androidx.compose.material3.minimumInteractiveComponentSize
+import com.letta.mobile.ui.shell.tokens.ShellType
+import com.letta.mobile.ui.components.foundation.LettaDivider
+import com.letta.mobile.ui.components.foundation.LettaNextButton
+import com.letta.mobile.ui.components.foundation.LettaPreviousButton
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaMenuItem
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,11 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import com.composables.icons.lucide.ChevronLeft
-import com.composables.icons.lucide.ChevronRight
-import com.composables.icons.lucide.Lucide
 import com.letta.mobile.data.schedules.SchedulesView
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaChipTabRow
@@ -103,7 +99,6 @@ private fun SchedulesWideControls(params: SchedulesHeaderParams) {
 @Composable
 private fun RangeNavigation(range: SchedulesRange, shown: Boolean, compact: Boolean) {
     val rowModifier = if (compact) Modifier.fillMaxWidth() else Modifier
-    val labelStyle = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium
     val onToday = if (shown) range.onToday else NO_OP
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -115,21 +110,26 @@ private fun RangeNavigation(range: SchedulesRange, shown: Boolean, compact: Bool
             onClick = onToday,
             modifier = Modifier.testTag(SchedulesPageTags.TODAY),
         )
-        IconButton(onClick = { range.onShift(-1) }, enabled = shown, modifier = Modifier.testTag(SchedulesPageTags.PREVIOUS_WEEK)) {
-            Icon(Lucide.ChevronLeft, contentDescription = "Previous")
-        }
+        LettaPreviousButton(
+            onClick = { range.onShift(-1) },
+            contentDescription = "Previous",
+            modifier = Modifier.testTag(SchedulesPageTags.PREVIOUS_WEEK),
+            enabled = shown,
+        )
         Text(
             range.label,
-            style = labelStyle,
-            fontWeight = FontWeight.Medium,
+            style = if (compact) MaterialTheme.typography.titleSmall else ShellType.bodyEmphasis,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
             maxLines = 1,
             modifier = rangeLabelModifier(compact).testTag(SchedulesPageTags.RANGE),
         )
-        IconButton(onClick = { range.onShift(1) }, enabled = shown, modifier = Modifier.testTag(SchedulesPageTags.NEXT_WEEK)) {
-            Icon(Lucide.ChevronRight, contentDescription = "Next")
-        }
+        LettaNextButton(
+            onClick = { range.onShift(1) },
+            contentDescription = "Next",
+            modifier = Modifier.testTag(SchedulesPageTags.NEXT_WEEK),
+            enabled = shown,
+        )
     }
 }
 
@@ -186,21 +186,16 @@ private fun SchedulesPausedChip(shown: Boolean, onToggle: () -> Unit) {
 @Composable
 internal fun SchedulesViewBar(view: SchedulesView, onView: (SchedulesView) -> Unit) {
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer).testTag(SchedulesPageTags.VIEW_BAR)) {
-        Box(
-            Modifier.fillMaxWidth().height(LettaDimens.Stroke.hairline)
-                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)),
-        )
+        LettaDivider()
         Row(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs)) {
             SchedulesView.entries.forEach { entry ->
-                Box(
-                    Modifier.weight(1f).heightIn(min = LettaDimens.Control.minTouchTarget).clickable { onView(entry) },
-                    contentAlignment = Alignment.Center,
-                ) {
+                // The chip is the segment's one click target; the box only centres it in its share.
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     LettaChipTab(
                         text = entry.label,
                         active = entry == view,
                         onClick = { onView(entry) },
-                        modifier = Modifier.testTag(SchedulesPageTags.tab(entry)),
+                        modifier = Modifier.minimumInteractiveComponentSize().testTag(SchedulesPageTags.tab(entry)),
                     )
                 }
             }

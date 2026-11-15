@@ -2,6 +2,7 @@ package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.ToolReturnStatus
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.isCommand
 import kotlin.time.Instant
 
 enum class RunActivityState {
@@ -86,18 +87,46 @@ private fun List<UiMessage>.failureCount(): Int {
     return failedTools + failedMessagesWithoutFailedTools
 }
 
+/**
+ * How long the run worked: the turn's latency, else its first-to-last span, less the time it sat
+ * waiting on a background command (see [backgroundCommandWaitMs]), so a run that spans a command's
+ * report sums the working spans either side of it. Without timestamps, the sum of its tools' times.
+ */
 private fun List<UiMessage>.runDurationMs(toolDurations: List<Long>): Long? {
-    asReversed()
-        .firstOrNull { it.role == "assistant" && !it.isReasoning && it.latencyMs != null }
-        ?.latencyMs
-        ?.takeIf { it >= 0L }
-        ?.let { return it }
+    val waited = backgroundCommandWaitMs()
+    turnLatencyMs()?.minus(waited)?.takeIf { it >= 0L }?.let { return it }
 
-    timestampDurationMs()?.let { return it }
+    timestampDurationMs()?.minus(waited)?.takeIf { it > 0L }?.let { return it }
 
     return toolDurations
         .takeIf { it.isNotEmpty() }
         ?.fold(0L) { total, duration -> total + duration.coerceAtLeast(0L) }
+}
+
+private fun List<UiMessage>.turnLatencyMs(): Long? = asReversed()
+    .firstOrNull { it.role == "assistant" && !it.isReasoning && it.latencyMs != null }
+    ?.latencyMs
+    ?.takeIf { it >= 0L }
+
+/**
+ * The idle time before each background command's report in the run: from when the message right
+ * before the report finished (its time plus its longest tool's execution) to the report. A report, or
+ * a predecessor, without a timestamp counts no wait, so the run keeps its plain duration.
+ */
+private fun List<UiMessage>.backgroundCommandWaitMs(): Long = indices.sumOf { commandWaitBefore(it) }
+
+private fun List<UiMessage>.commandWaitBefore(index: Int): Long {
+    if (index == 0 || this[index].subagentNotification?.isCommand() != true) return 0L
+    val reportedAt = parseTimestampEpochMillis(this[index].timestamp) ?: return 0L
+    val workedUntil = this[index - 1].finishedAtEpochMillis() ?: return 0L
+    return (reportedAt - workedUntil).coerceAtLeast(0L)
+}
+
+/** When a message's work finished: its time, plus its longest tool call's execution. */
+private fun UiMessage.finishedAtEpochMillis(): Long? {
+    val at = parseTimestampEpochMillis(timestamp) ?: return null
+    val longestTool = toolCalls.orEmpty().maxOfOrNull { it.executionTimeMs?.coerceAtLeast(0L) ?: 0L } ?: 0L
+    return at + longestTool
 }
 
 private fun List<UiMessage>.timestampDurationMs(): Long? {

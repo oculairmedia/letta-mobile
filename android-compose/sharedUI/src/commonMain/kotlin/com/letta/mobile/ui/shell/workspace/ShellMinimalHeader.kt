@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.shell.workspace
 
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
@@ -10,6 +9,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.shell_open_navigation
 import com.letta.mobile.sharedui.resources.shell_workspace_title
@@ -71,7 +71,7 @@ private fun ShellDrawerMenuButton(onClick: () -> Unit) {
                 .semantics { contentDescription = label },
             colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black, contentColor = Color.White),
         ) {
-            Icon(LettaIcons.Menu, contentDescription = null)
+            LettaIcon(LettaIcons.Menu, contentDescription = null)
         }
     }
 }

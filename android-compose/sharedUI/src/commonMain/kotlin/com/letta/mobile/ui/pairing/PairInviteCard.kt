@@ -11,7 +11,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -46,6 +45,9 @@ import com.letta.mobile.data.pairing.PairedDevice
 import com.letta.mobile.data.pairing.QrModules
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 
 /** An agent the inviter may share with the new device. */
 data class AgentChoice(val id: String, val name: String)
@@ -280,12 +282,12 @@ private fun LinkActions(invite: MintedPairInvite, toggle: LinkToggle?, onShare: 
             onClick = { clipboard.setText(AnnotatedString(invite.pairLink)); copied = true },
             modifier = Modifier.testTag(PairingTags.INVITE_COPY),
         ) {
-            Icon(LettaIcons.Copy, contentDescription = null)
+            LettaIcon(LettaIcons.Copy, contentDescription = null)
             Text(if (copied) PairingStrings.LINK_COPIED else PairingStrings.COPY_LINK)
         }
         onShare?.let { share ->
             TextButton(onClick = { share(invite.pairLink) }, modifier = Modifier.testTag(PairingTags.INVITE_SHARE)) {
-                Icon(LettaIcons.Share, contentDescription = null)
+                LettaIcon(LettaIcons.Share, contentDescription = null)
                 Text(PairingStrings.SHARE_LINK)
             }
         }
@@ -312,7 +314,11 @@ private fun EndedInvite(qr: QrModules?, ended: EndedCode, actions: PairDeviceAct
 
 @Composable
 private fun Redeemed(device: PairedDevice, onDone: () -> Unit) {
-    Icon(LettaIcons.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+    LettaIcon(
+        LettaIcons.CheckCircle,
+        contentDescription = null,
+        style = LettaIconStyle(LettaSurfaceSizes.pairingResultGlyph, MaterialTheme.colorScheme.primary),
+    )
     Text(
         PairingStrings.accepted(device),
         style = MaterialTheme.typography.titleMedium,

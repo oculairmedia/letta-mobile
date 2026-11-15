@@ -8,9 +8,16 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.components.row.LettaListRow
 import com.letta.mobile.ui.components.row.LettaListRowSpec
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +27,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
@@ -31,7 +37,6 @@ import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,10 +49,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.lens.LensDestination
@@ -224,8 +227,7 @@ private fun ShellPanelTitleSlot(state: ShellAgentPanelState, onEditAgent: () -> 
         if (home) {
             Text(
                 text = "Home",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = LettaTextStyles.titleMediumSemibold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -263,15 +265,14 @@ private fun ShellAgentIdentity(agent: ShellPanelAgent, onEditAgent: () -> Unit) 
         }
         Text(
             text = agent.name,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+            style = LettaTextStyles.titleMediumSemibold,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
             modifier = Modifier
-                .clip(RoundedCornerShape(LettaDimens.Radius.sm))
-                .clickable(onClick = onEditAgent)
+                .clip(MaterialTheme.shapes.small)
+                .clickable(role = Role.Button, onClickLabel = "Edit agent", onClick = onEditAgent)
                 .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
         )
     }
@@ -284,14 +285,15 @@ private fun ShellAgentOverflowMenu(frame: ShellPanelFrame) {
     var menuOpen by remember { mutableStateOf(false) }
     val sharedNotes = sharedNotesMenuItem()
     Box {
-        Icon(
-            imageVector = Icons.Outlined.MoreVert,
-            contentDescription = "Agent menu",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .size(LettaDimens.Control.icon)
-                .clickable { menuOpen = true }
-                .testTag(ShellAgentPanelTags.AGENT_MENU),
+        LettaIconButton(
+            icon = LettaButtonIcon(
+                LettaIcons.MoreVert,
+                "Agent menu",
+                size = LettaDimens.Control.iconButtonSm,
+                glyph = LettaIconStyle(tint = MaterialTheme.colorScheme.onSurfaceVariant),
+            ),
+            onClick = { menuOpen = true },
+            modifier = Modifier.testTag(ShellAgentPanelTags.AGENT_MENU),
         )
         LettaPopupMenu(
             expanded = menuOpen,

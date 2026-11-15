@@ -19,10 +19,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import com.composables.icons.lucide.Bug
+import com.composables.icons.lucide.Lucide
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.chat.routing.pickOtherAgentConversation
 import com.letta.mobile.ui.haptics.HapticEffects
-import com.letta.mobile.ui.icons.LettaIcons
 import kotlinx.coroutines.launch
 
 @Composable
@@ -139,7 +140,7 @@ private fun AgentScaffoldProjectBugFab(state: AgentScaffoldRuntimeState) {
         },
         modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_BUG_FAB),
     ) {
-        Icon(LettaIcons.Error, contentDescription = stringResource(R.string.screen_project_bug_report_open))
+        Icon(Lucide.Bug, contentDescription = stringResource(R.string.screen_project_bug_report_open))
     }
 }
 

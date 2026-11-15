@@ -1,27 +1,22 @@
 package com.letta.mobile.ui.settings
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.ui.theme.LettaChip
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.theme.tokens.LettaStatusTone
+import com.letta.mobile.ui.components.foundation.LettaStatusLabel
 
 object BackendConnectionTags {
     const val STATUS = "backend-connection-status"
@@ -45,25 +40,18 @@ fun BackendConnectionStatus.hint(): String = when (this) {
     BackendConnectionStatus.Unconfigured -> "Configure a backend before starting a conversation."
 }
 
-@Composable
-private fun BackendConnectionStatus.dotColor(): Color = when (this) {
-    BackendConnectionStatus.Unconfigured -> MaterialTheme.customColors.offlineColor
-    BackendConnectionStatus.Connecting -> MaterialTheme.customColors.reconnectingColor
-    is BackendConnectionStatus.Connected -> MaterialTheme.customColors.onlineColor
-    is BackendConnectionStatus.Failed -> MaterialTheme.colorScheme.error
-}
+private val BackendConnectionStatus.tone: LettaStatusTone
+    get() = when (this) {
+        BackendConnectionStatus.Unconfigured -> LettaStatusTone.Idle
+        BackendConnectionStatus.Connecting -> LettaStatusTone.Running
+        is BackendConnectionStatus.Connected -> LettaStatusTone.Success
+        is BackendConnectionStatus.Failed -> LettaStatusTone.Error
+    }
 
-/** A dot in the connection's colour and its [label]. */
+/** The connection's [label] after a dot in its status tone. */
 @Composable
 fun BackendConnectionStatusRow(status: BackendConnectionStatus, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier.testTag(BackendConnectionTags.STATUS),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(modifier = Modifier.size(StatusDotSize).background(status.dotColor(), CircleShape))
-        Text(status.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+    LettaStatusLabel(text = status.label, tone = status.tone, modifier = modifier.testTag(BackendConnectionTags.STATUS))
 }
 
 /** Where the notice's buttons go; a null action leaves its button out. [onRetry] reconnects. */
@@ -100,4 +88,3 @@ fun BackendConnectionNotice(
     }
 }
 
-private val StatusDotSize = 8.dp

@@ -7,20 +7,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
+import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaIcon
 
 /**
  * Full-content drop hint shown while an OS file drag hovers the window:
@@ -31,7 +30,7 @@ fun ImageDropOverlay(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.55f)),
+            .background(MaterialTheme.colorScheme.background.copy(alpha = LettaSurfaceSizes.dropScrimAlpha)),
         contentAlignment = Alignment.Center,
     ) {
         Surface(
@@ -45,16 +44,14 @@ fun ImageDropOverlay(modifier: Modifier = Modifier) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Image,
+                LettaIcon(
+                    imageVector = LettaIcons.Image,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(LettaDimens.Orb.railSlotHeight),
+                    style = LettaIconStyle(LettaSurfaceSizes.dropGlyph, MaterialTheme.colorScheme.primary),
                 )
                 Text(
                     text = "Drop images to attach",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = LettaTextStyles.titleMediumSemibold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(

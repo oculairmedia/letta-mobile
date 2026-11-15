@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.modelcontrol
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -13,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -42,7 +39,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
@@ -54,6 +50,9 @@ import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.delay
+import com.letta.mobile.ui.components.foundation.lettaPanelBorder
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaIcon
 
 /** Test tags of a model's effort options. */
 object ModelEffortTags {
@@ -184,10 +183,10 @@ internal fun EffortFlyout(state: EffortOptionsState, target: EffortTarget) {
     LaunchedEffect(hovered) { state.flyoutHover(hovered) }
     Popup(popupPositionProvider = provider, onDismissRequest = state::close, properties = PopupProperties(focusable = false)) {
         Surface(
-            modifier = Modifier.width(FLYOUT_WIDTH).hoverable(hover).testTag(ModelEffortTags.FLYOUT),
-            shape = RoundedCornerShape(LettaDimens.Radius.md),
+            modifier = Modifier.width(ModelControlDimens.effortFlyoutWidth).hoverable(hover).testTag(ModelEffortTags.FLYOUT),
+            shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
+            border = lettaPanelBorder(),
             shadowElevation = LettaDimens.Space.sm,
         ) {
             ModelEffortOptions(target.menu, state.highlight, state::pick, Modifier.padding(vertical = LettaDimens.Space.xs))
@@ -230,12 +229,7 @@ internal fun ModelEffortOptions(menu: ModelEffortMenu, highlight: Int, onPick: (
             ) {
                 Text(ReasoningTier.of(level)?.label ?: level, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                 if (current) {
-                    Icon(
-                        LettaIcons.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(LettaDimens.Control.icon),
-                    )
+                    LettaIcon(LettaIcons.Check, contentDescription = null, style = LettaIconStyle(tint = MaterialTheme.colorScheme.primary))
                 }
             }
         }
@@ -271,7 +265,6 @@ private fun OptionRow(
     }
 }
 
-private val FLYOUT_WIDTH = 220.dp
 
 /** Beside the row, top-aligned: after its end edge, or before its start when the window has no room there. */
 private class BesideAnchorPositionProvider(private val gapPx: Int) : PopupPositionProvider {

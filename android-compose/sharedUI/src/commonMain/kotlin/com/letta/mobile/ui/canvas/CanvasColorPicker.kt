@@ -2,7 +2,6 @@ package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,12 +9,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -33,21 +29,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import com.composables.icons.lucide.Ban
-import com.composables.icons.lucide.Lucide
 import com.letta.mobile.ui.components.foundation.LettaColorSwatch
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.foundation.LettaSwatch
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaComponentDimens
 
 /** One colour a picker offers, with the name its swatch reads out. */
 data class NamedColor(val color: Color, val name: String) {
@@ -100,24 +99,24 @@ fun ColorSwatchPicker(
     modifier: Modifier = Modifier,
     allowNone: Boolean = false,
     glyph: ImageVector? = null,
-    swatchSize: androidx.compose.ui.unit.Dp = LettaDimens.Orb.sm,
+    swatchSize: androidx.compose.ui.unit.Dp = LettaComponentDimens.swatch,
 ) {
     var open by remember { mutableStateOf(false) }
     val recent = rememberRecentColors()
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
-                .size(swatchSize)
-                .background(current, CircleShape)
-                .border(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), CircleShape)
-                .semantics { contentDescription = label }
-                .clickable { open = !open },
+                .clip(CircleShape)
+                .clickable(role = Role.Button) { open = !open }
+                .semantics { contentDescription = label },
             contentAlignment = Alignment.Center,
         ) {
-            if (current.alpha == 0f) {
-                Icon(Lucide.Ban, contentDescription = null, modifier = Modifier.size(swatchSize * 0.7f), tint = MaterialTheme.colorScheme.outline)
-            } else if (glyph != null) {
-                Icon(glyph, contentDescription = null, modifier = Modifier.size(swatchSize * 0.6f), tint = contrastOn(current))
+            // The shared swatch draws the colour, its ring and the "none" glyph; the glyph over it
+            // tells a fill swatch from a stroke one.
+            LettaColorSwatch(LettaSwatch(current, size = swatchSize))
+            if (glyph != null && current.alpha != 0f) {
+                val mark = LettaIconStyle(swatchSize * SWATCH_GLYPH_RATIO, contrastOn(current))
+                LettaIcon(glyph, contentDescription = null, style = mark)
             }
         }
         if (open) {
@@ -164,12 +163,12 @@ fun CanvasColorPicker(
     var hexText by remember(current) { mutableStateOf(current.toHex()) }
     val recent = rememberRecentColors()
     Surface(
-        shape = RoundedCornerShape(LettaDimens.Radius.md),
+        shape = MaterialTheme.shapes.medium,
         color = if (flat) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
         shadowElevation = if (flat) 0.dp else LettaDimens.Space.sm,
     ) {
         Column(
-            modifier = if (flat) Modifier.fillMaxWidth() else Modifier.padding(LettaDimens.Space.md).width(PICKER_WIDTH),
+            modifier = if (flat) Modifier.fillMaxWidth() else Modifier.padding(LettaDimens.Space.md).width(COLOR_PICKER_WIDTH),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             SwatchRow(current = current, entries = palette.map { it.color to it.name }, allowNone = allowNone) { onPick(it, true) }
@@ -200,12 +199,7 @@ fun CanvasColorPicker(
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-                Box(
-                    modifier = Modifier
-                        .size(LettaDimens.Control.iconButtonSm)
-                        .background(hsl.toColor(), CircleShape)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
-                )
+                LettaColorSwatch(LettaSwatch(hsl.toColor(), size = LettaDimens.Control.iconButtonSm))
                 BasicTextField(
                     value = hexText,
                     onValueChange = { typed ->
@@ -216,11 +210,11 @@ fun CanvasColorPicker(
                         }
                     },
                     singleLine = true,
-                    textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = MaterialTheme.typography.bodySmall.fontSize),
+                    textStyle = MaterialTheme.typography.bodySmall.merge(TextStyle(color = MaterialTheme.colorScheme.onSurface)),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier = Modifier
                         .weight(1f)
-                        .background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(LettaDimens.Radius.sm))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLowest, MaterialTheme.shapes.small)
                         .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.sm)
                         .semantics { contentDescription = "Hex color" },
                 )
@@ -316,32 +310,32 @@ internal fun Color.toHsl(): Hsl {
 
 /** Black or white, whichever reads on [background]. */
 internal fun contrastOn(background: Color): Color =
-    if (background.alpha > 0f && background.luminanceApprox() < 0.5f) Color.White else Color(0xFF1F1F1F)
+    if (background.alpha > 0f && background.luminanceApprox() < 0.5f) Color.White else InkBlack
 
 private fun Color.luminanceApprox(): Float = 0.2126f * red + 0.7152f * green + 0.0722f * blue
 
 /** A fixed marker-style palette; the colours whiteboards reach for, plus black and white. */
 val StrokePalette: List<NamedColor> = listOf(
-    NamedColor(Color(0xFF1F1F1F), "black"),
-    NamedColor(Color(0xFF6B7280), "gray"),
-    NamedColor(Color(0xFFE5484D), "red"),
-    NamedColor(Color(0xFFF59E0B), "orange"),
-    NamedColor(Color(0xFFEAB308), "yellow"),
-    NamedColor(Color(0xFF22C55E), "green"),
-    NamedColor(Color(0xFF3B82F6), "blue"),
-    NamedColor(Color(0xFF8B5CF6), "violet"),
-    NamedColor(Color(0xFFFFFFFF), "white"),
+    NamedColor(InkBlack, "black"),
+    NamedColor(InkGray, "gray"),
+    NamedColor(InkRed, "red"),
+    NamedColor(InkOrange, "orange"),
+    NamedColor(InkYellow, "yellow"),
+    NamedColor(InkGreen, "green"),
+    NamedColor(InkBlue, "blue"),
+    NamedColor(InkViolet, "violet"),
+    NamedColor(InkWhite, "white"),
 )
 
 /** Sticky-note tints: pale enough for dark text, distinct enough to sort by. */
 val NoteColors: List<NamedColor> = listOf(
-    NamedColor(Color(0xFFFDE68A), "yellow"),
-    NamedColor(Color(0xFFFBCFE8), "pink"),
-    NamedColor(Color(0xFFBBF7D0), "green"),
-    NamedColor(Color(0xFFBFDBFE), "blue"),
-    NamedColor(Color(0xFFDDD6FE), "violet"),
-    NamedColor(Color(0xFFFED7AA), "orange"),
-    NamedColor(Color(0xFFE5E7EB), "gray"),
+    NamedColor(NoteTintYellow, "yellow"),
+    NamedColor(NoteTintPink, "pink"),
+    NamedColor(NoteTintGreen, "green"),
+    NamedColor(NoteTintBlue, "blue"),
+    NamedColor(NoteTintViolet, "violet"),
+    NamedColor(NoteTintOrange, "orange"),
+    NamedColor(NoteTintGray, "gray"),
 )
 
 /** Parses `#rrggbb` or `#rrggbbaa`; null for anything else. */
@@ -352,4 +346,6 @@ fun parseHexColor(hex: String?): Color? {
 }
 
 private const val RECENT_LIMIT = 8
-private val PICKER_WIDTH = 260.dp
+
+/** The glyph over a swatch fills this much of it, so it scales with the swatch. */
+private const val SWATCH_GLYPH_RATIO = 0.6f

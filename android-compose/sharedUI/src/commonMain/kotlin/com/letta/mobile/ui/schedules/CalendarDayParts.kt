@@ -26,9 +26,9 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 
 /**
  * How a date badge reads, strongest first: the selected day, today, a day outside the month shown
@@ -71,7 +71,7 @@ fun CalendarDateBadge(number: Int, tone: CalendarDateTone, modifier: Modifier = 
         CalendarDateTone.Plain -> scheme.onSurface
     }
     Box(modifier.size(LettaDimens.Orb.sm).clip(CircleShape).background(fill), contentAlignment = Alignment.Center) {
-        Text("$number", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = text)
+        Text("$number", style = LettaTextAccents.labelMediumSemibold, color = text)
     }
 }
 
@@ -145,7 +145,7 @@ fun CalendarWeekStrip(days: List<CalendarStripDay>, onSelect: (CalendarStripDay)
                     .weight(1f)
                     .heightIn(min = LettaDimens.Control.minTouchTarget)
                     .clip(MaterialTheme.shapes.small)
-                    .clickable { onSelect(day) }
+                    .clickable(role = Role.Tab) { onSelect(day) }
                     .clearAndSetSemantics {
                         contentDescription = day.description
                         selected = day.selected

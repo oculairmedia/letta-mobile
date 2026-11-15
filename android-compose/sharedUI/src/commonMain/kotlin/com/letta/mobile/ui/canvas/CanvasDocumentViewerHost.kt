@@ -95,7 +95,7 @@ internal fun CanvasDocumentViewerHost(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-                .padding(top = chromeTopInset + 56.dp),
+                .padding(top = chromeTopInset + VIEWER_TOGGLE_TOP_OFFSET),
         )
     }
 }

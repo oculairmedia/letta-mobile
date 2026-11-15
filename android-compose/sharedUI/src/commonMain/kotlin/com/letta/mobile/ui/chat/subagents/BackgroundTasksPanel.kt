@@ -26,7 +26,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.ui.chat.AgentActivity
 import com.letta.mobile.ui.chat.AgentActivityOrb
@@ -120,7 +119,7 @@ fun BackgroundTasksSidePane(
     onDismiss: ((SubagentEntry) -> Unit)? = null,
     dismissTask: (suspend (SubagentEntry) -> Result<Unit>)? = null,
 ) {
-    InspectorPane(title = BACKGROUND_TASKS_TITLE, onClose = onClose, width = SIDE_PANE_WIDTH) {
+    InspectorPane(title = BACKGROUND_TASKS_TITLE, onClose = onClose) {
         BackgroundTasksPanel(
             subagents = subagents,
             onOpenConversation = onOpenConversation,
@@ -183,4 +182,3 @@ fun BackgroundTasksToggle(
 }
 
 private const val BACKGROUND_TASKS_TITLE = "Background tasks"
-private val SIDE_PANE_WIDTH = 360.dp

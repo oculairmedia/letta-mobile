@@ -13,11 +13,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,14 +21,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.diff.DiffLine
 import com.letta.mobile.data.diff.DiffLineKind
 import com.letta.mobile.data.memory.memfs.MemfsCommit
 import com.letta.mobile.data.memory.memfs.MemfsFileChange
 import com.letta.mobile.data.memory.memfs.MemfsFileDiff
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
 import com.letta.mobile.ui.components.row.LettaListRow
+import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaChip
@@ -101,9 +99,11 @@ internal fun MemfsDiffPane(page: MemfsPageScope) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = page.actions::clearCommit, modifier = Modifier.testTag(MemfsPageTags.BACK)) {
-                Icon(if (page.wide) Icons.Outlined.Close else Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = CLOSE_COMMIT)
-            }
+            LettaIconButton(
+                icon = LettaButtonIcon(if (page.wide) LettaIcons.Close else LettaIcons.ArrowBack, CLOSE_COMMIT),
+                onClick = page.actions::clearCommit,
+                modifier = Modifier.testTag(MemfsPageTags.BACK),
+            )
             Text(
                 history.selectedCommit?.message ?: history.selectedSha.orEmpty(),
                 style = MaterialTheme.typography.titleSmall,
@@ -153,13 +153,13 @@ private fun DiffRow(line: DiffLine) {
     Row(Modifier.padding(horizontal = LettaDimens.Space.sm)) {
         Text(
             (line.newLine ?: line.oldLine)?.toString().orEmpty(),
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            style = LettaTextStyles.mono,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(LettaDimens.Control.iconButtonLg),
         )
         Text(
             marker + line.text,
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            style = LettaTextStyles.mono,
             color = color,
             softWrap = false,
         )

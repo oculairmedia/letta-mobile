@@ -8,10 +8,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.home.FleetRecentConversation
 import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.util.time.TimeLabels
+import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterRowSlots
@@ -33,7 +33,7 @@ internal fun LazyListScope.homeRecents(page: HomePageScope) {
     item(key = "recents-header") { SeeAllHeader(RECENT_LABEL, HomeShortcut.CONVERSATIONS, page, Modifier.testTag(HomePageTags.RECENTS)) }
     val limit = if (page.wide) WIDE_RECENT_LIMIT else COMPACT_RECENT_LIMIT
     val groups = recentDayGroups(page.state.fleet.recent.take(limit))
-    if (groups.isEmpty()) item(key = "recents-empty") { HomeEmptyLine(NO_CONVERSATIONS) }
+    if (groups.isEmpty()) item(key = "recents-empty") { LettaEmptyHint(NO_CONVERSATIONS) }
     groups.forEach { group ->
         item(key = "recents-${group.day.name}") { RecentDayLabel(group.day) }
         items(items = group.conversations, key = { "recent-${it.conversationId}" }) { conversation ->
@@ -47,7 +47,6 @@ private fun RecentDayLabel(day: RecentDay) {
     Text(
         text = day.label,
         style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.Medium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = LettaDimens.Space.sm, top = LettaDimens.Space.xs).testTag(HomePageTags.recentDay(day.name)),
     )

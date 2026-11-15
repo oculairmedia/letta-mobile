@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -36,7 +35,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -119,7 +117,7 @@ fun LettaDialogFrame(
             .widthIn(max = spec.size.width.orElse(width))
             .heightIn(max = spec.size.maxHeight.orElse(LettaDimens.Pane.modalMaxHeight))
             .testTag(tag),
-        shape = RoundedCornerShape(LettaDimens.Radius.lg),
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
         shadowElevation = LettaDimens.Space.sm,
@@ -140,7 +138,7 @@ fun LettaPopoverFrame(spec: PaneSpec, content: @Composable ColumnScope.() -> Uni
             .then(if (width == Dp.Unspecified) Modifier.widthIn(max = LettaDimens.Pane.sidePanelWidth) else Modifier.width(width))
             .heightIn(max = spec.size.maxHeight.orElse(LettaDimens.Pane.modalMaxHeight))
             .testTag(LettaPaneTags.POPOVER),
-        shape = RoundedCornerShape(LettaDimens.Radius.md),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
         shadowElevation = LettaDimens.Space.sm,
@@ -158,7 +156,6 @@ private fun PaneTitle(title: String?) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Medium,
         color = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.padding(start = LettaDimens.Space.xl, end = LettaDimens.Space.xl, top = LettaDimens.Space.lg, bottom = LettaDimens.Space.md),
     )

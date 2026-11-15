@@ -9,7 +9,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.window.PopupPositionProvider
 import com.letta.mobile.ui.theme.LettaDimens
@@ -17,7 +16,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 // The arithmetic of foundation's desktop TooltipPlacement.CursorPoint and .ComponentRect (both desktop-only),
 // so a tooltip lands on the same pixel on desktop and in the browser.
 
-private val WINDOW_MARGIN = 4.dp
+private val WINDOW_MARGIN = LettaDimens.Space.xs
 
 /** The popup placement for [position]: beside [cursor] (local to the control), or under the control. */
 @Composable

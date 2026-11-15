@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.canvas
 
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Columns2
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Minus
@@ -155,7 +154,8 @@ private fun TableGrid(
     onCell: (row: Int, column: Int, text: String) -> Unit,
 ) {
     val line = MaterialTheme.colorScheme.outlineVariant
-    Column(modifier = modifier.border(1.dp, line, RoundedCornerShape(LettaDimens.Radius.sm)).semantics { contentDescription = "Table" }) {
+    val outline = modifier.border(LettaDimens.Stroke.hairline, line, MaterialTheme.shapes.small)
+    Column(modifier = outline.semantics { contentDescription = "Table" }) {
         rows.forEachIndexed { r, row ->
             Row(modifier = Modifier.fillMaxWidth()) {
                 row.forEachIndexed { c, cell ->
@@ -174,7 +174,8 @@ private fun TableGrid(
                             BasicTextField(
                                 value = text,
                                 onValueChange = { text = it; onCell(r, c, it) },
-                                textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+                                textStyle = MaterialTheme.typography.bodySmall
+                                    .merge(TextStyle(color = MaterialTheme.colorScheme.onSurface)),
                                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                                 modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Table cell ${r + 1},${c + 1}" },
                             )

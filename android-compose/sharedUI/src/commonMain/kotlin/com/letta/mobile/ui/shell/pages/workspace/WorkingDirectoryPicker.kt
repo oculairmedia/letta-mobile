@@ -21,7 +21,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,7 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.ArrowRight
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.ExternalLink
@@ -45,6 +43,10 @@ import com.composables.icons.lucide.GitFork
 import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.X
+import com.letta.mobile.ui.components.foundation.LettaInlineNotice
+import com.letta.mobile.ui.components.foundation.LettaNotice
+import com.letta.mobile.ui.components.foundation.LettaNoticeAction
+import com.letta.mobile.ui.theme.tokens.LettaPanelTone
 import com.letta.mobile.data.workspace.directory.DevicePath
 import com.letta.mobile.data.workspace.directory.FolderName
 import com.letta.mobile.data.workspace.directory.WorkingDirectoryPickerActions
@@ -181,30 +183,15 @@ private fun PickerHeader(onClose: () -> Unit) {
 /** "In worktree x", with the way back to the repository the worktree belongs to. */
 @Composable
 private fun WorktreeBanner(worktree: WorktreeLocation, onBackToRepository: () -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-        shape = MaterialTheme.shapes.medium,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg).testTag(WorkingDirectoryPickerTags.BANNER),
-    ) {
-        Row(
-            modifier = Modifier.padding(start = LettaDimens.Space.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        ) {
-            Icon(Lucide.GitFork, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
-            Text(
-                stringResource(Res.string.cwd_picker_in_worktree, worktree.name),
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(onClick = onBackToRepository, modifier = Modifier.testTag(WorkingDirectoryPickerTags.BACK_TO_REPOSITORY)) {
-                Text(stringResource(Res.string.cwd_picker_back_to_repository))
-            }
-        }
-    }
+    LettaInlineNotice(
+        notice = LettaNotice(stringResource(Res.string.cwd_picker_in_worktree, worktree.name), tone = LettaPanelTone.Warning),
+        modifier = Modifier.padding(horizontal = LettaDimens.Space.lg).testTag(WorkingDirectoryPickerTags.BANNER),
+        action = LettaNoticeAction(
+            stringResource(Res.string.cwd_picker_back_to_repository),
+            onBackToRepository,
+            tag = WorkingDirectoryPickerTags.BACK_TO_REPOSITORY,
+        ),
+    )
 }
 
 /** The folder being browsed, editable: typing a path and pressing Go browses there. */

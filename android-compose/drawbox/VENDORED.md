@@ -185,3 +185,11 @@ draw in its latest frame (`ImageBitmapCache.dropIdle`, the existing `trimToBudge
 budget), so what is on screen stays. The request is a snapshot-state counter that each board's
 `rememberImageBitmapCache` watches on its own UI thread, so the host may bump it from any thread and
 the canvas never depends on host types. Tests: `ImageBitmapCachePressureTest`.
+
+### 15. Default sizes and colours named once (letta-mobile-0349o.4)
+
+The selection chrome's defaults (`SelectionChromeStyle`), the fallback pick tolerance, the size an
+image without an intrinsic size is laid out at, the grid tints, the marquee fill and the text and
+image placeholders were literals at their use sites. They are named in `DrawBoxDimens.kt` and
+`DrawBoxColor.kt` with the same values, so nothing draws differently and a host reading the code
+finds every default in one place.

@@ -48,6 +48,7 @@ import kotlinx.serialization.json.put
 
 import kotlin.time.Duration.Companion.seconds
 import com.letta.mobile.ui.theme.LettaDimens
+import androidx.compose.ui.semantics.Role
 @Composable
 internal fun A2uiToolApprovalCard(
     component: A2uiComponent,
@@ -172,7 +173,7 @@ internal fun A2uiToolApprovalCard(
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.small,
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = A2uiDimens.argumentsWellAlpha),
                         ) {
                             Column(
                                 modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
@@ -318,11 +319,11 @@ internal fun ToolApprovalArgumentRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(min = 72.dp, max = 96.dp),
+            modifier = Modifier.widthIn(min = A2uiDimens.keyColumnWidth, max = A2uiDimens.argumentKeyMaxWidth),
         )
         val valueModifier = if (argument.isSensitive && !revealed) {
             Modifier
-                .clickable(onClickLabel = "Reveal value for ${argument.key}") { onReveal() }
+                .clickable(onClickLabel = "Reveal value for ${argument.key}", role = Role.Button) { onReveal() }
                 .testTag(A2uiTestTags.TOOL_APPROVAL_SENSITIVE_VALUE)
         } else {
             Modifier
@@ -364,7 +365,7 @@ internal fun ToolApprovalAffordanceButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val buttonModifier = modifier.widthIn(min = 64.dp)
+    val buttonModifier = modifier.widthIn(min = A2uiDimens.affordanceButtonMinWidth)
     if (affordance == ToolApprovalAffordance.Deny) {
         OutlinedButton(
             onClick = onClick,
