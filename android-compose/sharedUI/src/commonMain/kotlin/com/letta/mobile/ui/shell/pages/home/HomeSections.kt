@@ -211,9 +211,12 @@ private fun HomeStatsStrip(page: HomePageScope) {
     val tiles = page.state.statTiles()
     Column(Modifier.fillMaxWidth().testTag(HomePageTags.STATS_STRIP)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // Centred: a figure that opens a page reserves the 48dp touch target around itself, so
+            // centring keeps it on the same line as the figures that do not.
             Row(
                 modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 tiles.forEach { tile -> StatPair(tile, page) }
             }
