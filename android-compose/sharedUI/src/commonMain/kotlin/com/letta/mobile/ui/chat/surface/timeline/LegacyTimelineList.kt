@@ -165,8 +165,8 @@ private fun LazyListScope.legacyRows(
         if (row is TimelineRow.Item) {
             // Newest first: the row above this one is the next index, the row below it the previous.
             val older = (rows.getOrNull(index + 1) as? TimelineRow.Item)?.item
-            val neighbours = older to (rows.getOrNull(index - 1) as? TimelineRow.Item)?.item
-            TimelineItemRow(row.item, bindings, motion, neighbours)
+            val newer = (rows.getOrNull(index - 1) as? TimelineRow.Item)?.item
+            TimelineItemRow(row.item, bindings, motion, rememberRowSpacing(row.item, older, newer))
         } else {
             TimelineRowContent(row, bindings, today, motion)
         }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -199,29 +200,24 @@ private fun PinnedPromptCopy(prompt: ChatRenderItem, pinned: PinnedPrompt, bindi
         CompositionLocalProvider(LocalSendFlight provides null, LocalDockedPromptCompaction provides pinned.compaction) {
             // The bubble alone: without the row's leading space it holds snug under the chrome,
             // and bottom-aligned with its row it still rides the row seamlessly.
-            TimelineItemRow(prompt, bindings, neighbours = null)
+            TimelineItemRow(prompt, bindings, spacing = null)
         }
     }
 }
 
 /**
  * One render item, at the chat column's width, through the shared row seam. In the list it
- * carries its own leading space ([timelineLeadingSpace], decided against the older of its
- * [neighbours], the row above it); the pinned copy passes null and takes none. A completed report
- * whose work the newer neighbour continues gives up its line's floor ([LocalNoticeContinued]), as a
- * run header does over its body.
+ * carries its [spacing] ([rememberRowSpacing]: its leading space, and whether the row under it
+ * continues its report, so the report gives up its line's floor ([LocalNoticeContinued]) as a run
+ * header does over its body); the pinned copy passes null and takes none.
  */
 @Composable
 internal fun TimelineItemRow(
     item: ChatRenderItem,
     bindings: TimelineRowBindings,
     modifier: Modifier = Modifier,
-    /** The rows above and below it (older, newer) in the list; null for a copy outside the list. */
-    neighbours: Pair<ChatRenderItem?, ChatRenderItem?>? = NoNeighbours,
+    spacing: Pair<Dp, Boolean>? = rememberRowSpacing(item, older = null, newer = null),
 ) {
-    val leadingSpace = neighbours != null
-    val older = neighbours?.first
-    val newer = neighbours?.second
     val sticky = LocalStickyPrompt.current.takeIf { item.isUserPrompt() }
     val context = bindings.contexts.forItem(item)
     Box(
@@ -229,20 +225,28 @@ internal fun TimelineItemRow(
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .hiddenUnderStickyCopy(sticky, item.key)
-            .padding(top = if (leadingSpace) timelineLeadingSpace(item, older) else 0.dp)
+            .padding(top = spacing?.first ?: 0.dp)
             // The newest message (your prompt as it lands, then the reply as it streams) draws the
             // mascot's eyes (te3n1.2); only the list's own row, never the pinned copy.
             .mascotAttention(AttentionKey("message:${item.key}"), AttentionKind.MESSAGE, enabled = leadingSpace && context.isNewest),
     ) {
-        val continued = leadingSpace && newer != null && continuesNotice(item, newer)
-        CompositionLocalProvider(LocalNoticeContinued provides continued) {
+        CompositionLocalProvider(LocalNoticeContinued provides (spacing?.second == true)) {
             ChatRenderItemRow(item = item, context = context, callbacks = bindings.callbacks)
         }
     }
 }
 
-/** A list row with no known rows around it. */
-internal val NoNeighbours: Pair<ChatRenderItem?, ChatRenderItem?> = null to null
+/**
+ * A list row's spacing from the rows around it: its leading space against the [older] row above it,
+ * and whether the [newer] row under it continues its report. Remembered on those two values, so a
+ * neighbour that streams does not hand the row a new argument (and recompose it) every token.
+ */
+@Composable
+internal fun rememberRowSpacing(item: ChatRenderItem, older: ChatRenderItem?, newer: ChatRenderItem?): Pair<Dp, Boolean> {
+    val leading = timelineLeadingSpace(item, older)
+    val continued = newer != null && continuesNotice(item, newer)
+    return remember(leading, continued) { leading to continued }
+}
 
 /** [next] is the bare tool step that carries on [notice]'s completed report: the report's body, not a new block. */
 private fun continuesNotice(notice: ChatRenderItem, next: ChatRenderItem): Boolean =

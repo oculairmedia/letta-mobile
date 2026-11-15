@@ -310,7 +310,7 @@ private fun PagedRow(item: ChatRenderItem, neighbours: Pair<ChatRenderItem?, Cha
         pagedBoundaryDate(item, older)?.let { date ->
             DayDividerRow(date, scope.today)
         }
-        TimelineItemRow(item, scope.bindings, neighbours = neighbours)
+        TimelineItemRow(item, scope.bindings, spacing = rememberRowSpacing(item, older, neighbours.second))
         PendingPromptActions(item, scope.params.presentation)
     }
 }

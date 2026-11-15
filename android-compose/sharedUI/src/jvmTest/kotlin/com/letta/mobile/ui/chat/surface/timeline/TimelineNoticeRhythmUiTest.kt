@@ -78,7 +78,8 @@ class TimelineNoticeRhythmUiTest {
                     val context = rowContext(itemState = renderState(collapsedRunIds = collapsedRunIds), newestMessageId = NEWEST_ID)
                     val bindings = TimelineRowBindings(TimelineRowContexts(context, streaming = null), rowCallbacks())
                     items.forEachIndexed { index, item ->
-                        TimelineItemRow(item, bindings, neighbours = items.getOrNull(index - 1) to items.getOrNull(index + 1))
+                        val spacing = rememberRowSpacing(item, items.getOrNull(index - 1), items.getOrNull(index + 1))
+                        TimelineItemRow(item, bindings, spacing = spacing)
                     }
                 }
             }
