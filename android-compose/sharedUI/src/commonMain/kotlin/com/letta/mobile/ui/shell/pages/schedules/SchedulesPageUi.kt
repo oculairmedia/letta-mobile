@@ -116,6 +116,8 @@ internal class SchedulesBody(
     val calendar: ScheduleCalendarParams,
     val selectedId: String?,
     val onRefresh: () -> Unit,
+    val onTogglePause: ((String, Boolean) -> Unit)?,
+    val showPaused: Boolean,
 )
 
 /** The page state that outlives a day change: the view (saveable), the rail, the open form / confirm, the paused filter. */
@@ -256,7 +258,9 @@ internal fun SchedulesPageLayout(ui: SchedulesPageUi, input: SchedulesPageInput,
                 Text(notice, Modifier.padding(horizontal = lettaPageGutter(wide), vertical = LettaDimens.Space.sm))
             }
             val selectedId = (ui.rail as? ScheduleRailState.Detail)?.scheduleId
-            val body = SchedulesBody(input.state, data, view, calendar, selectedId, input.actions.onRefresh)
+            val body = SchedulesBody(
+                input.state, data, view, calendar, selectedId, input.actions.onRefresh, input.actions.onTogglePause, ui.showPaused,
+            )
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 SchedulesMainContent(body, Modifier.weight(1f).fillMaxHeight())
                 if (docked && ui.railShows(view)) {
@@ -319,7 +323,10 @@ private fun railParams(ui: SchedulesPageUi, input: SchedulesPageInput) = Schedul
     onSelectSchedule = { ui.rail = ScheduleRailState.Detail(it) },
     onBackToOverview = { ui.rail = ScheduleRailState.Overview },
     onDelete = { ui.pendingDelete = it },
-    onTogglePause = input.actions.onTogglePause,
+    onTogglePause = input.actions.onTogglePause.takeIf {
+        val id = (ui.rail as? ScheduleRailState.Detail)?.scheduleId
+        id != null && input.state.canTogglePause(id)
+    },
     agentNames = input.data.agentNames,
 )
 

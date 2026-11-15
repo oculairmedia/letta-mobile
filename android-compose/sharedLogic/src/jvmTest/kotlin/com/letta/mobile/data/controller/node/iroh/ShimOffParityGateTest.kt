@@ -249,6 +249,12 @@ class ShimOffParityGateTest {
 
         private fun isUnsafeCronCharacter(char: Char): Boolean = char in "/\\\u0000"
 
+        override suspend fun cronPause(command: AppServerCommand.CronPause) =
+            AppServerInboundFrame.CronPauseResponse(command.requestId, true)
+
+        override suspend fun cronResume(command: AppServerCommand.CronResume) =
+            AppServerInboundFrame.CronResumeResponse(command.requestId, true)
+
         override suspend fun cronTrigger(command: AppServerCommand.CronTrigger) =
             AppServerInboundFrame.CronTriggerResponse(command.requestId, true)
 

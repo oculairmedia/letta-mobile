@@ -58,7 +58,10 @@ internal fun SchedulesMainContent(body: SchedulesBody, modifier: Modifier) {
     LettaRefreshable(refreshing = library.isLoading, onRefresh = body.onRefresh, modifier = modifier) {
         when {
             hasContent -> Box(Modifier.fillMaxSize().testTag(SchedulesPageTags.view(body.view))) {
-                ActiveScheduleView(body)
+                Column {
+                    if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+                    ActiveScheduleView(body)
+                }
             }
             error != null -> SchedulesError(error, library.isLoading, body.onRefresh)
             library.isLoading -> CenteredNote("Loading schedules…")
@@ -82,7 +85,9 @@ private fun ActiveScheduleView(body: SchedulesBody) {
 @Composable
 private fun SchedulesRulesView(body: SchedulesBody) {
     val now = body.data.clock.now
-    val sections = remember(body.data.defs) { listOf(RosterSection(SchedulesPageTags.RULES_SECTION, body.data.defs)) }
+    val sections = remember(body.data.defs, body.showPaused) {
+        listOf(RosterSection(SchedulesPageTags.RULES_SECTION, body.data.defs.filter { body.showPaused || it.active }))
+    }
     RosterList(
         RosterSpec(
             sections = sections,
@@ -102,6 +107,11 @@ private fun SchedulesRulesView(body: SchedulesBody) {
             row = row,
             slots = RosterRowSlots(
                 end = {
+                    if (body.onTogglePause != null && body.state.canTogglePause(def.id)) {
+                        TextButton(onClick = { body.onTogglePause.invoke(def.id, !def.active) }) {
+                            Text(if (def.active) "Pause" else "Resume")
+                        }
+                    }
                     Text(
                         if (def.active) {
                             ScheduleRailText.relativeOrDash(now, ScheduleProjection.nextRun(def, now))

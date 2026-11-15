@@ -71,6 +71,7 @@ object ShellLibraryFactory {
             agentRepository = graph.agentRepository,
             scheduleRepository = graph.scheduleRepository,
             scope = scope,
+            cronRepository = graph.ifSupported(SessionRoute.SCHEDULES) { cronRepository },
             errorMessageMapper = ShellPageErrors::message,
             scheduleAdminUnavailableMatcher = ShellPageErrors::isNotServed,
             nativeScheduleRoute = graph.capabilities.supports(SessionRoute.SCHEDULES),

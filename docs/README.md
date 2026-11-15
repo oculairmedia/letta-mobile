@@ -328,6 +328,14 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [conversation.list: Visible Recents v1](reference/contracts/conversation.list/visible-recents-v1.md)
 
+### reference/contracts/cron.pause
+
+- [\`cron.pause\` v1](reference/contracts/cron.pause/control-v1.md)
+
+### reference/contracts/cron.resume
+
+- [\`cron.resume\` v1](reference/contracts/cron.resume/control-v1.md)
+
 ### reference/contracts/health.check
 
 - [health.check: Controller Status v1](reference/contracts/health.check/status-v1.md)

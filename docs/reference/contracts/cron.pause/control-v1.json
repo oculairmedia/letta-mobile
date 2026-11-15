@@ -1,0 +1,82 @@
+{
+  "method": "cron.pause",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/CronAdminHandlers.kt",
+  "cases": [
+    {
+      "name": "success",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "cron_control": {
+          "success": true,
+          "task": {
+            "id": "task-1",
+            "status": "paused"
+          }
+        }
+      },
+      "params": {
+        "task_id": "task-1"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "task": {
+            "id": "task-1",
+            "status": "paused"
+          }
+        }
+      }
+    },
+    {
+      "name": "failure",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "cron_control": {
+          "success": false,
+          "error": "Task cannot change state"
+        }
+      },
+      "params": {
+        "task_id": "task-1"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "Task cannot change state"
+      }
+    },
+    {
+      "name": "missing-param",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "cron_control": {
+          "success": true,
+          "task": {
+            "id": "task-1",
+            "status": "paused"
+          }
+        }
+      },
+      "params": {},
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "task_id required"
+      }
+    }
+  ]
+}

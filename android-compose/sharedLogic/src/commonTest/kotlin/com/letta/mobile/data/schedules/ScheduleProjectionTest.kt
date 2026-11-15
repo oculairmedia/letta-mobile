@@ -31,6 +31,16 @@ class ScheduleProjectionTest {
     }
 
     @Test
+    fun aPausedOneTimeCronRetainsItsExactHostTime() {
+        val at = kotlin.time.Instant.parse("2026-11-20T09:00:00Z")
+        val task = CronTask("once", cron = "", recurring = false, status = "paused", scheduledFor = at.toString())
+        val def = ScheduleProjection.toScheduleDefs(listOf(task), kotlinx.datetime.TimeZone.UTC, at).single()
+        assertEquals(at, def.oneShotAt)
+        assertEquals(null, def.cron)
+        assertEquals(false, def.active)
+    }
+
+    @Test
     fun `test recurring schedule projection`() {
         val msg = createMessage(
             type = "recurring",

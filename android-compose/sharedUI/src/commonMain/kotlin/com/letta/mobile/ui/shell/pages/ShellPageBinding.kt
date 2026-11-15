@@ -276,6 +276,14 @@ internal fun shellScheduleActions(
             schedules.deleteSchedule(ref.scheduleId)
         }
     },
+    onDeleteCron = { id ->
+        val agent = workspace.currentFocus.agentId?.value
+        if (agent != null && schedules.state.value.selectedAgentId == agent) schedules.deleteSchedule(id.value)
+    },
+    onTogglePause = { id, resume ->
+        val agent = workspace.currentFocus.agentId?.value
+        if (agent != null && schedules.state.value.selectedAgentId == agent) schedules.toggleCronPause(id, resume)
+    },
     onCreate = { request ->
         val agent = workspace.currentFocus.agentId?.value
         if (agent != null && schedules.state.value.selectedAgentId == agent && (request.agentId == null || request.agentId == agent)) {

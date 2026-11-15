@@ -23,6 +23,7 @@ internal object CronAdminHandlers {
         registerReads(router, nativeClient, records)
         registerCreate(router, nativeClient)
         registerMutations(router, nativeClient)
+        registerPauseAndResume(router, nativeClient)
     }
 
     private fun AppServerClient?.requireCronClient(): AppServerClient =
@@ -125,6 +126,30 @@ internal object CronAdminHandlers {
         }
     }
 
+    private fun registerPauseAndResume(router: AdminRpcRouter, nativeClient: AppServerClient?) {
+        router.register("cron.pause") { params ->
+            val response = nativeClient.requireCronClient().cronPause(
+                AppServerCommand.CronPause(
+                    requestId = NativeAdmin.requestId(),
+                    taskId = params.requireParam(AdminParamKey("task_id")),
+                ),
+            )
+            if (!response.success) adminError(response.error ?: "cron_pause failed")
+            buildJsonObject { put("task", response.task ?: JsonNull) }
+        }
+        router.register("cron.resume") { params ->
+            val response = nativeClient.requireCronClient().cronResume(
+                AppServerCommand.CronResume(
+                    requestId = NativeAdmin.requestId(),
+                    taskId = params.requireParam(AdminParamKey("task_id")),
+                    scheduledFor = param(params, AdminParamKey("scheduled_for")),
+                ),
+            )
+            if (!response.success) adminError(response.error ?: "cron_resume failed")
+            buildJsonObject { put("task", response.task ?: JsonNull) }
+        }
+    }
+
     private fun registerDeletes(router: AdminRpcRouter, nativeClient: AppServerClient?) {
         router.register("cron.delete") { params ->
             val response = nativeClient.requireCronClient().cronDelete(
@@ -151,5 +176,6 @@ internal object CronAdminHandlers {
     val methods: Set<String> = setOf(
         "cron.list", "cron.add", "cron.get", "cron.runs",
         "cron.trigger", "cron.update", "cron.delete", "cron.delete_all",
+        "cron.pause", "cron.resume",
     )
 }

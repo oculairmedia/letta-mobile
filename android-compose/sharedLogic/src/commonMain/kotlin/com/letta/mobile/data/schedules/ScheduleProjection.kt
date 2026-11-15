@@ -211,7 +211,10 @@ object ScheduleProjection {
             agentId = agentId,
             missedAt = missedAt.toInstantOrNull(),
         )
-        return if (recurring || rawCron == null) {
+        val exactTime = scheduledFor.toInstantOrNull()
+        return if (!recurring && exactTime != null) {
+            base.copy(cron = null, oneShotAt = exactTime)
+        } else if (recurring || rawCron == null) {
             base
         } else {
             base.copy(cron = null, oneShotAt = CronSchedule.parse(rawCron)?.let { CronSchedule.nextRun(it, now, taskZone) })

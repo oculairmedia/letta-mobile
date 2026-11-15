@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.schedules.leases.Lease
 import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.api.ICronRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
@@ -51,6 +52,8 @@ data class ScheduleLibraryState(
     val runHistory: Map<String, List<RunRecord>> = emptyMap(),
     /** Read-only leases owned by the selected agent. */
     val leases: List<Lease> = emptyList(),
+    /** Cron controls waiting for host confirmation and the refreshed list. */
+    val pendingCronIds: Set<String> = emptySet(),
 ) {
     /** Crons scoped to the selected agent (cron tasks may carry no agent id). */
     val cronsForSelectedAgent: List<CronTask>
@@ -124,12 +127,15 @@ class ScheduleLibraryController(
     nativeScheduleRoute: Boolean = true,
     /** Optional shared wrapper readers for run history and read-only leases. */
     private val recordSources: ScheduleRecordSources? = null,
+    /** The session's shared cron repository; mutations never go through native schedule IDs. */
+    private val cronRepository: ICronRepository? = null,
 ) : AutoCloseable {
     private val stateFlow = MutableStateFlow(ScheduleLibraryState())
     val state: StateFlow<ScheduleLibraryState> = stateFlow
 
     private var loadJob: Job? = null
     private var mutationJob: Job? = null
+    private var cronMutationJob: Job? = null
     private val targetRevision = atomic(0L)
 
     /**
@@ -179,8 +185,10 @@ class ScheduleLibraryController(
                     return@launch
                 }
                 val schedules = target.selectedAgentId?.let { loadSchedulesForAgent(it) }.orEmpty()
+                val crons = if (cronRepository != null) loadCronTasks(target.selectedAgentId) else null
                 if (targetRevision.value != revision) return@launch
                 stateFlow.value = target.withSchedules(schedules).copy(
+                    crons = crons ?: target.crons,
                     errorMessage = rosterError?.let { errorMessageMapper(it, "Failed to load agents") },
                 )
                 loadRunHistory()
@@ -208,13 +216,17 @@ class ScheduleLibraryController(
 
     fun selectAgent(agentId: String) {
         loadJob?.cancel()
-        if (stateFlow.value.selectedAgentId != agentId) targetRevision.incrementAndGet()
+        if (stateFlow.value.selectedAgentId != agentId) {
+            targetRevision.incrementAndGet()
+            cronMutationJob?.cancel()
+        }
         val revision = targetRevision.value
         stateFlow.update { current ->
             if (current.selectedAgentId == agentId) current else current.copy(
                 selectedAgentId = agentId,
                 schedules = emptyList(),
                 crons = emptyList(),
+                pendingCronIds = emptySet(),
                 runHistory = emptyMap(),
                 leases = emptyList(),
                 isLoading = true,
@@ -232,8 +244,9 @@ class ScheduleLibraryController(
             }
             try {
                 val schedules = loadSchedulesForAgent(agentId)
+                val crons = if (cronRepository != null) loadCronTasks(agentId) else null
                 if (targetRevision.value != revision) return@launch
-                stateFlow.value = target.withSchedules(schedules).copy(runHistory = emptyMap())
+                stateFlow.value = target.withSchedules(schedules).copy(crons = crons ?: target.crons, runHistory = emptyMap())
                 loadRunHistory()
                 loadLeases()
             } catch (cancelled: CancellationException) {
@@ -262,9 +275,11 @@ class ScheduleLibraryController(
             try {
                 scheduleRepository.createSchedule(agentId, params)
                 val schedules = scheduleRepository.getSchedules(agentId).first()
+                val crons = if (cronRepository != null) loadCronTasks(agentId) else null
                 if (targetRevision.value != revision) return@launch
                 stateFlow.value = current.copy(
                     selectedAgentId = agentId,
+                    crons = crons ?: current.crons,
                     runHistory = emptyMap(),
                     leases = current.leases.takeIf { agentId == current.selectedAgentId }.orEmpty(),
                 ).withSchedules(schedules)
@@ -302,10 +317,18 @@ class ScheduleLibraryController(
             val current = stateFlow.value
             val agentId = current.selectedAgentId ?: return@launch
             try {
-                scheduleRepository.deleteSchedule(agentId, scheduledMessageId)
-                val schedules = scheduleRepository.getSchedules(agentId).first()
+                val cron = current.crons.any { it.id == scheduledMessageId && (it.agentId == null || it.agentId == agentId) }
+                val schedules = if (cron && cronRepository != null) {
+                    cronRepository.deleteSchedule(agentId, scheduledMessageId).getOrThrow()
+                    loadSchedulesForAgent(agentId)
+                } else {
+                    scheduleRepository.deleteSchedule(agentId, scheduledMessageId)
+                    scheduleRepository.getSchedules(agentId).first()
+                }
+                val crons = if (cronRepository != null) loadCronTasks(agentId) else null
                 if (targetRevision.value != revision) return@launch
                 stateFlow.value = current.withSchedules(schedules).copy(
+                    crons = crons ?: current.crons,
                     runHistory = emptyMap(),
                     leases = current.leases,
                 )
@@ -330,6 +353,51 @@ class ScheduleLibraryController(
     override fun close() {
         loadJob?.cancel()
         mutationJob?.cancel()
+        cronMutationJob?.cancel()
+    }
+
+    /** Pause or resume once, retaining the current rows until the host's refreshed list arrives. */
+    fun toggleCronPause(taskId: String, resume: Boolean) {
+        val repository = cronRepository ?: return
+        val current = stateFlow.value
+        val agent = current.selectedAgentId ?: return
+        if (cronMutationJob?.isActive == true) return
+        if (current.crons.none {
+            it.id == taskId && (it.agentId == null || it.agentId == agent) &&
+                (it.status == "paused") == resume && (it.status == null || it.status in setOf("active", "paused"))
+        }) return
+        val revision = targetRevision.value
+        stateFlow.update { it.copy(pendingCronIds = setOf(taskId), errorMessage = null) }
+        cronMutationJob = scope.launch {
+            try {
+                if (resume) repository.resumeSchedule(agent, taskId).getOrThrow()
+                else repository.pauseSchedule(agent, taskId).getOrThrow()
+                val crons = loadCronTasks(agent).orEmpty()
+                if (targetRevision.value == revision) stateFlow.update { it.copy(crons = crons) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                if (targetRevision.value == revision) stateFlow.update {
+                    it.copy(errorMessage = errorMessageMapper(t, "Failed to change schedule state"))
+                }
+            } finally {
+                if (targetRevision.value == revision) stateFlow.update { it.copy(pendingCronIds = emptySet()) }
+            }
+        }
+    }
+
+    private suspend fun loadCronTasks(agent: String?): List<CronTask>? {
+        if (cronRepository == null) return cronSource?.listCrons(agent)
+        if (agent == null) return emptyList()
+        return cronRepository.refresh(agent).getOrThrow().map { task ->
+            CronTask(
+                id = task.id, agentId = task.agentId, conversationId = task.conversationId,
+                name = task.name, description = task.description, cron = task.cron, timezone = task.timezone,
+                recurring = task.recurring, prompt = task.prompt, status = task.status,
+                lastFiredAt = task.lastFiredAt, missedAt = task.missedAt, fireCount = task.fireCount,
+                scheduledFor = task.scheduledFor,
+            )
+        }
     }
 
     private fun targetForAgents(agents: List<AgentSummary>): ScheduleLibraryState {
@@ -355,7 +423,7 @@ class ScheduleLibraryController(
      * unavailable state either way, so latching there would change nothing.
      */
     private fun latchNativeUnavailableIfCronBacked() {
-        if (cronSource != null) {
+        if (cronSource != null || cronRepository != null) {
             nativeScheduleRouteUnavailable = true
         }
     }
@@ -369,7 +437,18 @@ class ScheduleLibraryController(
      * unavailable state. Parity with the desktop schedules surface.
      */
     private suspend fun publishCronFallbackOrUnavailable(target: ScheduleLibraryState, revision: Long) {
-        val crons = cronSource?.let { source -> runCatching { source.listCrons(target.selectedAgentId) }.getOrNull() }
+        val crons = try {
+            loadCronTasks(target.selectedAgentId)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            if (cronRepository == null) null else {
+                if (targetRevision.value == revision) stateFlow.value = target.copy(
+                    isLoading = false, errorMessage = errorMessageMapper(t, "Failed to load schedules"),
+                )
+                return
+            }
+        }
         if (targetRevision.value != revision) return
         stateFlow.value = if (crons != null) {
             target.withSchedules(emptyList()).copy(crons = crons, cronMode = true, runHistory = emptyMap())
