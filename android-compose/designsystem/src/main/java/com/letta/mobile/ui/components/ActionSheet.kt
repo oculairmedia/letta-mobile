@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -35,6 +34,7 @@ import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.theme.LettaElevationTokens
 import com.letta.mobile.ui.theme.LettaShapeTokens
 import com.letta.mobile.ui.theme.LettaDimens
+import androidx.compose.foundation.shape.CornerSize
 
 
 /**
@@ -124,7 +124,7 @@ fun ActionSheetItem(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
-        shape = RoundedCornerShape(corner),
+        shape = MaterialTheme.shapes.small.copy(CornerSize(corner)),
         color = LettaCardDefaults.listContainerColor,
         tonalElevation = elevation,
     ) {

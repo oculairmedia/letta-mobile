@@ -1,5 +1,9 @@
 package com.letta.mobile.ui.components
 
+import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.CardGroupInnerCorner
+import com.letta.mobile.ui.theme.CardGroupOuterCorner
+import com.letta.mobile.ui.theme.LettaDimens
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -14,9 +18,11 @@ class CardGroupContractTest {
 
     @Test
     fun `card group keeps grouped corner and spacing tokens`() {
-        assertTrue(source.contains("private val CardGroupCorner = 20.dp"))
-        assertTrue(source.contains("private val CardGroupItemSpacing = 2.dp"))
-        assertTrue(source.contains("private val CardGroupInnerCorner = 4.dp"))
+        assertTrue(source.contains("CardGroupOuterCorner else CardGroupInnerCorner"))
+        assertTrue(source.contains("Modifier.height(LettaDimens.Space.hair)"))
+        assertTrue(CardGroupOuterCorner == 20.dp)
+        assertTrue(CardGroupInnerCorner == 4.dp)
+        assertTrue(LettaDimens.Space.hair == 2.dp)
     }
 
     @Test

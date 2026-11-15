@@ -5,9 +5,13 @@ import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtDeclarationWithBody
 import org.jetbrains.kotlin.psi.KtLambdaArgument
+import org.jetbrains.kotlin.psi.KtNameReferenceExpression
+import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtValueArgument
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
+import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
 import org.jetbrains.kotlin.psi.psiUtil.parents
 
 /*
@@ -203,6 +207,10 @@ internal class DisclosureOutsideSharedRow(config: Config = Config.empty) : Mobil
 /**
  * `Icon(LettaIcons.CheckCircle, ...)` and friends: a status drawn by hand. Each
  * copy picks its own size, tint and content description for the same state.
+ *
+ * An argument that is a plain name is followed to a `val`/`var` of that name in the
+ * same function, so `val icon = when (state) { ... -> LettaIcons.Error }` and then
+ * `Icon(icon, ...)` is caught too.
  */
 internal class RawStatusGlyph(config: Config = Config.empty) : MobileRule(
     config,
@@ -227,6 +235,14 @@ internal class RawStatusGlyph(config: Config = Config.empty) : MobileRule(
         val candidates = listOfNotNull(this as? KtDotQualifiedExpression) +
             collectDescendantsOfType<KtDotQualifiedExpression>()
         return candidates.map { it.compactText() }.firstOrNull(STATUS_ICON::matches)
+            ?: (this as? KtNameReferenceExpression)?.localInitializer()?.statusIconReference()
+    }
+
+    /** The initializer of a local `val`/`var` with this name in the enclosing function, if any. */
+    private fun KtNameReferenceExpression.localInitializer(): KtExpression? {
+        val function = getParentOfType<KtDeclarationWithBody>(strict = true) ?: return null
+        return function.collectDescendantsOfType<KtProperty> { it.isLocal && it.name == getReferencedName() }
+            .firstNotNullOfOrNull { it.initializer }
     }
 
     private companion object {
@@ -235,8 +251,9 @@ internal class RawStatusGlyph(config: Config = Config.empty) : MobileRule(
 }
 
 /**
- * `.clickable { }` without a semantic role. Screen readers then announce a
- * plain element, and each copy picks its own indication and padding.
+ * `.clickable { }`, `.combinedClickable { }`, `.selectable(...)` or `.toggleable(...)`
+ * without a semantic role. Screen readers then announce a plain element, and each
+ * copy picks its own indication and padding.
  */
 internal class BareClickable(config: Config = Config.empty) : MobileRule(
     config,
@@ -248,17 +265,19 @@ internal class BareClickable(config: Config = Config.empty) : MobileRule(
         if (!expression.isBareClickable() || !expression.containingKtFile.isFeatureUiSource()) return
         report(
             expression,
-            "`clickable` has no role. Pass `role = Role.Button` (or the matching role), or use a shared " +
-                "toggle/button modifier from ui/components.",
+            "`${expression.calleeName()}` has no role. Pass `role = Role.Button` (or the matching role), " +
+                "or use a shared toggle/button modifier from ui/components.",
         )
     }
 
-    private fun KtCallExpression.isBareClickable(): Boolean = calleeName() == "clickable" && !declaresRole()
+    private fun KtCallExpression.isBareClickable(): Boolean = calleeName() in CLICK_MODIFIERS && !declaresRole()
 
     /**
      * A named `role =` other than `null`, or a positional value that names a role (`Role.Button`,
-     * `buttonRole`) in the role slot of either overload: `clickable(enabled, onClickLabel, role, onClick)`
-     * or `clickable(interactionSource, indication, enabled, onClickLabel, role, onClick)`.
+     * `buttonRole`) in the role slot. All four modifiers put it at index 2 in the short overload
+     * (`clickable(enabled, onClickLabel, role, onClick)`, `selectable(selected, enabled, role, onClick)`)
+     * and at index 4 in the interactionSource overload
+     * (`clickable(interactionSource, indication, enabled, onClickLabel, role, onClick)`).
      *
      * Without type resolution a positional value cannot be told apart from the `enabled` flag of the
      * second overload (`clickable(source, null, enabled)`), so it only counts when its text names a
@@ -277,5 +296,6 @@ internal class BareClickable(config: Config = Config.empty) : MobileRule(
     private companion object {
         const val ENABLED_ROLE_SLOT = 2
         const val INDICATION_ROLE_SLOT = 4
+        val CLICK_MODIFIERS = setOf("clickable", "combinedClickable", "selectable", "toggleable")
     }
 }

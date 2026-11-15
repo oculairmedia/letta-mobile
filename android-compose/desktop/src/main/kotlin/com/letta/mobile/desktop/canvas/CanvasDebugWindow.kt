@@ -11,7 +11,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.singleWindowApplication
@@ -20,6 +19,7 @@ import com.letta.mobile.desktop.input.InstallTabletPen
 import com.letta.mobile.ui.canvas.CanvasSamples
 import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
 import com.letta.mobile.ui.canvas.CanvasWorkspace
+import com.letta.mobile.ui.theme.tokens.desktop.DesktopWindowTokens
 
 /**
  * Standalone entry point for quick canvas lookdev and testing:
@@ -29,7 +29,7 @@ fun main() {
     initializeDesktopLifecycleMainThread()
     singleWindowApplication(
         title = "Meridian Canvas Workspace (Debug)",
-        state = androidx.compose.ui.window.WindowState(width = 1280.dp, height = 820.dp),
+        state = androidx.compose.ui.window.WindowState(width = DesktopWindowTokens.mainWidth, height = DesktopWindowTokens.mainHeight),
     ) {
         // Without this the canvas sees the pen as a mouse: flat pressure, no eraser end.
         val penRegistry = androidx.compose.runtime.remember(window) { com.letta.mobile.ui.canvas.CanvasPenRegistry() }
@@ -67,7 +67,7 @@ internal fun CanvasDebugWindow(
             onClose?.invoke()
         },
         title = "Meridian Canvas Workspace (Debug)",
-        state = rememberWindowState(width = 1280.dp, height = 820.dp),
+        state = rememberWindowState(width = DesktopWindowTokens.mainWidth, height = DesktopWindowTokens.mainHeight),
     ) {
         // Without this the canvas sees the pen as a mouse: flat pressure, no eraser end.
         val penRegistry = androidx.compose.runtime.remember(window) { com.letta.mobile.ui.canvas.CanvasPenRegistry() }

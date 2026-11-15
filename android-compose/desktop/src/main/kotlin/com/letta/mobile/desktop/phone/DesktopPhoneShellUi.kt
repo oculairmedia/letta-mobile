@@ -27,11 +27,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.chat.AgentIdentity
 import com.letta.mobile.ui.chat.AgentIdentityPill
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.desktop.PhoneChromeTokens
 
 /** Test tags for the phone shell's own chrome. */
 internal object PhoneShellTags {
@@ -169,5 +169,5 @@ internal fun PhoneAwareContent(
     }
 }
 
-private val HEADER_ELEVATION: Dp = 3.dp
-private val TOP_BAR_HEIGHT: Dp = 56.dp
+private val HEADER_ELEVATION: Dp = PhoneChromeTokens.headerElevation
+private val TOP_BAR_HEIGHT: Dp = PhoneChromeTokens.topBarHeight
