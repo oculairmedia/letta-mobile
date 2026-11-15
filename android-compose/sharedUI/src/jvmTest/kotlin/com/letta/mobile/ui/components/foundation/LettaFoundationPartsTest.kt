@@ -55,7 +55,9 @@ class LettaFoundationPartsTest {
             }
         }
         LettaStatusTone.entries.forEach {
-            onNodeWithTag(it.name).assertWidthIsEqualTo(LettaComponentDimens.statusDot).assertHeightIsEqualTo(LettaComponentDimens.statusDot)
+            onNodeWithTag(it.name)
+                .assertWidthIsEqualTo(LettaComponentDimens.statusDot)
+                .assertHeightIsEqualTo(LettaComponentDimens.statusDot)
         }
         assertEquals(LettaStatusTone.entries.size, colours.values.distinct().size, "tones share a colour: $colours")
     }

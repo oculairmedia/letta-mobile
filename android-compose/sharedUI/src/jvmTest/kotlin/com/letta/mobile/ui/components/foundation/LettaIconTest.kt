@@ -27,7 +27,8 @@ class LettaIconTest {
         setFoundationContent {
             Row {
                 LettaIcon(LettaIcons.Search, contentDescription = null, modifier = Modifier.testTag("default"))
-                LettaIcon(LettaIcons.Search, contentDescription = null, modifier = Modifier.testTag("small"), style = LettaIconStyle(LettaControlTokens.iconSm))
+                val small = LettaIconStyle(LettaControlTokens.iconSm)
+                LettaIcon(LettaIcons.Search, contentDescription = null, modifier = Modifier.testTag("small"), style = small)
             }
         }
         onNodeWithTag("default").assertWidthIsEqualTo(LettaControlTokens.icon).assertHeightIsEqualTo(LettaControlTokens.icon)
@@ -35,7 +36,10 @@ class LettaIconTest {
     }
 
     @Test
-    fun anIconButtonIsAButtonDrawnCompactWithAFullTouchTarget() = runDesktopComposeUiTest(FOUNDATION_WINDOW_WIDTH, FOUNDATION_WINDOW_HEIGHT) {
+    fun anIconButtonIsAButtonDrawnCompactWithAFullTouchTarget() = runDesktopComposeUiTest(
+        FOUNDATION_WINDOW_WIDTH,
+        FOUNDATION_WINDOW_HEIGHT,
+    ) {
         var clicks = 0
         setFoundationContent {
             LettaIconButton(LettaButtonIcon(LettaIcons.Close, "Close"), onClick = { clicks++ })

@@ -8,32 +8,16 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.tokens.LettaComponentDimens
 import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import com.letta.mobile.ui.theme.tokens.LettaStrokeTokens
-
-/**
- * A swatch's colour and state: [color], whether it is the [selected] choice, its [name] for a screen
- * reader ("Color red"; null when words beside it already say it) and its [size]
- * ([LettaComponentDimens.swatch] by default).
- */
-@Immutable
-data class LettaSwatch(
-    val color: Color,
-    val selected: Boolean = false,
-    val name: String? = null,
-    val size: Dp = LettaComponentDimens.swatch,
-)
 
 /**
  * The one colour swatch: a circle of the swatch's colour with a hairline `outlineVariant` ring, or a
@@ -72,7 +56,8 @@ fun LettaColorSwatch(swatch: LettaSwatch, modifier: Modifier = Modifier, onClick
         contentAlignment = Alignment.Center,
     ) {
         if (color.alpha == 0f) {
-            LettaIcon(LettaIcons.NoneSet, contentDescription = null, style = LettaIconStyle(LettaControlTokens.iconSm, MaterialTheme.colorScheme.outline))
+            val style = LettaIconStyle(LettaControlTokens.iconSm, MaterialTheme.colorScheme.outline)
+            LettaIcon(LettaIcons.NoneSet, contentDescription = null, style = style)
         }
     }
 }

@@ -62,7 +62,8 @@ class LettaSearchFieldTest {
                 onNodeWithTag(FIELD).performTextInput("x")
                 onNodeWithContentDescription(LETTA_SEARCH_CLEAR).performClick()
                 onNodeWithTag(FIELD).performTextInput("y")
-                assertEquals(empty, onNodeWithTag(ROW).getUnclippedBoundsInRoot().height, "the row does not jump when the clear button shows")
+                val typed = onNodeWithTag(ROW).getUnclippedBoundsInRoot().height
+                assertEquals(empty, typed, "the row does not jump when the clear button shows")
             }
         }
     }

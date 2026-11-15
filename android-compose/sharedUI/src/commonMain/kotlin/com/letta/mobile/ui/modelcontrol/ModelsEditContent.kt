@@ -125,9 +125,8 @@ private fun LazyListScope.exposureSections(state: ProviderManagementState, onExp
     val sections = state.visible.filter { it.rows.isNotEmpty() }
     if (sections.isEmpty() && !state.loading) {
         item("empty") {
-            LettaEmptyState(
-                LettaEmptyContent(if (state.searching) ModelControlStrings.noMatch(state.query.trim()) else ModelControlStrings.NO_PROVIDER_MODELS),
-            )
+            val text = if (state.searching) ModelControlStrings.noMatch(state.query.trim()) else ModelControlStrings.NO_PROVIDER_MODELS
+            LettaEmptyState(LettaEmptyContent(text))
         }
     }
     sections.forEach { visible ->

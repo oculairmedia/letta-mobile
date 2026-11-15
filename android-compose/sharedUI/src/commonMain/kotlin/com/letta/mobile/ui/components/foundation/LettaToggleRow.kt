@@ -12,7 +12,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -20,18 +19,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
-
-/**
- * A row's words and state: [title] over an optional one-line [supporting] helper; [enabled] false greys
- * them (and the row's control), [destructive] draws the title in the error colour.
- */
-@Immutable
-data class LettaRowLabel(
-    val title: String,
-    val supporting: String? = null,
-    val enabled: Boolean = true,
-    val destructive: Boolean = false,
-)
 
 /**
  * The one switch row: a [LettaRowLabel] at the start, a Material [Switch] at the end, and the whole

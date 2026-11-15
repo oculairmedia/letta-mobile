@@ -12135,6 +12135,10 @@ public final class com/letta/mobile/ui/theme/tokens/CustomColors {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/theme/tokens/CustomColorsKt {
+	public static final fun getLocalLettaCustomColors ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
 public final class com/letta/mobile/ui/theme/tokens/LettaComponentDimens {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaComponentDimens;
@@ -12155,10 +12159,6 @@ public final class com/letta/mobile/ui/theme/tokens/LettaControlTokens {
 	public final fun getIconButtonSm-D9Ej5fM ()F
 	public final fun getIconSm-D9Ej5fM ()F
 	public final fun getMinTouchTarget-D9Ej5fM ()F
-}
-
-public final class com/letta/mobile/ui/theme/tokens/LettaCustomColorsKt {
-	public static final fun getLocalLettaCustomColors ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public final class com/letta/mobile/ui/theme/tokens/LettaPanelTone : java/lang/Enum {
