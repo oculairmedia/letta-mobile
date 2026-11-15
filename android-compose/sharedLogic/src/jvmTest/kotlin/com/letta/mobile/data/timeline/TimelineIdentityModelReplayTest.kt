@@ -24,9 +24,9 @@ import kotlin.test.assertTrue
  * check.sh) found that the S1 fixtures (TimelineRunKeyAcrossPagesTest) do not cover, replayed
  * against the real coordinator, writer, Paging and presentation ([TimelineFrameRecorder]).
  *
- * The ledger is read with page edges as the production stores report them ([RoomEdgeKeys]): a
- * page's older/newer key is its own first/last row (RoomTimelineBoundedStore, the desktop store),
- * which TimelineLedgerPagingSource hands to Before/After for the next page.
+ * [InMemoryTimelineStore] reports page edges as the production stores do: a page's older/newer key
+ * is its own first/last row (RoomTimelineBoundedStore, the desktop store), which
+ * TimelineLedgerPagingSource hands to Before/After for the next page.
  */
 class TimelineIdentityModelReplayTest {
     /**
@@ -51,15 +51,15 @@ class TimelineIdentityModelReplayTest {
      * I1 NoDuplicateKey, model trace main-settled-b (cut 1..3 | 4..): the #2460 shape cut right
      * before the run-less follow-up prompt. runEnvelope answers Ends on both sides of the edge (a
      * prompt has no run), containsComplete holds on both pages and both claim `run-<id>`.
-     * TimelineRunKeyAcrossPagesTest saw this cut green only because the in-memory store reports
-     * the neighbour's key as the page edge, so its older page skipped the narration row.
+     * TimelineRunKeyAcrossPagesTest once saw this cut green only because the in-memory store then
+     * reported the neighbour's key as the page edge, so its older page skipped the narration row.
      */
     @Test fun aRunCutAtItsFollowUpPromptNeverRepeatsAKey() = runBlocking {
         val turn = listOf(prompt, call, callReturn, narration, followUp, secondCall, secondReturn, reply, usage, stop)
             .map { it.withRun(DURABLE_RUN) }
         val rows = turn.ledgerRows()
         val cut = rows.indexOf(followUp.id)
-        val recorder = TimelineFrameRecorder.open(scope, RoomEdgeKeys(InMemoryTimelineStore()))
+        val recorder = TimelineFrameRecorder.open(scope, InMemoryTimelineStore())
         val violations = try {
             recorder.openOnHistory((history + turn).reversed())
             // The ledger keeps what it holds; the next recent page brings only the later rows.
@@ -83,7 +83,7 @@ class TimelineIdentityModelReplayTest {
      *    the whole live block goes, and the rows that are not durable yet leave the list.
      */
     @Test fun aPartlyDurableRunNeverHidesItsLiveRows() = runBlocking {
-        val recorder = TimelineFrameRecorder.open(scope, RoomEdgeKeys(InMemoryTimelineStore()))
+        val recorder = TimelineFrameRecorder.open(scope, InMemoryTimelineStore())
         try {
             recorder.openOn(history.reversed())
             recorder.send(PROMPT_OTID, prompt.content, echo.date!!)
@@ -109,7 +109,7 @@ class TimelineIdentityModelReplayTest {
     }
 
     private suspend fun adoptedKeyDuplicatesWhenCutAt(cut: Int): List<String> {
-        val recorder = TimelineFrameRecorder.open(scope, RoomEdgeKeys(InMemoryTimelineStore()))
+        val recorder = TimelineFrameRecorder.open(scope, InMemoryTimelineStore())
         try {
             recorder.openOn(history.reversed())
             recorder.send(PROMPT_OTID, prompt.content, echo.date!!)
@@ -134,34 +134,6 @@ class TimelineIdentityModelReplayTest {
             frame.keys.filter { DUPLICATE_MARK in it }.map { "frame ${frame.index} [${frame.step}] blanked $it" }
         }.distinct()
         return repeated.map { (key, count) -> "$where: $key held by $count settled rows" } + blanked.map { "$where: $it" }
-    }
-
-    /**
-     * [store] read the way RoomTimelineBoundedStore (:195-196) and DesktopTimelineBoundedStore
-     * report page edges: older/newer is the page's own first/last row when more rows lie beyond it.
-     */
-    private class RoomEdgeKeys(private val store: TimelineBoundedStore) : TimelineBoundedStore {
-        override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T =
-            store.read(scope) { block(Reader(this)) }
-
-        override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T =
-            store.transaction(scope) { block(Transaction(this)) }
-
-        private class Reader(private val reader: TimelineStoreReader) : TimelineStoreReader by reader {
-            override suspend fun metadata(position: TimelineReadPosition, maxRows: Int) = reader.metadata(position, maxRows).ownEdges()
-        }
-
-        private class Transaction(private val transaction: TimelineStoreTransaction) : TimelineStoreTransaction by transaction {
-            override suspend fun metadata(position: TimelineReadPosition, maxRows: Int) =
-                transaction.metadata(position, maxRows).ownEdges()
-        }
-
-        companion object {
-            fun TimelineMetadataPage.ownEdges() = copy(
-                older = older?.let { rows.firstOrNull()?.key },
-                newer = newer?.let { rows.lastOrNull()?.key },
-            )
-        }
     }
 
     private companion object {

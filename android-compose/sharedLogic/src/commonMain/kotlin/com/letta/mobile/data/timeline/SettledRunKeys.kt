@@ -39,6 +39,11 @@ internal data class LiveRowPresentation(
  * would draw the reply twice for a frame and then drop the live row, the flash at the end of a turn
  *. The other way round never adopts: a live run whose rows settled as
  * separate bubbles keeps its own keys, since several settled rows cannot all take one live key.
+ *
+ * The settled row must hold EVERY record of the live row. Taking the key hides the live row
+ * (TimelineRowAssembly.displayedLive), so a row that settled only part of a run (a mid-turn
+ * catch-up) would take the rest of it off the screen. Until the rest is durable the live row keeps
+ * its key and the settled part keys by its own records.
  */
 internal fun ChatRenderItem.livePresentationFor(
     events: List<TimelineResidentEvent>,
@@ -49,7 +54,18 @@ internal fun ChatRenderItem.livePresentationFor(
     if (names.isEmpty()) return null
     val named = live.filter { item -> item.messagesInOrder().any { it.isNamedBy(names) } }
     val match = named.firstOrNull(::sharesShapeWith) ?: named.firstOrNull { isRunItem && !it.isRunItem } ?: return null
+    if (!match.messagesInOrder().all { it.isNamedBy(names) }) return null
     return LiveRowPresentation(match.key, match.runIdentity(), match.messagesInOrder().firstNotNullOfOrNull { it.latencyMs })
+}
+
+/** Whether no live row under this key shows a record that [events] do not hold. */
+internal fun LiveRowPresentation.isOnlyHeldWithin(
+    events: List<TimelineResidentEvent>,
+    live: List<ChatRenderItem>,
+    aliases: Map<String, TimelineMessageId>,
+): Boolean {
+    val names = events.flatMapTo(mutableSetOf()) { it.namesKnownTo(aliases) }
+    return live.filter { it.key == key }.all { row -> row.messagesInOrder().all { it.isNamedBy(names) } }
 }
 
 /** [this] as the live row showed it; every other field is the settled row's own. */

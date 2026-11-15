@@ -60,13 +60,21 @@ CONSTANTS
     InitDurable,  \* set of possible durable prefixes when the presentation opens
     Live,         \* TRUE: the turn streams through the live overlay
     MaxRev,       \* bound on durable revisions
-    Fix,          \* "main" (code as on main) or "D1" (the planned S2 fix)
+    Fix,          \* "main": code before the correction
+                  \* "S2":   S2's settled edge rule (mayContinuePastPage), main adoption
+                  \* "D1":   S2's key rule + S3 adoption (one anchor, whole-block handover)
+                  \* "OwnKeys": settled keys from a row's own records + S3 adoption
     Break         \* "none", or a deliberately broken variant that shows a passing
                   \* property can fail (able-to-fail.sh):
                   \*   containsCompleteIgnoresBoundary  claim even across Continues
-                  \*   d1PerPageOnly    D1 judges "whole run" by the page alone
+                  \*   bareRunKey       D1 claims the bare run-<id> (per-page key)
                   \*   keyByPageEdge    a claimed run is keyed by the page's first row
                   \*   refreshAtTail    getRefreshKey ignores the reader (Tail)
+                  \*   adoptEveryMember D1 remembers an adopted key under every member
+                  \*   adoptPartial     D1 lends a live key to a row that covers part of it
+                  \*   forgetAdoption   D1 does not remember an adopted key
+                  \*   rememberedUncovered  D1 reuses a remembered key even while a live
+                  \*                    row under that key holds records this row lacks
 
 LedgerLen == Len(Kind)
 Recs == 1..LedgerLen
@@ -98,6 +106,7 @@ Str(i) == ToString(i)
 
 RunKey(x)      == "run-" \o x                    \* MessageGrouping.runKey
 RunKeyAt(x, i) == "run-" \o x \o "-" \o Str(i)   \* runBlockKey split form
+OwnKey(x, i)   == "run-" \o x \o "-from-" \o Str(i) \* settledRunKey (D1)
 SegKey(i)    == "segment-" \o Str(i)            \* per-record projection key
 MsgKey(i)    == "msg-" \o Str(i)                \* prompt: msg-<clientMessageId>
 
@@ -169,25 +178,39 @@ PromptRow(i) == [key |-> MsgKey(i), members |-> {i}, owner |-> i, run |-> FALSE]
 SegRow(i)    == [key |-> SegKey(i), members |-> {i}, owner |-> i, run |-> TRUE]
 ClaimRow(b, k) == [key |-> k, members |-> b, owner |-> Min(b), run |-> TRUE]
 
-\* D1 (correction plan section 6): run-<id> only when the page holds every
-\* record of the run in this one block, otherwise run-<id>-<firstMessageId>.
-\* "Every record" is the ledger's whole run: a page cannot see it through the
-\* one-row envelope, so this is the fix as specified, not an implementation.
-D1Key(lo, hi, m, M, b) ==
-    LET x == RunOfBlock(b)
-        whole == IF Break = "d1PerPageOnly" THEN {j \in M : IsR(j) /\ RunOf[j] = x}
-                 ELSE RunRecords(m, x)
-    IN IF b = whole THEN RunKey(x)
-       ELSE IF Break = "keyByPageEdge" THEN RunKeyAt(x, lo) ELSE RunKeyAt(x, Min(b))
+\* S2 (TimelinePageProjection.kt mayContinuePastPage): a claim gives up the
+\* bare key when only opaque rows or run-less prompts lie between the run's
+\* outermost record on the page and an edge with more ledger beyond it; its
+\* block then keys run-<id>-<firstMessageId> (oldest member, splitKeyed).
+MayLieInsideRun(i) == Kind[i] # "R"
+MayContinuePastPage(lo, hi, m, x) ==
+    LET mem == {j \in lo..hi : IsR(j) /\ RunOf[j] = x}
+    IN /\ mem # {}
+       /\ \/ lo > 1 /\ \A j \in lo..(Min(mem) - 1) : MayLieInsideRun(j)
+          \/ hi < m /\ \A j \in (Max(mem) + 1)..hi : MayLieInsideRun(j)
+
+\* OwnKeys (the alternative): every claimed
+\* block keys run-<id>-from-<its oldest member>, a function of its own records
+\* only, never of where the page edges fell.
+OwnRecordKey(lo, hi, m, M, b) ==
+    LET x == RunOfBlock(b) IN
+    IF Break = "bareRunKey" THEN GroupKey(M, b)
+    ELSE IF Break = "keyByPageEdge" THEN OwnKey(x, lo)
+    ELSE OwnKey(x, Min(b))
 
 BlockRows(lo, hi, m, M, b) ==
-    IF Fix = "D1" THEN {ClaimRow(b, D1Key(lo, hi, m, M, b))}
-    ELSE LET k == GroupKey(M, b) IN
-         IF k # NoKey /\ ContainsComplete(lo, hi, m, RunOfBlock(b))
-         THEN {ClaimRow(b, IF Break = "keyByPageEdge" THEN RunKeyAt(RunOfBlock(b), lo) ELSE k)}
+    LET k == GroupKey(M, b)
+        x == RunOfBlock(b)
+    IN IF k # NoKey /\ ContainsComplete(lo, hi, m, x)
+       THEN {ClaimRow(b, CASE Fix = "OwnKeys" -> OwnRecordKey(lo, hi, m, M, b)
+                           [] Break = "keyByPageEdge" -> RunKeyAt(x, lo)
+                           [] Fix \in {"S2", "D1"} /\ Break = "bareRunKey" -> k
+                           [] Fix \in {"S2", "D1"} /\ k = RunKey(x) /\ MayContinuePastPage(lo, hi, m, x)
+                                -> RunKeyAt(x, Min(b))
+                           [] OTHER -> k)}
                                      \* spansVisibleGap is FALSE: only opaque
                                      \* run metadata can sit between members
-         ELSE {SegRow(i) : i \in b}
+       ELSE {SegRow(i) : i \in b}
 
 PageRowSet(lo, hi, m) ==
     LET M == {i \in lo..hi : Kind[i] # "U"}     \* renderableRecords :135
@@ -213,21 +236,36 @@ NoItem == [key |-> NoKey, members |-> {}, run |-> FALSE]
 Newest(S) == CHOOSE l \in S : \A o \in S : Max(o.members) <= Max(l.members)
 Held(hd, k) == IF k \in DOMAIN hd THEN hd[k] ELSE {}
 
+\* main / S2: a remembered key is found under ANY member (byIdentity holds
+\* every member) and skips the holders check; a live row named by any member
+\* lends its key.
+\* D1: the key is remembered under ONE anchor, the adopting row's owner
+\* (oldest member); only the row holding that anchor finds it again. A live
+\* row lends its key only when this row holds every one of its records.
 AdoptOne(row, lv, by, hd) ==
     IF ~row.run THEN [row |-> row, by |-> by, hd |-> hd]  \* prompt: :325 returns first
     ELSE
-    LET hits  == {m \in row.members : by[m] # NoKey}
+    LET d1    == Fix \in {"D1", "OwnKeys"}
+        hits0 == {m \in row.members : by[m] # NoKey}
+        \* D1: a remembered key is reused only while no live row under it holds
+        \* a record this row lacks (else displayedLive would hide that record).
+        reusable(m) == ~d1 \/ Break = "rememberedUncovered" \/
+                       \A l \in lv : l.key = by[m] => l.members \subseteq row.members
+        hits  == {m \in hits0 : reusable(m)}
         named == {l \in lv : l.members \cap row.members # {}}
         shaped == {l \in named : l.run}                    \* sharesShapeWith :69
         match == IF shaped # {} THEN Newest(shaped)
                  ELSE IF named # {} THEN Newest(named) ELSE NoItem
+        covers == ~d1 \/ Break = "adoptPartial" \/ match.members \subseteq row.members
+        fresh == hits0 = {} /\ match # NoItem /\ covers /\ Held(hd, match.key) = {}
         key == IF hits # {} THEN by[Min(hits)]
-               ELSE IF match # NoItem /\
-                       Held(hd, match.key) = {}
-                    THEN match.key ELSE NoKey
+               ELSE IF fresh THEN match.key ELSE NoKey
+        everyMember == ~d1 \/ Break = "adoptEveryMember"
+        remember == IF everyMember THEN row.members
+                    ELSE IF fresh /\ Break # "forgetAdoption" THEN {row.owner} ELSE {}
     IN IF key = NoKey THEN [row |-> row, by |-> by, hd |-> hd]
        ELSE [row |-> [row EXCEPT !.key = key],
-             by  |-> [m \in Recs |-> IF m \in row.members THEN key ELSE by[m]],
+             by  |-> [m \in Recs |-> IF m \in remember THEN key ELSE by[m]],
              hd  |-> (key :> (Held(hd, key) \cup row.members)) @@ hd]
 
 RECURSIVE AdoptAll(_, _, _, _)
@@ -426,6 +464,14 @@ StableKeys ==
 StableKeysAcrossRecut ==
     [][n' = n => \A x \in SettledMembers \cap SettledMembers' :
                     SettledKeyOf(x)' = SettledKeyOf(x)]_vars
+
+\* The same promise per row ("a row's key is a function of its own records"):
+\* while the ledger is unchanged, a settled row with exactly the same records
+\* keeps its key across any refresh, trim or page load.
+StableRowKeysAcrossRecut ==
+    [][n' = n => \A i \in DOMAIN SettledSeq, j \in DOMAIN SettledSeq' :
+                    SettledSeq[i].members = SettledSeq'[j].members =>
+                        SettledSeq[i].key = SettledSeq'[j].key]_vars
 
 TypeOK ==
     /\ n \in 0..LedgerLen /\ streamed \in 0..LedgerLen /\ rev \in 1..MaxRev

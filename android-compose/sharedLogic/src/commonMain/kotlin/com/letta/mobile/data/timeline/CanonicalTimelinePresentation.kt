@@ -325,7 +325,7 @@ class CanonicalTimelinePresentation private constructor(
         if (this is ChatRenderItem.Single && hasOptimisticUserIdentity()) {
             return copy(keyOverride = "msg-${message.clientMessageId}")
         }
-        val adopted = adoptions.adopted(this, residents, ::liveSnapshot)
+        val adopted = adoptions.adopted(this, identity, residents, ::liveSnapshot)
         if (adopted != null) return adopted
         return if (isRunItem) this else withKeyOverride(replacementKey(identity))
     }
