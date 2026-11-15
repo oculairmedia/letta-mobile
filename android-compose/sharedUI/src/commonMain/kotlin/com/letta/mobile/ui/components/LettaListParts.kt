@@ -7,7 +7,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.letta.mobile.ui.theme.LettaDimens
 
-/** The quiet one-liner an empty section shows ("No chats"). */
+/**
+ * The quiet one-liner an empty section shows ("No chats"). For a whole page or pane with nothing to
+ * show, use [com.letta.mobile.ui.components.foundation.LettaEmptyState].
+ */
 @Composable
 fun LettaEmptyHint(text: String, modifier: Modifier = Modifier) {
     Text(
