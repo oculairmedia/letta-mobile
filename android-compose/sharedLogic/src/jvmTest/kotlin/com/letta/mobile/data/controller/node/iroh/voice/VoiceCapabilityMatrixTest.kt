@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh.voice
 
+import com.letta.mobile.data.controller.node.iroh.AdminRpcInvocation
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.IrohPeerCapabilities
 import com.letta.mobile.data.voice.host.HostVoiceWire
@@ -38,7 +39,7 @@ class VoiceCapabilityMatrixTest {
         ) { 0L }.register(router)
         assertEquals(HostVoiceWire.METHODS, router.registeredMethods)
         assertEquals(setOf(HostVoiceWire.CAPABILITY), router.featureCapabilities)
-        assertTrue(router.streamedHandler(HostVoiceWire.SPEECH) != null)
-        assertEquals(setOf(HostVoiceWire.SPEECH), router.registeredMethods.filter { router.streamedHandler(it) != null }.toSet())
+        val streamed = router.registeredMethods.filter { router.streamedHandler(AdminRpcInvocation("r", it, null)) != null }
+        assertEquals(setOf(HostVoiceWire.SPEECH), streamed.toSet())
     }
 }

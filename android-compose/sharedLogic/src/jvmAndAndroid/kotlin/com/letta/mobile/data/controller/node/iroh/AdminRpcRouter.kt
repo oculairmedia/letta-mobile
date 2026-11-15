@@ -110,21 +110,21 @@ class AdminRpcRouter(
     }
 
     /**
-     * Registers a streamed method: on a request bi-stream of its own, [AdminRpcStreamServer] hands it to
-     * [streamed], which may write stream frames before the final response. Anywhere else (the
-     * control channel, a direct dispatch) [elsewhere] answers, normally with a refusal.
+     * Registers the streamed method [streamed] serves: on a request bi-stream of its own,
+     * [AdminRpcStreamServer] hands it to [streamed], which may write stream frames before the final
+     * response. Anywhere else (the control channel, a direct dispatch) [elsewhere] answers, normally with
+     * a refusal.
      */
     internal fun registerStreamed(
-        method: String,
         streamed: AdminRpcStreamedHandler,
         elsewhere: suspend (JsonObject?, AdminRpcRequestContext) -> JsonElement,
     ) {
-        registerScoped(method, elsewhere)
-        streamedHandlers[method] = streamed
+        registerScoped(streamed.method, elsewhere)
+        streamedHandlers[streamed.method] = streamed
     }
 
-    /** The streamed handler of [method], or null when it answers with a single response. */
-    internal fun streamedHandler(method: String): AdminRpcStreamedHandler? = streamedHandlers[method]
+    /** The streamed handler of [invocation]'s method, or null when it answers with a single response. */
+    internal fun streamedHandler(invocation: AdminRpcInvocation): AdminRpcStreamedHandler? = streamedHandlers[invocation.method]
 
     fun requireNonEmpty(minMethods: Int = 1): AdminRpcRouter {
         require(handlers.size >= minMethods) {

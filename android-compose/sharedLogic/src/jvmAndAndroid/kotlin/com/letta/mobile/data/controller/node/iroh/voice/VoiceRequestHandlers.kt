@@ -72,6 +72,7 @@ internal class VoiceRequestHandlers(
 
     /** The streamed synthesis handler; on any other channel the method is refused. */
     val speech: AdminRpcStreamedHandler = object : AdminRpcStreamedHandler {
+        override val method: String = HostVoiceWire.SPEECH
         override val cancelledError: String = HostVoiceErrorCode.CANCELLED.wire
 
         override suspend fun serve(call: AdminRpcStreamedCall): AdminRpcStreamOutcome = try {

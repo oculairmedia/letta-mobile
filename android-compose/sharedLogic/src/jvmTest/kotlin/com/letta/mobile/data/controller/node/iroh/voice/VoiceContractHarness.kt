@@ -294,29 +294,33 @@ internal object VoiceContractHarness {
             }
         }
 
+        /** A WAVE body the test writes piece by piece, as the case's `speech` says. */
         private fun speech(scope: MockRequestHandleScope): HttpResponseData {
             val body = ByteChannel(autoFlush = true)
             val header = wavHeader(spec.getValue("sample_rate_hz").jsonPrimitive.int, spec.getValue("channels").jsonPrimitive.int)
-            CoroutineScope(Dispatchers.Default).launch {
-                when (spec.getValue("speech").jsonPrimitive.content) {
-                    "wav_stream" -> {
-                        body.writeFully(header + ByteArray(8))
-                        secondAudioAllowed.await()
-                        body.writeFully(ByteArray(4))
-                        body.close()
-                    }
-                    "wav_stream_slow" -> {
-                        body.writeFully(header + ByteArray(8))
-                        while (!body.isClosedForWrite) delay(2.milliseconds)
-                        speechClosedAt.compareAndSet(null, System.nanoTime())
-                    }
-                    "wav_header_then_garbage" -> {
-                        body.writeFully(header + ByteArray(1))
-                        body.close()
-                    }
-                }
+            val writer: suspend () -> Unit = when (spec.getValue("speech").jsonPrimitive.content) {
+                "wav_stream" -> { -> twoRuns(body, header) }
+                "wav_stream_slow" -> { -> oneRunThenStall(body, header) }
+                "wav_header_then_garbage" -> { -> body.writeFully(header + ByteArray(1)); body.close() }
+                else -> error("Unexpected speech body")
             }
+            CoroutineScope(Dispatchers.Default).launch { writer() }
             return scope.respond(body)
+        }
+
+        /** Four samples, then two more once the host has written the first audio frame. */
+        private suspend fun twoRuns(body: ByteChannel, header: ByteArray) {
+            body.writeFully(header + ByteArray(8))
+            secondAudioAllowed.await()
+            body.writeFully(ByteArray(4))
+            body.close()
+        }
+
+        /** Four samples, then nothing until the host closes the request; records when it did. */
+        private suspend fun oneRunThenStall(body: ByteChannel, header: ByteArray) {
+            body.writeFully(header + ByteArray(8))
+            while (!body.isClosedForWrite) delay(2.milliseconds)
+            speechClosedAt.compareAndSet(null, System.nanoTime())
         }
 
         private fun listing(field: String, ids: kotlinx.serialization.json.JsonElement?): JsonObject = buildJsonObject {

@@ -393,6 +393,34 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [toolset.update v1](reference/contracts/toolset.update/toolset-v1.md)
 
+### reference/contracts/voice.models.list
+
+- [voice.models.list: voice endpoint v1](reference/contracts/voice.models.list/voice-endpoint-v1.md)
+
+### reference/contracts/voice.setup.clear
+
+- [voice.setup.clear: voice endpoint v1](reference/contracts/voice.setup.clear/voice-endpoint-v1.md)
+
+### reference/contracts/voice.setup.get
+
+- [voice.setup.get: voice endpoint v1](reference/contracts/voice.setup.get/voice-endpoint-v1.md)
+
+### reference/contracts/voice.setup.set
+
+- [voice.setup.set: voice endpoint v1](reference/contracts/voice.setup.set/voice-endpoint-v1.md)
+
+### reference/contracts/voice.setup.test
+
+- [voice.setup.test: voice endpoint v1](reference/contracts/voice.setup.test/voice-endpoint-v1.md)
+
+### reference/contracts/voice.speech
+
+- [voice.speech: voice endpoint v1 \(streamed\)](reference/contracts/voice.speech/voice-endpoint-v1.md)
+
+### reference/contracts/voice.transcribe
+
+- [voice.transcribe: voice endpoint v1](reference/contracts/voice.transcribe/voice-endpoint-v1.md)
+
 ### testing
 
 - [5s9lq.1 Chat Hydration Trace Baseline](testing/5s9lq-1-chat-hydration-trace.md)

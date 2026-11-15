@@ -379,7 +379,7 @@ internal class AdminRpcStreamServer(
         router.preauthorize(invocation)?.let { return it }
         // A streamed method is not observed: observation tracks conversation viewers, which no
         // streamed method changes.
-        router.streamedHandler(method)?.let { handler ->
+        router.streamedHandler(invocation)?.let { handler ->
             streamed(AdminRpcStreamedRequest(handler, requestId, method, params))
             return null
         }

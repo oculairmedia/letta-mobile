@@ -64,7 +64,7 @@ internal class VoiceRoutes(
         router.voice(HostVoiceWire.MODELS_LIST) { _, _ -> setup.models() }
         router.voice(HostVoiceWire.TRANSCRIBE) { params, context -> requests.transcribe(params, context) }
         // Valid only on a request stream of its own; on the control channel it is a malformed request.
-        router.registerStreamed(HostVoiceWire.SPEECH, requests.speech) { _, _ ->
+        router.registerStreamed(requests.speech) { _, _ ->
             VoiceTelemetry.answered(HostVoiceWire.SPEECH, HostVoiceErrorCode.INVALID_REQUEST.wire, 0L)
             adminError(HostVoiceErrorCode.INVALID_REQUEST.wire)
         }

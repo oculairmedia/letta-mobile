@@ -28,6 +28,7 @@ import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.Url
 import io.ktor.http.content.TextContent
+import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -134,18 +135,21 @@ internal class KtorVoiceSpeechUpstream(
         val channel = response.bodyAsChannel()
         val buffer = ByteArray(CHUNK_BYTES)
         while (true) {
-            val read = try {
-                channel.readAvailable(buffer, 0, buffer.size)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (timedOut: SocketTimeoutException) {
-                throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT, response.status.value)
-            } catch (broken: Exception) {
-                throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE, response.status.value)
-            }
+            val read = readRun(channel, buffer, response.status.value)
             if (read < 0) return
             if (read > 0) onBytes(buffer.copyOf(read))
         }
+    }
+
+    /** One run of the body into [buffer]: its length, or -1 at the end. A stall is a timeout, a break a bad response. */
+    private suspend fun readRun(channel: ByteReadChannel, buffer: ByteArray, status: Int): Int = try {
+        channel.readAvailable(buffer, 0, buffer.size)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (timedOut: SocketTimeoutException) {
+        throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT, status)
+    } catch (expectedBreak: Exception) {
+        throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE, status)
     }
 
     private fun requireSuccess(response: HttpResponse) {

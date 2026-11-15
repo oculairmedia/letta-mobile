@@ -48,6 +48,9 @@ internal sealed interface AdminRpcStreamOutcome {
 
 /** Serves a streamed admin_rpc method on a request bi-stream of its own. */
 internal interface AdminRpcStreamedHandler {
+    /** The method it serves. */
+    val method: String
+
     /** The `error` of the final response written after the client cancelled. */
     val cancelledError: String
 
