@@ -1424,6 +1424,25 @@
       "phase3_decision": "deny_fail_closed"
     },
     {
+      "method": "slash_command.execute",
+      "handler": "SlashCommandAdminHandlers.kt",
+      "current_backend": "native App Server execute_command with an explicit agent and conversation runtime",
+      "owner": "app_server_v2",
+      "public_contract": "slash_command.execute/execute-v1",
+      "native_contract": [
+        "execute_command",
+        "execute_command_response"
+      ],
+      "authorization_class": "admin_write",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none",
+      "notes": "General commands require admin.full because their effects include host and tool mutations. Agent and conversation scope are checked before forwarding; errors are returned without retry."
+    },
+    {
       "method": "slash_command.list",
       "handler": "SlashCommandAdminHandlers.kt",
       "current_backend": "controller catalog (NativeSlashCommandCatalog) of update_device_status.supported_commands, process-global; built-in list until a frame is observed",

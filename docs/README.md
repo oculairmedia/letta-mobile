@@ -376,6 +376,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [secret.request.submit: Secret Request v1](reference/contracts/secret.request.submit/secret-request-v1.md)
 
+### reference/contracts/slash\_command.execute
+
+- [Slash command execution v1](reference/contracts/slash_command.execute/execute-v1.md)
+
 ### reference/contracts/toolset.update
 
 - [toolset.update v1](reference/contracts/toolset.update/toolset-v1.md)

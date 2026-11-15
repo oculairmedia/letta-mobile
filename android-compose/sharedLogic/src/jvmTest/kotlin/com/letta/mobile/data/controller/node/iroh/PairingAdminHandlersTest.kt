@@ -257,6 +257,29 @@ class PairingAdminHandlersTest {
         assertEquals("$fixedId@203.0.113.7:4501", link.dial)
     }
 
+    /**
+     * A host ticket as the dial hint (`--public-dial-address`, or the endpoint's own ticket by
+     * default) is longer than the envelope, and the two together overflow a QR symbol: the inviter
+     * then had no code to draw. The minted link keeps the invite and leaves the hint out.
+     */
+    @Test
+    fun aDialHintTooLongForASymbolIsLeftOutOfTheCode() = runTest {
+        val fixedId = "abcd1234".repeat(8)
+        val r = AdminRpcRouter().also {
+            PairingAdminHandlers.register(
+                it,
+                IrohPairingService(InMemoryPairedPeerStore()),
+                PairingQrConfig(FixedSigner("sig"), fixedId) { "endpoint" + "a".repeat(2_400) },
+            )
+        }
+        val result = dispatch(r, "pair.invite.create", mapOf("qr" to true)).result
+        val link = com.letta.mobile.data.pairing.PairLink.parse(result["pair_link"]!!.jsonPrimitive.content)
+        assertNotNull(link)
+        assertEquals(result["qr_invite"]!!.jsonPrimitive.content, link.qrInvite)
+        assertNull(link.dial, "the hint does not fit the symbol, so the code carries only the invite")
+        assertTrue(result["pair_link"]!!.jsonPrimitive.content.length <= com.letta.mobile.data.pairing.PairLink.QR_MAX_CHARS)
+    }
+
     @Test
     fun inviteListNeverExposesSecretsAndRevokeKillsTheInvite() = runTest {
         val pairing = IrohPairingService(InMemoryPairedPeerStore())

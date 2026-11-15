@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session.graph
 
+import com.letta.mobile.data.transport.appserver.AppServerSlashCommandApi
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.context.ContextBreakdownLoader
 import com.letta.mobile.data.context.ContextTokenReadings
@@ -108,6 +109,8 @@ class SharedSessionRepositoryGraph(
     override val stepRepository: IStepRepository = host.stepRepository
     override val toolRepository: IToolRepository = host.toolRepository
     override val vibesyncEventStreamRepository: IVibesyncEventStreamRepository = host.vibesyncEventStreamRepository
+
+    override val slashCommands: AppServerSlashCommandApi = transportBound.slashCommands
 
     override val cronRepository: ICronRepository = transportBound.cronRepository
     override val selfTodoRepository: ISelfTodoRepository = transportBound.selfTodoRepository

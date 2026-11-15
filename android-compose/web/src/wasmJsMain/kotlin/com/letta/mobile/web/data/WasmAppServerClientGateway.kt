@@ -30,6 +30,7 @@ import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.data.session.graph.hostServedKind
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.subagents.SubagentView
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerApprovalAnswer
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerRunControls
@@ -189,10 +190,12 @@ class WasmAppServerClientGateway(
     /** letta-mobile-o4ygk.4.5: [target]'s chat on the live session (timeline, run controls, chips); null with none. */
     fun chatBinding(target: TimelineChatTarget, agentModel: String?, conversations: TimelineConversationChat?): WebChatBinding? {
         val session = activeSession ?: return null
-        val transport = timelineTransport(session) { AgentId(target.agentId) }
         return WebChatBinding(
             target = target,
-            transport = transport,
+            slashCommands = { sessionGraphProvider.current.takeIf { activeSession === session }?.slashCommands?.let { api ->
+                api to AppServerRuntimeScope(target.agentId, target.conversationId)
+            } },
+            transport = timelineTransport(session) { AgentId(target.agentId) },
             controls = webRunControls(AppServerRunControls(session.engine), session.irohChat, target),
             hostApprovals = session.irohChat,
             conversations = conversations,

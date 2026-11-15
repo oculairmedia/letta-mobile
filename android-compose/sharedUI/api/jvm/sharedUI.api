@@ -1324,6 +1324,10 @@ public final class com/letta/mobile/ui/chat/branch/SecondaryClickKt {
 	public static final fun onSecondaryClick (Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function0;)Landroidx/compose/ui/Modifier;
 }
 
+public final class com/letta/mobile/ui/chat/commands/SlashCommandSessionKt {
+	public static final fun rememberSlashCommandSessionPort (Lcom/letta/mobile/ui/chat/session/ChatSessionPort;Lcom/letta/mobile/data/chat/routing/SlashCommandBinding;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/chat/session/ChatSessionPort;
+}
+
 public final class com/letta/mobile/ui/chat/provenance/AgentMessageProvenanceLabelKt {
 	public static final fun AgentMessageProvenanceLabel-FV1VA1c (Lcom/letta/mobile/data/messaging/AgentMessageProvenance;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/graphics/Color;Landroidx/compose/runtime/Composer;II)V
 	public static final fun AgentMessageProvenanceMetadata-RPmYEkk (Lcom/letta/mobile/data/messaging/AgentMessageProvenance;JLandroidx/compose/runtime/Composer;I)V
@@ -6118,6 +6122,7 @@ public final class com/letta/mobile/ui/pairing/PairingStrings {
 	public static final field INVITE_TITLE Ljava/lang/String;
 	public static final field JOIN_TITLE Ljava/lang/String;
 	public static final field LINK_COPIED Ljava/lang/String;
+	public static final field LINK_ONLY_NO_QR Ljava/lang/String;
 	public static final field LINK_SECRET_NOTE Ljava/lang/String;
 	public static final field NEW_CODE Ljava/lang/String;
 	public static final field NOT_CONNECTED_YET Ljava/lang/String;

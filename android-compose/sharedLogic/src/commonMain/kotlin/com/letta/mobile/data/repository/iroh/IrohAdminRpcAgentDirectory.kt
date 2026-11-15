@@ -3,7 +3,7 @@ package com.letta.mobile.data.repository.iroh
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.chat.send.lettaWireJson
 import com.letta.mobile.data.commands.AgentSlashCommand
-import com.letta.mobile.data.commands.SlashCommandsResponse
+import com.letta.mobile.data.commands.api.SlashCommandsResponse
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
@@ -214,7 +214,7 @@ class IrohAdminRpcAgentDirectory(
             method = AdminRpcMethod("slash_command.list_agent"),
             path = AdminRpcPath("/v1/agents/${agentId.value}/slash-commands"),
             body = entityIdBody("agent_id", agentId.value),
-        ) ?: return emptyList()
+        ) ?: error("Iroh admin_rpc slash_command.list_agent returned no result")
         return json.decodeFromJsonElement(SlashCommandsResponse.serializer(), result).commands
     }
 

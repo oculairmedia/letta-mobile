@@ -185,6 +185,8 @@ Conversation system-prompt recompile requests and their Iroh RPC adapter. Recomp
 
 # Package com.letta.mobile.data.chat.routing
 
+Composer submission routing captures the current graph and conversation, preserves client-local routes, and projects confirmed command output and retryable errors.
+
 Target-conversation selection when following an inter-agent message. Sender and recipient have separate conversation spaces, so navigation cannot assume one shared conversation identifier. Keep navigation and conversation creation outside recipient selection; callers supply conversation candidates to [pickOtherAgentConversation](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.routing/pick-other-agent-conversation.html).
 
 # Package com.letta.mobile.data.chat.runtime
@@ -227,7 +229,7 @@ What the timeline does with steps once presenters have drawn them: which kind of
 
 # Package com.letta.mobile.data.commands
 
-Slash-command contracts and commands answered by the client itself. Navigation/local actions remain distinct from commands requiring active backend support. Keep arbitrary shell execution outside slash-command discovery; provide backend command capabilities through [SlashCommandsApi](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.commands/-slash-commands-api/index.html) and client commands through [ClientSlashCommands](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.commands/-client-slash-commands/index.html).
+Slash-command contracts and commands answered by the client itself. Navigation/local actions remain distinct from commands requiring active backend support. Keep arbitrary shell execution outside slash-command discovery; provide backend command capabilities through [SlashCommandsApi](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.commands.api/-slash-commands-api/index.html) and client commands through [ClientSlashCommands](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.commands/-client-slash-commands/index.html).
 
 # Package com.letta.mobile.data.compaction
 
@@ -932,6 +934,14 @@ Projects the trusted session graph's backend namespace for a pin binding. Sessio
 # Package com.letta.mobile.data.home.shortcut
 
 Existing Home shortcut identities, separated from Home controllers and storage. The original HomeShortcut source alias remains available; persistence names are unchanged.
+
+# Package com.letta.mobile.data.commands.api
+
+Portable slash-command listing contracts, advertised rows and built-in descriptions. They do not depend on composer routing or the App Server protocol; the session graph constructs the protocol adapter over these contracts.
+
+# Package com.letta.mobile.data.transport.delivery
+
+Internal delivery failures shared by transport implementations; the App Server socket retains its existing bounded-drain policy.
 
 # Package com.letta.mobile.data.toolsets
 

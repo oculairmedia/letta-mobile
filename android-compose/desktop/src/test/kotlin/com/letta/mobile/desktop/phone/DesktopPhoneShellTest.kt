@@ -157,6 +157,7 @@ class DesktopPhoneShellTest {
                     DesktopPhoneScreen(state) {
                         DesktopSharedChatPage(
                             state = DesktopSharedChatPageState(
+                                slashCommands = { null },
                                 port = port,
                                 pagedTimeline = null,
                                 hostInputs = ChatComposerHostInputs(),
