@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -91,7 +90,7 @@ internal fun SettingsSkeletonRow(modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .padding(vertical = LettaDimens.Space.xs)
             .height(LettaDimens.Control.minTouchTarget - LettaDimens.Space.sm)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(LettaDimens.Radius.sm)),
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.shapes.small),
     )
 }
 

@@ -23,8 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.MemoryParityItem
@@ -35,6 +33,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.text.LettaSelectionContainer
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /**
  * The selected node's inspector: identity, then what is useful about this kind of node (the
@@ -95,15 +94,13 @@ private fun MemoryNodeCardHeader(card: MemoryNodeCardState, onClose: () -> Unit)
                 LettaSwatch(card.accent)
                 Text(
                     kindOverline(detail.kind).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    style = LettaTextStyles.labelSmallSemibold,
                     color = card.accent,
                 )
             }
             Text(
                 detail.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = LettaTextStyles.titleMediumSemibold,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -176,8 +173,7 @@ private fun ColumnScope.MemoryNodeText(text: String, monospace: Boolean) {
     LettaSelectionContainer(Modifier.weight(1f, fill = false)) {
         Text(
             shown,
-            style = MaterialTheme.typography.bodyMedium,
-            fontFamily = if (monospace) FontFamily.Monospace else null,
+            style = if (monospace) LettaTextStyles.monoBody else MaterialTheme.typography.bodyMedium,
             modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
         )
     }

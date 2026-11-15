@@ -21,7 +21,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.context.AgentContextCardModel
 import com.letta.mobile.data.context.CompactAffordance
 import com.letta.mobile.data.context.ContextMeter
@@ -42,12 +41,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
 import com.letta.mobile.ui.components.row.LettaListRow
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.picker.PickerDrillIn
 import com.letta.mobile.ui.components.picker.rememberPickerDrillIn
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.modelcontrol.LocalModelPickerContextTokens
 import com.letta.mobile.ui.modelcontrol.ModelControlStrings
 import com.letta.mobile.ui.modelcontrol.ModelPickerActions
@@ -56,6 +53,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LettaSpinner
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.components.foundation.LettaNavChevron
 
 /**
  * The model list the sheet shows, when the host can switch models. [onEffortApplied] sets the
@@ -138,7 +137,7 @@ private fun ModelRow(model: AgentContextCardModel, picker: AgentContextPicker, o
         spec = LettaListRowSpec(title = name, trailing = EffortChoice.tierOf(model.effort, selected)?.let(ModelControlStrings::tierLabel)),
         onClick = onOpen,
         modifier = Modifier.padding(horizontal = LettaDimens.Space.sm).testTag(AgentContextTags.MODEL_ROW),
-        end = { Icon(LettaIcons.ChevronRight, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
+        end = { LettaNavChevron() },
     )
 }
 
@@ -188,7 +187,7 @@ private class EffortChoice(val entry: ModelPickerEntry, val stops: ReasoningEffo
 @Composable
 private fun SheetHeading(title: String, caption: String, captionModifier: Modifier = Modifier) {
     Column(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm)) {
-        Text(text = title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(text = title, style = LettaTextStyles.titleSemibold)
         Text(
             text = caption,
             style = MaterialTheme.typography.labelMedium,
@@ -225,8 +224,7 @@ private fun ContextHeader(model: AgentContextCardModel) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = AgentContextStrings.CONTEXT_TITLE,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
+            style = LettaTextStyles.titleSemibold,
             modifier = Modifier.weight(1f),
         )
         val usage = model.meter?.usage ?: return@Row

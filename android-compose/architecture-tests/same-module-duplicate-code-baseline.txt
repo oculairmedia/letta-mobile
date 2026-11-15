@@ -79,7 +79,7 @@ android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/trans
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohFrameFlowContent.kt|android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohTransportSupport.kt 5
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohObserverIngestor.kt|android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohTransportSupport.kt 6
 android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/timeline/TimelinePlatform.jvm.kt|android-compose/sharedLogic/src/wasmJsMain/kotlin/com/letta/mobile/data/timeline/TimelinePlatform.wasmJs.kt 11
-android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiBasicWidgets.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiBasicWidgets.kt 52
+android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiBasicWidgets.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiBasicWidgets.kt 31
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiBasicWidgets.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiSelectionWidgets.kt 87
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiRendererSupport.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiScheduleWidgets.kt 20
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiRendererSupport.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiToolApprovalWidgets.kt 6

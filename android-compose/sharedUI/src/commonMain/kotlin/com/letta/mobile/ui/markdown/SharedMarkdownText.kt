@@ -10,7 +10,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
@@ -21,6 +20,7 @@ import com.mikepenz.markdown.model.ReferenceLinkHandlerImpl
 import com.mikepenz.markdown.model.rememberMarkdownState
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.parser.MarkdownParser
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /**
  * A host-supplied markdown renderer for the shared chat page.
@@ -129,7 +129,7 @@ private fun sharedMarkdownTypography(bodyStyle: TextStyle?): MarkdownTypography 
     val body = bodyStyle ?: MaterialTheme.typography.bodyLarge
     return markdownTypography(
         text = bodyStyle ?: MaterialTheme.typography.bodyMedium,
-        code = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+        code = LettaTextStyles.mono,
         h1 = MaterialTheme.typography.headlineSmall,
         h2 = MaterialTheme.typography.titleLarge,
         h3 = MaterialTheme.typography.titleMedium,

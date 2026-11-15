@@ -10,7 +10,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -20,6 +19,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.graph.GraphDimens
 import kotlin.math.abs
 import kotlin.math.max
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /**
  * A node's label, measured once per graph/theme: the short form, and the full title the focused
@@ -31,20 +31,17 @@ internal class MemoryNodeLabel(val short: TextLayoutResult, val full: TextLayout
 @Composable
 internal fun rememberMemoryNodeLabels(view: MemoryGraphView, palette: MemoryGraphPalette, compact: Boolean): Map<String, MemoryNodeLabel> {
     val measurer = rememberTextMeasurer()
-    val typography = MaterialTheme.typography
+    val rootStyle = LettaTextStyles.labelSemibold.merge(TextStyle(color = palette.label))
+    val leafStyle = MaterialTheme.typography.labelMedium.merge(TextStyle(color = palette.label))
     val density = LocalDensity.current
     val resting = if (compact) LettaDimens.Pane.nodeLabelMaxWidth else GraphDimens.labelWidth
     val shortWidth = with(density) { resting.roundToPx() }
     val fullWidth = with(density) { (if (compact) resting * 2 else GraphDimens.labelFocusedWidth).roundToPx() }
     val maxChars = if (compact) COMPACT_CHARS else MemoryLabelText.MAX_CHARS
-    return remember(view, palette, typography, density, shortWidth) {
+    return remember(view, rootStyle, leafStyle, density, shortWidth) {
         view.nodes.associate { node ->
             val root = node.kind == MemoryGraphNodeKind.Agent || node.kind == MemoryGraphNodeKind.Backend
-            val style = if (root) {
-                typography.labelLarge.copy(fontWeight = FontWeight.SemiBold, color = palette.label)
-            } else {
-                typography.labelMedium.copy(color = palette.label)
-            }
+            val style = if (root) rootStyle else leafStyle
             node.id to MemoryNodeLabel(
                 short = measurer.label(MemoryLabelText.shorten(node.title, maxChars), style, LabelBox(shortWidth, 1)),
                 full = measurer.label(node.title, style, LabelBox(fullWidth, FULL_LABEL_LINES)),

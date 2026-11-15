@@ -10,13 +10,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.repository.modelcontrol.ConnectableProvider
 import com.letta.mobile.data.transport.appserver.AppServerToolset
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /** Small pieces the model-control surfaces share. */
 
@@ -62,8 +62,7 @@ fun ToolsetSelectorRow(
     ) {
         Text(
             text = "Toolset",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
+            style = LettaTextStyles.labelSmallSemibold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = LettaDimens.Space.xs),
         )

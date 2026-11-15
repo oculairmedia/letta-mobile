@@ -7,7 +7,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import com.letta.mobile.data.memory.graph.MemoryBlockDeletion
 import com.letta.mobile.data.memory.graph.MemoryBlockDraft
 import com.letta.mobile.data.memory.graph.MemoryBlockLifecycleActions
@@ -17,6 +16,7 @@ import com.letta.mobile.ui.host.LettaPaneButton
 import com.letta.mobile.ui.host.LettaPaneButtons
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /** The page's modal layer: the "New block" pane and the delete confirmation. */
 @Composable
@@ -57,7 +57,7 @@ private fun MemoryBlockCreateDialog(draft: MemoryBlockDraft, actions: MemoryBloc
             value = draft.value,
             onValueChange = actions::updateCreateValue,
             label = { Text("Contents") },
-            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+            textStyle = LettaTextStyles.monoBody,
             enabled = !draft.isSaving,
             modifier = Modifier.fillMaxWidth().heightIn(min = LettaDimens.Pane.sidePanelWidth / CONTENT_HEIGHT_DIVISOR),
         )

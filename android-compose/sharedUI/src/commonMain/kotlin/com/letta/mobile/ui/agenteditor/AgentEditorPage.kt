@@ -23,7 +23,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.agenteditor.AgentCreated
@@ -54,6 +53,7 @@ import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.ShellHeader
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 
 /** Test handles of the agent editor page. */
 object AgentEditorPageTags {
@@ -267,8 +267,7 @@ private fun AgentEditorHero(inputs: AgentEditorBodyInputs, onOpen: (AgentEditorP
         Column(Modifier.weight(1f)) {
             Text(
                 inputs.state.form.name.ifBlank { if (inputs.state.creating) "New agent" else "Unnamed agent" },
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
+                style = LettaTextAccents.titleLargeSemibold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

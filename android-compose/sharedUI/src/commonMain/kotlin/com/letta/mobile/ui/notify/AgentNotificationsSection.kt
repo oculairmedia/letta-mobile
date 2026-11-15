@@ -19,11 +19,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /** Test tags of the per-agent notification section. */
 object AgentNotificationsTags {
@@ -67,7 +67,7 @@ fun AgentNotificationsSection(prefs: AttentionPrefsRepository, agentId: String, 
             .testTag(AgentNotificationsTags.SECTION),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
-        Text(text = AgentNotificationsStrings.TITLE, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(text = AgentNotificationsStrings.TITLE, style = LettaTextStyles.titleSemibold)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,

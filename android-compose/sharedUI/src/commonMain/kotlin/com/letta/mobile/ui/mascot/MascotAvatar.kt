@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Image
@@ -28,7 +27,6 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
@@ -48,6 +46,7 @@ import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.AgentPresence
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 
 /**
  * What a platform contributes to draw a live mascot: the per-agent entry (renderer scene +
@@ -236,7 +235,7 @@ internal fun MascotHitArea(size: Dp, onClick: () -> Unit) {
         Modifier
             .mascotBodyArea(size)
             .pointerHoverIcon(PointerIcon.Hand)
-            .clickable(interactionSource = clicks, indication = null, onClick = onClick),
+            .clickable(interactionSource = clicks, indication = null, role = Role.Button, onClick = onClick),
     )
 }
 
@@ -361,7 +360,7 @@ const val MASCOT_TILE_OVERSCALE = 1.6f
 
 /** Distinguishes several surfaces of one agent in [MascotIdentityRegistry.mascotBounds]; composition-thread only. */
 private var slotCounter = 0
-internal val GAZE_MIN_REACH = 360.dp
+internal val GAZE_MIN_REACH = LettaSurfaceSizes.mascotGazeMinReach
 
 /** The identity to draw for [agentId], or null when it has none or the host cannot draw it. */
 @Composable
@@ -372,7 +371,7 @@ private fun drawableIdentity(agentId: String?): MascotIdentity? {
 }
 
 private fun Modifier.clickableIfSet(onClick: (() -> Unit)?): Modifier {
-    return if (onClick != null) clickable(onClick = onClick) else this
+    return if (onClick != null) clickable(role = Role.Button, onClick = onClick) else this
 }
 
 /**
@@ -399,7 +398,7 @@ fun MascotAvatar(
         return
     }
     Box(
-        modifier = modifier.size(size).clip(RoundedCornerShape(cornerRadius)).clickableIfSet(onClick),
+        modifier = modifier.size(size).clip(avatarShape(cornerRadius)).clickableIfSet(onClick),
         contentAlignment = Alignment.Center,
     ) {
         MascotInPlace(agentId, identity, size = size * overscale, live = live)
