@@ -228,7 +228,7 @@ internal fun TimelineItemRow(
             .padding(top = spacing?.first ?: 0.dp)
             // The newest message (your prompt as it lands, then the reply as it streams) draws the
             // mascot's eyes (te3n1.2); only the list's own row, never the pinned copy.
-            .mascotAttention(AttentionKey("message:${item.key}"), AttentionKind.MESSAGE, enabled = leadingSpace && context.isNewest),
+            .mascotAttention(AttentionKey("message:${item.key}"), AttentionKind.MESSAGE, enabled = spacing != null && context.isNewest),
     ) {
         CompositionLocalProvider(LocalNoticeContinued provides (spacing?.second == true)) {
             ChatRenderItemRow(item = item, context = context, callbacks = bindings.callbacks)
