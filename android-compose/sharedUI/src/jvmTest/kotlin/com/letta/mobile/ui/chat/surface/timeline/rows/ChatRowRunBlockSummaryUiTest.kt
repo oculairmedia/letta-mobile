@@ -92,6 +92,82 @@ class ChatRowRunBlockSummaryUiTest {
         UiMessage(id = "a", role = "assistant", content = "Read done.", timestamp = "2026-10-11T16:00:09Z", runId = RUN_ID),
     )
 
+    private fun interleavedImageRun() = runOf(
+        readImageMessage("read-a", "read-image-a"),
+        UiMessage(id = "text-1", role = "assistant", content = "text 1", timestamp = "2026-10-11T16:00:03Z", runId = RUN_ID),
+        readImageMessage("read-b", "read-image-b"),
+        UiMessage(id = "text-2", role = "assistant", content = "text 2", timestamp = "2026-10-11T16:00:09Z", runId = RUN_ID),
+    )
+
+    private fun reasoningBetweenImageAndProseRun() = runOf(
+        readImageMessage("read-reasoning", "read-image-reasoning"),
+        UiMessage(
+            id = "reasoning", role = "assistant", content = "Thinking about the image.",
+            timestamp = "2026-10-11T16:00:03Z", runId = RUN_ID, isReasoning = true,
+        ),
+        UiMessage(id = "text-1", role = "assistant", content = "text 1", timestamp = "2026-10-11T16:00:04Z", runId = RUN_ID),
+    )
+
+    private fun readImageMessage(messageId: String, callId: String) = UiMessage(
+        id = messageId, role = "assistant", content = "", timestamp = "2026-10-11T16:00:02Z", runId = RUN_ID,
+        toolCalls = listOf(UiToolCall(
+            name = "Read", arguments = """{"file_path":"/tmp/pixel.png"}""", result = "[Image: pixel.png]",
+            status = "success", toolCallId = callId,
+            generatedImageAttachments = listOf(com.letta.mobile.data.model.UiImageAttachment(
+                "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADUlEQVR42mNk+M9QDwADjgGAv7SktwAAAABJRU5ErkJggg==",
+                "image/png",
+            )),
+        )),
+    )
+
+    private fun ComposeUiTest.assertInterleavedImageOrder(opened: Boolean) {
+        show(interleavedImageRun(), opened = opened, environment = Environment(reducedMotion = true))
+        awaitText("text 2")
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag(ChatRowTestTags.IMAGE_GRID, useUnmergedTree = true).fetchSemanticsNodes().size == 2
+        }
+        val imageTops = onAllNodesWithTag(ChatRowTestTags.IMAGE_GRID, useUnmergedTree = true)
+            .fetchSemanticsNodes().map { it.boundsInRoot.top }
+        val text1Top = onNodeWithText("text 1").fetchSemanticsNode().boundsInRoot.top
+        val text2Top = onNodeWithText("text 2").fetchSemanticsNode().boundsInRoot.top
+        assertEquals(2, imageTops.size)
+        assertTrue(imageTops[0] < text1Top, "first Read image must precede text 1: $imageTops, $text1Top")
+        assertTrue(text1Top < imageTops[1], "text 1 must precede second Read image: $text1Top, $imageTops")
+        assertTrue(imageTops[1] < text2Top, "second Read image must precede text 2: $imageTops, $text2Top")
+    }
+
+    @Test
+    fun foldedRunKeepsReadImagesInlineWithInterleavedProse() = runComposeUiTest {
+        assertInterleavedImageOrder(opened = false)
+    }
+
+    @Test
+    fun openedRunKeepsReadImagesInlineWithInterleavedProse() = runComposeUiTest {
+        assertInterleavedImageOrder(opened = true)
+    }
+
+    private fun ComposeUiTest.assertReasoningDoesNotConsumeReadImage(opened: Boolean) {
+        show(reasoningBetweenImageAndProseRun(), opened = opened, environment = Environment(reducedMotion = true))
+        awaitText("text 1")
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag(ChatRowTestTags.IMAGE_GRID, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        val imageTop = onNodeWithTag(ChatRowTestTags.IMAGE_GRID, useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot.top
+        val textTop = onNodeWithText("text 1").fetchSemanticsNode().boundsInRoot.top
+        assertTrue(imageTop < textTop, "Read image must follow reasoning and precede text 1: $imageTop, $textTop")
+    }
+
+    @Test
+    fun foldedRunCarriesReadImagePastReasoningToProse() = runComposeUiTest {
+        assertReasoningDoesNotConsumeReadImage(opened = false)
+    }
+
+    @Test
+    fun openedRunCarriesReadImagePastReasoningToProse() = runComposeUiTest {
+        assertReasoningDoesNotConsumeReadImage(opened = true)
+    }
+
     private fun ComposeUiTest.assertOneReadImage() {
         awaitText("Read done.")
         waitUntil(timeoutMillis = 5_000) {
