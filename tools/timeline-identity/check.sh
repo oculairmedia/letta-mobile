@@ -14,11 +14,16 @@ jar="${TLA2TOOLS:-/opt/tools/tla/tla2tools-1.7.4.jar}"
 java="${JAVA:-$( [ -x /usr/lib/jvm/jdk-26/bin/java ] && echo /usr/lib/jvm/jdk-26/bin/java || echo java)}"
 props="${PROPS:-NoDuplicateKey NoVanishedRow StableKeys StableRowKeysAcrossRecut StableKeysAcrossRecut}"
 [ -f "$jar" ] || { echo "TLC jar not found: $jar (set TLA2TOOLS)"; exit 2; }
+# TLC runs from a scratch directory, so every path given relative to the caller is made absolute first.
+absolute() { echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"; }
+jar="$(absolute "$jar")"
+case "$java" in */*) java="$(absolute "$java")" ;; esac
 cfgs=("$@"); [ ${#cfgs[@]} -gt 0 ] || cfgs=($(cd "$here" && ls *.cfg | sed 's/\.cfg$//'))
 work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
 cp "$here"/*.tla "$work"/
 out="${OUT:-$here/out}"
 mkdir -p "$out"
+out="$(cd "$out" && pwd)"
 status=0
 for cfg in "${cfgs[@]}"; do
   for prop in $props; do

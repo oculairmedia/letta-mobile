@@ -34,12 +34,15 @@ s3-live-b      StableRowKeysAcrossRecut keyByPageEdge,forgetKeys
 '
 # The broken configs are written next to the committed ones (check.sh reads configs from here);
 # the trap removes them too, so an interrupted run never leaves one for a later full check.sh.
-work="$(mktemp -d)"; trap 'rm -rf "$work"; rm -f "$here"/_break-*.cfg' EXIT
+# Each run names its configs with its own process id and removes only those, so two runs at once
+# never delete a config the other has yet to read.
+mine="_break-$$"
+work="$(mktemp -d)"; trap 'rm -rf "$work"; rm -f "$here/$mine"-*.cfg' EXIT
 status=0
 while read -r cfg prop brk; do
   [ -n "$cfg" ] || continue
   case "$cfg" in "$only"*) ;; *) continue ;; esac
-  tmp="_break-$cfg-${brk//,/-}"
+  tmp="$mine-$cfg-${brk//,/-}"
   set_of="{\"${brk//,/\", \"}\"}"
   sed "s/^    Break = .*/    Break = $set_of/" "$here/$cfg.cfg" > "$here/$tmp.cfg"
   line="$(OUT="$work/out" PROPS="$prop" KEEP=1 "$here/check.sh" "$tmp" 2>&1 | tail -1)"
