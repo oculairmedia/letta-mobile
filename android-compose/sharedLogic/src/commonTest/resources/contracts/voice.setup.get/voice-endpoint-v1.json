@@ -1,0 +1,50 @@
+{
+  "method": "voice.setup.get",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/voice/VoiceSetupHandlers.kt",
+  "contract": "voice-endpoint",
+  "capability": "voice_endpoint_v1",
+  "required_capability": "chat.read",
+  "streamed": false,
+  "spec": "docs/reference/contracts/voice-endpoint-v1.md",
+  "note": "Synthetic values only: example.invalid hosts, a placeholder key, a few bytes of silence and placeholder text.",
+  "cases": [
+    {
+      "name": "nothing stored",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": null}},
+      "params": {},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"contract_version": 1, "configured": false, "has_api_key": false, "transcription": {"available": false}, "speech": {"available": false}, "consent": {"grants": {"audio_for_transcription": false, "text_for_synthesis": false}}, "reachability": {"state": "unknown"}}}
+    },
+    {
+      "name": "listening and speaking available",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-a", "speech_model": "tts-model-a", "voice": "voice-a", "grants": {"audio_for_transcription": true, "text_for_synthesis": true}, "granted_at_ms": 1767225600000, "reachability": {"state": "reachable", "checked_at_ms": 1767225600000}}}},
+      "params": {},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"contract_version": 1, "configured": true, "revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription": {"available": true, "model": "stt-model-a"}, "speech": {"available": true, "model": "tts-model-a", "voice": "voice-a"}, "consent": {"origin": "https://speech.example.invalid:443", "grants": {"audio_for_transcription": true, "text_for_synthesis": true}, "granted_at_ms": 1767225600000}, "reachability": {"state": "reachable", "checked_at_ms": 1767225600000}}}
+    },
+    {
+      "name": "speaking only",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-3", "base_url": "https://speech.example.invalid", "has_api_key": true, "speech_model": "tts-model-a", "voice": "voice-a", "grants": {"audio_for_transcription": false, "text_for_synthesis": true}, "granted_at_ms": 1767225600000, "reachability": {"state": "failed", "checked_at_ms": 1767225600000, "error": "voice.upstream_unauthorized"}}}},
+      "params": {},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"contract_version": 1, "configured": true, "revision": "rev-3", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription": {"available": false}, "speech": {"available": true, "model": "tts-model-a", "voice": "voice-a"}, "consent": {"origin": "https://speech.example.invalid:443", "grants": {"audio_for_transcription": false, "text_for_synthesis": true}, "granted_at_ms": 1767225600000}, "reachability": {"state": "failed", "checked_at_ms": 1767225600000, "error": "voice.upstream_unauthorized"}}}
+    },
+    {
+      "name": "pairing without chat read",
+      "context": {"authenticated": true, "capabilities": ["workactivity.report"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": null}},
+      "params": {},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "forbidden", "capability": "chat.read"},
+      "expected_code": "forbidden"
+    },
+    {
+      "name": "host without the contract",
+      "context": {"authenticated": true, "capabilities": ["admin.full"]},
+      "host_state": {"controller_state": "connected", "voice": {"contract_served": false}},
+      "params": {},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "Unknown method: voice.setup.get"},
+      "expected_code": "unsupported"
+    }
+  ]
+}

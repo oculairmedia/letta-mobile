@@ -304,9 +304,14 @@ object IrohPeerCapabilities {
         "step.list",
         "identity.list", "identity.get",
         "run.list", "run.get",
+        // Voice endpoint v1: the shared speech setup status (never the key) and the stored server's
+        // models, read like provider.list. Its writes (voice.setup.set / clear / test) stay admin.full
+        // via the else branch, like provider.connect.
+        "voice.setup.get", "voice.models.list",
     )
 
-    private val CHAT_SEND_METHODS = setOf("approval.submit")
+    // Voice endpoint v1: speaking and listening through the host act for the device like a chat send.
+    private val CHAT_SEND_METHODS = setOf("approval.submit", "voice.transcribe", "voice.speech")
 
     private val CONVERSATION_MANAGE_METHODS = setOf(
         "subagent.dismiss",

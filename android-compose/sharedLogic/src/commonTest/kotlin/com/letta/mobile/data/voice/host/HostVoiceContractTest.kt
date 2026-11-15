@@ -26,9 +26,14 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-/** Decodes and re-encodes every case of the voice-endpoint v1 fixture through the client wire types. */
+/** Decodes and re-encodes every case of the voice-endpoint v1 per-method fixtures through the client wire types. */
 class HostVoiceContractTest {
-    private val fixture = json.decodeFromString(VoiceFixture.serializer(), voiceEndpointContractText)
+    private val fixture = VoiceFixture.of(
+        listOf(
+            voiceSetupGetContractText, voiceSetupSetContractText, voiceSetupClearContractText, voiceSetupTestContractText,
+            voiceModelsListContractText, voiceTranscribeContractText, voiceSpeechContractText,
+        ).map { json.decodeFromString(VoiceMethod.serializer(), it) },
+    )
 
     @Test
     fun fixtureNamesEveryMethodWithItsCapability() {
@@ -140,18 +145,30 @@ class HostVoiceContractTest {
         return value
     }
 
-    @Serializable
-    private data class VoiceFixture(
+    /** The seven per-method fixtures, split into single-response methods and the streamed one. */
+    private class VoiceFixture(
         val version: Int,
         val capability: String,
         val methods: List<VoiceMethod>,
-        val streams: List<VoiceStream>,
-    )
+        val streams: List<VoiceMethod>,
+    ) {
+        companion object {
+            fun of(blocks: List<VoiceMethod>) = VoiceFixture(
+                version = blocks.map { it.version }.distinct().single(),
+                capability = blocks.map { it.capability }.distinct().single(),
+                methods = blocks.filterNot { it.streamed },
+                streams = blocks.filter { it.streamed },
+            )
+        }
+    }
 
     @Serializable
     private data class VoiceMethod(
         val method: String,
+        val version: Int,
+        val capability: String,
         @SerialName("required_capability") val requiredCapability: String,
+        val streamed: Boolean,
         val cases: List<VoiceCase>,
     )
 
@@ -159,23 +176,8 @@ class HostVoiceContractTest {
     private data class VoiceCase(
         val name: String,
         val params: JsonObject,
-        @SerialName("expected_response") val expectedResponse: JsonObject,
-        @SerialName("expected_code") val expectedCode: String? = null,
-    )
-
-    @Serializable
-    private data class VoiceStream(
-        val method: String,
-        @SerialName("required_capability") val requiredCapability: String,
-        val cases: List<VoiceStreamCase>,
-    )
-
-    @Serializable
-    private data class VoiceStreamCase(
-        val name: String,
-        val params: JsonObject,
-        @SerialName("client_frames") val clientFrames: List<VoiceClientFrame>,
-        @SerialName("server_frames") val serverFrames: List<JsonObject>,
+        @SerialName("client_frames") val clientFrames: List<VoiceClientFrame> = emptyList(),
+        @SerialName("server_frames") val serverFrames: List<JsonObject> = emptyList(),
         @SerialName("expected_response") val expectedResponse: JsonObject,
         @SerialName("expected_code") val expectedCode: String? = null,
     )

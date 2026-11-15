@@ -168,7 +168,7 @@ object AdminRpcRegistry {
 
     val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos", "subagent.dismiss")
 
-    /** Host-supplied route families: the plugin host, the canvas mount routes and the secret request routes. */
+    /** Host-supplied route families: the plugin host, the canvas mount, secret request and voice endpoint routes. */
     private fun registerHostRoutes(router: AdminRpcRouter, services: AdminRpcHostServices) {
         services.pluginRoutes?.register(router)
             ?: CapabilityUnavailable.register(router, PluginAdminRpc.METHODS, "plugin host")
@@ -176,6 +176,8 @@ object AdminRpcRegistry {
         services.canvasMountRoutes?.register(router)
         // All six secret request routes or none, never under the anonymous policy or without a keystore.
         services.secretRequestRoutes?.register(router)
+        // All seven voice endpoint routes or none.
+        services.voiceRoutes?.register(router)
     }
 
     private fun registerBeads(router: AdminRpcRouter, services: AdminRpcHostServices) {

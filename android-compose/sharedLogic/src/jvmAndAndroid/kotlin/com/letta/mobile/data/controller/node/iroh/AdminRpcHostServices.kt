@@ -28,4 +28,9 @@ class AdminRpcHostServices(
      * build them, and only with a paired-peers-only auth policy and a keystore provider; they register nothing otherwise.
      */
     val secretRequestRoutes: AdminRpcRoutes? = null,
+    /**
+     * The voice endpoint routes (the shared speech setup and speech through the host); null registers and
+     * advertises none.
+     */
+    val voiceRoutes: AdminRpcRoutes? = null,
 )

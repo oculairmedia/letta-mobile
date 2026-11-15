@@ -79,6 +79,8 @@ fun buildProductionAdminRouter(
     /** letta-mobile-cdgpr.7: the plugin host's `plugins.*` handlers; null when plugins are off. */
     pluginRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
     canvasMountRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
+    /** The voice endpoint routes (shared speech setup, speech through the host); null registers none. */
+    voiceRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
 ): AdminRpcRouter {
     // Every skill.list re-reads the root (a symlink is the controllable unit and can
     // change on disk at any time); the cold-start read below also logs what the host
@@ -139,6 +141,7 @@ fun buildProductionAdminRouter(
             },
             pluginRoutes = pluginRoutes,
             canvasMountRoutes = canvasMountRoutes,
+            voiceRoutes = voiceRoutes,
         ),
         pairing = AdminRpcPairing(
             pairingService = pairingService,

@@ -125,6 +125,10 @@ internal class AdminRpcStreamServer(
     private val maxFrameBytes = limits.maxFrameBytes
     private val maxReassembledBytes = limits.maxReassembledBytes
 
+    /** This connection, for handlers that keep per-connection limits. */
+    private val connection = AdminRpcConnection()
+    private val streamedExchange = AdminRpcStreamedExchange(connection, remoteEndpointId, maxFrameBytes, json)
+
     private val permits = Semaphore(maxActiveHandlers)
     private val activeHandlers = AtomicInteger(0)
     private val maxObservedActiveHandlers = AtomicInteger(0)
@@ -160,17 +164,22 @@ internal class AdminRpcStreamServer(
         }
     }
 
-    /** Serves exactly one admin_rpc request/response exchange on [stream]. */
+    /**
+     * Serves exactly one admin_rpc exchange on [stream]: one request, then one response, or for a
+     * streamed method ([AdminRpcRouter.registerStreamed]) stream frames and then the final response.
+     */
     suspend fun handleStream(stream: AdminRpcBiStream) {
         val sendStream = stream.send()
         try {
-            val frameJson = withTimeoutOrNull(firstFrameTimeoutMs.milliseconds) {
-                readOneFrame(stream.recv())
-            }
-            val response = if (frameJson == null) {
-                errorEnvelope("", "admin_rpc request stream closed before request")
-            } else {
-                handleFrame(frameJson)
+            val reader = frameReader(stream.recv())
+            val frameJson = withTimeoutOrNull(firstFrameTimeoutMs.milliseconds) { reader.next() }
+            val response = when (val handled = frameJson?.let { handleFrame(it) }) {
+                null -> errorEnvelope("", "admin_rpc request stream closed before request")
+                is FrameResult.Response -> handled.json
+                is FrameResult.Streamed -> {
+                    streamedExchange.serve(AdminRpcStreamedRequest(handled.handler, handled.invocation, reader, sendStream))
+                    return
+                }
             }
             runCatching { writeResponse(sendStream, response) }
                 .onFailure { writeError ->
@@ -251,7 +260,7 @@ internal class AdminRpcStreamServer(
         return listOf(IrohFrameCodec.encodeFrame(errorEnvelope(requestId, detail), maxFrameBytes))
     }
 
-    private suspend fun readOneFrame(recv: AdminRpcRecvStream): String? {
+    private fun frameReader(recv: AdminRpcRecvStream): AdminRpcFrameReader {
         // Chunked (frame_part) requests may only widen reassembly memory
         // beyond a single frame once the peer has authenticated AND advertised
         // the capability — otherwise a peer holding just the ticket could pin
@@ -259,19 +268,18 @@ internal class AdminRpcStreamServer(
         val decoder = IrohFrameCodec.Decoder(maxFrameBytes, maxReassembledBytesProvider = {
             if (authenticated.get() && peerSupportsFrameParts()) maxReassembledBytes else maxFrameBytes
         })
-        while (true) {
-            val chunk = recv.read(READ_CHUNK_SIZE.toUInt())
-            if (chunk.isEmpty()) {
-                decoder.finish()
-                return null
-            }
-            val frames = decoder.feed(chunk)
-            if (frames.isNotEmpty()) return frames.first()
-        }
+        return AdminRpcFrameReader(recv, decoder)
     }
 
-    private suspend fun handleFrame(frameJson: String): String {
-        return try {
+    /** What a request frame leads to: one response, or a streamed exchange that passed every gate. */
+    private sealed interface FrameResult {
+        class Response(val json: String) : FrameResult
+
+        class Streamed(val handler: AdminRpcStreamedHandler, val invocation: AdminRpcInvocation) : FrameResult
+    }
+
+    private suspend fun handleFrame(frameJson: String): FrameResult {
+        val response = try {
             val obj = json.parseToJsonElement(frameJson).jsonObject
             val type = obj["type"]?.jsonPrimitive?.contentOrNull
             val requestId = obj["request_id"]?.jsonPrimitive?.contentOrNull
@@ -290,7 +298,7 @@ internal class AdminRpcStreamServer(
             } else if (method == null || requestId == null) {
                 errorEnvelope(requestId ?: "", "method and request_id are required")
             } else {
-                authorizeAndDispatch(method, requestId, obj)
+                return authorizeAndDispatch(method, requestId, obj)
             }
         } catch (ce: CancellationException) {
             throw ce
@@ -299,6 +307,7 @@ internal class AdminRpcStreamServer(
             // (secret.request.submit).
             errorEnvelope("", "Failed to parse admin_rpc frame (${error::class.simpleName})")
         }
+        return FrameResult.Response(response)
     }
 
     /** One line per request, except health.check: a client's keep-alive poll was two thirds of every admin_rpc line. */
@@ -321,7 +330,7 @@ internal class AdminRpcStreamServer(
      * observation too; only an allowed call observes, then dispatches. Split out
      * of [handleFrame] purely to flatten the frame's validation chain.
      */
-    private suspend fun authorizeAndDispatch(method: String, requestId: String, obj: JsonObject): String {
+    private suspend fun authorizeAndDispatch(method: String, requestId: String, obj: JsonObject): FrameResult {
         val deniedCapability = capabilityGate(method)
         if (deniedCapability != null) {
             Telemetry.event(
@@ -330,7 +339,7 @@ internal class AdminRpcStreamServer(
                 "method" attr method,
                 "capability" attr deniedCapability,
             )
-            return forbiddenEnvelope(requestId, deniedCapability)
+            return FrameResult.Response(forbiddenEnvelope(requestId, deniedCapability))
         }
         val params = obj["params"]?.jsonObject
         val invocation = AdminRpcInvocation(
@@ -339,7 +348,14 @@ internal class AdminRpcStreamServer(
             params = params,
             context = requestContextProvider(),
         )
-        router.preauthorize(invocation)?.let { return it }
+        router.preauthorize(invocation)?.let { return FrameResult.Response(it) }
+        // A streamed method is not observed: observation tracks conversation viewers, which no
+        // streamed method changes.
+        router.streamedHandler(method)?.let { return FrameResult.Streamed(it, invocation) }
+        return FrameResult.Response(dispatchObserved(method, params, invocation))
+    }
+
+    private suspend fun dispatchObserved(method: String, params: JsonObject?, invocation: AdminRpcInvocation): String {
         val settle = notifyMethodObserved(method, params)
         val settleObservation: suspend (Boolean) -> Unit = { succeeded ->
             if (settle != null) {
@@ -357,7 +373,7 @@ internal class AdminRpcStreamServer(
             }
         }
         val response = try {
-            router.dispatch(invocation.copy(context = requestContextProvider()))
+            withContext(connection) { router.dispatch(invocation.copy(context = requestContextProvider())) }
         } catch (cancelled: CancellationException) {
             settleObservation(false)
             throw cancelled
@@ -431,7 +447,6 @@ internal class AdminRpcStreamServer(
     companion object {
         const val DEFAULT_MAX_ACTIVE_HANDLERS = 16
         const val DEFAULT_FIRST_FRAME_TIMEOUT_MS = 15_000L
-        private const val READ_CHUNK_SIZE = 8192
         private const val HEALTH_CHECK_METHOD = "health.check"
     }
 }

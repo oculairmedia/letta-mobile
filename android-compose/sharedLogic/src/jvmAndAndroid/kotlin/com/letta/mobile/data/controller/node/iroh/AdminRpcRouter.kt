@@ -84,6 +84,7 @@ class AdminRpcRouter(
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
     private val handlers = mutableMapOf<String, suspend (JsonObject?, AdminRpcRequestContext) -> JsonElement>()
+    private val streamedHandlers = mutableMapOf<String, AdminRpcStreamedHandler>()
 
     val methodCount: Int
         get() = handlers.size
@@ -107,6 +108,23 @@ class AdminRpcRouter(
         Telemetry.event("AdminRpc", "handler.registered", "method" attr method)
     }
 
+    /**
+     * Registers a streamed method: on a request bi-stream of its own, [AdminRpcStreamServer] hands it to
+     * [streamed], which may write stream frames before the final response. Anywhere else (the
+     * control channel, a direct dispatch) [elsewhere] answers, normally with a refusal.
+     */
+    internal fun registerStreamed(
+        method: String,
+        streamed: AdminRpcStreamedHandler,
+        elsewhere: suspend (JsonObject?, AdminRpcRequestContext) -> JsonElement,
+    ) {
+        registerScoped(method, elsewhere)
+        streamedHandlers[method] = streamed
+    }
+
+    /** The streamed handler of [method], or null when it answers with a single response. */
+    internal fun streamedHandler(method: String): AdminRpcStreamedHandler? = streamedHandlers[method]
+
     fun requireNonEmpty(minMethods: Int = 1): AdminRpcRouter {
         require(handlers.size >= minMethods) {
             "Admin RPC router has ${handlers.size} registered methods; expected at least $minMethods"
@@ -125,6 +143,8 @@ class AdminRpcRouter(
     fun copyHandlersFrom(other: AdminRpcRouter): AdminRpcRouter {
         handlers.clear()
         handlers.putAll(other.handlers)
+        streamedHandlers.clear()
+        streamedHandlers.putAll(other.streamedHandlers)
         featureCapabilities = other.featureCapabilities
         return requireNonEmpty(other.methodCount)
     }

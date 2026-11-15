@@ -634,6 +634,10 @@ class AppServerServeIrohCommand : CliktCommand(
             permissionModes = permissionModes,
             pluginRoutes = pluginRoutes,
             canvasMountRoutes = canvasMountRoutes,
+            // The shared speech setup lives beside the model exposure decisions; its key in an owner-only file.
+            voiceRoutes = com.letta.mobile.data.controller.node.iroh.voice.VoiceEndpointRoutes.forHost(
+                java.io.File(resolvedModelExposureFile()).absoluteFile.parentFile.toPath(),
+            ),
         )
         notebookGrantsFile?.let { file ->
             val store = requireNotNull(notebooks) { "Notebook grants require a notebook store" }

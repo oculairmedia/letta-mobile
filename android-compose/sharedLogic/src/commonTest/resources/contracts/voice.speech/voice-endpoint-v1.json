@@ -1,0 +1,92 @@
+{
+  "method": "voice.speech",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/voice/VoiceRequestHandlers.kt",
+  "contract": "voice-endpoint",
+  "capability": "voice_endpoint_v1",
+  "required_capability": "chat.send",
+  "streamed": true,
+  "spec": "docs/reference/contracts/voice-endpoint-v1.md",
+  "note": "Synthetic values only: example.invalid hosts, a placeholder key, a few bytes of silence and placeholder text.",
+  "cases": [
+    {
+      "name": "streamed reply",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "speech_model": "tts-model-a", "voice": "voice-a", "grants": {"audio_for_transcription": false, "text_for_synthesis": true}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"speech": "wav_stream", "sample_rate_hz": 24000, "channels": 1}}},
+      "params": {"text": "Placeholder reply."},
+      "client_frames": [],
+      "server_frames": [
+        {"type": "admin_rpc_stream", "request_id": "contract", "seq": 0, "event": "format", "sample_rate_hz": 24000, "channels": 1, "sample_format": "s16le"},
+        {"type": "admin_rpc_stream", "request_id": "contract", "seq": 1, "event": "audio", "pcm": "AAAAAAAAAAA="},
+        {"type": "admin_rpc_stream", "request_id": "contract", "seq": 2, "event": "audio", "pcm": "AAAAAA=="}
+      ],
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"audio_frames": 2, "sample_frames": 6}}
+    },
+    {
+      "name": "cancelled after first audio",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "speech_model": "tts-model-a", "voice": "voice-a", "grants": {"audio_for_transcription": false, "text_for_synthesis": true}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"speech": "wav_stream_slow", "sample_rate_hz": 24000, "channels": 1}}},
+      "params": {"text": "Placeholder reply."},
+      "client_frames": [{"after_seq": 1, "frame": {"type": "admin_rpc_cancel", "request_id": "contract"}}],
+      "server_frames": [
+        {"type": "admin_rpc_stream", "request_id": "contract", "seq": 0, "event": "format", "sample_rate_hz": 24000, "channels": 1, "sample_format": "s16le"},
+        {"type": "admin_rpc_stream", "request_id": "contract", "seq": 1, "event": "audio", "pcm": "AAAAAAAAAAA="}
+      ],
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.cancelled"},
+      "expected_code": "voice.cancelled",
+      "expected_upstream": "closed"
+    },
+    {
+      "name": "server refuses the key before any audio",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "speech_model": "tts-model-a", "voice": "voice-a", "grants": {"audio_for_transcription": false, "text_for_synthesis": true}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"status": 401}}},
+      "params": {"text": "Placeholder reply."},
+      "client_frames": [],
+      "server_frames": [],
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.upstream_unauthorized"},
+      "expected_code": "voice.upstream_unauthorized"
+    },
+    {
+      "name": "stream breaks after its format",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "speech_model": "tts-model-a", "voice": "voice-a", "grants": {"audio_for_transcription": false, "text_for_synthesis": true}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"speech": "wav_header_then_garbage", "sample_rate_hz": 24000, "channels": 1}}},
+      "params": {"text": "Placeholder reply."},
+      "client_frames": [],
+      "server_frames": [
+        {"type": "admin_rpc_stream", "request_id": "contract", "seq": 0, "event": "format", "sample_rate_hz": 24000, "channels": 1, "sample_format": "s16le"}
+      ],
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.upstream_bad_response"},
+      "expected_code": "voice.upstream_bad_response"
+    },
+    {
+      "name": "text grant missing",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-a", "speech_model": "tts-model-a", "voice": "voice-a", "grants": {"audio_for_transcription": true, "text_for_synthesis": false}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}}},
+      "params": {"text": "Placeholder reply."},
+      "client_frames": [],
+      "server_frames": [],
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.consent_required"},
+      "expected_code": "voice.consent_required"
+    },
+    {
+      "name": "one synthesis already in flight",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "speech_model": "tts-model-a", "voice": "voice-a", "grants": {"audio_for_transcription": false, "text_for_synthesis": true}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "in_flight": {"voice.speech": 1}}},
+      "params": {"text": "Placeholder reply."},
+      "client_frames": [],
+      "server_frames": [],
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.busy"},
+      "expected_code": "voice.busy"
+    },
+    {
+      "name": "text over the limit",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "speech_model": "tts-model-a", "voice": "voice-a", "grants": {"audio_for_transcription": false, "text_for_synthesis": true}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "text_override": {"chars": 4097}}},
+      "params": {"text": "Placeholder reply."},
+      "client_frames": [],
+      "server_frames": [],
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.payload_too_large"},
+      "expected_code": "voice.payload_too_large"
+    }
+  ]
+}

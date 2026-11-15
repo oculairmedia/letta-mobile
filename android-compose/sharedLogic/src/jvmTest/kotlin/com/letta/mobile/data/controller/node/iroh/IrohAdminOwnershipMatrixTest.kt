@@ -44,7 +44,10 @@ class IrohAdminOwnershipMatrixTest {
         val registered = router.registeredMethods
         val allDeclared = operations.map { it.requiredString("method") }.toSet()
         val secretMethods = com.letta.mobile.data.secrets.wire.SecretRequestRouteWire.METHODS
-        val declared = allDeclared.filterNot { it.startsWith("beads.") || it in CanvasMountWire.METHODS || it in secretMethods }.toSet()
+        val voiceMethods = com.letta.mobile.data.voice.host.HostVoiceWire.METHODS
+        val declared = allDeclared.filterNot {
+            it.startsWith("beads.") || it in CanvasMountWire.METHODS || it in secretMethods || it in voiceMethods
+        }.toSet()
 
         assertEquals(operations.size, allDeclared.size, "Duplicate method rows in the ownership matrix")
         assertEquals(
@@ -62,6 +65,11 @@ class IrohAdminOwnershipMatrixTest {
             secretMethods,
             allDeclared.filter { it.startsWith("secret.request") }.toSet(),
             "Conditional secret request routes must all have ownership decisions",
+        )
+        assertEquals(
+            voiceMethods,
+            allDeclared.filter { it.startsWith("voice.") }.toSet(),
+            "Conditional voice endpoint routes must all have ownership decisions",
         )
         assertEquals(
             emptySet(),
