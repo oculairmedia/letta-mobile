@@ -48,7 +48,7 @@ fun LettaChipTab(
         leading?.invoke()
         Text(
             text = text,
-            style = if (active) LettaTextAccents.labelMediumSemibold else MaterialTheme.typography.labelMedium,
+            style = if (active) LettaTextAccents.labelMediumSemibold else LettaTextAccents.labelMediumRegular,
             color = if (active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
         )

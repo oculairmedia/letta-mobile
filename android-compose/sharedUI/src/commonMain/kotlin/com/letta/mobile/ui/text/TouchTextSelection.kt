@@ -203,7 +203,8 @@ fun TouchTextToolbarHost(toolbar: TouchTextToolbar, quoteSink: QuoteSink? = null
             shape = LettaShapes.pill,
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            shadowElevation = LettaSpaceTokens.sm,
+            tonalElevation = LettaSurfaceSizes.selectionToolbarTonalElevation,
+            shadowElevation = LettaSurfaceSizes.selectionToolbarShadow,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 actions.forEachIndexed { index, (label, action) ->

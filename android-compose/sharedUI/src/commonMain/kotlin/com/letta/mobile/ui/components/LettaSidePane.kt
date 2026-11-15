@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.components.foundation.LettaButtonIcon
 import com.letta.mobile.ui.components.foundation.LettaIconButton
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
-import com.letta.mobile.ui.components.foundation.LettaVerticalDivider
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
@@ -73,9 +72,9 @@ fun LettaSidePane(
                     .width(RESIZE_HANDLE_WIDTH)
                     .fillMaxHeight()
                     .pointerHoverIcon(horizontalResizePointerIcon())
-                    .draggable(state = dragState, orientation = Orientation.Horizontal),
-                contentAlignment = Alignment.Center,
-            ) { LettaVerticalDivider() }
+                    .draggable(state = dragState, orientation = Orientation.Horizontal)
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaSurfaceSizes.resizeHandleAlpha)),
+            )
         }
         Column(
             modifier = Modifier

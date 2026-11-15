@@ -37,6 +37,24 @@ object LettaTextAccents {
         @ReadOnlyComposable
         get() = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
 
+    /** The unselected one of a set of small labels where the selected one is semibold (a chip). `labelMedium` at normal weight. */
+    val labelMediumRegular: TextStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal)
+
+    /** The unselected entry of a navigation list where the selected one is semibold (a section rail). `labelLarge` at normal weight. */
+    val labelLargeRegular: TextStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Normal)
+
+    /** A single letter standing in for an entry's picture (a catalog card's monogram). `titleMedium` bold. */
+    val monogram: TextStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+
     /** A code a person reads off the screen and types elsewhere (a device sign-in code). `headlineSmall` in monospace. */
     val codeDisplay: TextStyle
         @Composable

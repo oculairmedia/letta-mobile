@@ -12219,11 +12219,19 @@ public final class com/letta/mobile/ui/theme/tokens/LettaSurfaceSizes {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaSurfaceSizes;
 	public static final field dropScrimAlpha F
+	public static final field mascotLoadingTrackAlpha F
+	public static final field mascotTileAlpha F
+	public static final field mascotTileSelectedAlpha F
+	public static final field resizeHandleAlpha F
 	public final fun getBannerMaxWidth-D9Ej5fM ()F
+	public final fun getDropGlyph-D9Ej5fM ()F
 	public final fun getMascotGazeMinReach-D9Ej5fM ()F
 	public final fun getMascotPickerTile-D9Ej5fM ()F
+	public final fun getPairingResultGlyph-D9Ej5fM ()F
 	public final fun getRosterSwipeThreshold-D9Ej5fM ()F
 	public final fun getSelectionActionMinWidth-D9Ej5fM ()F
+	public final fun getSelectionToolbarShadow-D9Ej5fM ()F
+	public final fun getSelectionToolbarTonalElevation-D9Ej5fM ()F
 	public final fun getSidePaneMaxWidth-D9Ej5fM ()F
 	public final fun getSidePaneMinWidth-D9Ej5fM ()F
 	public final fun getSidePaneWidth-D9Ej5fM ()F
@@ -12236,7 +12244,10 @@ public final class com/letta/mobile/ui/theme/tokens/LettaTextAccents {
 	public final fun getBodySemibold (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
 	public final fun getBodySmallSemibold (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
 	public final fun getCodeDisplay (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
+	public final fun getLabelLargeRegular (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
+	public final fun getLabelMediumRegular (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
 	public final fun getLabelMediumSemibold (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
+	public final fun getMonogram (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
 	public final fun getTitleLargeSemibold (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
 }
 

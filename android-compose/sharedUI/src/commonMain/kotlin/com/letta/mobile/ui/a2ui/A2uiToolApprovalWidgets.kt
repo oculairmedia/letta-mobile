@@ -173,7 +173,7 @@ internal fun A2uiToolApprovalCard(
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.small,
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = A2uiDimens.argumentsWellAlpha),
                         ) {
                             Column(
                                 modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),

@@ -23,6 +23,7 @@ import com.letta.mobile.ui.components.foundation.LettaPanel
 import com.letta.mobile.ui.components.foundation.lettaClickable
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 
 /*
  * Building blocks for the catalog-style pages (Channels, Skills, Tools, ...) on desktop and
@@ -88,7 +89,7 @@ private fun CatalogCardRow(
             Modifier.size(LettaDimens.Control.actionButton).clip(MaterialTheme.shapes.small).background(accent.copy(alpha = AVATAR_ALPHA)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(leadingLabel, style = LettaTextStyles.titleMediumSemibold, color = accent)
+            Text(leadingLabel, style = LettaTextAccents.monogram, color = accent)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair), content = body)
         trailing()

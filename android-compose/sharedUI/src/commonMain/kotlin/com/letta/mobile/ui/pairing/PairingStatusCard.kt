@@ -34,9 +34,9 @@ import com.letta.mobile.data.pairing.QrModules
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaSpinner
-import com.letta.mobile.ui.theme.tokens.LettaComponentDimens
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 
 /** What the joining device can do from the status card and the scanner. */
 class PairingScanActions(
@@ -135,7 +135,7 @@ private fun PairedContent(state: PairingState.Paired, onOpenChat: () -> Unit) {
     LettaIcon(
         LettaIcons.CheckCircle,
         contentDescription = null,
-        style = LettaIconStyle(LettaComponentDimens.emptyStateIcon, MaterialTheme.colorScheme.primary),
+        style = LettaIconStyle(LettaSurfaceSizes.pairingResultGlyph, MaterialTheme.colorScheme.primary),
     )
     Text(PairingStrings.pairedTitle(state), style = MaterialTheme.typography.titleMedium)
     Text(
@@ -159,7 +159,7 @@ private fun FailedContent(state: PairingState.Failed, actions: PairingScanAction
     LettaIcon(
         LettaIcons.Error,
         contentDescription = null,
-        style = LettaIconStyle(LettaComponentDimens.emptyStateIcon, MaterialTheme.colorScheme.error),
+        style = LettaIconStyle(LettaSurfaceSizes.pairingResultGlyph, MaterialTheme.colorScheme.error),
     )
     Text(
         text = PairingStrings.error(state.error),

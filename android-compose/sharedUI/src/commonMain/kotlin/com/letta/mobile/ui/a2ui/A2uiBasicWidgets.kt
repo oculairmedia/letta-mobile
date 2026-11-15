@@ -657,7 +657,7 @@ private fun A2uiSkeletonIcon(
         modifier = modifier
             .size(size)
             .clip(MaterialTheme.shapes.small)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = A2uiDimens.skeletonFillAlpha)),
     )
 }
 

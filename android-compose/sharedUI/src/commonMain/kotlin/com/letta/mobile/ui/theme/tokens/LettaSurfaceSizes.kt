@@ -39,6 +39,26 @@ object LettaSurfaceSizes {
      */
     val mascotGazeMinReach: Dp = 360.dp
 
+    /** The drop target's picture glyph (ImageDropOverlay). */
+    val dropGlyph: Dp = 44.dp
+
+    /** How strongly a side pane's resize strip tints `outlineVariant`, so the grab area reads as a band. */
+    const val resizeHandleAlpha: Float = 0.35f
+
+    /** The glyph that heads a pairing result (paired, failed, accepted). */
+    val pairingResultGlyph: Dp = 24.dp
+
+    /** A mascot shape tile's `surfaceVariant` fill when chosen and when not. */
+    const val mascotTileSelectedAlpha: Float = 0.9f
+    const val mascotTileAlpha: Float = 0.4f
+
+    /** The mascot loading ring's track: `primary` at this strength under the moving arc. */
+    const val mascotLoadingTrackAlpha: Float = 0.18f
+
+    /** The text-selection toolbar's tonal tint and shadow, as the platform's own floating toolbar draws them. */
+    val selectionToolbarTonalElevation: Dp = 3.dp
+    val selectionToolbarShadow: Dp = 6.dp
+
     /** How strongly a full-window drop target dims the content under it (ImageDropOverlay). */
     const val dropScrimAlpha: Float = 0.55f
 }

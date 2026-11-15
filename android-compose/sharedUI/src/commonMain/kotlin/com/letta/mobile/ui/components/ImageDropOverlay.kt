@@ -17,7 +17,6 @@ import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
-import com.letta.mobile.ui.theme.tokens.LettaComponentDimens
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.foundation.LettaIcon
@@ -48,7 +47,7 @@ fun ImageDropOverlay(modifier: Modifier = Modifier) {
                 LettaIcon(
                     imageVector = LettaIcons.Image,
                     contentDescription = null,
-                    style = LettaIconStyle(LettaComponentDimens.emptyStateIcon, MaterialTheme.colorScheme.primary),
+                    style = LettaIconStyle(LettaSurfaceSizes.dropGlyph, MaterialTheme.colorScheme.primary),
                 )
                 Text(
                     text = "Drop images to attach",

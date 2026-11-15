@@ -128,7 +128,7 @@ fun lettaCustomColors(scheme: ColorScheme): CustomColors =
         dateSeparatorColor = scheme.onSurfaceVariant,
         textPrimary = scheme.onSurface,
         textSecondary = scheme.onSurfaceVariant,
-        textDisabled = scheme.onSurface.copy(alpha = LettaDimens.Alpha.disabled),
+        textDisabled = scheme.onSurface.copy(alpha = TEXT_DISABLED_ALPHA),
         textLink = scheme.primary,
         textOnPrimary = scheme.onPrimary,
         errorTextColor = scheme.error,
@@ -205,3 +205,6 @@ val SharedShapes: Shapes = Shapes(
  * (the user's bubble, a selected row), not content, so it sits far below the content alpha floor.
  */
 private const val LIGHT_PRIMARY_CONTAINER_TINT = 0.16f
+
+/** How strongly disabled text keeps `onSurface` (customColors.textDisabled). */
+private const val TEXT_DISABLED_ALPHA = 0.5f

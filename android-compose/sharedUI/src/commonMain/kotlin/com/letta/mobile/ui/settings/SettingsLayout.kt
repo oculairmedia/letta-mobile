@@ -30,6 +30,7 @@ import com.letta.mobile.ui.components.foundation.LettaSearchOptions
 import com.letta.mobile.ui.components.foundation.LettaSearchField
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 
 /**
  * The Settings page's three form factors. [Phone]: one scrolling list with
@@ -117,7 +118,7 @@ internal fun SettingsRail(groups: List<SettingsGroup>, active: SettingsGroup?, o
                 LettaIcon(group.icon, contentDescription = null, style = LettaIconStyle(tint = color))
                 Text(
                     group.title,
-                    style = if (selected) LettaTextStyles.labelSemibold else MaterialTheme.typography.labelLarge,
+                    style = if (selected) LettaTextStyles.labelSemibold else LettaTextAccents.labelLargeRegular,
                     color = color,
                 )
             }

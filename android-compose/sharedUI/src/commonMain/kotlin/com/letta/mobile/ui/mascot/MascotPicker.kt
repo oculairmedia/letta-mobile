@@ -140,7 +140,11 @@ private fun MascotShapeChoice(
         Modifier
             .size(LettaSurfaceSizes.mascotPickerTile)
             .clip(MaterialTheme.shapes.medium)
-            .background(if (selected) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainer)
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(
+                    alpha = if (selected) LettaSurfaceSizes.mascotTileSelectedAlpha else LettaSurfaceSizes.mascotTileAlpha,
+                ),
+            )
             .border(
                 if (selected) LettaDimens.Space.hair else 0.dp,
                 if (selected) accent else Color.Transparent,

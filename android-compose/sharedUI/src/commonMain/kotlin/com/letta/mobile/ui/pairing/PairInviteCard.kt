@@ -45,9 +45,9 @@ import com.letta.mobile.data.pairing.PairedDevice
 import com.letta.mobile.data.pairing.QrModules
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.tokens.LettaComponentDimens
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 
 /** An agent the inviter may share with the new device. */
 data class AgentChoice(val id: String, val name: String)
@@ -317,7 +317,7 @@ private fun Redeemed(device: PairedDevice, onDone: () -> Unit) {
     LettaIcon(
         LettaIcons.CheckCircle,
         contentDescription = null,
-        style = LettaIconStyle(LettaComponentDimens.emptyStateIcon, MaterialTheme.colorScheme.primary),
+        style = LettaIconStyle(LettaSurfaceSizes.pairingResultGlyph, MaterialTheme.colorScheme.primary),
     )
     Text(
         PairingStrings.accepted(device),

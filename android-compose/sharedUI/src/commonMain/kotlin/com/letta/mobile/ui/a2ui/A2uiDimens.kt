@@ -27,6 +27,15 @@ internal object A2uiDimens {
     /** The narrowest an approve or deny button draws, so short labels still read as buttons. */
     val affordanceButtonMinWidth: Dp = 64.dp
 
+    /** A Card's or Accordion's corner when the payload names none. */
+    val defaultCornerRadius: Dp = 12.dp
+
+    /** How strongly a placeholder line or glyph tints `onSurface`: a quiet shape, not content. */
+    const val skeletonFillAlpha: Float = 0.16f
+
+    /** How strongly a tool request's arguments well tints `surfaceVariant` behind the arguments. */
+    const val argumentsWellAlpha: Float = 0.52f
+
     /** The heavier outline a destructive tool request draws, one step above the hairline. */
     val destructiveBorder: Dp = 2.dp
 }

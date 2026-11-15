@@ -81,7 +81,7 @@ internal fun A2uiSkeletonLine(
             .fillMaxWidth(widthFraction)
             .height(height)
             .clip(MaterialTheme.shapes.small)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = A2uiDimens.skeletonFillAlpha))
     )
 }
 
@@ -398,13 +398,13 @@ internal fun A2uiComponent.weightRowChildren(): Boolean =
     ))
 
 /**
- * The container shape: the payload's own `cornerRadius` (data, drawn as given) on the theme's medium
- * shape, or the medium shape itself when the payload names none.
+ * The container shape on the theme's shape family: the payload's own `cornerRadius` (data, drawn as
+ * given), or [A2uiDimens.defaultCornerRadius] when the payload names none.
  */
 @Composable
 internal fun A2uiComponent.cornerShape(): Shape {
-    val base = MaterialTheme.shapes.medium
-    return raw.dpValue("cornerRadius", "corner_radius")?.let { base.copy(all = CornerSize(it)) } ?: base
+    val radius = raw.dpValue("cornerRadius", "corner_radius") ?: A2uiDimens.defaultCornerRadius
+    return MaterialTheme.shapes.medium.copy(all = CornerSize(radius))
 }
 
 internal fun A2uiComponent.elevation(): Dp =
