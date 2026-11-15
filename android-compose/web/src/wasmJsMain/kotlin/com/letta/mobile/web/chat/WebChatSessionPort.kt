@@ -9,6 +9,8 @@ import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineTransport
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.commands.SlashCommandSessionPort
+import com.letta.mobile.ui.chat.commands.SlashCommandBinding
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatApprovalStateSource
 import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
@@ -43,18 +45,12 @@ class WebChatBinding(
     val hostApprovals: IrohAdminRpcChatGateway? = null,
     /** The shared conversation owner (fork, edit, rerun, `/recompile`) and the shell's `/` palette; null: neither. */
     val conversations: TimelineConversationChat? = null,
+    val slashCommands: SlashCommandBinding,
 )
 
 /**
- * letta-mobile-o4ygk.4.5: the web client's [ChatSessionPort], the way Android's
- * `AdminChatSessionPort` and desktop's `DesktopChatSessionPort` bind theirs.
- *
- * The web binds only: the shared timeline loop runs over [WebChatBinding.transport], and the
- * commonMain [TimelineChatSessionPort] presents it with the shared owner's extension points (the
- * same timeline presenter, composer policy and optimistic send every client uses). Build one per
- * conversation in a scope that ends with it, and [close] it when the page moves on.
- *
- * The timeline lives in memory: a reload hydrates it again (no persistent store yet: letta-mobile-o4ygk.4.7).
+ * The browser's chat host: binds its timeline, chips and shared command submission to one
+ * conversation and page scope. Closing the host stops its in-memory timeline loop.
  */
 class WebChatSessionPort(
     binding: WebChatBinding,
@@ -73,12 +69,12 @@ class WebChatSessionPort(
         approvals = hostApprovalState(binding, scope),
         composerHost = hostInputs,
     ).withChips(scope, binding.target, binding.chips).withConversations(binding.conversations)
-    private val port = TimelineChatSessionPort(
+    private val port = SlashCommandSessionPort(TimelineChatSessionPort(
         session = TimelineSyncLoopSession(loop),
         target = binding.target,
         scope = scope,
         options = options,
-    )
+    ), scope, binding.slashCommands)
 
     /**
      * The conversation's model list and picks (the model chip's), which

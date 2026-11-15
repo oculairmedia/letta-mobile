@@ -44,6 +44,8 @@ interface SessionRepositoryGraph {
     val conversationLanes: ConversationLaneProjection? get() = null
     /** Foreground owners live for this trusted backend generation, independently of subscribers. */
     val activeTurns: com.letta.mobile.data.presence.ActiveTurnSession? get() = null
+    /** Host commands built once for this transport generation. */
+    val slashCommands: com.letta.mobile.data.session.graph.AppServerSlashCommandApi? get() = null
     val id: Long
     val backendDescriptor: BackendDescriptor
     val agentRepository: IAgentRepository

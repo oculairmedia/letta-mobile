@@ -1,6 +1,9 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
+import com.letta.mobile.data.repository.iroh.toSlashCommand
 import com.letta.mobile.data.model.GoalStatusResponse
 import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.model.SlashCommandsResponse
@@ -37,12 +40,10 @@ open class IrohAdminRpcSlashCommandSource(
     override suspend fun listGlobal(): List<SlashCommand> =
         fetch(path = "/v1/slash-commands", method = "slash_command.list", agentId = null)
 
-    override suspend fun listForAgent(agentId: String): List<SlashCommand> =
-        fetch(
-            path = "/v1/agents/$agentId/slash-commands",
-            method = "slash_command.list_agent",
-            agentId = agentId,
-        )
+    override suspend fun listForAgent(agentId: String): List<SlashCommand> {
+        ensureConnectedForAdminRpc()
+        return IrohAdminRpcAgentDirectory(channelTransport).listAgentSlashCommands(AgentId(agentId)).map { it.toSlashCommand() }
+    }
 
     override suspend fun installToAgent(agentId: String, skillName: String) {
         mutateSkillOverIroh(

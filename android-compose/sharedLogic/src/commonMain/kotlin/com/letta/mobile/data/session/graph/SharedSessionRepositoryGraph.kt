@@ -109,6 +109,8 @@ class SharedSessionRepositoryGraph(
     override val toolRepository: IToolRepository = host.toolRepository
     override val vibesyncEventStreamRepository: IVibesyncEventStreamRepository = host.vibesyncEventStreamRepository
 
+    override val slashCommands: AppServerSlashCommandApi = transportBound.slashCommands
+
     override val cronRepository: ICronRepository = transportBound.cronRepository
     override val selfTodoRepository: ISelfTodoRepository = transportBound.selfTodoRepository
     override val subagentRepository: ISubagentRepository = transportBound.subagentRepository

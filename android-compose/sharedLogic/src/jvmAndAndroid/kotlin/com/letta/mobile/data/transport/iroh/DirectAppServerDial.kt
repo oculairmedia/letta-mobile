@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.data.controller.node.iroh.AdminRpcInvocation
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
+import com.letta.mobile.data.controller.node.iroh.NativeSlashCommandCatalog
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerConnectionState
@@ -71,9 +72,12 @@ suspend fun openDirectAppServerDial(
     val connection = runCatching { openAppServerWebSocket(target, httpClient, scope) }
         .onFailure { releaseAll() }
         .getOrThrow()
+    val commandCatalog = NativeSlashCommandCatalog()
+    val commandCatalogJob = commandCatalog.start(scope, connection.client.events)
     val router = AdminRpcRegistry.buildRouter(
         native = AdminRpcNativeSources(
             nativeClient = connection.client,
+            slashCommands = commandCatalog,
             localBackendDir = localBackendDir,
         ),
     )
@@ -84,6 +88,7 @@ suspend fun openDirectAppServerDial(
         hostCapabilities = router.featureCapabilities,
         adminRpc = { method, path, body -> router.answer(method, appServerAdminRpcParams(path, body)) },
         close = { reason ->
+            commandCatalogJob.cancel()
             connection.close(reason)
             releaseAll()
         },

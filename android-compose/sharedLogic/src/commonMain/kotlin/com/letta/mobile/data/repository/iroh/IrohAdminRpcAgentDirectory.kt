@@ -214,7 +214,7 @@ class IrohAdminRpcAgentDirectory(
             method = AdminRpcMethod("slash_command.list_agent"),
             path = AdminRpcPath("/v1/agents/${agentId.value}/slash-commands"),
             body = entityIdBody("agent_id", agentId.value),
-        ) ?: return emptyList()
+        ) ?: error("Iroh admin_rpc slash_command.list_agent returned no result")
         return json.decodeFromJsonElement(SlashCommandsResponse.serializer(), result).commands
     }
 

@@ -7,6 +7,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import com.letta.mobile.desktop.commands.DesktopSlashCommandBinding
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.displayTitle
@@ -248,18 +249,21 @@ private fun DesktopShellSharedChatPage(
     frame: DesktopShellFrame,
     modifier: Modifier,
 ) {
-    val navigator = context.navigator
-    val focus = frame.focus
     val canonicalPresentation by context.core.chatController.canonicalPresentation.collectAsState()
     DesktopSharedChatPage(
         state = DesktopSharedChatPageState(
             port = page.port,
+            slashCommands = DesktopSlashCommandBinding(
+                { context.core.sessionGraph.value },
+                { context.core.chatController.state.value.selectedConversation },
+                context.core.chatController::isSelectionCurrent,
+            ),
             pagedTimeline = canonicalPresentation.takeIf { context.core.chatController.isSelectionCurrent() },
             hostInputs = ChatComposerHostInputs(
                 commands = page.host.composerCommands,
                 mentionables = frame.lists.mentionables,
                 contextUsage = page.host.contextUsage,
-                placeholder = WorkPlayLens.composerPlaceholder(navigator.workPlayMode, focus.selectedAgentName),
+                placeholder = WorkPlayLens.composerPlaceholder(context.navigator.workPlayMode, frame.focus.selectedAgentName),
             ),
             errorMessage = frame.chatState.errorMessage,
             canvasStore = context.core.canvasShell.store,
@@ -273,10 +277,9 @@ private fun DesktopShellSharedChatPage(
             openCanvas = { page.host.openConversationCanvas() },
             openAgent = { context.router.openAgent(AgentId(it)) },
             modelPicker = context.modelPicker,
-            // The companion mascot brings the agent pane back and leaves any
-            // editor; its pencil opens the editor.
+            // The mascot opens the agent pane; its pencil opens the editor.
             openAgentPane = { context.openAgentPane() },
-            editAgent = { navigator.editAgentId = focus.selectedAgentId?.let(::AgentId) },
+            editAgent = { context.navigator.editAgentId = frame.focus.selectedAgentId?.let(::AgentId) },
             agentNamesById = page.host.agentNamesById,
             recentInteractions = rememberDesktopRecentInteractions(context, frame),
         ),
@@ -284,10 +287,7 @@ private fun DesktopShellSharedChatPage(
     )
 }
 
-/**
- * The conversation's subagents for the shared rings over the full-screen chat (letta-mobile-ckmub.3.19):
- * a ring's todos come from the registry; none without one.
- */
+/** Binds this page's shared subagent rings to the registry and viewed conversations. */
 @Composable
 private fun rememberDesktopChatSubagents(context: DesktopShellContext, frame: DesktopShellFrame): DesktopChatSubagents? {
     val repository = context.panels.subagents.repository

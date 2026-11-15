@@ -56,7 +56,7 @@ class WebChatSessionPortTest {
     @Test
     fun hydratesTheConversationIntoTheSharedPageState() = runTest {
         val server = FakeAppServer(history = HISTORY)
-        val port = WebChatSessionPort(WebChatBinding(target, server.transport(), TimelineChatRunControls()), scope)
+        val port = WebChatSessionPort(WebChatBinding(target, server.transport(), TimelineChatRunControls(), slashCommands = { null }), scope)
 
         val state = awaitState(port) { it.conversationState is ConversationState.Ready && it.messages.size == 2 }
 
@@ -68,7 +68,7 @@ class WebChatSessionPortTest {
     @Test
     fun aSendRunsATurnAndItsStreamedReplyLands() = runTest {
         val server = FakeAppServer(history = EMPTY_HISTORY, reply = REPLY_DELTA)
-        val port = WebChatSessionPort(WebChatBinding(target, server.transport(), TimelineChatRunControls()), scope)
+        val port = WebChatSessionPort(WebChatBinding(target, server.transport(), TimelineChatRunControls(), slashCommands = { null }), scope)
         awaitState(port) { it.conversationState is ConversationState.Ready }
 
         port.actions.updateComposerText("ping")
@@ -85,10 +85,10 @@ class WebChatSessionPortTest {
         val answers = mutableListOf<ChatApprovalAnswer>()
         val transport = FakeAppServer(history = EMPTY_HISTORY).transport()
         val withControls = WebChatSessionPort(
-            WebChatBinding(target, transport, TimelineChatRunControls(answerApproval = { answers += it })),
+            WebChatBinding(target, transport, TimelineChatRunControls(answerApproval = { answers += it }), slashCommands = { null }),
             scope,
         )
-        val bare = WebChatSessionPort(WebChatBinding(target, transport, TimelineChatRunControls()), scope)
+        val bare = WebChatSessionPort(WebChatBinding(target, transport, TimelineChatRunControls(), slashCommands = { null }), scope)
 
         assertTrue(withControls.capabilities.value.approvals)
         assertEquals(false, bare.capabilities.value.approvals)
@@ -111,7 +111,7 @@ class WebChatSessionPortTest {
             ),
             permissionModes = null,
         )
-        val port = WebChatSessionPort(WebChatBinding(target, transport, TimelineChatRunControls(), chips), scope)
+        val port = WebChatSessionPort(WebChatBinding(target, transport, TimelineChatRunControls(), chips, slashCommands = { null }), scope)
 
         val model = withContext(Dispatchers.Default) {
             withTimeout(TIMEOUT_MS) { port.composer.first { it.model?.currentHandle == "openai/sol" }.model }
@@ -125,7 +125,7 @@ class WebChatSessionPortTest {
     @Test
     fun theShellsContextReadingIsTheComposersMeter() = runTest {
         val transport = FakeAppServer(history = EMPTY_HISTORY).transport()
-        val port = WebChatSessionPort(WebChatBinding(target, transport, TimelineChatRunControls()), scope)
+        val port = WebChatSessionPort(WebChatBinding(target, transport, TimelineChatRunControls(), slashCommands = { null }), scope)
         val reading = ContextWindowUsagePolicy.readTotal(contextTokens = 50_000, windowTokens = 200_000)
 
         port.updateContextUsage(reading)
