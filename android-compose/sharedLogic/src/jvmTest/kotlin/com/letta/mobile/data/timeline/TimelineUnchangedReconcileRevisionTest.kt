@@ -85,8 +85,13 @@ class TimelineUnchangedReconcileRevisionTest {
         val page = wholeTurn(TimelineRemoteOrder.NewestFirst)
         assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, page))
         val settled = engine.publication.value.durableRevision
-        val edited = page.map { if (it.id == "msg-reply") decode(wire("msg-reply", "assistant_message", RUN, 20, """"content":"Edited.""""))
-            else it }
+        val edited = page.map {
+            if (it.id == "msg-reply") {
+                decode(wire(WireRow("msg-reply", "assistant_message", RUN, 20, """"content":"Edited."""")))
+            } else {
+                it
+            }
+        }
         assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, edited))
         assertNotEquals(settled, engine.publication.value.durableRevision, "a real edit must replace the generation")
     }
@@ -163,43 +168,47 @@ class TimelineUnchangedReconcileRevisionTest {
         fun decode(row: String): LettaMessage = json.decodeFromString(LettaMessage.serializer(), row)
 
         /** One wire row; [second] orders it inside the turn. */
-        fun wire(id: String?, type: String, run: String?, second: Int, fields: String): String =
+        private data class WireRow(val id: String?, val type: String, val run: String?, val second: Int, val fields: String)
+
+        fun wire(row: WireRow): String =
             "{" + listOfNotNull(
-                id?.let { "\"id\":\"$it\"" }, "\"message_type\":\"$type\"", run?.let { "\"run_id\":\"$it\"" },
-                "\"date\":\"2026-11-14T15:54:%02d.000Z\"".format(second), fields,
+                row.id?.let { "\"id\":\"$it\"" }, "\"message_type\":\"${row.type}\"", row.run?.let { "\"run_id\":\"$it\"" },
+                "\"date\":\"2026-11-14T15:54:%02d.000Z\"".format(row.second), row.fields,
             ).joinToString(",") + "}"
 
-        val prompt = wire("msg-prompt", "user_message", null, 0, """"content":"check the build","otid":"cm-prompt"""")
-        val reasoning = wire("msg-thought", "reasoning_message", RUN, 1, """"reasoning":"Look at the log first."""")
-        val call = wire("msg-call", "tool_call_message", RUN, 2,
-            """"tool_call":{"tool_call_id":"call-bash","name":"Bash","arguments":"{\"command\":\"make\"}"}""")
-        val callReturn = wire("msg-call-return", "tool_return_message", RUN, 3,
-            """"tool_call_id":"call-bash","status":"success","tool_return":"ok"""")
-        val approval = wire("msg-approval", "approval_request_message", RUN, 4,
-            """"tool_call":{"tool_call_id":"call-approve","name":"Write","arguments":"{}"}""")
-        val approvalReturn = wire("msg-approval-return", "tool_return_message", RUN, 5,
-            """"tool_call_id":"call-approve","status":"success","tool_return":"written"""")
-        val approvalResponse = wire("msg-approval-response", "approval_response_message", RUN, 6,
-            """"approve":true,"approval_request_id":"msg-approval"""")
-        val readCall = wire("msg-read", "tool_call_message", RUN, 7,
-            """"tool_call":{"tool_call_id":"call-read","name":"Read","arguments":"{}"}""")
-        val readReturn = wire("msg-read-return", "tool_return_message", RUN, 8,
+        val prompt = wire(WireRow("msg-prompt", "user_message", null, 0, """"content":"check the build","otid":"cm-prompt""""))
+        val reasoning = wire(WireRow("msg-thought", "reasoning_message", RUN, 1, """"reasoning":"Look at the log first.""""))
+        val call = wire(WireRow("msg-call", "tool_call_message", RUN, 2,
+            """"tool_call":{"tool_call_id":"call-bash","name":"Bash","arguments":"{\"command\":\"make\"}"}"""))
+        val callReturn = wire(WireRow("msg-call-return", "tool_return_message", RUN, 3,
+            """"tool_call_id":"call-bash","status":"success","tool_return":"ok""""))
+        val approval = wire(WireRow("msg-approval", "approval_request_message", RUN, 4,
+            """"tool_call":{"tool_call_id":"call-approve","name":"Write","arguments":"{}"}"""))
+        val approvalReturn = wire(WireRow("msg-approval-return", "tool_return_message", RUN, 5,
+            """"tool_call_id":"call-approve","status":"success","tool_return":"written""""))
+        val approvalResponse = wire(WireRow("msg-approval-response", "approval_response_message", RUN, 6,
+            """"approve":true,"approval_request_id":"msg-approval""""))
+        val readCall = wire(WireRow("msg-read", "tool_call_message", RUN, 7,
+            """"tool_call":{"tool_call_id":"call-read","name":"Read","arguments":"{}"}"""))
+        val readReturn = wire(WireRow("msg-read-return", "tool_return_message", RUN, 8,
             """"tool_call_id":"call-read","status":"success","tool_return":[{"type":"text","text":"[Image: pixel.png]"},""" +
-                """{"type":"image","source":{"type":"base64","media_type":"image/png","data":"$PNG"}}]""")
-        val narration = wire("msg-narration", "assistant_message", RUN, 9, """"content":"Build is green."""")
-        val followUp = wire("msg-follow-up", "user_message", null, 10, """"content":"and the tests?","otid":"cm-follow-up"""")
-        val followUpInRun = wire("msg-follow-up-run", "user_message", RUN, 10, """"content":"and lint?","otid":"cm-follow-up-run"""")
-        val backgroundNotice = wire("msg-notice", "user_message", null, 11,
+                """{"type":"image","source":{"type":"base64","media_type":"image/png","data":"$PNG"}}]"""))
+        val narration = wire(WireRow("msg-narration", "assistant_message", RUN, 9, """"content":"Build is green.""""))
+        val followUp = wire(WireRow("msg-follow-up", "user_message", null, 10, """"content":"and the tests?","otid":"cm-follow-up""""))
+        val followUpInRun = wire(
+            WireRow("msg-follow-up-run", "user_message", RUN, 10, """"content":"and lint?","otid":"cm-follow-up-run""""),
+        )
+        val backgroundNotice = wire(WireRow("msg-notice", "user_message", null, 11,
             """"content":"<task-notification>\n<task-id>bash_7</task-id>\n<status>completed</status>\n""" +
-                """<summary>Background command \"make test\" completed</summary>\n</task-notification>"""")
-        val hiddenReasoning = wire("msg-hidden", "hidden_reasoning_message", RUN, 12, """"state":"redacted"""")
-        val event = wire("msg-event", "event_message", RUN, 13, """"event_type":"context_window_overflow"""")
-        val system = wire("msg-system", "system_message", null, 14, """"content":"Memory updated."""")
-        val error = wire("msg-error", "error_message", RUN, 15, """"message":"rate limited"""")
-        val summary = wire("msg-summary", "summary_message", null, 16, """"summary":"Earlier turns compacted."""")
-        val reply = wire("msg-reply", "assistant_message", RUN, 20, """"content":"Tests pass."""")
-        val usage = wire("msg-usage", "usage_statistics", RUN, 21, """"prompt_tokens":1000,"completion_tokens":14""")
-        val stop = wire("msg-stop", "stop_reason", RUN, 21, """"stop_reason":"end_turn"""")
+                """<summary>Background command \"make test\" completed</summary>\n</task-notification>""""))
+        val hiddenReasoning = wire(WireRow("msg-hidden", "hidden_reasoning_message", RUN, 12, """"state":"redacted""""))
+        val event = wire(WireRow("msg-event", "event_message", RUN, 13, """"event_type":"context_window_overflow""""))
+        val system = wire(WireRow("msg-system", "system_message", null, 14, """"content":"Memory updated.""""))
+        val error = wire(WireRow("msg-error", "error_message", RUN, 15, """"message":"rate limited""""))
+        val summary = wire(WireRow("msg-summary", "summary_message", null, 16, """"summary":"Earlier turns compacted.""""))
+        val reply = wire(WireRow("msg-reply", "assistant_message", RUN, 20, """"content":"Tests pass.""""))
+        val usage = wire(WireRow("msg-usage", "usage_statistics", RUN, 21, """"prompt_tokens":1000,"completion_tokens":14"""))
+        val stop = wire(WireRow("msg-stop", "stop_reason", RUN, 21, """"stop_reason":"end_turn""""))
         val readImage = RowKind("Read image body (tool return image)", listOf(readCall, readReturn))
 
         val rowKinds = listOf(

@@ -118,7 +118,7 @@ private fun ChatRenderItem.withReceipts(receipts: List<CanvasArtifactReceipt>?):
  *
  * A run that may continue past an edge of [page] with more ledger beyond it never claims the
  * bare `run-<id>` key: the neighbouring page could claim it too, and the presented list would
- * hold it twice (letta-mobile-o1hju). Its blocks here key `run-<id>-<firstMessageId>`, the split form one
+ * hold it twice. Its blocks here key `run-<id>-<firstMessageId>`, the split form one
  * snapshot already uses, which the same records always reproduce.
  */
 internal fun TimelinePageProjectionInput.aggregatePreparedRuns(
@@ -168,8 +168,8 @@ private fun RunClaim.splitKeyed(): RunClaim {
 /**
  * Whether [claim]'s run can have records past an edge of [page] with another page beyond it:
  * nothing between the run's outermost record and that edge proves the run over. An opaque record (usage, stop
- * reason, an unread body) can sit inside a run, and a run-less prompt can land inside a running
- * turn (#2460), so neither does. A prompt-owned run has no record carrying its id; only the page
+ * reason, an unread body) can sit inside a run, and a follow-up prompt sent while the run is still
+ * streaming can land inside it, so neither does. A prompt-owned run has no record carrying its id; only the page
  * holding its prompt can name it, so it never continues.
  */
 private fun TimelinePageProjectionInput.mayContinuePastPage(claim: RunClaim, page: TimelineMetadataPage): Boolean {
