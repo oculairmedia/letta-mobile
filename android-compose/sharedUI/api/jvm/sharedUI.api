@@ -553,22 +553,21 @@ public final class com/letta/mobile/ui/canvas/CanvasWorkspaceKt {
 public final class com/letta/mobile/ui/canvas/ComposableSingletons$CanvasHistoryDialogKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/ComposableSingletons$CanvasHistoryDialogKt;
 	public fun <init> ()V
-	public final fun getLambda$-109330943$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-456457965$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1198801031$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1622509388$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/canvas/ComposableSingletons$CanvasPropertyControlKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/ComposableSingletons$CanvasPropertyControlKt;
 	public fun <init> ()V
-	public final fun getLambda$-1881783451$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-24022577$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/canvas/ComposableSingletons$CanvasWorkspaceKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/ComposableSingletons$CanvasWorkspaceKt;
 	public fun <init> ()V
-	public final fun getLambda$863096003$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-231691206$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/canvas/DefaultPenTarget : com/letta/mobile/ui/canvas/CanvasPenTarget {
