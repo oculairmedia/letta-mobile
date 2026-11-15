@@ -30,6 +30,18 @@ class ClientSlashCommandsTest {
     }
 
     @Test
+    fun toolsetOpensTheSamePickerAsModels() {
+        val commands = ClientSlashCommands.composerCommands(
+            setOf(ClientSlashCommand.Models),
+            listOf(ChatComposerCommand(id = "toolset", label = "toolset", fillsComposer = true)),
+        )
+        val toolset = commands.single { it.id.removePrefix("/") == "toolset" }
+        assertFalse(toolset.fillsComposer)
+        assertEquals(ClientSlashCommand.Models, ClientSlashCommands.resolve(toolset))
+        assertEquals(ClientSlashCommand.Models, ClientSlashCommand.fromId("/toolset"))
+    }
+
+    @Test
     fun idsMatchWithOrWithoutTheSlash() {
         assertEquals(ClientSlashCommand.Connect, ClientSlashCommand.fromId("/Connect"))
         assertEquals(ClientSlashCommand.Search, ClientSlashCommand.fromId("search"))

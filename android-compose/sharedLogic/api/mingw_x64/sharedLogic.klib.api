@@ -7101,6 +7101,8 @@ abstract interface com.letta.mobile.data.transport.api/IChannelTransport { // co
         open fun <get-hostCapabilities>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.transport.api/IChannelTransport.hostCapabilities.<get-hostCapabilities>|<get-hostCapabilities>(){}[0]
     open val hostNodeId // com.letta.mobile.data.transport.api/IChannelTransport.hostNodeId|{}hostNodeId[0]
         open fun <get-hostNodeId>(): kotlin/String? // com.letta.mobile.data.transport.api/IChannelTransport.hostNodeId.<get-hostNodeId>|<get-hostNodeId>(){}[0]
+    open val toolsetStates // com.letta.mobile.data.transport.api/IChannelTransport.toolsetStates|{}toolsetStates[0]
+        open fun <get-toolsetStates>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/Map<com.letta.mobile.data.toolsets/ToolsetRuntime, com.letta.mobile.data.toolsets/ToolsetState>> // com.letta.mobile.data.transport.api/IChannelTransport.toolsetStates.<get-toolsetStates>|<get-toolsetStates>(){}[0]
 
     abstract fun bye(): kotlin/Boolean // com.letta.mobile.data.transport.api/IChannelTransport.bye|bye(){}[0]
     abstract fun cancel(kotlin/String): kotlin/Boolean // com.letta.mobile.data.transport.api/IChannelTransport.cancel|cancel(kotlin.String){}[0]
@@ -58160,7 +58162,7 @@ final class com.letta.mobile.data.repository.modelcontrol/ModelControlException 
 }
 
 final class com.letta.mobile.data.repository.modelcontrol/ModelControlSession { // com.letta.mobile.data.repository.modelcontrol/ModelControlSession|null[0]
-    constructor <init>(com.letta.mobile.data.repository.modelcontrol/AdminRpcInvoker, com.letta.mobile.data.repository.modelcontrol/ProviderOAuthHttp? = ..., com.letta.mobile.data.model/RecentModelsStore? = ...) // com.letta.mobile.data.repository.modelcontrol/ModelControlSession.<init>|<init>(com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker;com.letta.mobile.data.repository.modelcontrol.ProviderOAuthHttp?;com.letta.mobile.data.model.RecentModelsStore?){}[0]
+    constructor <init>(com.letta.mobile.data.repository.modelcontrol/AdminRpcInvoker, com.letta.mobile.data.repository.modelcontrol/ProviderOAuthHttp? = ..., com.letta.mobile.data.model/RecentModelsStore? = ..., kotlin/Function0<kotlinx.coroutines.flow/StateFlow<kotlin.collections/Map<com.letta.mobile.data.toolsets/ToolsetRuntime, com.letta.mobile.data.toolsets/ToolsetState>>> = ...) // com.letta.mobile.data.repository.modelcontrol/ModelControlSession.<init>|<init>(com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker;com.letta.mobile.data.repository.modelcontrol.ProviderOAuthHttp?;com.letta.mobile.data.model.RecentModelsStore?;kotlin.Function0<kotlinx.coroutines.flow.StateFlow<kotlin.collections.Map<com.letta.mobile.data.toolsets.ToolsetRuntime,com.letta.mobile.data.toolsets.ToolsetState>>>){}[0]
 
     final val catalog // com.letta.mobile.data.repository.modelcontrol/ModelControlSession.catalog|{}catalog[0]
         final fun <get-catalog>(): com.letta.mobile.data.repository.modelcontrol/ModelCatalogRepository // com.letta.mobile.data.repository.modelcontrol/ModelControlSession.catalog.<get-catalog>|<get-catalog>(){}[0]
@@ -58171,10 +58173,11 @@ final class com.letta.mobile.data.repository.modelcontrol/ModelControlSession { 
 
     final fun managementController(kotlinx.coroutines/CoroutineScope): com.letta.mobile.data.repository.modelcontrol/ProviderManagementController // com.letta.mobile.data.repository.modelcontrol/ModelControlSession.managementController|managementController(kotlinx.coroutines.CoroutineScope){}[0]
     final fun pickerSource(): com.letta.mobile.data.repository.modelcontrol/ModelPickerSource // com.letta.mobile.data.repository.modelcontrol/ModelControlSession.pickerSource|pickerSource(){}[0]
+    final fun toolsets(kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.toolsets/ToolsetRuntime?): com.letta.mobile.data.toolsets/ToolsetControl? // com.letta.mobile.data.repository.modelcontrol/ModelControlSession.toolsets|toolsets(kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.toolsets.ToolsetRuntime?){}[0]
 }
 
 final class com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding { // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding|null[0]
-    constructor <init>(com.letta.mobile.data.repository.modelcontrol/ModelPickerSource, kotlin/Function1<com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry, kotlin/Unit>, kotlin/Function2<com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry, kotlin/String?, kotlin/Unit>?, kotlin/Function1<kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.repository.modelcontrol/ProviderManagementController>?, kotlin/Function0<kotlin/Unit>?, kotlin.coroutines/SuspendFunction0<kotlin/Unit>) // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.<init>|<init>(com.letta.mobile.data.repository.modelcontrol.ModelPickerSource;kotlin.Function1<com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry,kotlin.Unit>;kotlin.Function2<com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry,kotlin.String?,kotlin.Unit>?;kotlin.Function1<kotlinx.coroutines.CoroutineScope,com.letta.mobile.data.repository.modelcontrol.ProviderManagementController>?;kotlin.Function0<kotlin.Unit>?;kotlin.coroutines.SuspendFunction0<kotlin.Unit>){}[0]
+    constructor <init>(com.letta.mobile.data.repository.modelcontrol/ModelPickerSource, kotlin/Function1<com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry, kotlin/Unit>, kotlin/Function2<com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry, kotlin/String?, kotlin/Unit>?, kotlin/Function1<kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.repository.modelcontrol/ProviderManagementController>?, kotlin/Function0<kotlin/Unit>?, kotlin.coroutines/SuspendFunction0<kotlin/Unit>, kotlin/Function1<kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.toolsets/ToolsetControl?>? = ...) // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.<init>|<init>(com.letta.mobile.data.repository.modelcontrol.ModelPickerSource;kotlin.Function1<com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry,kotlin.Unit>;kotlin.Function2<com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry,kotlin.String?,kotlin.Unit>?;kotlin.Function1<kotlinx.coroutines.CoroutineScope,com.letta.mobile.data.repository.modelcontrol.ProviderManagementController>?;kotlin.Function0<kotlin.Unit>?;kotlin.coroutines.SuspendFunction0<kotlin.Unit>;kotlin.Function1<kotlinx.coroutines.CoroutineScope,com.letta.mobile.data.toolsets.ToolsetControl?>?){}[0]
 
     final val editor // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.editor|{}editor[0]
         final fun <get-editor>(): kotlin/Function1<kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.repository.modelcontrol/ProviderManagementController>? // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.editor.<get-editor>|<get-editor>(){}[0]
@@ -58188,6 +58191,8 @@ final class com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding { /
         final fun <get-onModelsEdited>(): kotlin.coroutines/SuspendFunction0<kotlin/Unit> // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.onModelsEdited.<get-onModelsEdited>|<get-onModelsEdited>(){}[0]
     final val source // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.source|{}source[0]
         final fun <get-source>(): com.letta.mobile.data.repository.modelcontrol/ModelPickerSource // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.source.<get-source>|<get-source>(){}[0]
+    final val toolsets // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.toolsets|{}toolsets[0]
+        final fun <get-toolsets>(): kotlin/Function1<kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.toolsets/ToolsetControl?>? // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.toolsets.<get-toolsets>|<get-toolsets>(){}[0]
 
     final var editorOpen // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.editorOpen|{}editorOpen[0]
         final fun <get-editorOpen>(): kotlin/Boolean // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.editorOpen.<get-editorOpen>|<get-editorOpen>(){}[0]
@@ -67473,6 +67478,69 @@ final class com.letta.mobile.data.tools/ToolLibraryState { // com.letta.mobile.d
     final fun toString(): kotlin/String // com.letta.mobile.data.tools/ToolLibraryState.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.toolsets/ToolsetControl { // com.letta.mobile.data.toolsets/ToolsetControl|null[0]
+    constructor <init>(kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.toolsets/ToolsetRuntime, kotlinx.coroutines.flow/StateFlow<kotlin.collections/Map<com.letta.mobile.data.toolsets/ToolsetRuntime, com.letta.mobile.data.toolsets/ToolsetState>>, kotlin.coroutines/SuspendFunction1<kotlin/String, kotlin/Unit>) // com.letta.mobile.data.toolsets/ToolsetControl.<init>|<init>(kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.toolsets.ToolsetRuntime;kotlinx.coroutines.flow.StateFlow<kotlin.collections.Map<com.letta.mobile.data.toolsets.ToolsetRuntime,com.letta.mobile.data.toolsets.ToolsetState>>;kotlin.coroutines.SuspendFunction1<kotlin.String,kotlin.Unit>){}[0]
+
+    final val state // com.letta.mobile.data.toolsets/ToolsetControl.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.toolsets/ToolsetState> // com.letta.mobile.data.toolsets/ToolsetControl.state.<get-state>|<get-state>(){}[0]
+
+    final fun select(kotlin/String) // com.letta.mobile.data.toolsets/ToolsetControl.select|select(kotlin.String){}[0]
+}
+
+final class com.letta.mobile.data.toolsets/ToolsetOption { // com.letta.mobile.data.toolsets/ToolsetOption|null[0]
+    constructor <init>(kotlin/String, kotlin/String) // com.letta.mobile.data.toolsets/ToolsetOption.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+    final val displayName // com.letta.mobile.data.toolsets/ToolsetOption.displayName|{}displayName[0]
+        final fun <get-displayName>(): kotlin/String // com.letta.mobile.data.toolsets/ToolsetOption.displayName.<get-displayName>|<get-displayName>(){}[0]
+    final val id // com.letta.mobile.data.toolsets/ToolsetOption.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.letta.mobile.data.toolsets/ToolsetOption.id.<get-id>|<get-id>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.toolsets/ToolsetOption.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.toolsets/ToolsetOption.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ...): com.letta.mobile.data.toolsets/ToolsetOption // com.letta.mobile.data.toolsets/ToolsetOption.copy|copy(kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.toolsets/ToolsetOption.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.toolsets/ToolsetOption.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.toolsets/ToolsetOption.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.toolsets/ToolsetRuntime { // com.letta.mobile.data.toolsets/ToolsetRuntime|null[0]
+    constructor <init>(kotlin/String, kotlin/String) // com.letta.mobile.data.toolsets/ToolsetRuntime.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+    final val agentId // com.letta.mobile.data.toolsets/ToolsetRuntime.agentId|{}agentId[0]
+        final fun <get-agentId>(): kotlin/String // com.letta.mobile.data.toolsets/ToolsetRuntime.agentId.<get-agentId>|<get-agentId>(){}[0]
+    final val conversationId // com.letta.mobile.data.toolsets/ToolsetRuntime.conversationId|{}conversationId[0]
+        final fun <get-conversationId>(): kotlin/String // com.letta.mobile.data.toolsets/ToolsetRuntime.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.toolsets/ToolsetRuntime.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.toolsets/ToolsetRuntime.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ...): com.letta.mobile.data.toolsets/ToolsetRuntime // com.letta.mobile.data.toolsets/ToolsetRuntime.copy|copy(kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.toolsets/ToolsetRuntime.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.toolsets/ToolsetRuntime.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.toolsets/ToolsetRuntime.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.toolsets/ToolsetState { // com.letta.mobile.data.toolsets/ToolsetState|null[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.data.toolsets/ToolsetOption> = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ...) // com.letta.mobile.data.toolsets/ToolsetState.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.toolsets.ToolsetOption>;kotlin.String?;kotlin.Boolean;kotlin.String?){}[0]
+
+    final val available // com.letta.mobile.data.toolsets/ToolsetState.available|{}available[0]
+        final fun <get-available>(): kotlin.collections/List<com.letta.mobile.data.toolsets/ToolsetOption> // com.letta.mobile.data.toolsets/ToolsetState.available.<get-available>|<get-available>(){}[0]
+    final val changing // com.letta.mobile.data.toolsets/ToolsetState.changing|{}changing[0]
+        final fun <get-changing>(): kotlin/Boolean // com.letta.mobile.data.toolsets/ToolsetState.changing.<get-changing>|<get-changing>(){}[0]
+    final val error // com.letta.mobile.data.toolsets/ToolsetState.error|{}error[0]
+        final fun <get-error>(): kotlin/String? // com.letta.mobile.data.toolsets/ToolsetState.error.<get-error>|<get-error>(){}[0]
+    final val preference // com.letta.mobile.data.toolsets/ToolsetState.preference|{}preference[0]
+        final fun <get-preference>(): kotlin/String? // com.letta.mobile.data.toolsets/ToolsetState.preference.<get-preference>|<get-preference>(){}[0]
+
+    final fun component1(): kotlin.collections/List<com.letta.mobile.data.toolsets/ToolsetOption> // com.letta.mobile.data.toolsets/ToolsetState.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.toolsets/ToolsetState.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.toolsets/ToolsetState.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.data.toolsets/ToolsetState.component4|component4(){}[0]
+    final fun copy(kotlin.collections/List<com.letta.mobile.data.toolsets/ToolsetOption> = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ...): com.letta.mobile.data.toolsets/ToolsetState // com.letta.mobile.data.toolsets/ToolsetState.copy|copy(kotlin.collections.List<com.letta.mobile.data.toolsets.ToolsetOption>;kotlin.String?;kotlin.Boolean;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.toolsets/ToolsetState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.toolsets/ToolsetState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.toolsets/ToolsetState.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.transport.api/AppServerClientChannel : com.letta.mobile.data.transport.api/NoOpChannelTransport { // com.letta.mobile.data.transport.api/AppServerClientChannel|null[0]
     constructor <init>(com.letta.mobile.data.transport.appserver/AppServerClient, kotlinx.coroutines/CoroutineScope, kotlin.collections/Set<kotlin/String> = ...) // com.letta.mobile.data.transport.api/AppServerClientChannel.<init>|<init>(com.letta.mobile.data.transport.appserver.AppServerClient;kotlinx.coroutines.CoroutineScope;kotlin.collections.Set<kotlin.String>){}[0]
 
@@ -67482,6 +67550,8 @@ final class com.letta.mobile.data.transport.api/AppServerClientChannel : com.let
         final fun <get-hostCapabilities>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.transport.api/AppServerClientChannel.hostCapabilities.<get-hostCapabilities>|<get-hostCapabilities>(){}[0]
     final val state // com.letta.mobile.data.transport.api/AppServerClientChannel.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.transport/ChannelTransportState> // com.letta.mobile.data.transport.api/AppServerClientChannel.state.<get-state>|<get-state>(){}[0]
+    final val toolsetStates // com.letta.mobile.data.transport.api/AppServerClientChannel.toolsetStates|{}toolsetStates[0]
+        final fun <get-toolsetStates>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/Map<com.letta.mobile.data.toolsets/ToolsetRuntime, com.letta.mobile.data.toolsets/ToolsetState>> // com.letta.mobile.data.transport.api/AppServerClientChannel.toolsetStates.<get-toolsetStates>|<get-toolsetStates>(){}[0]
 
     final suspend fun adminRpc(kotlin/String, kotlin/String, kotlin/String?): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AdminRpcResponse // com.letta.mobile.data.transport.api/AppServerClientChannel.adminRpc|adminRpc(kotlin.String;kotlin.String;kotlin.String?){}[0]
 }
@@ -67572,6 +67642,16 @@ final class com.letta.mobile.data.transport.api/RedialWhileTurnActive { // com.l
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.transport.api/RedialWhileTurnActive.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.transport.api/RedialWhileTurnActive.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.transport.api/RedialWhileTurnActive.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.transport.api/ToolsetStatusStore { // com.letta.mobile.data.transport.api/ToolsetStatusStore|null[0]
+    constructor <init>() // com.letta.mobile.data.transport.api/ToolsetStatusStore.<init>|<init>(){}[0]
+
+    final val states // com.letta.mobile.data.transport.api/ToolsetStatusStore.states|{}states[0]
+        final fun <get-states>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/Map<com.letta.mobile.data.toolsets/ToolsetRuntime, com.letta.mobile.data.toolsets/ToolsetState>> // com.letta.mobile.data.transport.api/ToolsetStatusStore.states.<get-states>|<get-states>(){}[0]
+
+    final fun clear(kotlin/Long? = ...) // com.letta.mobile.data.transport.api/ToolsetStatusStore.clear|clear(kotlin.Long?){}[0]
+    final fun observe(com.letta.mobile.data.transport.appserver/AppServerReceivedFrame, kotlin/Long? = ...) // com.letta.mobile.data.transport.api/ToolsetStatusStore.observe|observe(com.letta.mobile.data.transport.appserver.AppServerReceivedFrame;kotlin.Long?){}[0]
 }
 
 final class com.letta.mobile.data.transport.appserver/AppServerApprovalAnswer { // com.letta.mobile.data.transport.appserver/AppServerApprovalAnswer|null[0]
@@ -72965,6 +73045,8 @@ final class com.letta.mobile.ui.chat.session/ConversationModels : com.letta.mobi
         final fun <get-available>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/LlmModel>> // com.letta.mobile.ui.chat.session/ConversationModels.available.<get-available>|<get-available>(){}[0]
     final val catalogLoader // com.letta.mobile.ui.chat.session/ConversationModels.catalogLoader|{}catalogLoader[0]
         final fun <get-catalogLoader>(): com.letta.mobile.ui.chat.session/ChatModelCatalogLoader // com.letta.mobile.ui.chat.session/ConversationModels.catalogLoader.<get-catalogLoader>|<get-catalogLoader>(){}[0]
+    final val focus // com.letta.mobile.ui.chat.session/ConversationModels.focus|{}focus[0]
+        final fun <get-focus>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.ui.chat.session/ConversationModelFocus> // com.letta.mobile.ui.chat.session/ConversationModels.focus.<get-focus>|<get-focus>(){}[0]
     final val model // com.letta.mobile.ui.chat.session/ConversationModels.model|{}model[0]
         final fun <get-model>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.ui.chat.session/ChatModelUiState?> // com.letta.mobile.ui.chat.session/ConversationModels.model.<get-model>|<get-model>(){}[0]
     final val picks // com.letta.mobile.ui.chat.session/ConversationModels.picks|{}picks[0]
@@ -80818,6 +80900,8 @@ final val com.letta.mobile.data.timeline/timelineAcquisitionProvenanceEnabled //
     final fun <get-timelineAcquisitionProvenanceEnabled>(): com.letta.mobile.util/TelemetryFlag // com.letta.mobile.data.timeline/timelineAcquisitionProvenanceEnabled.<get-timelineAcquisitionProvenanceEnabled>|<get-timelineAcquisitionProvenanceEnabled>(){}[0]
 final val com.letta.mobile.data.timeline/timelineIoDispatcher // com.letta.mobile.data.timeline/timelineIoDispatcher|{}timelineIoDispatcher[0]
     final fun <get-timelineIoDispatcher>(): kotlinx.coroutines/CoroutineDispatcher // com.letta.mobile.data.timeline/timelineIoDispatcher.<get-timelineIoDispatcher>|<get-timelineIoDispatcher>(){}[0]
+final val com.letta.mobile.data.toolsets/EmptyToolsets // com.letta.mobile.data.toolsets/EmptyToolsets|{}EmptyToolsets[0]
+    final fun <get-EmptyToolsets>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/Map<com.letta.mobile.data.toolsets/ToolsetRuntime, com.letta.mobile.data.toolsets/ToolsetState>> // com.letta.mobile.data.toolsets/EmptyToolsets.<get-EmptyToolsets>|<get-EmptyToolsets>(){}[0]
 final val com.letta.mobile.data.transport.appserver/snapshot // com.letta.mobile.data.transport.appserver/snapshot|@com.letta.mobile.data.transport.appserver.AppServerInboundFrame.UpdateDeviceStatus{}snapshot[0]
     final fun (com.letta.mobile.data.transport.appserver/AppServerInboundFrame.UpdateDeviceStatus).<get-snapshot>(): com.letta.mobile.data.transport.appserver/AppServerDeviceStatusSnapshot // com.letta.mobile.data.transport.appserver/snapshot.<get-snapshot>|<get-snapshot>@com.letta.mobile.data.transport.appserver.AppServerInboundFrame.UpdateDeviceStatus(){}[0]
 final val com.letta.mobile.data.voice.session/echoCancelled // com.letta.mobile.data.voice.session/echoCancelled|@com.letta.mobile.data.voice.session.VoiceAudio{}echoCancelled[0]
@@ -81122,8 +81206,9 @@ final fun com.letta.mobile.data.plugin.catalog/pluginPackageSha256(kotlin/ByteAr
 final fun com.letta.mobile.data.plugin.catalog/pluginsSettingsContribution(kotlin/Function0<kotlin/Unit>): com.letta.mobile.data.settings/SettingsContribution // com.letta.mobile.data.plugin.catalog/pluginsSettingsContribution|pluginsSettingsContribution(kotlin.Function0<kotlin.Unit>){}[0]
 final fun com.letta.mobile.data.plugin.catalog/pluginsSettingsContributionOrNull(kotlin/Function0<kotlin/Unit>?): com.letta.mobile.data.settings/SettingsContribution? // com.letta.mobile.data.plugin.catalog/pluginsSettingsContributionOrNull|pluginsSettingsContributionOrNull(kotlin.Function0<kotlin.Unit>?){}[0]
 final fun com.letta.mobile.data.presence/arbitrateActiveTurn(com.letta.mobile.data.presence/ActiveTurnState, com.letta.mobile.data.presence/ActiveTurnState, com.letta.mobile.data.presence/ActiveTurnBoundary): com.letta.mobile.data.presence/ActiveTurnState // com.letta.mobile.data.presence/arbitrateActiveTurn|arbitrateActiveTurn(com.letta.mobile.data.presence.ActiveTurnState;com.letta.mobile.data.presence.ActiveTurnState;com.letta.mobile.data.presence.ActiveTurnBoundary){}[0]
-final fun com.letta.mobile.data.repository.modelcontrol/chatModelPicker(com.letta.mobile.data.repository.modelcontrol/ModelPickerSource?, kotlin/Function1<kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.repository.modelcontrol/ProviderManagementController>?, com.letta.mobile.data.repository.modelcontrol/ModelPickerSource, kotlinx.coroutines.flow/Flow<kotlin.collections/List<kotlin/String>>?, kotlin/Function1<com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry, kotlin/Unit>, kotlin/Function2<com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry, kotlin/String?, kotlin/Unit>, kotlin/Function0<kotlin/Unit>?): com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding // com.letta.mobile.data.repository.modelcontrol/chatModelPicker|chatModelPicker(com.letta.mobile.data.repository.modelcontrol.ModelPickerSource?;kotlin.Function1<kotlinx.coroutines.CoroutineScope,com.letta.mobile.data.repository.modelcontrol.ProviderManagementController>?;com.letta.mobile.data.repository.modelcontrol.ModelPickerSource;kotlinx.coroutines.flow.Flow<kotlin.collections.List<kotlin.String>>?;kotlin.Function1<com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry,kotlin.Unit>;kotlin.Function2<com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry,kotlin.String?,kotlin.Unit>;kotlin.Function0<kotlin.Unit>?){}[0]
+final fun com.letta.mobile.data.repository.modelcontrol/chatModelPicker(com.letta.mobile.data.repository.modelcontrol/ModelPickerSource?, kotlin/Function1<kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.repository.modelcontrol/ProviderManagementController>?, com.letta.mobile.data.repository.modelcontrol/ModelPickerSource, kotlinx.coroutines.flow/Flow<kotlin.collections/List<kotlin/String>>?, kotlin/Function1<com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry, kotlin/Unit>, kotlin/Function2<com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry, kotlin/String?, kotlin/Unit>, kotlin/Function0<kotlin/Unit>?, kotlin/Function1<kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.toolsets/ToolsetControl?>? = ...): com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding // com.letta.mobile.data.repository.modelcontrol/chatModelPicker|chatModelPicker(com.letta.mobile.data.repository.modelcontrol.ModelPickerSource?;kotlin.Function1<kotlinx.coroutines.CoroutineScope,com.letta.mobile.data.repository.modelcontrol.ProviderManagementController>?;com.letta.mobile.data.repository.modelcontrol.ModelPickerSource;kotlinx.coroutines.flow.Flow<kotlin.collections.List<kotlin.String>>?;kotlin.Function1<com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry,kotlin.Unit>;kotlin.Function2<com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry,kotlin.String?,kotlin.Unit>;kotlin.Function0<kotlin.Unit>?;kotlin.Function1<kotlinx.coroutines.CoroutineScope,com.letta.mobile.data.toolsets.ToolsetControl?>?){}[0]
 final fun com.letta.mobile.data.repository.modelcontrol/defaultProviderOAuthHttp(): com.letta.mobile.data.repository.modelcontrol/ProviderOAuthHttp? // com.letta.mobile.data.repository.modelcontrol/defaultProviderOAuthHttp|defaultProviderOAuthHttp(){}[0]
+final fun com.letta.mobile.data.repository.modelcontrol/modelControlSession(kotlin/Function0<com.letta.mobile.data.transport.api/IChannelTransport?>, com.letta.mobile.data.model/RecentModelsStore? = ...): com.letta.mobile.data.repository.modelcontrol/ModelControlSession // com.letta.mobile.data.repository.modelcontrol/modelControlSession|modelControlSession(kotlin.Function0<com.letta.mobile.data.transport.api.IChannelTransport?>;com.letta.mobile.data.model.RecentModelsStore?){}[0]
 final fun com.letta.mobile.data.repository.modelcontrol/providerEditForm(com.letta.mobile.data.repository.modelcontrol/ConnectableProvider): com.letta.mobile.data.repository.modelcontrol/ProviderConnectForm // com.letta.mobile.data.repository.modelcontrol/providerEditForm|providerEditForm(com.letta.mobile.data.repository.modelcontrol.ConnectableProvider){}[0]
 final fun com.letta.mobile.data.repository.modelcontrol/reasoningEffortsOf(kotlin.collections/List<com.letta.mobile.data.repository.modelcontrol/CatalogModel>, com.letta.mobile.data.model/LlmModel): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.repository.modelcontrol/reasoningEffortsOf|reasoningEffortsOf(kotlin.collections.List<com.letta.mobile.data.repository.modelcontrol.CatalogModel>;com.letta.mobile.data.model.LlmModel){}[0]
 final fun com.letta.mobile.data.repository/defaultCachedAgentRepositoryScope(): kotlinx.coroutines/CoroutineScope // com.letta.mobile.data.repository/defaultCachedAgentRepositoryScope|defaultCachedAgentRepositoryScope(){}[0]

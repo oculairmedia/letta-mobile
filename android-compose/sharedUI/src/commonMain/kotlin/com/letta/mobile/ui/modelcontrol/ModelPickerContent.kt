@@ -76,6 +76,8 @@ data class ModelPickerActions(
     val rememberedEffort: (ModelPickerEntry) -> String? = { null },
     val availableToolsets: List<com.letta.mobile.data.transport.appserver.AppServerToolset> = emptyList(),
     val currentToolset: String? = null,
+    /** The host refusal or missing confirmation from the current toolset request. */
+    val toolsetError: String? = null,
     val onSelectToolset: ((String) -> Unit)? = null,
     /**
      * Set when the picker is the second level of a pane (the agent settings
@@ -236,6 +238,7 @@ private fun PickerFooterBar(state: ModelPickerState, actions: ModelPickerActions
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
     }
+    ModelControlNotice(error = actions.toolsetError, message = null)
     PickerFooter(state, actions)
 }
 

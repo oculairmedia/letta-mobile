@@ -98,7 +98,9 @@ class WasmAppServerClientGateway(
     val adminRpc: AdminRpcInvoker = AdminRpcInvoker.overTransport { activeSession?.let { sessionGraphProvider.current.channelTransport } }
 
     /** The provider and model catalog over the live session's `admin_rpc`, as desktop's Providers reads them; recents in the browser. */
-    val modelControl: ModelControlSession = ModelControlSession(adminRpc, recents = RecentModelsStore(SettingsStoreRecentModels(settings)))
+    val modelControl: ModelControlSession = com.letta.mobile.data.repository.modelcontrol.modelControlSession(
+        { sessionGraphProvider.current.channelTransport }, recents = RecentModelsStore(SettingsStoreRecentModels(settings)),
+    )
 
     /**
      * The context card's compaction and context limit, over the live session's `admin_rpc` and,

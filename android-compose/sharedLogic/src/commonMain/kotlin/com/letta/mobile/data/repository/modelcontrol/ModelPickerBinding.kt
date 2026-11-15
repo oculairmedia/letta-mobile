@@ -29,7 +29,20 @@ class ModelPickerBinding(
     val onAddProvider: (() -> Unit)?,
     /** After the Models sheet closes: what the picker lists may have changed, so the chat re-reads its own list. */
     val onModelsEdited: suspend () -> Unit,
+    /** Toolset control for the conversation captured on opening; null outside chat. */
+    toolsets: ((CoroutineScope) -> com.letta.mobile.data.toolsets.ToolsetControl?)? = null,
 ) {
+    private var toolsetFactory = toolsets
+
+    /** Toolset control for the conversation captured when the picker opens. */
+    val toolsets: ((CoroutineScope) -> com.letta.mobile.data.toolsets.ToolsetControl?)? get() = toolsetFactory
+
+    /** Configures the chat's toolset binding before the picker is shown. */
+    fun withToolsets(factory: ((CoroutineScope) -> com.letta.mobile.data.toolsets.ToolsetControl?)?): ModelPickerBinding = apply {
+        check(!pickerOpen && !editorOpen) { "Close the picker before changing its toolset binding" }
+        toolsetFactory = factory
+    }
+
     /** The effort last picked per model handle in this session; a provider-default pick forgets it. */
     private val lastEfforts = mutableStateMapOf<String, String>()
 

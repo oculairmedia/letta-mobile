@@ -302,6 +302,8 @@ class IrohChannelTransport(
         )
     }
 
+    override val toolsetStates get() = connectionSession.toolsetStates
+
     private fun handleSupervisorStateChange(state: IrohConnectionState) {
         _state.value = state.toChannelTransportState()
         if (state is IrohConnectionState.Ready) {

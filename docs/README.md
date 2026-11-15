@@ -376,6 +376,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [secret.request.submit: Secret Request v1](reference/contracts/secret.request.submit/secret-request-v1.md)
 
+### reference/contracts/toolset.update
+
+- [toolset.update v1](reference/contracts/toolset.update/toolset-v1.md)
+
 ### testing
 
 - [5s9lq.1 Chat Hydration Trace Baseline](testing/5s9lq-1-chat-hydration-trace.md)

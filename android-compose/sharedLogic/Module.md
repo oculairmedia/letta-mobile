@@ -932,3 +932,8 @@ Projects the trusted session graph's backend namespace for a pin binding. Sessio
 # Package com.letta.mobile.data.home.shortcut
 
 Existing Home shortcut identities, separated from Home controllers and storage. The original HomeShortcut source alias remains available; persistence names are unchanged.
+
+# Package com.letta.mobile.data.toolsets
+
+Host-confirmed toolset choices and preference selection. ToolsetControl sends one request and waits
+for the runtime's device-status echo; hosts bind their shared channel state and admin RPC.
