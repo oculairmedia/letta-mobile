@@ -1,10 +1,11 @@
 package com.letta.mobile.ui.canvas
 
+import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.host.LettaMenu
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,7 +21,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.model.CanvasNoteId
 import io.ak1.drawbox.domain.model.Element
@@ -28,7 +28,6 @@ import kotlinx.coroutines.launch
 
 private const val QUICK_ARROW_HEAD_PX = 16f
 private const val QUICK_ARROW_HEAD_SPREAD = 0.6f
-private val QUICK_ARROW_STROKE = 3.5.dp
 
 /** What is selected and being worked on, as the bars over the board show it. */
 internal class CanvasBoardSelection(
@@ -175,7 +174,7 @@ private fun CanvasBoard.dropQuickArrow(drop: QuickCreateDrag) {
 @Composable
 private fun QuickCreateDropMenu(board: CanvasBoard, drop: QuickCreateDrag, activeNote: CanvasSceneDocument?) {
     Box(modifier = Modifier.offset { IntOffset(drop.to.x.toInt(), drop.to.y.toInt()) }) {
-        DropdownMenu(expanded = true, onDismissRequest = { board.ui.quickDrop = null }) {
+        LettaMenu(expanded = true, onDismiss = { board.ui.quickDrop = null }) {
             quickCreateKinds(activeNote, board.session != null).forEach { kind ->
                 DropdownMenuItem(
                     text = { Text(kind.label) },
@@ -223,7 +222,7 @@ private fun CanvasBoardFloatingBar(
         topClearance = topInset + board.barTopClearance(),
         startClearance = board.view.resolvedLayout.railClearance(),
         // Above the quick-create target, when there is one, not on it.
-        gap = if (selection.quickAnchor != null) 56.dp else 12.dp,
+        gap = if (selection.quickAnchor != null) QUICK_CREATE_BAR_GAP else LettaDimens.Space.md,
         modifier = Modifier.fillMaxSize(),
     ) {
         CanvasBoardSelectionBar(board, actions, selection, Modifier)
@@ -236,7 +235,7 @@ private fun CanvasBoardFloatingBar(
  */
 private fun CanvasBoard.barTopClearance(): Dp {
     val pillsOnTop = host.chrome.showTitle || view.compact
-    return if (pillsOnTop && !view.actionsInFoot) 64.dp else CANVAS_CHROME_INSET
+    return if (pillsOnTop && !view.actionsInFoot) CANVAS_TOP_CHROME_CLEARANCE else CANVAS_CHROME_INSET
 }
 
 /** The selection's bar: floating on the selection, or riding on a phone's keyboard. */

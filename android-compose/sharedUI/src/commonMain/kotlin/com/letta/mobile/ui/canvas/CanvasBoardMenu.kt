@@ -1,11 +1,11 @@
 package com.letta.mobile.ui.canvas
 
+import com.letta.mobile.ui.host.LettaMenu
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
+import com.letta.mobile.ui.components.foundation.LettaDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -73,13 +73,13 @@ internal fun CanvasBoardMenu(
     onDismiss: () -> Unit,
 ) {
     Box(modifier = Modifier.offsetTo(request.screen)) {
-        DropdownMenu(expanded = true, onDismissRequest = onDismiss) {
+        LettaMenu(expanded = true, onDismiss = onDismiss) {
             if (request.onElement) {
                 if (request.canEditText) MenuItem(Lucide.TextCursorInput, "Edit text", onDismiss, element.onEditText)
                 MenuItem(Lucide.Copy, "Duplicate", onDismiss, element.onDuplicate)
                 MenuItem(Lucide.BringToFront, "Bring to front", onDismiss, element.onBringToFront)
                 MenuItem(Lucide.SendToBack, "Send to back", onDismiss, element.onSendToBack)
-                HorizontalDivider()
+                LettaDivider()
                 MenuItem(Lucide.Trash2, "Delete", onDismiss, element.onDelete)
             } else {
                 CanvasInsertMenuItems(insert, at = request.world, onDismiss = onDismiss)
@@ -94,7 +94,7 @@ internal fun CanvasInsertMenuItems(insert: BoardInsertActions, at: Offset, onDis
     insert.onAddNote?.let { addNote -> MenuItem(Lucide.StickyNote, "Note", onDismiss) { addNote(at) } }
     MenuItem(Lucide.Type, "Text", onDismiss) { insert.onAddText(at) }
     insert.onAddImages?.let { addImages -> MenuItem(Lucide.Image, "Image", onDismiss) { addImages(at) } }
-    HorizontalDivider()
+    LettaDivider()
     CanvasInsert.ShapeModes.forEach { (mode, label) ->
         MenuItem(iconFor(mode), label, onDismiss) { insert.onAddShape(mode, at) }
     }

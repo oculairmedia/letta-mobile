@@ -1,18 +1,13 @@
 package com.letta.mobile.ui.canvas
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -25,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Bold
 import com.composables.icons.lucide.Code
 import com.composables.icons.lucide.Heading1
@@ -54,6 +48,8 @@ import io.github.linreal.cascade.editor.richtext.StyleStatus
 import io.github.linreal.cascade.editor.state.BlockSpanStates
 import io.github.linreal.cascade.editor.state.BlockTextStates
 import io.github.linreal.cascade.editor.state.EditorStateHolder
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaVerticalDivider
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -73,7 +69,7 @@ fun CanvasFormattingBar(
     val focusedType = toolbar.holder.state.focusedBlock?.type
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(LettaDimens.Radius.lg),
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
         tonalElevation = LettaDimens.Space.hair,
         shadowElevation = LettaDimens.Space.sm,
@@ -130,19 +126,13 @@ private fun BarButton(icon: ImageVector, label: String, active: Boolean, enabled
         modifier = Modifier.size(BUTTON).semantics { contentDescription = label },
         colors = if (active) IconButtonDefaults.filledTonalIconButtonColors() else IconButtonDefaults.iconButtonColors(),
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
+        LettaIcon(icon, contentDescription = null)
     }
 }
 
 @Composable
 private fun BarDivider() {
-    Box(
-        modifier = Modifier
-            .padding(horizontal = LettaDimens.Space.hair)
-            .width(1.dp)
-            .height(LettaDimens.Space.xl)
-            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)),
-    )
+    LettaVerticalDivider(Modifier.padding(horizontal = LettaDimens.Space.hair).height(LettaDimens.Space.xl))
 }
 
 /**

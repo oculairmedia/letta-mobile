@@ -1,10 +1,12 @@
 package com.letta.mobile.ui.canvas
 
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.theme.LettaDimens
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -20,7 +22,6 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ArrowDown
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.ArrowRight
@@ -54,7 +55,7 @@ internal data class QuickCreateDrag(val direction: QuickCreateDirection, val fro
  * caret in it - so a chain of boxes is typed out without reaching for a tool. Dragged instead, a
  * target pulls an arrow out ([onDrag]), and where it is let go ([onDrop]) the new element goes.
  *
- * [anchor] is the element's screen rectangle; the buttons sit [OFFSET] beyond its edges, clear
+ * [anchor] is the element's screen rectangle; the buttons sit [QUICK_CREATE_OFFSET] beyond its edges, clear
  * of the selection handles. They are board chrome, so the pen cannot draw through them. On a
  * phone ([compact]) they are larger, big enough to hit with a finger.
  */
@@ -66,7 +67,7 @@ internal fun CanvasQuickCreateTargets(
     chromeRegions: CanvasChromeRegions? = null,
     compact: Boolean = false,
 ) {
-    val gapPx = with(LocalDensity.current) { (if (compact) TOUCH_OFFSET else OFFSET).toPx() }
+    val gapPx = with(LocalDensity.current) { (if (compact) QUICK_CREATE_TOUCH_OFFSET else QUICK_CREATE_OFFSET).toPx() }
     fun centreOf(direction: QuickCreateDirection): Offset = CanvasQuickCreate.targetCentre(anchor, direction, gapPx)
     // The drag outlives recompositions (the element moves, the board pans), so it reads the anchor
     // itself fresh. A remembered reference to centreOf kept the first anchor: a shape moved after it
@@ -123,15 +124,16 @@ private fun QuickCreateTarget(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.primary,
         contentColor = MaterialTheme.colorScheme.onPrimary,
-        shadowElevation = 2.dp,
+        shadowElevation = LettaDimens.Space.hair,
         modifier = Modifier
-            .size(if (compact) TOUCH_TARGET else TARGET)
+            .size(if (compact) QUICK_CREATE_TOUCH_TARGET else QUICK_CREATE_TARGET)
             .canvasChrome(chromeRegions)
             .semantics { contentDescription = "Add ${direction.label}" }
             .then(pull),
     ) {
         Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
-            Icon(direction.icon, contentDescription = null, modifier = Modifier.size(if (compact) TOUCH_ICON else ICON))
+            val glyph = LettaIconStyle(if (compact) QUICK_CREATE_TOUCH_ICON else QUICK_CREATE_ICON)
+            LettaIcon(direction.icon, contentDescription = null, style = glyph)
         }
     }
 }
@@ -296,10 +298,3 @@ private const val PULL_HANDLE = 0.5f
 private const val DEFAULT_WIDTH = 160f
 private const val DEFAULT_HEIGHT = 100f
 
-private val TARGET = 26.dp
-private val ICON = 14.dp
-private val OFFSET = 34.dp
-// A finger's size: Material's touch minimum is 48dp, and the disc sits a little inside that.
-private val TOUCH_TARGET = 40.dp
-private val TOUCH_ICON = 20.dp
-private val TOUCH_OFFSET = 46.dp
