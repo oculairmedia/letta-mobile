@@ -1,10 +1,10 @@
 package com.letta.mobile.data.controller.node.iroh.voice
 
-import com.letta.mobile.data.controller.node.iroh.AdminRpcConnection
+import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcConnection
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
-import com.letta.mobile.data.controller.node.iroh.AdminRpcStreamOutcome
-import com.letta.mobile.data.controller.node.iroh.AdminRpcStreamedCall
-import com.letta.mobile.data.controller.node.iroh.AdminRpcStreamedHandler
+import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcStreamOutcome
+import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcStreamedCall
+import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcStreamedHandler
 import com.letta.mobile.data.voice.audio.PcmChunk
 import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
 import com.letta.mobile.data.voice.audio.pcm.WavStreamDecoder
@@ -39,37 +39,35 @@ internal class VoiceRequestHandlers(
     /** One clip to text. */
     suspend fun transcribe(params: JsonObject?, context: AdminRpcRequestContext): JsonElement {
         val clip = VoiceParams.clip(params)
-        val snapshot = store.snapshot() ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
+        val snapshot = configured()
         val model = snapshot.setup.transcriptionModel ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
-        if (!snapshot.setup.grants.audioForTranscription) throw VoiceRefusal(HostVoiceErrorCode.CONSENT_REQUIRED)
-        val slot = inFlight.tryAcquire(connectionKey(context), VoiceRequestKind.TRANSCRIPTION)
-            ?: throw VoiceRefusal(HostVoiceErrorCode.BUSY)
-        val result = try {
-            transcript(snapshot, VoiceTranscriptionCall(clip.wav, model, clip.language ?: snapshot.setup.language, verbose = true))
-        } finally {
-            slot.release()
-        }
+        requireGrant(snapshot.setup.grants.audioForTranscription)
+        val call = VoiceTranscriptionCall(clip.wav, model, clip.language ?: snapshot.setup.language, verbose = true)
+        val result = holding(connectionKey(context), VoiceRequestKind.TRANSCRIPTION) { transcript(snapshot, call) }
         return voiceJson.encodeToJsonElement(HostTranscriptionResult.serializer(), result)
     }
 
+    /** Asks for `verbose_json` unless this setup's server already refused it, then falls back to `json`. */
     private suspend fun transcript(snapshot: VoiceSetupSnapshot, verbose: VoiceTranscriptionCall): HostTranscriptionResult {
-        val askVerbose = verboseRefusedAt != snapshot.revision
-        val first = if (askVerbose) upstreamCall { upstream.transcribe(snapshot.target, verbose) } else VoiceTranscriptionAnswer.FormatRefused
-        val (answer, format) = when (first) {
-            is VoiceTranscriptionAnswer.Transcript -> first to HostTranscriptFormat.VERBOSE_JSON
-            VoiceTranscriptionAnswer.FormatRefused -> {
-                val plain = VoiceTranscriptionCall(verbose.audio, verbose.model, verbose.language, verbose = false)
-                val retried = upstreamCall { upstream.transcribe(snapshot.target, plain) }
-                val transcript = retried as? VoiceTranscriptionAnswer.Transcript
-                    ?: throw VoiceRefusal(HostVoiceErrorCode.UPSTREAM_REJECTED)
-                verboseRefusedAt = snapshot.revision
-                transcript to HostTranscriptFormat.JSON
-            }
+        if (verboseRefusedAt != snapshot.revision) {
+            val first = upstreamCall { upstream.transcribe(snapshot.target, verbose) }
+            if (first is VoiceTranscriptionAnswer.Heard) return result(first, HostTranscriptFormat.VERBOSE_JSON)
         }
-        val segments = if (format == HostTranscriptFormat.JSON) emptyList() else answer.transcript.segments.map {
-            HostTranscriptSegment(it.noSpeechProbability, it.averageLogProbability)
-        }
-        return HostTranscriptionResult(answer.transcript.text.value, format, segments)
+        val plain = VoiceTranscriptionCall(verbose.audio, verbose.model, verbose.language, verbose = false)
+        val heard = upstreamCall { upstream.transcribe(snapshot.target, plain) } as? VoiceTranscriptionAnswer.Heard
+            ?: throw VoiceRefusal(HostVoiceErrorCode.UPSTREAM_REJECTED)
+        verboseRefusedAt = snapshot.revision
+        return result(heard, HostTranscriptFormat.JSON)
+    }
+
+    /** The wire result: the text and, for `verbose_json`, each segment's numbers (never its text). */
+    private fun result(heard: VoiceTranscriptionAnswer.Heard, format: HostTranscriptFormat): HostTranscriptionResult {
+        val segments = heard.transcript.segments.takeIf { format == HostTranscriptFormat.VERBOSE_JSON }.orEmpty()
+        return HostTranscriptionResult(
+            heard.transcript.text.value,
+            format,
+            segments.map { HostTranscriptSegment(it.noSpeechProbability, it.averageLogProbability) },
+        )
     }
 
     /** The streamed synthesis handler; on any other channel the method is refused. */
@@ -85,26 +83,43 @@ internal class VoiceRequestHandlers(
 
     private suspend fun synthesize(call: AdminRpcStreamedCall): AdminRpcStreamOutcome {
         val text = VoiceParams.speechText(call.params)
-        val snapshot = store.snapshot() ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
-        val model = snapshot.setup.speechModel ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
-        val voice = snapshot.setup.voice ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
-        if (!snapshot.setup.grants.textForSynthesis) throw VoiceRefusal(HostVoiceErrorCode.CONSENT_REQUIRED)
-        val slot = inFlight.tryAcquire(connectionKey(call.context), VoiceRequestKind.SPEECH)
-            ?: throw VoiceRefusal(HostVoiceErrorCode.BUSY)
-        try {
+        val snapshot = configured()
+        val request = speechCall(snapshot.setup, text)
+        requireGrant(snapshot.setup.grants.textForSynthesis)
+        // The slot is released before the exchange writes the final response, so the next request never races it.
+        return holding(connectionKey(null), VoiceRequestKind.SPEECH) {
             val stream = SpeechFrames(call)
-            upstreamCall { upstream.speech(snapshot.target, VoiceSpeechCall(text, model, voice)) { stream.push(it) } }
+            upstreamCall { upstream.speech(snapshot.target, request) { stream.push(it) } }
             if (!stream.complete) throw VoiceRefusal(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE)
-            return AdminRpcStreamOutcome.Success(stream.summary())
+            AdminRpcStreamOutcome.Success(stream.summary())
+        }
+    }
+
+    private suspend fun configured(): VoiceSetupSnapshot = store.snapshot() ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
+
+    private fun speechCall(setup: StoredVoiceSetup, text: String): VoiceSpeechCall {
+        val model = setup.speechModel ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
+        val voice = setup.voice ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
+        return VoiceSpeechCall(text, model, voice)
+    }
+
+    private fun requireGrant(granted: Boolean) {
+        if (!granted) throw VoiceRefusal(HostVoiceErrorCode.CONSENT_REQUIRED)
+    }
+
+    /** Runs [work] holding the [kind] slot of [connection], refused with `voice.busy` when it is taken. */
+    private suspend fun <T> holding(connection: Any, kind: VoiceRequestKind, work: suspend () -> T): T {
+        val slot = inFlight.tryAcquire(connection, kind) ?: throw VoiceRefusal(HostVoiceErrorCode.BUSY)
+        try {
+            return work()
         } finally {
-            // Released before the exchange writes the final response, so the next request never races it.
             slot.release()
         }
     }
 
     /** The serving connection, so the per-connection limit holds across request streams. */
-    private suspend fun connectionKey(context: AdminRpcRequestContext): Any =
-        currentCoroutineContext()[AdminRpcConnection] ?: context.authenticatedEndpointId ?: Any()
+    private suspend fun connectionKey(context: AdminRpcRequestContext?): Any =
+        currentCoroutineContext()[AdminRpcConnection] ?: context?.authenticatedEndpointId ?: Any()
 
     /** Decodes the server's WAVE stream and writes its format once, then each run of samples at once. */
     private class SpeechFrames(private val call: AdminRpcStreamedCall) {

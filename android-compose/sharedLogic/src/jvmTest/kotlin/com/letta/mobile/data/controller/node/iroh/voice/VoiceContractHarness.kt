@@ -35,6 +35,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -173,8 +174,10 @@ internal object VoiceContractHarness {
             }
         }
 
-        private fun checkUpstreamClosed() {
+        /** The fake server records when its request was closed; that time, not this check's, is measured. */
+        private suspend fun checkUpstreamClosed() {
             if (case["expected_upstream"]?.jsonPrimitive?.contentOrNull != "closed") return
+            withTimeoutOrNull(2.seconds) { while (fake.speechClosedAt.get() == null) delay(5.milliseconds) }
             val closedAt = checkNotNull(fake.speechClosedAt.get()) { "${case["name"]}: the upstream request was never closed" }
             val millis = (closedAt - cancelSentAt) / 1_000_000L
             assertTrue(millis <= CANCEL_BUDGET_MS, "${case["name"]}: upstream closed ${millis} ms after the cancel")
@@ -236,33 +239,47 @@ internal object VoiceContractHarness {
         private val violations = mutableListOf<String>()
 
         suspend fun answer(scope: MockRequestHandleScope, request: HttpRequestData): HttpResponseData {
-            if (blockNext) {
-                blockNext = false
-                blockerArrived.complete(Unit)
-                if (request.url.encodedPath.endsWith("/speech")) return scope.respond(ByteChannel(autoFlush = true))
-                awaitCancellation()
-            }
-            if (spec.isEmpty()) error("The host called the speech server in a case that must not reach it")
+            if (blockNext) return block(scope, request)
+            check(spec.isNotEmpty()) { "The host called the speech server in a case that must not reach it" }
+            return refusal(scope, request) ?: route(scope, request)
+        }
+
+        /** Holds the slot-occupying request open until the test cancels it. */
+        private suspend fun block(scope: MockRequestHandleScope, request: HttpRequestData): HttpResponseData {
+            blockNext = false
+            blockerArrived.complete(Unit)
+            if (request.url.encodedPath.endsWith("/speech")) return scope.respond(ByteChannel(autoFlush = true))
+            awaitCancellation()
+        }
+
+        /** A refused connection, a stall, a key where none may go, or a fixed status; null to route the call. */
+        private suspend fun refusal(scope: MockRequestHandleScope, request: HttpRequestData): HttpResponseData? {
             when (spec["connect"]?.jsonPrimitive?.contentOrNull) {
                 "refused" -> throw java.net.ConnectException("refused")
                 "stalls" -> awaitCancellation()
             }
-            if (spec["expect_authorization"]?.jsonPrimitive?.contentOrNull == "false" && request.headers[HttpHeaders.Authorization] != null) {
+            val keyForbidden = spec["expect_authorization"]?.jsonPrimitive?.contentOrNull == "false"
+            if (keyForbidden && request.headers[HttpHeaders.Authorization] != null) {
                 violations += "authorization sent"
                 return scope.respond("", HttpStatusCode.InternalServerError)
             }
-            spec["status"]?.jsonPrimitive?.int?.let { return scope.respond("", HttpStatusCode.fromValue(it)) }
+            return spec["status"]?.jsonPrimitive?.int?.let { scope.respond("", HttpStatusCode.fromValue(it)) }
+        }
+
+        private suspend fun route(scope: MockRequestHandleScope, request: HttpRequestData): HttpResponseData {
             val path = request.url.encodedPath
             return when {
                 path.endsWith("/v1/models") -> scope.jsonReply(listing("data", spec["models"]))
-                path.endsWith("/v1/audio/voices") -> spec["voices_status"]?.jsonPrimitive?.int
-                    ?.let { scope.respond("", HttpStatusCode.fromValue(it)) }
-                    ?: scope.jsonReply(buildJsonObject { put("voices", spec["voices"] ?: JsonArray(emptyList())) })
+                path.endsWith("/v1/audio/voices") -> voices(scope)
                 path.endsWith("/v1/audio/transcriptions") -> transcription(scope, request)
                 path.endsWith("/v1/audio/speech") -> speech(scope)
                 else -> error("Unexpected speech server path")
             }
         }
+
+        private fun voices(scope: MockRequestHandleScope): HttpResponseData =
+            spec["voices_status"]?.jsonPrimitive?.int?.let { scope.respond("", HttpStatusCode.fromValue(it)) }
+                ?: scope.jsonReply(buildJsonObject { put("voices", spec["voices"] ?: JsonArray(emptyList())) })
 
         private suspend fun transcription(scope: MockRequestHandleScope, request: HttpRequestData): HttpResponseData {
             val verbose = request.body.toByteArray().decodeToString().contains("verbose_json")

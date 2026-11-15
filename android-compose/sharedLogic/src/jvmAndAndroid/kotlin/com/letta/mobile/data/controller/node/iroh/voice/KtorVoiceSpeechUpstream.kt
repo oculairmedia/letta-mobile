@@ -87,7 +87,7 @@ internal class KtorVoiceSpeechUpstream(
             requireSuccess(response)
             val transcript = TranscriptResponse.parse(response.bodyAsText())
                 ?: throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE, response.status.value)
-            VoiceTranscriptionAnswer.Transcript(transcript)
+            VoiceTranscriptionAnswer.Heard(transcript)
         }
 
     override suspend fun speech(target: VoiceUpstreamTarget, request: VoiceSpeechCall, onBytes: suspend (ByteArray) -> Unit) {
@@ -175,29 +175,58 @@ internal class KtorVoiceSpeechUpstream(
     }.toString()
 
     /**
-     * Runs [block] within [totalMs], mapping every failure to the closed set: a timeout of any kind is
-     * `voice.upstream_timeout`, anything else that is not already a [VoiceUpstreamFailure] means the
-     * server could not be reached. Cancellation passes through.
+     * Runs [block] within [totalMs], mapping every failure to the closed set ([classify]). Cancellation
+     * passes through.
      */
     private suspend fun <T> guarded(totalMs: Long, block: suspend () -> T): T = try {
         withTimeout(totalMs) { block() }
-    } catch (timedOut: TimeoutCancellationException) {
-        throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
-    } catch (failure: VoiceUpstreamFailure) {
-        throw failure
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (timedOut: HttpRequestTimeoutException) {
-        throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
-    } catch (timedOut: ConnectTimeoutException) {
-        throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
-    } catch (timedOut: SocketTimeoutException) {
-        throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
-    } catch (unreachable: Exception) {
-        throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_UNREACHABLE)
+    } catch (expectedFailure: Exception) {
+        throw classify(expectedFailure)
     }
 
-    internal companion object {
+    /**
+     * A timeout of any kind is `voice.upstream_timeout`; anything else that is not already a
+     * [VoiceUpstreamFailure] or a cancellation means the server could not be reached.
+     */
+    private fun classify(error: Exception): Exception = when (error) {
+        is TimeoutCancellationException -> VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
+        is VoiceUpstreamFailure, is CancellationException -> error
+        is HttpRequestTimeoutException, is ConnectTimeoutException, is SocketTimeoutException ->
+            VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
+        else -> VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_UNREACHABLE)
+    }
+
+    /**
+     * The code for an HTTP status, or null for success: 401/403 unauthorized, 408/504 timeout,
+     * 502/503 unreachable, any other 4xx rejected, any other answer a bad response.
+     */
+    private fun statusFailure(status: Int): HostVoiceErrorCode? = when (status) {
+        in OK_FIRST..OK_LAST -> null
+        in failureByStatus -> failureByStatus.getValue(status)
+        in CLIENT_ERROR_FIRST..CLIENT_ERROR_LAST -> HostVoiceErrorCode.UPSTREAM_REJECTED
+        else -> HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE
+    }
+
+    private fun parse(body: String): JsonElement? = runCatching { lenientJson.parseToJsonElement(body) }.getOrNull()
+
+    /**
+     * The ids in a listing: a top-level array, or the array under the first of [fields] present; each
+     * entry a string or an object with an `id`, `name` or `voice_id` string. Null when the body is not
+     * such a listing.
+     */
+    private fun ids(root: JsonElement?, vararg fields: String): List<String>? {
+        val list = root as? JsonArray ?: (root as? JsonObject)?.let { obj -> fields.firstNotNullOfOrNull { obj[it] as? JsonArray } }
+        return list?.map { entry -> idOf(entry) ?: return null }
+    }
+
+    private fun idOf(entry: JsonElement): String? {
+        val primitive = (entry as? JsonPrimitive) ?: (entry as? JsonObject)?.let { obj ->
+            ID_FIELDS.firstNotNullOfOrNull { obj[it] as? JsonPrimitive }
+        }
+        return primitive?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }
+    }
+
+    private companion object {
         val MODELS_ROUTE = listOf("v1", "models")
         val VOICES_ROUTE = listOf("v1", "audio", "voices")
         val TRANSCRIPTIONS_ROUTE = listOf("v1", "audio", "transcriptions")
@@ -205,49 +234,24 @@ internal class KtorVoiceSpeechUpstream(
 
         /** A `verbose_json` request refused with these is retried as plain `json`. */
         val FORMAT_REFUSED_STATUSES = setOf(400, 415, 422)
-        private const val VERBOSE_JSON = "verbose_json"
-        private const val PLAIN_JSON = "json"
-        private const val WAV = "wav"
-        private const val WAV_MIME = "audio/wav"
-        private const val CHUNK_BYTES = 8 * 1024
-        private val lenientJson = Json { ignoreUnknownKeys = true }
-        private val unauthorizedStatuses = setOf(401, 403)
-        private val timedOutStatuses = setOf(408, 504)
-        private val unreachableStatuses = setOf(502, 503)
-        private const val OK_FIRST = 200
-        private const val OK_LAST = 299
-        private const val CLIENT_ERROR_LAST = 499
-
-        /**
-         * The code for an HTTP status, or null for success: 401/403 unauthorized, 408/504 timeout,
-         * 502/503 unreachable, any other 4xx rejected, any other answer a bad response.
-         */
-        fun statusFailure(status: Int): HostVoiceErrorCode? = when (status) {
-            in OK_FIRST..OK_LAST -> null
-            in unauthorizedStatuses -> HostVoiceErrorCode.UPSTREAM_UNAUTHORIZED
-            in timedOutStatuses -> HostVoiceErrorCode.UPSTREAM_TIMEOUT
-            in unreachableStatuses -> HostVoiceErrorCode.UPSTREAM_UNREACHABLE
-            in OK_LAST + 1..CLIENT_ERROR_LAST -> HostVoiceErrorCode.UPSTREAM_REJECTED
-            else -> HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE
-        }
-
-        private fun parse(body: String): JsonElement? = runCatching { lenientJson.parseToJsonElement(body) }.getOrNull()
-
-        /**
-         * The ids in a listing: a top-level array, or the array under the first of [fields] present;
-         * each entry a string or an object with an `id`, `name` or `voice_id` string. Null when the body
-         * is not such a listing.
-         */
-        fun ids(root: JsonElement?, vararg fields: String): List<String>? {
-            val list = root as? JsonArray ?: (root as? JsonObject)?.let { obj -> fields.firstNotNullOfOrNull { obj[it] as? JsonArray } }
-            return list?.map { entry -> idOf(entry) ?: return null }
-        }
-
-        private fun idOf(entry: JsonElement): String? {
-            val primitive = (entry as? JsonPrimitive) ?: (entry as? JsonObject)?.let { obj ->
-                listOf("id", "name", "voice_id").firstNotNullOfOrNull { obj[it] as? JsonPrimitive }
-            }
-            return primitive?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }
-        }
+        val ID_FIELDS = listOf("id", "name", "voice_id")
+        const val VERBOSE_JSON = "verbose_json"
+        const val PLAIN_JSON = "json"
+        const val WAV = "wav"
+        const val WAV_MIME = "audio/wav"
+        const val CHUNK_BYTES = 8 * 1024
+        val lenientJson = Json { ignoreUnknownKeys = true }
+        val failureByStatus = mapOf(
+            401 to HostVoiceErrorCode.UPSTREAM_UNAUTHORIZED,
+            403 to HostVoiceErrorCode.UPSTREAM_UNAUTHORIZED,
+            408 to HostVoiceErrorCode.UPSTREAM_TIMEOUT,
+            504 to HostVoiceErrorCode.UPSTREAM_TIMEOUT,
+            502 to HostVoiceErrorCode.UPSTREAM_UNREACHABLE,
+            503 to HostVoiceErrorCode.UPSTREAM_UNREACHABLE,
+        )
+        const val OK_FIRST = 200
+        const val OK_LAST = 299
+        const val CLIENT_ERROR_FIRST = 400
+        const val CLIENT_ERROR_LAST = 499
     }
 }

@@ -43,9 +43,6 @@ internal object VoiceParams {
         val fields = params ?: invalid()
         requireContractVersion(fields)
         val baseUrl = requireAddress(fields.string("base_url"))
-        val key = fields.string("api_key")
-        val remove = fields.flag("remove_api_key") == true
-        if (key != null && (remove || key.isBlank())) invalid()
         return HostVoiceSetupCommand(
             endpoint = HostVoiceEndpointChoice(
                 baseUrl = SpeechEndpointUrl(baseUrl),
@@ -54,14 +51,21 @@ internal object VoiceParams {
                 voice = fields.name("voice")?.let(::SpeechVoiceName),
                 language = fields.name("language")?.let(::SpeechLanguage),
             ),
-            apiKey = when {
-                key != null -> HostVoiceKeyChange.Replace(SecretWriteValue(key))
-                remove -> HostVoiceKeyChange.Remove
-                else -> HostVoiceKeyChange.Keep
-            },
+            apiKey = keyChange(fields),
             grants = grants(fields["grants"]),
             expectedRevision = fields.string("expected_revision"),
         )
+    }
+
+    /** At most one of `api_key` (store it) and `remove_api_key: true`; neither keeps the stored key. */
+    private fun keyChange(fields: JsonObject): HostVoiceKeyChange {
+        val key = fields.string("api_key")
+        val remove = fields.flag("remove_api_key") == true
+        return when {
+            key == null -> if (remove) HostVoiceKeyChange.Remove else HostVoiceKeyChange.Keep
+            remove || key.isBlank() -> invalid()
+            else -> HostVoiceKeyChange.Replace(SecretWriteValue(key))
+        }
     }
 
     /** `voice.setup.clear` params: the expected revision, if any. */
@@ -84,16 +88,25 @@ internal object VoiceParams {
     fun clip(params: JsonObject?): VoiceClip {
         val fields = params ?: invalid()
         if ((fields.string("encoding") ?: HostTranscriptionParams.WAV) != HostTranscriptionParams.WAV) invalid()
-        val encoded = fields.string("audio") ?: invalid()
+        val bytes = clipBytes(fields.string("audio") ?: invalid())
+        requireMonoWithinDuration(bytes)
+        return VoiceClip(bytes, fields.name("language"))
+    }
+
+    /** The clip's bytes, refused as too large before and after decoding. */
+    private fun clipBytes(encoded: String): ByteArray {
         if (encoded.length > MAX_AUDIO_BASE64_CHARS) refuse(HostVoiceErrorCode.PAYLOAD_TOO_LARGE)
         val bytes = runCatching { Base64.decode(encoded) }.getOrNull() ?: invalid()
         if (bytes.size > HostVoiceWire.MAX_TRANSCRIPTION_AUDIO_BYTES) refuse(HostVoiceErrorCode.PAYLOAD_TOO_LARGE)
+        return bytes
+    }
+
+    /** Mono 16-bit PCM WAVE no longer than 30 s by its header. */
+    private fun requireMonoWithinDuration(bytes: ByteArray) {
         val audio = (WavCodec.parse(bytes) as? WavParse.Decoded)?.audio ?: invalid()
         if (audio.format.channels != 1) invalid()
-        if (audio.frames.toLong() * MILLIS_PER_SECOND > HostVoiceWire.MAX_TRANSCRIPTION_AUDIO_MS * audio.format.sampleRateHz) {
-            refuse(HostVoiceErrorCode.PAYLOAD_TOO_LARGE)
-        }
-        return VoiceClip(bytes, fields.name("language"))
+        val millis = audio.frames.toLong() * MILLIS_PER_SECOND / audio.format.sampleRateHz
+        if (millis > HostVoiceWire.MAX_TRANSCRIPTION_AUDIO_MS) refuse(HostVoiceErrorCode.PAYLOAD_TOO_LARGE)
     }
 
     /** `voice.speech` params: the text, at most 4096 characters. */

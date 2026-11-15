@@ -53,7 +53,7 @@ internal class VoiceTranscriptionCall(
 /** What a transcription call came back with. */
 internal sealed interface VoiceTranscriptionAnswer {
     /** The transcript. */
-    class Transcript(val transcript: SpeechTranscript) : VoiceTranscriptionAnswer
+    class Heard(val transcript: SpeechTranscript) : VoiceTranscriptionAnswer
 
     /** The server refused the asked-for response format (400, 415 or 422 to a `verbose_json` request). */
     data object FormatRefused : VoiceTranscriptionAnswer
