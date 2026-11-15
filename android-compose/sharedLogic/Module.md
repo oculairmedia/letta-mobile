@@ -942,3 +942,7 @@ Portable slash-command listing contracts, advertised rows and built-in descripti
 # Package com.letta.mobile.data.transport.delivery
 
 Internal delivery failures shared by transport implementations; the App Server socket retains its existing bounded-drain policy.
+
+# Package com.letta.mobile.data.schedules.control
+
+Internal query-generation tokens for schedule controller work. A captured revision keeps delayed load and mutation results scoped to the selected target.

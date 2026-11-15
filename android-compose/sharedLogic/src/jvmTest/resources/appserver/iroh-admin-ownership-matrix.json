@@ -1829,6 +1829,8 @@
       "post_shim_owner": "app_server_v2",
       "post_shim_fallback": "none"
     },
+    {"method": "cron.pause", "handler": "CronAdminHandlers.kt", "current_backend": "native App Server v2 (no shim path ever existed over Iroh)", "owner": "app_server_v2", "public_contract": "cron_pause", "native_contract": ["cron_pause", "cron_pause_response"], "authorization_class": "admin_write", "data_store": "letta_local_backend", "fallback": "none", "migration_slice": "none", "notes": "Forwards the existing App Server cron command; the shared schedules page refreshes host state after confirmation.", "production_first_route": "app_server_v2", "post_shim_owner": "app_server_v2", "post_shim_fallback": "none"},
+    {"method": "cron.resume", "handler": "CronAdminHandlers.kt", "current_backend": "native App Server v2 (no shim path ever existed over Iroh)", "owner": "app_server_v2", "public_contract": "cron_resume", "native_contract": ["cron_resume", "cron_resume_response"], "authorization_class": "admin_write", "data_store": "letta_local_backend", "fallback": "none", "migration_slice": "none", "notes": "Forwards the existing App Server cron command; the shared schedules page refreshes host state after confirmation.", "production_first_route": "app_server_v2", "post_shim_owner": "app_server_v2", "post_shim_fallback": "none"},
     {
       "method": "cron.trigger",
       "handler": "CronAdminHandlers.kt",

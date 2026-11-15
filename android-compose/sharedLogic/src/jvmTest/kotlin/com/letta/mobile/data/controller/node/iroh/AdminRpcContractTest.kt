@@ -151,6 +151,7 @@ class AdminRpcContractTest {
             "cron.list",
             "cron.runs",
             "cron.trigger",
+            "cron.pause", "cron.resume",
             "cron.update",
             "schedule.create",
             "schedule.delete",
