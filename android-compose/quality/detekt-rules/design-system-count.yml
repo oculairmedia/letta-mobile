@@ -25,3 +25,5 @@ letta-mobile-design-system:
     active: true
   BareClickable:
     active: true
+  ComponentInExemptPath:
+    active: true
