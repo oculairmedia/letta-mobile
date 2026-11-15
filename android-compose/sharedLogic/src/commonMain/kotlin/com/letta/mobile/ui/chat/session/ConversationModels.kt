@@ -85,6 +85,9 @@ class ConversationModels(
         ),
     )
 
+    /** The current conversation, captured by controls when their picker opens. */
+    val focus: StateFlow<ConversationModelFocus> get() = host.focus
+
     /** The active backend's models. */
     val available: StateFlow<List<LlmModel>> = loaded.asStateFlow()
 

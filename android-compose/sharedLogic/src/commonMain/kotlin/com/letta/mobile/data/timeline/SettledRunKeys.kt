@@ -1,6 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.runKey
 import com.letta.mobile.data.model.UiMessage
 
 /**
@@ -12,6 +13,24 @@ internal val ChatRenderItem.isRunItem: Boolean
         is ChatRenderItem.RunBlock -> true
         is ChatRenderItem.Single -> stableRunKey != null
     }
+
+/**
+ * A run item keyed `run-<id>-from-<its oldest message id>`: a function of the item's own records,
+ * never of which other blocks of the run share its snapshot or where a page edge fell. The live
+ * overlay and the settled pages both key runs this way, so a settled block holding exactly the
+ * records of a live block computes that block's key, and a block cut in two keeps the key on the
+ * part that holds its oldest record. Items that are not runs keep their key.
+ */
+internal fun ChatRenderItem.keyedByOwnRecords(): ChatRenderItem = when (this) {
+    is ChatRenderItem.RunBlock -> keyedByOwnRecords()
+    is ChatRenderItem.Single -> stableRunId?.takeIf { stableRunKey != null }
+        ?.let { copy(keyOverride = "${runKey(it)}-from-${message.id}") }
+        ?: this
+}
+
+/** This block keyed `run-<id>-from-<its oldest message id>`. */
+internal fun ChatRenderItem.RunBlock.keyedByOwnRecords(): ChatRenderItem.RunBlock =
+    copy(keyOverride = "${runKey(runId)}-from-${messages.first().first.id}")
 
 /**
  * What the live row showed that its settled copy must keep so the two renders are identical
@@ -39,6 +58,9 @@ internal data class LiveRowPresentation(
  * would draw the reply twice for a frame and then drop the live row, the flash at the end of a turn
  *. The other way round never adopts: a live run whose rows settled as
  * separate bubbles keeps its own keys, since several settled rows cannot all take one live key.
+ *
+ * Whether the settled row may take the key is the caller's to decide (SettledLiveAdoptions takes
+ * it only from a live row it holds in full).
  */
 internal fun ChatRenderItem.livePresentationFor(
     events: List<TimelineResidentEvent>,
@@ -50,6 +72,16 @@ internal fun ChatRenderItem.livePresentationFor(
     val named = live.filter { item -> item.messagesInOrder().any { it.isNamedBy(names) } }
     val match = named.firstOrNull(::sharesShapeWith) ?: named.firstOrNull { isRunItem && !it.isRunItem } ?: return null
     return LiveRowPresentation(match.key, match.runIdentity(), match.messagesInOrder().firstNotNullOfOrNull { it.latencyMs })
+}
+
+/** Whether no live row under this key shows a record that [events] do not hold. */
+internal fun LiveRowPresentation.isOnlyHeldWithin(
+    events: List<TimelineResidentEvent>,
+    live: List<ChatRenderItem>,
+    aliases: Map<String, TimelineMessageId>,
+): Boolean {
+    val names = events.flatMapTo(mutableSetOf()) { it.namesKnownTo(aliases) }
+    return live.filter { it.key == key }.all { row -> row.messagesInOrder().all { it.isNamedBy(names) } }
 }
 
 /** [this] as the live row showed it; every other field is the settled row's own. */
@@ -83,8 +115,27 @@ private fun ChatRenderItem.runIdentity(): String? = when (this) {
 private fun UiMessage.withLatencyOf(live: LiveRowPresentation): UiMessage =
     if (latencyMs == null || live.latencyMs == null) this else copy(latencyMs = live.latencyMs)
 
-private fun TimelineResidentEvent.namesKnownTo(aliases: Map<String, TimelineMessageId>): List<String> =
+internal fun TimelineResidentEvent.namesKnownTo(aliases: Map<String, TimelineMessageId>): List<String> =
     (listOf(serverId, identity.value, otid) + aliases.filterValues { it == identity }.keys).filter(String::isNotBlank)
+
+/** Whether every message [this] draws is one of [names]. */
+internal fun ChatRenderItem.isWhollyNamedBy(names: Set<String>): Boolean = messagesInOrder().all { it.isNamedBy(names) }
+
+/**
+ * [this] without the messages one of [names] already names, or null when it names them all. A run
+ * keeps its key and the messages left, in order.
+ */
+internal fun ChatRenderItem.withoutRecordsNamedBy(names: Set<String>): ChatRenderItem? = when (this) {
+    is ChatRenderItem.Single -> takeUnless { message.isNamedBy(names) }
+    is ChatRenderItem.RunBlock -> {
+        val rest = messages.filterNot { it.first.isNamedBy(names) }
+        when (rest.size) {
+            0 -> null
+            messages.size -> this
+            else -> copy(messages = rest)
+        }
+    }
+}
 
 /** Reasoning rows are keyed `<serverId>:REASONING` so they cannot collide with their reply. */
 private fun UiMessage.isNamedBy(names: Set<String>): Boolean =

@@ -70,7 +70,7 @@ fun ToolsetSelectorRow(
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             toolsets.forEach { toolset ->
-                val isSelected = toolset.id == selectedId || (selectedId == null && toolset.id == "auto")
+                val isSelected = toolset.id == selectedId
                 LettaChipTab(
                     text = toolset.displayName ?: toolset.label ?: toolset.id,
                     active = isSelected,

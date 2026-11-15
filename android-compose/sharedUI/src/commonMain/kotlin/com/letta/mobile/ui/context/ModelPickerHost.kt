@@ -62,7 +62,19 @@ private fun ModelPickerPane(binding: ModelPickerBinding, selectedValue: String?,
     LaunchedEffect(controller, selectedValue) { controller.setSelected(selectedValue) }
     LaunchedEffect(controller) { controller.ensureLoaded() }
     val state by controller.state.collectAsState()
-    val actions = rememberPickerActions(binding, controller)
+    val toolsets = remember(binding) { binding.toolsets?.invoke(scope) }
+    val toolsetFlow = remember(toolsets) {
+        toolsets?.state ?: kotlinx.coroutines.flow.MutableStateFlow(com.letta.mobile.data.toolsets.ToolsetState())
+    }
+    val toolsetState by toolsetFlow.collectAsState()
+    val actions = rememberPickerActions(binding, controller).copy(
+        availableToolsets = toolsetState.available.map {
+            com.letta.mobile.data.transport.appserver.AppServerToolset(it.id, it.displayName)
+        },
+        currentToolset = toolsetState.preference,
+        onSelectToolset = toolsets?.let { it::select },
+        toolsetError = toolsetState.error,
+    )
     val closingEffort = effort?.copy(
         onSelect = { choice ->
             binding.close()

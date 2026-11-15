@@ -19,11 +19,30 @@ package com.letta.mobile.data.pairing
  *
  * `letta://pair?…` is accepted as an alias (the Android app's original scheme).
  * The link contains the invite secret: never log it.
+ *
+ * The link is also shown as TEXT under the code, so it must stay inside what a QR
+ * symbol can hold. A host ticket (`--public-dial-address`, or the endpoint's own
+ * ticket by default) is far longer than the envelope, and the two together overflow
+ * even a version 40 symbol: the encoder then fails and the inviter is left with no
+ * code at all. [forQr] therefore keeps the envelope and drops the hint when the link
+ * would not fit; the client still dials the envelope's NodeId and Iroh's relay
+ * discovery, which is what the browser client does for every invite anyway.
  */
 data class PairLink(val qrInvite: String, val dial: String?) {
     fun encode(): String = buildString {
         append(CANONICAL_PREFIX).append("qr=").append(percentEncode(qrInvite))
         dial?.takeIf { it.isNotBlank() }?.let { append("&dial=").append(percentEncode(it)) }
+    }
+
+    /**
+     * This link as a QR payload: the full link when it fits [maxQrChars], else the same
+     * invite without its dial hint. Null when even the bare link cannot fit.
+     */
+    fun forQr(maxQrChars: Int = QR_MAX_CHARS): String? {
+        val full = encode()
+        if (full.length <= maxQrChars) return full
+        if (dial == null) return null
+        return copy(dial = null).encode().takeIf { it.length <= maxQrChars }
     }
 
     override fun toString(): String = "PairLink(<redacted>, dial=${dial != null})"
@@ -32,6 +51,14 @@ data class PairLink(val qrInvite: String, val dial: String?) {
         const val QR_SCHEME_PREFIX = "letta-qr-v1."
         private const val CANONICAL_PREFIX = "meridian://pair?"
         private val ACCEPTED_PREFIXES = listOf("meridian://pair?", "letta://pair?", "meridian://pair/?", "letta://pair/?")
+
+        /**
+         * Longest link that still fits a QR symbol at level M. A version 40 symbol holds 2331
+         * bytes; byte mode spends 4 mode bits, 16 count bits and 12 ECI bits (the link is
+         * non-ASCII-safe only in theory, but the encoder emits the header for any non-ASCII
+         * byte), so 2299 characters is the ceiling — 2300 is the first length that fails.
+         */
+        const val QR_MAX_CHARS = 2299
 
         /**
          * Parse a scanned/opened value: a pairing link or a bare `letta-qr-v1.`

@@ -215,6 +215,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Project registry v1: host-owned project record, project file and read methods](reference/contracts/project-registry-v1.md)
 - [Admin RPC Wire Contracts](reference/contracts/README.md)
 - [Secret request v1: secure secret-input flow](reference/contracts/secret-request-v1.md)
+- [Voice endpoint v1: host-stored speech setup and speech through the host](reference/contracts/voice-endpoint-v1.md)
 
 ### reference/contracts/beads.config.get
 
@@ -328,6 +329,14 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [conversation.list: Visible Recents v1](reference/contracts/conversation.list/visible-recents-v1.md)
 
+### reference/contracts/cron.pause
+
+- [\`cron.pause\` v1](reference/contracts/cron.pause/control-v1.md)
+
+### reference/contracts/cron.resume
+
+- [\`cron.resume\` v1](reference/contracts/cron.resume/control-v1.md)
+
 ### reference/contracts/health.check
 
 - [health.check: Controller Status v1](reference/contracts/health.check/status-v1.md)
@@ -376,6 +385,14 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [secret.request.submit: Secret Request v1](reference/contracts/secret.request.submit/secret-request-v1.md)
 
+### reference/contracts/slash\_command.execute
+
+- [Slash command execution v1](reference/contracts/slash_command.execute/execute-v1.md)
+
+### reference/contracts/toolset.update
+
+- [toolset.update v1](reference/contracts/toolset.update/toolset-v1.md)
+
 ### testing
 
 - [5s9lq.1 Chat Hydration Trace Baseline](testing/5s9lq-1-chat-hydration-trace.md)
@@ -387,4 +404,8 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 ### tooling
 
 - [Self-hosted code intelligence pilot](tooling/serena-scip-pilot.md)
+
+### tooling/verifying-timeline-identity
+
+- [Verifying timeline row identity](tooling/verifying-timeline-identity/SKILL.md)
 <!-- documentation-index:end -->

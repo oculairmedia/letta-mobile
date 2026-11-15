@@ -303,7 +303,7 @@ android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/WebShellPages.kt 
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/WebShortcuts.kt 37
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/chat/WebChatSessionPort.kt 110
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/BrowserErrors.kt 21
-android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WasmAppServerClientGateway.kt 342
+android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WasmAppServerClientGateway.kt 326
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WasmAppServerSession.kt 308
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WebSessionBinding.kt 41
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WebSettingsStore.kt 34

@@ -34,7 +34,7 @@ class WireContractsTest {
         // Semantic fixtures have their own common tests, not Admin RPC methods.
         .filterNot {
             it.relativeTo(fixtureRoot).invariantSeparatorsPath in setOf(
-                "active-turn/v1.json", "object-verbs/v1.json", "current-focus/v1.json",
+                "active-turn/v1.json", "object-verbs/v1.json", "current-focus/v1.json", "voice-endpoint/v1.json",
             )
         }
         .map { WireContractFixture(it.readText()) }.toList().also {
@@ -60,7 +60,10 @@ class WireContractsTest {
                 val name = case.getValue("name").jsonPrimitive.content
                 val host = case.getValue("host_state").jsonObject
                 // New fixture families must supply a real host-state adapter, never be skipped.
-                val known = setOf("controller_state", "conversations", "hidden_agent_ids", "visibility_index", "reflection_settings")
+                val known = setOf(
+                    "controller_state", "conversations", "hidden_agent_ids", "visibility_index",
+                    "reflection_settings", "toolset_response", "cron_control", "execute_command_response",
+                )
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
                 val state = when (host.getValue("controller_state").jsonPrimitive.content) {
@@ -90,11 +93,12 @@ class WireContractsTest {
 
     @Test
     fun producerContractCopiesMatchSharedClientFixtures() {
-        for (method in listOf("run.record", "lease.upsert", "lease.list")) {
-            val relative = "$method/wrapper-records-v1.json"
+        val copies = listOf("run.record", "lease.upsert", "lease.list").map { "$it/wrapper-records-v1.json" } +
+            listOf("cron.pause/control-v1.json", "cron.resume/control-v1.json")
+        for (relative in copies) {
             val shared = Json.parseToJsonElement(File(fixtureRoot, relative).readText())
             val producer = Json.parseToJsonElement(File(root, "docs/reference/contracts/$relative").readText())
-            assertEquals(shared, producer, "$method producer/client fixture drift")
+            assertEquals(shared, producer, "$relative producer/client fixture drift")
         }
     }
 
@@ -205,7 +209,61 @@ class WireContractsTest {
         }
     } as AppServerClient
 
+    private fun toolsetNative(host: JsonObject): AppServerClient = Proxy.newProxyInstance(
+        AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java),
+    ) { _, method, args ->
+        check(method.name == "updateToolset") { "Unexpected native call: ${method.name}" }
+        val command = args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.UpdateToolset
+        val answer = host.getValue("toolset_response").jsonObject
+        com.letta.mobile.data.transport.appserver.AppServerInboundFrame.UpdateToolsetResponse(
+            requestId = command.requestId.orEmpty(),
+            success = answer.getValue("success").jsonPrimitive.boolean,
+            currentToolset = answer.getValue("current_toolset").jsonPrimitive.content,
+            error = answer.getValue("error").jsonPrimitive.content,
+        )
+    } as AppServerClient
+
+    private fun cronControlNative(host: JsonObject): AppServerClient = Proxy.newProxyInstance(
+        AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java),
+    ) { _, method, args ->
+        val stored = host.getValue("cron_control").jsonObject
+        val success = stored.getValue("success").jsonPrimitive.boolean
+        val task = stored["task"] as? JsonObject
+        val error = stored["error"]?.jsonPrimitive?.content
+        when (method.name) {
+            "cronPause" -> {
+                val command = args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.CronPause
+                assertEquals("task-1", command.taskId)
+                assertTrue(command.requestId.isNotBlank())
+                com.letta.mobile.data.transport.appserver.AppServerInboundFrame.CronPauseResponse(command.requestId, success, task, error)
+            }
+            "cronResume" -> {
+                val command = args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.CronResume
+                assertEquals("task-1", command.taskId)
+                assertEquals("2026-12-01T09:00:00Z", command.scheduledFor)
+                assertTrue(command.requestId.isNotBlank())
+                com.letta.mobile.data.transport.appserver.AppServerInboundFrame.CronResumeResponse(command.requestId, success, task, error)
+            }
+            else -> error("Unexpected native call: ${method.name}")
+        }
+    } as AppServerClient
+
+    private fun commandNative(host: JsonObject): AppServerClient = Proxy.newProxyInstance(
+        AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java),
+    ) { _, method, args ->
+        check(method.name == "executeCommand") { "Unexpected native call: ${method.name}" }
+        val command = args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.ExecuteCommand
+        val stored = host.getValue("execute_command_response").jsonObject
+        Json.decodeFromJsonElement(
+            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.ExecuteCommandResponse.serializer(),
+            JsonObject(stored + ("request_id" to kotlinx.serialization.json.JsonPrimitive(command.requestId))),
+        )
+    } as AppServerClient
+
     private fun fixtureNative(host: JsonObject?): AppServerClient = when {
+        host?.containsKey("toolset_response") == true -> toolsetNative(host)
+        host?.containsKey("cron_control") == true -> cronControlNative(host)
+        host?.containsKey("execute_command_response") == true -> commandNative(host)
         host?.containsKey("conversations") == true -> conversationNative(host)
         host?.containsKey("reflection_settings") == true -> reflectionNative(host)
         else -> rejectCalls("native")

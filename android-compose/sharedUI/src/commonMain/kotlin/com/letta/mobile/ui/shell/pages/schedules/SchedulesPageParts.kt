@@ -51,14 +51,13 @@ import com.letta.mobile.ui.theme.customColors
 internal fun SchedulesMainContent(body: SchedulesBody, modifier: Modifier) {
     val library = body.state.library
     val error = library.errorMessage
-    val showsHistory = body.view == SchedulesView.Agenda || body.view == SchedulesView.History
-    val hasContent = body.data.defs.isNotEmpty() || (showsHistory && body.data.runHistory.isNotEmpty()) ||
-        (error == null && body.view in listOf(SchedulesView.Week, SchedulesView.Agenda, SchedulesView.Month) &&
-            body.data.leases.isNotEmpty())
     LettaRefreshable(refreshing = library.isLoading, onRefresh = body.onRefresh, modifier = modifier) {
         when {
-            hasContent -> Box(Modifier.fillMaxSize().testTag(SchedulesPageTags.view(body.view))) {
-                ActiveScheduleView(body)
+            body.hasContent() -> Box(Modifier.fillMaxSize().testTag(SchedulesPageTags.view(body.view))) {
+                Column {
+                    if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+                    ActiveScheduleView(body)
+                }
             }
             error != null -> SchedulesError(error, library.isLoading, body.onRefresh)
             library.isLoading -> CenteredNote("Loading schedules…")
@@ -66,6 +65,15 @@ internal fun SchedulesMainContent(body: SchedulesBody, modifier: Modifier) {
         }
     }
 }
+
+private fun SchedulesBody.hasContent(): Boolean {
+    val showsHistory = view == SchedulesView.Agenda || view == SchedulesView.History
+    return data.defs.isNotEmpty() || (showsHistory && data.runHistory.isNotEmpty()) || hasVisibleLeases()
+}
+
+private fun SchedulesBody.hasVisibleLeases(): Boolean =
+    state.library.errorMessage == null && view in listOf(SchedulesView.Week, SchedulesView.Agenda, SchedulesView.Month) &&
+        data.leases.isNotEmpty()
 
 @Composable
 private fun ActiveScheduleView(body: SchedulesBody) {
@@ -82,7 +90,9 @@ private fun ActiveScheduleView(body: SchedulesBody) {
 @Composable
 private fun SchedulesRulesView(body: SchedulesBody) {
     val now = body.data.clock.now
-    val sections = remember(body.data.defs) { listOf(RosterSection(SchedulesPageTags.RULES_SECTION, body.data.defs)) }
+    val sections = remember(body.data.defs, body.showPaused) {
+        listOf(RosterSection(SchedulesPageTags.RULES_SECTION, body.data.defs.filter { body.showPaused || it.active }))
+    }
     RosterList(
         RosterSpec(
             sections = sections,
@@ -102,6 +112,11 @@ private fun SchedulesRulesView(body: SchedulesBody) {
             row = row,
             slots = RosterRowSlots(
                 end = {
+                    if (body.onTogglePause != null && body.state.canTogglePause(CronTaskId(def.id))) {
+                        TextButton(onClick = { body.onTogglePause.invoke(def.id, !def.active) }) {
+                            Text(if (def.active) "Pause" else "Resume")
+                        }
+                    }
                     Text(
                         if (def.active) {
                             ScheduleRailText.relativeOrDash(now, ScheduleProjection.nextRun(def, now))

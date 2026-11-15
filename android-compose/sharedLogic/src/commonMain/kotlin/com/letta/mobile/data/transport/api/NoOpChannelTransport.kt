@@ -1,5 +1,7 @@
 package com.letta.mobile.data.transport.api
 
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
@@ -52,7 +54,7 @@ open class NoOpChannelTransport : IChannelTransport, CronControlTransport {
         agentId: String?,
         conversationId: String?,
         timeoutMs: Long,
-    ): ServerFrame.CronListResponse = unsupported()
+    ): ServerFrame.CronListResponse = listCrons(CronListQuery(agentId, conversationId), timeoutMs.milliseconds)
 
     override suspend fun sendCronAdd(
         agentId: String,
@@ -66,16 +68,30 @@ open class NoOpChannelTransport : IChannelTransport, CronControlTransport {
         timezone: String?,
         conversationId: String?,
         timeoutMs: Long,
-    ): ServerFrame.CronAddResponse = unsupported()
+    ): ServerFrame.CronAddResponse = addCron(
+        CronAddRequest(agentId, name, description, prompt, recurring, cron, every, at, timezone, conversationId),
+        timeoutMs.milliseconds,
+    )
 
     override suspend fun sendCronGet(taskId: String, timeoutMs: Long): ServerFrame.CronGetResponse =
-        unsupported()
+        getCron(CronTaskRef(taskId), timeoutMs.milliseconds)
 
     override suspend fun sendCronDelete(taskId: String, timeoutMs: Long): ServerFrame.CronDeleteResponse =
-        unsupported()
+        deleteCron(CronTaskRef(taskId), timeoutMs.milliseconds)
 
     override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long): ServerFrame.CronDeleteAllResponse =
-        unsupported()
+        deleteAllCrons(CronAgentRef(agentId), timeoutMs.milliseconds)
+
+    /** Typed cron operations; legacy transport entry points adapt their arguments here. */
+    protected open suspend fun listCrons(query: CronListQuery, timeout: Duration): ServerFrame.CronListResponse = unsupported()
+
+    protected open suspend fun addCron(params: CronAddRequest, timeout: Duration): ServerFrame.CronAddResponse = unsupported()
+
+    protected open suspend fun getCron(task: CronTaskRef, timeout: Duration): ServerFrame.CronGetResponse = unsupported()
+
+    protected open suspend fun deleteCron(task: CronTaskRef, timeout: Duration): ServerFrame.CronDeleteResponse = unsupported()
+
+    protected open suspend fun deleteAllCrons(agent: CronAgentRef, timeout: Duration): ServerFrame.CronDeleteAllResponse = unsupported()
 
     override suspend fun sendCronPause(command: CronPauseCommand): ServerFrame.CronPauseResponse =
         unsupported()

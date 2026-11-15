@@ -80,7 +80,7 @@ internal class TimelineFrameRecorder private constructor(
     private fun record() = synchronized(lock) {
         val live = presentation.live.value
         val snapshot = presenter.snapshot()
-        val assembly = TimelineRowAssembly.assemble(live, snapshot.map { it?.item?.key })
+        val assembly = CanonicalTimelinePresentation.assemble(live, snapshot)
         val rows = (0 until assembly.size).map { index ->
             val item = assembly.live.getOrNull(index) ?: snapshot[index - assembly.liveCount]?.item
             val source = if (index < assembly.liveCount) TimelineRowAssembly.LIVE else TimelineRowAssembly.SETTLED
@@ -170,6 +170,24 @@ internal class TimelineFrameRecorder private constructor(
         presenter.awaitIdle()
     }
 
+    /**
+     * The recent page the Paging mediator reads at the newest end (TimelineHistoryMediator.refreshNewest):
+     * a catch-up, which the engine applies even while a turn is still streaming.
+     */
+    suspend fun catchUp(durable: List<LettaMessage>, step: String = "catch-up") {
+        this.step = step
+        transport.durable = durable
+        var outcome = owner.session.reconcileRecentDetailed(owner.selection, catchUp = true).outcome
+        var retries = 0
+        while (outcome == TimelineEnginePageOutcome.Stale && retries++ < STALE_RETRIES) {
+            yield()
+            outcome = owner.session.reconcileRecentDetailed(owner.selection, catchUp = true).outcome
+        }
+        assertEquals(TimelineEnginePageOutcome.Applied, outcome)
+        settleUi()
+        presenter.awaitIdle()
+    }
+
     /** Scrolls to the oldest edge, as a reader would, until Paging holds every settled page. */
     suspend fun readAllSettledPages() {
         step = "read older"
@@ -236,9 +254,10 @@ internal class TimelineFrameRecorder private constructor(
         private const val SETTLE_YIELDS = 20
         private const val STALE_RETRIES = 5
 
-        suspend fun open(scope: TimelineScope): TimelineFrameRecorder {
+        /** [store] defaults to the shared in-memory ledger; a test may wrap it to read like another store. */
+        suspend fun open(scope: TimelineScope, store: TimelineBoundedStore = InMemoryTimelineStore()): TimelineFrameRecorder {
             val transport = MutableDurableTransport()
-            val coordinator = CanonicalTimelineCoordinator(InMemoryTimelineStore(), transport)
+            val coordinator = CanonicalTimelineCoordinator(store, transport)
             val owner = coordinator.acquire(scope)
             val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
             val presentation = CanonicalTimelinePresentation.open(coordinator, owner, ui)

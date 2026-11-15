@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -65,6 +66,11 @@ class SessionScopedChannelTransport internal constructor(
 
     private val _state = MutableStateFlow(sessionManager.current.channelTransport.state.value)
     override val state: StateFlow<ChannelTransportState> = _state
+
+    /** Confirmed host choices follow the active graph, including while a picker remains open. */
+    override val toolsetStates = sessionManager.currentGraph
+        .flatMapLatest { it.channelTransport.toolsetStates }
+        .stateIn(proxyScope, SharingStarted.Eagerly, sessionManager.current.channelTransport.toolsetStates.value)
 
     private val seenIncidents = mutableSetOf<Pair<Long, Long>>()
     private val seenIncidentOrder = ArrayDeque<Pair<Long, Long>>()

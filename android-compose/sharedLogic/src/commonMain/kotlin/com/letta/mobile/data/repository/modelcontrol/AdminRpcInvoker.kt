@@ -26,3 +26,12 @@ fun interface AdminRpcInvoker {
 }
 
 class ModelControlException(message: String) : Exception(message)
+
+/** Provider, model and toolset control over the same live channel on every platform. */
+fun modelControlSession(
+    transport: () -> IChannelTransport?,
+    recents: com.letta.mobile.data.model.RecentModelsStore? = null,
+): ModelControlSession = ModelControlSession(
+    AdminRpcInvoker.overTransport(transport), recents = recents,
+    toolsetStates = { transport()?.toolsetStates ?: com.letta.mobile.data.toolsets.EmptyToolsets },
+)

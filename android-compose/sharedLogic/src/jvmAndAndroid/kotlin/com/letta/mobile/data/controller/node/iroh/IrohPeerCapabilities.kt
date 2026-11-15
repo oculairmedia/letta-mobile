@@ -169,6 +169,7 @@ object IrohPeerCapabilities {
         // capability migration. Mutations in the same namespaces (e.g. goal.command)
         // are NOT listed here and stay admin.full via the else branch.
         method in ADMIN_READ_METHODS -> CHAT_READ
+        method == "slash_command.execute" -> ADMIN_FULL
         method in CHAT_SEND_METHODS -> CHAT_SEND
         method in CONVERSATION_MANAGE_METHODS -> CONVERSATION_MANAGE
         // A paired desktop must be able to edit its own agents' config — most
@@ -181,6 +182,7 @@ object IrohPeerCapabilities {
         // desktop-manageable config edit as agent.update. Provider connect/
         // disconnect and model.exposure.set change what EVERY client sees, so
         // they stay admin.full via the else branch.
+        method == "toolset.update" -> CONVERSATION_MANAGE
         method == "model.update" -> CONVERSATION_MANAGE
         // letta-mobile-joigh: the context limit is the same model-settings edit (agent or
         // conversation `context_window_limit`, via letta-code's /context-limit).
