@@ -20,7 +20,9 @@ import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -221,11 +223,11 @@ class HomePageTest {
     fun editingPinsUnpinsAndAddsShortcuts() = runComposeUiTest {
         show(baseState())
         onNodeWithTag(HomePageTags.STATS_MENU).performClick()
-        onNodeWithTag(HomePageTags.CUSTOMIZE).performClick()
+        onAllNodesWithText("Customize Home").filterToOne(hasAnyAncestor(isPopup())).performClick()
         onNodeWithTag(HomePageTags.EDIT_PINS).assertExists()
         onNodeWithTag(HomePageTags.unpin(toolsPin)).performClick()
         onNodeWithTag(HomePageTags.ADD_PIN).performClick()
-        onNodeWithTag(HomePageTags.addShortcut(HomeShortcut.SCHEDULES)).performClick()
+        onAllNodesWithText(HomeShortcut.SCHEDULES.label).filterToOne(hasAnyAncestor(isPopup())).performClick()
         assertEquals(listOf("pin:TOOLS=false", "pin:SCHEDULES=true"), actions.events)
     }
 
@@ -293,7 +295,7 @@ class HomePageTest {
 
         onNodeWithTag(HomePageTags.PINNED_GRID).assertDoesNotExist()
         onNodeWithTag(HomePageTags.STATS_MENU).performClick()
-        onNodeWithTag(HomePageTags.CUSTOMIZE).performClick()
+        onAllNodesWithText("Customize Home").filterToOne(hasAnyAncestor(isPopup())).performClick()
         onNodeWithTag(HomePageTags.unpin(toolsPin)).performClick()
         assertEquals(listOf("pin:TOOLS=false"), actions.events)
     }

@@ -29,8 +29,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.schedules.CronBuilder
 import com.letta.mobile.data.schedules.CronBuilderState
 import com.letta.mobile.data.schedules.CronCadence
@@ -42,6 +40,7 @@ import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.host.PaneSize
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.theme.customColors
 
 /**
@@ -62,7 +61,7 @@ internal fun ScheduleFormPane(
         kind = LettaPaneKind.Modal,
         onDismiss = onDismiss,
         title = "New schedule",
-        size = PaneSize(width = FormWidth),
+        size = PaneSize(width = LettaDimens.Pane.modalWidth),
         testTag = SchedulesPageTags.FORM,
     ) {
         Column(
@@ -85,7 +84,7 @@ internal fun ScheduleFormPane(
                 minLines = 3,
                 modifier = Modifier.fillMaxWidth().testTag(SchedulesPageTags.FORM_PROMPT),
             )
-            FieldLabel("WHEN")
+            LettaSectionLabel("When")
             CadenceBuilder(draft.cadence) { draft = draft.copy(cadence = it) }
             CadencePreview(draft.cadence, clock)
         }
@@ -102,8 +101,6 @@ internal fun ScheduleFormPane(
         }
     }
 }
-
-private val FormWidth = 560.dp
 
 /** Cadence presets, then the controls the chosen preset needs. */
 @Composable
@@ -178,7 +175,7 @@ private fun CadencePreview(state: CronBuilderState, clock: ScheduleClock) {
         Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(LettaDimens.Space.md).testTag(SchedulesPageTags.FORM_PREVIEW),
     ) {
-        Text(CronBuilder.preview(state), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+        Text(CronBuilder.preview(state), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
         CronBuilder.previewRuns(state, clock.now, clock.zone, PREVIEW_RUNS).forEach {
             Text(
                 "• ${ScheduleFormat.dateLabel(it, clock.zone)} · ${ScheduleFormat.timeOfDay(it, clock.zone)}",
@@ -197,11 +194,6 @@ private fun CadenceChip(label: String, selected: Boolean, onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier.heightIn(min = LettaDimens.Control.iconButtonSm).testTag(SchedulesPageTags.cadence(label)),
     )
-}
-
-@Composable
-private fun FieldLabel(text: String) {
-    Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
 }
 
 private val CADENCES = listOf(

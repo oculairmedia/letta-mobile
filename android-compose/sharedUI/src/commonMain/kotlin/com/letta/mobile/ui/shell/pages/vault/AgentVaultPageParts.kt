@@ -6,30 +6,25 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaPanel
+import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.data.secrets.AgentSecretDraft
 import com.letta.mobile.data.secrets.SecretKey
 import com.letta.mobile.ui.theme.LettaDimens
@@ -38,39 +33,41 @@ import com.letta.mobile.ui.theme.LettaDimens
 @Composable
 internal fun SecretRow(key: String, page: AgentVaultPageScope) {
     val revealed = key in page.state.revealed
-    val actionModifier = if (page.options.touch) Modifier.minimumInteractiveComponentSize() else Modifier
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        modifier = Modifier.fillMaxWidth().testTag(AgentVaultPageTags.row(key)),
-    ) {
+    LettaPanel(modifier = Modifier.fillMaxWidth().testTag(AgentVaultPageTags.row(key)), border = false) {
         Row(
             modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
-                Text(key, style = MaterialTheme.typography.labelLarge.copy(fontFamily = FontFamily.Monospace))
+                Text(key, style = LettaTextStyles.monoBody)
                 Text(
                     page.state.displayValue(key),
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    style = LettaTextStyles.mono,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.testTag(AgentVaultPageTags.value(key)),
                 )
             }
-            IconButton(onClick = { page.actions.toggleReveal(SecretKey(key)) }, modifier = actionModifier.testTag(AgentVaultPageTags.reveal(key))) {
-                Icon(
-                    if (revealed) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                    contentDescription = if (revealed) "Hide $key" else "Reveal $key",
-                )
-            }
-            IconButton(onClick = { page.actions.startEditing(SecretKey(key)) }, modifier = actionModifier.testTag(AgentVaultPageTags.edit(key))) {
-                Icon(Icons.Outlined.Edit, contentDescription = "Replace $key")
-            }
-            IconButton(onClick = { page.actions.requestDelete(SecretKey(key)) }, modifier = actionModifier.testTag(AgentVaultPageTags.delete(key))) {
-                Icon(Icons.Outlined.Delete, contentDescription = "Delete $key", tint = MaterialTheme.colorScheme.error)
-            }
+            LettaIconButton(
+                icon = LettaButtonIcon(
+                    if (revealed) LettaIcons.VisibilityOff else LettaIcons.Visibility,
+                    if (revealed) "Hide $key" else "Reveal $key",
+                ),
+                onClick = { page.actions.toggleReveal(SecretKey(key)) },
+                modifier = Modifier.testTag(AgentVaultPageTags.reveal(key)),
+            )
+            LettaIconButton(
+                icon = LettaButtonIcon(LettaIcons.Edit, "Replace $key"),
+                onClick = { page.actions.startEditing(SecretKey(key)) },
+                modifier = Modifier.testTag(AgentVaultPageTags.edit(key)),
+            )
+            LettaIconButton(
+                icon = LettaButtonIcon(LettaIcons.Delete, "Delete $key", glyph = LettaIconStyle(tint = MaterialTheme.colorScheme.error)),
+                onClick = { page.actions.requestDelete(SecretKey(key)) },
+                modifier = Modifier.testTag(AgentVaultPageTags.delete(key)),
+            )
         }
     }
 }
@@ -103,12 +100,14 @@ internal fun SecretEditor(draft: AgentSecretDraft, page: AgentVaultPageScope) {
             visualTransformation = if (draft.showValue) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
             trailingIcon = {
-                IconButton(onClick = page.actions::toggleDraftValueVisible, modifier = Modifier.testTag(AgentVaultPageTags.EDITOR_SHOW_VALUE)) {
-                    Icon(
-                        if (draft.showValue) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                        contentDescription = if (draft.showValue) HIDE_VALUE else SHOW_VALUE,
-                    )
-                }
+                LettaIconButton(
+                    icon = LettaButtonIcon(
+                        if (draft.showValue) LettaIcons.VisibilityOff else LettaIcons.Visibility,
+                        if (draft.showValue) HIDE_VALUE else SHOW_VALUE,
+                    ),
+                    onClick = page.actions::toggleDraftValueVisible,
+                    modifier = Modifier.testTag(AgentVaultPageTags.EDITOR_SHOW_VALUE),
+                )
             },
             modifier = Modifier.fillMaxWidth().testTag(AgentVaultPageTags.EDITOR_VALUE),
         )

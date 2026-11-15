@@ -1,5 +1,8 @@
 package com.letta.mobile.ui.shell.sidebar
 
+import androidx.compose.ui.semantics.Role
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.ObjectVerbMenus
 import com.letta.mobile.ui.components.items
 import com.letta.mobile.data.objectverbs.ObjectRef
@@ -46,7 +49,6 @@ import com.letta.mobile.sharedui.resources.shell_canvas_current_device_state
 import com.letta.mobile.sharedui.resources.shell_canvas_current_state
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Palette
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
@@ -258,7 +260,7 @@ private fun RowMarkIcon(icon: ImageVector, description: String, tag: String) {
         imageVector = icon,
         contentDescription = description,
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.size(PIN_ICON_SIZE).testTag(tag),
+        modifier = Modifier.size(LettaDimens.Control.iconSm).testTag(tag),
     )
 }
 
@@ -303,13 +305,17 @@ private fun thinkingPulseAlpha(): Float {
 
 @Composable
 private fun ArchiveToggleIcon(archived: Boolean, noun: String, onToggle: () -> Unit) {
-    Icon(
+    // Stands in for the row's leading glyph on hover, so it keeps that glyph's size and draws no ripple of its own.
+    LettaIcon(
         imageVector = if (archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
         contentDescription = if (archived) "Restore $noun" else "Archive $noun",
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier
-            .size(LettaDimens.Control.icon)
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onToggle),
+        modifier = Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            role = Role.Button,
+            onClick = onToggle,
+        ),
+        style = LettaIconStyle(tint = MaterialTheme.colorScheme.onSurfaceVariant),
     )
 }
 
@@ -374,7 +380,6 @@ private fun mountedWords(model: ShellCanvasRowModel): MountedWords = when {
     else -> MountedWords(Res.string.shell_canvas_current, Res.string.shell_canvas_current_state)
 }
 
-private val PIN_ICON_SIZE = 12.dp
 private const val PULSE_MIN_ALPHA = 0.4f
 private const val PULSE_MS = 700
 

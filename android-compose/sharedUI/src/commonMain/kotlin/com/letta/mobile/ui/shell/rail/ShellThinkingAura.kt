@@ -10,7 +10,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
@@ -24,8 +23,9 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Shape
 import com.letta.mobile.ui.chat.AGENT_TILE_OVERSCALE
 import com.letta.mobile.ui.chat.agentOrbBrush
 import com.letta.mobile.ui.chat.agentTileStill
@@ -36,13 +36,14 @@ import com.letta.mobile.ui.theme.LocalReducedMotion
  * The thinking indicator, drawn BEHIND an agent's tile: the character's own silhouette (its captured
  * still, or the gradient orb's rounded square) in its own colour, blurred into a glow that breathes.
  * Each mascot glows in its shape, and nothing is drawn over its face. Reduced motion holds the glow.
+ * [shape] is the orb's own corner, so the gradient glow matches the tile it sits behind.
  */
 @Composable
 fun ShellThinkingAura(
     entry: ShellRailEntry,
     size: Dp,
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = LettaDimens.Radius.sm,
+    shape: Shape = MaterialTheme.shapes.small,
 ) {
     val breath = auraBreath()
     // Read in the layer, not in composition: the breath redraws the glow without recomposing the rail.
@@ -53,7 +54,7 @@ fun ShellThinkingAura(
             scaleY = scale
             alpha = lerp(ALPHA_REST, ALPHA_PEAK, breath.value)
         }
-        .blur(BLUR, BlurredEdgeTreatment.Unbounded)
+        .blur(LettaDimens.Space.sm, BlurredEdgeTreatment.Unbounded)
     val identity = entry.identity
     val still = identity?.let { agentTileStill(it) }
     if (identity != null && still != null) {
@@ -67,7 +68,6 @@ fun ShellThinkingAura(
         )
     } else {
         // The orb's own gradient; a mascot whose still has not landed yet glows in its colour.
-        val shape = RoundedCornerShape(cornerRadius)
         val fill = if (identity == null) {
             Modifier.background(agentOrbBrush(entry.orbStyle), shape)
         } else {
@@ -95,4 +95,3 @@ private const val SCALE_PEAK = 1.18f
 private const val ALPHA_REST = 0.45f
 private const val ALPHA_PEAK = 0.95f
 private const val HELD = 0.6f
-private val BLUR = 6.dp

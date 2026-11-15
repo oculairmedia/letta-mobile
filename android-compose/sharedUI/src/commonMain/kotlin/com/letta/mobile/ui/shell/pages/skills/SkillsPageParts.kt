@@ -1,8 +1,5 @@
 package com.letta.mobile.ui.shell.pages.skills
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,13 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilledTonalIconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -31,10 +23,8 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.skills.SkillCategories
@@ -42,6 +32,14 @@ import com.letta.mobile.data.skills.SkillCategory
 import com.letta.mobile.data.skills.SkillSourceLabels
 import com.letta.mobile.ui.components.LettaCatalogCard
 import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.LettaChipTabRow
+import com.letta.mobile.ui.components.LettaPageHeader
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.shell.tokens.ShellDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.components.LettaInfoBox
 import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.theme.LettaPill
@@ -55,28 +53,20 @@ import com.letta.mobile.ui.theme.lettaSectionTitle
 
 @Composable
 internal fun SkillsHeader(page: SkillsPageScope) {
-    val horizontal = if (page.wide) LettaDimens.Space.xxl else LettaDimens.Space.lg
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(start = horizontal, end = horizontal, top = LettaDimens.Space.lg, bottom = LettaDimens.Space.sm),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) {
-                if (page.options.showTitle) {
-                    Text(PAGE_TITLE, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                }
-            }
-            if (page.wide) SkillsSearch(page, Modifier.width(LettaDimens.Pane.navWidth))
+    LettaPageHeader(
+        title = PAGE_TITLE.takeIf { page.options.showTitle },
+        // The header puts the search beside the title on a wide page and on a row of its own on a phone.
+        context = { SkillsSearch(page, if (page.wide) Modifier.width(ShellDimens.pageSearchWidth) else Modifier.fillMaxWidth()) },
+        refresh = {
             // Pointer only: touch pulls the list (SkillsPage's LettaRefreshable).
             LettaRefreshAction(
                 refreshing = page.refreshing,
                 onRefresh = page::refresh,
                 modifier = Modifier.testTag(SkillsPageTags.REFRESH),
             ) { onRefresh, modifier -> page.options.slots.refreshAction.Content(onRefresh, modifier) }
-        }
-        if (!page.wide) SkillsSearch(page, Modifier.fillMaxWidth())
-        SkillsHeaderChips(page)
-    }
+        },
+        controls = { SkillsHeaderChips(page) },
+    )
 }
 
 @Composable
@@ -93,11 +83,7 @@ private fun SkillsSearch(page: SkillsPageScope, modifier: Modifier) {
 @Composable
 private fun SkillsHeaderChips(page: SkillsPageScope) {
     val chipModifier = if (page.options.touch) Modifier.minimumInteractiveComponentSize() else Modifier
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    LettaChipTabRow(Modifier.fillMaxWidth()) {
         SkillsPageSection.entries.forEach { section ->
             LettaChipTab(section.label, false, { page.controls.onJumpTo(section) }, chipModifier.testTag(SkillsPageTags.jump(section)))
         }
@@ -147,15 +133,16 @@ private fun SectionHeader(row: SkillsPageRow.SectionHeader, page: SkillsPageScop
     ) {
         Text(
             lettaSectionTitle(row.section.label, row.count),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+            style = LettaTextStyles.titleMediumSemibold,
             modifier = Modifier.weight(1f),
         )
         val onAddTool = page.actions.onAddTool
         if (row.section == SkillsPageSection.Tools && onAddTool != null) {
-            IconButton(onClick = onAddTool, modifier = Modifier.testTag(SkillsPageTags.ADD_TOOL)) {
-                Icon(Icons.Outlined.Add, contentDescription = CREATE_TOOL)
-            }
+            LettaIconButton(
+                icon = LettaButtonIcon(LettaIcons.Add, CREATE_TOOL),
+                onClick = onAddTool,
+                modifier = Modifier.testTag(SkillsPageTags.ADD_TOOL),
+            )
         }
     }
 }
@@ -205,20 +192,18 @@ private fun Skill.isReadOnly(page: SkillsPageScope): Boolean = name in page.stat
 private fun SkillToggle(skill: Skill, page: SkillsPageScope) {
     val installed = skill.name in page.state.installedSkillNames
     val canManage = page.state.canManageSkills
-    val background = if (installed) MaterialTheme.colorScheme.primary.copy(alpha = INSTALLED_ALPHA) else MaterialTheme.colorScheme.surfaceContainerHighest
-    // On touch the 28dp button keeps its look but reaches the 48dp touch target.
-    val target = if (page.options.touch) Modifier.minimumInteractiveComponentSize() else Modifier
-    Box(
-        target.size(LettaDimens.Control.iconButton).clip(MaterialTheme.shapes.small).background(background)
-            .clickable(enabled = canManage) { page.toggle(skill.name, installed) }
-            .testTag(SkillsPageTags.skillToggle(skill.name)),
-        contentAlignment = Alignment.Center,
+    // Material's toggle icon button: role Checkbox, the 48dp touch target around the 28dp button, and
+    // its own checked and disabled colours.
+    FilledTonalIconToggleButton(
+        checked = installed,
+        onCheckedChange = { page.toggle(skill.name, installed) },
+        enabled = canManage,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier.size(LettaDimens.Control.iconButton).testTag(SkillsPageTags.skillToggle(skill.name)),
     ) {
-        Icon(
-            imageVector = if (installed) Icons.Outlined.Check else Icons.Outlined.Add,
+        LettaIcon(
+            imageVector = if (installed) LettaIcons.Check else LettaIcons.Add,
             contentDescription = if (installed) "Remove skill" else "Add skill",
-            tint = if (installed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Control.icon),
         )
     }
 }
@@ -242,11 +227,7 @@ private fun ToolCard(tool: Tool, page: SkillsPageScope, modifier: Modifier) {
 @Composable
 private fun ToolTagChips(row: SkillsPageRow.ToolTags, page: SkillsPageScope) {
     val chipModifier = if (page.options.touch) Modifier.minimumInteractiveComponentSize() else Modifier
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    LettaChipTabRow(Modifier.fillMaxWidth()) {
         LettaChipTab(ALL_TOOLS, row.selected.isEmpty(), page.actions.onClearToolTags, chipModifier)
         row.tags.forEach { tag -> LettaChipTab(tag, tag in row.selected, { page.actions.onToolTagToggled(tag) }, chipModifier) }
     }
@@ -275,10 +256,12 @@ internal fun SkillDetail(skill: Skill, page: SkillsPageScope) {
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(skill.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            IconButton(onClick = { page.controls.onSelectSkill(null) }, modifier = Modifier.testTag(SkillsPageTags.DETAIL_CLOSE)) {
-                Icon(Icons.Outlined.Close, contentDescription = CLOSE)
-            }
+            Text(skill.name, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            LettaIconButton(
+                icon = LettaButtonIcon(LettaIcons.Close, CLOSE),
+                onClick = { page.controls.onSelectSkill(null) },
+                modifier = Modifier.testTag(SkillsPageTags.DETAIL_CLOSE),
+            )
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             skill.version?.takeIf { it.isNotBlank() }?.let { LettaPill("v$it", MaterialTheme.colorScheme.secondary) }
@@ -333,7 +316,6 @@ private fun SkillCategory.accentColor(): Color = when (this) {
 }
 
 private val NoPadding = PaddingValues()
-private const val INSTALLED_ALPHA = 0.16f
 private const val PAGE_TITLE = "Skills"
 private const val SEARCH_PLACEHOLDER = "Search skills and tools"
 private const val ALL_SKILLS = "All skills"

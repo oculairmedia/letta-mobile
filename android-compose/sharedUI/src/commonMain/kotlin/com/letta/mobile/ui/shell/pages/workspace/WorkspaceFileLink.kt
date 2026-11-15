@@ -1,13 +1,6 @@
 package com.letta.mobile.ui.shell.pages.workspace
 
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
@@ -22,8 +15,8 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
+import com.letta.mobile.ui.theme.LettaChip
 import com.letta.mobile.data.chat.tools.ToolPreviewTarget
 import com.letta.mobile.data.chat.tools.links.OutputLinks
 import com.letta.mobile.data.workspace.WorkspaceFileOpener
@@ -69,12 +62,9 @@ object WorkspaceFileLinkTags {
 @Composable
 fun WorkspaceFileChip(request: WorkspaceFileRequest, modifier: Modifier = Modifier) {
     val files = LocalWorkspaceFiles.current ?: return
-    AssistChip(
+    LettaChip(
+        text = chipLabel(request),
         onClick = { files.opener.open(request) },
-        label = { Text(chipLabel(request), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        leadingIcon = {
-            Icon(Icons.Outlined.Description, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))
-        },
         modifier = modifier.testTag(WorkspaceFileLinkTags.LINK),
     )
 }

@@ -1,14 +1,11 @@
 package com.letta.mobile.ui.shell.palette
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,6 +26,9 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.picker.LettaPickerContent
 import com.letta.mobile.ui.components.picker.LettaPickerSpec
 import com.letta.mobile.ui.components.picker.PickMode
@@ -162,11 +162,14 @@ private fun AmbientContextChip(title: String, onDismiss: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            Icon(
-                imageVector = LettaIcons.Clear,
-                contentDescription = "Remove context",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(LettaDimens.Control.icon).clickable(onClick = onDismiss),
+            LettaIconButton(
+                icon = LettaButtonIcon(
+                    LettaIcons.Clear,
+                    "Remove context",
+                    size = LettaDimens.Control.iconButtonSm,
+                    glyph = LettaIconStyle(tint = MaterialTheme.colorScheme.onSurfaceVariant),
+                ),
+                onClick = onDismiss,
             )
         }
     }

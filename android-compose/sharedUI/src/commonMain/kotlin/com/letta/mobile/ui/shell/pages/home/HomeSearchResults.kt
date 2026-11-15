@@ -6,11 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import com.letta.mobile.ui.components.row.LettaListRow
@@ -28,10 +25,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.home.HomeSearchState
 import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.LettaEmptyHint
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.foundation.lettaClickable
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSpinner
 
 /**
  * Home's global search results, one collapsible section per kind: agents, tools and blocks match
@@ -44,7 +45,7 @@ internal fun LazyListScope.homeSearchResults(page: HomePageScope) {
     sections.forEach { section -> searchSection(section) }
     if (search.searchingMessages && search.messages.isEmpty()) item(key = "search-pending") { PendingMessages() }
     if (!search.searchingMessages && search.isEmpty) {
-        item(key = "search-empty") { HomeEmptyLine(NO_RESULTS, Modifier.testTag(HomePageTags.SEARCH_EMPTY)) }
+        item(key = "search-empty") { LettaEmptyHint(NO_RESULTS, Modifier.testTag(HomePageTags.SEARCH_EMPTY)) }
     }
 }
 
@@ -129,7 +130,8 @@ private fun SearchHitRow(hit: SearchHit, section: SearchSection) {
             if (hit.agentId != null) {
                 AgentAvatar(agentId = hit.agentId, name = hit.primary, size = LettaDimens.Control.iconButtonSm, cornerRadius = LettaDimens.Radius.sm)
             } else {
-                Icon(section.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.iconButtonSm))
+                val glyph = LettaIconStyle(LettaDimens.Control.iconButtonSm, MaterialTheme.colorScheme.primary)
+                LettaIcon(section.icon, contentDescription = null, style = glyph)
             }
         },
     )
@@ -143,7 +145,7 @@ private fun PendingMessages() {
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Text(MESSAGES_LABEL, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Control.icon), strokeWidth = LettaDimens.Space.hair)
+        LettaSpinner(size = LettaDimens.Control.spinnerMd)
     }
 }
 
