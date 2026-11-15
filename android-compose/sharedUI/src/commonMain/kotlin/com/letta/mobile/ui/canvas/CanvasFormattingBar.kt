@@ -20,23 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import com.composables.icons.lucide.Bold
-import com.composables.icons.lucide.Code
-import com.composables.icons.lucide.Heading1
-import com.composables.icons.lucide.Heading2
-import com.composables.icons.lucide.Heading3
-import com.composables.icons.lucide.Italic
-import com.composables.icons.lucide.List
-import com.composables.icons.lucide.ListOrdered
-import com.composables.icons.lucide.ListTodo
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Minus
-import com.composables.icons.lucide.Table
-import com.composables.icons.lucide.Pilcrow
-import com.composables.icons.lucide.SquareCode
-import com.composables.icons.lucide.Strikethrough
-import com.composables.icons.lucide.TextQuote
-import com.composables.icons.lucide.Underline
 import io.github.linreal.cascade.editor.action.ConvertBlockType
 import io.github.linreal.cascade.editor.action.InsertBlockAfter
 import io.github.linreal.cascade.editor.core.Block
@@ -51,6 +34,7 @@ import io.github.linreal.cascade.editor.state.EditorStateHolder
 import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.components.foundation.LettaVerticalDivider
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.icons.LettaIcons
 
 /**
  * The block editor's controls, hoisted out of the note card to a bar at the foot of the board:
@@ -173,25 +157,25 @@ private data class FormattingButton(val style: SpanStyle, val icon: ImageVector,
 
 /** Every block kind the editor ships, in the order a slash menu lists them. */
 val BlockButtons: List<BlockButton> = listOf(
-    BlockButton(BlockKind.Convert(BlockType.Paragraph), Lucide.Pilcrow, "Paragraph"),
-    BlockButton(BlockKind.Convert(BlockType.Heading(1)), Lucide.Heading1, "Heading 1"),
-    BlockButton(BlockKind.Convert(BlockType.Heading(2)), Lucide.Heading2, "Heading 2"),
-    BlockButton(BlockKind.Convert(BlockType.Heading(3)), Lucide.Heading3, "Heading 3"),
-    BlockButton(BlockKind.Convert(BlockType.Todo(false)), Lucide.ListTodo, "To-do"),
-    BlockButton(BlockKind.Convert(BlockType.BulletList), Lucide.List, "Bullet list"),
-    BlockButton(BlockKind.Convert(BlockType.NumberedList()), Lucide.ListOrdered, "Numbered list"),
-    BlockButton(BlockKind.Convert(BlockType.Quote), Lucide.TextQuote, "Quote"),
-    BlockButton(BlockKind.Convert(BlockType.Code), Lucide.SquareCode, "Code block"),
-    BlockButton(BlockKind.Insert { Block.divider() }, Lucide.Minus, "Divider"),
-    BlockButton(BlockKind.Insert { CanvasTableBlock.descriptor.createBlock() }, Lucide.Table, "Table"),
+    BlockButton(BlockKind.Convert(BlockType.Paragraph), LettaIcons.Pilcrow, "Paragraph"),
+    BlockButton(BlockKind.Convert(BlockType.Heading(1)), LettaIcons.Heading1, "Heading 1"),
+    BlockButton(BlockKind.Convert(BlockType.Heading(2)), LettaIcons.Heading2, "Heading 2"),
+    BlockButton(BlockKind.Convert(BlockType.Heading(3)), LettaIcons.Heading3, "Heading 3"),
+    BlockButton(BlockKind.Convert(BlockType.Todo(false)), LettaIcons.ListTodo, "To-do"),
+    BlockButton(BlockKind.Convert(BlockType.BulletList), LettaIcons.ListIcon, "Bullet list"),
+    BlockButton(BlockKind.Convert(BlockType.NumberedList()), LettaIcons.ListOrdered, "Numbered list"),
+    BlockButton(BlockKind.Convert(BlockType.Quote), LettaIcons.TextQuote, "Quote"),
+    BlockButton(BlockKind.Convert(BlockType.Code), LettaIcons.SquareCode, "Code block"),
+    BlockButton(BlockKind.Insert { Block.divider() }, LettaIcons.Remove, "Divider"),
+    BlockButton(BlockKind.Insert { CanvasTableBlock.descriptor.createBlock() }, LettaIcons.Table, "Table"),
 )
 
 private val FormattingButtons = listOf(
-    FormattingButton(SpanStyle.Bold, Lucide.Bold, "Bold"),
-    FormattingButton(SpanStyle.Italic, Lucide.Italic, "Italic"),
-    FormattingButton(SpanStyle.Underline, Lucide.Underline, "Underline"),
-    FormattingButton(SpanStyle.StrikeThrough, Lucide.Strikethrough, "Strikethrough"),
-    FormattingButton(SpanStyle.InlineCode, Lucide.Code, "Inline code"),
+    FormattingButton(SpanStyle.Bold, LettaIcons.Bold, "Bold"),
+    FormattingButton(SpanStyle.Italic, LettaIcons.Italic, "Italic"),
+    FormattingButton(SpanStyle.Underline, LettaIcons.Underline, "Underline"),
+    FormattingButton(SpanStyle.StrikeThrough, LettaIcons.Strikethrough, "Strikethrough"),
+    FormattingButton(SpanStyle.InlineCode, LettaIcons.Code, "Inline code"),
 )
 
 private val BUTTON = LettaDimens.Space.xxl

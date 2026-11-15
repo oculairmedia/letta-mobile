@@ -39,15 +39,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import com.composables.icons.lucide.AlignCenter
-import com.composables.icons.lucide.AlignLeft
-import com.composables.icons.lucide.AlignRight
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.PaintBucket
-import com.composables.icons.lucide.PenLine
-import com.composables.icons.lucide.SlidersHorizontal
-import com.composables.icons.lucide.StickyNote
-import com.composables.icons.lucide.Type
 import com.letta.mobile.data.canvas.CanvasTextStyle
 import com.letta.mobile.ui.components.foundation.LettaButtonIcon
 import com.letta.mobile.ui.components.foundation.LettaColorSwatch
@@ -110,7 +101,7 @@ fun CanvasPropertyControl(
             LettaColorSwatch(LettaSwatch(swatch, size = OPENER_SIZE))
             if (swatch.alpha != 0f) {
                 val glyph = LettaIconStyle(OPENER_SIZE * OPENER_GLYPH_RATIO, contrastOn(swatch))
-                LettaIcon(Lucide.SlidersHorizontal, contentDescription = null, style = glyph)
+                LettaIcon(LettaIcons.SlidersHorizontal, contentDescription = null, style = glyph)
             }
         }
         if (open) {
@@ -148,10 +139,10 @@ enum class PropertyPopoverPlacement { BELOW, BESIDE, ABOVE }
 
 /** Which colour of the target the embedded picker edits. */
 private enum class ColorTarget(val label: String, val glyph: ImageVector) {
-    STROKE("stroke", Lucide.PenLine),
-    FILL("fill", Lucide.PaintBucket),
-    TEXT("text", Lucide.Type),
-    CARD("card", Lucide.StickyNote),
+    STROKE("stroke", LettaIcons.PenLine),
+    FILL("fill", LettaIcons.PaintBucket),
+    TEXT("text", LettaIcons.Type),
+    CARD("card", LettaIcons.StickyNote),
 }
 
 @Composable
@@ -232,7 +223,7 @@ private fun CanvasPropertyPanel(
                     Box(modifier = Modifier.weight(1f))
                     Toggle(
                         label = if (state.strokeEnabled) "Outline on" else "Outline off",
-                        icon = Lucide.PenLine,
+                        icon = LettaIcons.PenLine,
                         selected = state.strokeEnabled,
                     ) { dispatch(ControlsBarIntent.SetStrokeEnabled(!state.strokeEnabled)) }
                 }
@@ -388,13 +379,13 @@ private fun ShapeTextProperties(text: ShapeTextActions) {
     }
     SectionLabel("Alignment")
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-        Toggle("Align start", Lucide.AlignLeft, selected = text.alignment == io.ak1.drawbox.domain.model.TextAlignment.LEFT) {
+        Toggle("Align start", LettaIcons.AlignLeft, selected = text.alignment == io.ak1.drawbox.domain.model.TextAlignment.LEFT) {
             text.onAlignment(io.ak1.drawbox.domain.model.TextAlignment.LEFT)
         }
-        Toggle("Align center", Lucide.AlignCenter, selected = text.alignment == io.ak1.drawbox.domain.model.TextAlignment.CENTER) {
+        Toggle("Align center", LettaIcons.AlignCenter, selected = text.alignment == io.ak1.drawbox.domain.model.TextAlignment.CENTER) {
             text.onAlignment(io.ak1.drawbox.domain.model.TextAlignment.CENTER)
         }
-        Toggle("Align end", Lucide.AlignRight, selected = text.alignment == io.ak1.drawbox.domain.model.TextAlignment.RIGHT) {
+        Toggle("Align end", LettaIcons.AlignRight, selected = text.alignment == io.ak1.drawbox.domain.model.TextAlignment.RIGHT) {
             text.onAlignment(io.ak1.drawbox.domain.model.TextAlignment.RIGHT)
         }
     }
@@ -420,9 +411,10 @@ private fun NoteProperties(note: NoteBarActions, style: CanvasTextStyle) {
     }
     SectionLabel("Alignment")
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-        Toggle("Align start", Lucide.AlignLeft, selected = (style.align ?: "start") == "start") { note.onStyle(style.copy(align = "start")) }
-        Toggle("Align center", Lucide.AlignCenter, selected = style.align == "center") { note.onStyle(style.copy(align = "center")) }
-        Toggle("Align end", Lucide.AlignRight, selected = style.align == "end") { note.onStyle(style.copy(align = "end")) }
+        val alignStart = (style.align ?: "start") == "start"
+        Toggle("Align start", LettaIcons.AlignLeft, selected = alignStart) { note.onStyle(style.copy(align = "start")) }
+        Toggle("Align center", LettaIcons.AlignCenter, selected = style.align == "center") { note.onStyle(style.copy(align = "center")) }
+        Toggle("Align end", LettaIcons.AlignRight, selected = style.align == "end") { note.onStyle(style.copy(align = "end")) }
     }
 }
 

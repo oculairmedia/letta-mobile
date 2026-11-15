@@ -2,6 +2,8 @@ package com.letta.mobile.ui.icons
 
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.composables.icons.lucide.Archive
+import com.composables.icons.lucide.File
+import com.composables.icons.lucide.Box
 import com.composables.icons.lucide.ListFilter
 import com.composables.icons.lucide.LoaderCircle
 import com.composables.icons.lucide.ArrowLeft
@@ -76,6 +78,65 @@ import com.composables.icons.lucide.Users
 import com.composables.icons.lucide.Workflow
 import com.composables.icons.lucide.Wrench
 import com.composables.icons.lucide.X
+import com.composables.icons.lucide.AArrowDown
+import com.composables.icons.lucide.AArrowUp
+import com.composables.icons.lucide.ALargeSmall
+import com.composables.icons.lucide.AlignCenter
+import com.composables.icons.lucide.AlignLeft
+import com.composables.icons.lucide.AlignRight
+import com.composables.icons.lucide.ArrowDown
+import com.composables.icons.lucide.ArrowUp
+import com.composables.icons.lucide.Bold
+import com.composables.icons.lucide.BringToFront
+import com.composables.icons.lucide.CircleArrowUp
+import com.composables.icons.lucide.Columns2
+import com.composables.icons.lucide.Cpu
+import com.composables.icons.lucide.Download
+import com.composables.icons.lucide.EllipsisVertical
+import com.composables.icons.lucide.Eraser
+import com.composables.icons.lucide.FileJson
+import com.composables.icons.lucide.GripVertical
+import com.composables.icons.lucide.Hand
+import com.composables.icons.lucide.Heading1
+import com.composables.icons.lucide.Heading2
+import com.composables.icons.lucide.Heading3
+import com.composables.icons.lucide.History
+import com.composables.icons.lucide.Import
+import com.composables.icons.lucide.Italic
+import com.composables.icons.lucide.ListOrdered
+import com.composables.icons.lucide.ListTodo
+import com.composables.icons.lucide.Maximize
+import com.composables.icons.lucide.Maximize2
+import com.composables.icons.lucide.MousePointer
+import com.composables.icons.lucide.PackageX
+import com.composables.icons.lucide.PaintBucket
+import com.composables.icons.lucide.Palette
+import com.composables.icons.lucide.PenLine
+import com.composables.icons.lucide.PenTool
+import com.composables.icons.lucide.Pilcrow
+import com.composables.icons.lucide.Puzzle
+import com.composables.icons.lucide.Redo2
+import com.composables.icons.lucide.Rows2
+import com.composables.icons.lucide.SendToBack
+import com.composables.icons.lucide.SlidersHorizontal
+import com.composables.icons.lucide.Square
+import com.composables.icons.lucide.SquareCode
+import com.composables.icons.lucide.SquarePlus
+import com.composables.icons.lucide.StickyNote
+import com.composables.icons.lucide.Strikethrough
+import com.composables.icons.lucide.Table
+import com.composables.icons.lucide.TextCursorInput
+import com.composables.icons.lucide.TextQuote
+import com.composables.icons.lucide.Triangle
+import com.composables.icons.lucide.Type
+import com.composables.icons.lucide.Underline
+import com.composables.icons.lucide.Undo2
+import com.composables.icons.lucide.WifiOff
+import com.composables.icons.lucide.ArchiveRestore
+import com.composables.icons.lucide.CircleCheckBig
+import com.composables.icons.lucide.CircleStop
+import com.composables.icons.lucide.House
+import com.composables.icons.lucide.Network
 
 /**
  * Centralized icon mapping for Letta Mobile.
@@ -195,4 +256,76 @@ object LettaIcons {
     // Pin
     val Pin: ImageVector get() = Lucide.Pin
     val PinOff: ImageVector get() = Lucide.PinOff
+
+    // Canvas: tools, shapes, alignment, text formatting and board commands
+    val AArrowDown: ImageVector get() = Lucide.AArrowDown
+    val AArrowUp: ImageVector get() = Lucide.AArrowUp
+    val ALargeSmall: ImageVector get() = Lucide.ALargeSmall
+    val AlignCenter: ImageVector get() = Lucide.AlignCenter
+    val AlignLeft: ImageVector get() = Lucide.AlignLeft
+    val AlignRight: ImageVector get() = Lucide.AlignRight
+    val ArrowDown: ImageVector get() = Lucide.ArrowDown
+    val ArrowUp: ImageVector get() = Lucide.ArrowUp
+    val Bold: ImageVector get() = Lucide.Bold
+    val BringToFront: ImageVector get() = Lucide.BringToFront
+    val CircleArrowUp: ImageVector get() = Lucide.CircleArrowUp
+    val Columns2: ImageVector get() = Lucide.Columns2
+    val Cpu: ImageVector get() = Lucide.Cpu
+    val Download: ImageVector get() = Lucide.Download
+    val EllipsisVertical: ImageVector get() = Lucide.EllipsisVertical
+    val Eraser: ImageVector get() = Lucide.Eraser
+    val FileJson: ImageVector get() = Lucide.FileJson
+    val GripVertical: ImageVector get() = Lucide.GripVertical
+    val Hand: ImageVector get() = Lucide.Hand
+    val Heading1: ImageVector get() = Lucide.Heading1
+    val Heading2: ImageVector get() = Lucide.Heading2
+    val Heading3: ImageVector get() = Lucide.Heading3
+    val History: ImageVector get() = Lucide.History
+    val Import: ImageVector get() = Lucide.Import
+    val Italic: ImageVector get() = Lucide.Italic
+    val ListOrdered: ImageVector get() = Lucide.ListOrdered
+    val ListTodo: ImageVector get() = Lucide.ListTodo
+    val Box: ImageVector get() = Lucide.Box
+    val File: ImageVector get() = Lucide.File
+    val Maximize: ImageVector get() = Lucide.Maximize
+    val Maximize2: ImageVector get() = Lucide.Maximize2
+    val MousePointer: ImageVector get() = Lucide.MousePointer
+    val PackageX: ImageVector get() = Lucide.PackageX
+    val PaintBucket: ImageVector get() = Lucide.PaintBucket
+    val Palette: ImageVector get() = Lucide.Palette
+    val PenLine: ImageVector get() = Lucide.PenLine
+    val PenTool: ImageVector get() = Lucide.PenTool
+    val Pilcrow: ImageVector get() = Lucide.Pilcrow
+    val Puzzle: ImageVector get() = Lucide.Puzzle
+    val Redo2: ImageVector get() = Lucide.Redo2
+    val Rows2: ImageVector get() = Lucide.Rows2
+    val SendToBack: ImageVector get() = Lucide.SendToBack
+    val SlidersHorizontal: ImageVector get() = Lucide.SlidersHorizontal
+    val Square: ImageVector get() = Lucide.Square
+    val SquareCode: ImageVector get() = Lucide.SquareCode
+    val SquarePlus: ImageVector get() = Lucide.SquarePlus
+    val StickyNote: ImageVector get() = Lucide.StickyNote
+    val Strikethrough: ImageVector get() = Lucide.Strikethrough
+    val Table: ImageVector get() = Lucide.Table
+    val TextCursorInput: ImageVector get() = Lucide.TextCursorInput
+    val TextQuote: ImageVector get() = Lucide.TextQuote
+    val Triangle: ImageVector get() = Lucide.Triangle
+    val Type: ImageVector get() = Lucide.Type
+    val Underline: ImageVector get() = Lucide.Underline
+    val Undo2: ImageVector get() = Lucide.Undo2
+    val WifiOff: ImageVector get() = Lucide.WifiOff
+
+    // Shell glyphs still drawn from Material, named as Material named them so a call site swaps one-for-one
+    val Unarchive: ImageVector get() = Lucide.ArchiveRestore
+    val Autorenew: ImageVector get() = Lucide.RefreshCw
+    val Build: ImageVector get() = Lucide.Wrench
+    val ChatBubbleOutline: ImageVector get() = Lucide.MessageCircle
+    val Description: ImageVector get() = Lucide.FileText
+    val Group: ImageVector get() = Lucide.Users
+    val Home: ImageVector get() = Lucide.House
+    val Hub: ImageVector get() = Lucide.Network
+    val PushPin: ImageVector get() = Lucide.Pin
+    val Schedule: ImageVector get() = Lucide.Clock
+    val StopCircle: ImageVector get() = Lucide.CircleStop
+    val TaskAlt: ImageVector get() = Lucide.CircleCheckBig
 }

@@ -34,15 +34,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import com.composables.icons.lucide.CircleArrowUp
-import com.composables.icons.lucide.Cpu
-import com.composables.icons.lucide.ExternalLink
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.PackageX
-import com.composables.icons.lucide.PenTool
-import com.composables.icons.lucide.Puzzle
-import com.composables.icons.lucide.TriangleAlert
-import com.composables.icons.lucide.WifiOff
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.canvas_plugin_badge_fault
 import com.letta.mobile.sharedui.resources.canvas_plugin_badge_newer_version
@@ -64,10 +55,7 @@ import com.letta.mobile.ui.components.foundation.LettaTonalPill
 import com.letta.mobile.ui.theme.pill.LettaPillColors
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
-import com.composables.icons.lucide.Box as LucideBox
-import com.composables.icons.lucide.File as LucideFile
-import com.composables.icons.lucide.Image as LucideImage
-import com.composables.icons.lucide.Link as LucideLink
+import com.letta.mobile.ui.icons.LettaIcons
 
 /**
  * The card every client draws for a plugin element it has no live renderer for (
@@ -112,13 +100,13 @@ fun PluginFallbackCard(view: PluginElementView, chrome: PluginElementChrome, mod
 
 /** The closed icon set a fallback card names (`fallback.icon`); anything else is the puzzle piece. */
 internal fun pluginIcon(name: String?): ImageVector = when (name?.trim()?.lowercase()) {
-    "image" -> Lucide.LucideImage
-    "file" -> Lucide.LucideFile
-    "link" -> Lucide.LucideLink
-    "box" -> Lucide.LucideBox
-    "cpu" -> Lucide.Cpu
-    "pen-tool" -> Lucide.PenTool
-    else -> Lucide.Puzzle
+    "image" -> LettaIcons.Image
+    "file" -> LettaIcons.File
+    "link" -> LettaIcons.Link
+    "box" -> LettaIcons.Box
+    "cpu" -> LettaIcons.Cpu
+    "pen-tool" -> LettaIcons.PenTool
+    else -> LettaIcons.Puzzle
 }
 
 /** The badges a card wears, in the order it wears them. */
@@ -285,17 +273,17 @@ private fun PluginBadge(badge: PluginCardBadge, modifier: Modifier) {
 }
 
 private fun badgeContent(badge: PluginCardBadge): Pair<StringResource, ImageVector> = when (badge) {
-    PluginCardBadge.NOT_INSTALLED -> Res.string.canvas_plugin_badge_not_installed to Lucide.PackageX
-    PluginCardBadge.NEWER_VERSION -> Res.string.canvas_plugin_badge_newer_version to Lucide.CircleArrowUp
-    PluginCardBadge.OFFLINE -> Res.string.canvas_plugin_badge_offline to Lucide.WifiOff
-    PluginCardBadge.FAULT -> Res.string.canvas_plugin_badge_fault to Lucide.TriangleAlert
+    PluginCardBadge.NOT_INSTALLED -> Res.string.canvas_plugin_badge_not_installed to LettaIcons.PackageX
+    PluginCardBadge.NEWER_VERSION -> Res.string.canvas_plugin_badge_newer_version to LettaIcons.CircleArrowUp
+    PluginCardBadge.OFFLINE -> Res.string.canvas_plugin_badge_offline to LettaIcons.WifiOff
+    PluginCardBadge.FAULT -> Res.string.canvas_plugin_badge_fault to LettaIcons.Warning
 }
 
 @Composable
 private fun PluginOpenButton(open: () -> Unit, touch: Boolean, modifier: Modifier) {
     val padding = if (touch) LettaDimens.Space.md else LettaDimens.Space.sm
     TextButton(onClick = open, modifier = modifier, contentPadding = PaddingValues(horizontal = padding)) {
-        Icon(imageVector = Lucide.ExternalLink, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
+        Icon(imageVector = LettaIcons.ExternalLink, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
         Spacer(modifier = Modifier.size(LettaDimens.Space.xs))
         Text(text = stringResource(Res.string.canvas_plugin_open), style = MaterialTheme.typography.labelLarge)
     }
