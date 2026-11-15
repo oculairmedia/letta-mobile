@@ -99,6 +99,7 @@ internal data class DesktopSharedChatPageNavigation(
 
 internal data class DesktopSharedChatPageState(
     val port: DesktopChatSessionPort,
+    val slashCommands: com.letta.mobile.data.chat.routing.SlashCommandBinding,
     val pagedTimeline: CanonicalTimelinePresentation?,
     val hostInputs: ChatComposerHostInputs,
     /** Tints the ambient glow "failed" (the controller keeps its error until the next send). */
@@ -119,12 +120,7 @@ internal data class DesktopSharedChatPageState(
     val subagents: DesktopChatSubagents? = null,
 )
 
-/**
- * letta-mobile-bglj6.1 (stage 4): the conversation opens on the full-screen page, or, with "Open
- * conversations on the canvas" on, on its canvas with the chat docked under it; swipe up or "Open
- * canvas" goes to the canvas and expanding the dock returns to the page. The page itself is the
- * shared [ShellChatDestination].
- */
+/** Displays the shared conversation page with its canvas and host affordances. */
 @Composable
 internal fun DesktopSharedChatPage(
     state: DesktopSharedChatPageState,
@@ -132,6 +128,7 @@ internal fun DesktopSharedChatPage(
     modifier: Modifier = Modifier,
 ) {
     val port = state.port
+    val surfacePort = com.letta.mobile.ui.chat.commands.rememberSlashCommandSessionPort(port, state.slashCommands)
     SideEffect { port.updateHostInputs(state.hostInputs) }
     val openOnCanvas = LocalDesktopOpenChatsOnCanvas.current
     // The phone preview draws this page as Android's SharedChatPage does; null on the desktop.
@@ -140,8 +137,7 @@ internal fun DesktopSharedChatPage(
     val directoryPicker = rememberDesktopWorkingDirectoryPicker(port)
     val host = rememberDesktopChatSurfaceHost(port, navigation, directoryPicker, phone)
     val pageHost = rememberSubagentDualViewHost(host, state.subagents?.views, state.subagents?.entries.orEmpty())
-    // The run's own state, as the composer's Stop button and the docked panel's glow read it: the
-    // shell's "thinking" flag clears at the first reply and put the page's glow out mid-run.
+    // The port keeps the composer busy until the active run finishes.
     val uiState by port.uiState.collectAsState()
     val displayOptions by port.displayOptions.collectAsState()
     val ambientStatus = rememberChatAmbientStatus(isThinking = uiState.isRunInFlight, failed = state.errorMessage != null)
@@ -152,7 +148,7 @@ internal fun DesktopSharedChatPage(
     val frameInputs = PhoneChatPageInputs(presentation.value.mode, port.uiState) { presentation.onIntent(ChatSurfaceIntent.Collapse) }
     DesktopPhoneChatFrame(phone, frameInputs, modifier) { pageModifier, frame ->
         ShellChatDestination(
-            page = ShellChatPage(port, pageHost, board, state.canvasOwner, state.dockGeometry),
+            page = ShellChatPage(surfacePort, pageHost, board, state.canvasOwner, state.dockGeometry),
             presentation = presentation,
             modifier = pageModifier.fillMaxSize(),
             look = ShellChatLook(

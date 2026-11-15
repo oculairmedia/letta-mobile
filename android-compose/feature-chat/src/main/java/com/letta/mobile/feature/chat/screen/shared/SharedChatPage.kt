@@ -27,6 +27,7 @@ import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.projection.toChatDisplayMode
 import com.letta.mobile.data.chat.recompile.ConversationRecompileController
 import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
+import com.letta.mobile.ui.chat.commands.rememberSlashCommandSessionPort
 import com.letta.mobile.data.commands.ClientSlashCommand
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.feature.chat.screen.AndroidAgentMessageContext
@@ -143,7 +144,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     )
     val canvas = canvasContent(canvasSlot, target, params.topChromeInset)
     val appearance = rememberSharedChatAppearance(params, rememberSharedChatDisplayOptions())
-    val surfacePort = rememberClientCommandPort(port, params.viewModel, LocalAndroidClientCommands.current)
+    val surfacePort = rememberComposerCommandPort(port, params.viewModel, LocalAndroidClientCommands.current)
     // letta-mobile-bglj6.1.19: the shared page reads the OS "Remove animations" setting through
     // sharedUI's LocalReducedMotion, the same preference the legacy chat honours.
     val dualView = rememberSubagentDualView(params.viewModel.conversationId, params.viewSessions, params.fullSubagentView())
@@ -265,19 +266,19 @@ private fun rememberSharedChatDisplayOptions(): ChatDisplayOptions {
 
 /**
  * letta-mobile-zxk2n.5 (G92): the page's port with the scaffold's client-local `/` commands, and
- * `/recompile` run here so its status reaches the page. Without a scaffold the owner's port as is.
+ * `/recompile` runs here so its status reaches the page; host commands use the shared graph adapter.
  */
 @Composable
-private fun rememberClientCommandPort(
+private fun rememberComposerCommandPort(
     port: AdminChatSessionPort,
     viewModel: AdminChatViewModel,
     commands: AndroidClientCommands?,
 ): ChatSessionPort {
-    if (commands == null) return port
+    if (commands == null) return rememberSlashCommandSessionPort(port, AdminSlashCommandBinding(viewModel))
     val current by rememberUpdatedState(commands)
     // letta-mobile-09m53: the page's scope, never the ViewModel's (see rememberAdminChatSessionPort).
     val scope = rememberCoroutineScope()
-    return remember(port, viewModel, commands.offered) {
+    val clientPort = remember(port, viewModel, commands.offered) {
         val recompile = ConversationRecompileController(
             scope = scope,
             gateway = { current.recompileGateway },
@@ -298,6 +299,7 @@ private fun rememberClientCommandPort(
         )
         ClientCommandSessionPort(port, routing, scope)
     }
+    return rememberSlashCommandSessionPort(clientPort, AdminSlashCommandBinding(viewModel))
 }
 
 /** Full-screen "open canvas" leaves for the canvas screen until the docked mode ships. */
@@ -315,9 +317,8 @@ private fun rememberAdminChatSessionPort(
     val currentOnBugCommand by rememberUpdatedState(navigation.onBugCommand)
     val currentOpenConversation by rememberUpdatedState(navigation.onOpenConversation)
     val canOpenConversation = navigation.onOpenConversation != null
-    // letta-mobile-09m53: the port holds the screen's callbacks (its NavController, its Activity), so
-    // it lives in the page's scope, cancelled when the page leaves composition. Never the ViewModel's:
-    // it outlives the Activity on a configuration change and kept the destroyed one reachable.
+    // Bind navigation and Activity callbacks to the page scope, which ends on rotation.
+    // The ViewModel scope outlives the Activity and would retain its destroyed instance.
     val scope = rememberCoroutineScope()
     return remember(viewModel, canOpenConversation, workspaceFiles) {
         AdminChatSessionPort(

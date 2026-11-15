@@ -1,6 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
-import com.letta.mobile.data.commands.AppServerSlashCommandApi
+import com.letta.mobile.data.commands.AppServerCommandDescriptions
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.GoalStatusResponse
 import com.letta.mobile.data.model.SlashCommandsResponse
@@ -40,7 +40,7 @@ class SlashCommandAndGoalAdminHandlersTest {
     fun beforeAnyDeviceStatusTheBuiltinListIsServedAndLabelled() {
         val listing = NativeSlashCommandCatalog().global()
         assertEquals(SlashCommandCatalogOrigin.BuiltinDefault, listing.origin)
-        assertEquals(AppServerSlashCommandApi.DEFAULT_SUPPORTED_COMMANDS, listing.commands.map { it.id })
+        assertEquals(AppServerCommandDescriptions.DEFAULT_SUPPORTED_COMMANDS, listing.commands.map { it.id })
     }
 
     @Test
@@ -152,6 +152,42 @@ class SlashCommandAndGoalAdminHandlersTest {
         assertTrue(error.startsWith("capability_unavailable") && "no goal mode" in error, error)
     }
 
+    @Test
+    fun executeForwardsRuntimeAndArgumentsAndReportsHostFailure() = runTest {
+        var received: AppServerCommand.ExecuteCommand? = null
+        var succeeds = true
+        val client = object : SilentClient() {
+            override suspend fun executeCommand(command: AppServerCommand.ExecuteCommand):
+                com.letta.mobile.data.transport.appserver.AppServerInboundFrame.ExecuteCommandResponse {
+                received = command
+                return com.letta.mobile.data.transport.appserver.AppServerInboundFrame.ExecuteCommandResponse(
+                    command.requestId, succeeds, error = if (succeeds) null else "command refused", output = "diagnostics",
+                )
+            }
+        }
+        val router = AdminRpcRegistry.buildRouter(native = AdminRpcNativeSources(nativeClient = client))
+        val params = buildJsonObject {
+            put("agent_id", "agent-1")
+            put("conversation_id", "conv-1")
+            put("command_id", "doctor")
+            put("args", "--verbose")
+        }
+        val result = success(router, "slash_command.execute", params)
+        assertEquals("diagnostics", result.getValue("output").jsonPrimitive.content)
+        assertEquals("doctor", received?.commandId)
+        assertEquals("--verbose", received?.args)
+        assertEquals("conv-1", received?.runtime?.conversationId)
+        assertEquals("agent-1", received?.runtime?.agentId)
+        assertTrue(!received?.requestId.isNullOrBlank())
+        succeeds = false
+        val error = dispatch(router, "slash_command.execute", params)
+        assertFalse(error.getValue("success").jsonPrimitive.boolean)
+        assertEquals("command refused", error.getValue("error").jsonPrimitive.content)
+        received = null
+        assertFalse(dispatch(router, "slash_command.execute", null).getValue("success").jsonPrimitive.boolean)
+        assertNull(received)
+    }
+
     private fun deviceStatus(agent: String, supported: List<String>, mods: List<Pair<String, String>> = emptyList()) =
         AppServerProtocol.decodeFrame(deviceStatusJson(agent, supported, mods)).frame
 
@@ -179,7 +215,7 @@ class SlashCommandAndGoalAdminHandlersTest {
         Json.parseToJsonElement(router.dispatch(AdminRpcInvocation("t-1", method, params))).jsonObject
 
     /** A native client the slash handlers must never call: they only read observed frames. */
-    private class SilentClient : AppServerClient {
+    private open class SilentClient : AppServerClient {
         override val events = MutableSharedFlow<AppServerReceivedFrame>()
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) = unexpected()
         override suspend fun input(command: AppServerCommand.Input): Unit = unexpected()

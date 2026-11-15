@@ -197,7 +197,7 @@ private fun rememberShellChatController(
 internal fun rememberDesktopShellPanels(core: DesktopShellCore, chatState: DesktopChatSurfaceState): DesktopShellPanels {
     val chatScope = core.chatScope
     val sessionGraph = core.sessionGraph.value
-    val httpApis = rememberDesktopHttpApis(core.iroh.transport != null, core.iroh.agentDirectory)
+    val httpApis = rememberDesktopHttpApis(core.iroh.transport != null, core.iroh.agentDirectory, sessionGraph.slashCommands)
     val settingsStore = core.bootstrap.secureSettingsStore
     // The MemFS browser reads through the process-wide direct App Server session, not the session graph.
     val librarySources = remember(settingsStore) { ShellLibrarySources(settingsStore, DesktopWorkspaceSources().memfs()) }
