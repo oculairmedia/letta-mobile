@@ -1,6 +1,9 @@
 package com.letta.mobile.ui.theme
 
+import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import com.letta.mobile.ui.theme.tokens.LettaRowDimens
+import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
+import com.letta.mobile.ui.theme.tokens.LettaStrokeTokens
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -62,13 +65,13 @@ object LettaDimens {
      * pairs visibly separate into two elements.
      */
     object Space {
-        val hair: Dp = 2.dp
-        val xs: Dp = 4.dp
-        val sm: Dp = LettaRowDimens.spacing
-        val md: Dp = 12.dp
-        val lg: Dp = 16.dp
-        val xl: Dp = 24.dp
-        val xxl: Dp = 32.dp
+        val hair: Dp = LettaSpaceTokens.hair
+        val xs: Dp = LettaSpaceTokens.xs
+        val sm: Dp = LettaSpaceTokens.sm
+        val md: Dp = LettaSpaceTokens.md
+        val lg: Dp = LettaSpaceTokens.lg
+        val xl: Dp = LettaSpaceTokens.xl
+        val xxl: Dp = LettaSpaceTokens.xxl
     }
 
     /**
@@ -82,28 +85,28 @@ object LettaDimens {
      */
     object Control {
         /** Hit target around a glyph that lives inside another control. */
-        val iconButtonSm: Dp = 20.dp
+        val iconButtonSm: Dp = LettaControlTokens.iconButtonSm
 
         /** A control in its own right, in a toolbar or composer. */
-        val iconButton: Dp = 28.dp
+        val iconButton: Dp = LettaControlTokens.iconButton
 
         /** A primary navigation target, e.g. the rail's action icons. */
-        val iconButtonLg: Dp = 34.dp
+        val iconButtonLg: Dp = LettaControlTokens.iconButtonLg
 
         /** Glyph inside [iconButtonSm]. */
-        val iconSm: Dp = 13.dp
+        val iconSm: Dp = LettaControlTokens.iconSm
 
         /** Glyph inside [iconButton] and [iconButtonLg]. */
-        val icon: Dp = LettaRowDimens.icon
+        val icon: Dp = LettaControlTokens.icon
 
         /** Single-line text field / chip height. */
-        val fieldHeight: Dp = 32.dp
+        val fieldHeight: Dp = LettaControlTokens.fieldHeight
 
         /** Send button and other emphasised round actions. */
-        val actionButton: Dp = 38.dp
+        val actionButton: Dp = LettaControlTokens.actionButton
 
         /** The smallest hit target of a whole tappable row (a settings row): the platform minimum. */
-        val minTouchTarget: Dp = 48.dp
+        val minTouchTarget: Dp = LettaControlTokens.minTouchTarget
 
         /**
          * Spinner sizes, by role (see LettaSpinner): inside a line of text or a chip, in place of
@@ -130,6 +133,13 @@ object LettaDimens {
     /**
      * Corner radii. Scaled to what they wrap: a chip and a dialog should not
      * share a radius or the dialog reads as an oversized chip.
+     *
+     * Deprecated as a call-site API: these values are the definition of
+     * `MaterialTheme.shapes` (see SharedShapes), the one corner scale. At a call
+     * site use the role instead of building a shape: `RoundedCornerShape(Radius.sm)`
+     * -> `MaterialTheme.shapes.small`, `Radius.md` -> `shapes.medium` (or
+     * `LettaShapes.panel`), `Radius.lg` -> `shapes.large`. The values are equal,
+     * so the conversion moves nothing.
      */
     object Radius {
         /** Chips, small badges. */
@@ -151,7 +161,7 @@ object LettaDimens {
      * from the rail divider's line.
      */
     object Stroke {
-        val hairline: Dp = 1.dp
+        val hairline: Dp = LettaStrokeTokens.hairline
 
         /** A spinner's arc, not a border: [spinner] for the small and medium sizes, [spinnerLg] for the large. */
         val spinner: Dp = 2.dp

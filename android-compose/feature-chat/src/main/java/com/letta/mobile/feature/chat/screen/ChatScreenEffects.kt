@@ -13,6 +13,7 @@ import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.surface.timeline.PendingToolAnnouncementEffect
 import com.letta.mobile.ui.haptics.HapticEffects
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -59,7 +60,7 @@ internal fun ChatScreenEffects(params: ChatScreenEffectsParams) {
     ChatScreenPendingToolHapticEffect(
         pendingTools = params.state.pendingTools,
         hapticsEnabled = params.hapticsEnabled,
-        view = view,
+        onToolStarted = { HapticEffects.toolCallStarted(view, enabled = true) },
     )
 
     ChatScreenResolvedToolHapticEffect(
@@ -135,19 +136,16 @@ private fun ChatScreenStreamingHapticEffect(
 }
 
 @Composable
-private fun ChatScreenPendingToolHapticEffect(
+internal fun ChatScreenPendingToolHapticEffect(
     pendingTools: kotlinx.collections.immutable.ImmutableList<com.letta.mobile.ui.chat.render.PendingToolCall>,
     hapticsEnabled: Boolean,
-    view: android.view.View,
+    onToolStarted: () -> Unit,
 ) {
-    val greetedToolIds = remember { HashSet<String>() }
-    LaunchedEffect(pendingTools, hapticsEnabled) {
-        if (!hapticsEnabled) return@LaunchedEffect
-        pendingTools.forEach { pending ->
-            if (greetedToolIds.add(pending.id)) {
-                HapticEffects.toolCallStarted(view, enabled = true)
-            }
-        }
+    if (hapticsEnabled) {
+        PendingToolAnnouncementEffect(
+            pendingToolIds = pendingTools.map { it.id },
+            onToolStarted = onToolStarted,
+        )
     }
 }
 

@@ -46,7 +46,8 @@ import kotlinx.coroutines.flow.stateIn
  * context usage, A2UI, branching and the live status are the shared extension points
  * ([ChatSessionExtensions]) bound to the ViewModel, as desktop's port binds them to its controller.
  *
- * @param scope the ViewModel's scope; the derived composer flow lives exactly as long as it.
+ * @param scope the page's scope; the derived flows live exactly as long as it. Never the ViewModel's
+ *   (letta-mobile-09m53): this port holds the screen's callbacks, which a rotation must free.
  * @param onOpenBugReport see [AdminChatActions].
  */
 internal class AdminChatSessionPort(

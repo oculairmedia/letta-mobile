@@ -230,6 +230,152 @@ const AGENT_LAZYLOAD_LIST_AGENT_REPLACEMENT =
   `  listAgentMessages(agentId, body) {\n` +
   `    if (this.strictAgentAccess && !this.refreshAgentRecordFromStorage(agentId)) {`;
 
+// lcp-conversation-list-mtime (letta-mobile-w4sqr): listConversations calls
+// refreshLoadedConversationRecordsFromStorage on EVERY list, and
+// refreshConversationRecordFromStorage readFileSyncs every loaded conversation.json only to
+// compare the text with conversationRecordJsonByKey: ~2,400 synchronous reads (~37 ms) per
+// list on the App Server's single event loop. Agent records already skip on an mtime stamp;
+// conversations had none. Now a stat taken BEFORE each read is stamped with the exact text
+// that read returned, and the refresh skips the read only when the file's (mtimeMs, ctimeMs,
+// size, ino) still equal the stamp AND the cached text is still the stamped text. So:
+//  - any write by this process (persistConversationState, cacheConversationRecord, or a
+//    future write site) replaces the cached text and invalidates the stamp by itself, and any
+//    write by another process moves mtime/ctime; either way the stock read runs;
+//  - a missing stat, a missing stamp, a parse/key mismatch or a read error all take the stock
+//    read path unchanged, including evicting resident messages when the JSON really changed;
+//  - a file modified within RACY_WINDOW_MS of the stat is never stamped (git's "racily clean"
+//    rule), so a same-size rewrite inside one timestamp tick cannot hide behind the stamp.
+// One anchor spans the scan read, the refresh and the scan's statSync5 call, so all three
+// bindings the replacement uses (join22, readFileSync9, statSync5) are proven in scope, and
+// drift skips the whole patch.
+const CONVERSATION_LIST_MTIME_TOKEN =
+  `  loadConversationRecordFromDir(conversationDir) {\n` +
+  `    try {\n` +
+  `      const recordJson = readFileSync9(join22(conversationDir, "conversation.json"), "utf8");\n` +
+  `      const conversation = parsePersistedLocalConversation(recordJson, (id2) => this.executionAgentIdForConversation(id2));\n` +
+  `      if (!conversation)\n` +
+  `        return;\n` +
+  `      return this.cacheConversationRecord(conversationDir, conversation, {\n` +
+  `        recordJson\n` +
+  `      });\n` +
+  `    } catch {\n` +
+  `      return;\n` +
+  `    }\n` +
+  `  }\n` +
+  `  refreshConversationRecordFromStorage(key) {\n` +
+  `    const existing = this.conversations.get(key);\n` +
+  `    const metadata = this.transcriptMetadataByConversationKey.get(key);\n` +
+  `    const conversationDir = metadata?.conversationDir ?? this.conversationDirForKey(key);\n` +
+  `    if (!conversationDir)\n` +
+  `      return existing;\n` +
+  `    try {\n` +
+  `      const recordJson = readFileSync9(join22(conversationDir, "conversation.json"), "utf8");\n` +
+  `      const cachedJson = this.conversationRecordJsonByKey.get(key);\n` +
+  `      if (existing && cachedJson === recordJson)\n` +
+  `        return existing;\n` +
+  `      const conversation = parsePersistedLocalConversation(recordJson, (id2) => this.executionAgentIdForConversation(id2));\n` +
+  `      if (!conversation)\n` +
+  `        return existing;\n` +
+  `      const loadedKey = this.conversationKey(conversation.id, conversation.agent_id);\n` +
+  `      if (loadedKey !== key)\n` +
+  `        return existing;\n` +
+  `      if (existing && cachedJson !== undefined) {\n` +
+  `        this.evictResidentHeadMessages(key, this.localMessagesByConversationKey.get(key) ?? []);\n` +
+  `        this.localMessagesByConversationKey.delete(key);\n` +
+  `        this.loadedConversationKeys.delete(key);\n` +
+  `        this.tailResidentConversationKeys.delete(key);\n` +
+  `        this.residentTailStartIndexByConversationKey.delete(key);\n` +
+  `        this.unreadTranscriptHeadBytesByKey.delete(key);\n` +
+  `      }\n` +
+  `      return this.cacheConversationRecord(conversationDir, conversation, {\n` +
+  `        forceRefresh: true,\n` +
+  `        recordJson\n` +
+  `      });\n` +
+  `    } catch {\n` +
+  `      return existing;\n` +
+  `    }\n` +
+  `  }\n` +
+  `  loadConversationRecordsFromStorage() {\n` +
+  `    if (this.conversationRecordsScanned)\n` +
+  `      return;\n` +
+  `    this.conversationRecordsScanned = true;\n` +
+  `    const conversationsDir = this.conversationsDir();\n` +
+  `    if (!conversationsDir || !existsSync15(conversationsDir))\n` +
+  `      return;\n` +
+  `    let entries;\n` +
+  `    try {\n` +
+  `      entries = readdirSync3(conversationsDir);\n` +
+  `    } catch {\n` +
+  `      return;\n` +
+  `    }\n` +
+  `    for (const entry of entries) {\n` +
+  `      const conversationDir = join22(conversationsDir, entry);\n` +
+  `      try {\n` +
+  `        if (!statSync5(conversationDir).isDirectory())`;
+const CONVERSATION_LIST_MTIME_STAMP_METHODS =
+  `  lcpConversationRecordStat(recordPath) {\n` +
+  `    const statStartedAtMs = Date.now();\n` +
+  `    try {\n` +
+  `      const stats = statSync5(recordPath);\n` +
+  `      return { mtimeMs: stats.mtimeMs, ctimeMs: stats.ctimeMs, size: stats.size, ino: stats.ino, statStartedAtMs };\n` +
+  `    } catch {\n` +
+  `      return;\n` +
+  `    }\n` +
+  `  }\n` +
+  `  lcpRememberConversationRecordStamp(key, recordPath, stat, recordJson) {\n` +
+  `    const RACY_WINDOW_MS = 2000;\n` +
+  `    const stamps = this.lcpConversationRecordStampByKey ??= new Map;\n` +
+  `    if (!stat || Math.max(stat.mtimeMs, stat.ctimeMs) > stat.statStartedAtMs - RACY_WINDOW_MS) {\n` +
+  `      stamps.delete(key);\n` +
+  `      return;\n` +
+  `    }\n` +
+  `    stamps.set(key, { recordPath, mtimeMs: stat.mtimeMs, ctimeMs: stat.ctimeMs, size: stat.size, ino: stat.ino, recordJson });\n` +
+  `  }\n` +
+  `  lcpConversationRecordStampMatches(key, recordPath, stat, cachedJson) {\n` +
+  `    const stamp = this.lcpConversationRecordStampByKey?.get(key);\n` +
+  `    if (!stamp || !stat || cachedJson === undefined)\n` +
+  `      return false;\n` +
+  `    return stamp.recordJson === cachedJson && stamp.recordPath === recordPath && stamp.mtimeMs === stat.mtimeMs && stamp.ctimeMs === stat.ctimeMs && stamp.size === stat.size && stamp.ino === stat.ino;\n` +
+  `  }\n`;
+const CONVERSATION_LIST_MTIME_REPLACEMENT =
+  CONVERSATION_LIST_MTIME_STAMP_METHODS +
+  `  loadConversationRecordFromDir(conversationDir) {\n` +
+  `    try {\n` +
+  `      const recordPath = join22(conversationDir, "conversation.json");\n` +
+  `      const recordStat = this.lcpConversationRecordStat(recordPath);\n` +
+  `      const recordJson = readFileSync9(recordPath, "utf8");\n` +
+  `      const conversation = parsePersistedLocalConversation(recordJson, (id2) => this.executionAgentIdForConversation(id2));\n` +
+  `      if (!conversation)\n` +
+  `        return;\n` +
+  `      const cached = this.cacheConversationRecord(conversationDir, conversation, {\n` +
+  `        recordJson\n` +
+  `      });\n` +
+  `      this.lcpRememberConversationRecordStamp(this.conversationKey(conversation.id, conversation.agent_id), recordPath, recordStat, recordJson);\n` +
+  `      return cached;\n` +
+  `    } catch {\n` +
+  `      return;\n` +
+  `    }\n` +
+  `  }\n` +
+  `  refreshConversationRecordFromStorage(key) {\n` +
+  `    const existing = this.conversations.get(key);\n` +
+  `    const metadata = this.transcriptMetadataByConversationKey.get(key);\n` +
+  `    const conversationDir = metadata?.conversationDir ?? this.conversationDirForKey(key);\n` +
+  `    if (!conversationDir)\n` +
+  `      return existing;\n` +
+  `    try {\n` +
+  `      const recordPath = join22(conversationDir, "conversation.json");\n` +
+  `      const cachedJson = this.conversationRecordJsonByKey.get(key);\n` +
+  `      const recordStat = this.lcpConversationRecordStat(recordPath);\n` +
+  `      if (existing && this.lcpConversationRecordStampMatches(key, recordPath, recordStat, cachedJson))\n` +
+  `        return existing;\n` +
+  `      const recordJson = readFileSync9(recordPath, "utf8");\n` +
+  `      this.lcpRememberConversationRecordStamp(key, recordPath, recordStat, recordJson);\n` +
+  `      if (existing && cachedJson === recordJson)\n` +
+  `        return existing;\n` +
+  CONVERSATION_LIST_MTIME_TOKEN.slice(
+    CONVERSATION_LIST_MTIME_TOKEN.indexOf(`      const conversation = parsePersistedLocalConversation(recordJson, (id2) => this.executionAgentIdForConversation(id2));\n      if (!conversation)\n        return existing;`),
+  );
+
 const SETTLE_BUG_LITERAL =
   `this.store.settleInterruptedToolCalls(conversationId, {\n` +
   `        reason: TURN_DID_NOT_COMPLETE\n` +
@@ -1247,6 +1393,27 @@ function agentLazyload(state) {
   Object.assign(state, { patched, appliedPatches, skippedPatches });
 }
 
+function conversationListMtime(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
+
+  {
+    const occurrences = countOccurrences(patched, CONVERSATION_LIST_MTIME_TOKEN);
+    if (occurrences === 1) {
+      patched = patched.replace(CONVERSATION_LIST_MTIME_TOKEN, CONVERSATION_LIST_MTIME_REPLACEMENT);
+      appliedPatches += 1;
+    } else {
+      skippedPatches += 1;
+      if (warn) process.stderr.write(
+        `[letta-code-patch] WARN: lcp-conversation-list-mtime anchor matched ${occurrences} time(s), expected exactly 1, ` +
+        `in ${path} — running without it; every conversation list re-reads every conversation.json\n`,
+      );
+    }
+  }
+
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
 function simplePatch({ token, replacement, replaceAll, helper, warning }) {
   return (state) => {
     if (!state.patched.includes(token)) {
@@ -1819,6 +1986,7 @@ function subagentErrorLog(state) {
 const PATCH_STEPS = [
   retryOtid,
   agentLazyload,
+  conversationListMtime,
   settle,
   thinkingSettings,
   thinkingRequest,

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.chat.conversations.listing.repositoryConversationListingFactory
 import com.letta.mobile.data.backend.bound
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
@@ -145,6 +146,7 @@ internal data class TestDefaultSessionRepositoryGraphFactoryBuilder(
 
     fun build(): DefaultSessionRepositoryGraphFactory = DefaultSessionRepositoryGraphFactory(
         assembler = SessionGraphAssembler(
+            listingFactory = repositoryConversationListingFactory(),
             agentDao = agentDao,
             conversationDao = conversationDao,
             remoteSources = remoteSources(),

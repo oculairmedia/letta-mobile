@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.backend.ConversationListingFactory
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.context.ContextReadingSnapshots
@@ -16,6 +17,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.api.rosterForLists
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.ProjectWorkRepository
 import com.letta.mobile.data.repository.ScheduleRepository
@@ -30,6 +32,7 @@ import com.letta.mobile.data.repository.routedBackendKind
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
 import dagger.Lazy
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -43,6 +46,7 @@ import javax.inject.Singleton
 // happens lazily on the first dao.get() (inside clearCachesForNewSession /
 // repositoryScope.launch), not on the main thread during Hilt graph resolution.
 class SessionGraphAssembler @Inject constructor(
+    private val listingFactory: ConversationListingFactory,
     private val agentDao: Lazy<AgentDao>,
     private val conversationDao: Lazy<ConversationDao>,
     /** letta-mobile-ckmub.4: the backend seam; production binds [SessionRemoteSources.None]. */
@@ -122,6 +126,7 @@ class SessionGraphAssembler @Inject constructor(
         val irohConversationListSource = request.irohSource(::IrohAdminRpcConversationListSource)
         return ConversationRepos(
             allConversations = AllConversationsRepository(
+                listingFactory = listingFactory,
                 // letta-mobile-fyo4s: the list reads each roster agent's own conversations.
                 roster = { agentRepository.rosterForLists() },
                 remote = remoteSources.conversations,
@@ -131,6 +136,8 @@ class SessionGraphAssembler @Inject constructor(
                 // letta-mobile-lks7m: conversations started on another device arrive as pushes.
                 transport = request.channelTransport,
                 cacheGate = request.cacheGate,
+                // letta-mobile-ybdv3: pinned agents' pages load beside the recents, as on web and desktop.
+                pinnedAgents = { request.settingsRepository.pinnedAgents() },
             ),
             conversation = ConversationRepository(
                 remote = remoteSources.conversations,
@@ -197,3 +204,7 @@ class SessionGraphAssembler @Inject constructor(
         val conversation: ConversationRepository,
     )
 }
+
+/** The pinned agents as the conversation list reads them; none without settings. */
+private suspend fun ISettingsRepository?.pinnedAgents(): Set<AgentId> =
+    this?.getPinnedAgentIds()?.first().orEmpty().mapTo(mutableSetOf(), ::AgentId)

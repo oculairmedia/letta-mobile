@@ -46,6 +46,7 @@ import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.foundation.LettaNavChevron
 import com.letta.mobile.ui.components.row.LettaListRow
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.theme.LettaBusyBar
@@ -286,7 +287,7 @@ private fun <T> DefaultPickerRow(item: PickerItem<T>, state: PickerRowState, lea
 @Composable
 private fun RowEnd(item: PickerItem<*>, state: PickerRowState) {
     when {
-        item.drillIn -> Icon(LettaIcons.ChevronRight, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
+        item.drillIn -> LettaNavChevron()
         state.mode == PickMode.Multi -> Checkbox(checked = state.selected, onCheckedChange = null)
         state.mode == PickMode.Single && state.selected -> Icon(
             imageVector = LettaIcons.Check,

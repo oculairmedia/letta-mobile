@@ -2,6 +2,7 @@ package com.letta.mobile.ui.shell.pages.home
 
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LocalObjectVerbs
+import com.letta.mobile.ui.components.foundation.LettaDivider
 import com.letta.mobile.ui.components.items
 import com.letta.mobile.data.objectverbs.ObjectRef
 
@@ -77,7 +78,7 @@ private fun FleetTableHeader(page: HomePageScope) {
             )
             Box(Modifier.width(PinWidth))
         }
-        RowHairline()
+        LettaDivider()
     }
 }
 
@@ -151,7 +152,7 @@ private fun FleetAgentRow(agent: FleetAgentStat, page: HomePageScope) {
             }
             AgentPinToggle(agent)
         }
-        RowHairline()
+        LettaDivider()
     }
 }
 
@@ -207,11 +208,6 @@ private fun FleetCell(text: String, modifier: Modifier, strong: Boolean = false,
         textAlign = align,
         modifier = modifier,
     )
-}
-
-@Composable
-private fun RowHairline() {
-    Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)))
 }
 
 private fun sortArrow(descending: Boolean): String = if (descending) "▼" else "▲"

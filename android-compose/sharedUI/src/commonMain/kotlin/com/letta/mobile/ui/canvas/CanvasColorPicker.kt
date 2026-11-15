@@ -45,6 +45,8 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.composables.icons.lucide.Ban
 import com.composables.icons.lucide.Lucide
+import com.letta.mobile.ui.components.foundation.LettaColorSwatch
+import com.letta.mobile.ui.components.foundation.LettaSwatch
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** One colour a picker offers, with the name its swatch reads out. */
@@ -263,23 +265,7 @@ private fun HslSlider(label: String, value: Float, range: ClosedFloatingPointRan
 
 @Composable
 private fun PaletteEntry(color: Color, name: String, selected: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(LettaDimens.Orb.sm)
-            .background(color, CircleShape)
-            .border(
-                width = 1.dp,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                shape = CircleShape,
-            )
-            .semantics { contentDescription = "Color $name" }
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (color.alpha == 0f) {
-            Icon(Lucide.Ban, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm), tint = MaterialTheme.colorScheme.outline)
-        }
-    }
+    LettaColorSwatch(LettaSwatch(color, selected, name = "Color $name"), onClick = onClick)
 }
 
 /** Hue in degrees, saturation and lightness in 0..1. */

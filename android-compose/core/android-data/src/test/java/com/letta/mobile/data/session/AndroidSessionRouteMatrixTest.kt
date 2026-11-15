@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.chat.conversations.listing.repositoryConversationListingFactory
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.backend.SessionRoute
@@ -68,6 +69,7 @@ class AndroidSessionRouteMatrixTest {
         transport: FakeChannelTransport,
         settings: FakeSettingsRepository,
     ): SessionGraph = SessionGraphAssembler(
+        listingFactory = repositoryConversationListingFactory(),
         agentDao = dagger.Lazy<AgentDao> { FakeAgentDao() },
         conversationDao = dagger.Lazy<ConversationDao> { FakeConversationDao() },
         // Production: SessionRemoteSources.None, the default.

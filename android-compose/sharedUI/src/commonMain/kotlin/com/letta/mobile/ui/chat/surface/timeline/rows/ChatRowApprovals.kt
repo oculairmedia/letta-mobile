@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.runtime.setValue
@@ -214,10 +215,16 @@ internal fun ApprovalRequestCard(
 ) {
     if (!approval.requiresUserInput()) return
     val decider = rememberApprovalDecider(approval, rememberRowApprovalOwner(context, callbacks))
-    // The moment a decision lands on the person: one attention cue per request.
+    // The moment a decision lands on the person: one attention cue per request. Saved, so a
+    // recreated Activity (rotation, dark mode) or a row scrolled back into view does not raise it
+    // again for a request already announced (letta-mobile-09m53).
     val haptics = LocalHaptics.current
+    var announced by rememberSaveable(approval.requestId) { mutableStateOf(false) }
     LaunchedEffect(approval.requestId) {
-        if (decider.submit != null) haptics.play(LettaHapticCue.ApprovalNeeded)
+        if (!announced && decider.submit != null) {
+            haptics.play(LettaHapticCue.ApprovalNeeded)
+            announced = true
+        }
     }
     // The step header and the queued note sit above the card, never under it. While it waits, the
     // card is where the mascot looks (te3n1.2), its pull fading over a few seconds.

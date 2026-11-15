@@ -1,15 +1,11 @@
 package com.letta.mobile.ui.modelcontrol
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -30,11 +26,13 @@ import com.letta.mobile.data.repository.modelcontrol.ProviderSection
 import com.letta.mobile.data.repository.modelcontrol.connectMethod
 import com.letta.mobile.data.repository.modelcontrol.connectMethodOn
 import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.foundation.LettaStatusDot
 import com.letta.mobile.ui.providers.icons.ProviderIcon
 import com.letta.mobile.ui.providers.icons.ProviderIdentity
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaTonalPill
 import com.letta.mobile.ui.theme.pill.LettaPillColors
+import com.letta.mobile.ui.theme.tokens.LettaStatusTone
 
 /** Rows of [ProviderManagementPane]: the provider card header, its action strip, and one model. */
 
@@ -60,7 +58,7 @@ internal fun ProviderHeaderRow(section: ProviderSection, expanded: Boolean, inAp
             Column(modifier = Modifier.weight(1f)) {
                 Text(section.displayName, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-                    StatusDot(connected = section.isConnected)
+                    LettaStatusDot(if (section.isConnected) LettaStatusTone.Success else LettaStatusTone.Idle)
                     Text(
                         text = providerSubtitle(section, inAppSignIn),
                         style = MaterialTheme.typography.labelSmall,
@@ -82,18 +80,6 @@ private fun ProviderMark(section: ProviderSection) {
     ProviderIcon(
         provider = ProviderIdentity(section.key, section.displayName, section.provider?.brandIds().orEmpty() + section.displayName),
         connected = section.isConnected,
-    )
-}
-
-@Composable
-private fun StatusDot(connected: Boolean) {
-    Box(
-        modifier = Modifier
-            .size(LettaDimens.Space.sm)
-            .background(
-                color = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                shape = CircleShape,
-            ),
     )
 }
 

@@ -1,7 +1,6 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -77,8 +76,8 @@ internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
  * The scheme, `LocalCustomColors`, type scale and shapes are the shared
  * [lettaColorScheme], [lettaCustomColors], [SharedTypography] and
  * [SharedShapes] (also behind the web host's `SharedMaterialTheme`); the
- * desktop type scale and shapes are tighter than Material 3's phone defaults
- * so monitors get more words per line and crisper corners.
+ * desktop type scale is tighter than Material 3's phone defaults so monitors
+ * get more words per line; the shapes are the one scale every host uses.
  */
 @Composable
 internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
@@ -93,7 +92,8 @@ internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
             val phoneMetrics = override?.phoneMetrics == true
             MaterialTheme(
                 colorScheme = scheme,
-                shapes = if (phoneMetrics) PhoneShapes else SharedShapes,
+                // One corner scale on every host and metric; only the type scale follows density.
+                shapes = SharedShapes,
                 typography = if (phoneMetrics) PhoneTypography else SharedTypography,
                 content = content,
             )
@@ -103,6 +103,3 @@ internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
 
 /** The phone preview's type scale: Material 3's defaults, the sizes Android's theme uses (in Inter there). */
 private val PhoneTypography = Typography()
-
-/** The phone preview's shapes: Material 3's defaults, as on Android. */
-private val PhoneShapes = Shapes()
