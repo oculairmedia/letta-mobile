@@ -1,6 +1,6 @@
 ---
 name: verifying-timeline-identity
-description: Use when a change touches how the shared timeline keys rows or hands them between the live overlay and settled pages - TimelinePageProjection (aggregatePreparedRuns, claimRun, containsComplete, runEnvelope), MessageGrouping (groupMessagesForRender, runBlockKey), TimelineRowAssembly / TimelineRowKeyGuard, SettledLiveAdoptions / SettledRunKeys, CanonicalTimelinePresentation (settledRows, live projection, withSettledKey, onResidentRows), CanonicalTimelineSessionPaging / TimelineLedgerPagingSource, or the store read positions - and when implementing or reviewing the letta-mobile-o1hju flicker fixes (S2 / D1). Runs a TLA+ model (TLC) that checks no key is listed twice, no drawn row vanishes, and keys stay stable, under every interleaving of live frames, durable writes, generation replacement, memory trims, scrolling and Paging loads.
+description: Use when a change touches how the shared timeline keys rows or hands them between the live overlay and settled pages - TimelinePageProjection (aggregatePreparedRuns, claimRun, containsComplete, runEnvelope), MessageGrouping (groupMessagesForRender, runBlockKey), TimelineRowAssembly / TimelineRowKeyGuard, SettledLiveAdoptions / SettledRunKeys, CanonicalTimelinePresentation (settledRows, live projection, withSettledKey, onResidentRows), CanonicalTimelineSessionPaging / TimelineLedgerPagingSource, or the store read positions - and when implementing or reviewing the letta-mobile-o1hju flicker fixes (S2 / S3). Runs a TLA+ model (TLC) that checks no key is listed twice, no drawn row vanishes, and keys stay stable, under every interleaving of live frames, durable writes, generation replacement, memory trims, scrolling and Paging loads.
 license: Method from pstack create-formal-verification-skill (MIT, Lauren Tan, https://github.com/cursor/plugins)
 metadata:
   bead: letta-mobile-o1hju
@@ -18,8 +18,14 @@ pages as one LazyColumn. It promises:
   flash out and back in.
 - **I7 StableKeys**: the same record set (same page, same ledger) always gets the same key. If not,
   a row is remounted with nothing changed.
-- **StableKeysAcrossRecut**: I7 strengthened. The key also survives a refresh that moves the page edges.
-  This is informational: the plan's R1 assumes it, and per-page grouping cannot meet it (see Results).
+- **StableRowKeysAcrossRecut** (binding, owner decision R1, 2026-11-14): while the ledger is
+  unchanged, a row with exactly the same records keeps its key across any refresh, trim or page
+  load, even when the refresh moves the page edges. The promise is per visible row.
+- **StableKeysAcrossRecut** (expected failure, kept on purpose): the same promise per record.
+  A re-cut that splits or merges a row gives its records a different row, and so a different
+  key; per-page grouping cannot avoid that, and the owner chose the row-level promise instead.
+  Old wording (binding before R1): "a settled record keeps its key even when a refresh around
+  the reader moves the page edges". New status: informational, listed as FAIL below.
 
 The model is `verification/timeline-identity/TimelineIdentity.tla`. Every action names the Kotlin
 function and file:line it models, and one indivisible code step is one model step.
@@ -31,12 +37,12 @@ Covered code at the sync commit. Paths are under
 
 | Code | Model |
 |---|---|
-| `timeline/TimelinePageProjection.kt` `aggregatePreparedRuns` :118, `runClaim` :153, `claimRun` :163, `spansVisibleGap` :191, `containsComplete` :209, `runEnvelope` :222 | `PageRowSet`, `BlockRows`, `ContainsComplete`, `Boundary` |
+| `timeline/TimelinePageProjection.kt` `aggregatePreparedRuns` :124, `keyedByOwnRecords` :161, `runClaim` :164, `claimRun` :174, `spansVisibleGap` :202, `containsComplete` :220, `runEnvelope` :233 | `PageRowSet`, `BlockRows`, `OwnRecordKey`, `ContainsComplete`, `Boundary` |
 | `chat/projection/MessageGrouping.kt` `groupMessagesForRender` :182 (runIdCounts :194, unique Single :266), `runBlockKey` :541 | `Blocks`, `GroupKey` |
 | `timeline/TimelineLivePublication.kt` per-record key `segment-<identity>` :117-124, `overlayEvents` :245 | `SegRow`, live drain |
-| `timeline/CanonicalTimelinePresentation.kt` `settledRows` :113, `projectLiveItems` :180, `filterUnsettledEvents` :210, `onResidentRows` :245, `withSettledKey` :320, `project` :353 | `Load`, `LiveItems`, `ResidentRows` |
-| `timeline/SettledLiveAdoptions.kt` `adoptLocked` :26; `timeline/SettledRunKeys.kt` `livePresentationFor` :43, `sharesShapeWith` :69 | `AdoptOne`, `AdoptAll` |
-| `chat/projection/TimelineRowAssembly.kt` `assemble` :34, `displayedLive` :43; `chat/projection/TimelineRowKeyGuard.kt` `duplicateRows` :20 | `ShownLive`, `ListKeys`, `Blanked`, `Drawn` |
+| `timeline/CanonicalTimelinePresentation.kt` `settledRows` :123, `projectLiveItems` :190 (live keys from own records :219), `filterUnsettledEvents` :223, `onResidentRows` :258, `withSettledKey` :334, `project` :373, `assemble` :420, `Row.holdsAll` :100 | `Load`, `LiveItems`, `ResidentRows`, `ShownLiveOf` |
+| `timeline/SettledLiveAdoptions.kt` `keyed` :36, `keyedLocked` :43, `firstPresentation` :57; `timeline/SettledRunKeys.kt` `keyedByOwnRecords` :24, `livePresentationFor` :67, `isOnlyHeldWithin` :81, `sharesShapeWith` :104 | `KeyOne`, `KeyAll` (S3); `AdoptOne`, `AdoptAll` (main..OwnKeys) |
+| `chat/projection/TimelineRowAssembly.kt` `assemble` :47, `displayedLive` :63; `chat/projection/TimelineRowKeyGuard.kt` `duplicateRows` :20 | `ShownLiveOf`, `ListKeys`, `Blanked`, `Drawn` |
 | `timeline/CanonicalTimelineSessionPaging.kt` `observePublications` :65 (trims :75, revisions :82) | `Invalidate`, `Trim` |
 | `timeline/TimelineLedgerPagingSource.kt` `invalidateIfBehind` :25, `getRefreshKey` :31, `load` :41; `timeline/CanonicalTimelineEngine.kt` `preparePage` :579, `reconcilePageDetailed` :502, `shouldDeferLiveReconcile` :556 | `Refresh`, `LoadOlder`, `LoadNewer`, `DurableWrite` |
 | `android-compose/core/android-data/.../RoomTimelineBoundedStore.kt` read positions :181-196 | `AroundRange`, page edges |
@@ -71,19 +77,26 @@ Elsewhere, download that jar from the TLA+ GitHub release v1.7.4, check the sha2
 `TLA2TOOLS=/path/to/jar`.
 
 ```sh
-verification/timeline-identity/check.sh          # all configs x all properties, about 1 minute
-verification/timeline-identity/able-to-fail.sh   # each passing property fails on a broken variant
+verification/timeline-identity/check.sh s3-settled-a s3-settled-b s3-settled-c   # about 1 minute
+WORKERS=4 verification/timeline-identity/check.sh s3-live-a s3-live-b       # see Bounds for run times
+verification/timeline-identity/check.sh          # every config x every property (hours, see Bounds)
+verification/timeline-identity/able-to-fail.sh [config-prefix]   # each passing property fails on a broken variant
 verification/timeline-identity/trace.py verification/timeline-identity/out/<config>.<Property>.out
 ```
 
 `check.sh` runs each property in its own TLC run, so one failure never hides another. It keeps
-only failing traces in `out/` (git-ignored). `trace.py` prints a trace one step per line: the
+only failing traces in `out/` (git-ignored; `OUT=<dir>` writes elsewhere, and concurrent runs
+need their own, since each run clears the passing outputs of its directory). `trace.py` prints a trace one step per line: the
 action, the durable prefix `n`, the pages as `lo..hi@n=<ledger read>:[key{records}]`, and the
 live rows. Read every TLC result with the pstack `/statechart` skill if you have it: it tells
 each violation as its shortest path in plain words and charts the state graph when a check
 passes.
 
-Configs (`<fix>-<mode>-<scenario>.cfg`). The fix is `main` (code as on main) or `d1` (plan D1).
+Configs (`<fix>-<mode>-<scenario>.cfg`). The fix is `main` (code as on main), `s2` (S2's
+settled edge rule), `d1` (S2's key rule with the first S3 adoption guards), `ownkeys` (settled
+keys from own records with those guards; the held alternative) or `s3` (the shipped correction:
+settled and live keys from own records, remembered keys, and the list hides a live row only
+behind a settled row that holds all of it). `Break` is a set of guards to break (able-to-fail).
 The mode is `settled` (history already durable, no overlay, the S1 fixture) or `live` (the
 turn streams while it is written). The scenarios are in `MC.tla`:
 - `a`: one multi-step run with opaque usage/stop rows (prompt, R, R, U, R, R, U);
@@ -93,20 +106,31 @@ turn streams while it is written). The scenarios are in `MC.tla`:
 ## Expected result at the sync commit
 
 FAIL is a known finding, not a regression. Anything that differs from this table needs a look.
+`s3` is the shipped code and must pass I1, I5, I7 and RowRecut in every scenario; the other
+fixes are kept to show what each guard removes. `Recut` (per record) is an expected failure.
 
-| config | I1 NoDuplicateKey | I5 NoVanishedRow | I7 StableKeys | AcrossRecut |
-|---|---|---|---|---|
-| main-settled-a | FAIL (S1 H1, cut at usage row) | FAIL (blanked row) | pass (vacuous*) | pass |
-| main-settled-b | FAIL (S1 H1, cut next to the follow-up) | FAIL | pass (vacuous*) | FAIL |
-| main-settled-c | pass | pass | pass (vacuous*) | FAIL |
-| main-live-a/b | FAIL (adopted live key) | FAIL | FAIL | FAIL |
-| d1-settled-a | pass | pass | pass (vacuous*) | pass |
-| d1-settled-b | pass | pass | pass (vacuous*) | FAIL |
-| d1-settled-c | pass | pass | pass (vacuous*) | FAIL |
-| d1-live-a/b | FAIL (adopted live key) | FAIL (partial page hides live run) | FAIL | FAIL |
+| config | I1 NoDuplicateKey | I5 NoVanishedRow | I7 StableKeys | RowRecut | Recut (per record) |
+|---|---|---|---|---|---|
+| main-settled-a | FAIL (S1 H1, cut at usage row) | FAIL (blanked row) | pass (vacuous*) | pass | pass |
+| main-settled-b | FAIL (S1 H1, cut next to the follow-up) | FAIL | pass (vacuous*) | pass | FAIL |
+| main-settled-c | pass | pass | pass (vacuous*) | pass | FAIL |
+| main-live-a/b | FAIL (adopted live key) | FAIL | FAIL | FAIL | FAIL |
+| s2-settled-a/b/c | pass | pass | pass (vacuous*) | pass | a pass, b/c FAIL |
+| s2-live-a/b | FAIL | FAIL | FAIL | FAIL | FAIL |
+| d1-settled-a/b/c | pass | pass | pass (vacuous*) | pass | a pass, b/c FAIL |
+| d1-live-a | pass | FAIL | FAIL | FAIL | FAIL |
+| ownkeys-settled-a/b/c | pass | pass | pass (vacuous*) | pass | a pass, b/c FAIL |
+| s3-settled-a | pass | pass | pass | pass | pass |
+| s3-settled-b/c | pass | pass | pass | pass | FAIL (re-cut splits a row) |
+| s3-live-a | pass | pass | pass | pass | FAIL (re-cut splits a row) |
+| s3-live-b | pass | pass | pass | pass | FAIL (re-cut splits a row) |
 
-\* With no live overlay, a settled page's keys are a pure function of (page bounds, ledger), so
-I7 cannot fail there. It is only meaningful in `live` configs, where adoption state exists.
+\* With no live overlay and no remembered keys, a settled page's keys are a pure function of
+(page bounds, ledger), so I7 cannot fail there. In s3 it can (a key depends on what was drawn
+before), and able-to-fail shows it does when the guards are broken.
+
+`able-to-fail.sh` must print `caught` for every line; S3's key properties need two guards broken
+at once (own-record keys and remembered keys each keep rows stable on their own).
 
 ## Real bug or modelling error?
 
@@ -116,12 +140,10 @@ Replay the trace against the real engine, one model step per code step, before y
   `send`, `stream(..., finished = false)`, `settle`, `reconcile`, `catchUp` (the mediator's
   mid-turn write), `readAllSettledPages`.
 - `later(PAGE_ROWS - k)` moves the newest page edge to a chosen row (page = 64 rows).
-- Wrap the store in `RoomEdgeKeys`. The shared `InMemoryTimelineStore` reports a page's
-  older/newer key as the NEIGHBOUR row, while Room and the desktop store report the page's own
-  edge row, which `TimelineLedgerPagingSource` passes to `Before`/`After`. Without the wrapper,
-  every Paging append skips the row just before the edge. That hides real collisions (S1 saw the
-  follow-up cut green because of it) and makes rows look as if they vanish when the product
-  would not drop them.
+- The shared `InMemoryTimelineStore` reports a page's older/newer key as the page's own edge row,
+  as Room and the desktop store do; `TimelineLedgerPagingSource` passes it to `Before`/`After`.
+  (It once reported the NEIGHBOUR row, which made every Paging append skip a row and hid real
+  collisions.)
 - Wait for Paging to present before reading a frame (poll `settledKeys()`). A frame read right
   after a write can still be the old generation.
 
@@ -143,20 +165,23 @@ that introduced it and keep the replay test.
 6. Move `sync-commit` (here and in the `TimelineIdentity.tla` header) only after you have
    confirmed the model describes the code at the new commit. Update the expected-result table.
 
-To model D1 as S2 actually implements it, replace `D1Key` with the implemented rule. The current
-`D1Key` is the plan's rule ("the page holds every record of the run"), and it reads the whole
-ledger. A real page sees only one row past each edge, so S2 needs more evidence than
-`runEnvelope` gives.
+The model's checking aids (`drawnV`, `seenV`, `rowsV`) are recomputed after every step
+(`ObserveNext`) so the step properties compare two values instead of re-deriving the list for
+every record; they add no behaviour, and every action is `<Name>Step /\ ObserveNext`.
 
 ## Bounds and assumptions
 
 - A seven-row ledger, PageSize 3 (Room's Around: 1 older row, the anchor, then newer rows), up to 6
-  durable revisions, one live turn per run of the model. Fewer than 2,000 distinct states per
-  config.
+  durable writes (MaxRev 7), one live turn per run of the model. These constants are the only
+  bounds: every s3 run finishes without a state CONSTRAINT. Distinct states: s3-settled 189 to
+  4,283; s3-live-a 534,904 (about 1 minute per property); s3-live-b S3LIVEB_STATES (about
+  S3LIVEB_TIME per property with WORKERS=4).
 - Record identity is the ledger index. serverId, otid and stream aliases collapse into it.
   Durable rows carry their run id (as the S1 fixture stores them); App Server rows that carry
   none get `turn-<prompt>` from `withPromptOwnedRunIds`, which the model does not reproduce.
-- The live run id equals the durable one. The live key is `run-<id>` like the settled one.
+- The live run id equals the durable one, so live and settled keys share one name space (the worst
+  case for collisions). main..OwnKeys key a live run `run-<id>` (unique in its snapshot); s3 keys
+  it `run-<id>-from-<oldest record>`, as its settled copy.
 - Paging page dropping (maxSize = 3 pages) is never reached at these bounds. Placeholders are off.
 - One load step = `preparePage` + `project` (adoption). Splitting it adds no behaviour: the load
   is checked against the revision afterwards, and `project` reads only live state, which can
@@ -169,19 +194,25 @@ counting), and render cost.
 
 ## Results at the sync commit (for context)
 
-Replayed on the real engine by `TimelineIdentityModelReplayTest`. All three are red on main.
-- **Adopted live key comes back on two rows (I1).** A run that took its live key at handover
+Replayed on the real engine by `TimelineIdentityModelReplayTest`. The first three are red on
+main; the fourth is the owner's R4 case.
+- **Adopted live key comes back on two rows (I1, N2).** A run that took its live key at handover
   (`SettledLiveAdoptions.byIdentity`, remembered under every member) is cut by a later page edge.
-  Each part finds a member in `byIdentity` and takes the same key, on a path that skips the
-  holders check. The measured key `run-local-run-125` is a live run id. D1 does not change this.
+  Each part finds a member and takes the same key. S3 remembers a key under one anchor, the
+  record that owns the row, and never gives a key another anchor holds.
 - **Follow-up cut (I1).** A page edge right before a run-less follow-up prompt: both pages see
-  `Ends` and both claim `run-<id>`.
-- **Partial durable page hides live rows (I5).** A mid-turn catch-up makes only the first rows of
-  a run durable. That settled row adopts the live block's key, and `displayedLive` then hides the
-  whole live block, including the rows that are not durable yet.
-- **D1 and keys across re-cuts.** D1's `run-<id>-<firstMessageId>` changes when a refresh around
-  the reader moves the page edge into a run (`d1-settled-b/c`, StableKeysAcrossRecut). The
-  plan's R1 ("I7 guarantees stability afterwards") does not hold under re-cuts.
+  `Ends` and both claim `run-<id>`. S3 keys every claimed block by its own oldest record.
+- **Partial durable page hides live rows (I5, N3).** A mid-turn catch-up makes only the first rows
+  of a run durable; that row took the live block's key and `displayedLive` hid the whole live
+  block. S3 keys live runs by their own records too, and lists a live row under a settled row's
+  key as `<key>~live` unless that settled row holds every one of its records.
+- **A durable row drawn before its live frame keeps its key (R4).** After a reconnect catch-up
+  the settled row is drawn first; the turn's live frames arrive later and the turn settles. S3
+  keeps the row's first key for the presentation's life, and hides the live block, whose records
+  that row already draws, instead of drawing them twice.
+- **Keys across re-cuts.** Per record (StableKeysAcrossRecut) no per-page scheme holds: a re-cut
+  that splits `{2,3}` into `{3}` moves record 3 to another row (s3-settled-b/c, s3-live-a/b).
+  Per visible row (StableRowKeysAcrossRecut) s3 holds in every scenario.
 
 ## Credits
 

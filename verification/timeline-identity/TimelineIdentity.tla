@@ -11,26 +11,31 @@
 (*          frame (timeline.duplicateKeyDropped); a changed key remounts   *)
 (*          the row. The user sees rows vanish and reappear (flicker).     *)
 (*                                                                         *)
-(* SYNC     Confirmed against origin/main 624012ec297e65003062991f5a07a2a5 *)
-(*          945f316c (2026-11-14). Paths below are under                   *)
-(*          android-compose/sharedLogic/src/commonMain/kotlin/com/letta/   *)
-(*          mobile/data/ unless stated.                                    *)
+(* SYNC     Fix "S3" is confirmed against branch                        *)
+(*          fix/o1hju-s3-own-keys-final (sync-commit in the skill); the    *)
+(*          other fixes describe the code each one names (Fix, below).     *)
+(*          Paths below are under android-compose/sharedLogic/src/         *)
+(*          commonMain/kotlin/com/letta/mobile/data/ unless stated.        *)
 (*                                                                         *)
 (* COVERS (one indivisible code step = one model step)                     *)
 (*  timeline/TimelinePageProjection.kt                                     *)
-(*    aggregatePreparedRuns :118, runClaim :153, claimRun :163,            *)
-(*    spansVisibleGap :191, containsComplete :209, runEnvelope :222-256    *)
+(*    aggregatePreparedRuns :124, keyedByOwnRecords :161, runClaim :164,   *)
+(*    claimRun :174, spansVisibleGap :202, containsComplete :220,          *)
+(*    runEnvelope :233                                                     *)
 (*  chat/projection/MessageGrouping.kt                                     *)
 (*    groupMessagesForRender :182 (runIdCounts :194, unique Single :266),  *)
 (*    runBlockKey :541                                                     *)
 (*  timeline/TimelineLivePublication.kt  per-record projection key         *)
 (*    segment-<identity> :117-124, overlayEvents :245                      *)
 (*  timeline/CanonicalTimelinePresentation.kt                              *)
-(*    settledRows :113, projectLiveItems :180, filterUnsettledEvents :210, *)
-(*    onResidentRows :245, withSettledKey :320, project :353               *)
-(*  timeline/SettledLiveAdoptions.kt adoptLocked :26                       *)
-(*  timeline/SettledRunKeys.kt livePresentationFor :43, sharesShapeWith :69*)
-(*  chat/projection/TimelineRowAssembly.kt assemble :34, displayedLive :43 *)
+(*    settledRows :123, projectLiveItems :190 (own-record keys :219),      *)
+(*    filterUnsettledEvents :223, onResidentRows :258, withSettledKey :334,*)
+(*    project :373, assemble :420, Row.holdsAll :100                       *)
+(*  timeline/SettledLiveAdoptions.kt keyed :36, keyedLocked :43,           *)
+(*    firstPresentation :57 (S3); adoptLocked (main..OwnKeys)              *)
+(*  timeline/SettledRunKeys.kt keyedByOwnRecords :24,                      *)
+(*    livePresentationFor :67, isOnlyHeldWithin :81, sharesShapeWith :104  *)
+(*  chat/projection/TimelineRowAssembly.kt assemble :47, displayedLive :63 *)
 (*  chat/projection/TimelineRowKeyGuard.kt duplicateRows :20               *)
 (*  timeline/CanonicalTimelineSessionPaging.kt observePublications :65     *)
 (*  timeline/TimelineLedgerPagingSource.kt invalidateIfBehind :25,         *)
@@ -63,9 +68,12 @@ CONSTANTS
     Fix,          \* "main": code before the correction
                   \* "S2":   S2's settled edge rule (mayContinuePastPage), main adoption
                   \* "D1":   S2's key rule + S3 adoption (one anchor, whole-block handover)
-                  \* "OwnKeys": settled keys from a row's own records + S3 adoption
-    Break         \* "none", or a deliberately broken variant that shows a passing
-                  \* property can fail (able-to-fail.sh):
+                  \* "OwnKeys": settled keys from a row's own records + D1 adoption
+                  \* "S3":   the shipped correction: settled AND live keys from a row's
+                  \*         own records, and every settled row keeps the key it was first
+                  \*         drawn with for the presentation's life (remembered keys)
+    Break         \* {} (the code), or the set of guards deliberately broken to show a
+                  \* passing property can fail (able-to-fail.sh):
                   \*   containsCompleteIgnoresBoundary  claim even across Continues
                   \*   bareRunKey       D1 claims the bare run-<id> (per-page key)
                   \*   keyByPageEdge    a claimed run is keyed by the page's first row
@@ -75,6 +83,15 @@ CONSTANTS
                   \*   forgetAdoption   D1 does not remember an adopted key
                   \*   rememberedUncovered  D1 reuses a remembered key even while a live
                   \*                    row under that key holds records this row lacks
+                  \*   keyByReader      a claimed run's key also names the reader's row
+                  \*   forgetKeys       S3 does not remember a row's first key
+                  \*   reuseTakenKey    S3 gives a row a key another row already holds
+                  \*   hideUncoveredLive  S3 takes a key a live row holds with records
+                  \*                    this row lacks
+                  \*   hideByKeyOnly    S3's list hides a live row whenever a settled row
+                  \*                    holds its key, as main does
+                  \*   liveSnapshotKeys S3's live overlay keys a run by the snapshot
+                  \*                    (run-<id> when unique) instead of its own records
 
 LedgerLen == Len(Kind)
 Recs == 1..LedgerLen
@@ -92,11 +109,18 @@ VARIABLES
     pages,        \* presented pages, newest first: [lo, hi, m (ledger length
                   \* it was read at), rows (newest first)]
     anchor,       \* reader position: record behind PagingState.anchorPosition (0 = none)
-    byId,         \* SettledLiveAdoptions.byIdentity: record -> adopted live key
-    holders       \* SettledLiveAdoptions.holders: live key -> records holding it
+    byId,         \* main..OwnKeys: SettledLiveAdoptions.byIdentity, record -> adopted
+                  \* live key; S3: SettledRowKeys, owner record -> first drawn key
+    holders,      \* SettledLiveAdoptions.holders: live key -> records holding it
+    \* Checking aids, not code state: each is a function of the variables
+    \* above, recomputed once per step (Observe) so the step properties
+    \* compare two values instead of re-deriving the list per quantified record.
+    drawnV,       \* Drawn
+    seenV,        \* settled record -> [key it is listed under, page that holds it]
+    rowsV         \* {<<members, key>>} of every settled row
 
 vars == <<n, rev, streamed, retired, live, resident, srcRev, needRefresh,
-          pages, anchor, byId, holders>>
+          pages, anchor, byId, holders, drawnV, seenV, rowsV>>
 
 -----------------------------------------------------------------------------
 (* Helpers                                                                 *)
@@ -163,7 +187,7 @@ NewerBoundary(hi, m) == IF hi = m THEN "Ends" ELSE Boundary(hi, hi + 1)
 
 \* containsComplete (:209): only Continues(runId) refuses a claim.
 ContainsComplete(lo, hi, m, x) ==
-    \/ Break = "containsCompleteIgnoresBoundary"
+    \/ "containsCompleteIgnoresBoundary" \in Break
     \/ OlderBoundary(lo) # x /\ NewerBoundary(hi, m) # x
 
 \* Every R record of run x that is durable at ledger length m.
@@ -194,17 +218,18 @@ MayContinuePastPage(lo, hi, m, x) ==
 \* only, never of where the page edges fell.
 OwnRecordKey(lo, hi, m, M, b) ==
     LET x == RunOfBlock(b) IN
-    IF Break = "bareRunKey" THEN GroupKey(M, b)
-    ELSE IF Break = "keyByPageEdge" THEN OwnKey(x, lo)
+    IF "bareRunKey" \in Break THEN GroupKey(M, b)
+    ELSE IF "keyByPageEdge" \in Break THEN OwnKey(x, lo)
+    ELSE IF "keyByReader" \in Break THEN OwnKey(x, Min(b)) \o "@" \o Str(anchor)
     ELSE OwnKey(x, Min(b))
 
 BlockRows(lo, hi, m, M, b) ==
     LET k == GroupKey(M, b)
         x == RunOfBlock(b)
     IN IF k # NoKey /\ ContainsComplete(lo, hi, m, x)
-       THEN {ClaimRow(b, CASE Fix = "OwnKeys" -> OwnRecordKey(lo, hi, m, M, b)
-                           [] Break = "keyByPageEdge" -> RunKeyAt(x, lo)
-                           [] Fix \in {"S2", "D1"} /\ Break = "bareRunKey" -> k
+       THEN {ClaimRow(b, CASE Fix \in {"OwnKeys", "S3"} -> OwnRecordKey(lo, hi, m, M, b)
+                           [] "keyByPageEdge" \in Break -> RunKeyAt(x, lo)
+                           [] Fix \in {"S2", "D1"} /\ "bareRunKey" \in Break -> k
                            [] Fix \in {"S2", "D1"} /\ k = RunKey(x) /\ MayContinuePastPage(lo, hi, m, x)
                                 -> RunKeyAt(x, Min(b))
                            [] OTHER -> k)}
@@ -222,9 +247,13 @@ PageRowSet(lo, hi, m) ==
 -----------------------------------------------------------------------------
 (* Live projection: projectLiveItems (CanonicalTimelinePresentation:180)   *)
 (* groups the unsettled live events in one snapshot.                       *)
+\* S3 (CanonicalTimelinePresentation.projectLiveItems -> keyedByOwnRecords):
+\* every live run block keys run-<id>-from-<its oldest record>, the key its
+\* settled copy computes from the same records.
+LiveOwnKeys == Fix = "S3" /\ "liveSnapshotKeys" \notin Break
 LiveItems(E) ==
     {[key |-> MsgKey(i), members |-> {i}, run |-> FALSE] : i \in {j \in E : Kind[j] = "P"}}
-    \cup {LET k == GroupKey(E, b) IN
+    \cup {LET k == IF LiveOwnKeys THEN OwnKey(RunOfBlock(b), Min(b)) ELSE GroupKey(E, b) IN
             IF k = NoKey THEN [key |-> MsgKey(Max(b)), members |-> b, run |-> FALSE]
             ELSE [key |-> k, members |-> b, run |-> TRUE]
           : b \in Blocks(E)}
@@ -249,24 +278,57 @@ AdoptOne(row, lv, by, hd) ==
         hits0 == {m \in row.members : by[m] # NoKey}
         \* D1: a remembered key is reused only while no live row under it holds
         \* a record this row lacks (else displayedLive would hide that record).
-        reusable(m) == ~d1 \/ Break = "rememberedUncovered" \/
+        reusable(m) == ~d1 \/ "rememberedUncovered" \in Break \/
                        \A l \in lv : l.key = by[m] => l.members \subseteq row.members
         hits  == {m \in hits0 : reusable(m)}
         named == {l \in lv : l.members \cap row.members # {}}
         shaped == {l \in named : l.run}                    \* sharesShapeWith :69
         match == IF shaped # {} THEN Newest(shaped)
                  ELSE IF named # {} THEN Newest(named) ELSE NoItem
-        covers == ~d1 \/ Break = "adoptPartial" \/ match.members \subseteq row.members
+        covers == ~d1 \/ "adoptPartial" \in Break \/ match.members \subseteq row.members
         fresh == hits0 = {} /\ match # NoItem /\ covers /\ Held(hd, match.key) = {}
         key == IF hits # {} THEN by[Min(hits)]
                ELSE IF fresh THEN match.key ELSE NoKey
-        everyMember == ~d1 \/ Break = "adoptEveryMember"
+        everyMember == ~d1 \/ "adoptEveryMember" \in Break
         remember == IF everyMember THEN row.members
-                    ELSE IF fresh /\ Break # "forgetAdoption" THEN {row.owner} ELSE {}
+                    ELSE IF fresh /\ "forgetAdoption" \notin Break THEN {row.owner} ELSE {}
     IN IF key = NoKey THEN [row |-> row, by |-> by, hd |-> hd]
        ELSE [row |-> [row EXCEPT !.key = key],
              by  |-> [m \in Recs |-> IF m \in remember THEN key ELSE by[m]],
              hd  |-> (key :> (Held(hd, key) \cup row.members)) @@ hd]
+
+\* S3: SettledRowKeys.keyFor. by[owner] is the key the row owning that record
+\* was first drawn with; it is kept for the presentation's life (owner decision
+\* R4). A row drawn for the first time adopts the live row it holds in full,
+\* else keys by its own records; a key another owner already holds, or that a
+\* live row holds with records this row lacks (displayedLive would hide them),
+\* is never taken, and the row keys <own key>~settled instead.
+AltKey(row) == row.key \o "~settled"
+KeyOne(row, lv, by) ==
+    IF ~row.run THEN [row |-> row, by |-> by]  \* prompt: withSettledKey returns msg-<otid> first
+    ELSE
+    LET taken == {by[r] : r \in {q \in Recs : q # row.owner}} \ {NoKey}
+        uncovered(k) == \E l \in lv : l.key = k /\ ~(l.members \subseteq row.members)
+        usable(k) == /\ (k \notin taken \/ "reuseTakenKey" \in Break)
+                     /\ (~uncovered(k) \/ "hideUncoveredLive" \in Break)
+        named == {l \in lv : l.members \cap row.members # {}}
+        shaped == {l \in named : l.run = row.run}             \* sharesShapeWith :69
+        match == IF shaped # {} THEN Newest(shaped)
+                 ELSE IF row.run /\ named # {} THEN Newest(named) ELSE NoItem
+        adoptable == match # NoItem /\ match.members \subseteq row.members
+        fresh == CASE adoptable /\ usable(match.key) -> match.key
+                   [] usable(row.key) -> row.key
+                   [] OTHER -> AltKey(row)
+        key == IF by[row.owner] # NoKey THEN by[row.owner] ELSE fresh
+    IN [row |-> [row EXCEPT !.key = key],
+        by  |-> IF "forgetKeys" \in Break THEN by ELSE [by EXCEPT ![row.owner] = key]]
+
+RECURSIVE KeyAll(_, _, _)
+KeyAll(rows, lv, by) ==
+    IF rows = <<>> THEN [rows |-> <<>>, by |-> by]
+    ELSE LET first == KeyOne(Head(rows), lv, by)
+             rest  == KeyAll(Tail(rows), lv, first.by)
+         IN [rows |-> <<first.row>> \o rest.rows, by |-> rest.by]
 
 RECURSIVE AdoptAll(_, _, _, _)
 AdoptAll(rows, lv, by, hd) ==
@@ -281,8 +343,18 @@ SettledSeq == Concat([p \in DOMAIN pages |-> pages[p].rows])
 SettledKeys == {SettledSeq[i].key : i \in DOMAIN SettledSeq}
 SettledMembers == UNION {SettledSeq[i].members : i \in DOMAIN SettledSeq}
 
-ShownLive ==                                         \* displayedLive :43
-    {l \in live : l.key \notin SettledKeys}
+\* displayedLive :43. main..OwnKeys: a live row is hidden when any settled
+\* row holds its key. S3 (CanonicalTimelinePresentation.assemble): when a
+\* settled row holds every one of its records, under any key; a live row whose
+\* key a settled row holds only in part stays listed, as <key>~live, so the
+\* settled part can keep the key it was drawn with.
+ShownLiveOf(seq, lv) ==
+    LET sk == {seq[i].key : i \in DOMAIN seq}
+        drawnBy(l) == \E i \in DOMAIN seq : l.members \subseteq seq[i].members
+    IN IF Fix = "S3" /\ "hideByKeyOnly" \notin Break
+       THEN {IF l.key \in sk THEN [l EXCEPT !.key = l.key \o "~live"] ELSE l : l \in {m \in lv : ~drawnBy(m)}}
+       ELSE {l \in lv : l.key \notin sk}
+ShownLive == ShownLiveOf(SettledSeq, live)
 ShownLiveSeq == LET ks == Desc({Max(l.members) : l \in ShownLive})
                 IN [i \in DOMAIN ks |-> CHOOSE l \in ShownLive : Max(l.members) = ks[i]]
 
@@ -295,6 +367,26 @@ ListRows == ShownLiveSeq \o [i \in DOMAIN SettledSeq |-> [key |-> SettledSeq[i].
 \* TimelineRowKeyGuard.duplicateRows :20 blanks every later repeat.
 Blanked == {i \in DOMAIN ListKeys : \E j \in 1..(i - 1) : ListKeys[j] = ListKeys[i]}
 Drawn == UNION {ListRows[i].members : i \in (DOMAIN ListRows) \ Blanked}
+
+\* Drawn, Rows and the per-record listing of given pages and live rows, each
+\* evaluated once (the checking aids; same definitions as above).
+DrawnOf(pgs, lv) ==
+    LET seq == Concat([p \in DOMAIN pgs |-> pgs[p].rows])
+        shown == ShownLiveOf(seq, lv)
+        ks == Desc({Max(l.members) : l \in shown})
+        sseq == [i \in DOMAIN ks |-> CHOOSE l \in shown : Max(l.members) = ks[i]]
+        rows == [i \in DOMAIN sseq |-> [key |-> sseq[i].key, members |-> sseq[i].members]]
+                \o [i \in DOMAIN seq |-> [key |-> seq[i].key, members |-> seq[i].members]]
+        blanked == {i \in DOMAIN rows : \E j \in 1..(i - 1) : rows[j].key = rows[i].key}
+    IN UNION {rows[i].members : i \in (DOMAIN rows) \ blanked}
+RowsOf(pgs) ==
+    UNION {{<<pgs[p].rows[k].members, pgs[p].rows[k].key>> : k \in DOMAIN pgs[p].rows} : p \in DOMAIN pgs}
+SeenOf(pgs) ==
+    LET placed == UNION {{<<pgs[p].rows[k], <<pgs[p].lo, pgs[p].hi, pgs[p].m>>>> :
+                            k \in DOMAIN pgs[p].rows} : p \in DOMAIN pgs}
+    IN [x \in UNION {r[1].members : r \in placed} |->
+          LET r == CHOOSE r \in placed : x \in r[1].members
+          IN [key |-> r[1].key, page |-> r[2]]]
 
 \* The settled key a record is listed under (records sit on one page only).
 SettledKeyOf(x) == SettledSeq[CHOOSE i \in DOMAIN SettledSeq : x \in SettledSeq[i].members].key
@@ -315,9 +407,23 @@ AroundRange(a, m) ==
 (* moved meanwhile, and project reads no durable state, so splitting it    *)
 (* from the load adds no behaviour beyond live frames, which can already   *)
 (* happen before or after this step.                                       *)
-Load(lo, hi) == AdoptAll(RowsDesc(PageRowSet(lo, hi, n)), live, byId, holders)
+Load(lo, hi) ==
+    IF Fix = "S3"
+    THEN LET k == KeyAll(RowsDesc(PageRowSet(lo, hi, n)), live, byId)
+         IN [rows |-> k.rows, by |-> k.by, hd |-> holders]
+    ELSE AdoptAll(RowsDesc(PageRowSet(lo, hi, n)), live, byId, holders)
 Page(lo, hi, adopted) == [lo |-> lo, hi |-> hi, m |-> n, rows |-> adopted.rows]
 Adopted(adopted) == byId' = adopted.by /\ holders' = adopted.hd
+
+\* The presented page that holds record x: its bounds and the ledger it read.
+PageOf(x) == LET p == CHOOSE p \in DOMAIN pages : x \in pages[p].lo..pages[p].hi
+             IN <<pages[p].lo, pages[p].hi, pages[p].m>>
+
+\* The checking aids (see VARIABLES); Next sets their primed values.
+Observe ==
+    /\ drawnV = DrawnOf(pages, live)
+    /\ seenV = SeenOf(pages)
+    /\ rowsV = RowsOf(pages)
 
 -----------------------------------------------------------------------------
 Init ==
@@ -333,10 +439,11 @@ Init ==
     /\ anchor = 0
     /\ byId = [i \in Recs |-> NoKey]
     /\ holders = <<>>  \* empty function
+    /\ Observe
 
 \* A live frame reaches the overlay (TimelineLivePublication published;
 \* projectLiveItems :180 recomputes).
-LiveFrame ==
+LiveFrameStep ==
     /\ Live /\ ~retired /\ streamed < LedgerLen
     /\ streamed' = streamed + 1
     /\ live' = LiveItems({i \in 1..streamed' : Kind[i] # "U" /\
@@ -349,21 +456,21 @@ LiveFrame ==
 \* While a turn streams, a plain reconcile is deferred (shouldDeferLiveReconcile
 \* :556), but the Paging mediator's catch-up (TimelineHistoryMediator.
 \* refreshNewest, catchUp = true) is not, so a write can land mid-turn.
-DurableWrite ==
+DurableWriteStep ==
     /\ n < LedgerLen /\ rev < MaxRev
     /\ \E m \in (n + 1)..LedgerLen : n' = m
     /\ rev' = rev + 1
     /\ UNCHANGED <<streamed, retired, live, resident, srcRev, needRefresh, pages, anchor, byId, holders>>
 
 \* observePublications :82-95 -> invalidateIfBehind :25 (generation.replaced).
-Invalidate ==
+InvalidateStep ==
     /\ srcRev # 0 /\ ~needRefresh /\ srcRev < rev
     /\ needRefresh' = TRUE
     /\ UNCHANGED <<n, rev, streamed, retired, live, resident, srcRev, pages, anchor, byId, holders>>
 
 \* observePublications :75-80: a CRITICAL memory trim invalidates the active
 \* source with no revision change; Paging reloads around the reader.
-Trim ==
+TrimStep ==
     /\ srcRev # 0 /\ ~needRefresh
     /\ needRefresh' = TRUE
     /\ UNCHANGED <<n, rev, streamed, retired, live, resident, srcRev, pages, anchor, byId, holders>>
@@ -371,9 +478,9 @@ Trim ==
 \* Paging refresh: a new source at the current revision loads
 \* getRefreshKey :31 -> Around(anchor), or Tail before any anchor; the
 \* presenter swaps the whole list for this one page.
-Refresh ==
+RefreshStep ==
     /\ needRefresh /\ n > 0
-    /\ LET r   == IF anchor = 0 \/ Break = "refreshAtTail" THEN (IF n > PageSize THEN n - PageSize + 1 ELSE 1)..n
+    /\ LET r   == IF anchor = 0 \/ "refreshAtTail" \in Break THEN (IF n > PageSize THEN n - PageSize + 1 ELSE 1)..n
                   ELSE AroundRange(anchor, n)
            lo  == Min(r)
            hi  == Max(r)
@@ -384,7 +491,7 @@ Refresh ==
     /\ UNCHANGED <<n, rev, streamed, retired, live, resident, anchor>>
 
 \* Paging append: Before(oldest resident row) loads up to PageSize older rows.
-LoadOlder ==
+LoadOlderStep ==
     /\ ~needRefresh /\ srcRev = rev /\ pages # <<>>
     /\ LET lo0 == pages[Len(pages)].lo
            lo  == IF lo0 > PageSize THEN lo0 - PageSize ELSE 1
@@ -395,7 +502,7 @@ LoadOlder ==
     /\ UNCHANGED <<n, rev, streamed, retired, live, resident, srcRev, needRefresh, anchor>>
 
 \* Paging prepend: After(newest resident row) loads up to PageSize newer rows.
-LoadNewer ==
+LoadNewerStep ==
     /\ ~needRefresh /\ srcRev = rev /\ pages # <<>>
     /\ LET hi0 == pages[1].hi
            hi  == IF hi0 + PageSize < n THEN hi0 + PageSize ELSE n
@@ -406,7 +513,7 @@ LoadNewer ==
     /\ UNCHANGED <<n, rev, streamed, retired, live, resident, srcRev, needRefresh, anchor>>
 
 \* The reader rests on another settled row; Paging's anchorPosition follows.
-Scroll ==
+ScrollStep ==
     /\ \E i \in DOMAIN SettledSeq :
          /\ SettledSeq[i].owner # anchor
          /\ anchor' = SettledSeq[i].owner
@@ -416,7 +523,7 @@ Scroll ==
 \* projection drops events whose rows are resident (filterUnsettledEvents
 \* :210, overlayEvents :245); a turn whose rows are all resident at once is
 \* acknowledged settled and its publication retires.
-ResidentRows ==
+ResidentRowsStep ==
     /\ resident' = SettledMembers
     /\ resident' # resident
     /\ retired' = (retired \/ (streamed = LedgerLen /\ n = LedgerLen /\
@@ -425,6 +532,21 @@ ResidentRows ==
                ELSE LiveItems({i \in 1..streamed : Kind[i] # "U" /\
                       i \notin resident'})
     /\ UNCHANGED <<n, rev, streamed, srcRev, needRefresh, pages, anchor, byId, holders>>
+
+\* Every code step, followed by the checking aids it leaves behind.
+ObserveNext ==
+    /\ drawnV' = DrawnOf(pages', live')
+    /\ seenV' = SeenOf(pages')
+    /\ rowsV' = RowsOf(pages')
+LiveFrame == LiveFrameStep /\ ObserveNext
+DurableWrite == DurableWriteStep /\ ObserveNext
+Invalidate == InvalidateStep /\ ObserveNext
+Trim == TrimStep /\ ObserveNext
+Refresh == RefreshStep /\ ObserveNext
+LoadOlder == LoadOlderStep /\ ObserveNext
+LoadNewer == LoadNewerStep /\ ObserveNext
+Scroll == ScrollStep /\ ObserveNext
+ResidentRows == ResidentRowsStep /\ ObserveNext
 
 Next ==
     \/ LiveFrame \/ DurableWrite \/ Invalidate \/ Trim \/ Refresh
@@ -445,33 +567,26 @@ NoDuplicateKey == Blanked = {}
 Protected == (UNION {l.members : l \in ShownLive})
              \cup (IF anchor = 0 THEN {} ELSE AroundRange(anchor, n))
 NoVanishedRow ==
-    [][anchor' = anchor => \A x \in Drawn \cap Protected : x \in Drawn']_vars
-
-\* The presented page that holds record x: its bounds and the ledger it read.
-PageOf(x) == LET p == CHOOSE p \in DOMAIN pages : x \in pages[p].lo..pages[p].hi
-             IN <<pages[p].lo, pages[p].hi, pages[p].m>>
+    [][anchor' = anchor => \A x \in drawnV \cap Protected : x \in drawnV']_vars
 
 \* I7, as the plan words it ("the same record set always produces the same
 \* keys"): a record that stays settled on a page with the same bounds, read
 \* from the same ledger, keeps its key, in every generation.
 StableKeys ==
-    [][\A x \in SettledMembers \cap SettledMembers' :
-          PageOf(x)' = PageOf(x) => SettledKeyOf(x)' = SettledKeyOf(x)]_vars
+    [][\A x \in DOMAIN seenV \cap DOMAIN seenV' :
+          seenV'[x].page = seenV[x].page => seenV'[x].key = seenV[x].key]_vars
 
 \* I7 strengthened ("no remount when nothing changed"): while the ledger is
 \* unchanged, a settled record keeps its key even when a refresh around the
 \* reader moves the page edges (getRefreshKey -> Around(anchor)).
 StableKeysAcrossRecut ==
-    [][n' = n => \A x \in SettledMembers \cap SettledMembers' :
-                    SettledKeyOf(x)' = SettledKeyOf(x)]_vars
+    [][n' = n => \A x \in DOMAIN seenV \cap DOMAIN seenV' : seenV'[x].key = seenV[x].key]_vars
 
 \* The same promise per row ("a row's key is a function of its own records"):
 \* while the ledger is unchanged, a settled row with exactly the same records
 \* keeps its key across any refresh, trim or page load.
 StableRowKeysAcrossRecut ==
-    [][n' = n => \A i \in DOMAIN SettledSeq, j \in DOMAIN SettledSeq' :
-                    SettledSeq[i].members = SettledSeq'[j].members =>
-                        SettledSeq[i].key = SettledSeq'[j].key]_vars
+    [][n' = n => \A r \in rowsV, q \in rowsV' : r[1] = q[1] => r[2] = q[2]]_vars
 
 TypeOK ==
     /\ n \in 0..LedgerLen /\ streamed \in 0..LedgerLen /\ rev \in 1..MaxRev

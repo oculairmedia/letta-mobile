@@ -7,6 +7,7 @@ import androidx.paging.filter
 import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
+import com.letta.mobile.data.chat.projection.TimelineRowAssembly
 import com.letta.mobile.data.chat.projection.buildChatRenderModel
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.chat.projection.parseTimestampEpochMillis
@@ -88,7 +89,16 @@ class CanonicalTimelinePresentation private constructor(
         val serverId: String = "",
         // A grouped run owns several durable records; all must count as resident for settlement.
         val residentEvents: List<TimelineResidentEvent> = emptyList(),
-    )
+        // Every id a live row may know this row's records by: server ids, identities, otids and the
+        // stream ids aliased to them when the row was projected.
+        val liveNames: Set<String> = emptySet(),
+    ) {
+        /**
+         * Whether this row holds every record [live] draws, so it can take [live]'s place in the
+         * list. A row that names nothing (an optimistic prompt) stands in for the live row under its key.
+         */
+        fun holdsAll(live: ChatRenderItem): Boolean = liveNames.isEmpty() || live.isWhollyNamedBy(liveNames)
+    }
 
     private val anchor = MutableStateFlow(lease.anchor)
     val target = MutableStateFlow(lease.anchor?.identity?.value)
@@ -203,7 +213,10 @@ class CanonicalTimelinePresentation private constructor(
             messages = activeMessages.withPromptOwnedRunIds(),
             mode = ChatDisplayMode.Interactive,
             activeAgentId = owner.selection.scope.agentId,
-        ).renderItems
+        // A live run is keyed by its own records, as its settled copy is: never `run-<id>` because the
+        // block happens to be the run's only one in this snapshot, a key the settled part of a
+        // partly durable run could also compute.
+        ).renderItems.map { it.keyedByOwnRecords() }
         return positionPendingInLive(active, optimistic.asReversed())
     }
 
@@ -315,7 +328,8 @@ class CanonicalTimelinePresentation private constructor(
     /**
      * A settled row takes over the live row it replaces - key, run id, turn latency - so the final
      * live render and the settled render of one turn are identical. Rows that replace no live row
-     * keep a run's own key or a segment key.
+     * keep a run's own key or a segment key. Whichever key a row was first drawn with, it keeps for
+     * this presentation's life (SettledLiveAdoptions).
      */
     private fun ChatRenderItem.withSettledKey(
         identity: TimelineMessageId,
@@ -325,13 +339,19 @@ class CanonicalTimelinePresentation private constructor(
         if (this is ChatRenderItem.Single && hasOptimisticUserIdentity()) {
             return copy(keyOverride = "msg-${message.clientMessageId}")
         }
-        val adopted = adoptions.adopted(this, identity, residents, ::liveSnapshot)
-        if (adopted != null) return adopted
-        return if (isRunItem) this else withKeyOverride(replacementKey(identity))
+        val own = if (isRunItem) this else withKeyOverride(replacementKey(identity))
+        return adoptions.keyed(own, identity, residents, ::liveSnapshot)
     }
 
     private fun ChatRenderItem.Single.hasOptimisticUserIdentity(): Boolean =
         message.role == "user" && !message.clientMessageId.isNullOrBlank()
+
+    /** Every id the live and settling publications know [this] by. */
+    private fun List<TimelineResidentEvent>.liveNames(): Set<String> {
+        val aliases = (owner.session.settling.value + listOfNotNull(owner.session.live.value))
+            .fold(emptyMap<String, TimelineMessageId>()) { all, publication -> all + publication.aliases }
+        return flatMapTo(mutableSetOf()) { it.namesKnownTo(aliases) }
+    }
 
     private fun liveSnapshot(): Pair<List<ChatRenderItem>, Map<String, TimelineMessageId>> =
         mutableLive.value to owner.session.live.value?.aliases.orEmpty()
@@ -362,9 +382,16 @@ class CanonicalTimelinePresentation private constructor(
                 otid = presentation.event.otid,
                 serverId = presentation.event.serverId,
                 residentEvents = residents,
+                liveNames = residents.liveNames(),
             )
         }
-        is TimelineSettledPresentation.Defer -> Row(
+        is TimelineSettledPresentation.Defer -> deferredRow(record)
+        TimelineSettledPresentation.Drop -> error("Dropped records must not reach projection")
+    }
+
+    private fun deferredRow(record: TimelineSettledRecord): Row {
+        val residents = listOf(TimelineResidentEvent(record.key.identity, record.revision, "", ""))
+        return Row(
             record.key.identity,
             record.revision,
             ChatRenderItem.Single(
@@ -378,12 +405,26 @@ class CanonicalTimelinePresentation private constructor(
                 record.contentType,
                 record.revision,
             ),
-            residentEvents = listOf(TimelineResidentEvent(record.key.identity, record.revision, "", "")),
+            residentEvents = residents,
+            liveNames = residents.liveNames(),
         )
-        TimelineSettledPresentation.Drop -> error("Dropped records must not reach projection")
     }
 
     companion object {
+        /**
+         * The list one read of [live] and the presented [settled] slots (null for a placeholder)
+         * renders. A live row is hidden only behind a settled row that holds all of it: under its key
+         * (the usual handover), or under the key a settled row was first drawn with before the live
+         * frame for its records arrived (a reconnect catch-up), so no record is drawn twice.
+         */
+        fun assemble(live: List<ChatRenderItem>, settled: List<Row?>): TimelineRowAssembly {
+            val namedRows = settled.filter { it != null && it.liveNames.isNotEmpty() }
+            val shown = live.filterNot { item -> namedRows.any { it!!.holdsAll(item) } }
+            return TimelineRowAssembly.assemble(shown, settled.map { it?.item?.key }) { index, item ->
+                settled[index]?.holdsAll(item) ?: true
+            }
+        }
+
         /** Missing search targets fall back to a usable tail without replacing ingestion generation. */
         suspend fun open(
             coordinator: CanonicalTimelineCoordinator,

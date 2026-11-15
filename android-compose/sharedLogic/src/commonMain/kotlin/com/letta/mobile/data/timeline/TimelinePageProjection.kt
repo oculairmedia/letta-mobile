@@ -8,7 +8,6 @@ import com.letta.mobile.data.chat.projection.buildFoldedChatRenderModel
 import com.letta.mobile.data.chat.projection.foldMonitorEvents
 import com.letta.mobile.data.chat.projection.hasNoRenderableContent
 import com.letta.mobile.data.chat.projection.isMonitorWatcher
-import com.letta.mobile.data.chat.projection.runKey
 import com.letta.mobile.data.chat.projection.scopeMessagesToAgent
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.model.UiMessage
@@ -119,8 +118,8 @@ private fun ChatRenderItem.withReceipts(receipts: List<CanvasArtifactReceipt>?):
  * A claimed block keys `run-<id>-from-<its oldest message id>`: a function of the block's own
  * records, never of where the page edges fell. A per-page `run-<id>` could be claimed by both pages
  * a run straddles, and a key chosen from the edges changes when a refresh around the reader moves
- * one. Only the live overlay names a whole run `run-<id>`; a settled block takes that key over only
- * by adopting the live row it replaces (SettledLiveAdoptions).
+ * one. The live overlay keys its blocks the same way (CanonicalTimelinePresentation), so a settled
+ * block that holds a whole live block takes that block's place under the same key.
  */
 internal fun TimelinePageProjectionInput.aggregatePreparedRuns(
     prepared: List<TimelineSettledRecord>,
@@ -159,10 +158,7 @@ private fun TimelinePageProjectionInput.renderableRecords(
 private data class RunClaim(val item: ChatRenderItem.RunBlock, val runId: String, val memberIds: List<String>)
 
 /** This block keyed by its oldest message, whatever page or snapshot it was cut from. */
-private fun RunClaim.keyedByOwnRecords(): RunClaim {
-    val oldestMessageId = item.messages.first().first.id
-    return copy(item = ChatRenderItem.RunBlock(runId, item.messages, stableKey = "${runKey(runId)}-from-$oldestMessageId"))
-}
+private fun RunClaim.keyedByOwnRecords(): RunClaim = copy(item = item.keyedByOwnRecords())
 
 private fun ChatRenderItem.runClaim(): RunClaim? = when (this) {
     is ChatRenderItem.RunBlock -> RunClaim(this, runId, messages.map { it.first.id })

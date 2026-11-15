@@ -31,7 +31,7 @@ class LiveSettledKeyOverlapTest {
             harness.streamTurn(OverlapTurn.live)
             val streaming = harness.frame()
             val liveKeys = streaming.live.map { it.key }
-            assertEquals("run-${OverlapTurn.LIVE_RUN}", liveKeys.first())
+            assertEquals("run-${OverlapTurn.LIVE_RUN}-from-ui-msg-9180002:REASONING", liveKeys.first())
             assertTrue(liveKeys.last().startsWith("msg-") && OverlapTurn.OTID in liveKeys.last(), "echo key: $liveKeys")
             assertFrameClean(streaming)
 

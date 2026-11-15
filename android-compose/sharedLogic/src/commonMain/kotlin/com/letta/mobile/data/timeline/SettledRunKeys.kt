@@ -1,6 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.runKey
 import com.letta.mobile.data.model.UiMessage
 
 /**
@@ -12,6 +13,24 @@ internal val ChatRenderItem.isRunItem: Boolean
         is ChatRenderItem.RunBlock -> true
         is ChatRenderItem.Single -> stableRunKey != null
     }
+
+/**
+ * A run item keyed `run-<id>-from-<its oldest message id>`: a function of the item's own records,
+ * never of which other blocks of the run share its snapshot or where a page edge fell. The live
+ * overlay and the settled pages both key runs this way, so a settled block holding exactly the
+ * records of a live block computes that block's key, and a block cut in two keeps the key on the
+ * part that holds its oldest record. Items that are not runs keep their key.
+ */
+internal fun ChatRenderItem.keyedByOwnRecords(): ChatRenderItem = when (this) {
+    is ChatRenderItem.RunBlock -> keyedByOwnRecords()
+    is ChatRenderItem.Single -> stableRunId?.takeIf { stableRunKey != null }
+        ?.let { copy(keyOverride = "${runKey(it)}-from-${message.id}") }
+        ?: this
+}
+
+/** This block keyed `run-<id>-from-<its oldest message id>`. */
+internal fun ChatRenderItem.RunBlock.keyedByOwnRecords(): ChatRenderItem.RunBlock =
+    copy(keyOverride = "${runKey(runId)}-from-${messages.first().first.id}")
 
 /**
  * What the live row showed that its settled copy must keep so the two renders are identical
@@ -40,10 +59,8 @@ internal data class LiveRowPresentation(
  *. The other way round never adopts: a live run whose rows settled as
  * separate bubbles keeps its own keys, since several settled rows cannot all take one live key.
  *
- * The settled row must hold EVERY record of the live row. Taking the key hides the live row
- * (TimelineRowAssembly.displayedLive), so a row that settled only part of a run (a mid-turn
- * catch-up) would take the rest of it off the screen. Until the rest is durable the live row keeps
- * its key and the settled part keys by its own records.
+ * Whether the settled row may take the key is the caller's to decide (SettledLiveAdoptions takes
+ * it only from a live row it holds in full).
  */
 internal fun ChatRenderItem.livePresentationFor(
     events: List<TimelineResidentEvent>,
@@ -54,7 +71,6 @@ internal fun ChatRenderItem.livePresentationFor(
     if (names.isEmpty()) return null
     val named = live.filter { item -> item.messagesInOrder().any { it.isNamedBy(names) } }
     val match = named.firstOrNull(::sharesShapeWith) ?: named.firstOrNull { isRunItem && !it.isRunItem } ?: return null
-    if (!match.messagesInOrder().all { it.isNamedBy(names) }) return null
     return LiveRowPresentation(match.key, match.runIdentity(), match.messagesInOrder().firstNotNullOfOrNull { it.latencyMs })
 }
 
@@ -99,8 +115,11 @@ private fun ChatRenderItem.runIdentity(): String? = when (this) {
 private fun UiMessage.withLatencyOf(live: LiveRowPresentation): UiMessage =
     if (latencyMs == null || live.latencyMs == null) this else copy(latencyMs = live.latencyMs)
 
-private fun TimelineResidentEvent.namesKnownTo(aliases: Map<String, TimelineMessageId>): List<String> =
+internal fun TimelineResidentEvent.namesKnownTo(aliases: Map<String, TimelineMessageId>): List<String> =
     (listOf(serverId, identity.value, otid) + aliases.filterValues { it == identity }.keys).filter(String::isNotBlank)
+
+/** Whether every message [this] draws is one of [names]. */
+internal fun ChatRenderItem.isWhollyNamedBy(names: Set<String>): Boolean = messagesInOrder().all { it.isNamedBy(names) }
 
 /** Reasoning rows are keyed `<serverId>:REASONING` so they cannot collide with their reply. */
 private fun UiMessage.isNamedBy(names: Set<String>): Boolean =

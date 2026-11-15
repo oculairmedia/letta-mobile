@@ -4,47 +4,69 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
+/** Marks the key of a row whose own key a live row or another settled row already holds. */
+private const val SETTLED_KEY_SUFFIX = "~settled"
+
 /**
- * Which settled rows took over which live rows, for one presentation's lifetime.
+ * The key, run id and turn latency each settled row was first drawn with, for one presentation's
+ * lifetime.
  *
- * An adopted key is remembered under ONE anchor, the identity of the row that adopted it. Only a
- * row holding that record finds the key again, so the adoption survives the overlay draining and a
- * run that later grows an older row keeps it across paging generations, while a page edge that
- * later cuts the run gives the key to the part holding the anchor and lets every other part key by
- * its own records. Remembering it under every member let each part of a cut run find it, and the
- * list held one live key twice. A live key is lent at most once: a second, unrelated row can never
- * receive a key already on screen.
+ * A row is remembered under its anchor, the identity of the record that owns it (a run's oldest
+ * record). Once drawn, it keeps that presentation for as long as the chat is open: when the live
+ * overlay drains, when a later generation regroups its page, and when a live frame for records it
+ * already shows arrives after it (a reconnect catch-up drew the durable copy first). A row with the
+ * same records always gets the same key, so a refresh that moves a page edge remounts nothing it
+ * did not split or merge.
+ *
+ * The first time an anchor is drawn, the row takes over the live row it holds in full (its key,
+ * run id and latency), or else keeps its own key. A key is never taken when another anchor already
+ * holds it, which would list it twice, or when a live row under that key shows a record this row
+ * does not hold, which the list would then show beside it under a second key. Such a row keys
+ * `<own key>~settled`, which only its anchor can produce.
+ *
+ * A remembered key is kept even when a live row under it has since grown past the row (a page
+ * edge split the row while its turn still streams): TimelineRowAssembly then lists that live row
+ * beside it instead of hiding it.
+ *
+ * One entry per settled row drawn while the chat is open: bounded by the conversation's history.
  */
 internal class SettledLiveAdoptions {
     private val byAnchor = HashMap<TimelineMessageId, LiveRowPresentation>()
-    private val lent = HashSet<String>()
+    private val anchorByKey = HashMap<String, TimelineMessageId>()
     private val lock = SynchronizedObject()
 
-    /** [item], the row [anchor] owns, as the live row it replaces showed it, or null when it replaces none. */
-    fun adopted(
+    /** [item], the row [anchor] owns, as it is to be drawn: under the key it was first drawn with. */
+    fun keyed(
         item: ChatRenderItem,
         anchor: TimelineMessageId,
         residents: List<TimelineResidentEvent>,
         live: () -> Pair<List<ChatRenderItem>, Map<String, TimelineMessageId>>,
-    ): ChatRenderItem? = synchronized(lock) { adoptLocked(item, anchor, residents, live) }
+    ): ChatRenderItem = synchronized(lock) { keyedLocked(item, anchor, residents, live()) }
 
-    private fun adoptLocked(
+    private fun keyedLocked(
         item: ChatRenderItem,
         anchor: TimelineMessageId,
         residents: List<TimelineResidentEvent>,
-        live: () -> Pair<List<ChatRenderItem>, Map<String, TimelineMessageId>>,
-    ): ChatRenderItem? {
-        val (rows, aliases) = live()
-        residents.firstNotNullOfOrNull { byAnchor[it.identity] }?.let { remembered ->
-            // The live row under that key may have grown past this row (a later page edge moved
-            // into the run while it still streams); taking the key would hide those records.
-            return if (remembered.isOnlyHeldWithin(residents, rows, aliases)) item.adopt(remembered) else null
-        }
-        val presentation = item.livePresentationFor(residents, rows, aliases)
-            ?.takeIf { it.key !in lent }
-            ?: return null
+        live: Pair<List<ChatRenderItem>, Map<String, TimelineMessageId>>,
+    ): ChatRenderItem {
+        val (rows, aliases) = live
+        byAnchor[anchor]?.let { return item.adopt(it) }
+        val presentation = firstPresentation(item, residents, rows, aliases)
         byAnchor[anchor] = presentation
-        lent += presentation.key
+        anchorByKey[presentation.key] = anchor
         return item.adopt(presentation)
+    }
+
+    private fun firstPresentation(
+        item: ChatRenderItem,
+        residents: List<TimelineResidentEvent>,
+        rows: List<ChatRenderItem>,
+        aliases: Map<String, TimelineMessageId>,
+    ): LiveRowPresentation {
+        fun usable(presentation: LiveRowPresentation) =
+            presentation.key !in anchorByKey && presentation.isOnlyHeldWithin(residents, rows, aliases)
+        item.livePresentationFor(residents, rows, aliases)?.takeIf(::usable)?.let { return it }
+        val own = LiveRowPresentation(item.key, runId = null, latencyMs = null)
+        return if (usable(own)) own else own.copy(key = "${item.key}$SETTLED_KEY_SUFFIX")
     }
 }

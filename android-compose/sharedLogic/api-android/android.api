@@ -14035,6 +14035,7 @@ public final class com/letta/mobile/data/chat/projection/TimelineEventToUiMessag
 public final class com/letta/mobile/data/chat/projection/TimelineRowAssembly {
 	public static final field Companion Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly$Companion;
 	public static final field LIVE Ljava/lang/String;
+	public static final field PARTLY_SETTLED_SUFFIX Ljava/lang/String;
 	public static final field SETTLED Ljava/lang/String;
 	public final fun getDuplicates ()Ljava/util/Map;
 	public final fun getLive ()Ljava/util/List;
@@ -14044,8 +14045,10 @@ public final class com/letta/mobile/data/chat/projection/TimelineRowAssembly {
 }
 
 public final class com/letta/mobile/data/chat/projection/TimelineRowAssembly$Companion {
-	public final fun assemble (Ljava/util/List;Ljava/util/List;)Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly;
-	public final fun displayedLive (Ljava/util/List;Ljava/util/Collection;)Ljava/util/List;
+	public final fun assemble (Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function2;)Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly;
+	public static synthetic fun assemble$default (Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly$Companion;Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly;
+	public final fun displayedLive (Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function2;)Ljava/util/List;
+	public static synthetic fun displayedLive$default (Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly$Companion;Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Ljava/util/List;
 }
 
 public final class com/letta/mobile/data/chat/projection/TimelineRowKeyGuard {
@@ -55333,13 +55336,14 @@ public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation 
 }
 
 public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation$Companion {
+	public final fun assemble (Ljava/util/List;Ljava/util/List;)Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly;
 	public final fun open-o2nkW-g (Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator;Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Lkotlinx/coroutines/CoroutineScope;Ljava/lang/String;Lcom/letta/mobile/data/timeline/TimelineSettledProjectionAdapter;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun open-o2nkW-g$default (Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Companion;Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator;Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Lkotlinx/coroutines/CoroutineScope;Ljava/lang/String;Lcom/letta/mobile/data/timeline/TimelineSettledProjectionAdapter;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row {
-	public synthetic fun <init> (Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Set;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-P88pw2U ()Ljava/lang/String;
 	public final fun component2 ()J
 	public final fun component3 ()Lcom/letta/mobile/data/chat/projection/ChatRenderItem;
@@ -55347,17 +55351,20 @@ public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation$
 	public final fun component5 ()Ljava/lang/String;
 	public final fun component6 ()Ljava/lang/String;
 	public final fun component7 ()Ljava/util/List;
-	public final fun copy-ZqcmX-8 (Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;
-	public static synthetic fun copy-ZqcmX-8$default (Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;
+	public final fun component8 ()Ljava/util/Set;
+	public final fun copy-E7VDhUw (Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Set;)Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;
+	public static synthetic fun copy-E7VDhUw$default (Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDeferred ()Lcom/letta/mobile/data/timeline/TimelineBodyReference;
 	public final fun getIdentity-P88pw2U ()Ljava/lang/String;
 	public final fun getItem ()Lcom/letta/mobile/data/chat/projection/ChatRenderItem;
+	public final fun getLiveNames ()Ljava/util/Set;
 	public final fun getOtid ()Ljava/lang/String;
 	public final fun getResidentEvents ()Ljava/util/List;
 	public final fun getRevision ()J
 	public final fun getServerId ()Ljava/lang/String;
 	public fun hashCode ()I
+	public final fun holdsAll (Lcom/letta/mobile/data/chat/projection/ChatRenderItem;)Z
 	public fun toString ()Ljava/lang/String;
 }
 

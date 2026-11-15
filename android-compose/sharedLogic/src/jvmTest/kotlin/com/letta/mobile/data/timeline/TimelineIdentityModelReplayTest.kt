@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.chat.projection.TimelineRowAssembly
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ReasoningMessage
@@ -107,6 +108,53 @@ class TimelineIdentityModelReplayTest {
             recorder.close()
         }
     }
+
+    /**
+     * A settled row keeps the key it was first drawn with while the chat is open, including when its
+     * durable copy was drawn before its live frame arrived (model scenario s3-live, a durable write
+     * before the live frames that name the same records), in the code's words:
+     * 1. After a reconnect, the Paging mediator's catch-up makes the first rows of a running turn
+     *    durable before any live frame names them; the settled page draws them as one run row keyed
+     *    by its own records.
+     * 2. The stream resumes: live frames for the turn arrive while that row is on screen.
+     * 3. The turn settles. The page now holds the whole run, which covers the live block, so taking
+     *    over the live block's key (livePresentationFor) would remount the row drawn in step 1.
+     * While the live block still shows records the settled row already draws, the list must hide it
+     * rather than draw them twice.
+     */
+    @Test fun aDurableRowDrawnBeforeItsLiveFrameKeepsItsKey() = runBlocking {
+        val recorder = TimelineFrameRecorder.open(scope, InMemoryTimelineStore())
+        try {
+            recorder.openOn(history.reversed())
+            recorder.catchUp((history + listOf(prompt, thought, call, callReturn)).reversed(), step = "reconnect catch-up")
+            withTimeout(PRESENT_TIMEOUT_MS) {
+                while (recorder.frames.none { frame -> frame.settledRowOf(thought.id) != null }) delay(PRESENT_POLL_MS)
+            }
+            val first = recorder.frames.first { frame -> frame.settledRowOf(thought.id) != null }
+            val drawnWith = requireNotNull(first.settledRowOf(thought.id)).key
+            recorder.stream(liveTurn)
+            recorder.settle((history + durableTurn).reversed())
+            val rekeyed = recorder.frames.drop(first.index).mapNotNull { frame ->
+                frame.settledRowOf(thought.id)?.takeIf { it.key != drawnWith }?.let { "frame ${frame.index} [${frame.step}] ${it.key}" }
+            }
+            assertTrue(
+                rekeyed.isEmpty(),
+                "the row first drawn as $drawnWith changed key:\n" + rekeyed.joinToString("\n") +
+                    "\nframes:\n" + recorder.frames.drop(first.index).joinToString("\n"),
+            )
+            val drawnTwice = recorder.frames.drop(first.index).flatMap { frame ->
+                frame.rows.flatMap { row -> row.messages.map { it to row.key } }.groupBy({ it.first }, { it.second })
+                    .filterValues { it.size > 1 }.map { (message, keys) -> "frame ${frame.index} [${frame.step}] $message under $keys" }
+            }
+            assertTrue(drawnTwice.isEmpty(), "a record was drawn twice:\n" + drawnTwice.joinToString("\n"))
+            assertTrue(duplicates(recorder, "after the turn settled").isEmpty(), "duplicate keys after the turn settled")
+        } finally {
+            recorder.close()
+        }
+    }
+
+    private fun TimelineFrameRecorder.Frame.settledRowOf(messageId: String): TimelineFrameRecorder.FrameRow? =
+        rows.firstOrNull { it.source == TimelineRowAssembly.SETTLED && messageId in it.messages }
 
     private suspend fun adoptedKeyDuplicatesWhenCutAt(cut: Int): List<String> {
         val recorder = TimelineFrameRecorder.open(scope, InMemoryTimelineStore())

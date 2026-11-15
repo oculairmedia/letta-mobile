@@ -80,7 +80,7 @@ internal class TimelineFrameRecorder private constructor(
     private fun record() = synchronized(lock) {
         val live = presentation.live.value
         val snapshot = presenter.snapshot()
-        val assembly = TimelineRowAssembly.assemble(live, snapshot.map { it?.item?.key })
+        val assembly = CanonicalTimelinePresentation.assemble(live, snapshot)
         val rows = (0 until assembly.size).map { index ->
             val item = assembly.live.getOrNull(index) ?: snapshot[index - assembly.liveCount]?.item
             val source = if (index < assembly.liveCount) TimelineRowAssembly.LIVE else TimelineRowAssembly.SETTLED
