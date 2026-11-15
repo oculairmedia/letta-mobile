@@ -9,20 +9,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.IntOffset
-import com.composables.icons.lucide.BringToFront
-import com.composables.icons.lucide.Copy
-import com.composables.icons.lucide.Image
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.SendToBack
-import com.composables.icons.lucide.StickyNote
-import com.composables.icons.lucide.TextCursorInput
-import com.composables.icons.lucide.Trash2
-import com.composables.icons.lucide.Type
 import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlin.math.roundToInt
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.components.foundation.LettaMenuEntry
 import com.letta.mobile.ui.components.foundation.LettaMenuItem
 
@@ -72,12 +64,12 @@ internal fun CanvasBoardMenu(
     Box(modifier = Modifier.offsetTo(request.screen)) {
         LettaMenu(expanded = true, onDismiss = onDismiss) {
             if (request.onElement) {
-                if (request.canEditText) MenuItem(Lucide.TextCursorInput, "Edit text", onDismiss, element.onEditText)
-                MenuItem(Lucide.Copy, "Duplicate", onDismiss, element.onDuplicate)
-                MenuItem(Lucide.BringToFront, "Bring to front", onDismiss, element.onBringToFront)
-                MenuItem(Lucide.SendToBack, "Send to back", onDismiss, element.onSendToBack)
+                if (request.canEditText) MenuItem(LettaIcons.TextCursorInput, "Edit text", onDismiss, element.onEditText)
+                MenuItem(LettaIcons.Copy, "Duplicate", onDismiss, element.onDuplicate)
+                MenuItem(LettaIcons.BringToFront, "Bring to front", onDismiss, element.onBringToFront)
+                MenuItem(LettaIcons.SendToBack, "Send to back", onDismiss, element.onSendToBack)
                 LettaDivider()
-                MenuItem(Lucide.Trash2, "Delete", onDismiss, element.onDelete)
+                MenuItem(LettaIcons.Delete, "Delete", onDismiss, element.onDelete)
             } else {
                 CanvasInsertMenuItems(insert, at = request.world, onDismiss = onDismiss)
             }
@@ -88,9 +80,9 @@ internal fun CanvasBoardMenu(
 /** The "add" entries, shared by the context menu and the phone bar's add button. */
 @Composable
 internal fun CanvasInsertMenuItems(insert: BoardInsertActions, at: Offset, onDismiss: () -> Unit) {
-    insert.onAddNote?.let { addNote -> MenuItem(Lucide.StickyNote, "Note", onDismiss) { addNote(at) } }
-    MenuItem(Lucide.Type, "Text", onDismiss) { insert.onAddText(at) }
-    insert.onAddImages?.let { addImages -> MenuItem(Lucide.Image, "Image", onDismiss) { addImages(at) } }
+    insert.onAddNote?.let { addNote -> MenuItem(LettaIcons.StickyNote, "Note", onDismiss) { addNote(at) } }
+    MenuItem(LettaIcons.Type, "Text", onDismiss) { insert.onAddText(at) }
+    insert.onAddImages?.let { addImages -> MenuItem(LettaIcons.Image, "Image", onDismiss) { addImages(at) } }
     LettaDivider()
     CanvasInsert.ShapeModes.forEach { (mode, label) ->
         MenuItem(iconFor(mode), label, onDismiss) { insert.onAddShape(mode, at) }

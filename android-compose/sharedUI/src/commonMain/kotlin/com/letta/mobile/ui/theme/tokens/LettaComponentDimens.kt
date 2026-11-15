@@ -23,4 +23,7 @@ object LettaComponentDimens {
 
     /** The working status glyph's ring and spinner stroke (StatusGlyph). */
     val statusGlyphStroke: Dp = 1.5.dp
+
+    /** The shadow an elevated notice casts over the page (the overlay host's banner, LettaInlineNotice). */
+    val floatingNoticeElevation: Dp = 4.dp
 }

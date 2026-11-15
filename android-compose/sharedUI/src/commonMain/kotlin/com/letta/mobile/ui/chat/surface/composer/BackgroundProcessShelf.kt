@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +31,7 @@ import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.icons.LettaIcons
 
 /**
  * Shelf above the composer listing active background processes
@@ -133,7 +132,7 @@ private fun BackgroundProcessItem(
                 modifier = Modifier.size(LettaDimens.Control.iconButtonSm),
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Close,
+                    imageVector = LettaIcons.Close,
                     contentDescription = "Stop process ${process.id}",
                     modifier = Modifier.size(LettaDimens.Control.iconSm),
                     tint = MaterialTheme.colorScheme.error,

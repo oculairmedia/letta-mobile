@@ -18,19 +18,28 @@ import androidx.compose.ui.platform.testTag
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.tokens.LettaPanelTone
 import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
+import androidx.compose.ui.draw.shadow
+import com.letta.mobile.ui.theme.tokens.LettaComponentDimens
+import com.letta.mobile.ui.theme.tokens.LettaShapes
 
-/** A button on a [LettaInlineNotice]: its words, what it does, its test tag, and whether it can be pressed now. */
+/**
+ * A button on a [LettaInlineNotice]: its words, what it does, its test tag, and whether it can be
+ * pressed now. A dismiss with an [icon] is the shared icon button (a close mark) labelled [label]
+ * instead of a text button.
+ */
 @Immutable
 data class LettaNoticeAction(
     val label: String,
     val onClick: () -> Unit,
     val tag: String = "",
     val enabled: Boolean = true,
+    val icon: ImageVector? = null,
 )
 
 /**
  * What a [LettaInlineNotice] says: [message] (under an optional [title]) in [tone]'s panel; [contentTag]
- * goes on the content row inside the panel, for tests.
+ * goes on the content row inside the panel, for tests. An [elevated] notice floats over the page (an
+ * overlay banner) and casts the floating notice's shadow.
  */
 @Immutable
 data class LettaNotice(
@@ -38,6 +47,7 @@ data class LettaNotice(
     val tone: LettaPanelTone = LettaPanelTone.Info,
     val title: String? = null,
     val contentTag: String = "",
+    val elevated: Boolean = false,
 )
 
 /**
@@ -47,7 +57,8 @@ data class LettaNotice(
  * [LettaPanelTone.Error] with a retry.
  *
  * Use it for a note that stays in the page's layout ("Read only while offline", "Sign in to sync"),
- * not for a transient message (that is a snackbar or an overlay). [modifier] goes on the panel.
+ * or, [LettaNotice.elevated], for the overlay host's banner over the page; a transient message is a
+ * snackbar. [modifier] goes on the panel.
  */
 @Composable
 fun LettaInlineNotice(
@@ -58,7 +69,8 @@ fun LettaInlineNotice(
 ) {
     val tone = notice.tone
     val title = notice.title
-    LettaPanel(modifier = modifier.fillMaxWidth(), tone = tone, border = false) {
+    val shadow = if (notice.elevated) Modifier.shadow(LettaComponentDimens.floatingNoticeElevation, LettaShapes.panel) else Modifier
+    LettaPanel(modifier = modifier.fillMaxWidth().then(shadow), tone = tone, border = false) {
         Row(
             modifier = Modifier
                 .testTag(notice.contentTag)
@@ -78,10 +90,23 @@ fun LettaInlineNotice(
             action?.let {
                 OutlinedButton(onClick = it.onClick, enabled = it.enabled, modifier = Modifier.testTag(it.tag)) { Text(it.label) }
             }
-            dismiss?.let {
-                TextButton(onClick = it.onClick, enabled = it.enabled, modifier = Modifier.testTag(it.tag)) { Text(it.label) }
-            }
+            dismiss?.let { NoticeDismiss(it) }
         }
+    }
+}
+
+@Composable
+private fun NoticeDismiss(dismiss: LettaNoticeAction) {
+    val icon = dismiss.icon
+    if (icon != null) {
+        LettaIconButton(
+            LettaButtonIcon(icon, dismiss.label),
+            onClick = dismiss.onClick,
+            modifier = Modifier.testTag(dismiss.tag),
+            enabled = dismiss.enabled,
+        )
+    } else {
+        TextButton(onClick = dismiss.onClick, enabled = dismiss.enabled, modifier = Modifier.testTag(dismiss.tag)) { Text(dismiss.label) }
     }
 }
 

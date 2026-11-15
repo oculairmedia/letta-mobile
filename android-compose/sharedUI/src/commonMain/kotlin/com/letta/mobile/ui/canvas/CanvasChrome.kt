@@ -25,19 +25,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import com.composables.icons.lucide.Download
-import com.composables.icons.lucide.EllipsisVertical
-import com.composables.icons.lucide.FileJson
-import com.composables.icons.lucide.History
-import com.composables.icons.lucide.Import
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Maximize
-import com.composables.icons.lucide.Redo2
-import com.composables.icons.lucide.Share2
-import com.composables.icons.lucide.Trash2
-import com.composables.icons.lucide.Undo2
-import com.composables.icons.lucide.ZoomIn
-import com.composables.icons.lucide.ZoomOut
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
 import com.letta.mobile.data.canvas.CanvasSyncHealth
 import com.letta.mobile.sharedui.resources.Res
@@ -158,16 +145,17 @@ internal fun CanvasOverflowMenu(overflow: CanvasOverflow, expanded: Boolean, onD
         overflow.host.forEach { entry -> LettaMenuEntry(LettaMenuItem(entry.label, entry.icon, onClick = entry.onClick), onDismiss) }
         if (overflow.sync != null || overflow.host.isNotEmpty()) LettaDivider()
         overflow.onShare?.let { share ->
-            LettaMenuEntry(LettaMenuItem(stringResource(Res.string.canvas_menu_share), Lucide.Share2, onClick = share), onDismiss)
+            LettaMenuEntry(LettaMenuItem(stringResource(Res.string.canvas_menu_share), LettaIcons.Share, onClick = share), onDismiss)
         }
         if (overflow.compact) {
             val zoom = overflow.zoom
-            val zoomIn = LettaMenuItem("Zoom in (${zoom.scalePercent}%)", Lucide.ZoomIn, keepsMenuOpen = true, onClick = zoom.onZoomIn)
+            val zoomIn = LettaMenuItem("Zoom in (${zoom.scalePercent}%)", LettaIcons.ZoomIn, keepsMenuOpen = true, onClick = zoom.onZoomIn)
             LettaMenuEntry(zoomIn, onDismiss)
-            LettaMenuEntry(LettaMenuItem("Zoom out", Lucide.ZoomOut, keepsMenuOpen = true, onClick = zoom.onZoomOut), onDismiss)
-            LettaMenuEntry(LettaMenuItem("Fit to content", Lucide.Maximize, onClick = zoom.onReset), onDismiss)
+            LettaMenuEntry(LettaMenuItem("Zoom out", LettaIcons.ZoomOut, keepsMenuOpen = true, onClick = zoom.onZoomOut), onDismiss)
+            LettaMenuEntry(LettaMenuItem("Fit to content", LettaIcons.Maximize, onClick = zoom.onReset), onDismiss)
             overflow.onHistory?.let { history ->
-                LettaMenuEntry(LettaMenuItem("History (${overflow.checkpointCount ?: 0})", Lucide.History, onClick = history), onDismiss)
+                val historyItem = LettaMenuItem("History (${overflow.checkpointCount ?: 0})", LettaIcons.History, onClick = history)
+                LettaMenuEntry(historyItem, onDismiss)
             }
         }
         BoardMenuEntries(overflow.menu, overflow.background, onDismiss)
@@ -196,20 +184,20 @@ internal fun CanvasActionsPill(
     val compact = undo != null
     ChromePill(modifier = modifier) {
         if (undo != null) {
-            PillIconButton(Lucide.Undo2, "Undo", enabled = undo.canUndo, onClick = undo.onUndo)
-            PillIconButton(Lucide.Redo2, "Redo", enabled = undo.canRedo, onClick = undo.onRedo)
+            PillIconButton(LettaIcons.Undo2, "Undo", enabled = undo.canUndo, onClick = undo.onUndo)
+            PillIconButton(LettaIcons.Redo2, "Redo", enabled = undo.canRedo, onClick = undo.onRedo)
         } else {
             ZoomControls(zoom)
         }
         PillDivider()
         if (onHistory != null && !compact) {
-            PillIconButton(Lucide.History, "History (${checkpointCount ?: 0})", onClick = onHistory)
+            PillIconButton(LettaIcons.History, "History (${checkpointCount ?: 0})", onClick = onHistory)
         }
         if (onShare != null) {
-            PillIconButton(Lucide.Share2, "Share to chat", onClick = onShare)
+            PillIconButton(LettaIcons.Share, "Share to chat", onClick = onShare)
         }
         Box {
-            PillIconButton(Lucide.EllipsisVertical, "More", onClick = { menuOpen = true })
+            PillIconButton(LettaIcons.EllipsisVertical, "More", onClick = { menuOpen = true })
             CanvasOverflowMenu(
                 overflow = CanvasOverflow(zoom, checkpointCount, onHistory, menu, background, compact),
                 expanded = menuOpen,
@@ -221,7 +209,7 @@ internal fun CanvasActionsPill(
 
 @Composable
 private fun ZoomControls(zoom: CanvasZoom) {
-    PillIconButton(Lucide.ZoomOut, "Zoom out", onClick = zoom.onZoomOut)
+    PillIconButton(LettaIcons.ZoomOut, "Zoom out", onClick = zoom.onZoomOut)
         Text(
             text = "${zoom.scalePercent}%",
             style = MaterialTheme.typography.labelMedium,
@@ -231,18 +219,18 @@ private fun ZoomControls(zoom: CanvasZoom) {
                 .pointerInput(zoom.onActualSize) { detectTapGestures(onDoubleTap = { zoom.onActualSize() }) },
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-    PillIconButton(Lucide.ZoomIn, "Zoom in", onClick = zoom.onZoomIn)
-    PillIconButton(Lucide.Maximize, "Fit to content", onClick = zoom.onReset)
+    PillIconButton(LettaIcons.ZoomIn, "Zoom in", onClick = zoom.onZoomIn)
+    PillIconButton(LettaIcons.Maximize, "Fit to content", onClick = zoom.onReset)
 }
 
 /** The overflow's board commands and background settings, shared by both layouts. */
 @Composable
 private fun BoardMenuEntries(menu: CanvasMenuActions, background: CanvasBackgroundActions, close: () -> Unit) {
-    LettaMenuEntry(LettaMenuItem("Import Build Cycle", Lucide.Import, onClick = menu.onImportBuildCycle), close)
-    LettaMenuEntry(LettaMenuItem("Import Daily Loop", Lucide.Import, onClick = menu.onImportDailyLoop), close)
-    LettaMenuEntry(LettaMenuItem("Export JSON", Lucide.FileJson, onClick = menu.onExportJson), close)
-    LettaMenuEntry(LettaMenuItem("Export SVG", Lucide.Download, onClick = menu.onExportSvg), close)
-    LettaMenuEntry(LettaMenuItem("Clear", Lucide.Trash2, onClick = menu.onClear), close)
+    LettaMenuEntry(LettaMenuItem("Import Build Cycle", LettaIcons.Import, onClick = menu.onImportBuildCycle), close)
+    LettaMenuEntry(LettaMenuItem("Import Daily Loop", LettaIcons.Import, onClick = menu.onImportDailyLoop), close)
+    LettaMenuEntry(LettaMenuItem("Export JSON", LettaIcons.FileJson, onClick = menu.onExportJson), close)
+    LettaMenuEntry(LettaMenuItem("Export SVG", LettaIcons.Download, onClick = menu.onExportSvg), close)
+    LettaMenuEntry(LettaMenuItem("Clear", LettaIcons.Delete, onClick = menu.onClear), close)
     Text(
         text = "Background",
         style = MaterialTheme.typography.labelSmall,

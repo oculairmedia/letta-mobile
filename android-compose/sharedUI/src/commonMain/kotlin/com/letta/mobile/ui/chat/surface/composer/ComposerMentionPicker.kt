@@ -5,10 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -27,6 +23,7 @@ import com.letta.mobile.ui.components.picker.PickerItem
 import com.letta.mobile.ui.components.picker.PickerSection
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.icons.LettaIcons
 
 /** How many mentionables each section lists before the user narrows the `@` token. */
 internal const val MENTIONS_PER_SECTION = 6
@@ -78,7 +75,7 @@ internal fun mentionSections(groups: List<Pair<MentionKind, List<Mentionable>>>)
 
 private val MentionKind.icon: ImageVector
     get() = when (this) {
-        MentionKind.File -> Icons.Outlined.Description
-        MentionKind.Agent -> Icons.Outlined.SmartToy
-        MentionKind.Memory -> Icons.Outlined.Memory
+        MentionKind.File -> LettaIcons.FileOpen
+        MentionKind.Agent -> LettaIcons.Agent
+        MentionKind.Memory -> LettaIcons.Psychology
     }

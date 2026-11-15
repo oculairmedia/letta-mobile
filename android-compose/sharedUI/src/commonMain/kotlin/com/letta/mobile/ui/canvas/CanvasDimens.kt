@@ -107,3 +107,20 @@ internal val HISTORY_LIST_HEIGHT: Dp = 300.dp
 
 /** The document viewer toggle's distance below the board's own chrome. */
 internal val VIEWER_TOGGLE_TOP_OFFSET: Dp = 56.dp
+
+/*
+ * A note's own ink on its own colour. The note's colour is data, not a theme role, so these alphas
+ * are facts about a note card, kept at the values the note editor was designed with.
+ */
+
+/** A note editor glyph that cannot be used now (no checklist to add yet): its ink, faded. */
+internal const val NOTE_GLYPH_DISABLED_ALPHA: Float = 0.38f
+
+/** The empty title's "Title" placeholder in the note's ink. */
+internal const val NOTE_TITLE_PLACEHOLDER_ALPHA: Float = 0.5f
+
+/** The fill behind the note editor button whose panel is open. */
+internal const val NOTE_BUTTON_SELECTED_FILL_ALPHA: Float = 0.12f
+
+/** The tinted band a note card's drag handle sits on. */
+internal const val NOTE_HANDLE_BAND_ALPHA: Float = 0.08f
