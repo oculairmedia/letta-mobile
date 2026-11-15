@@ -12366,3 +12366,77 @@ public final class com/letta/mobile/ui/theme/tokens/LettaTextStyles {
 	public final fun getTitleSemibold (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
 }
 
+public final class com/letta/mobile/ui/theme/tokens/desktop/DesktopWindowTokens {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/desktop/DesktopWindowTokens;
+	public final fun getLookdevHeight-D9Ej5fM ()F
+	public final fun getLookdevWidth-D9Ej5fM ()F
+	public final fun getMainHeight-D9Ej5fM ()F
+	public final fun getMainWidth-D9Ej5fM ()F
+	public final fun getQuickQueryHeight-D9Ej5fM ()F
+	public final fun getQuickQueryWidth-D9Ej5fM ()F
+	public final fun getTitleBarHeight-D9Ej5fM ()F
+	public final fun getTitleBarMinDragWidth-D9Ej5fM ()F
+}
+
+public final class com/letta/mobile/ui/theme/tokens/desktop/PhoneChromeTokens {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/desktop/PhoneChromeTokens;
+	public final fun getBatteryHeight-D9Ej5fM ()F
+	public final fun getBatteryNubHeight-D9Ej5fM ()F
+	public final fun getBatteryNubWidth-D9Ej5fM ()F
+	public final fun getBatteryShape ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getBatteryWidth-D9Ej5fM ()F
+	public final fun getBezelDark-0d7_KjU ()J
+	public final fun getBezelLight-0d7_KjU ()J
+	public final fun getCameraSize-D9Ej5fM ()F
+	public final fun getFrameRimColor-0d7_KjU ()J
+	public final fun getFrameWidth-D9Ej5fM ()F
+	public final fun getGestureHandleHeight-D9Ej5fM ()F
+	public final fun getGestureHandleWidth-D9Ej5fM ()F
+	public final fun getHeaderElevation-D9Ej5fM ()F
+	public final fun getKeyGap-D9Ej5fM ()F
+	public final fun getKeyShape ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getKeyText ()Landroidx/compose/ui/text/TextStyle;
+	public final fun getOverlayElevation-D9Ej5fM ()F
+	public final fun getOverlayKeyColumn-D9Ej5fM ()F
+	public final fun getOverlayMargin-D9Ej5fM ()F
+	public final fun getOverlayPadding-D9Ej5fM ()F
+	public final fun getOverlayRowGap-D9Ej5fM ()F
+	public final fun getSignalBarHeights ()Ljava/util/List;
+	public final fun getSignalBarWidth-D9Ej5fM ()F
+	public final fun getSignalGap-D9Ej5fM ()F
+	public final fun getStatusIconGap-D9Ej5fM ()F
+	public final fun getStatusSidePadding-D9Ej5fM ()F
+	public final fun getStatusText ()Landroidx/compose/ui/text/TextStyle;
+	public final fun getSuggestionStripHeight-D9Ej5fM ()F
+	public final fun getSuggestionText ()Landroidx/compose/ui/text/TextStyle;
+	public final fun getToastGap-D9Ej5fM ()F
+	public final fun getToastPadding-D9Ej5fM ()F
+	public final fun getToastShape ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getTopBarHeight-D9Ej5fM ()F
+	public final fun glassShape-0680j_4 (F)Landroidx/compose/ui/graphics/Shape;
+}
+
+public final class com/letta/mobile/ui/theme/tokens/desktop/RiveWorkbenchColors {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/desktop/RiveWorkbenchColors;
+	public final fun getHeading-0d7_KjU ()J
+	public final fun getHint-0d7_KjU ()J
+	public final fun getNodeRing-0d7_KjU ()J
+	public final fun getNodeRingShadow-0d7_KjU ()J
+	public final fun getReadout-0d7_KjU ()J
+	public final fun getSparkBar-0d7_KjU ()J
+}
+
+public final class com/letta/mobile/ui/theme/tokens/desktop/ShaderLookdevTokens {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/desktop/ShaderLookdevTokens;
+	public final fun getControlsWidth-D9Ej5fM ()F
+	public final fun getEditorMinHeight-D9Ej5fM ()F
+	public final fun getSampleText-0d7_KjU ()J
+	public final fun getStage-0d7_KjU ()J
+	public final fun getTealRunning-0d7_KjU ()J
+	public final fun getTintPresets ()Ljava/util/List;
+}
+

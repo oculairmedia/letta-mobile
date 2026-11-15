@@ -19,10 +19,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -40,10 +40,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.letta.mobile.ui.theme.tokens.desktop.PhoneChromeTokens
 import kotlinx.coroutines.delay
 
 /**
@@ -73,8 +72,7 @@ private fun PhoneStatusBar(state: DesktopPhoneState, modifier: Modifier) {
         Text(
             "10:18",
             color = ink,
-            fontSize = STATUS_TEXT_SIZE,
-            fontWeight = FontWeight.Medium,
+            style = LocalTextStyle.current.merge(PhoneChromeTokens.statusText),
             modifier = Modifier.align(Alignment.CenterStart).padding(start = STATUS_SIDE_PADDING),
         )
         // The front camera's punch hole.
@@ -101,7 +99,7 @@ private fun SignalBars(ink: Color) {
 @Composable
 private fun Battery(ink: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(BATTERY_WIDTH, BATTERY_HEIGHT).background(ink, RoundedCornerShape(BATTERY_CORNER)))
+        Box(Modifier.size(BATTERY_WIDTH, BATTERY_HEIGHT).background(ink, PhoneChromeTokens.batteryShape))
         Box(Modifier.size(BATTERY_NUB_WIDTH, BATTERY_NUB_HEIGHT).background(ink))
     }
 }
@@ -162,14 +160,14 @@ private fun SuggestionStrip(onHide: () -> Unit) {
         Text(
             "⌄",
             color = colors.onSurfaceVariant,
-            fontSize = SUGGESTION_TEXT_SIZE,
+            style = LocalTextStyle.current.merge(PhoneChromeTokens.suggestionText),
             modifier = Modifier.clickable(role = Role.Button, onClick = onHide).padding(horizontal = KEY_GAP * 2),
         )
         SUGGESTIONS.forEach { word ->
             Text(
                 word,
                 color = colors.onSurface,
-                fontSize = SUGGESTION_TEXT_SIZE,
+                style = LocalTextStyle.current.merge(PhoneChromeTokens.suggestionText),
                 modifier = Modifier.weight(1f).padding(horizontal = KEY_GAP),
                 maxLines = 1,
             )
@@ -196,10 +194,10 @@ private fun RowScope.KeyCap(key: PhoneKey) {
         Modifier
             .weight(key.weight)
             .fillMaxHeight()
-            .background(fill, RoundedCornerShape(KEY_CORNER)),
+            .background(fill, PhoneChromeTokens.keyShape),
         contentAlignment = Alignment.Center,
     ) {
-        Text(key.label, color = colors.onSurface, fontSize = KEY_TEXT_SIZE)
+        Text(key.label, color = colors.onSurface, style = LocalTextStyle.current.merge(PhoneChromeTokens.keyText))
     }
 }
 
@@ -215,7 +213,7 @@ private fun PhoneToast(state: DesktopPhoneState, modifier: Modifier) {
     }
     AnimatedVisibility(visible, modifier = modifier, enter = fadeIn(), exit = fadeOut()) {
         Surface(
-            shape = RoundedCornerShape(TOAST_CORNER),
+            shape = PhoneChromeTokens.toastShape,
             color = MaterialTheme.colorScheme.inverseSurface,
             contentColor = MaterialTheme.colorScheme.inverseOnSurface,
         ) {
@@ -261,31 +259,25 @@ private fun ShortcutRow(shortcut: PhoneShortcut) {
     }
 }
 
-private val TOAST_GAP: Dp = 12.dp
+private val TOAST_GAP: Dp = PhoneChromeTokens.toastGap
 private const val TOAST_MILLIS = 1600L
-private val TOAST_CORNER: Dp = 20.dp
-private val TOAST_PADDING: Dp = 12.dp
-private val STATUS_TEXT_SIZE = 14.sp
-private val STATUS_SIDE_PADDING: Dp = 24.dp
-private val STATUS_ICON_GAP: Dp = 6.dp
-private val CAMERA_SIZE: Dp = 12.dp
-private val BATTERY_WIDTH: Dp = 20.dp
-private val BATTERY_HEIGHT: Dp = 10.dp
-private val BATTERY_CORNER: Dp = 2.dp
-private val BATTERY_NUB_WIDTH: Dp = 2.dp
-private val BATTERY_NUB_HEIGHT: Dp = 4.dp
-private val SIGNAL_GAP: Dp = 1.5.dp
-private val SIGNAL_BAR_WIDTH: Dp = 3.dp
-private val SIGNAL_BAR_HEIGHTS = listOf(4.dp, 6.dp, 8.dp, 10.dp)
-private val GESTURE_HANDLE_WIDTH: Dp = 108.dp
-private val GESTURE_HANDLE_HEIGHT: Dp = 4.dp
+private val TOAST_PADDING: Dp = PhoneChromeTokens.toastPadding
+private val STATUS_SIDE_PADDING: Dp = PhoneChromeTokens.statusSidePadding
+private val STATUS_ICON_GAP: Dp = PhoneChromeTokens.statusIconGap
+private val CAMERA_SIZE: Dp = PhoneChromeTokens.cameraSize
+private val BATTERY_WIDTH: Dp = PhoneChromeTokens.batteryWidth
+private val BATTERY_HEIGHT: Dp = PhoneChromeTokens.batteryHeight
+private val BATTERY_NUB_WIDTH: Dp = PhoneChromeTokens.batteryNubWidth
+private val BATTERY_NUB_HEIGHT: Dp = PhoneChromeTokens.batteryNubHeight
+private val SIGNAL_GAP: Dp = PhoneChromeTokens.signalGap
+private val SIGNAL_BAR_WIDTH: Dp = PhoneChromeTokens.signalBarWidth
+private val SIGNAL_BAR_HEIGHTS = PhoneChromeTokens.signalBarHeights
+private val GESTURE_HANDLE_WIDTH: Dp = PhoneChromeTokens.gestureHandleWidth
+private val GESTURE_HANDLE_HEIGHT: Dp = PhoneChromeTokens.gestureHandleHeight
 private const val GESTURE_HANDLE_ALPHA = 0.7f
-private val SUGGESTION_STRIP_HEIGHT: Dp = 44.dp
-private val SUGGESTION_TEXT_SIZE = 15.sp
+private val SUGGESTION_STRIP_HEIGHT: Dp = PhoneChromeTokens.suggestionStripHeight
 private val SUGGESTIONS = listOf("the", "I", "and")
-private val KEY_GAP: Dp = 4.dp
-private val KEY_CORNER: Dp = 6.dp
-private val KEY_TEXT_SIZE = 18.sp
+private val KEY_GAP: Dp = PhoneChromeTokens.keyGap
 private const val SPACE_WEIGHT = 4f
 private const val WIDE_KEY_WEIGHT = 1.5f
 private val KEY_ROWS: List<List<PhoneKey>> = listOf(
@@ -301,8 +293,8 @@ private val KEY_ROWS: List<List<PhoneKey>> = listOf(
     ),
 )
 private const val OVERLAY_ALPHA = 0.96f
-private val OVERLAY_ELEVATION: Dp = 6.dp
-private val OVERLAY_MARGIN: Dp = 16.dp
-private val OVERLAY_PADDING: Dp = 16.dp
-private val OVERLAY_ROW_GAP: Dp = 4.dp
-private val OVERLAY_KEY_COLUMN: Dp = 104.dp
+private val OVERLAY_ELEVATION: Dp = PhoneChromeTokens.overlayElevation
+private val OVERLAY_MARGIN: Dp = PhoneChromeTokens.overlayMargin
+private val OVERLAY_PADDING: Dp = PhoneChromeTokens.overlayPadding
+private val OVERLAY_ROW_GAP: Dp = PhoneChromeTokens.overlayRowGap
+private val OVERLAY_KEY_COLUMN: Dp = PhoneChromeTokens.overlayKeyColumn

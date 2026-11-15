@@ -40,9 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.window.Window
@@ -59,6 +57,8 @@ import org.jetbrains.skia.RuntimeEffect
 import org.jetbrains.skia.RuntimeShaderBuilder
 import kotlin.math.PI
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.desktop.DesktopWindowTokens
+import com.letta.mobile.ui.theme.tokens.desktop.ShaderLookdevTokens
 
 /**
  * Realtime lookdev for the ambient agent-status shader, hosted as a SECOND
@@ -98,7 +98,7 @@ internal fun ShaderLookdevWindow() {
     Window(
         onCloseRequest = { open = false },
         title = "Ambient Shader Lookdev",
-        state = rememberWindowState(width = 1280.dp, height = 860.dp),
+        state = rememberWindowState(width = DesktopWindowTokens.lookdevWidth, height = DesktopWindowTokens.lookdevHeight),
     ) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(modifier = Modifier.fillMaxSize()) { LookdevRoot() }
@@ -199,7 +199,7 @@ private class LookdevState {
     var agitation by mutableFloatStateOf(1.6f)
     var envelope by mutableFloatStateOf(1f)
     var alpha by mutableFloatStateOf(1f)
-    var tint by mutableStateOf(Color(0xFF3FE0C0))
+    var tint by mutableStateOf(ShaderLookdevTokens.tealRunning)
     var source by mutableStateOf(PROPOSED_DESKTOP_SKSL)
     var compileError by mutableStateOf<String?>(null)
     var variants by mutableStateOf(listOf<ShaderVariant>())
@@ -271,7 +271,7 @@ private fun LookdevRoot() {
 private fun ControlsColumn(state: LookdevState) {
     Column(
         modifier = Modifier
-            .width(360.dp)
+            .width(ShaderLookdevTokens.controlsWidth)
             .fillMaxHeight()
             .verticalScroll(rememberScrollState())
             .padding(LettaDimens.Space.md),
@@ -328,13 +328,7 @@ private fun ControlsColumn(state: LookdevState) {
 
         Text("Tint", style = MaterialTheme.typography.labelSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-            listOf(
-                Color(0xFF3FE0C0), // teal (running)
-                Color(0xFFE0457B), // pink identity
-                Color(0xFFF0A03C), // amber identity
-                Color(0xFFFF5449), // error red
-                Color(0xFF8E7CFF), // violet identity
-            ).forEach { color ->
+            ShaderLookdevTokens.tintPresets.forEach { color ->
                 LettaColorSwatch(LettaSwatch(color, selected = state.tint == color), onClick = { state.tint = color })
             }
         }
@@ -351,7 +345,7 @@ private fun ControlsColumn(state: LookdevState) {
             value = state.source,
             onValueChange = { state.source = it },
             textStyle = LettaTextStyles.mono,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 420.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = ShaderLookdevTokens.editorMinHeight),
         )
     }
 }
@@ -367,7 +361,7 @@ private fun PreviewPane(
         Modifier
             .fillMaxHeight()
             .fillMaxWidth()
-            .background(Color(0xFF0A0A0A)),
+            .background(ShaderLookdevTokens.stage),
     ) {
         // Glow FIRST, text over it — the same order production uses
         // (DesktopAmbientChatBackground draws its canvas before `content()`).
@@ -412,7 +406,7 @@ private fun PreviewPane(
                     } else {
                         "Assistant narration line $index — glow must never wash this out while streaming."
                     },
-                    color = Color(0xFFB8C2C4),
+                    color = ShaderLookdevTokens.sampleText,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
