@@ -93,7 +93,7 @@ import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchor
 import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
 import com.letta.mobile.ui.chat.surface.composer.LocalMinimisedBarLayout
-import com.letta.mobile.ui.components.LettaFoldButton
+import com.letta.mobile.ui.components.disclosure.LettaFoldButton
 import com.letta.mobile.ui.components.ResizeDirection
 import com.letta.mobile.ui.components.movePointerIcon
 import com.letta.mobile.ui.components.resizePointerIcon

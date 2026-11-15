@@ -33,8 +33,8 @@ import com.letta.mobile.ui.chat.surface.composer.ComposerActionChip
 import com.letta.mobile.ui.chat.surface.composer.ComposerChipLabel
 import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import com.letta.mobile.ui.chat.surface.composer.TouchOpenChatButton
-import com.letta.mobile.ui.components.DisclosureChevronDefaults
-import com.letta.mobile.ui.components.LettaDisclosureHeader
+import com.letta.mobile.ui.components.disclosure.DisclosureChevronDefaults
+import com.letta.mobile.ui.components.disclosure.LettaDisclosureHeader
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.TouchComposerDimens

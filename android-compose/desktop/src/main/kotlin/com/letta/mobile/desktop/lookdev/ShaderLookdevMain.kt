@@ -25,7 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 import com.letta.mobile.ui.components.foundation.LettaColorSwatch
 import com.letta.mobile.ui.components.foundation.LettaSwatch
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles

@@ -40,6 +40,7 @@ import com.letta.mobile.ui.host.ProvideLettaHost
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 
 /** letta-mobile-ckmub.3.10 (hard cut S7, primitive P4): the one sectioned, selectable list. */
 class RosterListTest {
@@ -256,7 +257,7 @@ class RosterListTest {
                 Roster(
                     sections = listOf(RosterSection("fruit", listOf(banana))),
                     actions = RosterActions(
-                        menu = { item, _ -> listOf(com.letta.mobile.ui.components.LettaMenuItem("Peel") { events += "peel:${item.id}" }) },
+                        menu = { item, _ -> listOf(LettaMenuItem("Peel") { events += "peel:${item.id}" }) },
                         quick = { item -> listOf(RosterAction("Eat", onClick = { events += "eat:${item.id}" })) },
                         swipe = { item -> RosterAction("Toss", onClick = { events += "toss:${item.id}" }) },
                     ),

@@ -41,9 +41,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.letta.mobile.ui.components.LettaEmptyHint
-import com.letta.mobile.ui.components.LettaMenuItem
-import com.letta.mobile.ui.theme.LettaBusyBar
-import com.letta.mobile.ui.theme.LettaSectionHeader
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaSectionHeader
 import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.host.LocalRowHoldDrag

@@ -113,9 +113,6 @@ object ChatRowSpacing {
     /** The run summary line's status glyph (check, spinner, warning). */
     val runGlyphSize: Dp = LettaDimens.Control.iconSm
 
-    /** The working glyph's ring and spinner stroke. */
-    internal val runGlyphStroke: Dp = 1.5.dp
-
     /** A step-rail line's start inset (a tool call, a reasoning): its glyph sits this far in. */
     internal val stepHorizontal: Dp = LettaDimens.Space.sm
 

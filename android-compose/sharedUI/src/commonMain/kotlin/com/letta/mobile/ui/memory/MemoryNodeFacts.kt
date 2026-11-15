@@ -25,7 +25,7 @@ import com.letta.mobile.ui.components.lettaFraction
 import com.letta.mobile.ui.components.lettaPercent
 import com.letta.mobile.ui.components.lettaUsage
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 import androidx.compose.ui.semantics.Role
 

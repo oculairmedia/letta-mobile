@@ -4,7 +4,6 @@ import com.letta.mobile.ui.theme.ChatRowInsetShape
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -38,6 +37,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.collections.immutable.ImmutableList
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 /**
  * Decodes a base64 attachment once per payload. Null for an empty (stored-pointer) or
@@ -85,7 +86,12 @@ internal fun ChatImageAttachmentsGrid(
                 cellHeight = cellHeight,
                 modifier = Modifier
                     .weight(1f)
-                    .clickable(role = Role.Image, onClickLabel = openLabel) { tap.open(index) },
+                    .lettaClickable(
+                        role = Role.Image,
+                        onClickLabel = openLabel,
+                        target = LettaClickTarget.Inline,
+                        onClick = { tap.open(index) },
+                    ),
             )
         }
     }
@@ -115,7 +121,12 @@ internal fun ChatPromptImageGrid(
                 cellHeight = if (single) null else ChatRowDimens.promptGridCellHeight,
                 modifier = Modifier
                     .weight(1f)
-                    .clickable(role = Role.Image, onClickLabel = openLabel) { tap.open(index) },
+                    .lettaClickable(
+                        role = Role.Image,
+                        onClickLabel = openLabel,
+                        target = LettaClickTarget.Inline,
+                        onClick = { tap.open(index) },
+                    ),
             )
         }
     }
@@ -143,7 +154,12 @@ internal fun ChatImageThumbnailStrip(
                 cellHeight = ChatRowDimens.thumbnailHeight,
                 modifier = Modifier
                     .size(width = ChatRowDimens.thumbnailWidth, height = ChatRowDimens.thumbnailHeight)
-                    .clickable(role = Role.Image, onClickLabel = openLabel) { tap.open(index) },
+                    .lettaClickable(
+                        role = Role.Image,
+                        onClickLabel = openLabel,
+                        target = LettaClickTarget.Inline,
+                        onClick = { tap.open(index) },
+                    ),
             )
         }
         val hidden = images.size - ChatRowDimens.stripMaxImages

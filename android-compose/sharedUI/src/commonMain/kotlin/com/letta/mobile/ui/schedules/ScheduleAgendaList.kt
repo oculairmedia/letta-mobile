@@ -36,7 +36,7 @@ import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.row.LettaListRow
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import kotlinx.datetime.toLocalDateTime
 
 /**

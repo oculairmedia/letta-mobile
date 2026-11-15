@@ -59,7 +59,7 @@ import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.data.shell.sidemenu.PanelViews
 import com.letta.mobile.ui.chat.AgentOrb
-import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSeatVacancy

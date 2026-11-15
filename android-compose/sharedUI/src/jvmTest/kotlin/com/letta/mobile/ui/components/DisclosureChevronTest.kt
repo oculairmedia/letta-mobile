@@ -7,6 +7,9 @@ import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.components.disclosure.ChevronEmphasis
+import com.letta.mobile.ui.components.disclosure.ChevronIndication
+import com.letta.mobile.ui.components.disclosure.DisclosureChevronDefaults
 
 class DisclosureChevronTest {
 

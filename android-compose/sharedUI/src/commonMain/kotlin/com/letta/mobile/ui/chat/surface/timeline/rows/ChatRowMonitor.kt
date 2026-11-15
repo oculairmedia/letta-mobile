@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,6 +42,8 @@ import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 // letta-mobile-a7ir6: a Monitor watch recedes to one chip (its newest event, the event count and
 // whether it still watches); an actionable event is one line. The raw task id shows only expanded.
@@ -130,7 +131,9 @@ private fun MonitorDetails(raw: String, lines: List<String>, notification: UiSub
     Text(
         text = stringResource(if (showRaw) Res.string.rows_monitor_hide_raw else Res.string.rows_monitor_show_raw),
         style = MaterialTheme.typography.labelSmall,
-        modifier = Modifier.clickable(role = Role.Button) { showRaw = !showRaw }.padding(LettaDimens.Space.xs),
+        modifier = Modifier
+            .lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = { showRaw = !showRaw })
+            .padding(LettaDimens.Space.xs),
     )
     notification.taskId?.let {
         Text(

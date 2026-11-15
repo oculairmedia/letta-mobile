@@ -91,7 +91,7 @@ import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneButton
 import com.letta.mobile.ui.host.LettaPaneButtons
 import com.letta.mobile.ui.host.LettaPaneKind
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.StringResource

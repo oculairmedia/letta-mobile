@@ -46,7 +46,7 @@ import com.letta.mobile.ui.shell.pages.memfs.MemfsPageOptions
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceBinding
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceView
 import com.letta.mobile.ui.shell.pages.workspace.MemoryPreview
-import com.letta.mobile.ui.theme.LettaChip
+import com.letta.mobile.ui.components.foundation.LettaChip
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.compose.resources.stringResource

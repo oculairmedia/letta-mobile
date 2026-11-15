@@ -26,7 +26,7 @@ import com.letta.mobile.ui.shell.header.HeaderNav
 import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.ShellHeader
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.delay
 

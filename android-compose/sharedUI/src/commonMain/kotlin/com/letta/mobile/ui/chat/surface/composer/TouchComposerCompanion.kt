@@ -26,7 +26,7 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_open_chat
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.surface.timeline.ThinkingStatusText
-import com.letta.mobile.ui.components.LettaUnfoldButton
+import com.letta.mobile.ui.components.disclosure.LettaUnfoldButton
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.theme.ChatMotionTokens

@@ -20,7 +20,7 @@ import com.letta.mobile.sharedui.resources.rows_rerun
 import com.letta.mobile.sharedui.resources.rows_send_again
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
-import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.icons.LettaIcons
 import org.jetbrains.compose.resources.stringResource

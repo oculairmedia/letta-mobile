@@ -5,7 +5,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.components.ArrowGlyph
 import com.letta.mobile.ui.components.PagerBar
-import com.letta.mobile.ui.components.StatusGlyph
+import com.letta.mobile.ui.components.foundation.StatusGlyph
 import com.letta.mobile.ui.components.line.ArrowDirection
 import com.letta.mobile.ui.components.line.PagerLabel
 import com.letta.mobile.ui.components.line.PagerStep

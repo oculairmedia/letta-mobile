@@ -32,7 +32,7 @@ import com.letta.mobile.ui.components.LettaSwatch
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.text.LettaSelectionContainer
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /**

@@ -60,7 +60,7 @@ import com.letta.mobile.sharedui.resources.canvas_plugin_status_running
 import com.letta.mobile.sharedui.resources.canvas_plugin_untitled
 import com.letta.mobile.ui.canvas.LocalCanvasCompact
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaTonalPill
+import com.letta.mobile.ui.components.foundation.LettaTonalPill
 import com.letta.mobile.ui.theme.pill.LettaPillColors
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
