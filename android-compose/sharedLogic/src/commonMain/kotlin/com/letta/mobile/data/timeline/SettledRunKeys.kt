@@ -121,6 +121,22 @@ internal fun TimelineResidentEvent.namesKnownTo(aliases: Map<String, TimelineMes
 /** Whether every message [this] draws is one of [names]. */
 internal fun ChatRenderItem.isWhollyNamedBy(names: Set<String>): Boolean = messagesInOrder().all { it.isNamedBy(names) }
 
+/**
+ * [this] without the messages one of [names] already names, or null when it names them all. A run
+ * keeps its key and the messages left, in order.
+ */
+internal fun ChatRenderItem.withoutRecordsNamedBy(names: Set<String>): ChatRenderItem? = when (this) {
+    is ChatRenderItem.Single -> takeUnless { message.isNamedBy(names) }
+    is ChatRenderItem.RunBlock -> {
+        val rest = messages.filterNot { it.first.isNamedBy(names) }
+        when (rest.size) {
+            0 -> null
+            messages.size -> this
+            else -> copy(messages = rest)
+        }
+    }
+}
+
 /** Reasoning rows are keyed `<serverId>:REASONING` so they cannot collide with their reply. */
 private fun UiMessage.isNamedBy(names: Set<String>): Boolean =
     id in names || id.removeSuffix(":REASONING") in names || clientMessageId in names

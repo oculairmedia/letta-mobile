@@ -14084,10 +14084,15 @@ public final class com/letta/mobile/data/chat/projection/TimelineRowAssembly {
 }
 
 public final class com/letta/mobile/data/chat/projection/TimelineRowAssembly$Companion {
-	public final fun assemble (Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function2;)Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly;
-	public static synthetic fun assemble$default (Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly$Companion;Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly;
-	public final fun displayedLive (Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function2;)Ljava/util/List;
-	public static synthetic fun displayedLive$default (Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly$Companion;Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Ljava/util/List;
+	public final fun assemble (Ljava/util/List;Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly$Settled;)Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly;
+	public final fun displayedLive (Ljava/util/List;Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly$Settled;)Ljava/util/List;
+}
+
+public final class com/letta/mobile/data/chat/projection/TimelineRowAssembly$Settled {
+	public fun <init> (Ljava/util/List;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Ljava/util/List;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getHolds ()Lkotlin/jvm/functions/Function2;
+	public final fun getKeys ()Ljava/util/List;
 }
 
 public final class com/letta/mobile/data/chat/projection/TimelineRowKeyGuard {

@@ -35,7 +35,7 @@ class TimelineRowAssemblyTest {
     @Test
     fun settledRowTakesTheLiveRowsSlotInOneRead() {
         val settled = listOf("run-local-run-65", "msg-cm-android-a3789bb3", "segment-older")
-        val rows = TimelineRowAssembly.assemble(live, settled)
+        val rows = TimelineRowAssembly.assemble(live, TimelineRowAssembly.Settled(settled))
         assertEquals(emptyList(), rows.live)
         assertEquals(emptyMap(), rows.duplicates)
         assertEquals(settled, (0 until rows.size).map(rows::key))
@@ -43,7 +43,7 @@ class TimelineRowAssemblyTest {
 
     @Test
     fun liveRowsStayAheadUntilTheirTwinIsResident() {
-        val rows = TimelineRowAssembly.assemble(live, listOf("segment-older", null))
+        val rows = TimelineRowAssembly.assemble(live, TimelineRowAssembly.Settled(listOf("segment-older", null)))
         assertEquals(2, rows.liveCount)
         assertEquals(
             listOf("run-local-run-65", "msg-cm-android-a3789bb3", "segment-older", null),
@@ -70,7 +70,7 @@ class TimelineRowAssemblyTest {
         val rows = CanonicalTimelinePresentation.assemble(live, settled)
         assertEquals(emptyMap(), rows.duplicates)
         assertEquals(listOf("run-r-from-a~live", "run-r-from-a"), (0 until rows.size).map(rows::key))
-        assertEquals(setOf("a", "b", "c"), drawn(rows, settled).toSet())
+        assertEquals(listOf("c", "a", "b"), drawn(rows, settled), "every record drawn once")
     }
 
     @Test

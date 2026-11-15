@@ -39,38 +39,27 @@ class TimelineRowAssembly private constructor(
         /** Suffix of a live row listed beside a settled row that holds only part of it. */
         const val PARTLY_SETTLED_SUFFIX = "~live"
 
-        /**
-         * [settledKeys] holds one entry per settled slot, null for a placeholder. [holds] tells
-         * whether the settled row in a slot holds every record of a live row under its key; without
-         * it a key match is taken to mean it does.
-         */
-        fun assemble(
-            live: List<ChatRenderItem>,
-            settledKeys: List<String?>,
-            holds: (settledIndex: Int, live: ChatRenderItem) -> Boolean = { _, _ -> true },
-        ): TimelineRowAssembly {
-            val shown = displayedLive(live, settledKeys, holds)
-            val duplicates = TimelineRowKeyGuard.duplicateRows(shown.map { it.key } + settledKeys) { index ->
+        /** Assembles [live] ahead of the presented [settled] slots, as one read of both. */
+        fun assemble(live: List<ChatRenderItem>, settled: Settled): TimelineRowAssembly {
+            val shown = displayedLive(live, settled)
+            val duplicates = TimelineRowKeyGuard.duplicateRows(shown.map { it.key } + settled.keys) { index ->
                 if (index < shown.size) LIVE else SETTLED
             }
-            return TimelineRowAssembly(shown, settledKeys, duplicates)
+            return TimelineRowAssembly(shown, settled.keys, duplicates)
         }
 
         /**
          * The live rows no resident settled row has taken over yet: a live row whose key a settled
-         * row holds is hidden when that row [holds] all of it, and listed as `<key>~live` when not.
+         * row holds is hidden when that row holds all of it ([Settled.holds]), and listed as
+         * `<key>~live` when not.
          */
-        fun displayedLive(
-            live: List<ChatRenderItem>,
-            settledKeys: List<String?>,
-            holds: (settledIndex: Int, live: ChatRenderItem) -> Boolean = { _, _ -> true },
-        ): List<ChatRenderItem> {
-            if (live.isEmpty() || settledKeys.isEmpty()) return live
-            val slotByKey = HashMap<String, Int>(settledKeys.size)
-            settledKeys.forEachIndexed { index, key -> if (key != null) slotByKey.getOrPut(key) { index } }
+        fun displayedLive(live: List<ChatRenderItem>, settled: Settled): List<ChatRenderItem> {
+            if (live.isEmpty() || settled.keys.isEmpty()) return live
+            val slotByKey = HashMap<String, Int>(settled.keys.size)
+            settled.keys.forEachIndexed { index, key -> if (key != null) slotByKey.getOrPut(key) { index } }
             return live.mapNotNull { item ->
                 val slot = slotByKey[item.key] ?: return@mapNotNull item
-                if (holds(slot, item)) null else item.withKey(item.key + PARTLY_SETTLED_SUFFIX)
+                if (settled.holds(slot, item)) null else item.withKey(item.key + PARTLY_SETTLED_SUFFIX)
             }
         }
 
@@ -79,4 +68,16 @@ class TimelineRowAssembly private constructor(
             is ChatRenderItem.RunBlock -> copy(keyOverride = key)
         }
     }
+
+    /**
+     * The presented settled slots of one read, as the list keys them.
+     *
+     * @property keys one entry per slot, null for a placeholder.
+     * @property holds whether the settled row in a slot (by index) holds every record of a live row
+     *   listed under its key; without it a key match is taken to mean it does.
+     */
+    class Settled(
+        val keys: List<String?>,
+        val holds: (Int, ChatRenderItem) -> Boolean = { _, _ -> true },
+    )
 }

@@ -4,7 +4,7 @@
 # copies the config with Break set to those guards (comma-separated) and expects TLC to report a
 # violation. S3 keeps row keys stable by two guards at once (keys from a row's own records, and the
 # key a row was first drawn with is remembered), so its key properties need both broken.
-# Usage: verification/timeline-identity/able-to-fail.sh [config-prefix]
+# Usage: tools/timeline-identity/able-to-fail.sh [config-prefix]
 #   (a prefix such as s3-settled runs only the matching lines)
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -32,7 +32,9 @@ s3-live-b      StableKeys               keyByReader,forgetKeys
 s3-live-a      StableRowKeysAcrossRecut keyByPageEdge,forgetKeys
 s3-live-b      StableRowKeysAcrossRecut keyByPageEdge,forgetKeys
 '
-work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
+# The broken configs are written next to the committed ones (check.sh reads configs from here);
+# the trap removes them too, so an interrupted run never leaves one for a later full check.sh.
+work="$(mktemp -d)"; trap 'rm -rf "$work"; rm -f "$here"/_break-*.cfg' EXIT
 status=0
 while read -r cfg prop brk; do
   [ -n "$cfg" ] || continue

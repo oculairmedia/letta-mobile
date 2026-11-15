@@ -21,7 +21,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * letta-mobile-o1hju: counterexamples the TLA+ model (verification/timeline-identity, run with
+ * letta-mobile-o1hju: counterexamples the TLA+ model (tools/timeline-identity, run with
  * check.sh) found that the S1 fixtures (TimelineRunKeyAcrossPagesTest) do not cover, replayed
  * against the real coordinator, writer, Paging and presentation ([TimelineFrameRecorder]).
  *

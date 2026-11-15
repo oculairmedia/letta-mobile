@@ -19,9 +19,9 @@
 (*                                                                         *)
 (* COVERS (one indivisible code step = one model step)                     *)
 (*  timeline/TimelinePageProjection.kt                                     *)
-(*    aggregatePreparedRuns :124, keyedByOwnRecords :161, runClaim :164,   *)
-(*    claimRun :174, spansVisibleGap :202, containsComplete :220,          *)
-(*    runEnvelope :233                                                     *)
+(*    aggregatePreparedRuns :124, keyedByOwnRecords :161, runClaim :163,   *)
+(*    claimRun :173, spansVisibleGap :201, containsComplete :219,          *)
+(*    runEnvelope :232                                                     *)
 (*  chat/projection/MessageGrouping.kt                                     *)
 (*    groupMessagesForRender :182 (runIdCounts :194, unique Single :266),  *)
 (*    runBlockKey :541                                                     *)
@@ -30,12 +30,12 @@
 (*  timeline/CanonicalTimelinePresentation.kt                              *)
 (*    settledRows :123, projectLiveItems :190 (own-record keys :219),      *)
 (*    filterUnsettledEvents :223, onResidentRows :258, withSettledKey :334,*)
-(*    project :373, assemble :420, Row.holdsAll :100                       *)
-(*  timeline/SettledLiveAdoptions.kt keyed :36, keyedLocked :43,           *)
-(*    firstPresentation :57 (S3); adoptLocked (main..OwnKeys)              *)
+(*    project :373, assemble :422, Row.holdsAll :100                       *)
+(*  timeline/SettledLiveAdoptions.kt keyed :39, keyedLocked :46,           *)
+(*    firstPresentation :60 (S3); adoptLocked (main..OwnKeys)              *)
 (*  timeline/SettledRunKeys.kt keyedByOwnRecords :24,                      *)
-(*    livePresentationFor :67, isOnlyHeldWithin :81, sharesShapeWith :104  *)
-(*  chat/projection/TimelineRowAssembly.kt assemble :47, displayedLive :63 *)
+(*    livePresentationFor :65, isOnlyHeldWithin :78, sharesShapeWith :101  *)
+(*  chat/projection/TimelineRowAssembly.kt assemble :43, displayedLive :56 *)
 (*  chat/projection/TimelineRowKeyGuard.kt duplicateRows :20               *)
 (*  timeline/CanonicalTimelineSessionPaging.kt observePublications :65     *)
 (*  timeline/TimelineLedgerPagingSource.kt invalidateIfBehind :25,         *)
@@ -45,7 +45,8 @@
 (*  core/android-data/.../RoomTimelineBoundedStore.kt read positions       *)
 (*    :181-189 (Tail / Before / After / Around)                            *)
 (*                                                                         *)
-(* ABSTRACTIONS (full list: .agent/skills/verifying-timeline-identity)     *)
+(* ABSTRACTIONS (full list: the skill,                                     *)
+(*   docs/tooling/verifying-timeline-identity/SKILL.md)                    *)
 (*  - One conversation; records are a fixed ledger order. Kind "P" = user  *)
 (*    prompt (run-less, carries an otid), "R" = assistant row of run       *)
 (*    RunOf[i], "U" = opaque usage / stop_reason row (no event).           *)
@@ -253,7 +254,11 @@ PageRowSet(lo, hi, m) ==
 LiveOwnKeys == Fix = "S3" /\ "liveSnapshotKeys" \notin Break
 LiveItems(E) ==
     {[key |-> MsgKey(i), members |-> {i}, run |-> FALSE] : i \in {j \in E : Kind[j] = "P"}}
-    \cup {LET k == IF LiveOwnKeys THEN OwnKey(RunOfBlock(b), Min(b)) ELSE GroupKey(E, b) IN
+    \cup {LET g == GroupKey(E, b)
+              \* keyedByOwnRecords leaves a Single without a stable run key
+              \* (run id not unique in the snapshot) as the grouper built it.
+              k == IF LiveOwnKeys /\ ~(Cardinality(b) = 1 /\ g = NoKey)
+                   THEN OwnKey(RunOfBlock(b), Min(b)) ELSE g IN
             IF k = NoKey THEN [key |-> MsgKey(Max(b)), members |-> b, run |-> FALSE]
             ELSE [key |-> k, members |-> b, run |-> TRUE]
           : b \in Blocks(E)}
@@ -338,21 +343,24 @@ AdoptAll(rows, lv, by, hd) ==
          IN [rows |-> <<first.row>> \o rest.rows, by |-> rest.by, hd |-> rest.hd]
 
 -----------------------------------------------------------------------------
-(* What the list shows: TimelineRowAssembly.assemble :34.                  *)
+(* What the list shows: TimelineRowAssembly.assemble :43.                  *)
 SettledSeq == Concat([p \in DOMAIN pages |-> pages[p].rows])
 SettledKeys == {SettledSeq[i].key : i \in DOMAIN SettledSeq}
 SettledMembers == UNION {SettledSeq[i].members : i \in DOMAIN SettledSeq}
 
-\* displayedLive :43. main..OwnKeys: a live row is hidden when any settled
-\* row holds its key. S3 (CanonicalTimelinePresentation.assemble): when a
-\* settled row holds every one of its records, under any key; a live row whose
-\* key a settled row holds only in part stays listed, as <key>~live, so the
-\* settled part can keep the key it was drawn with.
+\* displayedLive :56. main..OwnKeys: a live row is hidden when any settled
+\* row holds its key. S3 (CanonicalTimelinePresentation.assemble): a live
+\* row draws only the records no settled row draws (withoutRecordsNamedBy),
+\* under any key, and is hidden when none are left; a live row left with
+\* records under a key a settled row holds is listed as <key>~live, so the
+\* settled part can keep the key it was drawn with. No record is drawn twice.
 ShownLiveOf(seq, lv) ==
     LET sk == {seq[i].key : i \in DOMAIN seq}
-        drawnBy(l) == \E i \in DOMAIN seq : l.members \subseteq seq[i].members
+        sm == UNION {seq[i].members : i \in DOMAIN seq}
+        rest(l) == [l EXCEPT !.members = l.members \ sm]
     IN IF Fix = "S3" /\ "hideByKeyOnly" \notin Break
-       THEN {IF l.key \in sk THEN [l EXCEPT !.key = l.key \o "~live"] ELSE l : l \in {m \in lv : ~drawnBy(m)}}
+       THEN {IF l.key \in sk THEN [l EXCEPT !.key = l.key \o "~live"] ELSE l :
+               l \in {rest(m) : m \in {o \in lv : o.members \ sm # {}}}}
        ELSE {l \in lv : l.key \notin sk}
 ShownLive == ShownLiveOf(SettledSeq, live)
 ShownLiveSeq == LET ks == Desc({Max(l.members) : l \in ShownLive})

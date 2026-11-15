@@ -36412,6 +36412,15 @@ final class com.letta.mobile.data.chat.projection/TimelineRowAssembly { // com.l
 
     final fun key(kotlin/Int): kotlin/String? // com.letta.mobile.data.chat.projection/TimelineRowAssembly.key|key(kotlin.Int){}[0]
 
+    final class Settled { // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Settled|null[0]
+        constructor <init>(kotlin.collections/List<kotlin/String?>, kotlin/Function2<kotlin/Int, com.letta.mobile.data.chat.projection/ChatRenderItem, kotlin/Boolean> = ...) // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Settled.<init>|<init>(kotlin.collections.List<kotlin.String?>;kotlin.Function2<kotlin.Int,com.letta.mobile.data.chat.projection.ChatRenderItem,kotlin.Boolean>){}[0]
+
+        final val holds // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Settled.holds|{}holds[0]
+            final fun <get-holds>(): kotlin/Function2<kotlin/Int, com.letta.mobile.data.chat.projection/ChatRenderItem, kotlin/Boolean> // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Settled.holds.<get-holds>|<get-holds>(){}[0]
+        final val keys // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Settled.keys|{}keys[0]
+            final fun <get-keys>(): kotlin.collections/List<kotlin/String?> // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Settled.keys.<get-keys>|<get-keys>(){}[0]
+    }
+
     final object Companion { // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Companion|null[0]
         final const val LIVE // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Companion.LIVE|{}LIVE[0]
             final fun <get-LIVE>(): kotlin/String // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Companion.LIVE.<get-LIVE>|<get-LIVE>(){}[0]
@@ -36420,8 +36429,8 @@ final class com.letta.mobile.data.chat.projection/TimelineRowAssembly { // com.l
         final const val SETTLED // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Companion.SETTLED|{}SETTLED[0]
             final fun <get-SETTLED>(): kotlin/String // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Companion.SETTLED.<get-SETTLED>|<get-SETTLED>(){}[0]
 
-        final fun assemble(kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>, kotlin.collections/List<kotlin/String?>, kotlin/Function2<kotlin/Int, com.letta.mobile.data.chat.projection/ChatRenderItem, kotlin/Boolean> = ...): com.letta.mobile.data.chat.projection/TimelineRowAssembly // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Companion.assemble|assemble(kotlin.collections.List<com.letta.mobile.data.chat.projection.ChatRenderItem>;kotlin.collections.List<kotlin.String?>;kotlin.Function2<kotlin.Int,com.letta.mobile.data.chat.projection.ChatRenderItem,kotlin.Boolean>){}[0]
-        final fun displayedLive(kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>, kotlin.collections/List<kotlin/String?>, kotlin/Function2<kotlin/Int, com.letta.mobile.data.chat.projection/ChatRenderItem, kotlin/Boolean> = ...): kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem> // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Companion.displayedLive|displayedLive(kotlin.collections.List<com.letta.mobile.data.chat.projection.ChatRenderItem>;kotlin.collections.List<kotlin.String?>;kotlin.Function2<kotlin.Int,com.letta.mobile.data.chat.projection.ChatRenderItem,kotlin.Boolean>){}[0]
+        final fun assemble(kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>, com.letta.mobile.data.chat.projection/TimelineRowAssembly.Settled): com.letta.mobile.data.chat.projection/TimelineRowAssembly // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Companion.assemble|assemble(kotlin.collections.List<com.letta.mobile.data.chat.projection.ChatRenderItem>;com.letta.mobile.data.chat.projection.TimelineRowAssembly.Settled){}[0]
+        final fun displayedLive(kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>, com.letta.mobile.data.chat.projection/TimelineRowAssembly.Settled): kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem> // com.letta.mobile.data.chat.projection/TimelineRowAssembly.Companion.displayedLive|displayedLive(kotlin.collections.List<com.letta.mobile.data.chat.projection.ChatRenderItem>;com.letta.mobile.data.chat.projection.TimelineRowAssembly.Settled){}[0]
     }
 }
 

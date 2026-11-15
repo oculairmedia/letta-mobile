@@ -27,7 +27,7 @@ pages as one LazyColumn. It promises:
   Old wording (binding before R1): "a settled record keeps its key even when a refresh around
   the reader moves the page edges". New status: informational, listed as FAIL below.
 
-The model is `verification/timeline-identity/TimelineIdentity.tla`. Every action names the Kotlin
+The model is `tools/timeline-identity/TimelineIdentity.tla`. Every action names the Kotlin
 function and file:line it models, and one indivisible code step is one model step.
 
 ## Does my change touch it?
@@ -37,12 +37,12 @@ Covered code at the sync commit. Paths are under
 
 | Code | Model |
 |---|---|
-| `timeline/TimelinePageProjection.kt` `aggregatePreparedRuns` :124, `keyedByOwnRecords` :161, `runClaim` :164, `claimRun` :174, `spansVisibleGap` :202, `containsComplete` :220, `runEnvelope` :233 | `PageRowSet`, `BlockRows`, `OwnRecordKey`, `ContainsComplete`, `Boundary` |
+| `timeline/TimelinePageProjection.kt` `aggregatePreparedRuns` :124, `keyedByOwnRecords` :161, `runClaim` :163, `claimRun` :173, `spansVisibleGap` :201, `containsComplete` :219, `runEnvelope` :232 | `PageRowSet`, `BlockRows`, `OwnRecordKey`, `ContainsComplete`, `Boundary` |
 | `chat/projection/MessageGrouping.kt` `groupMessagesForRender` :182 (runIdCounts :194, unique Single :266), `runBlockKey` :541 | `Blocks`, `GroupKey` |
 | `timeline/TimelineLivePublication.kt` per-record key `segment-<identity>` :117-124, `overlayEvents` :245 | `SegRow`, live drain |
-| `timeline/CanonicalTimelinePresentation.kt` `settledRows` :123, `projectLiveItems` :190 (live keys from own records :219), `filterUnsettledEvents` :223, `onResidentRows` :258, `withSettledKey` :334, `project` :373, `assemble` :420, `Row.holdsAll` :100 | `Load`, `LiveItems`, `ResidentRows`, `ShownLiveOf` |
-| `timeline/SettledLiveAdoptions.kt` `keyed` :36, `keyedLocked` :43, `firstPresentation` :57; `timeline/SettledRunKeys.kt` `keyedByOwnRecords` :24, `livePresentationFor` :67, `isOnlyHeldWithin` :81, `sharesShapeWith` :104 | `KeyOne`, `KeyAll` (S3); `AdoptOne`, `AdoptAll` (main..OwnKeys) |
-| `chat/projection/TimelineRowAssembly.kt` `assemble` :47, `displayedLive` :63; `chat/projection/TimelineRowKeyGuard.kt` `duplicateRows` :20 | `ShownLiveOf`, `ListKeys`, `Blanked`, `Drawn` |
+| `timeline/CanonicalTimelinePresentation.kt` `settledRows` :123, `projectLiveItems` :190 (live keys from own records :219), `filterUnsettledEvents` :223, `onResidentRows` :258, `withSettledKey` :334, `project` :373, `assemble` :422, `Row.holdsAll` :100 | `Load`, `LiveItems`, `ResidentRows`, `ShownLiveOf` |
+| `timeline/SettledLiveAdoptions.kt` `keyed` :39, `keyedLocked` :46, `firstPresentation` :60; `timeline/SettledRunKeys.kt` `keyedByOwnRecords` :24, `livePresentationFor` :65, `isOnlyHeldWithin` :78, `sharesShapeWith` :101, `withoutRecordsNamedBy` :128 | `KeyOne`, `KeyAll` (S3); `AdoptOne`, `AdoptAll` (main..OwnKeys) |
+| `chat/projection/TimelineRowAssembly.kt` `assemble` :43, `displayedLive` :56; `chat/projection/TimelineRowKeyGuard.kt` `duplicateRows` :20 | `ShownLiveOf`, `ListKeys`, `Blanked`, `Drawn` |
 | `timeline/CanonicalTimelineSessionPaging.kt` `observePublications` :65 (trims :75, revisions :82) | `Invalidate`, `Trim` |
 | `timeline/TimelineLedgerPagingSource.kt` `invalidateIfBehind` :25, `getRefreshKey` :31, `load` :41; `timeline/CanonicalTimelineEngine.kt` `preparePage` :579, `reconcilePageDetailed` :502, `shouldDeferLiveReconcile` :556 | `Refresh`, `LoadOlder`, `LoadNewer`, `DurableWrite` |
 | `android-compose/core/android-data/.../RoomTimelineBoundedStore.kt` read positions :181-196 | `AroundRange`, page edges |
@@ -77,11 +77,11 @@ Elsewhere, download that jar from the TLA+ GitHub release v1.7.4, check the sha2
 `TLA2TOOLS=/path/to/jar`.
 
 ```sh
-verification/timeline-identity/check.sh s3-settled-a s3-settled-b s3-settled-c   # about 1 minute
-WORKERS=4 verification/timeline-identity/check.sh s3-live-a s3-live-b       # see Bounds for run times
-verification/timeline-identity/check.sh          # every config x every property (hours, see Bounds)
-verification/timeline-identity/able-to-fail.sh [config-prefix]   # each passing property fails on a broken variant
-verification/timeline-identity/trace.py verification/timeline-identity/out/<config>.<Property>.out
+tools/timeline-identity/check.sh s3-settled-a s3-settled-b s3-settled-c   # about 1 minute
+WORKERS=4 tools/timeline-identity/check.sh s3-live-a s3-live-b       # see Bounds for run times
+tools/timeline-identity/check.sh          # every config x every property (hours, see Bounds)
+tools/timeline-identity/able-to-fail.sh [config-prefix]   # each passing property fails on a broken variant
+tools/timeline-identity/trace.py tools/timeline-identity/out/<config>.<Property>.out
 ```
 
 `check.sh` runs each property in its own TLC run, so one failure never hides another. It keeps
@@ -176,14 +176,16 @@ every record; they add no behaviour, and every action is `<Name>Step /\ ObserveN
 - A seven-row ledger, PageSize 3 (Room's Around: 1 older row, the anchor, then newer rows), up to 6
   durable writes (MaxRev 7), one live turn per run of the model. These constants are the only
   bounds: every s3 run finishes without a state CONSTRAINT. Distinct states: s3-settled 189 to
-  4,283; s3-live-a 534,904 (about 1 minute per property); s3-live-b 3,769,282 (about 5 minutes
-  per property with WORKERS=4 on an idle host, 13 under a concurrent build).
+  4,283; s3-live-a 534,904 (about 1 minute per property); s3-live-b 5,573,348 (about 10 minutes
+  per property with WORKERS=4 under a concurrent build).
 - Record identity is the ledger index. serverId, otid and stream aliases collapse into it.
   Durable rows carry their run id (as the S1 fixture stores them); App Server rows that carry
   none get `turn-<prompt>` from `withPromptOwnedRunIds`, which the model does not reproduce.
 - The live run id equals the durable one, so live and settled keys share one name space (the worst
   case for collisions). main..OwnKeys key a live run `run-<id>` (unique in its snapshot); s3 keys
-  it `run-<id>-from-<oldest record>`, as its settled copy.
+  it `run-<id>-from-<oldest record>`, as its settled copy, except a one-record block whose run id
+  is not unique in the snapshot: the grouper builds a Single without a run key, which keeps its
+  `msg-` key (`keyedByOwnRecords` leaves it as built).
 - Paging page dropping (maxSize = 3 pages) is never reached at these bounds. Placeholders are off.
 - One load step = `preparePage` + `project` (adoption). Splitting it adds no behaviour: the load
   is checked against the revision afterwards, and `project` reads only live state, which can
@@ -206,8 +208,9 @@ main; the fourth is the owner's R4 case.
   `Ends` and both claim `run-<id>`. S3 keys every claimed block by its own oldest record.
 - **Partial durable page hides live rows (I5, N3).** A mid-turn catch-up makes only the first rows
   of a run durable; that row took the live block's key and `displayedLive` hid the whole live
-  block. S3 keys live runs by their own records too, and lists a live row under a settled row's
-  key as `<key>~live` unless that settled row holds every one of its records.
+  block. S3 keys live runs by their own records too; a live row draws only the records no settled
+  row draws yet (`withoutRecordsNamedBy`), so no record is drawn twice, and a live row left with
+  records under a settled row's key is listed as `<key>~live`.
 - **A durable row drawn before its live frame keeps its key (R4).** After a reconnect catch-up
   the settled row is drawn first; the turn's live frames arrive later and the turn settles. S3
   keeps the row's first key for the presentation's life, and hides the live block, whose records

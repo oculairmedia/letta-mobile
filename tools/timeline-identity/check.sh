@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Model-check TimelineIdentity: each property of each config in its own TLC run, so one
 # failing property never hides another. Usage:
-#   verification/timeline-identity/check.sh                 # every *.cfg, every property
-#   verification/timeline-identity/check.sh main-settled-a  # one config
-#   PROPS="NoDuplicateKey" verification/timeline-identity/check.sh d1-live-b
+#   tools/timeline-identity/check.sh                 # every *.cfg, every property
+#   tools/timeline-identity/check.sh main-settled-a  # one config
+#   PROPS="NoDuplicateKey" tools/timeline-identity/check.sh d1-live-b
 # Env: TLA2TOOLS (default /opt/tools/tla/tla2tools-1.7.4.jar), JAVA (default java on PATH,
-#      /usr/lib/jvm/jdk-26/bin/java when present), KEEP=1 keeps the TLC output in out/,
+#      /usr/lib/jvm/jdk-26/bin/java when present), KEEP=1 also keeps the output of passing runs,
 #      OUT=<dir> writes the TLC output there instead (give concurrent runs their own),
 #      WORKERS=<n> TLC worker threads (default 1).
 set -euo pipefail
@@ -31,6 +31,8 @@ for cfg in "${cfgs[@]}"; do
         -metadir "$work/states" -config run.cfg MC > "$log" 2>&1) || true
     if grep -q "No error has been found" "$log"; then
       result="PASS ($(grep -o '[0-9,]* distinct states found' "$log" | tail -1))"
+      # Only a passing run's log is dropped; a FAIL or ERROR log stays for the line that names it.
+      [ "${KEEP:-0}" = 1 ] || rm -f "$log"
     elif grep -qE "is violated|Temporal properties were violated" "$log"; then
       result="FAIL (trace: $log)"; status=1
     else
@@ -40,5 +42,4 @@ for cfg in "${cfgs[@]}"; do
     rm -rf "$work/states"
   done
 done
-[ "${KEEP:-0}" = 1 ] || find "$out" -name '*.out' -exec grep -L -E "is violated|Temporal properties were violated|Error" {} + 2>/dev/null | xargs -r rm -f
 exit $status

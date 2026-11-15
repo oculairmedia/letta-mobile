@@ -413,16 +413,19 @@ class CanonicalTimelinePresentation private constructor(
     companion object {
         /**
          * The list one read of [live] and the presented [settled] slots (null for a placeholder)
-         * renders. A live row is hidden only behind a settled row that holds all of it: under its key
-         * (the usual handover), or under the key a settled row was first drawn with before the live
-         * frame for its records arrived (a reconnect catch-up), so no record is drawn twice.
+         * renders, with no record drawn twice. A live row draws only the records no resident settled
+         * row draws yet, whatever key that row has (a settled row first drawn before the live frame
+         * for its records arrived, after a reconnect catch-up, keeps its own key), and is hidden once
+         * none are left. A live row that keeps records under a key a settled row holds is listed as
+         * `<key>~live` (TimelineRowAssembly.displayedLive).
          */
         fun assemble(live: List<ChatRenderItem>, settled: List<Row?>): TimelineRowAssembly {
-            val namedRows = settled.filter { it != null && it.liveNames.isNotEmpty() }
-            val shown = live.filterNot { item -> namedRows.any { it!!.holdsAll(item) } }
-            return TimelineRowAssembly.assemble(shown, settled.map { it?.item?.key }) { index, item ->
-                settled[index]?.holdsAll(item) ?: true
-            }
+            val drawnNames = settled.flatMapTo(HashSet()) { it?.liveNames.orEmpty() }
+            val shown = live.mapNotNull { it.withoutRecordsNamedBy(drawnNames) }
+            return TimelineRowAssembly.assemble(
+                shown,
+                TimelineRowAssembly.Settled(settled.map { it?.item?.key }) { index, item -> settled[index]?.holdsAll(item) ?: true },
+            )
         }
 
         /** Missing search targets fall back to a usable tail without replacing ingestion generation. */
