@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.data.commands.api.SlashCommandQuery
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -44,7 +45,7 @@ class IrohSlashCommandApiTest {
         }
         val api = IrohSlashCommandApi(IrohAdminRpcAgentDirectory(transport))
 
-        val commands = api.listAgentSlashCommands("agent-1")
+        val commands = api.listAgentSlashCommands(SlashCommandQuery("agent-1"))
 
         assertEquals(listOf("goal", "review"), commands.map { it.command })
         assertEquals("review", commands[1].skillName)

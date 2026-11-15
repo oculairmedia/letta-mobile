@@ -28,4 +28,15 @@ fun conversationModelPicker(
         models.select(entry.value, effort?.let(ReasoningEffortChoice::Named) ?: ReasoningEffortChoice.ProviderDefault)
     },
     onAddProvider = onAddProvider,
+).withToolsets(
+    session?.let { control ->
+        { scope ->
+            val focus = models.focus.value
+            control.toolsets(scope, focus.conversationId?.let { conversation ->
+                focus.agentId?.let { agent ->
+                    com.letta.mobile.data.toolsets.ToolsetRuntime(agent.value, conversation.value)
+                }
+            })
+        }
+    },
 )

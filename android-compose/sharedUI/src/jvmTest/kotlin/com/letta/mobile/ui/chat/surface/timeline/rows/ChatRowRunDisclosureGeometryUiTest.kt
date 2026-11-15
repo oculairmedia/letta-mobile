@@ -27,7 +27,7 @@ import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.ui.common.GroupPosition
-import com.letta.mobile.ui.components.DisclosureChevronDefaults
+import com.letta.mobile.ui.components.disclosure.DisclosureChevronDefaults
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.theme.ChatRowSpacing

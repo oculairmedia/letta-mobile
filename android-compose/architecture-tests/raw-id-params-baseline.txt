@@ -218,7 +218,7 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/runtime/TurnStreamIdenti
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/runtime/UnleasedApprovalAnswerer.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/runtime/WorkingDirectoryScopeKey.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/schedules/CronApi.kt 1
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/schedules/ScheduleLibraryController.kt 6
+sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/schedules/ScheduleLibraryController.kt 4
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/schedules/SchedulesPageModel.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/search/MessageSearch.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/secrets/AgentSecrets.kt 2
@@ -271,6 +271,7 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/timeline/snapshot/Confir
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/TimelineEventKeys.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/WsChatBridge.kt 5
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/WsFrameMapper.kt 1
+sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/api/CronRpcChannel.kt 7
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/api/IChannelTransport.kt 14
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/api/NoOpChannelTransport.kt 13
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/AppServerCommand.kt 1
@@ -348,7 +349,6 @@ sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohAg
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohAgentMessageReceiver.kt 1
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohAppServerTransport.kt 2
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohChannelTransport.kt 27
-sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohCronRpcClient.kt 7
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohDialer.kt 1
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohObserverIngestor.kt 5
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohPairingRedeemer.kt 2

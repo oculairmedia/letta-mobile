@@ -50,4 +50,6 @@ data class CronTask(
     /** ISO-8601 instant of the last fire the scheduler skipped, when the backend records one. */
     @SerialName("missed_at") val missedAt: String? = null,
     @SerialName("fire_count") val fireCount: Int = 0,
+    /** Exact host time for a one-time task; the cron expression alone has no year. */
+    @SerialName("scheduled_for") val scheduledFor: String? = null,
 )

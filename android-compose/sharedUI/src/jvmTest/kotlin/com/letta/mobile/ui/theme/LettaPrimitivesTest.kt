@@ -36,6 +36,17 @@ import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaChip
+import com.letta.mobile.ui.components.foundation.LettaOutlinedPill
+import com.letta.mobile.ui.components.foundation.LettaPill
+import com.letta.mobile.ui.components.foundation.LettaSectionHeader
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaTonalPill
+import com.letta.mobile.ui.components.foundation.lettaSectionTitle
+import com.letta.mobile.ui.components.disclosure.LettaMenuIndicator
+import com.letta.mobile.ui.components.foundation.LettaChipSlots
 
 /** The theme's shared primitives: section label and header, the pill family, spinner and busy bar (letta-mobile-yx00h). */
 class LettaPrimitivesTest {
@@ -65,7 +76,9 @@ class LettaPrimitivesTest {
                     LettaOutlinedPill("Read only", Modifier.testTag("outlined"))
                     LettaPill("fault", MaterialTheme.colorScheme.error, Modifier.testTag("icon"), icon = LettaIcons.Check)
                     // The box measures the chip's layout, touch target included.
-                    Box(Modifier.testTag("chip")) { LettaChip("High", onClick = {}, trailingIcon = LettaIcons.ChevronRight) }
+                    Box(Modifier.testTag("chip")) {
+                        LettaChip("High", onClick = {}, slots = LettaChipSlots(trailing = { LettaMenuIndicator() }))
+                    }
                 }
             }
         }
@@ -122,7 +135,7 @@ class LettaPrimitivesTest {
                     LettaTonalPill("Paused", LettaPillColors(scheme.secondaryContainer, scheme.onSecondaryContainer))
                     LettaTonalPill("12 / 80", LettaPillColors(scheme.surfaceContainerHighest, scheme.onSurfaceVariant))
                     LettaOutlinedPill("Full access")
-                    LettaChip("High", onClick = {}, trailingIcon = LettaIcons.ChevronRight)
+                    LettaChip("High", onClick = {}, slots = LettaChipSlots(trailing = { LettaMenuIndicator() }))
                 }
                 LettaSectionLabel("Status")
                 LettaStatusLabel("Connected", scheme.primary, icon = LettaIcons.Check)

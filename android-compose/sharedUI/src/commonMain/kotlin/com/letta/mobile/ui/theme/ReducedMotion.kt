@@ -2,16 +2,14 @@ package com.letta.mobile.ui.theme
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.staticCompositionLocalOf
+import com.letta.mobile.ui.theme.tokens.LocalLettaReducedMotion
 
 /**
- * Ambient reduced-motion preference for shared Compose UI. True snaps the shared chat page's
- * motion (row placement, disclosures, label swaps, composer morphs) and stills its loops.
- *
- * [ProvideAccessibilityPolicy] at each host theme fills this from the OS. Tests and the desktop
- * phone preview may still override it.
+ * The ambient reduced-motion preference; defined beside the leaf tokens, see
+ * [com.letta.mobile.ui.theme.tokens.LocalLettaReducedMotion]. The same local under its theme name,
+ * so call sites that read it through ui.theme need no change.
  */
-val LocalReducedMotion: ProvidableCompositionLocal<Boolean> = staticCompositionLocalOf { false }
+val LocalReducedMotion: ProvidableCompositionLocal<Boolean> = LocalLettaReducedMotion
 
 /** The ambient reduced-motion flag. Same name the Android designsystem used to own. */
 @Composable

@@ -52,7 +52,7 @@ import kotlinx.datetime.TimeZone
 import kotlin.time.Instant
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.theme.tokens.LettaTextAccents
-import com.letta.mobile.ui.theme.LettaPill
+import com.letta.mobile.ui.components.foundation.LettaPill
 import com.letta.mobile.ui.components.foundation.LettaPanel
 import androidx.compose.ui.semantics.Role
 import com.letta.mobile.ui.icons.LettaIcons
@@ -310,7 +310,7 @@ fun ScheduleDefRow(label: String, value: String) {
 
 /** The rail's words, pure. */
 object ScheduleRailText {
-    const val CONTROL_NOTE = "Run now / Pause need a backend control endpoint (not available yet)."
+    const val CONTROL_NOTE = "Run now needs a backend control endpoint (not available yet)."
 
     fun cadence(def: ScheduleDef): String =
         def.cron?.let { CronSchedule.parse(it)?.let(CronSchedule::describe) ?: it } ?: "One-time"

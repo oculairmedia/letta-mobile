@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.chat.subagents
 
-import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -10,6 +9,8 @@ import androidx.compose.ui.semantics.Role
 import com.letta.mobile.data.subagents.SubagentRoster
 import com.letta.mobile.data.subagents.SubagentRosterItem
 import com.letta.mobile.ui.components.list.RosterSection
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 /** One roster row: a running [card] (activity lines) or an ended row. */
 @Immutable
@@ -60,7 +61,7 @@ private fun SectionAction(label: String, onClick: () -> Unit) {
         text = label,
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.clickable(role = Role.Button, onClick = onClick),
+        modifier = Modifier.lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = onClick),
     )
 }
 

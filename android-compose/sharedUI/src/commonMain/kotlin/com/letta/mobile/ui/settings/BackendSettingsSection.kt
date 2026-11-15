@@ -26,7 +26,7 @@ import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaSpinner
 import kotlinx.coroutines.launch
 import kotlin.time.TimeSource
 

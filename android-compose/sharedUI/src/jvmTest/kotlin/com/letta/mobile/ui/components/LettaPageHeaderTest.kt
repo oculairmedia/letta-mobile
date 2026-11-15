@@ -27,6 +27,7 @@ import com.letta.mobile.ui.host.ProvideLettaHost
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 
 /**
  * The page header's placement contract (letta-mobile-16b2u) at the owner's four widths: the title

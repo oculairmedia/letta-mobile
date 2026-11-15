@@ -1,10 +1,10 @@
 package com.letta.mobile.ui.memory
 
 import androidx.compose.ui.platform.testTag
-import com.letta.mobile.ui.components.LettaChipTabRow
-import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTabRow
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 import com.letta.mobile.ui.components.LettaRefreshAction
-import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -31,15 +29,16 @@ import com.letta.mobile.data.memory.MemoryParityControllerState
 import com.letta.mobile.data.memory.MemoryParitySummary
 import com.letta.mobile.data.memory.MemorySummaryMetricKind
 import com.letta.mobile.data.memory.graph.MemoryPageActions
-import com.letta.mobile.ui.components.ChevronEmphasis
-import com.letta.mobile.ui.components.ChevronIndication
-import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.disclosure.ChevronEmphasis
 import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.components.LettaPageHeader
 import com.letta.mobile.ui.components.lettaCount
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.components.disclosure.LettaMenuIndicator
+import com.letta.mobile.ui.components.disclosure.LettaMenuIndicatorStyle
+import com.letta.mobile.ui.components.LettaPopupMenu
 
 /** The host's presentation choices, and [canCreateBlock]: offer "New block". */
 internal data class MemoryChromeOptions(val page: MemoryPageOptions, val canCreateBlock: Boolean)
@@ -93,24 +92,16 @@ internal fun MemoryAgentPicker(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            DisclosureChevron(
-                expanded = false,
-                emphasis = ChevronEmphasis.Emphasized,
-                indicates = ChevronIndication.Sheet,
+            LettaMenuIndicator(
                 contentDescription = CHOOSE_AGENT,
+                style = LettaMenuIndicatorStyle(emphasis = ChevronEmphasis.Emphasized, compact = false),
             )
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            agents.forEach { agent ->
-                DropdownMenuItem(
-                    text = { Text(agent.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    onClick = {
-                        expanded = false
-                        onAgentSelected(agent.id)
-                    },
-                )
-            }
-        }
+        LettaPopupMenu(
+            expanded = expanded,
+            onDismiss = { expanded = false },
+            items = agents.map { agent -> LettaMenuItem(agent.name) { onAgentSelected(agent.id) } },
+        )
     }
 }
 

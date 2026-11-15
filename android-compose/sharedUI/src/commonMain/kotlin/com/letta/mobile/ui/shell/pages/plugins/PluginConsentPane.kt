@@ -17,7 +17,7 @@ import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.catalog.PluginConsentItem
 import com.letta.mobile.data.plugin.catalog.PluginConsentSheet
 import com.letta.mobile.data.plugin.catalog.PluginsPageActions
-import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.host.LettaPaneButton
 import com.letta.mobile.ui.host.LettaPaneButtonRow

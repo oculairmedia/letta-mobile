@@ -3,7 +3,6 @@ package com.letta.mobile.ui.chat.surface.composer
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -49,7 +48,7 @@ import com.letta.mobile.sharedui.resources.composer_send
 import com.letta.mobile.sharedui.resources.composer_stop
 import com.letta.mobile.sharedui.resources.composer_stopping
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
-import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.context.ModelPickerHost
 import com.letta.mobile.ui.icons.LettaIcons
@@ -57,6 +56,8 @@ import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import org.jetbrains.compose.resources.stringResource
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 /**
  * The prompt card's control row: the plus (attach / open canvas), the one model control (model and
@@ -167,7 +168,7 @@ internal fun ComposerIconButton(
         modifier = modifier
             .size(LettaDimens.Control.iconButton)
             .clip(CircleShape)
-            .clickable(onClick = onClick, role = Role.Button, onClickLabel = contentDescription),
+            .lettaClickable(role = Role.Button, onClickLabel = contentDescription, target = LettaClickTarget.Inline, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(

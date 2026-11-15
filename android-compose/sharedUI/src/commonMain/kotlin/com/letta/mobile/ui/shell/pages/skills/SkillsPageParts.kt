@@ -32,8 +32,8 @@ import com.letta.mobile.data.skills.SkillCategories
 import com.letta.mobile.data.skills.SkillCategory
 import com.letta.mobile.data.skills.SkillSourceLabels
 import com.letta.mobile.ui.components.LettaCatalogCard
-import com.letta.mobile.ui.components.LettaChipTab
-import com.letta.mobile.ui.components.LettaChipTabRow
+import com.letta.mobile.ui.components.foundation.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTabRow
 import com.letta.mobile.ui.components.LettaPageHeader
 import com.letta.mobile.ui.components.foundation.LettaButtonIcon
 import com.letta.mobile.ui.components.foundation.LettaIcon
@@ -43,14 +43,14 @@ import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.components.LettaInfoBox
 import com.letta.mobile.ui.components.LettaInlineError
-import com.letta.mobile.ui.theme.LettaPill
+import com.letta.mobile.ui.components.foundation.LettaPill
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import com.letta.mobile.ui.theme.customColors
-import com.letta.mobile.ui.theme.lettaSectionTitle
+import com.letta.mobile.ui.components.foundation.lettaSectionTitle
 
 @Composable
 internal fun SkillsHeader(page: SkillsPageScope) {

@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -48,12 +47,13 @@ import com.letta.mobile.ui.components.foundation.LettaIconButton
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.foundation.LettaSwatch
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import io.ak1.drawbox.domain.model.StrokeStyle
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 
 /**
  * The board's one property control, in the way Concepts keeps a single master control that
@@ -420,23 +420,21 @@ private fun NoteProperties(note: NoteBarActions, style: CanvasTextStyle) {
 
 @Composable
 private fun TargetChip(target: ColorTarget, color: Color, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
+    LettaChipTab(
+        text = null,
+        active = selected,
         onClick = onClick,
-        label = { LettaIcon(target.glyph, contentDescription = null, style = LettaIconStyle(LettaDimens.Control.iconSm)) },
-        leadingIcon = { LettaColorSwatch(LettaSwatch(color, size = LettaDimens.Control.icon)) },
         modifier = Modifier.semantics { contentDescription = "Target ${target.label}" },
+        leading = {
+            LettaColorSwatch(LettaSwatch(color, size = LettaDimens.Control.icon))
+            LettaIcon(target.glyph, contentDescription = null, style = LettaIconStyle(LettaDimens.Control.iconSm))
+        },
     )
 }
 
 @Composable
 private fun Chip(label: String, description: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label) },
-        modifier = Modifier.semantics { contentDescription = description },
-    )
+    LettaChipTab(text = label, active = selected, onClick = onClick, modifier = Modifier.semantics { contentDescription = description })
 }
 
 @Composable

@@ -34,7 +34,8 @@ object ModelControlModule {
     /** letta-mobile-ckmub.2: the shell's Providers page and the chat's picker share one catalog. */
     @Provides
     @Singleton
-    fun provideModelControlSession(rpc: AdminRpcInvoker): ModelControlSession = ModelControlSession(rpc)
+    fun provideModelControlSession(transport: IChannelTransport): ModelControlSession =
+        com.letta.mobile.data.repository.modelcontrol.modelControlSession({ transport })
 
     /** n2stx.2.2: notes the host shares with this device; the RPC resolves on the first call, not at composition. */
     @Provides

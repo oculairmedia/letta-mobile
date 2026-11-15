@@ -26,7 +26,7 @@ The upstream source commit is distinct from the Git blob identities below. Hashe
 | Authoritative fixture | SHA-256 (LF-normalized bytes) | Git blob SHA-1 (LF-normalized bytes) |
 | --- | --- | --- |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json | 8497018ab5029688fb39e12649cb23eb590579e4089d23c953f7328f43e7dd48 | 084ee402a409222c1fddc297f3a9e2f2af1bbb0d |
-| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 04b988d7e640ff16c9d21edf8b2c521fe1d4955a3b61407ee1f11125b231e548 | fae41ccd0fff7307048a7c3170cd55eaaefdab77 |
+| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 34ae7e9876c1846751cacb7420fd225848f4ed72a4b83b34c66a7afc066d7bd8 | 3a7d6d269410817a630ae1cf3b7198de930407b5 |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json | 68d58b33f8c43e2f576c401895964a7ba3c0b9a2c4f0feef05ce769c063bcfc1 | ab8544019a9bc743793d7405cb93d4c1248e465d |
 
 Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json), [admin ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json) and [contract matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json). These source files may contain dated annotations; this generator does not upgrade their evidence dates.
@@ -295,13 +295,13 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | write&#95;file&#95;response |
 | write&#95;memory&#95;file&#95;response |
 
-## Admin ownership (166 methods)
+## Admin ownership (170 methods)
 
 These are declared ownership decisions, not newly observed production execution. Method-registration parity remains enforced by [IrohAdminOwnershipMatrixTest](../../android-compose/sharedLogic/src/jvmTest/kotlin/com/letta/mobile/data/controller/node/iroh/IrohAdminOwnershipMatrixTest.kt); the generator does not parse Kotlin or replace that test.
 
 | Owner | Method count |
 | --- | --- |
-| app&#95;server&#95;v2 | 57 |
+| app&#95;server&#95;v2 | 61 |
 | beads&#95;service | 21 |
 | capability&#95;gated&#95;unsupported | 17 |
 | controller&#95;native | 44 |
@@ -312,7 +312,7 @@ These are declared ownership decisions, not newly observed production execution.
 | Fallback | Method count |
 | --- | --- |
 | deny&#95;fail&#95;closed | 58 |
-| none | 108 |
+| none | 112 |
 
 | Method | Owner | Fallback | Authorization | Handler | Public contract |
 | --- | --- | --- | --- | --- | --- |
@@ -380,6 +380,8 @@ These are declared ownership decisions, not newly observed production execution.
 | cron.delete&#95;all | app&#95;server&#95;v2 | none | admin&#95;write | CronAdminHandlers.kt | cron&#95;delete&#95;all |
 | cron.get | app&#95;server&#95;v2 | none | admin&#95;read | CronAdminHandlers.kt | cron&#95;get |
 | cron.list | app&#95;server&#95;v2 | none | admin&#95;read | CronAdminHandlers.kt | cron&#95;list |
+| cron.pause | app&#95;server&#95;v2 | none | admin&#95;write | CronAdminHandlers.kt | cron&#95;pause |
+| cron.resume | app&#95;server&#95;v2 | none | admin&#95;write | CronAdminHandlers.kt | cron&#95;resume |
 | cron.runs | app&#95;server&#95;v2 | none | admin&#95;read | CronAdminHandlers.kt | cron&#95;runs |
 | cron.trigger | app&#95;server&#95;v2 | none | admin&#95;write | CronAdminHandlers.kt | cron&#95;trigger |
 | cron.update | app&#95;server&#95;v2 | none | admin&#95;write | CronAdminHandlers.kt | cron&#95;update |
@@ -466,6 +468,7 @@ These are declared ownership decisions, not newly observed production execution.
 | skill.list | controller&#95;native | none | admin&#95;read | SkillAdminHandlers.kt | authoritative catalog with explicit hydrated/stale/catalog&#95;source provenance |
 | skill.list&#95;agent | controller&#95;native | none | admin&#95;read | SkillAdminHandlers.kt | the process-global catalog, explicitly labelled process&#95;global:true |
 | skill.uninstall | app&#95;server&#95;v2 | none | admin&#95;write | SkillAdminHandlers.kt | skill&#95;disable |
+| slash&#95;command.execute | app&#95;server&#95;v2 | none | admin&#95;write | SlashCommandAdminHandlers.kt | slash&#95;command.execute/execute-v1 |
 | slash&#95;command.list | controller&#95;native | none | admin&#95;read | SlashCommandAdminHandlers.kt | SlashCommandsResponse rows with catalog&#95;source provenance |
 | slash&#95;command.list&#95;agent | controller&#95;native | none | admin&#95;read | SlashCommandAdminHandlers.kt | SlashCommandsResponse rows with catalog&#95;source provenance |
 | step.list | local&#95;backend&#95;store | deny&#95;fail&#95;closed | admin&#95;read | RunAdminHandlers.kt | controller-owned step history over the letta-code on-disk backend |
@@ -480,6 +483,7 @@ These are declared ownership decisions, not newly observed production execution.
 | tool.list | controller&#95;native | none | admin&#95;read | ToolAdminHandlers.kt | controller-owned builtin tool catalog |
 | tool.update | capability&#95;gated&#95;unsupported | deny&#95;fail&#95;closed | admin&#95;write | ToolAdminHandlers.kt | explicit capability denial pending a native tool-library command |
 | tool&#95;return.get | app&#95;server&#95;v2 | none | conversation&#95;scoped | ConversationAdminHandlers.kt | conversation&#95;messages&#95;list |
+| toolset.update | app&#95;server&#95;v2 | none | conversation&#95;scoped | ModelAdminHandlers.kt | docs/reference/contracts/toolset.update/toolset-v1.md |
 | workspace.read&#95;file | app&#95;server&#95;v2 | none | admin&#95;read | WorkspaceAdminHandlers.kt | read&#95;file |
 | workspace.search&#95;files | app&#95;server&#95;v2 | none | admin&#95;read | WorkspaceAdminHandlers.kt | search&#95;files |
 

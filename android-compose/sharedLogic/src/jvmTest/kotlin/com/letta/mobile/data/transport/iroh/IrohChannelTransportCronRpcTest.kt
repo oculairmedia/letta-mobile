@@ -29,6 +29,70 @@ class IrohChannelTransportCronRpcTest {
         """{"id":"task-1","agent_id":"agent-1","conversation_id":"conv-a","name":"Nightly","description":"d","cron":"0 3 * * *","timezone":"UTC","recurring":true,"prompt":"go","status":"active","created_at":"2026-01-01T00:00:00Z"}"""
 
     @Test
+    fun appServerChannelUsesTheSamePauseAndResumeContract() = runTest {
+        val calls = mutableListOf<String>()
+        var caseName = "success"
+        val client = java.lang.reflect.Proxy.newProxyInstance(
+            com.letta.mobile.data.transport.appserver.AppServerClient::class.java.classLoader,
+            arrayOf(com.letta.mobile.data.transport.appserver.AppServerClient::class.java),
+        ) { _, method, args ->
+            when (method.name) {
+                "isConnected", "getIsConnected" -> kotlinx.coroutines.flow.MutableStateFlow(true)
+                "getEvents" -> kotlinx.coroutines.flow.MutableSharedFlow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>()
+                "adminRpc" -> {
+                    val command = args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.AdminRpc
+                    calls += command.method
+                    assertEquals("task-1", command.params?.get("task_id")?.jsonPrimitive?.content)
+                    if (command.method == "cron.resume") {
+                        assertEquals("2026-12-01T09:00:00Z", command.params?.get("scheduled_for")?.jsonPrimitive?.content)
+                    }
+                    val text = checkNotNull(javaClass.classLoader.getResource("contracts/${command.method}/control-v1.json")).readText()
+                    val wire = WireContractFixture(text).response(caseName)
+                    response(command.requestId, wire.getValue("success").jsonPrimitive.content == "true", wire["result"],
+                        wire["error"]?.jsonPrimitive?.content)
+                }
+                else -> error("Unexpected client call: ${method.name}")
+            }
+        } as com.letta.mobile.data.transport.appserver.AppServerClient
+        val channel = com.letta.mobile.data.transport.api.AppServerClientChannel(client, backgroundScope)
+        val pause = com.letta.mobile.data.transport.api.CronPauseCommand("task-1")
+        val resume = com.letta.mobile.data.transport.api.CronResumeCommand("task-1", "2026-12-01T09:00:00Z")
+        assertTrue(channel.sendCronPause(pause).success)
+        assertTrue(channel.sendCronResume(resume).success)
+        caseName = "failure"
+        assertEquals("Task cannot change state", channel.sendCronPause(pause).error)
+        assertEquals("Task cannot change state", channel.sendCronResume(resume).error)
+        assertEquals(listOf("cron.pause", "cron.resume", "cron.pause", "cron.resume"), calls)
+    }
+
+    @Test
+    fun pauseAndResumeUseTheHandlerContractAndPreserveHostErrors() = runTest {
+        var caseName = "success"
+        val calls = mutableListOf<Call>()
+        val transport = transport(calls) { method, _, _ ->
+            val text = checkNotNull(javaClass.classLoader.getResource("contracts/$method/control-v1.json")).readText()
+            val wire = WireContractFixture(text).response(caseName)
+            response(
+                "control", success = wire.getValue("success").jsonPrimitive.content == "true",
+                result = wire["result"], error = wire["error"]?.jsonPrimitive?.content,
+            )
+        }
+        val pause = com.letta.mobile.data.transport.api.CronPauseCommand("task-1")
+        val resume = com.letta.mobile.data.transport.api.CronResumeCommand("task-1", "2026-12-01T09:00:00Z")
+        assertTrue(transport.sendCronPause(pause).success)
+        assertTrue(transport.sendCronResume(resume).success)
+        assertEquals(listOf("cron.pause", "cron.resume"), calls.map { it.method })
+        assertEquals("task-1", json.parseToJsonElement(calls[0].body!!).jsonObject.getValue("task_id").jsonPrimitive.content)
+        assertEquals(
+            "2026-12-01T09:00:00Z",
+            json.parseToJsonElement(calls[1].body!!).jsonObject.getValue("scheduled_for").jsonPrimitive.content,
+        )
+        caseName = "failure"
+        assertEquals("Task cannot change state", transport.sendCronPause(pause).error)
+        assertEquals("Task cannot change state", transport.sendCronResume(resume).error)
+    }
+
+    @Test
     fun `list maps tasks and forwards agent and conversation filters`() = runTest {
         val calls = mutableListOf<Call>()
         val transport = transport(calls = calls) { method, _, _ ->

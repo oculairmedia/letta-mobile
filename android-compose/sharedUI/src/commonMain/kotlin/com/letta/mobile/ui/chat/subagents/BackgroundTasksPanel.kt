@@ -2,7 +2,6 @@ package com.letta.mobile.ui.chat.subagents
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -35,6 +34,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 object BackgroundTasksTags {
     const val PANEL = "background_tasks_panel"
@@ -156,7 +157,7 @@ fun BackgroundTasksToggle(
                     modifier = Modifier
                         .size(LettaDimens.Control.iconButtonLg)
                         .clip(CircleShape)
-                        .clickable(role = Role.Button, onClick = onClick)
+                        .lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = onClick)
                         .semantics { contentDescription = label }
                         .testTag(BackgroundTasksTags.TOGGLE),
                     contentAlignment = Alignment.Center,

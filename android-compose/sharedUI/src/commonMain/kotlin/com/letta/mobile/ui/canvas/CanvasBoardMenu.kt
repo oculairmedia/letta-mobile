@@ -3,23 +3,20 @@ package com.letta.mobile.ui.canvas
 import com.letta.mobile.ui.host.LettaMenu
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.DropdownMenuItem
 import com.letta.mobile.ui.components.foundation.LettaDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.IntOffset
-import com.letta.mobile.ui.theme.LettaDimens
 import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlin.math.roundToInt
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.components.foundation.LettaMenuEntry
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 
 /** Where a context menu was asked for, and whether it landed on something. */
 internal data class BoardMenuRequest(
@@ -92,16 +89,10 @@ internal fun CanvasInsertMenuItems(insert: BoardInsertActions, at: Offset, onDis
     }
 }
 
+/** One of the board menu's rows: the shared menu row. */
 @Composable
 private fun MenuItem(icon: ImageVector, label: String, onDismiss: () -> Unit, onClick: () -> Unit) {
-    DropdownMenuItem(
-        text = { Text(label) },
-        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
-        onClick = {
-            onDismiss()
-            onClick()
-        },
-    )
+    LettaMenuEntry(LettaMenuItem(label, icon, onClick = onClick), onDismiss)
 }
 
 private fun Modifier.offsetTo(position: Offset): Modifier =

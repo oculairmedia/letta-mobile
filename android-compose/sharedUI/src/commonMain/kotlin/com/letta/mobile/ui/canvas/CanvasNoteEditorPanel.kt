@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -54,7 +53,6 @@ import com.letta.mobile.data.canvas.CanvasTextStyle
 import com.letta.mobile.data.model.CanvasNoteId
 import com.letta.mobile.ui.components.foundation.LettaButtonIcon
 import com.letta.mobile.ui.components.foundation.LettaColorSwatch
-import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.components.foundation.LettaIconButton
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.foundation.LettaSwatch
@@ -66,6 +64,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.clip
+import com.letta.mobile.ui.components.foundation.LettaMenuEntry
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 
 /** What the opened note offers beyond its own text: the board's undo, copying and removing it. */
 class NoteEditorActions(
@@ -262,10 +262,7 @@ private fun NoteAddMenu(toolbar: NoteToolbar?, onCard: Color) {
         NoteIcon(NoteButton(LettaIcons.SquarePlus, "Add to note", enabled = toolbar != null && todo != null), onCard) { open = true }
         LettaMenu(expanded = open, onDismiss = { open = false }) {
             if (toolbar != null && todo != null) {
-                MenuRow(LettaIcons.ListTodo, "Checkboxes") {
-                    open = false
-                    toolbar.apply(todo)
-                }
+                LettaMenuEntry(LettaMenuItem("Checkboxes", LettaIcons.ListTodo) { toolbar.apply(todo) }, onDismiss = { open = false })
             }
         }
     }
@@ -278,15 +275,9 @@ private fun NoteMoreMenu(actions: NoteEditorActions, onCard: Color) {
         NoteIcon(NoteButton(LettaIcons.EllipsisVertical, "More"), onCard) { open = true }
         LettaMenu(expanded = open, onDismiss = { open = false }) {
             actions.onDuplicate?.let { duplicate ->
-                MenuRow(LettaIcons.Copy, "Make a copy") {
-                    open = false
-                    duplicate()
-                }
+                LettaMenuEntry(LettaMenuItem("Make a copy", LettaIcons.Copy, onClick = duplicate), onDismiss = { open = false })
             }
-            MenuRow(LettaIcons.Delete, "Delete") {
-                open = false
-                actions.onDelete()
-            }
+            LettaMenuEntry(LettaMenuItem("Delete", LettaIcons.Delete, onClick = actions.onDelete), onDismiss = { open = false })
         }
     }
 }
@@ -331,15 +322,6 @@ private fun SwatchRow(palette: List<NamedColor>, current: Color?, onPick: (Color
             LettaColorSwatch(LettaSwatch(swatch.color, selected, name = swatch.name), onClick = { onPick(swatch.color) })
         }
     }
-}
-
-@Composable
-private fun MenuRow(icon: ImageVector, label: String, onClick: () -> Unit) {
-    DropdownMenuItem(
-        text = { Text(label) },
-        leadingIcon = { LettaIcon(icon, contentDescription = null) },
-        onClick = onClick,
-    )
 }
 
 /** A button in the note's bars: what it shows and says, and whether it is on or available. */

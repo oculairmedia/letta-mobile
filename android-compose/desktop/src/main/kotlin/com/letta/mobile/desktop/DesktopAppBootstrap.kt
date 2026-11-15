@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.commands.api.SlashCommandQuery
 import com.letta.mobile.data.objectverbs.binding.withDevicePins
 import com.letta.mobile.data.storage.SecureSettingsStore
 import androidx.compose.runtime.Composable
@@ -123,13 +124,12 @@ internal fun DesktopChatControllerLifecycle(chatController: DesktopChatControlle
 /** Typed agent id for desktop library/panel operations. */
 @JvmInline
 internal value class DesktopAgentId(val value: String)
-
 /** The focused agent's server slash commands for the composer palette. */
 internal suspend fun loadAgentSlashCommands(
     api: SlashCommandsApi?,
     agentId: DesktopAgentId?,
 ): List<AgentSlashCommand> = if (api != null && agentId != null) {
-    runCatching { api.listAgentSlashCommands(agentId.value) }.getOrDefault(emptyList())
+    runCatching { api.listAgentSlashCommands(SlashCommandQuery(agentId.value)) }.getOrDefault(emptyList())
 } else {
     emptyList()
 }

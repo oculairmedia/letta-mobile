@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.chat.surface.composer
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,13 +37,16 @@ import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.surface.touchStyle
-import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.theme.LettaCheckGlyph
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.chatRowName
 import org.jetbrains.compose.resources.stringResource
+import com.letta.mobile.ui.components.line.StatusTone
+import com.letta.mobile.ui.components.foundation.StatusGlyph
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 /**
  * Chooses [command] for the draft's `/` token: a filling command puts its text in the draft;
@@ -119,7 +121,7 @@ private fun CommandSuggestionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Button) { onChoose(command) }
+            .lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = { onChoose(command) })
             .testTag(ComposerTestTags.COMMAND_ROW + command.id)
             .padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.xs),
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
@@ -221,7 +223,7 @@ private fun TouchCommandChip(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (command.removable) {
-                    LettaCheckGlyph()
+                    StatusGlyph(StatusTone.Chosen, size = LettaDimens.Control.icon)
                 } else {
                     Icon(imageVector = LettaIcons.Add, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
                 }

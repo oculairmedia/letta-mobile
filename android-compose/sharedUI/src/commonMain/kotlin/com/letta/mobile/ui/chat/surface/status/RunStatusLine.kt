@@ -50,7 +50,7 @@ import com.letta.mobile.sharedui.resources.run_status_tool
 import com.letta.mobile.sharedui.resources.run_status_waiting
 import com.letta.mobile.sharedui.resources.run_status_working
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaSpinner
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.StringResource

@@ -8,7 +8,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -108,6 +107,8 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 /*
  * letta-mobile-bglj6.1.9: the Touch canvas mode. No panel: a flush chat bar pinned to the bottom of
@@ -561,7 +562,7 @@ private fun PopupReply(reply: PopupTurn, content: TouchHeadContent, placement: P
     val onOpen = content.openChat
     Column(
         Modifier
-            .clickable(onClickLabel = openLabel, role = Role.Button, onClick = onOpen)
+            .lettaClickable(role = Role.Button, onClickLabel = openLabel, target = LettaClickTarget.Inline, onClick = onOpen)
             .semantics {
                 contentDescription = announcement
                 if (!turn.streaming) liveRegion = LiveRegionMode.Polite

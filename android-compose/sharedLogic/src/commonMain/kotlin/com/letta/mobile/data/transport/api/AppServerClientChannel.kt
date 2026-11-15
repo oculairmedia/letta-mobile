@@ -9,6 +9,12 @@ import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ServerFrameSerializer
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.shareIn
@@ -25,16 +31,37 @@ import kotlin.uuid.Uuid
  * holds ([client]), for a host with no JVM Iroh binding (the browser reaches an Iroh host's App
  * Server on `/letta/appserver/0` through iroh-wasm). It carries what the graph's Iroh admin sources
  * need: `admin_rpc` (the same [appServerAdminRpcParams] request the JVM Iroh transport sends) and
- * the connection state. Chat turns ride the App Server turn engine, not this channel; cron and
- * subagent RPCs are not bridged yet, so they fail as on [NoOpChannelTransport]. [state] and [events]
- * are shared on [scope] only while something observes them, so a closed graph leaves nothing running.
+ * the connection state. Chat turns ride the App Server turn engine, not this channel; cron RPCs use the
+ * same bridge as the JVM channel. Subagent RPCs are not bridged yet, so they fail as on
+ * [NoOpChannelTransport]. [state] and [events] are shared on [scope] only while something observes
+ * them. Toolset status is retained eagerly until the session disconnects; [scope] bounds its
+ * collector as well.
  */
 class AppServerClientChannel(
     private val client: AppServerClient,
     scope: CoroutineScope,
     /** What the host advertised when this session authenticated (its `auth_response` capabilities). */
     override val hostCapabilities: Set<String> = emptySet(),
-) : NoOpChannelTransport() {
+) : CronRpcChannel(appServerCronRpc(client)) {
+    private val toolsets = ToolsetStatusStore()
+    override val toolsetStates = toolsets.states
+
+    init {
+        scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            val observation = launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                client.events.collect { toolsets.observe(it) }
+            }
+            try {
+                if (client.isConnected.firstOrNull { !it } == null) awaitCancellation()
+            } finally {
+                withContext(NonCancellable) {
+                    observation.cancelAndJoin()
+                    toolsets.clear()
+                }
+            }
+        }
+    }
+
     override val state: StateFlow<ChannelTransportState> = client.isConnected
         .map { connected -> if (connected) CONNECTED else DISCONNECTED }
         .stateIn(scope, SharingStarted.WhileSubscribed(), ChannelTransportState.Connecting())
@@ -47,16 +74,6 @@ class AppServerClientChannel(
     override val events: SharedFlow<ServerFrame> = client.events
         .mapNotNull { received -> (received.frame as? AppServerInboundFrame.Unknown)?.let { hostPush(it.raw) } }
         .shareIn(scope, SharingStarted.WhileSubscribed())
-
-    @OptIn(ExperimentalUuidApi::class)
-    override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
-        client.adminRpc(
-            AppServerCommand.AdminRpc(
-                requestId = "admin-${Uuid.random()}",
-                method = method,
-                params = appServerAdminRpcParams(path = path, body = body),
-            ),
-        )
 
     private companion object {
         /**
@@ -74,4 +91,15 @@ class AppServerClientChannel(
         val CONNECTED = ChannelTransportState.Connected(serverId = "app-server", sessionId = "app-server", deviceId = null)
         val DISCONNECTED = ChannelTransportState.Disconnected(code = 1000, reason = "App Server session closed")
     }
+}
+
+@OptIn(ExperimentalUuidApi::class)
+private fun appServerCronRpc(client: AppServerClient):
+    suspend (String, String, String?) -> AppServerInboundFrame.AdminRpcResponse = { method, path, body ->
+    client.adminRpc(
+        AppServerCommand.AdminRpc(
+            requestId = "admin-${Uuid.random()}", method = method,
+            params = appServerAdminRpcParams(path = path, body = body),
+        ),
+    )
 }

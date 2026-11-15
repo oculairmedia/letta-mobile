@@ -3,7 +3,6 @@ package com.letta.mobile.ui.chat.surface.timeline.rows
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,6 +67,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 /** The viewed page's zoom, for tests (the legacy viewer's ChatImageViewerScale). */
 internal val ChatImageViewerScaleKey = SemanticsPropertyKey<Float>("ChatImageViewerScale")
@@ -106,7 +107,18 @@ internal fun ChatImageViewerContent(
                 .fillMaxSize()
                 .testTag(ChatRowTestTags.IMAGE_VIEWER)
                 .background(if (touch) Color.Black else MaterialTheme.colorScheme.scrim.copy(alpha = ChatRowAlpha.viewerScrim))
-                .then(if (touch) Modifier else Modifier.clickable(role = Role.Button, onClickLabel = closeLabel, onClick = onDismiss))
+                .then(
+                    if (touch) {
+                        Modifier
+                    } else {
+                        Modifier.lettaClickable(
+                            role = Role.Button,
+                            onClickLabel = closeLabel,
+                            target = LettaClickTarget.Inline,
+                            onClick = onDismiss,
+                        )
+                    },
+                )
                 .onPreviewKeyEvent { event -> handleViewerKey(event, ViewerKeyTarget(pagerState, scope, onDismiss)) }
                 .focusRequester(focusRequester)
                 .focusable(),

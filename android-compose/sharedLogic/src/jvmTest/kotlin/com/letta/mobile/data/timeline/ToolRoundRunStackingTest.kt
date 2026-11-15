@@ -40,7 +40,7 @@ class ToolRoundRunStackingTest {
             // The running Bash call (no return yet) sits in the same run as the finished ones.
             assertTrue(messages.last().toolCalls.orEmpty().single().result == null)
             // The run keeps its first round's key as later rounds append, so its slot never moves.
-            assertEquals("run-$RUN_1", runs.single().key)
+            assertEquals("run-$RUN_1-from-thought-1:REASONING", runs.single().key)
         } finally {
             harness.close()
         }

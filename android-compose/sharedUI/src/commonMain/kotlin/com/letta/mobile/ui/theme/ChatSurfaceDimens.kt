@@ -2,7 +2,6 @@ package com.letta.mobile.ui.theme
 
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 
 /** The shared chat page's shell tokens (the docked panel over the canvas). */
 object ChatSurfaceDimens {
@@ -55,7 +54,7 @@ object ChatSurfaceDimens {
     val dockCollapsedHeightEstimate: Dp = 180.dp
 
     /** The collapsed dock's reply bubble: at most this wide (a share of the chat column)... */
-    val collapsedBubbleMaxWidth: Dp = ChatColumnMaxWidth * 0.6f
+    val collapsedBubbleMaxWidth: Dp = LettaDimens.Pane.contentMaxWidth * 0.6f
 
     /** ...and this tall; a longer reply scrolls inside it. */
     val collapsedBubbleMaxHeight: Dp = 280.dp

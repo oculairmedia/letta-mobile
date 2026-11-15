@@ -17,9 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.launch
 import com.letta.mobile.data.lens.WorkPlayLens
-import com.letta.mobile.ui.components.LettaChipTab
-import com.letta.mobile.ui.components.LettaMenuItem
-import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import com.letta.mobile.ui.components.list.RosterActions
 import com.letta.mobile.ui.components.list.RosterLayout
 import com.letta.mobile.ui.components.list.RosterList

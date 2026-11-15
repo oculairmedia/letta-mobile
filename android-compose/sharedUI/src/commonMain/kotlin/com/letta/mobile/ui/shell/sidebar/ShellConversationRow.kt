@@ -55,7 +55,7 @@ import com.composables.icons.lucide.Palette
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.ui.chat.branch.ForkNameDialog
 import com.letta.mobile.ui.components.row.LettaListRowSpec
-import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterRowSlots
@@ -66,7 +66,7 @@ import com.letta.mobile.ui.shell.ShellConversationManageMenu
 import com.letta.mobile.ui.shell.ShellConversationMenuActions
 import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaSpinner
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import androidx.compose.runtime.collectAsState
 import com.letta.mobile.data.lanes.ConversationLane
