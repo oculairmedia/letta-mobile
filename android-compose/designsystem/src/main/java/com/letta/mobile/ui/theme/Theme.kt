@@ -504,6 +504,8 @@ fun LettaTheme(
         CompositionLocalProvider(LocalCustomColors provides customColors) {
             MaterialExpressiveTheme(
                 colorScheme = colorScheme,
+                // The one corner scale, shared with desktop and the web.
+                shapes = SharedShapes,
                 typography = Typography,
                 motionScheme = MotionScheme.expressive(),
                 content = content,
