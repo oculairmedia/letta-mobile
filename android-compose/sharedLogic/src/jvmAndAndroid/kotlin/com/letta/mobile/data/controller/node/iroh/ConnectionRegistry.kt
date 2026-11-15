@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.sync.Mutex
@@ -22,6 +24,10 @@ interface ViewerHandle {
      * registry/fanout can de-register a dead viewer.
      */
     suspend fun writeFrame(frame: String): Boolean
+
+    /** Native snapshot delivery; a multiplexed viewer stamps its own connection envelope. */
+    suspend fun writeDeviceStatus(status: AppServerInboundFrame.UpdateDeviceStatus): Boolean =
+        writeFrame(AppServerProtocol.json.encodeToString(AppServerInboundFrame.serializer(), status))
 
     /**
      * Whether this connection may receive device-wide `agent_updated` pushes, which name agents: the

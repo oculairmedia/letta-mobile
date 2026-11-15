@@ -42,6 +42,11 @@ data class ChatComposerHostInputs(
     val contextUsage: ContextWindowUsageState? = null,
     /** Overrides the composer's default placeholder; null keeps the shared one. */
     val placeholder: String? = null,
+    /** Only the host's snapshots determine the visible process rows. */
+    val backgroundProcesses: List<com.letta.mobile.data.transport.appserver.AppServerBackgroundProcess> = emptyList(),
+    val backgroundProcessError: String? = null,
+    val stopBackgroundProcess: ((String) -> Unit)? = null,
+    val clearBackgroundProcessError: (() -> Unit)? = null,
 )
 
 /** The page's timeline at the moment the user asked for a branch. */

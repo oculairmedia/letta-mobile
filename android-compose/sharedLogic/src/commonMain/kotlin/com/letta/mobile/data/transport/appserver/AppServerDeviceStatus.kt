@@ -225,3 +225,12 @@ private fun JsonObject.firstArray(vararg keys: String): JsonArray? =
 
 private fun JsonObject.stringListOrEmpty(vararg keys: String): List<String> =
     firstArray(*keys)?.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.contentOrNull } ?: emptyList()
+
+/** Native binding for the shared process shelf; only a host snapshot changes the visible rows. */
+@OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+suspend fun AppServerClient.stopBackgroundProcess(runtime: AppServerRuntimeScope, processId: String) {
+    val response = monitorStop(AppServerCommand.MonitorStop(
+        requestId = kotlin.uuid.Uuid.random().toString(), processId = processId, runtime = runtime,
+    ))
+    check(response.success) { response.error ?: "Could not stop background process" }
+}

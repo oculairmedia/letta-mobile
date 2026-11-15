@@ -35,6 +35,8 @@ fun ChatComposerUiState.withChrome(chrome: ChatComposerChrome): ChatComposerUiSt
     commands = chrome.host.commands.map(ChatHostCommand::command).toImmutableList(),
     mentionables = chrome.host.mentionables.toImmutableList(),
     contextUsage = chrome.host.contextUsage,
+    backgroundProcesses = chrome.host.backgroundProcesses.toImmutableList(),
+    error = chrome.host.backgroundProcessError ?: error,
 )
 
 /** What a host's extension points turn on. */
@@ -65,7 +67,15 @@ class ChatSessionExtensions(
 ) {
     private val workingDirectory = options.workingDirectory?.current ?: MutableStateFlow(null)
     private val model = options.models?.model ?: MutableStateFlow(null)
-    private val host = options.composerHost ?: MutableStateFlow(ChatComposerHostInputs())
+    private val host = combine(
+        options.composerHost ?: MutableStateFlow(ChatComposerHostInputs()),
+        options.backgroundProcesses ?: MutableStateFlow(ChatComposerHostInputs()),
+    ) { inputs, processes -> inputs.copy(
+        backgroundProcesses = processes.backgroundProcesses,
+        backgroundProcessError = processes.backgroundProcessError,
+        stopBackgroundProcess = processes.stopBackgroundProcess,
+        clearBackgroundProcessError = processes.clearBackgroundProcessError,
+    ) }.stateIn(scope, SharingStarted.Eagerly, options.composerHost?.value ?: ChatComposerHostInputs())
     private val branching = options.branching?.support ?: MutableStateFlow(ChatBranchSupport())
 
     /** A send during a run goes to the host's queue rather than waiting for the run to end. */

@@ -148,6 +148,7 @@ class IrohChannelTransport(
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
     private val framePublisher = IrohFramePublisher(connectionGeneration = ::currentConnectionGeneration)
+    override val deviceStatusFrames get() = connectionSession.deviceStatusFrames
     override val events: SharedFlow<ServerFrame> = framePublisher.events
 
     override val hostCapabilities: Set<String> get() = connectionSession.hostCapabilities()

@@ -60,7 +60,8 @@ class WireContractsTest {
                 val name = case.getValue("name").jsonPrimitive.content
                 val host = case.getValue("host_state").jsonObject
                 // New fixture families must supply a real host-state adapter, never be skipped.
-                val known = setOf("controller_state", "conversations", "hidden_agent_ids", "visibility_index", "reflection_settings")
+                val known = setOf("controller_state", "conversations", "hidden_agent_ids", "visibility_index",
+                    "reflection_settings", "monitor_success")
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
                 val state = when (host.getValue("controller_state").jsonPrimitive.content) {
@@ -205,7 +206,20 @@ class WireContractsTest {
         }
     } as AppServerClient
 
+    private fun monitorNative(host: JsonObject): AppServerClient = Proxy.newProxyInstance(
+        AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java),
+    ) { _, method, args ->
+        check(method.name == "monitorStop") { "Unexpected native call: ${method.name}" }
+        val command = args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.MonitorStop
+        assertEquals("process-1", command.processId)
+        assertEquals(com.letta.mobile.data.transport.appserver.AppServerRuntimeScope("agent-1", "conv-1"), command.runtime)
+        com.letta.mobile.data.transport.appserver.AppServerInboundFrame.MonitorStopResponse(
+            command.requestId, host.getValue("monitor_success").jsonPrimitive.boolean,
+        )
+    } as AppServerClient
+
     private fun fixtureNative(host: JsonObject?): AppServerClient = when {
+        host?.containsKey("monitor_success") == true -> monitorNative(host)
         host?.containsKey("conversations") == true -> conversationNative(host)
         host?.containsKey("reflection_settings") == true -> reflectionNative(host)
         else -> rejectCalls("native")

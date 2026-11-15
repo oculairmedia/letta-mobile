@@ -17,6 +17,9 @@ import kotlinx.serialization.json.JsonArray
 interface IChannelTransport {
     /** Present only when this captured transport can observe and abort exact turns authoritatively. */
     val activeTurnEvents: RuntimeTurnEventSource? get() = null
+    /** Runtime snapshots from the current connection; empty on transports without native status. */
+    val deviceStatusFrames: kotlinx.coroutines.flow.Flow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>
+        get() = kotlinx.coroutines.flow.emptyFlow()
     val state: StateFlow<ChannelTransportState>
     val events: SharedFlow<ServerFrame>
     val frameEvents: SharedFlow<TransportFrameEvent>
@@ -175,3 +178,17 @@ data class RedialWhileTurnActive(
     val runId: String,
     val connectionGeneration: Long = 0L,
 )
+
+/** Stop one host-owned process. The next host snapshot, rather than this acknowledgement, removes its row. */
+suspend fun IChannelTransport.stopBackgroundProcess(
+    runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
+    processId: String,
+) {
+    val body = kotlinx.serialization.json.buildJsonObject {
+        put("agent_id", kotlinx.serialization.json.JsonPrimitive(runtime.agentId))
+        put("conversation_id", kotlinx.serialization.json.JsonPrimitive(runtime.conversationId))
+        put("process_id", kotlinx.serialization.json.JsonPrimitive(processId))
+    }
+    val response = adminRpc("monitor.stop", "", body.toString())
+    check(response.success) { response.error ?: "Could not stop background process" }
+}

@@ -76,6 +76,7 @@ object AdminRpcRegistry {
         "health.check",
         "run.record", "lease.upsert", "lease.list",
         "approval.submit",
+        "monitor.stop",
         "project.list",
         "project.get",
         "project.beadsRemoteStatus",
@@ -137,6 +138,7 @@ object AdminRpcRegistry {
         val wrapperRecords = native.wrapperRecords
             ?: com.letta.mobile.data.controller.node.iroh.records.FileWrapperRecordStore()
         registerRunRecordHandlers(router, wrapperRecords)
+        registerMonitorStop(router, native.nativeClient)
         CronAdminHandlers.register(router, native.nativeClient, wrapperRecords)
         ReflectionAdminHandlers.register(router, native.nativeClient)
         // letta-mobile-bzvro.37: MemFS / secrets / workspace files for Iroh clients.

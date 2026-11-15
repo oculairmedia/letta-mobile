@@ -2,6 +2,13 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.transform
+import kotlinx.coroutines.flow.update
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
@@ -24,6 +31,8 @@ internal class IrohConnectionSession(
     private val resubscribe: suspend (IrohViewedConversation) -> Unit,
 ) {
     private val generation = atomic(0L)
+    private val statusFrames = MutableStateFlow(0L to emptyMap<AppServerRuntimeScope, AppServerReceivedFrame>())
+    val deviceStatusFrames = statusFrames.transform { emitAll(it.second.values.asFlow()) }
     @Volatile
     private var observerJob: Job? = null
     private val stoppedObserverJobs = ConcurrentHashMap.newKeySet<Job>()
@@ -65,7 +74,11 @@ internal class IrohConnectionSession(
         }
     }
 
-    private fun nextGeneration() = IrohSessionGeneration(generation.incrementAndGet())
+    private fun nextGeneration(): IrohSessionGeneration {
+        val next = generation.incrementAndGet()
+        statusFrames.value = next to emptyMap()
+        return IrohSessionGeneration(next)
+    }
 
     private fun stopSessionWork(reason: SessionStopReason): Job? {
         readyCapabilities = emptySet()
@@ -104,7 +117,9 @@ internal class IrohConnectionSession(
             runCatching {
                 streamFrames.collect { received ->
                     if (!isCurrent(readyGeneration)) return@collect
-                    ingestObserverFrame(received)
+                    val scoped = received.copy(connectionGeneration = readyGeneration.value)
+                    cacheDeviceStatus(scoped)
+                    ingestObserverFrame(scoped)
                 }
             }.onFailure { error ->
                 if (error is CancellationException) throw error
@@ -114,6 +129,16 @@ internal class IrohConnectionSession(
                     "class" attr error::class.simpleName,
                 )
             }
+        }
+    }
+
+    private fun cacheDeviceStatus(received: AppServerReceivedFrame) {
+        if (received.frame !is AppServerInboundFrame.UpdateDeviceStatus) return
+        val runtime = received.frame.runtime
+        statusFrames.update { cached ->
+            if (cached.first == received.connectionGeneration) {
+                cached.first to (cached.second + (runtime to received))
+            } else cached
         }
     }
 

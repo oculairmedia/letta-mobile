@@ -35,6 +35,8 @@ class AppServerClientChannel(
     /** What the host advertised when this session authenticated (its `auth_response` capabilities). */
     override val hostCapabilities: Set<String> = emptySet(),
 ) : NoOpChannelTransport() {
+    override val deviceStatusFrames = client.events
+
     override val state: StateFlow<ChannelTransportState> = client.isConnected
         .map { connected -> if (connected) CONNECTED else DISCONNECTED }
         .stateIn(scope, SharingStarted.WhileSubscribed(), ChannelTransportState.Connecting())

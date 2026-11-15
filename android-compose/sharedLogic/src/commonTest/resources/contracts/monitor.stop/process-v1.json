@@ -1,0 +1,30 @@
+{
+  "method": "monitor.stop",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/BackgroundProcessAdminHandler.kt",
+  "cases": [
+    {
+      "name": "accepted",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "monitor_success": true
+      },
+      "params": {
+        "agent_id": "agent-1",
+        "conversation_id": "conv-1",
+        "process_id": "process-1"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "accepted": true
+        }
+      }
+    }
+  ]
+}

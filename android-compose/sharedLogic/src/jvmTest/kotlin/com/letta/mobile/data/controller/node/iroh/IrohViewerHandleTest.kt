@@ -1,6 +1,9 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import com.letta.mobile.data.transport.appserver.snapshot
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
@@ -54,6 +57,25 @@ class IrohViewerHandleTest {
         put("id", "cm-stream-$otid")
         put("message_type", "assistant_message")
         put("content", text)
+    }
+
+    @Test
+    fun processSnapshotsUseTheViewersSequenceAndDecodeAsNativeStatus() = runTest {
+        val sink = CapturingSink()
+        val viewer = viewer(sink, frameParts = true)
+        val native = AppServerInboundFrame.UpdateDeviceStatus(runtime, 999, "native-time", "native-key",
+            json.parseToJsonElement("""{"background_processes":[{"id":"p"}]}""").jsonObject)
+        viewer.writeBroadcastFrame(runtime, taggedAssistantDelta("before", "first"))
+        assertTrue(viewer.writeDeviceStatus(native))
+        viewer.writeBroadcastFrame(runtime, taggedAssistantDelta("after", "last"))
+        val received = sink.frames().map { AppServerProtocol.decodeFrame(it).frame }
+        val status = received[1] as AppServerInboundFrame.UpdateDeviceStatus
+        val sequences = sink.frames().map {
+            json.parseToJsonElement(it).jsonObject.getValue("event_seq").jsonPrimitive.content.toLong()
+        }
+        assertEquals(listOf(sequences.first(), sequences.first() + 1, sequences.first() + 2), sequences)
+        assertEquals(listOf("p"), status.snapshot.backgroundProcesses.map { it.id })
+        assertTrue(status.idempotencyKey != native.idempotencyKey)
     }
 
     @Test

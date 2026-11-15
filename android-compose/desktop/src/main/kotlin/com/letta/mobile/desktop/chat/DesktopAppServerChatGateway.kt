@@ -41,6 +41,7 @@ import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.pendingApprovalDetails
 import com.letta.mobile.data.runtime.TurnFailureNotice
 import com.letta.mobile.data.runtime.TurnFailureNotices
+import com.letta.mobile.data.transport.appserver.stopBackgroundProcess
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -199,6 +200,10 @@ class DesktopAppServerChatGateway internal constructor(
     private val activeRunIdByConversation = ConcurrentHashMap<ConversationId, DesktopRunId>()
 
     /** letta-mobile-ckmub.17.2: the shared engine-side mode change the web's chat page binds too. */
+    override val deviceStatusFrames get() = client.events
+
+    override val stopBackgroundProcess: suspend (AppServerRuntimeScope, String) -> Unit = client::stopBackgroundProcess
+
     private val modeChanges = EnginePermissionModes(turnEngine as? AppServerTurnEngine, permissionModes)
 
     override suspend fun setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean =

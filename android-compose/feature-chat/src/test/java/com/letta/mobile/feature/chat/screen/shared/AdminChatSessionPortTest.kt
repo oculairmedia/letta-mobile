@@ -26,6 +26,8 @@ import com.letta.mobile.ui.chat.session.TimelineChatSessionOptions
 import com.letta.mobile.ui.chat.session.TimelineLocalState
 import com.letta.mobile.ui.chat.session.withExtensions
 import com.letta.mobile.ui.chat.session.ChatModelHandle
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -34,6 +36,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import com.letta.mobile.feature.chat.coordination.ChatApprovalRelay
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -50,6 +57,44 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AdminChatSessionPortTest {
+
+    @Test
+    fun `process shelf and Stop use the common host projection`() = runTest(UnconfinedTestDispatcher()) {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        var viewModel: AdminChatViewModel? = null
+        try {
+            val frames = MutableSharedFlow<AppServerReceivedFrame>()
+            val relay = mockk<ChatApprovalRelay>(relaxed = true)
+            every { relay.deviceStatusFrames } returns frames
+            every { relay.pendingDetails } returns MutableStateFlow(emptyMap())
+            every { relay.outbox.queuedRequestIds } returns MutableStateFlow(emptySet())
+            every { relay.outbox.notices } returns MutableSharedFlow()
+            every { relay.permissionMode(any()) } returns flowOf(null)
+            coEvery { relay.stopBackgroundProcess(any(), any()) } returns Unit
+            val agent = TestData.agent("agent-process", "Process")
+            val vm = openedChatViewModel(canonicalPagingHost(), agent, "conversation-process",
+                FixtureSession("process", approvalRelay = relay))
+            viewModel = vm
+            val port = AdminChatSessionPort(vm, backgroundScope)
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.composer.collect {} }
+            fun status(processes: String) = AppServerProtocol.decodeFrame(
+                """{"type":"update_device_status","event_seq":1,"emitted_at":"now","idempotency_key":"status",
+                    "runtime":{"agent_id":"agent-process","conversation_id":"conversation-process"},
+                    "device_status":{"background_processes":$processes}}""",
+            )
+            frames.emit(status("""[{"id":"p"}]"""))
+            assertEquals(listOf("p"), port.composer.value.backgroundProcesses.map { it.id })
+            port.actions.stopBackgroundProcess("p")
+            port.actions.stopBackgroundProcess("p")
+            coVerify(exactly = 1) { relay.stopBackgroundProcess(AppServerRuntimeScope("agent-process", "conversation-process"), "p") }
+            assertEquals(1, port.composer.value.backgroundProcesses.size)
+            frames.emit(status("[]"))
+            assertTrue(port.composer.value.backgroundProcesses.isEmpty())
+        } finally {
+            viewModel?.viewModelScope?.cancel()
+            Dispatchers.resetMain()
+        }
+    }
 
     @Test
     fun `fork, edit and rerun come and go together with the page's ability to branch`() {

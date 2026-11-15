@@ -105,6 +105,7 @@ class AdminRpcContractTest {
 
         fun miscMethods() = setOf(
             "approval.submit",
+            "monitor.stop",
             "permission_mode.get",
             "permission_mode.set",
             "archive.list",

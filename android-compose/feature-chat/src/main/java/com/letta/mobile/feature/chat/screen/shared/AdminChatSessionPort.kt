@@ -67,6 +67,12 @@ internal class AdminChatSessionPort(
         models = AdminChatModels(viewModel, scope),
         sendQueue = viewModel.sendQueue,
         composerHost = hostInputs(scope, fileMentions),
+        backgroundProcesses = viewModel.approvalRelay?.let { relay -> com.letta.mobile.ui.chat.session.backgroundProcessHost(
+            scope, relay.deviceStatusFrames,
+            viewModel.uiState.map { viewModel.conversationId?.value?.let {
+                com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(viewModel.agentId.value, it)
+            } }, relay::stopBackgroundProcess,
+        ) },
         onA2uiAction = viewModel::submitA2uiAction,
         branching = branching,
         attachmentLimits = viewModel.attachmentLimits,

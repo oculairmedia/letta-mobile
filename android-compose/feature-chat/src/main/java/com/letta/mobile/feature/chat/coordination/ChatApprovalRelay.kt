@@ -8,6 +8,7 @@ import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.data.runtime.PermissionModeRuntime
 import com.letta.mobile.data.runtime.RelayedPermissionModes
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.api.stopBackgroundProcess
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.ui.chat.session.ChatPermissionModeSource
@@ -37,6 +38,11 @@ class ChatApprovalRelay @Inject constructor(
     /** letta-mobile-bzvro.14: answers made while the link is down, replayed after the reconnect. */
     val outbox: ApprovalOutboxCoordinator,
 ) {
+    val deviceStatusFrames get() = transport.deviceStatusFrames
+
+    suspend fun stopBackgroundProcess(runtime: AppServerRuntimeScope, processId: String) =
+        transport.stopBackgroundProcess(runtime, processId)
+
     val pendingDetails: StateFlow<Map<String, PendingApprovalDetails>> get() = client.pending
 
     /**
@@ -52,10 +58,7 @@ class ChatApprovalRelay @Inject constructor(
             .flatMapLatest { supported -> if (supported) chip(runtime) else flowOf(null) }
     }
 
-    /**
-     * This client's view at once; the host's answer then confirms or replaces it, and the host's
-     * `permission_mode` pushes (letta-mobile-a4tm7) keep it current while open. Names the host.
-     */
+    /** Follows the host's confirmed mode and other viewers' changes. */
     private fun chip(runtime: AppServerRuntimeScope): Flow<ChatPermissionModeUiState> = channelFlow {
         launch { modes.sync(runtime) }
         modes.observe(runtime).collect { send(it.toUiState(runtime = PermissionModeRuntime.Host(transport.hostNodeId))) }

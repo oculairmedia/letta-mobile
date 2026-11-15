@@ -340,6 +340,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [lease.upsert v1](reference/contracts/lease.upsert/wrapper-records-v1.md)
 
+### reference/contracts/monitor.stop
+
+- [monitor.stop: Background process stop v1](reference/contracts/monitor.stop/process-v1.md)
+
 ### reference/contracts/reflection.get
 
 - [reflection.get: Reflection Settings v2](reference/contracts/reflection.get/settings-v2.md)

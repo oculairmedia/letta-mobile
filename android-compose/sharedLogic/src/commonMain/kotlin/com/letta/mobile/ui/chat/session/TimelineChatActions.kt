@@ -24,7 +24,10 @@ internal class TimelineChatActions(
 
     override fun reportComposerError(message: String) = port.updateDraft { it.copy(hostError = message) }
 
-    override fun clearComposerError() = port.updateDraft { it.cleared() }
+    override fun clearComposerError() {
+        backgroundProcessErrorClear?.invoke()
+        port.updateDraft { it.cleared() }
+    }
 
     override fun stopRun() = port.stopRun()
 

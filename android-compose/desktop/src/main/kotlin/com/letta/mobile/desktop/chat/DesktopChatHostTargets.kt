@@ -31,3 +31,7 @@ internal fun DesktopChatGateway?.permissionModeTarget(conversation: DesktopConve
     val agentId = conversation?.agentId?.takeIf(String::isNotBlank) ?: return null
     return ChatPermissionModeTarget(modes, AppServerRuntimeScope(agentId, conversation.id))
 }
+
+internal fun DesktopChatGateway?.backgroundProcessTarget(conversation: DesktopConversationSummary?) = this?.let { gateway ->
+    conversation?.agentId?.let { gateway to AppServerRuntimeScope(it, conversation.id) }
+}

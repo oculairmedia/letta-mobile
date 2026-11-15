@@ -25,13 +25,20 @@ class ChatExtensionActionState(
  * extension point bound is a no-op its capabilities hide.
  */
 abstract class ChatExtensionActions(
-    options: TimelineChatSessionOptions,
+    private val options: TimelineChatSessionOptions,
     private val state: ChatExtensionActionState,
 ) : ChatActions,
     ChatHostCommandActions by HostCommandExtensions(options),
     ChatBranchActions by BranchExtensions(options.branching, state.branchView),
     ChatSendQueueActions by SendQueueExtensions(options.sendQueue),
     ChatConversationSettingsActions by SettingsExtensions(options) {
+    /** The process source owns clearing its error; absent when the host has reported none. */
+    protected val backgroundProcessErrorClear: (() -> Unit)?
+        get() = options.backgroundProcesses?.value?.clearBackgroundProcessError
+
+    override fun stopBackgroundProcess(processId: String) =
+        options.backgroundProcesses?.value?.stopBackgroundProcess?.invoke(processId) ?: Unit
+
     override fun rerun(message: UiMessage) = Unit
 
     override fun dismissA2uiSurface(surfaceId: A2uiSurfaceId) = Unit

@@ -214,6 +214,9 @@ class ShimOffParityGateTest {
             put("prompt", "hi")
         }
 
+        override suspend fun monitorStop(command: AppServerCommand.MonitorStop) =
+            AppServerInboundFrame.MonitorStopResponse(command.requestId, true)
+
         override suspend fun cronList(command: AppServerCommand.CronList) =
             AppServerInboundFrame.CronListResponse(command.requestId, true, buildJsonArray { add(cronTask()) })
 
@@ -378,6 +381,7 @@ class ShimOffParityGateTest {
         put("message_id", "m-1")
         put("identifier", "p-1")
         put("task_id", "t-1")
+        put("process_id", "process-1")
         put("tool_call_id", "tc-1")
         put("name", "demo")
         put("cron", "0 0 * * *")

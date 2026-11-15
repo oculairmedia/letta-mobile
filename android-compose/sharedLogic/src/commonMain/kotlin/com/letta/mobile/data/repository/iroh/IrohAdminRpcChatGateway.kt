@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository.iroh
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.transport.api.stopBackgroundProcess
 import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
@@ -183,6 +184,11 @@ class IrohAdminRpcChatGateway(
 
     override val pendingApprovalDetails: kotlinx.coroutines.flow.StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>>
         get() = approvalControls?.relay?.pending ?: noPendingApprovals
+
+    override val deviceStatusFrames get() = transport.deviceStatusFrames
+
+    override val stopBackgroundProcess:
+        suspend (com.letta.mobile.data.transport.appserver.AppServerRuntimeScope, String) -> Unit = transport::stopBackgroundProcess
 
     override val permissionModes: com.letta.mobile.data.runtime.PermissionModeRegistry?
         get() = approvalControls?.modes?.takeIf { it.supported }?.modes
