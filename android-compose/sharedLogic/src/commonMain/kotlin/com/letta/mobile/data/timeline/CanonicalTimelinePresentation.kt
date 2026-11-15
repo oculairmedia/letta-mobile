@@ -89,8 +89,10 @@ class CanonicalTimelinePresentation private constructor(
         val serverId: String = "",
         // A grouped run owns several durable records; all must count as resident for settlement.
         val residentEvents: List<TimelineResidentEvent> = emptyList(),
-        // Every id a live row may know this row's records by: server ids, identities, otids and the
-        // stream ids aliased to them when the row was projected.
+        /**
+         * Every id a live row may know this row's records by: server ids, identities, otids and the
+         * stream ids aliased to them when the row was projected.
+         */
         val liveNames: Set<String> = emptySet(),
     ) {
         /**

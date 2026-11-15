@@ -387,4 +387,8 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 ### tooling
 
 - [Self-hosted code intelligence pilot](tooling/serena-scip-pilot.md)
+
+### tooling/verifying-timeline-identity
+
+- [Verifying timeline row identity](tooling/verifying-timeline-identity/SKILL.md)
 <!-- documentation-index:end -->
