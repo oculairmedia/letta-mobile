@@ -116,7 +116,7 @@ internal class AdminRpcStreamedExchange(
         val finished = CompletableDeferred<AdminRpcStreamOutcome>()
         val work = launch(connection) { finished.complete(run(request, frames)) }
         val watcher = launch {
-            val reason = awaitCancel(halves, request.requestId)
+            val reason = awaitCancel(halves, request)
             work.cancel()
             withTimeoutOrNull(cancelGraceMs.milliseconds) { work.join() }
             if (finished.complete(AdminRpcStreamOutcome.Failure(request.handler.cancelledError))) {
@@ -143,7 +143,7 @@ internal class AdminRpcStreamedExchange(
     }
 
     /** Returns why the client cancelled; suspends while its send half stays open and quiet. */
-    private suspend fun awaitCancel(halves: AdminRpcStreamHalves, requestId: String): String {
+    private suspend fun awaitCancel(halves: AdminRpcStreamHalves, request: AdminRpcStreamedRequest): String {
         while (true) {
             val frame = try {
                 halves.nextFrame()
@@ -152,15 +152,15 @@ internal class AdminRpcStreamedExchange(
             } catch (expectedReset: Exception) {
                 return "send_reset"
             } ?: return "send_finished"
-            if (isCancelFor(frame, requestId)) return "cancel_frame"
+            if (isCancelFor(frame, request)) return "cancel_frame"
         }
     }
 
     /** Whether [frame] is this request's `admin_rpc_cancel`; anything else on the cancel channel is ignored. */
-    private fun isCancelFor(frame: String, requestId: String): Boolean {
+    private fun isCancelFor(frame: String, request: AdminRpcStreamedRequest): Boolean {
         val obj = runCatching { Json.parseToJsonElement(frame).jsonObject }.getOrNull() ?: return false
         val type = obj["type"]?.jsonPrimitive?.contentOrNull
-        return type == CANCEL_FRAME_TYPE && obj["request_id"]?.jsonPrimitive?.contentOrNull == requestId
+        return type == CANCEL_FRAME_TYPE && obj["request_id"]?.jsonPrimitive?.contentOrNull == request.requestId
     }
 
     private fun fields(request: AdminRpcStreamedRequest, vararg extra: Pair<String, String>): Map<String, String> =
