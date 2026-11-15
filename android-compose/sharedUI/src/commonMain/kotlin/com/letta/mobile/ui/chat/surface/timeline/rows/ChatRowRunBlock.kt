@@ -374,7 +374,7 @@ private fun runImageCallsBeforeMessages(messages: List<UiMessage>): Map<String?,
     val pending = mutableListOf<UiToolCall>()
     messages.forEach { message ->
         message.toolCalls.orEmpty().filter { it.generatedImageAttachments.isNotEmpty() }.let(pending::addAll)
-        if (pending.isNotEmpty() && message.ownRunStep() != null) {
+        if (pending.isNotEmpty() && message.ownRunStep() != null && !message.isReasoning) {
             images.getOrPut(message.id) { mutableListOf() }.addAll(pending)
             pending.clear()
         }
