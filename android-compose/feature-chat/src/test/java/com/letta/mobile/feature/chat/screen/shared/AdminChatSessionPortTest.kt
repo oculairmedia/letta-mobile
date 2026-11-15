@@ -84,19 +84,20 @@ class AdminChatSessionPortTest {
             viewModel = vm
             val port = AdminChatSessionPort(vm, backgroundScope)
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.composer.collect {} }
-            fun status(processes: String) = AppServerProtocol.decodeFrame(
+            // The host's device status listing these running processes, as it arrives on the wire.
+            fun status(running: List<ProcessId>) = AppServerProtocol.decodeFrame(
                 """{"type":"update_device_status","event_seq":1,"emitted_at":"now","idempotency_key":"status",
                     "runtime":{"agent_id":"agent-process","conversation_id":"conversation-process"},
-                    "device_status":{"background_processes":$processes}}""",
+                    "device_status":{"background_processes":[${running.joinToString(",") { """{"id":"${it.value}"}""" }}]}}""",
             )
-            frames.emit(status("""[{"id":"p"}]"""))
+            frames.emit(status(listOf(ProcessId("p"))))
             assertEquals(listOf("p"), port.composer.first { it.backgroundProcesses.isNotEmpty() }.backgroundProcesses.map { it.id })
             port.actions.stopBackgroundProcess(ProcessId("p"))
             port.actions.stopBackgroundProcess(ProcessId("p"))
             stopped.await()
             coVerify(exactly = 1) { relay.stopBackgroundProcess(AppServerRuntimeScope("agent-process", "conversation-process"), "p") }
             assertEquals(1, port.composer.value.backgroundProcesses.size)
-            frames.emit(status("[]"))
+            frames.emit(status(emptyList()))
             assertTrue(port.composer.first { it.backgroundProcesses.isEmpty() }.backgroundProcesses.isEmpty())
         } finally {
             viewModel?.viewModelScope?.cancel()
