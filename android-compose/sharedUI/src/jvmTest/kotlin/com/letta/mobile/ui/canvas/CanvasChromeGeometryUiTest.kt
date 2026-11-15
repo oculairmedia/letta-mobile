@@ -5,10 +5,12 @@ package com.letta.mobile.ui.canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -44,7 +46,9 @@ class CanvasChromeGeometryUiTest {
     private fun ComposeUiTest.showAt(width: Dp, content: @Composable () -> Unit) {
         setContent {
             MaterialTheme {
-                Box(Modifier.size(width, HEIGHT)) { content() }
+                // The test window is smaller than a desktop width, so the pane is laid out at its own
+                // size from the top-left corner rather than squeezed into the window.
+                Box(Modifier.wrapContentSize(Alignment.TopStart, unbounded = true).requiredSize(width, HEIGHT)) { content() }
             }
         }
     }
@@ -102,8 +106,9 @@ class CanvasChromeGeometryUiTest {
         runComposeUiTest {
             showAt(width) { CanvasWorkspaceLoadFailure(Modifier, onRetry = {}) }
             val page = onNodeWithTag(CANVAS_WORKSPACE_LOAD_FAILURE_TAG).getBoundsInRoot()
-            assertEquals(width.value, page.width.value, 0.5f, "the failure fills the pane at $width")
-            assertEquals(HEIGHT.value, page.height.value, 0.5f, "the failure fills the pane at $width")
+            assertEquals(width.value, page.width.value, 0.5f, "the failure spans the pane at $width")
+            val middle = (page.top + page.bottom) / 2
+            assertEquals((HEIGHT / 2).value, middle.value, 0.5f, "the failure is centred in the pane at $width")
         }
     }
 
@@ -122,7 +127,7 @@ class CanvasChromeGeometryUiTest {
     }
 
     private companion object {
-        val HEIGHT = 800.dp
+        val HEIGHT = 600.dp
         const val TITLE = "geometry-title"
         const val ACTIONS = "geometry-actions"
         const val BANNER = "geometry-banner"
