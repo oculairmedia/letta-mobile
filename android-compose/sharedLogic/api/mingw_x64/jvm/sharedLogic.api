@@ -64060,7 +64060,6 @@ public final class com/letta/mobile/data/transport/api/CronResumeCommand {
 }
 
 public class com/letta/mobile/data/transport/api/CronRpcChannel : com/letta/mobile/data/transport/api/NoOpChannelTransport {
-	public static final field Companion Lcom/letta/mobile/data/transport/api/CronRpcChannel$Companion;
 	public fun <init> (Lkotlin/jvm/functions/Function4;)V
 	protected fun addCron-8Mi8wO0 (Lcom/letta/mobile/data/transport/api/CronAddRequest;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun adminRpc (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -64070,9 +64069,6 @@ public class com/letta/mobile/data/transport/api/CronRpcChannel : com/letta/mobi
 	protected fun listCrons-8Mi8wO0 (Lcom/letta/mobile/data/transport/api/CronListQuery;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun sendCronPause (Lcom/letta/mobile/data/transport/api/CronPauseCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun sendCronResume (Lcom/letta/mobile/data/transport/api/CronResumeCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
-public final class com/letta/mobile/data/transport/api/CronRpcChannel$Companion {
 }
 
 public final class com/letta/mobile/data/transport/api/CronTaskRef {

@@ -75619,8 +75619,6 @@ open class com.letta.mobile.data.transport.api/CronRpcChannel : com.letta.mobile
     open suspend fun listCrons(com.letta.mobile.data.transport.api/CronListQuery, kotlin.time/Duration): com.letta.mobile.data.transport/ServerFrame.CronListResponse // com.letta.mobile.data.transport.api/CronRpcChannel.listCrons|listCrons(com.letta.mobile.data.transport.api.CronListQuery;kotlin.time.Duration){}[0]
     open suspend fun sendCronPause(com.letta.mobile.data.transport.api/CronPauseCommand): com.letta.mobile.data.transport/ServerFrame.CronPauseResponse // com.letta.mobile.data.transport.api/CronRpcChannel.sendCronPause|sendCronPause(com.letta.mobile.data.transport.api.CronPauseCommand){}[0]
     open suspend fun sendCronResume(com.letta.mobile.data.transport.api/CronResumeCommand): com.letta.mobile.data.transport/ServerFrame.CronResumeResponse // com.letta.mobile.data.transport.api/CronRpcChannel.sendCronResume|sendCronResume(com.letta.mobile.data.transport.api.CronResumeCommand){}[0]
-
-    final object Companion // com.letta.mobile.data.transport.api/CronRpcChannel.Companion|null[0]
 }
 
 open class com.letta.mobile.data.transport.api/NoOpChannelTransport : com.letta.mobile.data.transport.api/CronControlTransport, com.letta.mobile.data.transport.api/IChannelTransport { // com.letta.mobile.data.transport.api/NoOpChannelTransport|null[0]
