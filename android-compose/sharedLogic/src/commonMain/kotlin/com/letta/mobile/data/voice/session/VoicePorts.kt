@@ -17,7 +17,7 @@ interface VoiceAudio {
     /** Emits when audio devices are added or removed, so a lost microphone is reopened promptly. */
     fun deviceChanges(): Flow<Unit>
 
-    /** The speaker. It plays WAVE clips. */
+    /** The speaker. It plays 16-bit PCM as it streams in. */
     fun speaker(): AudioPlayer
 }
 
