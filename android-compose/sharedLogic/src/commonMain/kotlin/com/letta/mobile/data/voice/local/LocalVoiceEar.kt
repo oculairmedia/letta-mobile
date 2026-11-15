@@ -206,8 +206,10 @@ internal class LocalEarMemory {
 
     fun setOutput(active: Boolean) {
         synchronized(lock) {
-            if (active && !output.value) outputStarts.value += 1
+            val started = active && !output.value
+            // The hint first, then the count: a reader that sees the old count already sees output active.
             output.value = active
+            if (started) outputStarts.value += 1
             taken?.setOutputActive(active)
         }
     }
