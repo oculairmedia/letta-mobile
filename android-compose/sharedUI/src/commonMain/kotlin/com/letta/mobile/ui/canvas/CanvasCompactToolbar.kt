@@ -19,11 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
-import com.composables.icons.lucide.EllipsisVertical
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Plus
-import com.composables.icons.lucide.Redo2
-import com.composables.icons.lucide.Undo2
 import com.letta.mobile.data.canvas.CanvasSyncHealth
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.canvas_foot_more
@@ -39,6 +34,7 @@ import org.jetbrains.compose.resources.stringResource
 import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
+import com.letta.mobile.ui.icons.LettaIcons
 
 /**
  * The phone board's tools: one pill bar along the bottom edge instead of the rail down the left.
@@ -120,12 +116,12 @@ internal fun CanvasCompactToolbar(
 @Composable
 internal fun CompactBoardActions(undo: CanvasUndoActions, overflow: CanvasOverflow) {
     ControlButton(
-        Control(Lucide.Undo2, stringResource(Res.string.canvas_foot_undo), enabled = undo.canUndo),
+        Control(LettaIcons.Undo2, stringResource(Res.string.canvas_foot_undo), enabled = undo.canUndo),
         size = COMPACT_TOOL_BUTTON,
         onClick = undo.onUndo,
     )
     ControlButton(
-        Control(Lucide.Redo2, stringResource(Res.string.canvas_foot_redo), enabled = undo.canRedo),
+        Control(LettaIcons.Redo2, stringResource(Res.string.canvas_foot_redo), enabled = undo.canRedo),
         size = COMPACT_TOOL_BUTTON,
         onClick = undo.onRedo,
     )
@@ -137,7 +133,7 @@ internal fun CompactBoardActions(undo: CanvasUndoActions, overflow: CanvasOverfl
         stringResource(Res.string.canvas_foot_more_status, canvasSyncStatusText(sync).label)
     }
     Box(Modifier.testTag(CANVAS_FOOT_MORE_TAG)) {
-        ControlButton(Control(Lucide.EllipsisVertical, label), size = COMPACT_TOOL_BUTTON) { open = true }
+        ControlButton(Control(LettaIcons.EllipsisVertical, label), size = COMPACT_TOOL_BUTTON) { open = true }
         if (sync != null) {
             LettaStatusDot(canvasSyncTone(sync), Modifier.align(Alignment.TopEnd).padding(LettaDimens.Space.xs))
         }
@@ -155,7 +151,7 @@ private fun ToolbarDivider() {
 private fun AddButton(insert: BoardInsertActions, addAt: () -> Offset) {
     var open by remember { mutableStateOf(false) }
     Box {
-        ControlButton(Control(Lucide.Plus, "Add"), size = COMPACT_TOOL_BUTTON) { open = true }
+        ControlButton(Control(LettaIcons.Add, "Add"), size = COMPACT_TOOL_BUTTON) { open = true }
         LettaMenu(expanded = open, onDismiss = { open = false }) {
             CanvasInsertMenuItems(insert, at = addAt(), onDismiss = { open = false })
         }

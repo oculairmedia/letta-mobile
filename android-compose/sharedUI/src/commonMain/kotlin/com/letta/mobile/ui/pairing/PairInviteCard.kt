@@ -16,7 +16,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -48,6 +47,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
+import com.letta.mobile.ui.components.foundation.LettaRowLabel
+import com.letta.mobile.ui.components.foundation.LettaToggleRow
 
 /** An agent the inviter may share with the new device. */
 data class AgentChoice(val id: String, val name: String)
@@ -168,16 +169,16 @@ private fun AgentChecklist(agents: List<AgentChoice>, selected: Set<String>, onC
 
 @Composable
 private fun SettingsToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Switch, onValueChange = onChange).testTag(PairingTags.INVITE_SETTINGS),
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(PairingStrings.INVITE_SETTINGS_TOGGLE)
-            Text(PairingStrings.INVITE_SETTINGS_BODY, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Switch(checked = checked, onCheckedChange = null)
-    }
+    LettaToggleRow(
+        label = LettaRowLabel(
+            title = PairingStrings.INVITE_SETTINGS_TOGGLE,
+            supporting = PairingStrings.INVITE_SETTINGS_BODY,
+            supportingMaxLines = Int.MAX_VALUE,
+        ),
+        checked = checked,
+        onCheckedChange = onChange,
+        modifier = Modifier.testTag(PairingTags.INVITE_SETTINGS),
+    )
 }
 
 /** A code that can still be redeemed, and how long it has left. */
