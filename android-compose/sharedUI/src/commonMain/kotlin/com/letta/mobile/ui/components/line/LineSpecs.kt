@@ -109,12 +109,6 @@ internal class LineDisclosure(
 internal enum class ArrowDirection {
     /** Down to the newest content. */
     Down,
-
-    /** Back to the previous page. */
-    Back,
-
-    /** On to the next page. */
-    Forward,
 }
 
 /** Where a pager is ("Approval 2 of 3", "Page 4"), and its test tag. */

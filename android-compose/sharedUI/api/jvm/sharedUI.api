@@ -2576,7 +2576,7 @@ public final class com/letta/mobile/ui/components/disclosure/DisclosureChevronKt
 }
 
 public final class com/letta/mobile/ui/components/disclosure/LettaDisclosureControlsKt {
-	public static final fun LettaDisclosureHeader (ZLkotlin/jvm/functions/Function0;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaDisclosureHeader (ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaFoldButton (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaMenuIndicator (Landroidx/compose/ui/Modifier;Ljava/lang/String;Lcom/letta/mobile/ui/components/disclosure/LettaMenuIndicatorStyle;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaUnfoldButton--jt2gSs (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/Modifier;FLandroidx/compose/runtime/Composer;II)V
@@ -2633,6 +2633,20 @@ public final class com/letta/mobile/ui/components/foundation/LettaButtonIcon {
 	public final fun getSize-D9Ej5fM ()F
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/components/foundation/LettaChipSlots {
+	public static final field $stable I
+	public static final field Companion Lcom/letta/mobile/ui/components/foundation/LettaChipSlots$Companion;
+	public fun <init> ()V
+	public fun <init> (Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getLeading ()Lkotlin/jvm/functions/Function2;
+	public final fun getTrailing ()Lkotlin/jvm/functions/Function2;
+}
+
+public final class com/letta/mobile/ui/components/foundation/LettaChipSlots$Companion {
+	public final fun getNone ()Lcom/letta/mobile/ui/components/foundation/LettaChipSlots;
 }
 
 public final class com/letta/mobile/ui/components/foundation/LettaChipTabKt {
@@ -2718,21 +2732,23 @@ public final class com/letta/mobile/ui/components/foundation/LettaInlineNoticeKt
 
 public final class com/letta/mobile/ui/components/foundation/LettaMenuItem {
 	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZZLkotlin/jvm/functions/Function0;)V
-	public synthetic fun <init> (Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZZLkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZZLjava/lang/String;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZZLjava/lang/String;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun component3 ()Z
 	public final fun component4 ()Z
-	public final fun component5 ()Lkotlin/jvm/functions/Function0;
-	public final fun copy (Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZZLkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/components/foundation/LettaMenuItem;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/foundation/LettaMenuItem;Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZZLkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/components/foundation/LettaMenuItem;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Lkotlin/jvm/functions/Function0;
+	public final fun copy (Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZZLjava/lang/String;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/components/foundation/LettaMenuItem;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/foundation/LettaMenuItem;Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZZLjava/lang/String;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/components/foundation/LettaMenuItem;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getEnabled ()Z
 	public final fun getIcon ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getKeepsMenuOpen ()Z
 	public final fun getLabel ()Ljava/lang/String;
 	public final fun getOnClick ()Lkotlin/jvm/functions/Function0;
+	public final fun getTag ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -2796,7 +2812,7 @@ public final class com/letta/mobile/ui/components/foundation/LettaPanelKt {
 }
 
 public final class com/letta/mobile/ui/components/foundation/LettaPillsKt {
-	public static final fun LettaChip (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaChip (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/foundation/LettaChipSlots;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaOutlinedPill (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaPill-sW7UJKQ (Ljava/lang/String;JLandroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaTonalPill (Ljava/lang/String;Lcom/letta/mobile/ui/theme/pill/LettaPillColors;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
@@ -5416,7 +5432,7 @@ public final class com/letta/mobile/ui/modelcontrol/ComposableSingletons$ModelPi
 	public static final field INSTANCE Lcom/letta/mobile/ui/modelcontrol/ComposableSingletons$ModelPickerContentKt;
 	public fun <init> ()V
 	public final fun getLambda$-1086427408$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-581242200$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-1247975951$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$152368274$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 

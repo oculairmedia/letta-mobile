@@ -65,11 +65,11 @@ fun LettaOutlinedPill(text: String, modifier: Modifier = Modifier, icon: ImageVe
 
 /**
  * The tonal pill as a control: a neutral chip that opens something (the effort in force, then the
- * shared menu indicator in [trailing]). Its touch target is the platform minimum even though it draws
- * small.
+ * shared menu indicator as [LettaChipSlots.trailing]; a live mark such as a pulsing dot as
+ * [LettaChipSlots.leading]). Its touch target is the platform minimum even though it draws small.
  */
 @Composable
-fun LettaChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, trailing: (@Composable () -> Unit)? = null) {
+fun LettaChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, slots: LettaChipSlots = LettaChipSlots.None) {
     Surface(
         onClick = onClick,
         // A clickable Surface reserves the platform's minimum touch target around the small pill.
@@ -77,7 +77,7 @@ fun LettaChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, 
         shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    ) { PillContent(text, icon = null, trailing = trailing) }
+    ) { PillContent(text, icon = null, slots = slots) }
 }
 
 @Composable
@@ -99,15 +99,16 @@ private fun PillSurface(
 }
 
 @Composable
-private fun PillContent(text: String, icon: ImageVector?, trailing: (@Composable () -> Unit)? = null) {
+private fun PillContent(text: String, icon: ImageVector?, slots: LettaChipSlots = LettaChipSlots.None) {
     Row(
         modifier = Modifier.padding(horizontal = LettaSpaceTokens.sm, vertical = LettaSpaceTokens.hair),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaSpaceTokens.xs),
     ) {
+        slots.leading?.invoke()
         icon?.let { Icon(it, contentDescription = null, modifier = Modifier.size(LettaControlTokens.iconSm)) }
         Text(text, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        trailing?.invoke()
+        slots.trailing?.invoke()
     }
 }
 

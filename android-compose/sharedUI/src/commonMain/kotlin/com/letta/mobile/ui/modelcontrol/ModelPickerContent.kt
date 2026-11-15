@@ -62,6 +62,7 @@ import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.components.disclosure.LettaMenuIndicator
+import com.letta.mobile.ui.components.foundation.LettaChipSlots
 
 /** Callbacks of [ModelPickerContent]; [bind] wires the controller-owned ones. */
 data class ModelPickerActions(
@@ -350,7 +351,7 @@ private fun EffortPill(entry: ModelPickerEntry, effort: String?, onClick: () -> 
     LettaChip(
         text = effortLabel(effort),
         onClick = onClick,
-        trailing = { LettaMenuIndicator() },
+        slots = LettaChipSlots(trailing = { LettaMenuIndicator() }),
         modifier = Modifier
             .semantics { contentDescription = ModelControlStrings.effortOptionsOf(entry.displayName) }
             .testTag("${ModelEffortTags.PILL_PREFIX}${entry.value}"),

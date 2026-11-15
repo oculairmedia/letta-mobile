@@ -38,15 +38,15 @@ import kotlin.test.assertTrue
 
 /**
  * The one disclosure line and the menu indicator keep the sizes their callers had before they were
- * merged onto them, from the 360 dp phone to a 1200 dp window: a header is as tall as its words (no
- * touch minimum added), its chevron closes the line at the frame's edge, a padded header (a provider
+ * merged onto them, from the 360 dp phone to a 1200 dp window: a standalone header is at least the touch
+ * minimum, its chevron closes the line at the frame's edge, a padded header (a provider
  * card's) keeps its inset inside the toggle, and the menu indicator is the small glyph unless told
  * otherwise.
  */
 class DisclosureControlsGeometryUiTest {
 
     @Test
-    fun aHeaderIsAsTallAsItsWordsAndEndsInTheChevron() = atEveryWidth { width ->
+    fun aHeaderKeepsTheTouchMinimumAndEndsInTheChevron() = atEveryWidth { width ->
         var flips = 0
         show(width) {
             Column {
@@ -57,7 +57,7 @@ class DisclosureControlsGeometryUiTest {
             }
         }
         val chevron = onAllNodesWithTag(DisclosureChevronDefaults.TestTag, useUnmergedTree = true)[0].getUnclippedBoundsInRoot()
-        assertNear(maxOf(height(PLAIN), LettaControlTokens.icon), height(HEADER))
+        assertNear(maxOf(height(PLAIN), LettaControlTokens.minTouchTarget), height(HEADER))
         assertNear(width, chevron.right)
         assertNear(LettaControlTokens.icon, chevron.right - chevron.left)
         onNodeWithTag(HEADER).assertExists()

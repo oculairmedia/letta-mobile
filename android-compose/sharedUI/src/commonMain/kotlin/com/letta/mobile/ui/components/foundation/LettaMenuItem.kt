@@ -8,7 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
 import kotlinx.coroutines.CoroutineScope
@@ -17,7 +19,8 @@ import kotlinx.coroutines.launch
 /**
  * One row of a menu (LettaPopupMenu, or a menu with its own dividers and status lines built on
  * LettaMenu). [keepsMenuOpen] is for a row that adjusts something the person is watching (a zoom
- * step) and leaves the menu up; every other row closes it before its action runs.
+ * step) and leaves the menu up; every other row closes it before its action runs. [tag] is the
+ * row's test tag.
  */
 @Immutable
 data class LettaMenuItem(
@@ -25,6 +28,7 @@ data class LettaMenuItem(
     val icon: ImageVector? = null,
     val enabled: Boolean = true,
     val keepsMenuOpen: Boolean = false,
+    val tag: String = "",
     val onClick: () -> Unit,
 )
 
@@ -57,6 +61,7 @@ internal fun LettaMenuEntry(item: LettaMenuItem, onDismiss: () -> Unit) {
             }
         },
         enabled = item.enabled,
+        modifier = if (item.tag.isEmpty()) Modifier else Modifier.testTag(item.tag),
         contentPadding = PaddingValues(horizontal = LettaSpaceTokens.lg, vertical = LettaSpaceTokens.hair),
         onClick = {
             if (item.keepsMenuOpen) {

@@ -16,6 +16,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
 
@@ -24,8 +26,8 @@ import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
  * switch, a legend that filters, a canvas panel's options). [active] draws it raised and semibold.
  * [leading] is a small mark before the words (a legend's [LettaSwatch]); a chip whose mark says it
  * all (a colour target's swatch and glyph) passes null [text] and names itself through [modifier]'s
- * semantics. [role] is [Role.Tab] for one-of-many and [Role.Checkbox] for a chip that toggles on its
- * own.
+ * semantics. [role] is [Role.Tab] for one-of-many (announced selected) and [Role.Checkbox] for a chip
+ * that toggles on its own (announced checked).
  */
 @Composable
 fun LettaChipTab(
@@ -41,7 +43,7 @@ fun LettaChipTab(
             .clip(MaterialTheme.shapes.small)
             .background(if (active) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)
             .lettaClickable(role = role, target = LettaClickTarget.Inline, onClick = onClick)
-            .semantics { selected = active }
+            .semantics { if (role == Role.Checkbox) toggleableState = ToggleableState(active) else selected = active }
             .padding(horizontal = LettaSpaceTokens.md, vertical = LettaSpaceTokens.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaSpaceTokens.xs),

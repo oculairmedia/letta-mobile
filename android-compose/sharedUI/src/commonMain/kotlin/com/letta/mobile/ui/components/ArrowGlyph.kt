@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,10 +17,12 @@ import com.letta.mobile.ui.components.line.PagerLabel
 import com.letta.mobile.ui.components.line.PagerStep
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.components.foundation.LettaNextButton
+import com.letta.mobile.ui.components.foundation.LettaPreviousButton
 
 /**
- * The one arrow a control points with (down to the newest message, back and on through pages), in
- * the content colour. A disclosure is never drawn with it: that is DisclosureChevron. [size] is the
+ * The one arrow a control points with (down to the newest message), in the content colour; paging
+ * steps are the shared pager buttons. A disclosure is never drawn with it: that is DisclosureChevron. [size] is the
  * icon's own when null.
  */
 @Composable
@@ -35,13 +36,12 @@ internal fun ArrowGlyph(direction: ArrowDirection, contentDescription: String?, 
 
 private fun ArrowDirection.icon(): ImageVector = when (this) {
     ArrowDirection.Down -> LettaIcons.KeyboardArrowDown
-    ArrowDirection.Back -> LettaIcons.ChevronLeft
-    ArrowDirection.Forward -> LettaIcons.ChevronRight
 }
 
 /**
- * The one pager: back, where it is ("Approval 2 of 3", "Page 4"), on. Each step is an icon button
- * with the shared [ArrowGlyph]; a step that cannot go is disabled, not hidden, so the label never moves.
+ * The one pager bar: back, where it is ("Approval 2 of 3", "Page 4"), on. The steps are the shared
+ * LettaPreviousButton and LettaNextButton; a step that cannot go is disabled, not hidden, so the label
+ * never moves.
  */
 @Composable
 internal fun PagerBar(label: PagerLabel, back: PagerStep, forward: PagerStep, modifier: Modifier = Modifier) {
@@ -50,21 +50,14 @@ internal fun PagerBar(label: PagerLabel, back: PagerStep, forward: PagerStep, mo
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
-        PagerButton(back, ArrowDirection.Back)
+        LettaPreviousButton(back.onClick, back.contentDescription, tagged(back.tag), back.enabled)
         Text(
             text = label.text,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = tagged(label.tag),
         )
-        PagerButton(forward, ArrowDirection.Forward)
-    }
-}
-
-@Composable
-private fun PagerButton(step: PagerStep, direction: ArrowDirection) {
-    IconButton(onClick = step.onClick, enabled = step.enabled, modifier = tagged(step.tag)) {
-        ArrowGlyph(direction, step.contentDescription)
+        LettaNextButton(forward.onClick, forward.contentDescription, tagged(forward.tag), forward.enabled)
     }
 }
 

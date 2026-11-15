@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.components.line.LineDisclosure
+import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 
 /*
  * The disclosure affordances built on [DisclosureChevron], so a screen places one instead of laying
@@ -59,8 +60,9 @@ fun LettaUnfoldButton(
  * A full-width header line that expands and collapses what sits under it: [content] (the title,
  * and any state words such as "Details" / "Hide"), then the [DisclosureChevron]. The whole line is
  * the shared disclosure toggle: a button with an "Expand" / "Collapse" click label and an
- * "Expanded" / "Collapsed" state, flipped by pointer, touch or keyboard. It is the same line the
- * chat timeline draws its disclosures with.
+ * "Expanded" / "Collapsed" state, flipped by pointer, touch or keyboard, at least the platform's
+ * minimum touch target tall. It is the same line the chat timeline draws its disclosures with.
+ * [modifier] goes on the line (test tags, outer padding).
  *
  * @param chevronDescription The chevron's label; null derives "Expand" / "Collapse" from [expanded].
  */
@@ -68,15 +70,21 @@ fun LettaUnfoldButton(
 fun LettaDisclosureHeader(
     expanded: Boolean,
     onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
     chevronDescription: String? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
     DisclosureRow(
         disclosure = LineDisclosure(expanded = expanded, onToggle = onToggle),
+        modifier = modifier,
+        style = StandaloneHeaderStyle,
         words = DisclosureRowWords(chevronDescription = chevronDescription),
         content = content,
     )
 }
+
+/** A standalone header: the default gap and chevron, the platform's minimum touch height. */
+private val StandaloneHeaderStyle = DisclosureRowStyle(minHeight = LettaControlTokens.minTouchTarget)
 
 /**
  * The mark at the end of a control that opens a menu, a picker or a sheet (a composer chip, an

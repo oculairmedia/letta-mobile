@@ -33,6 +33,7 @@ import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
 import org.jetbrains.compose.resources.stringResource
+import androidx.compose.foundation.layout.heightIn
 
 /**
  * The one way a disclosure is clicked: a button (to assistive technology) whose click label says what
@@ -72,13 +73,15 @@ private fun disclosureKey(key: Key, expanded: Boolean, flip: () -> Unit, focus: 
 
 /**
  * How a [DisclosureRow] is laid out: the [gap] between its parts, its [contentPadding] (inside the
- * toggle, so the ripple covers it), and whether its chevron is the [compactChevron] size.
+ * toggle, so the ripple covers it), whether its chevron is the [compactChevron] size, and its
+ * [minHeight] (a standalone header's touch minimum; unspecified for a line whose rail sets it).
  */
 @Immutable
 internal class DisclosureRowStyle(
     val gap: Dp = LettaSpaceTokens.sm,
     val contentPadding: PaddingValues = PaddingValues(),
     val compactChevron: Boolean = false,
+    val minHeight: Dp = Dp.Unspecified,
 ) {
     companion object {
         /** A header line with no inset of its own: the chevron at the standard glyph size. */
@@ -111,6 +114,7 @@ internal fun DisclosureRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .heightIn(min = style.minHeight)
             .then(if (disclosure != null) Modifier.disclosureToggle(disclosure, words.stateDescription) else Modifier)
             .padding(style.contentPadding),
         verticalAlignment = Alignment.CenterVertically,
