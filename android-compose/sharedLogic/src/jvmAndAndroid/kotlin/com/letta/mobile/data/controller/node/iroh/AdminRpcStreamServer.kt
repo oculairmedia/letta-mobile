@@ -188,36 +188,7 @@ internal class AdminRpcStreamServer(
     suspend fun handleStream(stream: AdminRpcBiStream) {
         val sendStream = stream.send()
         try {
-            // Chunked (frame_part) requests may only widen reassembly memory
-            // beyond a single frame once the peer has authenticated AND advertised
-            // the capability — otherwise a peer holding just the ticket could pin
-            // maxReassembled bytes per stream before presenting any token.
-            val decoder = IrohFrameCodec.Decoder(maxFrameBytes, maxReassembledBytesProvider = {
-                if (authenticated.get() && peerSupportsFrameParts()) maxReassembledBytes else maxFrameBytes
-            })
-            val nextFrame = frameReader(stream.recv(), decoder)
-            val frameJson = withTimeoutOrNull(firstFrameTimeoutMs.milliseconds) { nextFrame() }
-            var streamed: AdminRpcStreamedRequest? = null
-            val response = if (frameJson == null) {
-                errorEnvelope("", "admin_rpc request stream closed before request")
-            } else {
-                handleFrame(frameJson) { streamed = it }
-            }
-            streamed?.let { request ->
-                val write: suspend (String) -> Unit = { frame -> sendStream.writeAll(IrohFrameCodec.encodeFrame(frame, maxFrameBytes)) }
-                streamedExchange.serve(request, AdminRpcStreamHalves(nextFrame, write))
-                return
-            }
-            checkNotNull(response)
-            runCatching { writeResponse(sendStream, response) }
-                .onFailure { writeError ->
-                    Telemetry.event(
-                        "IrohNode", "admin_rpc.stream.error_response_failed",
-                        "remoteEndpointId" attr remoteEndpointId,
-                        "error" attr (writeError.message ?: writeError.toString()),
-                        "class" attr writeError::class.simpleName,
-                    )
-                }
+            exchange(stream, sendStream)
         } catch (ce: CancellationException) {
             throw ce
         } catch (error: Exception) {
@@ -238,6 +209,40 @@ internal class AdminRpcStreamServer(
         } finally {
             runCatching { sendStream.finish() }
         }
+    }
+
+    /** Reads the request and answers it: one response, or a streamed exchange. Failures propagate to [handleStream]. */
+    private suspend fun exchange(stream: AdminRpcBiStream, sendStream: AdminRpcSendStream) {
+        // Chunked (frame_part) requests may only widen reassembly memory
+        // beyond a single frame once the peer has authenticated AND advertised
+        // the capability — otherwise a peer holding just the ticket could pin
+        // maxReassembled bytes per stream before presenting any token.
+        val decoder = IrohFrameCodec.Decoder(maxFrameBytes, maxReassembledBytesProvider = {
+            if (authenticated.get() && peerSupportsFrameParts()) maxReassembledBytes else maxFrameBytes
+        })
+        val nextFrame = frameReader(stream.recv(), decoder)
+        val frameJson = withTimeoutOrNull(firstFrameTimeoutMs.milliseconds) { nextFrame() }
+        var streamed: AdminRpcStreamedRequest? = null
+        val response = if (frameJson == null) {
+            errorEnvelope("", "admin_rpc request stream closed before request")
+        } else {
+            handleFrame(frameJson) { streamed = it }
+        }
+        streamed?.let { request ->
+            val write: suspend (String) -> Unit = { frame -> sendStream.writeAll(IrohFrameCodec.encodeFrame(frame, maxFrameBytes)) }
+            streamedExchange.serve(request, AdminRpcStreamHalves(nextFrame, write))
+            return
+        }
+        checkNotNull(response)
+        runCatching { writeResponse(sendStream, response) }
+            .onFailure { writeError ->
+                Telemetry.event(
+                    "IrohNode", "admin_rpc.stream.error_response_failed",
+                    "remoteEndpointId" attr remoteEndpointId,
+                    "error" attr (writeError.message ?: writeError.toString()),
+                    "class" attr writeError::class.simpleName,
+                )
+            }
     }
 
     /**
@@ -458,12 +463,6 @@ internal class AdminRpcStreamServer(
             put("capability", capability)
         }
 
-    private fun AtomicInteger.updateMax(value: Int) {
-        while (true) {
-            val current = get()
-            if (value <= current || compareAndSet(current, value)) return
-        }
-    }
 
     companion object {
         const val DEFAULT_MAX_ACTIVE_HANDLERS = 16
@@ -489,5 +488,12 @@ private fun frameReader(recv: AdminRpcRecvStream, decoder: IrohFrameCodec.Decode
             pending.addAll(decoder.feed(chunk))
         }
         pending.removeFirst()
+    }
+}
+
+private fun AtomicInteger.updateMax(value: Int) {
+    while (true) {
+        val current = get()
+        if (value <= current || compareAndSet(current, value)) return
     }
 }

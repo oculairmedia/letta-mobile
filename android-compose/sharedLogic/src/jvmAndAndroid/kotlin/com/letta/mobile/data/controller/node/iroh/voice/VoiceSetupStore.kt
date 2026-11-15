@@ -94,24 +94,27 @@ internal class VoiceSetupStore(
     }
 
     /**
-     * Applies [change] to the key store and returns how to persist the matching setup: if that write
-     * fails, the key store is put back as it was (the earlier key, or none) and the failure is rethrown,
-     * so the key never changes without its setup.
+     * Applies [change] to the key store and returns how to persist the matching setup. If the change or
+     * that write fails, the key store is put back as it was (the earlier key, or none) and the original
+     * failure is rethrown, so the key never changes without its setup.
      */
     private fun withKeyRollback(change: () -> Unit): KeyRollback {
-        val before = persistence.read().setup?.origin?.let { origin -> keys.read(origin)?.let { origin to it } }
-        change()
-        return KeyRollback(before)
+        val rollback = KeyRollback(persistence.read().setup?.origin?.let { origin -> keys.read(origin)?.let { origin to it } })
+        rollback.guard(change)
+        return rollback
     }
 
     private inner class KeyRollback(private val before: Pair<String, String>?) {
-        fun persist(state: VoiceSetupState) {
-            var written = false
+        fun persist(state: VoiceSetupState) = guard { persistence.write(state) }
+
+        /** Runs [step]; if it fails, restores the key store (a failed restore never hides the original failure). */
+        fun guard(step: () -> Unit) {
+            var done = false
             try {
-                persistence.write(state)
-                written = true
+                step()
+                done = true
             } finally {
-                if (!written) restore()
+                if (!done) runCatching { restore() }
             }
         }
 

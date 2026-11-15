@@ -107,6 +107,34 @@ class VoiceSetupStoreTest {
         assertTrue(failing.status().hasApiKey)
     }
 
+    @Test
+    fun aKeyWriteThatFailsHalfwayIsRolledBack(): Unit = runBlocking {
+        val flaky = FlakyKeys()
+        val store = VoiceSetupStore(InMemoryVoiceSetupPersistence(), flaky) { NOW }
+        store.write(command(PRIMARY, HostVoiceKeyChange.Replace(SecretWriteValue(KEY)), both))
+        flaky.failAfterWrite = true
+        assertFailsWith<IllegalStateException> {
+            store.write(command(PRIMARY, HostVoiceKeyChange.Replace(SecretWriteValue("another-placeholder")), both))
+        }
+        flaky.failAfterWrite = false
+        assertEquals(KEY, flaky.read(PRIMARY_ORIGIN))
+    }
+
+    /** A key store whose write lands and then fails, as a permission step after the rename can. */
+    private class FlakyKeys : VoiceKeyStore {
+        var failAfterWrite = false
+        private val inner = InMemoryVoiceKeyStore()
+
+        override fun read(origin: String): String? = inner.read(origin)
+
+        override fun write(origin: String, key: String) {
+            inner.write(origin, key)
+            check(!failAfterWrite) { "permissions not applied" }
+        }
+
+        override fun delete() = inner.delete()
+    }
+
     /** Keeps the setup in memory, failing every write while [fail] is set. */
     private class FailingPersistence : VoiceSetupPersistence {
         var fail = false
