@@ -4,7 +4,7 @@ description: Use when a change touches how the shared timeline keys rows or hand
 license: Method from pstack create-formal-verification-skill (MIT, Lauren Tan, https://github.com/cursor/plugins)
 metadata:
   bead: letta-mobile-o1hju
-  sync-commit: 124ddf0384f8b6464bb628081537e83162a0f105
+  sync-commit: 3dc2866b71975dd5caccc07066ed72ffeb44fddc
 ---
 
 # Verifying timeline row identity
@@ -50,7 +50,7 @@ Covered code at the sync commit. Paths are under
 To see what changed since the model was last confirmed:
 
 ```sh
-git diff --stat 124ddf0384f8b6464bb628081537e83162a0f105 -- \
+git diff --stat 3dc2866b71975dd5caccc07066ed72ffeb44fddc -- \
   android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/timeline/TimelinePageProjection.kt \
   android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/MessageGrouping.kt \
   android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/TimelineRowAssembly.kt \
