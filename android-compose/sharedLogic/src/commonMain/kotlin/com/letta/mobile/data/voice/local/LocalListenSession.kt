@@ -178,14 +178,23 @@ internal class LocalListenSession(private val parts: LocalListenParts, private v
         outputStarted?.onAwait { RecognitionOutcome.Paused }
     }
 
+    /** Handles one event; returns how the recognition ended once it has ([event] null: it ended without saying). */
     private suspend fun onEvent(event: LocalRecognitionEvent?, turn: LocalTurn): RecognitionOutcome? = when (event) {
         null -> RecognitionOutcome.Failed(LocalRecognitionError.OTHER, turn.ready)
-        LocalRecognitionEvent.Ready -> null.also { ready(turn) }
-        is LocalRecognitionEvent.Level -> null.also { out.send(VoiceEarEvent.InputLevel(event.level)) }
-        is LocalRecognitionEvent.Partial -> null.also { turn.partial(event.text) }
-        LocalRecognitionEvent.EndOfSpeech -> null.also { turn.endOfSpeech() }
         is LocalRecognitionEvent.Final -> RecognitionOutcome.Heard.also { turn.final(event.text, memory.output.value) }
         is LocalRecognitionEvent.Failed -> RecognitionOutcome.Failed(event.error, turn.ready)
+        else -> null.also { onProgress(event, turn) }
+    }
+
+    /** An event of a recognition still under way. */
+    private suspend fun onProgress(event: LocalRecognitionEvent, turn: LocalTurn) {
+        when (event) {
+            LocalRecognitionEvent.Ready -> ready(turn)
+            is LocalRecognitionEvent.Level -> out.send(VoiceEarEvent.InputLevel(event.level))
+            is LocalRecognitionEvent.Partial -> turn.partial(event.text)
+            LocalRecognitionEvent.EndOfSpeech -> turn.endOfSpeech()
+            else -> Unit
+        }
     }
 
     private suspend fun ready(turn: LocalTurn) {

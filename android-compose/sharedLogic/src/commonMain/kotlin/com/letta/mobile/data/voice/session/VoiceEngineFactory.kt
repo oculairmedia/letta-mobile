@@ -78,15 +78,11 @@ class VoiceEngineSet(
     /** Whether speech over the app's output interrupts it. */
     val bargeInByVoice: Boolean = true,
     /** Why the local ear handed listening over to the server mid-session; null while it has not (or never listened locally). */
-    val handover: StateFlow<LocalHandoverReason?> = NoHandover,
+    val handover: StateFlow<LocalHandoverReason?> = MutableStateFlow(null),
     private val onRelease: () -> Unit,
 ) {
     /** Releases the engines' resources (the retained capture, the HTTP client). Call once, after the loop's shutdown. */
     fun release() = onRelease()
-
-    private companion object {
-        val NoHandover: StateFlow<LocalHandoverReason?> = MutableStateFlow(null)
-    }
 }
 
 /** Builds the engines for one voice session. */
