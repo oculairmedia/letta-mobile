@@ -106,6 +106,16 @@ class PairInviteSurfacesUiTest {
         onNodeWithTag(PairingTags.INVITE_COUNTDOWN).assertTextContains(PairingStrings.EXPIRING_SOON, substring = true)
     }
 
+    /** A link past a QR symbol's capacity has no code to draw; the card says so and still offers the link. */
+    @Test
+    fun aLinkThatCannotBeDrawnFallsBackToTheLinkAndSaysWhy() = runComposeUiTest {
+        val view = PairDeviceView(PairInviteUiState(invite = invite, qr = null), emptyList(), 0)
+        setContent { MaterialTheme { PairDevicePanel(view, Recorder().actions()) } }
+        onNodeWithTag(PairingTags.INVITE_QR).assertDoesNotExist()
+        onNodeWithTag(PairingTags.INVITE_LINK).assertTextContains(link)
+        onNodeWithText(PairingStrings.LINK_ONLY_NO_QR).assertIsDisplayed()
+    }
+
     @Test
     fun expiredCodeIsMaskedAndOffersNewCodeNotAnAutoRefresh() = runComposeUiTest {
         val r = Recorder()

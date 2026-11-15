@@ -24,6 +24,7 @@ import kotlin.time.Duration.Companion.milliseconds
 open class CronRpcChannel(
     private val rpcCall: suspend (method: String, path: String, body: String?) -> AppServerInboundFrame.AdminRpcResponse,
 ) : NoOpChannelTransport() {
+    /** Sends one admin RPC through the channel this transport was built over. */
     override suspend fun adminRpc(method: String, path: String, body: String?) = rpcCall(method, path, body)
 
     override suspend fun listCrons(query: CronListQuery, timeout: Duration): ServerFrame.CronListResponse =
@@ -108,6 +109,7 @@ open class CronRpcChannel(
             },
         )
 
+    /** Pauses the task through the wrapper's `cron.pause`; the response carries the host's task state. */
     override suspend fun sendCronPause(command: CronPauseCommand): ServerFrame.CronPauseResponse =
         executeCronOp<Unit, ServerFrame.CronPauseResponse>(
             op = "cron.pause",
@@ -121,6 +123,7 @@ open class CronRpcChannel(
             },
         )
 
+    /** Resumes the task through the wrapper's `cron.resume`; the response carries the host's task state. */
     override suspend fun sendCronResume(command: CronResumeCommand): ServerFrame.CronResumeResponse =
         executeCronOp<Unit, ServerFrame.CronResumeResponse>(
             op = "cron.resume",
@@ -181,7 +184,7 @@ open class CronRpcChannel(
             put("success", true)
         })
 
-    companion object {
+    private companion object {
         private const val CRON_ADMIN_PATH = "/v1/cron"
         private val json = LettaJson.wire
     }

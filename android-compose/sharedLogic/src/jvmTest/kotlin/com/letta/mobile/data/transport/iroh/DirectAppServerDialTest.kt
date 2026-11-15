@@ -46,6 +46,7 @@ class DirectAppServerDialTest {
     private var server: EmbeddedServer<*, *>? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val received = Collections.synchronizedList(mutableListOf<String>())
+    private val nativeRequests = Collections.synchronizedList(mutableListOf<JsonObject>())
     private val authHeaders = Collections.synchronizedList(mutableListOf<String?>())
     private val sessions = AtomicInteger()
 
@@ -85,6 +86,38 @@ class DirectAppServerDialTest {
         transport.close()
     }
 
+    @Test
+    fun advertisedCommandsOnTheAndroidDirectChannelUseTheNativeCommand() = runBlocking {
+        val port = startStockServer()
+        val transport = directTransport(port, AtomicInteger())
+        try {
+            withTimeout(TIMEOUT) { transport.adminRpc("agent.list", "/v1/agents", null) }
+            val params = buildJsonObject {
+                put("agent_id", "agent-1")
+                put("conversation_id", "conv-1")
+                put("command_id", "deploy")
+                put("args", "staging")
+            }
+            withTimeout(TIMEOUT) {
+                while (true) {
+                    val listing = transport.adminRpc("slash_command.list_agent", "", params.toString())
+                    if (listing.result.toString().contains("/deploy")) break
+                    delay(POLL_MS)
+                }
+            }
+            val response = withTimeout(TIMEOUT) { transport.adminRpc("slash_command.execute", "", params.toString()) }
+            assertTrue(response.success, response.error)
+            assertEquals("deployed", response.result?.jsonObject?.get("output")?.jsonPrimitive?.content)
+            val request = nativeRequests.single { it["type"]?.jsonPrimitive?.content == "execute_command" }
+            assertEquals("deploy", request["command_id"]?.jsonPrimitive?.content)
+            assertEquals("staging", request["args"]?.jsonPrimitive?.content)
+            assertEquals("conv-1", request["runtime"]?.jsonObject?.get("conversation_id")?.jsonPrimitive?.content)
+            assertFalse(received.any { it == "admin_rpc" })
+        } finally {
+            transport.close()
+        }
+    }
+
     private fun directTransport(port: Int, releases: AtomicInteger) = IrohChannelTransport(
         scope = scope,
         activeConfigProvider = { IrohConnectConfig("ws://127.0.0.1:$port", "", "test-device", "test") },
@@ -113,6 +146,7 @@ class DirectAppServerDialTest {
                         val request = Json.parseToJsonElement(frame.readText()).jsonObject
                         val type = request["type"]?.jsonPrimitive?.content.orEmpty()
                         received += type
+                        nativeRequests += request
                         answer(type, request)
                         if (endsSession(closeFirstSessionAfterInfo, session, type)) return@webSocket
                     }
@@ -155,10 +189,21 @@ class DirectAppServerDialTest {
                 put("success", true)
                 put("agents", buildJsonArray { add(buildJsonObject { put("id", "agent-1"); put("name", "Local") }) })
             }
+            "execute_command" -> buildJsonObject {
+                put("type", "execute_command_response")
+                put("request_id", requestId)
+                put("success", true)
+                put("output", "deployed")
+            }
             // A stock server has no admin_rpc: it would answer an unknown type with an error.
             else -> return
         }
         send(Frame.Text(reply.toString()))
+        if (type == "agent_list") {
+            send(Frame.Text("""{"type":"update_device_status","runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},
+                "event_seq":1,"emitted_at":"2026-11-15T00:00:00Z","idempotency_key":"catalog",
+                "device_status":{"supported_commands":["doctor"],"mod_commands":[{"id":"deploy","description":"Deploy"}]}}"""))
+        }
     }
 
     private companion object {
