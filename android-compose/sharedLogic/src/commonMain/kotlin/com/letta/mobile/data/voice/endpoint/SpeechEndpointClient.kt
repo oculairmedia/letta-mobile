@@ -2,7 +2,6 @@ package com.letta.mobile.data.voice.endpoint
 
 import com.letta.mobile.data.voice.SpeechEndpointUrl
 import com.letta.mobile.data.voice.VoiceErrorCode
-import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.audio.AudioChunk
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
@@ -34,11 +33,9 @@ import io.ktor.http.content.TextContent
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancel
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import kotlin.concurrent.Volatile
 
 /**
  * An OpenAI-compatible speech client: `POST {base}/v1/audio/transcriptions` and
@@ -72,20 +69,38 @@ class SpeechEndpointClient(
         }
     }
 
+    /** Set once the server refused `verbose_json` and accepted plain `json`. */
+    @Volatile
+    private var verboseRefused = false
+
     /** The server this client talks to, for destination grant checks. */
     val endpoint: SpeechEndpointUrl get() = config.baseUrl
 
-    /** Transcribes [request]'s audio and returns the text. */
-    suspend fun transcribe(request: TranscriptionRequest): VoiceText = call(SpeechOperation.TRANSCRIPTION) {
+    /**
+     * Transcribes [request]'s audio. Asks for `verbose_json`, whose segments carry the recogniser's
+     * own no-speech evidence ([SpeechTranscript.segments]). A server that refuses that format (400 or
+     * 422) but accepts plain `json` gets plain `json` from then on, and its transcripts carry no
+     * segments.
+     */
+    suspend fun transcribe(request: TranscriptionRequest): SpeechTranscript = call(SpeechOperation.TRANSCRIPTION) {
         val target = requestUrl(TRANSCRIPTIONS_ROUTE, SpeechOperation.TRANSCRIPTION)
-        val response = client.post {
-            url(target)
-            authorize()
-            setBody(transcriptionBody(request))
+        val verbose = !verboseRefused
+        var response = postTranscription(target, request, verbose)
+        if (verbose && response.status.value in FORMAT_REFUSED_STATUSES) {
+            response = postTranscription(target, request, verbose = false)
+            if (SpeechStatusCodes.failureFor(response.status.value) == null) verboseRefused = true
         }
         check(SpeechOperation.TRANSCRIPTION, response)
-        parseTranscript(response.bodyAsText())
+        TranscriptResponse.parse(response.bodyAsText())
+            ?: throw SpeechEndpointException(SpeechOperation.TRANSCRIPTION, VoiceErrorCode.BAD_RESPONSE, HTTP_OK)
     }
+
+    private suspend fun postTranscription(target: Url, request: TranscriptionRequest, verbose: Boolean): HttpResponse =
+        client.post {
+            url(target)
+            authorize()
+            setBody(transcriptionBody(request, if (verbose) VERBOSE_JSON else PLAIN_JSON))
+        }
 
     /**
      * Synthesises [request], handing the audio to [onChunk] as it streams in. A
@@ -156,7 +171,7 @@ class SpeechEndpointClient(
         config.apiKey?.let { header(HttpHeaders.Authorization, it.bearer()) }
     }
 
-    private fun transcriptionBody(request: TranscriptionRequest): MultiPartFormDataContent {
+    private fun transcriptionBody(request: TranscriptionRequest, format: String): MultiPartFormDataContent {
         val encoding = request.audio.encoding
         val fileHeaders = Headers.build {
             append(HttpHeaders.ContentType, encoding.mimeType)
@@ -165,7 +180,7 @@ class SpeechEndpointClient(
         return MultiPartFormDataContent(
             formData {
                 append("model", request.model.value)
-                append("response_format", "json")
+                append("response_format", format)
                 request.language?.let { append("language", it.value) }
                 append("file", request.audio.bytes, fileHeaders)
             },
@@ -190,14 +205,6 @@ class SpeechEndpointClient(
             received += read.coerceAtLeast(0)
         }
         if (received == 0L) throw SpeechEndpointException(SpeechOperation.SPEECH, VoiceErrorCode.BAD_RESPONSE, response.status.value)
-    }
-
-    private fun parseTranscript(body: String): VoiceText {
-        val text = runCatching { Json.parseToJsonElement(body).jsonObject["text"] as? JsonPrimitive }.getOrNull()
-        if (text == null || !text.isString) {
-            throw SpeechEndpointException(SpeechOperation.TRANSCRIPTION, VoiceErrorCode.BAD_RESPONSE, HTTP_OK)
-        }
-        return VoiceText(text.content.trim())
     }
 
     private fun check(operation: SpeechOperation, response: HttpResponse) {
@@ -231,6 +238,9 @@ class SpeechEndpointClient(
         val SPEECH_ROUTE = listOf("v1", "audio", "speech")
         val MODELS_ROUTE = listOf("v1", "models")
         val UNAUTHORIZED_STATUSES = setOf(401, 403)
+        val FORMAT_REFUSED_STATUSES = setOf(400, 422)
+        const val VERBOSE_JSON = "verbose_json"
+        const val PLAIN_JSON = "json"
         const val CHUNK_BYTES = 8 * 1024
         const val HTTP_OK = 200
     }

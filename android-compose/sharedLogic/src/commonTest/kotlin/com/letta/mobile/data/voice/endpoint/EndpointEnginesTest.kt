@@ -105,7 +105,7 @@ class EndpointEnginesTest {
     fun grantedTranscriptionIsSent() = runTest {
         val granted = grants(VoiceEndpointGrant(origin, VoiceEndpointPayload.AUDIO_FOR_TRANSCRIPTION))
         val text = withContext(Dispatchers.Default) { EndpointTranscriber(client(), { granted }, settings).transcribe(clip) }
-        assertEquals("hello", text.value)
+        assertEquals("hello", text.text.value)
         assertEquals(1, requests)
     }
 
