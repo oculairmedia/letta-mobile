@@ -26,7 +26,7 @@ import dev.snipme.highlights.model.SyntaxThemes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.letta.mobile.ui.theme.MarkdownTextStyles
+import com.letta.mobile.ui.theme.MarkdownStrongSpan
 
 /**
  * One syntax-highlight span, renderer-neutral so it can be cached and carried between
@@ -156,7 +156,7 @@ internal fun annotate(revision: HighlightedRevision): AnnotatedString = buildAnn
     append(code)
     for (span in revision.spans) {
         if (span.end > code.length || span.start >= span.end) continue
-        val style = if (span.rgb != null) SpanStyle(color = Color(span.rgb).copy(alpha = 1f)) else MarkdownTextStyles.strong
+        val style = if (span.rgb != null) SpanStyle(color = Color(span.rgb).copy(alpha = 1f)) else MarkdownStrongSpan
         addStyle(style, span.start, span.end)
     }
 }

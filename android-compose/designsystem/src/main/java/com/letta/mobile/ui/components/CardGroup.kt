@@ -28,7 +28,8 @@ import com.letta.mobile.ui.theme.listItemColors
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.ui.theme.LettaDimens
 import androidx.compose.foundation.shape.CornerSize
-import com.letta.mobile.ui.theme.CardGroupTokens
+import com.letta.mobile.ui.theme.CardGroupInnerCorner
+import com.letta.mobile.ui.theme.CardGroupOuterCorner
 
 data class CardGroupItem(
     val onClick: (() -> Unit)?,
@@ -88,12 +89,12 @@ private fun CardGroupListItem(
     val isPressed by interactionSource.collectIsPressedAsState()
 
     val topCorner by animateDpAsState(
-        targetValue = if (isPressed || count == 1 || isFirst) CardGroupTokens.outerCorner else CardGroupTokens.innerCorner,
+        targetValue = if (isPressed || count == 1 || isFirst) CardGroupOuterCorner else CardGroupInnerCorner,
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "topCorner",
     )
     val bottomCorner by animateDpAsState(
-        targetValue = if (isPressed || count == 1 || isLast) CardGroupTokens.outerCorner else CardGroupTokens.innerCorner,
+        targetValue = if (isPressed || count == 1 || isLast) CardGroupOuterCorner else CardGroupInnerCorner,
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "bottomCorner",
     )

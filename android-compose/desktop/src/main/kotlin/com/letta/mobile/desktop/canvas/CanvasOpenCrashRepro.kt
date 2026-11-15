@@ -17,12 +17,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.SwingPanel
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.singleWindowApplication
 import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.desktop.DesktopWindowDimens
 import com.letta.mobile.desktop.initializeDesktopLifecycleMainThread
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +65,7 @@ fun main() {
 
     singleWindowApplication(
         title = "Canvas open crash repro",
-        state = WindowState(width = DesktopWindowDimens.mainWidth, height = DesktopWindowDimens.mainHeight),
+        state = WindowState(width = 1280.dp, height = 820.dp),
     ) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(modifier = Modifier.fillMaxSize()) { ReproContent(window) }

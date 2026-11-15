@@ -102,7 +102,7 @@ private fun TagDrillInItemCard(item: TagDrillInItem) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = com.letta.mobile.ui.theme.TAG_DRILL_IN_CARD_FILL_ALPHA),
         ),
     ) {
         Column(

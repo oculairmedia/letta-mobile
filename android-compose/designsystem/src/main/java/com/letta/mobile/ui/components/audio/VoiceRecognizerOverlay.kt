@@ -26,7 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.VoiceOverlayTokens
+import com.letta.mobile.ui.theme.VoiceOverlayInstructionInset
 
 /**
  * letta-mobile-arhd: full-screen visual context for an in-flight
@@ -96,7 +96,7 @@ fun VoiceRecognizerOverlay(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(bottom = VoiceOverlayTokens.instructionBottomInset, start = LettaDimens.Space.xl, end = LettaDimens.Space.xl)
+                    .padding(bottom = VoiceOverlayInstructionInset, start = LettaDimens.Space.xl, end = LettaDimens.Space.xl)
                     .pointerInput(Unit) { /* eat all pointer events here */ },
             ) {
                 Column(

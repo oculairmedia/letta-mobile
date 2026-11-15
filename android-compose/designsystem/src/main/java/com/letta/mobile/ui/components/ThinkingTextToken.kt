@@ -149,7 +149,7 @@ private const val SWEEP_TRAVEL_PX = 2_400f
  * realistic text bounds; phase 1 leaves it well to the right.
  */
 internal fun thinkingTextTokenBrush(scheme: ColorScheme, phase: Float): Brush {
-    val tail = scheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled)
+    val tail = scheme.onSurfaceVariant.copy(alpha = com.letta.mobile.ui.theme.THINKING_SWEEP_TAIL_ALPHA)
     val startX = -SWEEP_BAND_PX + phase * SWEEP_TRAVEL_PX
     val endX = startX + SWEEP_BAND_PX
     return Brush.linearGradient(

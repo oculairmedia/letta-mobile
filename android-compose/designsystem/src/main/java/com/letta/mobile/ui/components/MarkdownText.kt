@@ -55,9 +55,16 @@ import com.letta.mobile.ui.text.RichInlineAtomKind
 import com.letta.mobile.ui.text.RichInlineItem
 import com.letta.mobile.ui.text.prepareRichInlineItems
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.MarkdownBlockDimens
-import com.letta.mobile.ui.theme.MarkdownInlineCodeDimens
-import com.letta.mobile.ui.theme.MarkdownTextStyles
+import com.letta.mobile.ui.theme.MarkdownCollapsedFallbackMaxHeight
+import com.letta.mobile.ui.theme.MarkdownInlineCodeCorner
+import com.letta.mobile.ui.theme.MarkdownInlineCodeMargin
+import com.letta.mobile.ui.theme.MarkdownInlineCodePaddingHorizontal
+import com.letta.mobile.ui.theme.MarkdownInlineCodePaddingVertical
+import com.letta.mobile.ui.theme.markdownBodyStyle
+import com.letta.mobile.ui.theme.markdownBulletStyle
+import com.letta.mobile.ui.theme.markdownCodeBlockStyle
+import com.letta.mobile.ui.theme.markdownHeadingStyle
+import com.letta.mobile.ui.theme.markdownQuoteStyle
 
 @Composable
 fun MarkdownText(
@@ -525,13 +532,13 @@ private fun MarkdownTextRaw(
     val extendedSpans = markdownExtendedSpans {
         ExtendedSpans(
             RoundedCornerSpanPainter(
-                cornerRadius = MarkdownInlineCodeDimens.cornerRadius,
+                cornerRadius = MarkdownInlineCodeCorner,
                 padding = RoundedCornerSpanPainter.TextPaddingValues(
-                    horizontal = MarkdownInlineCodeDimens.horizontalPadding,
-                    vertical = MarkdownInlineCodeDimens.verticalPadding,
+                    horizontal = MarkdownInlineCodePaddingHorizontal,
+                    vertical = MarkdownInlineCodePaddingVertical,
                 ),
-                topMargin = MarkdownInlineCodeDimens.verticalMargin,
-                bottomMargin = MarkdownInlineCodeDimens.verticalMargin,
+                topMargin = MarkdownInlineCodeMargin,
+                bottomMargin = MarkdownInlineCodeMargin,
             ),
         )
     }
@@ -540,7 +547,7 @@ private fun MarkdownTextRaw(
     // This works because sp → px conversion uses Density.fontScale, so changing
     // it effectively scales all text rendered inside the provider — including
     // the library's internal rendering that ignores external typography changes.
-    val typeScale = MarkdownTextStyles.scale(MaterialTheme.typography, textColor, MaterialTheme.colorScheme.onSurfaceVariant)
+    val type = MaterialTheme.typography
     val currentDensity = LocalDensity.current
     val scaledDensity = remember(currentDensity, fontScale) {
         Density(
@@ -580,18 +587,18 @@ private fun MarkdownTextRaw(
                 dividerColor = MaterialTheme.colorScheme.outlineVariant,
             ),
             typography = markdownTypography(
-                text = typeScale.text,
-                code = typeScale.code,
-                h1 = typeScale.h1,
-                h2 = typeScale.h2,
-                h3 = typeScale.h3,
-                h4 = typeScale.h4,
-                h5 = typeScale.h5,
-                h6 = typeScale.h6,
-                quote = typeScale.quote,
-                bullet = typeScale.bullet,
-                list = typeScale.text,
-                ordered = typeScale.text,
+                text = markdownBodyStyle(type, textColor),
+                code = markdownCodeBlockStyle(type, MaterialTheme.colorScheme.onSurfaceVariant),
+                h1 = markdownHeadingStyle(1, type, textColor),
+                h2 = markdownHeadingStyle(2, type, textColor),
+                h3 = markdownHeadingStyle(3, type, textColor),
+                h4 = markdownHeadingStyle(4, type, textColor),
+                h5 = markdownHeadingStyle(5, type, textColor),
+                h6 = markdownHeadingStyle(6, type, textColor),
+                quote = markdownQuoteStyle(type, textColor),
+                bullet = markdownBulletStyle(type, textColor),
+                list = markdownBodyStyle(type, textColor),
+                ordered = markdownBodyStyle(type, textColor),
             ),
         )
     }
@@ -735,6 +742,6 @@ private fun extractCodeFenceInfo(content: String, node: ASTNode): Pair<String, S
     return language to codeText
 }
 
-private val A2UI_JSON_FALLBACK_COLLAPSED_MAX_HEIGHT = MarkdownBlockDimens.collapsedFallbackMaxHeight
+private val A2UI_JSON_FALLBACK_COLLAPSED_MAX_HEIGHT = MarkdownCollapsedFallbackMaxHeight
 private const val A2UI_JSON_FALLBACK_COLLAPSE_CHAR_LIMIT = 1_600
 private const val A2UI_JSON_FALLBACK_COLLAPSE_LINE_LIMIT = 18

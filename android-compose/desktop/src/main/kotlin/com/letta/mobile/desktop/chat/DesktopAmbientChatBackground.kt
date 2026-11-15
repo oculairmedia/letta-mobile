@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import com.letta.mobile.desktop.DesktopEffectTokens
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -47,7 +46,8 @@ import kotlin.math.sin
  * shader, not a flat gradient. Desktop Compose renders through Skia, and
  * [RuntimeEffect] compiles the exact SkSL source the Android AGSL path uses
  * (ambientGlowShaderSource for the chosen style).
- * The layered radial gradient survives only as a fallback if the effect fails to compile on some exotic GPU/driver.
+ * The layered radial gradient survives only as a fallback if the effect fails
+ * to compile on some exotic GPU/driver.
  *
  * Status drives MOTION as well as tint, from the shared [AmbientMotion] table
  * (same floats as the Android renderer, so the platforms stay in step):
@@ -204,7 +204,7 @@ internal fun DesktopAmbientChatBackground(
                             colorStops = arrayOf(
                                 0.00f to tint.copy(alpha = tint.alpha * 0.18f * intensity),
                                 0.52f to tint.copy(alpha = tint.alpha * 0.08f * intensity),
-                                1.00f to tint.copy(alpha = DesktopEffectTokens.GLOW_EDGE_ALPHA),
+                                1.00f to tint.copy(alpha = 0f),
                             ),
                             center = center,
                             radius = radius,

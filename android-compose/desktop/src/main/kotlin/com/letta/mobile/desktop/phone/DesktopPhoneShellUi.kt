@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.chat.AgentIdentity
 import com.letta.mobile.ui.chat.AgentIdentityPill
 import com.letta.mobile.ui.icons.LettaIcons
@@ -167,3 +168,6 @@ internal fun PhoneAwareContent(
         PhoneDestinationFrame(title, onMenu = { phone.drawerOpen = true }, modifier = modifier, content = content)
     }
 }
+
+private val HEADER_ELEVATION: Dp = 3.dp
+private val TOP_BAR_HEIGHT: Dp = 56.dp

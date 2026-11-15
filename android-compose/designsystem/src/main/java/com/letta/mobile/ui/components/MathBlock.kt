@@ -38,6 +38,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import java.io.ByteArrayInputStream
 import java.util.Locale
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.MathDisplayMinHeight
 
 /**
  * Render a single LaTeX expression — block or inline — using KaTeX inside a
@@ -91,7 +92,7 @@ fun MathBlock(
         AndroidView(
             modifier = Modifier
                 .then(if (displayMode) Modifier.fillMaxWidth() else Modifier)
-                .defaultMinSize(minHeight = if (displayMode) LettaDimens.Control.minTouchTarget else LettaDimens.Space.xxl)
+                .defaultMinSize(minHeight = if (displayMode) MathDisplayMinHeight else LettaDimens.Space.xxl)
                 .semantics { contentDescription = source }
                 .combinedClickable(
                     onClick = {},

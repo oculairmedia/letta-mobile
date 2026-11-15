@@ -58,7 +58,8 @@ import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.MarkdownTextStyles
+import com.letta.mobile.ui.theme.markdownBodyStyle
+import com.letta.mobile.ui.theme.markdownTableHeaderStyle
 /**
  * Streaming-aware markdown renderer with a stable committed-prefix path.
  *
@@ -218,7 +219,7 @@ fun StreamingMarkdownText(
     val layoutDirection = LocalLayoutDirection.current
     val chatFontScale = LocalChatFontScale.current
     val geometryMeasurer = rememberChatTextGeometryMeasurer()
-    val activeTextStyle = MarkdownTextStyles.body(MaterialTheme.typography, textColor)
+    val activeTextStyle = markdownBodyStyle(MaterialTheme.typography, textColor)
     val scaledDensity = remember(density, chatFontScale) {
         Density(
             density = density.density,
@@ -660,7 +661,7 @@ private fun StreamingMarkdownTable(
                 textColor = textColor,
                 containerColor = headerContainer,
                 outlineColor = outlineColor,
-                cellTextStyle = MarkdownTextStyles.tableHeader(MaterialTheme.typography),
+                cellTextStyle = markdownTableHeaderStyle(MaterialTheme.typography),
                 alignments = table.alignments,
                 columnWeights = columnWeights,
                 inlineCodeBackground = inlineCodeBackground,

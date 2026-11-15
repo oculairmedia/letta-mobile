@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
@@ -154,7 +155,7 @@ private fun runDesktopApplication(
                         // available from the Nucleus native tray menu.
                         onCloseRequest = { activationHandler.hideWindow() },
                         title = windowTitle,
-                        state = rememberWindowState(width = DesktopWindowDimens.mainWidth, height = DesktopWindowDimens.mainHeight),
+                        state = rememberWindowState(width = 1280.dp, height = 820.dp),
                         header = headerChrome,
                     ) {
                         LaunchedEffect(Unit) {

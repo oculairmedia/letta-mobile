@@ -55,8 +55,9 @@ import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSizing
 import com.letta.mobile.ui.theme.LettaSpacing
-import com.letta.mobile.ui.theme.MarkdownTextStyles
 import com.letta.mobile.ui.zoom.ZoomViewportState
+import com.letta.mobile.ui.theme.markdownCodeBlockStyle
+import com.letta.mobile.ui.theme.MERMAID_VIEWPORT_FILL_ALPHA
 
 @Composable
 fun MermaidDiagram(
@@ -271,7 +272,7 @@ private fun MermaidFullscreenDialog(
                             .padding(horizontal = LettaSpacing.INNER_PADDING_SMALL, vertical = LettaSpacing.CARD_GAP)
                             .onSizeChanged { viewportSize = it }
                             .clip(MaterialTheme.shapes.extraLarge)
-                            .background(MaterialTheme.colorScheme.surface)
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = MERMAID_VIEWPORT_FILL_ALPHA))
                             .pointerInput(Unit) {
                                 detectTransformGestures { centroid, panChange, zoomChange, _ ->
                                     zoomState.onTransform(
@@ -353,7 +354,7 @@ private fun MermaidErrorFallback(
             )
             Text(
                 text = source,
-                style = MarkdownTextStyles.codeBlock(MaterialTheme.typography, MaterialTheme.colorScheme.onErrorContainer),
+                style = markdownCodeBlockStyle(MaterialTheme.typography, MaterialTheme.colorScheme.onErrorContainer),
                 color = MaterialTheme.colorScheme.onErrorContainer,
                     modifier = Modifier.padding(top = LettaSpacing.CARD_GAP),
             )

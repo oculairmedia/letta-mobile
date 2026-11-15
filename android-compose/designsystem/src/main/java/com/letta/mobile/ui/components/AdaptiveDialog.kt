@@ -59,7 +59,7 @@ fun AdaptiveDialog(
             Dialog(onDismissRequest = onDismiss) {
                 Card(
                     modifier = modifier
-                        .widthIn(max = LettaSizing.readableDialogMaxWidth)
+                        .widthIn(max = com.letta.mobile.ui.theme.AdaptiveDialogMaxWidth)
                         .fillMaxWidth()
                         .padding(LettaDimens.Orb.lg),
                 ) {
