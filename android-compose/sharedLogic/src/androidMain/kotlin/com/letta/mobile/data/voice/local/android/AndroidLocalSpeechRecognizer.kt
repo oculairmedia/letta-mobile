@@ -14,8 +14,10 @@ import com.letta.mobile.data.voice.local.LocalRecognizerSession
 import com.letta.mobile.data.voice.local.LocalSpeechAvailability
 import com.letta.mobile.data.voice.local.LocalSpeechRecognizer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import java.util.Locale
@@ -45,7 +47,12 @@ class AndroidLocalSpeechRecognizer(context: Context) : LocalSpeechRecognizer {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
 }
 
-/** One `SpeechRecognizer`, created on first use on the main thread and reused across recognitions. */
+/**
+ * One `SpeechRecognizer`, created on first use on the main thread and reused while recognitions end
+ * on their own. A recognition cancelled mid-way destroys it instead: the framework forwards a late
+ * callback of the cancelled recognition to whichever listener is set next, so the next recognition
+ * gets a fresh recogniser.
+ */
 private class AndroidRecognizerSession(
     private val context: Context,
     request: LocalRecognitionRequest,
@@ -71,9 +78,10 @@ private class AndroidRecognizerSession(
         return true
     }
 
-    /** Cancels the recognition in progress, if any. Main thread. */
-    fun cancel() {
-        recognizer?.cancel()
+    /** Drops the recogniser of a recognition cancelled mid-way, so none of its late callbacks reach the next one. Main thread. */
+    fun discard() {
+        recognizer?.destroy()
+        recognizer = null
     }
 
     fun finish() {
@@ -96,21 +104,29 @@ private class AndroidRecognizerSession(
         }
 }
 
-/** One recognition: collecting starts it on the main thread; cancelling cancels it there. */
+/**
+ * One recognition: collecting starts it on the main thread; cancelling it before it ended discards
+ * the recogniser there. Every callback is kept (the buffer is unbounded, and one utterance's
+ * callbacks are few), so the final result or failure always reaches the collector.
+ */
 private class AndroidRecognition(private val session: AndroidRecognizerSession) : LocalRecognition {
     override val events: Flow<LocalRecognitionEvent> = callbackFlow {
+        var ended = false
         val listener = DetachableRecognitionListener(
             RecognitionCallbacks { event ->
                 trySend(event)
-                if (event is LocalRecognitionEvent.Final || event is LocalRecognitionEvent.Failed) close()
+                if (event is LocalRecognitionEvent.Final || event is LocalRecognitionEvent.Failed) {
+                    ended = true
+                    close()
+                }
             },
         )
         if (!session.start(listener)) close()
         awaitClose {
             listener.detach()
-            session.cancel()
+            if (!ended) session.discard()
         }
-    }.flowOn(Dispatchers.Main.immediate)
+    }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.Main.immediate)
 
     override fun finish() = session.finish()
 }

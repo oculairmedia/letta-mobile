@@ -80,6 +80,9 @@ internal class LocalListenSession(private val parts: LocalListenParts, private v
     private var announced = false
     private var failures = 0
 
+    /** The output start count the last quiet wait covered. */
+    private var quietAfter = 0L
+
     suspend fun run(): LocalGiveUp {
         if (memory.closed) return LocalGiveUp(VoiceErrorCode.UNAVAILABLE, null)
         if (!parts.recognizer.availability(config.language).available) {
@@ -105,16 +108,16 @@ internal class LocalListenSession(private val parts: LocalListenParts, private v
     }
 
     /**
-     * When the ear pauses for output and there was output since the last recognition, waits until
-     * it has been quiet for the tail.
+     * When the ear pauses for output and output started since the last wait (however briefly),
+     * waits until it has been quiet for the tail with no new start.
      */
     private suspend fun awaitQuietOutput() {
-        if (!config.pauseDuringOutput || !memory.outputSeen) return
-        memory.outputSeen = false
-        while (true) {
+        if (!config.pauseDuringOutput) return
+        while (memory.output.value || memory.outputStarts.value != quietAfter) {
+            val seen = memory.outputStarts.value
             memory.output.first { !it }
-            val restarted = withTimeoutOrNull(config.outputTail) { memory.output.first { it } }
-            if (restarted == null) return
+            val restarted = withTimeoutOrNull(config.outputTail) { memory.outputStarts.first { it != seen } }
+            if (restarted == null) quietAfter = seen
         }
     }
 
@@ -151,8 +154,9 @@ internal class LocalListenSession(private val parts: LocalListenParts, private v
     /** Runs [recognition] to its end, the app's output starting, or cancellation. */
     private suspend fun recognizeOnce(recognition: LocalRecognition): RecognitionOutcome = coroutineScope {
         val events = recognition.events.produceIn(this)
-        val outputStarted = if (config.pauseDuringOutput) async { memory.output.first { it } } else null
-        val turn = LocalTurn(config, out)
+        val startedAt = memory.outputStarts.value
+        val outputStarted = if (config.pauseDuringOutput) async { memory.outputStarts.first { it != startedAt } } else null
+        val turn = LocalTurn(config, out, startedAt)
         try {
             var outcome: RecognitionOutcome? = null
             while (outcome == null) outcome = nextOutcome(events, outputStarted, recognition, turn)
@@ -166,7 +170,7 @@ internal class LocalListenSession(private val parts: LocalListenParts, private v
 
     private suspend fun nextOutcome(
         events: ReceiveChannel<LocalRecognitionEvent>,
-        outputStarted: Deferred<Boolean>?,
+        outputStarted: Deferred<Long>?,
         recognition: LocalRecognition,
         turn: LocalTurn,
     ): RecognitionOutcome? = select {
@@ -181,7 +185,7 @@ internal class LocalListenSession(private val parts: LocalListenParts, private v
     /** Handles one event; returns how the recognition ended once it has ([event] null: it ended without saying). */
     private suspend fun onEvent(event: LocalRecognitionEvent?, turn: LocalTurn): RecognitionOutcome? = when (event) {
         null -> RecognitionOutcome.Failed(LocalRecognitionError.OTHER, turn.ready)
-        is LocalRecognitionEvent.Final -> RecognitionOutcome.Heard.also { turn.final(event.text, memory.output.value) }
+        is LocalRecognitionEvent.Final -> RecognitionOutcome.Heard.also { turn.final(event.text, memory.output.value || memory.outputStarts.value != turn.outputStartsAt) }
         is LocalRecognitionEvent.Failed -> RecognitionOutcome.Failed(event.error, turn.ready)
         else -> null.also { onProgress(event, turn) }
     }
@@ -206,7 +210,12 @@ internal class LocalListenSession(private val parts: LocalListenParts, private v
 }
 
 /** One recognition's turn as the loop sees it: whether it heard the person start, and how it ends. */
-private class LocalTurn(private val config: LocalEarConfig, private val out: ProducerScope<VoiceEarEvent>) {
+private class LocalTurn(
+    private val config: LocalEarConfig,
+    private val out: ProducerScope<VoiceEarEvent>,
+    /** The output start count when the recognition began: any change means it heard the app. */
+    val outputStartsAt: Long,
+) {
     var ready = false
     private var spoke = false
     private var ended = false
@@ -229,10 +238,10 @@ private class LocalTurn(private val config: LocalEarConfig, private val out: Pro
         out.send(VoiceEarEvent.SpeechEnded)
     }
 
-    /** The final result: one utterance, or an empty end when it is dropped or the app is speaking. */
-    suspend fun final(text: VoiceText, outputActive: Boolean) {
+    /** The final result: one utterance, or an empty end when it is dropped or [heardOutput] (the app spoke during it). */
+    suspend fun final(text: VoiceText, heardOutput: Boolean) {
         val reason = when {
-            outputActive && config.pauseDuringOutput -> TurnDiscardReason.OUTPUT_ACTIVE
+            heardOutput && config.pauseDuringOutput -> TurnDiscardReason.OUTPUT_ACTIVE
             else -> config.transcripts.discardReason(text, EarTurnReport.Unmeasured)
         }
         if (reason != null) {

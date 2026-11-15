@@ -226,6 +226,17 @@ class LocalVoiceEarTest {
     }
 
     @Test
+    fun aResultFromARecognitionTheAppSpokeDuringIsDroppedEvenOnceItStopped() = runTest {
+        val heard = listen()
+        recognizer.current.send(LocalRecognitionEvent.Ready, final("my own reply echoed"))
+        heard.ear.setOutputActive(true)
+        heard.ear.setOutputActive(false)
+        runCurrent()
+
+        assertTrue(heard.turns.none { !it.utterance.isEmpty })
+    }
+
+    @Test
     fun outputStartingAgainDuringTheTailKeepsThePause() = runTest {
         val heard = listen()
         heard.ear.setOutputActive(true)

@@ -9,6 +9,8 @@ import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.vad.TurnDiscardReason
 import com.letta.mobile.data.voice.vad.ear.TranscriptPolicy
 import com.letta.mobile.data.voice.vad.ear.VadEarConfig
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -159,8 +161,7 @@ class LocalVoiceEar(
         val ear = fallback?.takeUnless { memory.closed }?.ear()
         config.observer.handedOver(reason, toServer = ear != null)
         if (ear == null) return null
-        ear.setOutputActive(memory.output.value)
-        memory.taken = ear
+        memory.takeOver(ear)
         memory.handover.value = reason
         return ear
     }
@@ -170,9 +171,7 @@ class LocalVoiceEar(
     }
 
     override fun setOutputActive(active: Boolean) {
-        if (active) memory.outputSeen = true
-        memory.output.value = active
-        memory.taken?.setOutputActive(active)
+        memory.setOutput(active)
     }
 
     override fun retry(handle: CapturedAudioHandle): Boolean = memory.taken?.retry(handle) ?: false
@@ -184,21 +183,42 @@ class LocalVoiceEar(
     }
 }
 
-/** What a [LocalVoiceEar] keeps between listens. */
+/**
+ * What a [LocalVoiceEar] keeps between listens. The output hint, its start count and the ear that
+ * took over change together under [lock], so a hand-over and an output change racing on other
+ * threads always leave the fallback ear with the latest hint.
+ */
 internal class LocalEarMemory {
+    private val lock = SynchronizedObject()
     val output = MutableStateFlow(false)
+
+    /** Counts the times output started: a recognition during which it moved heard some of the app. */
+    val outputStarts = MutableStateFlow(0L)
     val commits = Channel<Unit>(Channel.CONFLATED)
     val handover = MutableStateFlow<LocalHandoverReason?>(null)
 
     @Volatile
     var taken: VoiceEar? = null
+        private set
 
     @Volatile
     var closed: Boolean = false
 
-    /** Output was active since the last recognition started: the next one waits for its tail. */
-    @Volatile
-    var outputSeen: Boolean = false
+    fun setOutput(active: Boolean) {
+        synchronized(lock) {
+            if (active && !output.value) outputStarts.value += 1
+            output.value = active
+            taken?.setOutputActive(active)
+        }
+    }
+
+    /** [ear] takes over, starting from the current output hint. */
+    fun takeOver(ear: VoiceEar) {
+        synchronized(lock) {
+            ear.setOutputActive(output.value)
+            taken = ear
+        }
+    }
 
     fun drainCommits() {
         do {

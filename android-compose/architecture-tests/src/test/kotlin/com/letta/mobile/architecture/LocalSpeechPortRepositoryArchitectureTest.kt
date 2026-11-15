@@ -33,6 +33,6 @@ class LocalSpeechPortRepositoryArchitectureTest {
 
     private companion object {
         val IMPORT = Regex("""(?m)^import\s+([\w.]+)""")
-        val ALLOWED = listOf("com.letta.mobile.data.", "kotlin.", "kotlinx.coroutines.")
+        val ALLOWED = listOf("com.letta.mobile.data.", "kotlin.", "kotlinx.coroutines.", "kotlinx.atomicfu.")
     }
 }

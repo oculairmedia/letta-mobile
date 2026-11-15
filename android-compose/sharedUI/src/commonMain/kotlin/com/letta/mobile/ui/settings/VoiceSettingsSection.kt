@@ -30,7 +30,6 @@ import com.letta.mobile.sharedui.resources.voice_settings_key_saved
 import com.letta.mobile.sharedui.resources.voice_settings_listening
 import com.letta.mobile.sharedui.resources.voice_settings_listening_automatic
 import com.letta.mobile.sharedui.resources.voice_settings_listening_automatic_help
-import com.letta.mobile.sharedui.resources.voice_settings_listening_help
 import com.letta.mobile.sharedui.resources.voice_settings_listening_local
 import com.letta.mobile.sharedui.resources.voice_settings_listening_local_help
 import com.letta.mobile.sharedui.resources.voice_settings_listening_local_unavailable
@@ -191,7 +190,8 @@ private fun SettingsScope.VoiceListeningRow(access: VoiceSetupAccess, listening:
         title = stringResource(Res.string.voice_settings_listening),
         options = options,
         selected = listening.name,
-        supporting = stringResource(Res.string.voice_settings_listening_help),
+        // The chosen option's own description: a pointer's segmented control shows only this line.
+        supporting = options.first { it.key == listening.name }.description,
         onSelect = { picked -> access.store.setListening(VoiceListening.valueOf(picked)) },
     )
     ChoiceRow(row)
