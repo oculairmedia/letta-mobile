@@ -51023,6 +51023,11 @@ public final class com/letta/mobile/data/session/graph/AdminRemoteRoutes {
 	public final fun getTools ()Lcom/letta/mobile/data/backend/RemoteRoute;
 }
 
+public final class com/letta/mobile/data/session/graph/BrowserSessionRoutesKt {
+	public static final fun unservedBrowserSessionStatus (Lcom/letta/mobile/data/model/LettaConfig;)Lcom/letta/mobile/data/model/BackendConnectionStatus;
+	public static final fun webSessionCapabilities (Lcom/letta/mobile/data/model/LettaConfig;)Lcom/letta/mobile/data/backend/SessionCapabilities;
+}
+
 public abstract interface class com/letta/mobile/data/session/graph/HostAppServerClients {
 	public abstract fun clientFor (Lcom/letta/mobile/data/model/BackendKind;)Lkotlin/jvm/functions/Function1;
 }
