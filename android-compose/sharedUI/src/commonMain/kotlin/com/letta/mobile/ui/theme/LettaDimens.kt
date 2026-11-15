@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.theme
 
+import com.letta.mobile.ui.theme.tokens.LettaAlphaTokens
 import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import com.letta.mobile.ui.theme.tokens.LettaRowDimens
 import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
@@ -113,9 +114,9 @@ object LettaDimens {
          * an icon, and a pane loading in place of its content. The first two are the glyph sizes
          * they stand in for; [spinnerLg] is Material's own indicator diameter.
          */
-        val spinnerSm: Dp = iconSm
-        val spinnerMd: Dp = icon
-        val spinnerLg: Dp = 40.dp
+        val spinnerSm: Dp = LettaControlTokens.spinnerSm
+        val spinnerMd: Dp = LettaControlTokens.spinnerMd
+        val spinnerLg: Dp = LettaControlTokens.spinnerLg
     }
 
     /** Agent orb sizes. The rail slot is wider than the orb so a selection marker fits beside it. */
@@ -164,8 +165,8 @@ object LettaDimens {
         val hairline: Dp = LettaStrokeTokens.hairline
 
         /** A spinner's arc, not a border: [spinner] for the small and medium sizes, [spinnerLg] for the large. */
-        val spinner: Dp = 2.dp
-        val spinnerLg: Dp = 4.dp
+        val spinner: Dp = LettaStrokeTokens.spinner
+        val spinnerLg: Dp = LettaStrokeTokens.spinnerLg
     }
 
     /**
@@ -252,7 +253,7 @@ object LettaDimens {
          * Quiet text one step below `onSurfaceVariant`: section labels, and the secondary ink on a
          * bubble whose content colour is not a theme role. Also `customColors.onSurfaceMutedColor`.
          */
-        const val muted: Float = 0.72f
+        const val muted: Float = LettaAlphaTokens.muted
     }
 
     /**

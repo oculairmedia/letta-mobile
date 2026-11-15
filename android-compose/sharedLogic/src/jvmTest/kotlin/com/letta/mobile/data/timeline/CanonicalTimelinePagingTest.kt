@@ -353,7 +353,7 @@ class CanonicalTimelinePagingTest {
             listOf(
                 "segment-cm-stream-reply" to "assistant:It is current",
                 "segment-cm-stream-thought" to "reasoning:Inspect the state",
-                "run-local-run-1967" to "run:local-run-1967:Inspect the state|It is current",
+                "run-local-run-1967-from-cm-stream-thought:REASONING" to "run:local-run-1967:Inspect the state|It is current",
             ),
             before,
         )

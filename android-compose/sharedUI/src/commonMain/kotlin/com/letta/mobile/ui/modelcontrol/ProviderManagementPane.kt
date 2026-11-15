@@ -26,15 +26,15 @@ import com.letta.mobile.data.repository.modelcontrol.ModelVisibilityFilter
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementController
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementState
 import com.letta.mobile.data.repository.modelcontrol.VisibleSection
-import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSectionLabel
-import com.letta.mobile.ui.theme.lettaSectionTitle
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.lettaSectionTitle
 
 /** Callbacks of [ProviderManagementPane]; [bind] wires them to the shared controller. */
 data class ProviderManagementActions(

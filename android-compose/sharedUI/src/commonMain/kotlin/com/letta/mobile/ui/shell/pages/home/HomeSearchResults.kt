@@ -22,14 +22,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.home.HomeSearchState
-import com.letta.mobile.ui.components.LettaDisclosureHeader
+import com.letta.mobile.ui.components.disclosure.LettaDisclosureHeader
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaSpinner
 
 /**
  * Home's global search results, one collapsible section per kind: agents, tools and blocks match

@@ -55,12 +55,14 @@ import com.letta.mobile.ui.components.picker.PickerSlots
 import com.letta.mobile.ui.components.picker.PickerTags
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.providers.icons.ProviderIcons
-import com.letta.mobile.ui.theme.LettaChip
+import com.letta.mobile.ui.components.foundation.LettaChip
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaSpinner
 import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.disclosure.LettaMenuIndicator
+import com.letta.mobile.ui.components.foundation.LettaChipSlots
 
 /** Callbacks of [ModelPickerContent]; [bind] wires the controller-owned ones. */
 data class ModelPickerActions(
@@ -76,6 +78,8 @@ data class ModelPickerActions(
     val rememberedEffort: (ModelPickerEntry) -> String? = { null },
     val availableToolsets: List<com.letta.mobile.data.transport.appserver.AppServerToolset> = emptyList(),
     val currentToolset: String? = null,
+    /** The host refusal or missing confirmation from the current toolset request. */
+    val toolsetError: String? = null,
     val onSelectToolset: ((String) -> Unit)? = null,
     /**
      * Set when the picker is the second level of a pane (the agent settings
@@ -236,6 +240,7 @@ private fun PickerFooterBar(state: ModelPickerState, actions: ModelPickerActions
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
     }
+    ModelControlNotice(error = actions.toolsetError, message = null)
     PickerFooter(state, actions)
 }
 
@@ -349,7 +354,7 @@ private fun EffortPill(entry: ModelPickerEntry, effort: String?, onClick: () -> 
     LettaChip(
         text = effortLabel(effort),
         onClick = onClick,
-        trailingIcon = LettaIcons.ChevronRight,
+        slots = LettaChipSlots(trailing = { LettaMenuIndicator() }),
         modifier = Modifier
             .semantics { contentDescription = ModelControlStrings.effortOptionsOf(entry.displayName) }
             .testTag("${ModelEffortTags.PILL_PREFIX}${entry.value}"),

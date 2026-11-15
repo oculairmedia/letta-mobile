@@ -35,7 +35,6 @@ sharedLogic com.letta.mobile.data.timeline <-> com.letta.mobile.data.timeline.sn
 sharedLogic com.letta.mobile.data.transport <-> com.letta.mobile.data.transport.api
 sharedLogic com.letta.mobile.data.transport.appserver <-> com.letta.mobile.data.transport.iroh
 sharedUI com.letta.mobile.ui.canvas <-> com.letta.mobile.ui.canvas.plugin
-sharedUI com.letta.mobile.ui.chat <-> com.letta.mobile.ui.theme
 sharedUI com.letta.mobile.ui.chat.surface <-> com.letta.mobile.ui.chat.surface.composer
 sharedUI com.letta.mobile.ui.chat.surface <-> com.letta.mobile.ui.chat.surface.timeline
 sharedUI com.letta.mobile.ui.chat.surface <-> com.letta.mobile.ui.chat.surface.timeline.rows

@@ -65,6 +65,15 @@ class WireContractsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "without spec"):
             self.module.contracts(self.root)
 
+    def test_voice_endpoint_semantic_fixture_is_no_longer_exempt(self):
+        # The voice endpoint moved to per-method RPC fixtures; a stray semantic file is an orphan.
+        self.pair()
+        fixture = self.root / self.module.FIXTURES / "voice-endpoint/v1.json"
+        fixture.parent.mkdir(parents=True)
+        fixture.write_text("{}")
+        with self.assertRaisesRegex(ValueError, "without spec"):
+            self.module.contracts(self.root)
+
     def test_orphans_fail(self):
         spec, fixture = self.pair()
         spec.unlink()

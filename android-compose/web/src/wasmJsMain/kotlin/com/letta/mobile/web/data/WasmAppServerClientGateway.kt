@@ -1,8 +1,6 @@
 package com.letta.mobile.web.data
 
-import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionPlatform
-import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.canvas.CanvasRelayDial
 import com.letta.mobile.data.chat.approval.SettingsApprovalOutboxStore
 import com.letta.mobile.data.chat.conversations.TimelineConversationChat
@@ -27,7 +25,7 @@ import com.letta.mobile.data.session.graph.HostSessionBinding
 import com.letta.mobile.data.session.graph.HostSessionGraphFactory
 import com.letta.mobile.data.session.graph.HostSessionGraphProvider
 import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
-import com.letta.mobile.data.session.graph.hostServedKind
+import com.letta.mobile.data.session.graph.unservedBrowserSessionStatus
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.subagents.SubagentView
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -95,11 +93,15 @@ class WasmAppServerClientGateway(
         SessionPlatform.WEB,
     )
 
+    private val liveTransport = { activeSession?.let { sessionGraphProvider.current.channelTransport } }
+
     /** The live session's `admin_rpc`. */
-    val adminRpc: AdminRpcInvoker = AdminRpcInvoker.overTransport { activeSession?.let { sessionGraphProvider.current.channelTransport } }
+    val adminRpc: AdminRpcInvoker = AdminRpcInvoker.overTransport(liveTransport)
 
     /** The provider and model catalog over the live session's `admin_rpc`, as desktop's Providers reads them; recents in the browser. */
-    val modelControl: ModelControlSession = ModelControlSession(adminRpc, recents = RecentModelsStore(SettingsStoreRecentModels(settings)))
+    val modelControl: ModelControlSession = com.letta.mobile.data.repository.modelcontrol.modelControlSession(
+        liveTransport, recents = RecentModelsStore(SettingsStoreRecentModels(settings)),
+    )
 
     /**
      * The context card's compaction and context limit, over the live session's `admin_rpc` and,
@@ -126,7 +128,7 @@ class WasmAppServerClientGateway(
     val canvasRelay: StateFlow<CanvasRelayDial?> = mutableCanvasRelay.asStateFlow()
 
     suspend fun listAgents(config: LettaConfig): List<Agent> {
-        unservedStatus(config)?.let { status ->
+        unservedBrowserSessionStatus(config)?.let { status ->
             close()
             mutableState.value = status
             return emptyList()
@@ -288,29 +290,6 @@ class WasmAppServerClientGateway(
     private companion object {
         const val WEB_BACKEND_ID = "web-app-server"
     }
-}
-
-/**
- * letta-mobile-by4vm.13: what a browser session serves — the web row of the
- * [com.letta.mobile.data.backend.SessionRouteMatrix], the same as desktop's for a ws:// or Iroh host
- * (letta-mobile-ckmub.17.1). A blank address is no backend.
- */
-internal fun webSessionCapabilities(config: LettaConfig): SessionCapabilities =
-    SessionCapabilities.forSession(
-        platform = SessionPlatform.WEB,
-        kind = hostServedKind(config),
-    )
-
-private const val NO_BROWSER_ROUTE = "This backend has no route from a browser (a browser cannot run the on-device runtime)."
-
-/**
- * Why [config] cannot list agents from a browser, or null when it can: no address, or (letta-mobile-by4vm.13)
- * a backend kind outside the web row of the session route matrix.
- */
-internal fun unservedStatus(config: LettaConfig): BackendConnectionStatus? = when {
-    config.serverUrl.isBlank() -> BackendConnectionStatus.Unconfigured
-    !webSessionCapabilities(config).supports(SessionRoute.AGENTS) -> BackendConnectionStatus.Failed(NO_BROWSER_ROUTE)
-    else -> null
 }
 
 /**

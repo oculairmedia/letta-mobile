@@ -14,7 +14,9 @@ import com.letta.mobile.data.voice.audio.PcmFormat
  */
 internal class WavStreamDecoder(private val headerLimit: Int = DEFAULT_HEADER_LIMIT) {
     private var head = ByteArray(0)
-    private var format: PcmFormat? = null
+    /** The stream's format once its header has been read; null before. */
+    var format: PcmFormat? = null
+        private set
     private var remaining: Long? = null
     private var carry = ByteArray(0)
 
@@ -26,6 +28,13 @@ internal class WavStreamDecoder(private val headerLimit: Int = DEFAULT_HEADER_LI
 
     /** Whether the header has been read and samples may follow. */
     val started: Boolean get() = format != null
+
+    /**
+     * Whether everything the stream promised has arrived: the header, every byte of a declared `data`
+     * size (a streaming placeholder promises none) and no half sample frame. False at the end means a
+     * cut stream.
+     */
+    val complete: Boolean get() = started && (remaining ?: 0L) == 0L && carry.isEmpty()
 
     /** The stream ended. Throws BAD_RESPONSE when it ended before the samples started. */
     fun finish() {

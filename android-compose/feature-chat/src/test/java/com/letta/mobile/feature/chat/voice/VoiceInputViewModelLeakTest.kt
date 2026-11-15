@@ -3,8 +3,22 @@ package com.letta.mobile.feature.chat.voice
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
+import com.letta.mobile.data.voice.AudioLevel
+import com.letta.mobile.data.voice.VoiceText
+import com.letta.mobile.data.voice.local.LocalRecognition
+import com.letta.mobile.data.voice.local.LocalRecognitionError
+import com.letta.mobile.data.voice.local.LocalRecognitionEvent
+import com.letta.mobile.data.voice.local.LocalRecognitionRequest
+import com.letta.mobile.data.voice.local.LocalRecognizerSession
+import com.letta.mobile.data.voice.local.LocalSpeechAvailability
+import com.letta.mobile.data.voice.local.LocalSpeechRecognizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -21,7 +35,7 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * letta-mobile-7a1vl: LeakCanary showed the framework's recognizer binder stub pinning
+ * LeakCanary showed the framework's recognizer binder stub pinning
  * VoiceInputViewModel, whose stored `onRecognitionDone` pinned the shared chat page. These pin the
  * fix: every session's recognizer is destroyed and its listener detached when the session ends,
  * and the view model has no way to hold a caller's callback.
@@ -29,7 +43,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class VoiceInputViewModelLeakTest {
     private val dispatcher = StandardTestDispatcher()
-    private val factory = FakeRecognizerFactory()
+    private val factory = FakeRecognizer()
 
     @Before
     fun setUp() {
@@ -46,15 +60,18 @@ class VoiceInputViewModelLeakTest {
         val store = ViewModelStore()
         val vm = store.provide(VoiceInputViewModel(factory))
         vm.startSpeechRecognition()
+        runCurrent()
         val session = factory.sessions.single()
         assertTrue(session.started)
 
         store.clear()
+        runCurrent()
 
-        assertTrue("recognizer must be destroyed in onCleared", session.released)
-        session.events.onPartialText("late")
-        session.events.onFinalText("late")
-        assertEquals("a detached listener reaches nothing", "", vm.uiState.value.recognizedText)
+        assertTrue("recognizer must be released in onCleared", session.released)
+        assertFalse("its recognition is no longer collected", session.collecting)
+        session.send(LocalRecognitionEvent.Partial(VoiceText("late")))
+        runCurrent()
+        assertEquals("nothing reaches the view model after release", "", vm.uiState.value.recognizedText)
     }
 
     @Test
@@ -65,19 +82,21 @@ class VoiceInputViewModelLeakTest {
         runCurrent()
 
         vm.startSpeechRecognition()
+        runCurrent()
         val session = factory.sessions.single()
-        session.events.onPartialText("hel")
+        session.send(LocalRecognitionEvent.Partial(VoiceText("hel")))
+        runCurrent()
         assertEquals("hel", vm.uiState.value.recognizedText)
         vm.stopSpeechRecognition()
         advanceUntilIdle()
         assertTrue(session.stopped)
-        session.events.onFinalText("hello")
+        session.send(LocalRecognitionEvent.Final(VoiceText("hello")))
         runCurrent()
 
         assertEquals(listOf("hello"), received)
         assertTrue("result must release the recognizer", session.released)
         assertFalse(vm.uiState.value.recognizing)
-        session.events.onFinalText("again")
+        session.send(LocalRecognitionEvent.Final(VoiceText("again")))
         runCurrent()
         assertEquals("late callbacks after release go nowhere", listOf("hello"), received)
         collector.cancel()
@@ -87,12 +106,15 @@ class VoiceInputViewModelLeakTest {
     fun `an error releases the session`() = runTest(dispatcher) {
         val vm = VoiceInputViewModel(factory)
         vm.startSpeechRecognition()
+        runCurrent()
         val session = factory.sessions.single()
 
-        session.events.onError(7)
+        session.send(LocalRecognitionEvent.Failed(LocalRecognitionError.NO_MATCH))
+        runCurrent()
 
         assertTrue(session.released)
-        session.events.onRms(50f)
+        session.send(LocalRecognitionEvent.Level(AudioLevel(0.5f)))
+        runCurrent()
         assertEquals(0, vm.uiState.value.amplitude)
     }
 
@@ -102,6 +124,7 @@ class VoiceInputViewModelLeakTest {
         vm.startSpeechRecognition()
         vm.cancelSpeechRecognition()
         vm.startSpeechRecognition()
+        runCurrent()
 
         assertEquals(2, factory.sessions.size)
         assertTrue(factory.sessions[0].released)
@@ -133,35 +156,6 @@ class VoiceInputViewModelLeakTest {
         assertEquals("no stored lambdas", emptyList<Any>(), functionFields.map { it.name })
     }
 
-    @Test
-    fun `a detached framework listener forwards nothing`() {
-        val events = RecordingEvents()
-        val listener = DetachableRecognitionListener(events)
-        listener.onRmsChanged(1f)
-        listener.detach()
-        listener.onRmsChanged(2f)
-        listener.onError(3)
-
-        assertTrue(listener.isDetached)
-        assertEquals(listOf("rms"), events.calls)
-    }
-
-    private class RecordingEvents : VoiceRecognitionEvents {
-        val calls = mutableListOf<String>()
-        override fun onRms(rmsdB: Float) {
-            calls += "rms"
-        }
-        override fun onPartialText(text: String) {
-            calls += "partial"
-        }
-        override fun onFinalText(text: String) {
-            calls += "final"
-        }
-        override fun onError(error: Int) {
-            calls += "error"
-        }
-    }
-
     private fun <T : ViewModel> ViewModelStore.provide(vm: T): T {
         val factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -170,27 +164,39 @@ class VoiceInputViewModelLeakTest {
         return ViewModelProvider(this, factory)[vm.javaClass]
     }
 
-    private class FakeRecognizerFactory : VoiceRecognizerFactory {
+    private class FakeRecognizer : LocalSpeechRecognizer {
         val sessions = mutableListOf<FakeSession>()
 
-        override fun create(events: VoiceRecognitionEvents): VoiceRecognizerSession =
-            FakeSession(events).also { sessions += it }
+        override fun availability(language: String?): LocalSpeechAvailability = LocalSpeechAvailability.PLATFORM_SERVICE
+
+        override fun open(request: LocalRecognitionRequest): LocalRecognizerSession = FakeSession().also { sessions += it }
     }
 
-    private class FakeSession(val events: VoiceRecognitionEvents) : VoiceRecognizerSession {
+    private class FakeSession : LocalRecognizerSession, LocalRecognition {
+        private val channel = Channel<LocalRecognitionEvent>(Channel.UNLIMITED)
         var started = false
+        var collecting = false
         var stopped = false
         var released = false
 
-        override fun start() {
-            started = true
+        fun send(event: LocalRecognitionEvent) {
+            channel.trySend(event)
         }
 
-        override fun stop() {
+        override val events: Flow<LocalRecognitionEvent> = channel.consumeAsFlow()
+            .onStart {
+                started = true
+                collecting = true
+            }
+            .onCompletion { collecting = false }
+
+        override fun recognize(): LocalRecognition = this
+
+        override fun finish() {
             stopped = true
         }
 
-        override fun release() {
+        override fun close() {
             released = true
         }
     }

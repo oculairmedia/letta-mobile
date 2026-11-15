@@ -1,0 +1,75 @@
+{
+  "method": "voice.transcribe",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/voice/VoiceRequestHandlers.kt",
+  "contract": "voice-endpoint",
+  "capability": "voice_endpoint_v1",
+  "required_capability": "chat.send",
+  "streamed": false,
+  "spec": "docs/reference/contracts/voice-endpoint-v1.md",
+  "note": "Synthetic values only: example.invalid hosts, a placeholder key, a few bytes of silence and placeholder text.",
+  "cases": [
+    {
+      "name": "verbose answer with segment numbers",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-a", "grants": {"audio_for_transcription": true, "text_for_synthesis": false}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"transcription": "verbose_json"}}},
+      "params": {"audio": "UklGRiwAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQgAAAAAAAAAAAAAAA==", "encoding": "wav", "language": "en"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"text": "placeholder words", "format": "verbose_json", "segments": [{"no_speech_prob": 0.02, "avg_logprob": -0.25}, {"no_speech_prob": 0.9, "avg_logprob": -1.5}]}}
+    },
+    {
+      "name": "server without verbose answers plain",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-a", "grants": {"audio_for_transcription": true, "text_for_synthesis": false}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"transcription": "json_only"}}},
+      "params": {"audio": "UklGRiwAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQgAAAAAAAAAAAAAAA==", "encoding": "wav"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"text": "placeholder words", "format": "json", "segments": []}}
+    },
+    {
+      "name": "audio grant missing",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-3", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-a", "speech_model": "tts-model-a", "voice": "voice-a", "grants": {"audio_for_transcription": false, "text_for_synthesis": true}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}}},
+      "params": {"audio": "UklGRiwAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQgAAAAAAAAAAAAAAA==", "encoding": "wav"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.consent_required"},
+      "expected_code": "voice.consent_required"
+    },
+    {
+      "name": "nothing stored",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": null}},
+      "params": {"audio": "UklGRiwAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQgAAAAAAAAAAAAAAA==", "encoding": "wav"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.not_configured"},
+      "expected_code": "voice.not_configured"
+    },
+    {
+      "name": "clip over the limit",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-a", "grants": {"audio_for_transcription": true, "text_for_synthesis": false}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "audio_override": {"decoded_bytes": 1048577}}},
+      "params": {"audio": "UklGRiwAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQgAAAAAAAAAAAAAAA==", "encoding": "wav"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.payload_too_large"},
+      "expected_code": "voice.payload_too_large"
+    },
+    {
+      "name": "compressed audio refused",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-a", "grants": {"audio_for_transcription": true, "text_for_synthesis": false}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}}},
+      "params": {"audio": "AAAAAA==", "encoding": "mp3"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.invalid_request"},
+      "expected_code": "voice.invalid_request"
+    },
+    {
+      "name": "unknown model",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-missing", "grants": {"audio_for_transcription": true, "text_for_synthesis": false}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"status": 404}}},
+      "params": {"audio": "UklGRiwAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQgAAAAAAAAAAAAAAA==", "encoding": "wav"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.upstream_rejected"},
+      "expected_code": "voice.upstream_rejected"
+    },
+    {
+      "name": "one transcription already in flight",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-a", "grants": {"audio_for_transcription": true, "text_for_synthesis": false}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "in_flight": {"voice.transcribe": 1}}},
+      "params": {"audio": "UklGRiwAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQgAAAAAAAAAAAAAAA==", "encoding": "wav"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": false, "error": "voice.busy"},
+      "expected_code": "voice.busy"
+    }
+  ]
+}

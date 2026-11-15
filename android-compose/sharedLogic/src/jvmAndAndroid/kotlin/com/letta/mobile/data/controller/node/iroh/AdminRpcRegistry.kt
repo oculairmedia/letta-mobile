@@ -34,6 +34,7 @@ fun interface AdminRpcRoutes {
 
 object AdminRpcRegistry {
     val canonicalMethods: Set<String> = setOf(
+        "toolset.update",
         "conversation.list",
         "conversation.list_agent",
         // P2.6 (audit): conversation.get is registered by ConversationAdminHandlers
@@ -110,6 +111,34 @@ object AdminRpcRegistry {
             notifications.agentChanges, notifications.conversationChanges, notifications.turnIdentity,
         )
 
+        registerCatalogRoutes(router, services, native, tiers, localBackendStore)
+        registerSessionRoutes(router, services, pairing, native, notifications, localBackendStore)
+        registerHostRoutes(router, services)
+
+        router.requireNonEmpty()
+        val missingMethods = when (val source = services.subagentRegistrySource) {
+            null -> canonicalMethods - subagentMethods
+            is ControllerSubagentRegistrySource -> if (source.registry.supportsDurableDismissal &&
+                source.changeListener != null) canonicalMethods else canonicalMethods - "subagent.dismiss"
+            else -> canonicalMethods - "subagent.dismiss"
+        } - router.registeredMethods
+        check(missingMethods.isEmpty()) {
+            "Admin RPC registry missing canonical methods: ${missingMethods.sorted().joinToString(", ")}"
+        }
+
+        return router
+    }
+
+    val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos", "subagent.dismiss")
+
+    /** Agents, conversations, projects, models, tools and skills: the catalog routes, in registration order. */
+    private fun registerCatalogRoutes(
+        router: AdminRpcRouter,
+        services: AdminRpcHostServices,
+        native: AdminRpcNativeSources,
+        tiers: NativeReadTiers,
+        localBackendStore: LocalBackendAdminStore?,
+    ) {
         HealthAdminHandlers.register(router, services.controller)
         AgentAdminHandlers.register(router, services.controller, tiers)
         SubagentAdminHandlers.register(router, services.subagentRegistrySource)
@@ -133,6 +162,17 @@ object AdminRpcRegistry {
             controller = services.controller,
             skillsListing = native.skillsListing,
         )
+    }
+
+    /** Approvals, pairing, run records, monitors, schedules and workspace routes, in registration order. */
+    private fun registerSessionRoutes(
+        router: AdminRpcRouter,
+        services: AdminRpcHostServices,
+        pairing: AdminRpcPairing,
+        native: AdminRpcNativeSources,
+        notifications: AdminRpcNotifications,
+        localBackendStore: LocalBackendAdminStore?,
+    ) {
         ApprovalAdminHandlers.register(router, services.controller)
         // letta-mobile-bzvro.40: the conversation's permission mode for Iroh clients.
         PermissionModeAdminHandlers.register(router, services.controller, notifications.permissionModes)
@@ -151,23 +191,7 @@ object AdminRpcRegistry {
         ConversationContextLimitHandlers.register(router, native.nativeClient)
         // letta-mobile-by4vm.51: /recompile for Iroh clients (conversation_recompile).
         ConversationRecompileHandlers.register(router, native.nativeClient)
-        registerHostRoutes(router, services)
-
-        router.requireNonEmpty()
-        val missingMethods = when (val source = services.subagentRegistrySource) {
-            null -> canonicalMethods - subagentMethods
-            is ControllerSubagentRegistrySource -> if (source.registry.supportsDurableDismissal &&
-                source.changeListener != null) canonicalMethods else canonicalMethods - "subagent.dismiss"
-            else -> canonicalMethods - "subagent.dismiss"
-        } - router.registeredMethods
-        check(missingMethods.isEmpty()) {
-            "Admin RPC registry missing canonical methods: ${missingMethods.sorted().joinToString(", ")}"
-        }
-
-        return router
     }
-
-    val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos", "subagent.dismiss")
 
     /** Host-supplied route families: the plugin host, the canvas mount routes and the secret request routes. */
     private fun registerHostRoutes(router: AdminRpcRouter, services: AdminRpcHostServices) {

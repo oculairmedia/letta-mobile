@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.shell.pages.home
 
 import com.letta.mobile.ui.shell.tokens.ShellType
-import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 import com.letta.mobile.ui.components.LocalObjectVerbs
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.foundation.LettaButtonIcon
@@ -43,7 +43,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import com.letta.mobile.ui.theme.tokens.LettaStatusTone
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 

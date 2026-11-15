@@ -3,6 +3,7 @@ package com.letta.mobile.data.voice.session
 import com.letta.mobile.data.voice.audio.AudioFrameFormat
 import com.letta.mobile.data.voice.audio.AudioFrameSource
 import com.letta.mobile.data.voice.audio.AudioPlayer
+import com.letta.mobile.data.voice.local.LocalSpeechRecognizer
 import com.letta.mobile.data.voice.responder.VoiceChatSession
 import kotlinx.coroutines.flow.Flow
 
@@ -19,6 +20,12 @@ interface VoiceAudio {
 
     /** The speaker. It plays 16-bit PCM as it streams in. */
     fun speaker(): AudioPlayer
+
+    /**
+     * The device's own speech recogniser, or null where the platform supplies none (voice mode then
+     * listens through the speech server). Creating it opens nothing.
+     */
+    fun localRecognizer(): LocalSpeechRecognizer? = null
 }
 
 /**

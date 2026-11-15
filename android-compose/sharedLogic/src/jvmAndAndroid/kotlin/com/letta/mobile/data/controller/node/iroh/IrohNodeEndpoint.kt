@@ -216,6 +216,10 @@ class IrohNodeEndpoint(
         }
     }
 
+    /** Forwards and replays host-confirmed toolsets to authorized conversation viewers. */
+    fun attachToolsetStatuses(client: com.letta.mobile.data.transport.appserver.AppServerClient): Job =
+        bindToolsetDeviceStatuses(scope, client, connectionRegistry)
+
     @Volatile
     private var appToolRelay: AppToolRelayHost? = null
 

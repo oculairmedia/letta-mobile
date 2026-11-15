@@ -2,7 +2,7 @@ package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.theme.ChatRowInsetShape
-import com.letta.mobile.ui.components.successTint
+import com.letta.mobile.ui.components.foundation.successTint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row

@@ -24,7 +24,7 @@ enum class ClientSlashCommand(val id: String, val description: String) {
         /** The client command named by [id] (with or without its leading `/`), or null. */
         fun fromId(id: String): ClientSlashCommand? {
             val bare = id.trim().removePrefix("/").lowercase()
-            return entries.firstOrNull { it.id == bare }
+            return if (bare == "toolset") Models else entries.firstOrNull { it.id == bare }
         }
     }
 }
@@ -39,9 +39,12 @@ object ClientSlashCommands {
      * A server command named like an offered client command is dropped, so the name means one thing.
      */
     fun composerCommands(offered: Collection<ClientSlashCommand>, server: List<ChatComposerCommand>): List<ChatComposerCommand> {
-        val clientIds = offered.map { it.id }.toSet()
+        val alias = if (ClientSlashCommand.Models in offered) listOf(
+            ChatComposerCommand(id = "toolset", label = "toolset", description = "Select active toolset", fillsComposer = false),
+        ) else emptyList()
+        val clientIds = offered.map { it.id }.toSet() + alias.map { it.id }
         val ordered = ClientSlashCommand.entries.filter { it in offered }
-        return ordered.map(::toComposerCommand) + server.filterNot { it.id.removePrefix("/").lowercase() in clientIds }
+        return ordered.map(::toComposerCommand) + alias + server.filterNot { it.id.removePrefix("/").lowercase() in clientIds }
     }
 
     /** The client command a chosen composer entry stands for, or null for a server command. */

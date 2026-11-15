@@ -183,6 +183,7 @@ object IrohPeerCapabilities {
         // desktop-manageable config edit as agent.update. Provider connect/
         // disconnect and model.exposure.set change what EVERY client sees, so
         // they stay admin.full via the else branch.
+        method == "toolset.update" -> CONVERSATION_MANAGE
         method == "model.update" -> CONVERSATION_MANAGE
         // letta-mobile-joigh: the context limit is the same model-settings edit (agent or
         // conversation `context_window_limit`, via letta-code's /context-limit).
@@ -304,9 +305,14 @@ object IrohPeerCapabilities {
         "step.list",
         "identity.list", "identity.get",
         "run.list", "run.get",
+        // Voice endpoint v1: the shared speech setup status (never the key) and the stored server's
+        // models, read like provider.list. Its writes (voice.setup.set / clear / test) stay admin.full
+        // via the else branch, like provider.connect.
+        "voice.setup.get", "voice.models.list",
     )
 
-    private val CHAT_SEND_METHODS = setOf("approval.submit")
+    // Voice endpoint v1: speaking and listening through the host act for the device like a chat send.
+    private val CHAT_SEND_METHODS = setOf("approval.submit", "voice.transcribe", "voice.speech")
 
     private val CONVERSATION_MANAGE_METHODS = setOf(
         "subagent.dismiss",

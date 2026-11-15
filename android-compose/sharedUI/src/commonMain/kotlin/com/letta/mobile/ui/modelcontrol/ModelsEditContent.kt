@@ -37,8 +37,8 @@ import com.letta.mobile.data.repository.modelcontrol.ProviderManagementState
 import com.letta.mobile.ui.components.foundation.LettaEmptyContent
 import com.letta.mobile.ui.components.foundation.LettaEmptyState
 import com.letta.mobile.ui.components.picker.LettaPickerSearchField
-import com.letta.mobile.ui.theme.LettaBusyBar
-import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import com.letta.mobile.ui.components.picker.PickerSearch
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens

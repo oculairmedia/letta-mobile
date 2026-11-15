@@ -26,6 +26,8 @@
     <string name="voice_action_interrupt">Interrupt</string>
     <string name="voice_action_setup">Set up</string>
     <string name="voice_action_dismiss">Close voice mode</string>
+    <string name="voice_action_notice_close">Close</string>
+    <string name="voice_notice_handover">This device's speech recognition stopped working, so your speech server is listening now.</string>
 
     <!-- Failures, shared by the status strip and the Voice settings. -->
     <string name="voice_error_unreachable">Couldn't reach the speech server.</string>
@@ -55,6 +57,14 @@
     <string name="voice_settings_interrupt">Interrupt by speaking (use headphones)</string>
     <string name="voice_settings_interrupt_help">Without headphones the microphone hears the replies, and they would interrupt themselves. While this is off, press the voice button to interrupt a reply.</string>
     <string name="voice_settings_interrupt_builtin">Speaking over a reply interrupts it: this device cancels its own echo.</string>
+    <string name="voice_settings_listening">Listen with</string>
+    <string name="voice_settings_listening_automatic">Automatic</string>
+    <string name="voice_settings_listening_automatic_help">This device's speech recognition where it has one, showing your words as you speak; else the speech server. The speech server still speaks the replies.</string>
+    <string name="voice_settings_listening_local">This device only</string>
+    <string name="voice_settings_listening_local_help">Recordings never go to your speech server. Where this device can't recognise speech offline, its speech service may use the network.</string>
+    <string name="voice_settings_listening_local_unavailable">Not available on this device.</string>
+    <string name="voice_settings_listening_server">Speech server</string>
+    <string name="voice_settings_listening_server_help">Send recordings to the speech server to be transcribed.</string>
     <string name="voice_settings_save">Save</string>
     <string name="voice_settings_test">Test</string>
     <string name="voice_settings_testing">Testing…</string>

@@ -22,7 +22,7 @@ import com.letta.mobile.ui.shell.rail.ShellAgentLibrary
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.rail.ShellRailFocus
 import com.letta.mobile.ui.shell.rail.ShellRailMapping
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Test tags of the agents page. */

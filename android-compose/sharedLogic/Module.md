@@ -763,6 +763,18 @@ An OpenAI-compatible speech client for `POST /v1/audio/transcriptions` (multipar
 
 The three seams of the voice loop. A [VoiceEar](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.engine/-voice-ear/index.html) owns its audio source and decides end of turn itself, so a realtime audio model can replace a speech recogniser; a [VoiceResponder](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.engine/-voice-responder/index.html) streams reply text and can delegate the rest to arrive later as a late reply; a [VoiceMouth](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.engine/-voice-mouth/index.html) speaks segments in order and stops at once for barge-in. Stops and cancels suspend until the work has actually stopped.
 
+# Package com.letta.mobile.data.voice.host
+
+The client side of the voice-endpoint v1 contract, in which the host keeps one speech server setup for every device: [HostVoiceEndpoint](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.host/-host-voice-endpoint/index.html) reads the shared setup, writes, clears and tests it, lists the server's models and voices, and sends transcriptions and streamed syntheses through the host. The key is write-only: [HostVoiceSetupCommand](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.host/-host-voice-setup-command/index.html) can be encoded but never decoded or printed, and no status carries it. Every failure is one [HostVoiceErrorCode](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.host/-host-voice-error-code/index.html) that says whether a retry may help and never echoes the speech server's reply or address. Interface and wire types only; the transport binding comes later.
+
+# Package com.letta.mobile.data.voice.local
+
+Local listening for voice mode on every client: the [LocalSpeechRecognizer](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.local/-local-speech-recognizer/index.html) port each platform implements over its own recogniser (no platform types in it), and the one [LocalVoiceEar](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.local/-local-voice-ear/index.html) over it that owns all the policy: words so far as partial transcripts, a final result as one utterance, restarting after silence, retrying a failing recogniser, pausing while the app speaks (unless the recogniser reports echo cancellation, when it keeps listening and speaking interrupts the reply) so the app's own speech is not transcribed, and handing over to the server ear when the recogniser is unavailable or cannot go on.
+
+# Package com.letta.mobile.data.voice.local.android
+
+Android's binding of the local recognition port: [AndroidLocalSpeechRecognizer](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.local.android/-android-local-speech-recognizer/index.html) drives `SpeechRecognizer` (on-device where the device has it, else the platform service preferring offline, partial results on) from the main thread and maps its callbacks and error codes onto the port. Voice mode and dictation both listen through it.
+
 # Package com.letta.mobile.data.voice.loop
 
 The voice loop driver: idle, listening, thinking, speaking and failed, continuous or single shot, with barge-in, a bounded thinking timeout and a late-reply policy. It serialises every input on one coroutine, drops events from stale generations, publishes a phase only after the engines have let go, never opens the microphone over its own speech unless barge-in needs it, and exposes a [VoiceLoopState](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.loop/-voice-loop-state/index.html) rich enough for a page and the avatar.
@@ -893,6 +905,14 @@ Authenticated admin RPC routes over the canvas mount facade (`canvas.mount.resol
 
 `CanvasMountDeviceUpgrade` gives devices paired before canvas mounts the two mount capabilities once, on a host that runs with canvas mounts enabled: only records whose capability set is exactly the chat, desktop or vibesync role as it was before mounts change, in one locked read-modify-write of the paired-device store, and a marker beside that store makes it run once.
 
+# Package com.letta.mobile.data.controller.node.iroh.stream
+
+Streamed admin_rpc: a method registered with `AdminRpcRouter.registerStreamed` writes `admin_rpc_stream` frames (with `seq` counting from 0) before its final `admin_rpc_response`, on a request bi-stream of its own. `AdminRpcStreamedExchange` runs one such exchange: the client's send half stays open as the cancel channel, and an `admin_rpc_cancel` frame, the half finishing or resetting, or a failed write cancels the handler, gives it a short grace period to let go and writes its cancelled error. `AdminRpcConnection` names the serving connection in the coroutine context for handlers that keep per-connection limits. A leaf package: it imports nothing from the router or the handlers, which import it.
+
+# Package com.letta.mobile.data.controller.node.iroh.voice
+
+The host side of the voice-endpoint v1 contract: one speech server setup shared by every paired device, and speech through the host. `VoiceEndpointRoutes.forHost` builds the `AdminRpcRoutes` a host registers on its built admin router; it registers the seven `voice.*` methods and advertises `voice_endpoint_v1`. The setup (server, model and voice names, the shared grant record per origin, the last reachability check and a revision for optimistic concurrency) lives in a JSON file; the key lives in a separate file only the host's user may read, bound to the origin it was entered for, and is write-only over the wire (status says only `has_api_key`). A write to a new origin drops the key and the grants it does not restate. The speech server is reached only through the `VoiceSpeechUpstream` seam, whose Ktor implementation refuses to send a key over plain http off loopback and maps every failure to the contract's closed codes. `voice.speech` is a streamed admin_rpc method: a format frame, then PCM audio frames of at most 64 KiB as they decode, then the final response; the client's cancel frame, its send half finishing or resetting, a failed write or a dropped connection cancel the upstream request. At most one transcription and one synthesis run per connection and four syntheses per host. Nothing here logs or reports audio, transcript or reply text, the key or the server address. The package depends on the iroh router package, never the reverse.
+
 # Package com.letta.mobile.data.controller.node.iroh.errors
 
 The one exception type whose message the admin RPC router returns to a remote client. Handlers raise it for deliberate, safe refusals built from the caller's own request; every other exception answers a fixed internal-error text so host paths and state never cross the wire. This leaf package imports nothing from the handlers or the router.
@@ -944,3 +964,12 @@ Portable slash-command listing contracts, advertised rows and built-in descripti
 # Package com.letta.mobile.data.transport.delivery
 
 Internal delivery failures shared by transport implementations; the App Server socket retains its existing bounded-drain policy.
+
+# Package com.letta.mobile.data.schedules.control
+
+Internal query-generation tokens for schedule controller work. A captured revision keeps delayed load and mutation results scoped to the selected target.
+
+# Package com.letta.mobile.data.toolsets
+
+Host-confirmed toolset choices and preference selection. ToolsetControl sends one request and waits
+for the runtime's device-status echo; hosts bind their shared channel state and admin RPC.

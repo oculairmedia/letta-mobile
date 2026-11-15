@@ -915,6 +915,25 @@
       "notes": "letta-mobile-w4q4p: model_handle/model_id plus reasoning_effort (explicit null restores the provider default)."
     },
     {
+      "method": "toolset.update",
+      "handler": "ModelAdminHandlers.kt",
+      "current_backend": "app_server_v2 update_toolset for one agent + conversation runtime scope",
+      "owner": "app_server_v2",
+      "public_contract": "docs/reference/contracts/toolset.update/toolset-v1.md",
+      "native_contract": [
+        "update_toolset",
+        "update_toolset_response"
+      ],
+      "authorization_class": "conversation_scoped",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none",
+      "notes": "Forwards toolset_preference unchanged; the picker follows the scoped host device-status echo."
+    },
+    {
       "method": "model.exposure.get",
       "current_backend": "controller_native model exposure decisions (model-exposure.json beside host-canvases.json)",
       "public_contract": "wrapper model exposure allow-list keyed by model handle",
@@ -1829,6 +1848,8 @@
       "post_shim_owner": "app_server_v2",
       "post_shim_fallback": "none"
     },
+    {"method": "cron.pause", "handler": "CronAdminHandlers.kt", "current_backend": "native App Server v2 (no shim path ever existed over Iroh)", "owner": "app_server_v2", "public_contract": "cron_pause", "native_contract": ["cron_pause", "cron_pause_response"], "authorization_class": "admin_write", "data_store": "letta_local_backend", "fallback": "none", "migration_slice": "none", "notes": "Forwards the existing App Server cron command; the shared schedules page refreshes host state after confirmation.", "production_first_route": "app_server_v2", "post_shim_owner": "app_server_v2", "post_shim_fallback": "none"},
+    {"method": "cron.resume", "handler": "CronAdminHandlers.kt", "current_backend": "native App Server v2 (no shim path ever existed over Iroh)", "owner": "app_server_v2", "public_contract": "cron_resume", "native_contract": ["cron_resume", "cron_resume_response"], "authorization_class": "admin_write", "data_store": "letta_local_backend", "fallback": "none", "migration_slice": "none", "notes": "Forwards the existing App Server cron command; the shared schedules page refreshes host state after confirmation.", "production_first_route": "app_server_v2", "post_shim_owner": "app_server_v2", "post_shim_fallback": "none"},
     {
       "method": "cron.trigger",
       "handler": "CronAdminHandlers.kt",
@@ -2861,7 +2882,112 @@
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "deny_fail_closed"
     },
-    {"method":"monitor.stop","handler":"BackgroundProcessAdminHandler.kt","current_backend":"native App Server v2 (no shim path ever existed over Iroh)","owner":"app_server_v2","public_contract":"monitor_stop","native_contract":["monitor_stop","monitor_stop_response"],"authorization_class":"runtime_write","data_store":"controller_memory","fallback":"none","migration_slice":"none","notes":"Scoped process stop forwards to the owning App Server runtime; snapshots confirm removal.","production_first_route":"app_server_v2","post_shim_owner":"app_server_v2","post_shim_fallback":"none"}
+    {"method":"monitor.stop","handler":"BackgroundProcessAdminHandler.kt","current_backend":"native App Server v2 (no shim path ever existed over Iroh)","owner":"app_server_v2","public_contract":"monitor_stop","native_contract":["monitor_stop","monitor_stop_response"],"authorization_class":"runtime_write","data_store":"controller_memory","fallback":"none","migration_slice":"none","notes":"Scoped process stop forwards to the owning App Server runtime; snapshots confirm removal.","production_first_route":"app_server_v2","post_shim_owner":"app_server_v2","post_shim_fallback":"none"},
+    {
+      "method": "voice.setup.get",
+      "handler": "VoiceSetupHandlers.kt",
+      "current_backend": "host voice store (voice-setup.json + owner-only key file) and the configured OpenAI-compatible speech server, Iroh admin_rpc only",
+      "owner": "controller_native",
+      "public_contract": "docs/reference/contracts/voice-endpoint-v1.md",
+      "authorization_class": "admin_read",
+      "data_store": "controller_state_file",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Voice endpoint v1: registered only when the host supplies voice routes (methods omitted otherwise). Shared speech setup status (never the key; has_api_key only). chat.read, like provider.list.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "voice.models.list",
+      "handler": "VoiceSetupHandlers.kt",
+      "current_backend": "host voice store (voice-setup.json + owner-only key file) and the configured OpenAI-compatible speech server, Iroh admin_rpc only",
+      "owner": "controller_native",
+      "public_contract": "docs/reference/contracts/voice-endpoint-v1.md",
+      "authorization_class": "admin_read",
+      "data_store": "controller_state_file",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Voice endpoint v1: registered only when the host supplies voice routes (methods omitted otherwise). Models and voices of the stored speech server via GET /v1/models and /v1/audio/voices; refreshes reachability. chat.read.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "voice.setup.set",
+      "handler": "VoiceSetupHandlers.kt",
+      "current_backend": "host voice store (voice-setup.json + owner-only key file) and the configured OpenAI-compatible speech server, Iroh admin_rpc only",
+      "owner": "controller_native",
+      "public_contract": "docs/reference/contracts/voice-endpoint-v1.md",
+      "authorization_class": "admin_write",
+      "data_store": "controller_state_file",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Voice endpoint v1: registered only when the host supplies voice routes (methods omitted otherwise). Writes the shared setup; key write-only into the host key file bound to its origin; a new origin drops the key and unrestated grants. admin.full, like provider.connect.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "voice.setup.clear",
+      "handler": "VoiceSetupHandlers.kt",
+      "current_backend": "host voice store (voice-setup.json + owner-only key file) and the configured OpenAI-compatible speech server, Iroh admin_rpc only",
+      "owner": "controller_native",
+      "public_contract": "docs/reference/contracts/voice-endpoint-v1.md",
+      "authorization_class": "admin_write",
+      "data_store": "controller_state_file",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Voice endpoint v1: registered only when the host supplies voice routes (methods omitted otherwise). Deletes the setup, key and grants. admin.full.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "voice.setup.test",
+      "handler": "VoiceSetupHandlers.kt",
+      "current_backend": "host voice store (voice-setup.json + owner-only key file) and the configured OpenAI-compatible speech server, Iroh admin_rpc only",
+      "owner": "controller_native",
+      "public_contract": "docs/reference/contracts/voice-endpoint-v1.md",
+      "authorization_class": "admin_write",
+      "data_store": "controller_state_file",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Voice endpoint v1: registered only when the host supplies voice routes (methods omitted otherwise). GET /v1/models against the stored setup or a candidate (which may carry a key and an address the client chose). admin.full.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "voice.transcribe",
+      "handler": "VoiceRequestHandlers.kt",
+      "current_backend": "host voice store (voice-setup.json + owner-only key file) and the configured OpenAI-compatible speech server, Iroh admin_rpc only",
+      "owner": "controller_native",
+      "public_contract": "docs/reference/contracts/voice-endpoint-v1.md",
+      "authorization_class": "runtime_write",
+      "data_store": "controller_state_file",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Voice endpoint v1: registered only when the host supplies voice routes (methods omitted otherwise). One WAVE clip to text through the stored speech server; needs the shared audio grant; one per connection. chat.send.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "voice.speech",
+      "handler": "VoiceRequestHandlers.kt",
+      "current_backend": "host voice store (voice-setup.json + owner-only key file) and the configured OpenAI-compatible speech server, Iroh admin_rpc only",
+      "owner": "controller_native",
+      "public_contract": "docs/reference/contracts/voice-endpoint-v1.md",
+      "authorization_class": "runtime_write",
+      "data_store": "controller_state_file",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Voice endpoint v1: registered only when the host supplies voice routes (methods omitted otherwise). Streamed admin_rpc: format frame, PCM audio frames, final response; cancel closes the upstream request; one per connection, four per host. chat.send.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "deny_fail_closed"
+    }
   ],
   "unsupported_native_operations": [
     {

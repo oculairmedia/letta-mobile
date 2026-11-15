@@ -16,7 +16,7 @@ import com.letta.mobile.ui.host.LettaPaneButton
 import com.letta.mobile.ui.host.LettaPaneButtons
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 

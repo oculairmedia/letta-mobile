@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -153,7 +151,12 @@ private fun NewTabButton(label: String, onNew: () -> Unit) {
         modifier = Modifier.size(LettaDimens.Space.xl).semantics { contentDescription = label },
     ) {
         // Explicit tint: a title bar's content colour is a dimmed chrome role, which made the "+" all but invisible.
-        Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon), tint = MaterialTheme.colorScheme.onSurface)
+        Icon(
+            LettaIcons.Add,
+            contentDescription = null,
+            modifier = Modifier.size(LettaDimens.Control.icon),
+            tint = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

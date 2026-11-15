@@ -16,7 +16,7 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
-import com.letta.mobile.ui.theme.LettaChip
+import com.letta.mobile.ui.components.foundation.LettaChip
 import com.letta.mobile.data.chat.tools.ToolPreviewTarget
 import com.letta.mobile.data.chat.tools.links.OutputLinks
 import com.letta.mobile.data.workspace.WorkspaceFileOpener

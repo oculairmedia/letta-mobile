@@ -43,6 +43,7 @@ enum class NativeAdminOp(
 
     ModelList("model.list", NativeAdminOperationPolicy.Read),
     ModelUpdate("model.update", NativeAdminOperationPolicy.MutationAmbiguous),
+    ToolsetUpdate("toolset.update", NativeAdminOperationPolicy.MutationAmbiguous),
 
     ProviderList("provider.list", NativeAdminOperationPolicy.Read),
     ProviderConnect("provider.connect", NativeAdminOperationPolicy.MutationAmbiguous),

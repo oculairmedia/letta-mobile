@@ -18,6 +18,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.session.pins.pinSource
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohSkillsApi
+import com.letta.mobile.data.schedules.RepositoryCronScheduleSource
 import com.letta.mobile.data.schedules.ScheduleLibraryController
 import com.letta.mobile.data.schedules.ScheduleRecordSources
 import com.letta.mobile.data.schedules.runs.CronRunHistory
@@ -71,6 +72,8 @@ object ShellLibraryFactory {
             agentRepository = graph.agentRepository,
             scheduleRepository = graph.scheduleRepository,
             scope = scope,
+            cronSource = graph.ifSupported(SessionRoute.SCHEDULES) { cronRepository }
+                ?.let(::RepositoryCronScheduleSource),
             errorMessageMapper = ShellPageErrors::message,
             scheduleAdminUnavailableMatcher = ShellPageErrors::isNotServed,
             nativeScheduleRoute = graph.capabilities.supports(SessionRoute.SCHEDULES),

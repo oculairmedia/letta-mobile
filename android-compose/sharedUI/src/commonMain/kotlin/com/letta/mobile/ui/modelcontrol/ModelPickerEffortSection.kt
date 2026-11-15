@@ -16,11 +16,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 import com.letta.mobile.ui.context.ModelPickerEffortChoice
 import com.letta.mobile.ui.context.ModelPickerEffortSection
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 
 /** The section the open picker shows under its list; null shows none. */
 internal val LocalModelPickerEffortSection = staticCompositionLocalOf<ModelPickerEffortSection?> { null }

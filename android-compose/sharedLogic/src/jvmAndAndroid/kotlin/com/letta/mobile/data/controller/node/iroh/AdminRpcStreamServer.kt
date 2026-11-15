@@ -1,5 +1,9 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcConnection
+import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcStreamHalves
+import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcStreamedExchange
+import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcStreamedRequest
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.util.Telemetry
@@ -125,6 +129,23 @@ internal class AdminRpcStreamServer(
     private val maxFrameBytes = limits.maxFrameBytes
     private val maxReassembledBytes = limits.maxReassembledBytes
 
+    /** This connection, for handlers that keep per-connection limits. */
+    private val connection = AdminRpcConnection()
+    private val streamedExchange = AdminRpcStreamedExchange(
+        connection = connection,
+        internalError = ADMIN_RPC_INTERNAL_ERROR,
+        report = { name: String, fields: Map<String, String> ->
+            val detail = (fields - REQUEST_ID_FIELD - METHOD_FIELD).entries.joinToString(",") { "${it.key}=${it.value}" }
+            Telemetry.event(
+                "IrohNode", "admin_rpc.stream.$name",
+                "remoteEndpointId" attr remoteEndpointId,
+                REQUEST_ID_FIELD attr fields[REQUEST_ID_FIELD],
+                METHOD_FIELD attr fields[METHOD_FIELD],
+                "detail" attr detail,
+            )
+        },
+    )
+
     private val permits = Semaphore(maxActiveHandlers)
     private val activeHandlers = AtomicInteger(0)
     private val maxObservedActiveHandlers = AtomicInteger(0)
@@ -160,27 +181,14 @@ internal class AdminRpcStreamServer(
         }
     }
 
-    /** Serves exactly one admin_rpc request/response exchange on [stream]. */
+    /**
+     * Serves exactly one admin_rpc exchange on [stream]: one request, then one response, or for a
+     * streamed method ([AdminRpcRouter.registerStreamed]) stream frames and then the final response.
+     */
     suspend fun handleStream(stream: AdminRpcBiStream) {
         val sendStream = stream.send()
         try {
-            val frameJson = withTimeoutOrNull(firstFrameTimeoutMs.milliseconds) {
-                readOneFrame(stream.recv())
-            }
-            val response = if (frameJson == null) {
-                errorEnvelope("", "admin_rpc request stream closed before request")
-            } else {
-                handleFrame(frameJson)
-            }
-            runCatching { writeResponse(sendStream, response) }
-                .onFailure { writeError ->
-                    Telemetry.event(
-                        "IrohNode", "admin_rpc.stream.error_response_failed",
-                        "remoteEndpointId" attr remoteEndpointId,
-                        "error" attr (writeError.message ?: writeError.toString()),
-                        "class" attr writeError::class.simpleName,
-                    )
-                }
+            exchange(stream, sendStream)
         } catch (ce: CancellationException) {
             throw ce
         } catch (error: Exception) {
@@ -201,6 +209,40 @@ internal class AdminRpcStreamServer(
         } finally {
             runCatching { sendStream.finish() }
         }
+    }
+
+    /** Reads the request and answers it: one response, or a streamed exchange. Failures propagate to [handleStream]. */
+    private suspend fun exchange(stream: AdminRpcBiStream, sendStream: AdminRpcSendStream) {
+        // Chunked (frame_part) requests may only widen reassembly memory
+        // beyond a single frame once the peer has authenticated AND advertised
+        // the capability — otherwise a peer holding just the ticket could pin
+        // maxReassembled bytes per stream before presenting any token.
+        val decoder = IrohFrameCodec.Decoder(maxFrameBytes, maxReassembledBytesProvider = {
+            if (authenticated.get() && peerSupportsFrameParts()) maxReassembledBytes else maxFrameBytes
+        })
+        val nextFrame = frameReader(stream.recv(), decoder)
+        val frameJson = withTimeoutOrNull(firstFrameTimeoutMs.milliseconds) { nextFrame() }
+        var streamed: AdminRpcStreamedRequest? = null
+        val response = if (frameJson == null) {
+            errorEnvelope("", "admin_rpc request stream closed before request")
+        } else {
+            handleFrame(frameJson) { streamed = it }
+        }
+        streamed?.let { request ->
+            val write: suspend (String) -> Unit = { frame -> sendStream.writeAll(IrohFrameCodec.encodeFrame(frame, maxFrameBytes)) }
+            streamedExchange.serve(request, AdminRpcStreamHalves(nextFrame, write))
+            return
+        }
+        checkNotNull(response)
+        runCatching { writeResponse(sendStream, response) }
+            .onFailure { writeError ->
+                Telemetry.event(
+                    "IrohNode", "admin_rpc.stream.error_response_failed",
+                    "remoteEndpointId" attr remoteEndpointId,
+                    "error" attr (writeError.message ?: writeError.toString()),
+                    "class" attr writeError::class.simpleName,
+                )
+            }
     }
 
     /**
@@ -251,26 +293,11 @@ internal class AdminRpcStreamServer(
         return listOf(IrohFrameCodec.encodeFrame(errorEnvelope(requestId, detail), maxFrameBytes))
     }
 
-    private suspend fun readOneFrame(recv: AdminRpcRecvStream): String? {
-        // Chunked (frame_part) requests may only widen reassembly memory
-        // beyond a single frame once the peer has authenticated AND advertised
-        // the capability — otherwise a peer holding just the ticket could pin
-        // maxReassembled bytes per stream before presenting any token.
-        val decoder = IrohFrameCodec.Decoder(maxFrameBytes, maxReassembledBytesProvider = {
-            if (authenticated.get() && peerSupportsFrameParts()) maxReassembledBytes else maxFrameBytes
-        })
-        while (true) {
-            val chunk = recv.read(READ_CHUNK_SIZE.toUInt())
-            if (chunk.isEmpty()) {
-                decoder.finish()
-                return null
-            }
-            val frames = decoder.feed(chunk)
-            if (frames.isNotEmpty()) return frames.first()
-        }
-    }
-
-    private suspend fun handleFrame(frameJson: String): String {
+    /**
+     * The response to [frameJson], or null when it is a streamed request that passed every gate: then
+     * [streamed] has it, and the caller serves the exchange.
+     */
+    private suspend fun handleFrame(frameJson: String, streamed: (AdminRpcStreamedRequest) -> Unit): String? {
         return try {
             val obj = json.parseToJsonElement(frameJson).jsonObject
             val type = obj["type"]?.jsonPrimitive?.contentOrNull
@@ -290,7 +317,7 @@ internal class AdminRpcStreamServer(
             } else if (method == null || requestId == null) {
                 errorEnvelope(requestId ?: "", "method and request_id are required")
             } else {
-                authorizeAndDispatch(method, requestId, obj)
+                authorizeAndDispatch(method, requestId, obj, streamed)
             }
         } catch (ce: CancellationException) {
             throw ce
@@ -321,7 +348,12 @@ internal class AdminRpcStreamServer(
      * observation too; only an allowed call observes, then dispatches. Split out
      * of [handleFrame] purely to flatten the frame's validation chain.
      */
-    private suspend fun authorizeAndDispatch(method: String, requestId: String, obj: JsonObject): String {
+    private suspend fun authorizeAndDispatch(
+        method: String,
+        requestId: String,
+        obj: JsonObject,
+        streamed: (AdminRpcStreamedRequest) -> Unit,
+    ): String? {
         val deniedCapability = capabilityGate(method)
         if (deniedCapability != null) {
             Telemetry.event(
@@ -340,6 +372,16 @@ internal class AdminRpcStreamServer(
             context = requestContextProvider(),
         )
         router.preauthorize(invocation)?.let { return it }
+        // A streamed method is not observed: observation tracks conversation viewers, which no
+        // streamed method changes.
+        router.streamedHandler(invocation)?.let { handler ->
+            streamed(AdminRpcStreamedRequest(handler, requestId, method, params))
+            return null
+        }
+        return dispatchObserved(method, params, invocation)
+    }
+
+    private suspend fun dispatchObserved(method: String, params: JsonObject?, invocation: AdminRpcInvocation): String {
         val settle = notifyMethodObserved(method, params)
         val settleObservation: suspend (Boolean) -> Unit = { succeeded ->
             if (settle != null) {
@@ -357,7 +399,7 @@ internal class AdminRpcStreamServer(
             }
         }
         val response = try {
-            router.dispatch(invocation.copy(context = requestContextProvider()))
+            withContext(connection) { router.dispatch(invocation.copy(context = requestContextProvider())) }
         } catch (cancelled: CancellationException) {
             settleObservation(false)
             throw cancelled
@@ -421,17 +463,37 @@ internal class AdminRpcStreamServer(
             put("capability", capability)
         }
 
-    private fun AtomicInteger.updateMax(value: Int) {
-        while (true) {
-            val current = get()
-            if (value <= current || compareAndSet(current, value)) return
-        }
-    }
 
     companion object {
         const val DEFAULT_MAX_ACTIVE_HANDLERS = 16
         const val DEFAULT_FIRST_FRAME_TIMEOUT_MS = 15_000L
-        private const val READ_CHUNK_SIZE = 8192
+        private const val REQUEST_ID_FIELD = "requestId"
+        private const val METHOD_FIELD = "method"
         private const val HEALTH_CHECK_METHOD = "health.check"
+    }
+}
+
+private const val READ_CHUNK_SIZE = 8192
+
+/** Reads [recv] frame by frame through [decoder], keeping frames that arrived together; null once the peer finished. */
+private fun frameReader(recv: AdminRpcRecvStream, decoder: IrohFrameCodec.Decoder): suspend () -> String? {
+    val pending = ArrayDeque<String>()
+    return reader@{
+        while (pending.isEmpty()) {
+            val chunk = recv.read(READ_CHUNK_SIZE.toUInt())
+            if (chunk.isEmpty()) {
+                decoder.finish()
+                return@reader null
+            }
+            pending.addAll(decoder.feed(chunk))
+        }
+        pending.removeFirst()
+    }
+}
+
+private fun AtomicInteger.updateMax(value: Int) {
+    while (true) {
+        val current = get()
+        if (value <= current || compareAndSet(current, value)) return
     }
 }

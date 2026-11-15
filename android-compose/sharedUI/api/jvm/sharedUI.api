@@ -2410,6 +2410,8 @@ public final class com/letta/mobile/ui/chat/voice/VoiceModeKt {
 public final class com/letta/mobile/ui/chat/voice/VoiceModeTags {
 	public static final field $stable I
 	public static final field BUTTON Ljava/lang/String;
+	public static final field HANDOVER Ljava/lang/String;
+	public static final field HANDOVER_CLOSE Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/voice/VoiceModeTags;
 	public static final field STRIP Ljava/lang/String;
 	public static final field STRIP_ACTION Ljava/lang/String;
@@ -2418,27 +2420,12 @@ public final class com/letta/mobile/ui/chat/voice/VoiceModeTags {
 
 public final class com/letta/mobile/ui/chat/voice/VoiceSetupAccess {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLkotlin/jvm/functions/Function2;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCheck ()Lkotlin/jvm/functions/Function2;
 	public final fun getEchoCancelled ()Z
+	public final fun getLocalListening ()Lcom/letta/mobile/data/voice/local/LocalSpeechAvailability;
 	public final fun getStore ()Lcom/letta/mobile/data/voice/session/VoiceSetupStore;
-}
-
-public final class com/letta/mobile/ui/components/ChevronEmphasis : java/lang/Enum {
-	public static final field Emphasized Lcom/letta/mobile/ui/components/ChevronEmphasis;
-	public static final field Neutral Lcom/letta/mobile/ui/components/ChevronEmphasis;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/components/ChevronEmphasis;
-	public static fun values ()[Lcom/letta/mobile/ui/components/ChevronEmphasis;
-}
-
-public final class com/letta/mobile/ui/components/ChevronIndication : java/lang/Enum {
-	public static final field Expansion Lcom/letta/mobile/ui/components/ChevronIndication;
-	public static final field Sheet Lcom/letta/mobile/ui/components/ChevronIndication;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/components/ChevronIndication;
-	public static fun values ()[Lcom/letta/mobile/ui/components/ChevronIndication;
 }
 
 public final class com/letta/mobile/ui/components/ComposableSingletons$ImageDropOverlayKt {
@@ -2472,26 +2459,6 @@ public final class com/letta/mobile/ui/components/ConversationLaneBindingKt {
 	public static final fun getLocalConversationPurposes ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
-public final class com/letta/mobile/ui/components/DisclosureChevronDefaults {
-	public static final field $stable I
-	public static final field AnimationDurationMillis I
-	public static final field INSTANCE Lcom/letta/mobile/ui/components/DisclosureChevronDefaults;
-	public static final field RotationCollapsed F
-	public static final field RotationExpanded F
-	public static final field TestTag Ljava/lang/String;
-	public static final field TintDisabledAlpha F
-	public static final field TintNeutralAlpha F
-	public final fun animationSpec (Lcom/letta/mobile/ui/components/ChevronIndication;Z)Landroidx/compose/animation/core/AnimationSpec;
-	public final fun contentDescription (Lcom/letta/mobile/ui/components/ChevronIndication;Z)Ljava/lang/String;
-	public final fun size-u2uoSUM (Z)F
-	public final fun targetRotation (Lcom/letta/mobile/ui/components/ChevronIndication;Z)F
-	public final fun tint-NThj0cA (ZLcom/letta/mobile/ui/components/ChevronEmphasis;JJ)J
-}
-
-public final class com/letta/mobile/ui/components/DisclosureChevronKt {
-	public static final fun DisclosureChevron (ZLandroidx/compose/ui/Modifier;ZLcom/letta/mobile/ui/components/ChevronEmphasis;Lcom/letta/mobile/ui/components/ChevronIndication;ZLjava/lang/String;ZLandroidx/compose/runtime/Composer;II)V
-}
-
 public final class com/letta/mobile/ui/components/ImageDropOverlayKt {
 	public static final fun ImageDropOverlay (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
@@ -2500,18 +2467,6 @@ public final class com/letta/mobile/ui/components/LettaCatalogKt {
 	public static final fun LettaCatalogCard-lVb_Clg (Ljava/lang/String;Ljava/lang/String;JLkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaInfoBox (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/runtime/Composer;II)V
 	public static final fun getLettaCatalogGridPadding ()Landroidx/compose/foundation/layout/PaddingValues;
-}
-
-public final class com/letta/mobile/ui/components/LettaChipTabKt {
-	public static final fun LettaChipTab-ZDkf97M (Ljava/lang/String;ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;ILkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaChipTabRow (Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
-}
-
-public final class com/letta/mobile/ui/components/LettaDisclosureControlsKt {
-	public static final fun LettaDisclosureHeader (ZLkotlin/jvm/functions/Function0;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaFoldButton (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaMenuIndicator (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaUnfoldButton--jt2gSs (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/Modifier;FLandroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/components/LettaFadingEdgesKt {
@@ -2535,36 +2490,16 @@ public final class com/letta/mobile/ui/components/LettaListPartsKt {
 	public static final fun LettaEmptyHint (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
 
-public final class com/letta/mobile/ui/components/LettaMenuItem {
-	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZLkotlin/jvm/functions/Function0;)V
-	public synthetic fun <init> (Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZLkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Landroidx/compose/ui/graphics/vector/ImageVector;
-	public final fun component3 ()Z
-	public final fun component4 ()Lkotlin/jvm/functions/Function0;
-	public final fun copy (Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZLkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/components/LettaMenuItem;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/LettaMenuItem;Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZLkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/components/LettaMenuItem;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getEnabled ()Z
-	public final fun getIcon ()Landroidx/compose/ui/graphics/vector/ImageVector;
-	public final fun getLabel ()Ljava/lang/String;
-	public final fun getOnClick ()Lkotlin/jvm/functions/Function0;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
 public final class com/letta/mobile/ui/components/LettaPageHeaderKt {
 	public static final field LETTA_PAGE_CAPTION_TAG Ljava/lang/String;
 	public static final field LETTA_PAGE_PRIMARY_ACTION_TAG Ljava/lang/String;
 	public static final field LETTA_PAGE_TITLE_TAG Ljava/lang/String;
-	public static final fun LettaPageHeader (Ljava/lang/String;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/LettaMenuItem;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaPageHeader (Ljava/lang/String;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/foundation/LettaMenuItem;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
 	public static final fun lettaPageGutter (Z)F
 }
 
 public final class com/letta/mobile/ui/components/LettaPopupMenuKt {
 	public static final fun LettaPopupMenu (ZLkotlin/jvm/functions/Function0;Ljava/util/List;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
-	public static final fun getLocalMenuActionScope ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public final class com/letta/mobile/ui/components/LettaRefreshTags {
@@ -2611,6 +2546,71 @@ public final class com/letta/mobile/ui/components/ResizePointerIcon_jvmKt {
 	public static final fun resizePointerIcon (Lcom/letta/mobile/ui/components/ResizeDirection;)Landroidx/compose/ui/input/pointer/PointerIcon;
 }
 
+public final class com/letta/mobile/ui/components/disclosure/ChevronEmphasis : java/lang/Enum {
+	public static final field Emphasized Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;
+	public static final field Neutral Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;
+	public static fun values ()[Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;
+}
+
+public final class com/letta/mobile/ui/components/disclosure/ChevronIndication : java/lang/Enum {
+	public static final field Expansion Lcom/letta/mobile/ui/components/disclosure/ChevronIndication;
+	public static final field Sheet Lcom/letta/mobile/ui/components/disclosure/ChevronIndication;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/components/disclosure/ChevronIndication;
+	public static fun values ()[Lcom/letta/mobile/ui/components/disclosure/ChevronIndication;
+}
+
+public final class com/letta/mobile/ui/components/disclosure/DisclosureChevronDefaults {
+	public static final field $stable I
+	public static final field AnimationDurationMillis I
+	public static final field INSTANCE Lcom/letta/mobile/ui/components/disclosure/DisclosureChevronDefaults;
+	public static final field RotationCollapsed F
+	public static final field RotationExpanded F
+	public static final field TestTag Ljava/lang/String;
+	public static final field TintDisabledAlpha F
+	public static final field TintNeutralAlpha F
+	public final fun animationSpec (Lcom/letta/mobile/ui/components/disclosure/ChevronIndication;Z)Landroidx/compose/animation/core/AnimationSpec;
+	public final fun contentDescription (Lcom/letta/mobile/ui/components/disclosure/ChevronIndication;Z)Ljava/lang/String;
+	public final fun size-u2uoSUM (Z)F
+	public final fun targetRotation (Lcom/letta/mobile/ui/components/disclosure/ChevronIndication;Z)F
+	public final fun tint-NThj0cA (ZLcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;JJ)J
+}
+
+public final class com/letta/mobile/ui/components/disclosure/DisclosureChevronKt {
+	public static final fun DisclosureChevron-VRxQTpk (ZLandroidx/compose/ui/Modifier;ZLcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;Lcom/letta/mobile/ui/components/disclosure/ChevronIndication;ZLjava/lang/String;ZJLandroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/components/disclosure/LettaDisclosureControlsKt {
+	public static final fun LettaDisclosureHeader (ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaFoldButton (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaMenuIndicator (Landroidx/compose/ui/Modifier;Ljava/lang/String;Lcom/letta/mobile/ui/components/disclosure/LettaMenuIndicatorStyle;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaUnfoldButton--jt2gSs (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/Modifier;FLandroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/components/disclosure/LettaMenuIndicatorStyle {
+	public static final field $stable I
+	public static final field Companion Lcom/letta/mobile/ui/components/disclosure/LettaMenuIndicatorStyle$Companion;
+	public synthetic fun <init> (Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;ZJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;ZJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;
+	public final fun component2 ()Z
+	public final fun component3-0d7_KjU ()J
+	public final fun copy-mxwnekA (Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;ZJ)Lcom/letta/mobile/ui/components/disclosure/LettaMenuIndicatorStyle;
+	public static synthetic fun copy-mxwnekA$default (Lcom/letta/mobile/ui/components/disclosure/LettaMenuIndicatorStyle;Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;ZJILjava/lang/Object;)Lcom/letta/mobile/ui/components/disclosure/LettaMenuIndicatorStyle;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCompact ()Z
+	public final fun getEmphasis ()Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;
+	public final fun getTint-0d7_KjU ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/components/disclosure/LettaMenuIndicatorStyle$Companion {
+	public final fun getDefault ()Lcom/letta/mobile/ui/components/disclosure/LettaMenuIndicatorStyle;
+}
+
 public final class com/letta/mobile/ui/components/foundation/ComposableSingletons$LettaSearchFieldKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/components/foundation/ComposableSingletons$LettaSearchFieldKt;
 	public fun <init> ()V
@@ -2642,9 +2642,45 @@ public final class com/letta/mobile/ui/components/foundation/LettaButtonIcon {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/components/foundation/LettaChipSlots {
+	public static final field $stable I
+	public static final field Companion Lcom/letta/mobile/ui/components/foundation/LettaChipSlots$Companion;
+	public fun <init> ()V
+	public fun <init> (Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getLeading ()Lkotlin/jvm/functions/Function2;
+	public final fun getTrailing ()Lkotlin/jvm/functions/Function2;
+}
+
+public final class com/letta/mobile/ui/components/foundation/LettaChipSlots$Companion {
+	public final fun getNone ()Lcom/letta/mobile/ui/components/foundation/LettaChipSlots;
+}
+
+public final class com/letta/mobile/ui/components/foundation/LettaChipTabKt {
+	public static final fun LettaChipTab-ZDkf97M (Ljava/lang/String;ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;ILkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaChipTabRow (Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/components/foundation/LettaClickTarget {
+	public static final field $stable I
+	public static final field Companion Lcom/letta/mobile/ui/components/foundation/LettaClickTarget$Companion;
+	public fun <init> ()V
+	public fun <init> (Landroidx/compose/ui/graphics/Shape;Z)V
+	public synthetic fun <init> (Landroidx/compose/ui/graphics/Shape;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getMinimumTouchTarget ()Z
+	public final fun getShape ()Landroidx/compose/ui/graphics/Shape;
+}
+
+public final class com/letta/mobile/ui/components/foundation/LettaClickTarget$Companion {
+	public final fun getInline ()Lcom/letta/mobile/ui/components/foundation/LettaClickTarget;
+	public final fun getStandalone ()Lcom/letta/mobile/ui/components/foundation/LettaClickTarget;
+}
+
 public final class com/letta/mobile/ui/components/foundation/LettaClickableKt {
 	public static final fun lettaClickable-glApdhM (Landroidx/compose/ui/Modifier;ILjava/lang/String;Landroidx/compose/ui/graphics/Shape;Lkotlin/jvm/functions/Function0;)Landroidx/compose/ui/Modifier;
+	public static final fun lettaClickable-glApdhM (Landroidx/compose/ui/Modifier;ILjava/lang/String;Lcom/letta/mobile/ui/components/foundation/LettaClickTarget;Lkotlin/jvm/functions/Function0;)Landroidx/compose/ui/Modifier;
 	public static synthetic fun lettaClickable-glApdhM$default (Landroidx/compose/ui/Modifier;ILjava/lang/String;Landroidx/compose/ui/graphics/Shape;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Landroidx/compose/ui/Modifier;
+	public static synthetic fun lettaClickable-glApdhM$default (Landroidx/compose/ui/Modifier;ILjava/lang/String;Lcom/letta/mobile/ui/components/foundation/LettaClickTarget;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Landroidx/compose/ui/Modifier;
 }
 
 public final class com/letta/mobile/ui/components/foundation/LettaColorSwatchKt {
@@ -2701,22 +2737,51 @@ public final class com/letta/mobile/ui/components/foundation/LettaInlineNoticeKt
 	public static final fun LettaInlineNotice (Lcom/letta/mobile/ui/components/foundation/LettaNotice;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/foundation/LettaNoticeAction;Lcom/letta/mobile/ui/components/foundation/LettaNoticeAction;Landroidx/compose/runtime/Composer;II)V
 }
 
+public final class com/letta/mobile/ui/components/foundation/LettaMenuItem {
+	public static final field $stable I
+	public fun <init> (Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZZLjava/lang/String;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZZLjava/lang/String;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Lkotlin/jvm/functions/Function0;
+	public final fun copy (Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZZLjava/lang/String;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/components/foundation/LettaMenuItem;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/foundation/LettaMenuItem;Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZZLjava/lang/String;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/components/foundation/LettaMenuItem;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEnabled ()Z
+	public final fun getIcon ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getKeepsMenuOpen ()Z
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getOnClick ()Lkotlin/jvm/functions/Function0;
+	public final fun getTag ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/components/foundation/LettaMenuItemKt {
+	public static final fun getLocalMenuActionScope ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
 public final class com/letta/mobile/ui/components/foundation/LettaNavChevronKt {
 	public static final fun LettaNavChevron (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/components/foundation/LettaNotice {
 	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/ui/theme/tokens/LettaPanelTone;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/ui/theme/tokens/LettaPanelTone;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/ui/theme/tokens/LettaPanelTone;Ljava/lang/String;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/ui/theme/tokens/LettaPanelTone;Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Lcom/letta/mobile/ui/theme/tokens/LettaPanelTone;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/ui/theme/tokens/LettaPanelTone;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/ui/components/foundation/LettaNotice;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/foundation/LettaNotice;Ljava/lang/String;Lcom/letta/mobile/ui/theme/tokens/LettaPanelTone;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/components/foundation/LettaNotice;
+	public final fun component5 ()Z
+	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/ui/theme/tokens/LettaPanelTone;Ljava/lang/String;Ljava/lang/String;Z)Lcom/letta/mobile/ui/components/foundation/LettaNotice;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/foundation/LettaNotice;Ljava/lang/String;Lcom/letta/mobile/ui/theme/tokens/LettaPanelTone;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lcom/letta/mobile/ui/components/foundation/LettaNotice;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getContentTag ()Ljava/lang/String;
+	public final fun getElevated ()Z
 	public final fun getMessage ()Ljava/lang/String;
 	public final fun getTitle ()Ljava/lang/String;
 	public final fun getTone ()Lcom/letta/mobile/ui/theme/tokens/LettaPanelTone;
@@ -2726,16 +2791,18 @@ public final class com/letta/mobile/ui/components/foundation/LettaNotice {
 
 public final class com/letta/mobile/ui/components/foundation/LettaNoticeAction {
 	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Z)V
-	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Ljava/lang/String;ZLandroidx/compose/ui/graphics/vector/ImageVector;)V
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Ljava/lang/String;ZLandroidx/compose/ui/graphics/vector/ImageVector;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Lkotlin/jvm/functions/Function0;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Z
-	public final fun copy (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Z)Lcom/letta/mobile/ui/components/foundation/LettaNoticeAction;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/foundation/LettaNoticeAction;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Ljava/lang/String;ZILjava/lang/Object;)Lcom/letta/mobile/ui/components/foundation/LettaNoticeAction;
+	public final fun component5 ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun copy (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Ljava/lang/String;ZLandroidx/compose/ui/graphics/vector/ImageVector;)Lcom/letta/mobile/ui/components/foundation/LettaNoticeAction;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/foundation/LettaNoticeAction;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Ljava/lang/String;ZLandroidx/compose/ui/graphics/vector/ImageVector;ILjava/lang/Object;)Lcom/letta/mobile/ui/components/foundation/LettaNoticeAction;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getEnabled ()Z
+	public final fun getIcon ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getLabel ()Ljava/lang/String;
 	public final fun getOnClick ()Lkotlin/jvm/functions/Function0;
 	public final fun getTag ()Ljava/lang/String;
@@ -2755,20 +2822,34 @@ public final class com/letta/mobile/ui/components/foundation/LettaPanelKt {
 	public static final fun lettaPanelBorder (Landroidx/compose/runtime/Composer;I)Landroidx/compose/foundation/BorderStroke;
 }
 
+public final class com/letta/mobile/ui/components/foundation/LettaPillsKt {
+	public static final fun LettaChip (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/foundation/LettaChipSlots;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaOutlinedPill (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaPill-sW7UJKQ (Ljava/lang/String;JLandroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaTonalPill (Ljava/lang/String;Lcom/letta/mobile/ui/theme/pill/LettaPillColors;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/components/foundation/LettaProgressKt {
+	public static final fun LettaBusyBar (Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaSpinner-9IZ8Weo (Landroidx/compose/ui/Modifier;FJLandroidx/compose/runtime/Composer;II)V
+}
+
 public final class com/letta/mobile/ui/components/foundation/LettaRowLabel {
 	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;ZZ)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;ZZI)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ZZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Z
 	public final fun component4 ()Z
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;ZZ)Lcom/letta/mobile/ui/components/foundation/LettaRowLabel;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/foundation/LettaRowLabel;Ljava/lang/String;Ljava/lang/String;ZZILjava/lang/Object;)Lcom/letta/mobile/ui/components/foundation/LettaRowLabel;
+	public final fun component5 ()I
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;ZZI)Lcom/letta/mobile/ui/components/foundation/LettaRowLabel;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/foundation/LettaRowLabel;Ljava/lang/String;Ljava/lang/String;ZZIILjava/lang/Object;)Lcom/letta/mobile/ui/components/foundation/LettaRowLabel;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDestructive ()Z
 	public final fun getEnabled ()Z
 	public final fun getSupporting ()Ljava/lang/String;
+	public final fun getSupportingMaxLines ()I
 	public final fun getTitle ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -2802,6 +2883,12 @@ public final class com/letta/mobile/ui/components/foundation/LettaSearchOptions 
 	public final fun getPlaceholder ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/components/foundation/LettaSectionLabelKt {
+	public static final fun LettaSectionHeader (Ljava/lang/String;Landroidx/compose/ui/Modifier;Ljava/lang/Integer;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaSectionLabel (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/runtime/Composer;II)V
+	public static final fun lettaSectionTitle (Ljava/lang/String;Ljava/lang/Integer;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/components/foundation/LettaStatusDotKt {
@@ -4532,19 +4619,33 @@ public final class com/letta/mobile/ui/host/RowHoldDragKt {
 public final class com/letta/mobile/ui/icons/LettaIcons {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/icons/LettaIcons;
+	public final fun getAArrowDown ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getAArrowUp ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getALargeSmall ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getAccessTime ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getAccountCircle ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getAdd ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getAgent ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getAlignCenter ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getAlignLeft ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getAlignRight ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getApps ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getArchive ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getArrowBack ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getArrowDown ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getArrowDropDown ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getArrowDropUp ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getArrowForward ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getArrowUp ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getAutoAwesome ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getAutorenew ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getBold ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getBox ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getBringToFront ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getBuild ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getCamera ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getChat ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getChatBubbleOutline ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getChatOutline ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getCheck ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getCheckCircle ()Landroidx/compose/ui/graphics/vector/ImageVector;
@@ -4553,30 +4654,50 @@ public final class com/letta/mobile/ui/icons/LettaIcons {
 	public final fun getChevronRight ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getChevronUp ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getCircle ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getCircleArrowUp ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getClear ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getClose ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getCloud ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getCode ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getColumns2 ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getCopy ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getCpu ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getDashboard ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getDatabase ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getDelete ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getDescription ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getDownload ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getEdit ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getEllipsisVertical ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getEraser ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getError ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getExpandLess ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getExpandMore ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getExternalLink ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getFavorite ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getFavoriteBorder ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getFile ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getFileJson ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getFileOpen ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getFitToView ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getFlashlight ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getFlashlightOff ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getForkRight ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getGripVertical ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getGroup ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getHand ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getHeading1 ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getHeading2 ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getHeading3 ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getHelp ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getHistory ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getHome ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getHub ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getImage ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getImport ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getInfo ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getInventory ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getItalic ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getKey ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getKeyboardArrowDown ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getLightbulb ()Landroidx/compose/ui/graphics/vector/ImageVector;
@@ -4584,37 +4705,71 @@ public final class com/letta/mobile/ui/icons/LettaIcons {
 	public final fun getLinkOff ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getListFilter ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getListIcon ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getListOrdered ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getListTodo ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getLoader ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getManageSearch ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getMaximize ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getMaximize2 ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getMenu ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getMoreVert ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getMousePointer ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getNoneSet ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getPackageX ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getPaintBucket ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getPalette ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getPanelLeftClose ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getPanelLeftOpen ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getPenLine ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getPenTool ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getPeople ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getPilcrow ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getPin ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getPinOff ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getPlay ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getPsychology ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getPushPin ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getPuzzle ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getQrCode ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getRedo2 ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getRefresh ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getRemove ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getRows2 ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getSave ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getSchedule ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getSchema ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getSearch ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getSend ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getSendToBack ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getServer ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getSettings ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getShare ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getSlidersHorizontal ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getSparkles ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getSquare ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getSquareCode ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getSquarePlus ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getStar ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getStickyNote ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getStopCircle ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getStorage ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getStrikethrough ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getTable ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getTaskAlt ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getTerminal ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getTextCursorInput ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getTextQuote ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getTool ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getTriangle ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getType ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getUnarchive ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getUnderline ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getUndo2 ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getViewModule ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getVisibility ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getVisibilityOff ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getWarning ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getWifiOff ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getZoomIn ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getZoomOut ()Landroidx/compose/ui/graphics/vector/ImageVector;
 }
@@ -5358,6 +5513,7 @@ public final class com/letta/mobile/ui/modelcontrol/ComposableSingletons$ModelPi
 	public static final field INSTANCE Lcom/letta/mobile/ui/modelcontrol/ComposableSingletons$ModelPickerContentKt;
 	public fun <init> ()V
 	public final fun getLambda$-1086427408$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1247975951$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$152368274$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
@@ -5527,11 +5683,12 @@ public final class com/letta/mobile/ui/modelcontrol/ModelEffortTags {
 public final class com/letta/mobile/ui/modelcontrol/ModelPickerActions {
 	public static final field $stable I
 	public static final field Companion Lcom/letta/mobile/ui/modelcontrol/ModelPickerActions$Companion;
-	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)V
-	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lkotlin/jvm/functions/Function1;
-	public final fun component10 ()Lkotlin/jvm/functions/Function1;
-	public final fun component11 ()Lkotlin/jvm/functions/Function0;
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component11 ()Lkotlin/jvm/functions/Function1;
+	public final fun component12 ()Lkotlin/jvm/functions/Function0;
 	public final fun component2 ()Lkotlin/jvm/functions/Function1;
 	public final fun component3 ()Lkotlin/jvm/functions/Function1;
 	public final fun component4 ()Lkotlin/jvm/functions/Function0;
@@ -5540,8 +5697,8 @@ public final class com/letta/mobile/ui/modelcontrol/ModelPickerActions {
 	public final fun component7 ()Lkotlin/jvm/functions/Function1;
 	public final fun component8 ()Ljava/util/List;
 	public final fun component9 ()Ljava/lang/String;
-	public final fun copy (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/modelcontrol/ModelPickerActions;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/modelcontrol/ModelPickerActions;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/modelcontrol/ModelPickerActions;
+	public final fun copy (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/modelcontrol/ModelPickerActions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/modelcontrol/ModelPickerActions;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/modelcontrol/ModelPickerActions;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAvailableToolsets ()Ljava/util/List;
 	public final fun getCurrentToolset ()Ljava/lang/String;
@@ -5554,6 +5711,7 @@ public final class com/letta/mobile/ui/modelcontrol/ModelPickerActions {
 	public final fun getOnSelectToolset ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnToggleGroup ()Lkotlin/jvm/functions/Function1;
 	public final fun getRememberedEffort ()Lkotlin/jvm/functions/Function1;
+	public final fun getToolsetError ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -7608,6 +7766,7 @@ public final class com/letta/mobile/ui/settings/VoiceSettingsKeys {
 	public static final field INSTANCE Lcom/letta/mobile/ui/settings/VoiceSettingsKeys;
 	public static final field INTERRUPT Ljava/lang/String;
 	public static final field KEY Ljava/lang/String;
+	public static final field LISTENING Ljava/lang/String;
 	public static final field PANE Ljava/lang/String;
 	public static final field SAVE Ljava/lang/String;
 	public static final field SECTION Ljava/lang/String;
@@ -11999,32 +12158,6 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Type {
 	public final fun getMicro-XSAIIZE ()J
 }
 
-public final class com/letta/mobile/ui/theme/LettaPillsKt {
-	public static final fun LettaChip (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaOutlinedPill (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaPill-sW7UJKQ (Ljava/lang/String;JLandroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaTonalPill (Ljava/lang/String;Lcom/letta/mobile/ui/theme/pill/LettaPillColors;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
-}
-
-public final class com/letta/mobile/ui/theme/LettaProgressKt {
-	public static final fun LettaBusyBar (Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaSpinner-9IZ8Weo (Landroidx/compose/ui/Modifier;FJLandroidx/compose/runtime/Composer;II)V
-}
-
-public final class com/letta/mobile/ui/theme/LettaSectionLabelKt {
-	public static final fun LettaSectionHeader (Ljava/lang/String;Landroidx/compose/ui/Modifier;Ljava/lang/Integer;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaSectionLabel (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/runtime/Composer;II)V
-	public static final fun lettaSectionTitle (Ljava/lang/String;Ljava/lang/Integer;)Ljava/lang/String;
-}
-
-public final class com/letta/mobile/ui/theme/LettaStatusGlyphsKt {
-	public static final fun LettaCheckGlyph (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaDoneGlyph (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaFailedGlyph (Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaInProgressGlyph (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaPendingGlyph (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
-}
-
 public final class com/letta/mobile/ui/theme/PlatformAccessibility_jvmKt {
 	public static final fun jvmOsHighContrast ()Z
 	public static final fun jvmOsReducedMotion ()Z
@@ -12236,11 +12369,19 @@ public final class com/letta/mobile/ui/theme/tokens/CustomColorsKt {
 	public static final fun getLocalLettaCustomColors ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
+public final class com/letta/mobile/ui/theme/tokens/LettaAlphaTokens {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaAlphaTokens;
+	public static final field muted F
+}
+
 public final class com/letta/mobile/ui/theme/tokens/LettaComponentDimens {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaComponentDimens;
 	public final fun getEmptyStateIcon-D9Ej5fM ()F
+	public final fun getFloatingNoticeElevation-D9Ej5fM ()F
 	public final fun getStatusDot-D9Ej5fM ()F
+	public final fun getStatusGlyphStroke-D9Ej5fM ()F
 	public final fun getSwatch-D9Ej5fM ()F
 	public final fun getSwatchSelectedStroke-D9Ej5fM ()F
 }
@@ -12256,6 +12397,13 @@ public final class com/letta/mobile/ui/theme/tokens/LettaControlTokens {
 	public final fun getIconButtonSm-D9Ej5fM ()F
 	public final fun getIconSm-D9Ej5fM ()F
 	public final fun getMinTouchTarget-D9Ej5fM ()F
+	public final fun getSpinnerLg-D9Ej5fM ()F
+	public final fun getSpinnerMd-D9Ej5fM ()F
+	public final fun getSpinnerSm-D9Ej5fM ()F
+}
+
+public final class com/letta/mobile/ui/theme/tokens/LettaMotionPreferenceKt {
+	public static final fun getLocalLettaReducedMotion ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public final class com/letta/mobile/ui/theme/tokens/LettaPanelTone : java/lang/Enum {
@@ -12311,6 +12459,8 @@ public final class com/letta/mobile/ui/theme/tokens/LettaStrokeTokens {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaStrokeTokens;
 	public final fun getHairline-D9Ej5fM ()F
+	public final fun getSpinner-D9Ej5fM ()F
+	public final fun getSpinnerLg-D9Ej5fM ()F
 }
 
 public final class com/letta/mobile/ui/theme/tokens/LettaSurfaceSizes {

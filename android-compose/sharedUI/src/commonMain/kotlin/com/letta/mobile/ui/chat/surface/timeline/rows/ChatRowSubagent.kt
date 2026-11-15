@@ -10,7 +10,6 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.components.LocalLineRail
 import com.letta.mobile.ui.components.line.LineRail
 import com.letta.mobile.ui.theme.ChatRowSpacing
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -67,10 +66,12 @@ import com.letta.mobile.ui.components.line.StatusTone
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaTonalPill
+import com.letta.mobile.ui.components.foundation.LettaTonalPill
 import com.letta.mobile.ui.theme.pill.LettaPillColors
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 // letta-mobile-bglj6.1: Android's SubagentNotificationCard
 // (ChatToolCallCards.kt), without haptics, opening the subagent through the host
@@ -320,7 +321,7 @@ private fun NotificationActionRow(actions: NotificationActions) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
             .defaultMinSize(minHeight = LettaDimens.Space.xxl)
-            .clickable(role = Role.Button, onClick = onOpen)
+            .lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = onOpen)
             .padding(vertical = LettaDimens.Space.sm),
     )
 }

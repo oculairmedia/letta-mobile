@@ -33,6 +33,10 @@ internal class IrohConnectionSession(
     private val generation = atomic(0L)
     private val statusFrames = MutableStateFlow(0L to emptyMap<AppServerRuntimeScope, AppServerReceivedFrame>())
     val deviceStatusFrames = statusFrames.transform { emitAll(it.second.values.asFlow()) }
+    private val toolsets = com.letta.mobile.data.transport.api.ToolsetStatusStore()
+
+    /** Host-confirmed toolsets from this session's observer stream. */
+    val toolsetStates get() = toolsets.states
     @Volatile
     private var observerJob: Job? = null
     private val stoppedObserverJobs = ConcurrentHashMap.newKeySet<Job>()
@@ -84,6 +88,7 @@ internal class IrohConnectionSession(
         readyCapabilities = emptySet()
         readyTicket = null
         nextGeneration()
+        toolsets.clear(currentGeneration())
         resubscribeJob?.cancel()
         resubscribeJob = null
         return stopObserverIngest(reason)
@@ -119,6 +124,7 @@ internal class IrohConnectionSession(
                     if (!isCurrent(readyGeneration)) return@collect
                     val scoped = received.copy(connectionGeneration = readyGeneration.value)
                     cacheDeviceStatus(scoped)
+                    toolsets.observe(scoped, currentGeneration())
                     ingestObserverFrame(scoped)
                 }
             }.onFailure { error ->

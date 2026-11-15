@@ -196,6 +196,9 @@ class ShimOffParityGateTest {
         override suspend fun disconnectProvider(command: AppServerCommand.DisconnectProvider) =
             AppServerInboundFrame.DisconnectProviderResponse(command.requestId, true, command.target, emptyList(), true)
 
+        override suspend fun updateToolset(command: AppServerCommand.UpdateToolset) =
+            AppServerInboundFrame.UpdateToolsetResponse(command.requestId.orEmpty(), true, currentToolset = command.toolsetPreference)
+
         override suspend fun updateModel(command: AppServerCommand.UpdateModel) =
             AppServerInboundFrame.UpdateModelResponse(command.requestId, true, command.runtime, appliedTo = "conversation")
 
@@ -251,6 +254,12 @@ class ShimOffParityGateTest {
         }
 
         private fun isUnsafeCronCharacter(char: Char): Boolean = char in "/\\\u0000"
+
+        override suspend fun cronPause(command: AppServerCommand.CronPause) =
+            AppServerInboundFrame.CronPauseResponse(command.requestId, true)
+
+        override suspend fun cronResume(command: AppServerCommand.CronResume) =
+            AppServerInboundFrame.CronResumeResponse(command.requestId, true)
 
         override suspend fun cronTrigger(command: AppServerCommand.CronTrigger) =
             AppServerInboundFrame.CronTriggerResponse(command.requestId, true)
@@ -407,6 +416,7 @@ class ShimOffParityGateTest {
         // letta-mobile-w4q4p rows: provider.connect/disconnect, model.update, model.exposure.set.
         put("provider_id", "openai")
         put("model_handle", "openai/gpt-sol")
+        put("toolset_preference", "auto")
         put("handle", "openai/gpt-sol")
         put("exposed", false)
         // letta-mobile-joigh: conversation.context_limit.

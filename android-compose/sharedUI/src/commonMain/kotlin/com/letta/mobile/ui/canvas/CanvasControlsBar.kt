@@ -17,26 +17,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import com.composables.icons.lucide.ArrowRight
-import com.composables.icons.lucide.Circle
-import com.composables.icons.lucide.Eraser
-import com.composables.icons.lucide.Hand
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Minus
-import com.composables.icons.lucide.MousePointer
-import com.composables.icons.lucide.Pencil
-import com.composables.icons.lucide.Redo2
-import com.composables.icons.lucide.Square
-import com.composables.icons.lucide.StickyNote
-import com.composables.icons.lucide.Triangle
-import com.composables.icons.lucide.Type
-import com.composables.icons.lucide.Undo2
 import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
 import com.letta.mobile.ui.components.foundation.LettaDivider
 import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.icons.LettaIcons
 
 /**
  * The tool rail down the left of the board, the way Concepts and Miro keep their tools: pointer
@@ -91,7 +78,7 @@ fun CanvasControlsBar(
                 }
             }
             if (onAddNote != null) {
-                ControlButton(Control(Lucide.StickyNote, "Add note"), onClick = onAddNote)
+                ControlButton(Control(LettaIcons.StickyNote, "Add note"), onClick = onAddNote)
             }
             RailDivider()
             // The rail's swatch is the same master control the selection bar opens: one place
@@ -108,8 +95,8 @@ fun CanvasControlsBar(
                 )
                 RailDivider()
             }
-            ControlButton(Control(Lucide.Undo2, "Undo", enabled = state.canUndo)) { dispatch(ControlsBarIntent.Undo) }
-            ControlButton(Control(Lucide.Redo2, "Redo", enabled = state.canRedo)) { dispatch(ControlsBarIntent.Redo) }
+            ControlButton(Control(LettaIcons.Undo2, "Undo", enabled = state.canUndo)) { dispatch(ControlsBarIntent.Undo) }
+            ControlButton(Control(LettaIcons.Redo2, "Redo", enabled = state.canRedo)) { dispatch(ControlsBarIntent.Redo) }
         }
     }
 }
@@ -172,17 +159,17 @@ internal val DrawingModes: List<Pair<Mode, String>> = listOf(
 internal val CanvasModes: List<Pair<Mode, String>> = PointerModes + DrawingModes
 
 internal fun iconFor(mode: Mode): ImageVector = when (mode) {
-    Mode.SELECT -> Lucide.MousePointer
-    Mode.PAN -> Lucide.Hand
-    Mode.PEN -> Lucide.Pencil
-    Mode.LINE -> Lucide.Minus
-    Mode.ARROW -> Lucide.ArrowRight
-    Mode.RECTANGLE -> Lucide.Square
-    Mode.CIRCLE -> Lucide.Circle
-    Mode.TRIANGLE -> Lucide.Triangle
-    Mode.TEXT -> Lucide.Type
-    Mode.ERASER -> Lucide.Eraser
-    else -> Lucide.Pencil
+    Mode.SELECT -> LettaIcons.MousePointer
+    Mode.PAN -> LettaIcons.Hand
+    Mode.PEN -> LettaIcons.Edit
+    Mode.LINE -> LettaIcons.Remove
+    Mode.ARROW -> LettaIcons.ArrowForward
+    Mode.RECTANGLE -> LettaIcons.Square
+    Mode.CIRCLE -> LettaIcons.Circle
+    Mode.TRIANGLE -> LettaIcons.Triangle
+    Mode.TEXT -> LettaIcons.Type
+    Mode.ERASER -> LettaIcons.Eraser
+    else -> LettaIcons.Edit
 }
 
 private val BUTTON_SIZE = LettaDimens.Control.actionButton

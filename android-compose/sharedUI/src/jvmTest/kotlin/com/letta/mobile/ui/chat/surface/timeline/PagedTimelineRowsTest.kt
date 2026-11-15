@@ -8,7 +8,6 @@ import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
-import com.letta.mobile.data.chat.projection.TimelineRowAssembly
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.data.timeline.TimelineMessageId
@@ -120,7 +119,7 @@ class PagedTimelineRowsTest {
         leading: Int = 0,
     ) = PagedRows(
         leading = leading,
-        assembly = TimelineRowAssembly.assemble(live, snapshot.map { it?.item?.key }),
+        assembly = CanonicalTimelinePresentation.assemble(live, snapshot),
         identity = live to snapshot,
     )
 

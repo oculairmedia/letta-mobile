@@ -17,9 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -55,9 +52,10 @@ import kotlinx.datetime.TimeZone
 import kotlin.time.Instant
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.theme.tokens.LettaTextAccents
-import com.letta.mobile.ui.theme.LettaPill
+import com.letta.mobile.ui.components.foundation.LettaPill
 import com.letta.mobile.ui.components.foundation.LettaPanel
 import androidx.compose.ui.semantics.Role
+import com.letta.mobile.ui.icons.LettaIcons
 
 /** What the schedules rail shows: the overview, one schedule's detail, or one run's detail. */
 sealed interface ScheduleRailState {
@@ -188,7 +186,7 @@ private fun NextRunCard(def: ScheduleDef, now: Instant, zone: TimeZone) {
 @Composable
 private fun NextRunContent(def: ScheduleDef, next: Instant?, now: Instant, zone: TimeZone) {
     Row(Modifier.padding(LettaDimens.Space.lg), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Outlined.Schedule, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.icon))
+        Icon(LettaIcons.AccessTime, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.icon))
         Spacer(Modifier.width(LettaDimens.Space.md))
         Column {
             Text(
@@ -282,7 +280,12 @@ private fun ScheduleRunDetailRail(run: ScheduleRun, params: ScheduleRailParams) 
 @Composable
 private fun BackToOverview(description: String, onBack: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(role = Role.Button, onClick = onBack)) {
-        Icon(Icons.Outlined.ArrowBack, description, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(LettaDimens.Control.icon))
+        Icon(
+            LettaIcons.ArrowBack,
+            description,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(LettaDimens.Control.icon),
+        )
         Spacer(Modifier.width(LettaDimens.Space.sm))
         Text("Overview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -307,7 +310,7 @@ fun ScheduleDefRow(label: String, value: String) {
 
 /** The rail's words, pure. */
 object ScheduleRailText {
-    const val CONTROL_NOTE = "Run now / Pause need a backend control endpoint (not available yet)."
+    const val CONTROL_NOTE = "Run now needs a backend control endpoint (not available yet)."
 
     fun cadence(def: ScheduleDef): String =
         def.cron?.let { CronSchedule.parse(it)?.let(CronSchedule::describe) ?: it } ?: "One-time"

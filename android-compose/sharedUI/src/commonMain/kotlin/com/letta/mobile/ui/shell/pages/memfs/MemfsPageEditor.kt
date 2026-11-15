@@ -32,7 +32,7 @@ import com.letta.mobile.ui.theme.tokens.LettaPanelTone
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.host.LettaConfirmTags
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 

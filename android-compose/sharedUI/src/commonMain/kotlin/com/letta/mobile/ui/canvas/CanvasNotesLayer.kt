@@ -50,9 +50,6 @@ import com.letta.mobile.data.model.CanvasNoteId
 import io.ak1.drawbox.domain.model.ResizeHandle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
-import com.composables.icons.lucide.GripVertical
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Maximize2
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasTextStyle
@@ -70,6 +67,7 @@ import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import androidx.compose.foundation.background
 
 /**
  * The canvas's block documents as elements on the board, one card per document, placed in the
@@ -570,11 +568,12 @@ private fun NoteHandleBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(HANDLE_HEIGHT)
+            .background(onCard.copy(alpha = NOTE_HANDLE_BAND_ALPHA))
             .dragHandle(onDragStart, onDrag, onDragEnd)
             .padding(start = LettaDimens.Space.sm, end = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        LettaIcon(Lucide.GripVertical, contentDescription = "Move note", style = LettaIconStyle(tint = onCard))
+        LettaIcon(LettaIcons.GripVertical, contentDescription = "Move note", style = LettaIconStyle(tint = onCard))
         Spacer(modifier = Modifier.size(LettaDimens.Space.sm))
         Text(
             text = title?.takeIf { it.isNotBlank() } ?: "Note",
@@ -585,7 +584,7 @@ private fun NoteHandleBar(
             modifier = Modifier.weight(1f),
         )
         val glyph = LettaIconStyle(tint = onCard)
-        LettaIconButton(LettaButtonIcon(Lucide.Maximize2, "Open note", size = HANDLE_HEIGHT, glyph = glyph), onClick = onExpand)
+        LettaIconButton(LettaButtonIcon(LettaIcons.Maximize2, "Open note", size = HANDLE_HEIGHT, glyph = glyph), onClick = onExpand)
         LettaIconButton(LettaButtonIcon(LettaIcons.Close, "Remove note", size = HANDLE_HEIGHT, glyph = glyph), onClick = onRemove)
     }
 }
@@ -605,7 +604,11 @@ private fun TextMoveGrip(
             .semantics { contentDescription = "Move text" },
         contentAlignment = Alignment.Center,
     ) {
-        LettaIcon(Lucide.GripVertical, contentDescription = null, style = LettaIconStyle(tint = MaterialTheme.colorScheme.onSurfaceVariant))
+        LettaIcon(
+            LettaIcons.GripVertical,
+            contentDescription = null,
+            style = LettaIconStyle(tint = MaterialTheme.colorScheme.onSurfaceVariant),
+        )
     }
 }
 

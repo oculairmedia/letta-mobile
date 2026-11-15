@@ -22,6 +22,9 @@ interface IChannelTransport {
     /** Runtime snapshots from the current connection; empty on transports without native status. */
     val deviceStatusFrames: kotlinx.coroutines.flow.Flow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>
         get() = kotlinx.coroutines.flow.emptyFlow()
+    /** Host toolset choices and confirmed preferences for this connection, scoped by runtime. */
+    val toolsetStates: StateFlow<Map<com.letta.mobile.data.toolsets.ToolsetRuntime, com.letta.mobile.data.toolsets.ToolsetState>>
+        get() = com.letta.mobile.data.toolsets.EmptyToolsets
     val state: StateFlow<ChannelTransportState>
     val events: SharedFlow<ServerFrame>
     val frameEvents: SharedFlow<TransportFrameEvent>

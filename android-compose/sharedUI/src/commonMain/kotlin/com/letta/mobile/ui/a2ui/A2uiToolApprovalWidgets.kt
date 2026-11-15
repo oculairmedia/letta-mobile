@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.A2uiActionOrigin
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
-import com.letta.mobile.ui.theme.LettaTonalPill
+import com.letta.mobile.ui.components.foundation.LettaTonalPill
 import com.letta.mobile.ui.theme.pill.LettaPillColors
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray

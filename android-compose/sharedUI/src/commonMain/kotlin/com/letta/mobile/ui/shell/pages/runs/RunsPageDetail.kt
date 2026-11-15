@@ -18,7 +18,7 @@ import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.settings.ActionButton
 import com.letta.mobile.ui.settings.SettingsHeader
 import com.letta.mobile.ui.settings.SettingsSection
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Test tags inside the run detail. */

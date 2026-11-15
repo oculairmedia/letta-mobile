@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.chat.provenance
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -27,9 +26,13 @@ import com.letta.mobile.data.messaging.AgentMessageDirection
 import com.letta.mobile.data.messaging.AgentMessageProvenance
 import com.letta.mobile.data.messaging.agentMessageDisplayLabel
 import com.letta.mobile.data.messaging.displayLabel
-import com.letta.mobile.ui.components.LettaDisclosureHeader
+import com.letta.mobile.ui.components.disclosure.DisclosureRow
+import com.letta.mobile.ui.components.disclosure.DisclosureRowWords
+import com.letta.mobile.ui.components.line.LineDisclosure
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 /**
  * Shared (Android + Desktop + Web) VISUAL render for
@@ -158,10 +161,12 @@ private fun AgentMessageProvenanceHeader(
     onToggleExpand: () -> Unit,
     onAgentClick: (String) -> Unit,
 ) {
-    LettaDisclosureHeader(
-        expanded = expanded,
-        onToggle = onToggleExpand,
-        chevronDescription = if (expanded) "Collapse agent message details" else "Expand agent message details",
+    // The inline disclosure line, not the standalone header: the label keeps its own height in the message.
+    DisclosureRow(
+        disclosure = LineDisclosure(expanded = expanded, onToggle = onToggleExpand),
+        words = DisclosureRowWords(
+            chevronDescription = if (expanded) "Collapse agent message details" else "Expand agent message details",
+        ),
     ) {
         AgentRoute(provenance, spec, colors, onAgentClick)
         DeliveryState(provenance.deliveryState, spec.isFailed, colors.muted)
@@ -202,7 +207,7 @@ private fun AgentLink(label: String, agentId: String, tint: Color, onAgentClick:
         color = tint,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.clickable(role = Role.Button) { onAgentClick(agentId) },
+        modifier = Modifier.lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = { onAgentClick(agentId) }),
     )
 }
 

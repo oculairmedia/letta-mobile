@@ -50,7 +50,7 @@ import com.letta.mobile.ui.chat.branch.rememberMessageMenu
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightTarget
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.common.GroupPosition
-import com.letta.mobile.ui.components.DisclosureButton
+import com.letta.mobile.ui.components.disclosure.DisclosureButton
 import com.letta.mobile.ui.components.line.DefaultDisclosureLabels
 import com.letta.mobile.ui.components.line.LineDisclosure
 import com.letta.mobile.ui.components.line.LineDisclosureLabels

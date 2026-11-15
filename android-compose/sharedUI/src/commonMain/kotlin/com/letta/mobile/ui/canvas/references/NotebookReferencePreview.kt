@@ -42,7 +42,7 @@ import com.letta.mobile.sharedui.resources.notebook_reference_refresh
 import com.letta.mobile.sharedui.resources.notebook_reference_unavailable
 import com.letta.mobile.sharedui.resources.notebook_reference_unsupported
 import com.letta.mobile.ui.markdown.SharedMarkdownText
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource

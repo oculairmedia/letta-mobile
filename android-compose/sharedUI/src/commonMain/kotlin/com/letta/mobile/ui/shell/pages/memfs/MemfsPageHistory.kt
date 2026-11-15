@@ -33,8 +33,8 @@ import com.letta.mobile.ui.components.row.LettaListRow
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.components.row.LettaListRowSpec
-import com.letta.mobile.ui.theme.LettaBusyBar
-import com.letta.mobile.ui.theme.LettaChip
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaChip
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 

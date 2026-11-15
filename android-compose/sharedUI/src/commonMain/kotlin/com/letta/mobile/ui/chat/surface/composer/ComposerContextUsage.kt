@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.chat.surface.composer
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,6 +46,8 @@ import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import org.jetbrains.compose.resources.stringResource
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 /**
  * The composer's context-window indicator and breakdown popover: how much of the agent's window
@@ -88,7 +89,12 @@ private fun ContextIndicator(text: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .clip(MaterialTheme.shapes.small)
-            .clickable(onClickLabel = stringResource(Res.string.composer_context_show_breakdown), role = Role.Button, onClick = onClick)
+            .lettaClickable(
+                role = Role.Button,
+                onClickLabel = stringResource(Res.string.composer_context_show_breakdown),
+                target = LettaClickTarget.Inline,
+                onClick = onClick,
+            )
             .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.hair)
             .testTag(ComposerTestTags.CONTEXT_CHIP),
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),

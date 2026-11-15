@@ -37,10 +37,27 @@ object ModelAdminHandlers {
         val nativeClient = tiers.nativeClient
         router.register("model.list") { params -> listModels(nativeClient, exposure, params) }
         router.register("model.update") { params -> updateModel(tiers, params) }
+        router.registerScoped("toolset.update") { params, context -> updateToolset(nativeClient, params, context) }
         router.register("model.exposure.get") { exposureState(exposure.decisions()) }
         router.register("model.exposure.set") { params -> setExposure(exposure, params) }
         router.register("model.list.embedding") { NativeAdminCatalogs.embeddingModelCatalog() }
         ProviderAdminHandlers.register(router, nativeClient)
+    }
+
+    private suspend fun updateToolset(client: AppServerClient?, params: JsonObject?, context: AdminRpcRequestContext): JsonObject {
+        val agentId = params.requireParam(AdminParamKey("agent_id"))
+        val conversationId = params.requireParam(AdminParamKey("conversation_id"))
+        val preference = params.requireParam(AdminParamKey("toolset_preference"))
+        if (preference.isBlank()) adminError("toolset_preference required")
+        if (!context.canAccessConversation(conversationId)) adminError("forbidden: conversation not in this device's scope")
+        return NativeAdmin.require(client, NativeAdminOp.ToolsetUpdate) { native ->
+            val response = native.updateToolset(AppServerCommand.UpdateToolset(
+                requestId = NativeAdmin.requestId(), toolsetPreference = preference,
+                runtime = com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(agentId, conversationId),
+            ))
+            if (!response.success) adminError(response.error ?: "update_toolset failed")
+            buildJsonObject { response.currentToolset?.let { put("current_toolset", it) } }
+        }
     }
 
     private suspend fun listModels(
@@ -124,5 +141,5 @@ object ModelAdminHandlers {
     val EXPOSURE_METHODS: Set<String> = setOf("model.exposure.get", "model.exposure.set")
 
     val METHODS: Set<String> =
-        setOf("model.list", "model.update") + CONSTANT_CATALOG_METHODS + EXPOSURE_METHODS + ProviderAdminHandlers.METHODS
+        setOf("model.list", "model.update", "toolset.update") + CONSTANT_CATALOG_METHODS + EXPOSURE_METHODS + ProviderAdminHandlers.METHODS
 }
