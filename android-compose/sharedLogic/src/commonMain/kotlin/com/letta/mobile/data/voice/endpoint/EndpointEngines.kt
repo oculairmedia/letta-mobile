@@ -5,8 +5,12 @@ import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioEncoding
+import com.letta.mobile.data.voice.audio.PcmChunk
+import com.letta.mobile.data.voice.audio.pcm.WavStreamDecoder
 import com.letta.mobile.data.voice.consent.VoiceEndpointGrantSource
 import com.letta.mobile.data.voice.consent.VoiceEndpointPayload
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 
 /** Refuses a request whose destination the person has not granted for its payload. */
 private fun SpeechEndpointClient.requireGrant(
@@ -38,9 +42,10 @@ class EndpointTranscriber(
 }
 
 /**
- * The synthesis half of [EndpointVoiceMouth]: one text segment to one audio clip through the
- * client's speech endpoint (for example a Qwen3-TTS server with a cloned voice). Checks for a grant
- * naming that endpoint for [VoiceEndpointPayload.TEXT_FOR_SYNTHESIS] before every request.
+ * The synthesis half of [EndpointVoiceMouth]: one text segment to audio through the client's speech
+ * endpoint (for example a Qwen3-TTS server with a cloned voice), as one clip ([synthesize]) or as
+ * PCM while it streams in ([stream]). Checks for a grant naming that endpoint for
+ * [VoiceEndpointPayload.TEXT_FOR_SYNTHESIS] before every request.
  */
 class EndpointSpeechSynthesizer(
     private val client: SpeechEndpointClient,
@@ -52,5 +57,21 @@ class EndpointSpeechSynthesizer(
     suspend fun synthesize(text: VoiceText): AudioClip {
         client.requireGrant(grants, VoiceEndpointPayload.TEXT_FOR_SYNTHESIS, SpeechOperation.SPEECH)
         return client.synthesizeClip(SpeechRequest(text, settings.speechModel, settings.voice, encoding))
+    }
+
+    /**
+     * [text] as 16-bit PCM, emitted as each part of the response arrives rather than after the
+     * whole body. Always asks for WAVE, whatever this synthesizer's clip encoding: the streamed
+     * header carries the sample rate, which headerless PCM would not (and compressed formats are
+     * generated whole before they are sent). Collecting sends the request; cancelling the collector
+     * closes it. A response that is not 16-bit PCM WAVE fails with a [SpeechEndpointException]
+     * carrying BAD_RESPONSE or UNSUPPORTED_FORMAT.
+     */
+    fun stream(text: VoiceText): Flow<PcmChunk> = channelFlow {
+        client.requireGrant(grants, VoiceEndpointPayload.TEXT_FOR_SYNTHESIS, SpeechOperation.SPEECH)
+        val decoder = WavStreamDecoder()
+        val request = SpeechRequest(text, settings.speechModel, settings.voice, AudioEncoding.WAV)
+        client.synthesize(request) { chunk -> decoder.push(chunk.bytes)?.let { send(it) } }
+        if (!decoder.started) throw SpeechEndpointException(SpeechOperation.SPEECH, VoiceErrorCode.BAD_RESPONSE)
     }
 }

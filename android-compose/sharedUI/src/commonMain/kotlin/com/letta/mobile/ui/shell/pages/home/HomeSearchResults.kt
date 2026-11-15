@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.shell.pages.home
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,11 +23,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.home.HomeSearchState
 import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.foundation.lettaClickable
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
@@ -96,7 +96,15 @@ private fun LazyListScope.searchSection(section: SearchSection) {
 @Composable
 private fun SectionHeader(section: SearchSection, expanded: Boolean, onToggle: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable(onClick = onToggle).padding(vertical = LettaDimens.Space.xs),
+        modifier = Modifier
+            .fillMaxWidth()
+            .lettaClickable(
+                role = Role.Button,
+                onClickLabel = if (expanded) COLLAPSE_LABEL else EXPAND_LABEL,
+                shape = MaterialTheme.shapes.small,
+                onClick = onToggle,
+            )
+            .padding(vertical = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(section.title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
@@ -143,4 +151,6 @@ private const val MESSAGES_LABEL = "Messages"
 private const val MESSAGE_FALLBACK = "Message"
 private const val UNNAMED_BLOCK = "Unnamed"
 private const val NO_RESULTS = "No results found"
+private const val EXPAND_LABEL = "Expand"
+private const val COLLAPSE_LABEL = "Collapse"
 private const val MESSAGE_LINES = 3
