@@ -108,7 +108,8 @@ class SharedSurfaceGeometryTest {
     }
 
     private fun ComposeUiTest.assertInside(key: String, width: Dp, byText: Boolean = false) {
-        val node = if (byText) onNodeWithText(key) else onNodeWithTag(key)
+        // The unmerged tree: a part inside a clickable row merges into the row in the merged one.
+        val node = if (byText) onNodeWithText(key, useUnmergedTree = true) else onNodeWithTag(key, useUnmergedTree = true)
         val bounds = node.getBoundsInRoot()
         assertTrue(bounds.left >= 0.dp && bounds.right <= width, "$key stays inside $width (${bounds.left}..${bounds.right})")
     }
