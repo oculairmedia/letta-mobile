@@ -73797,6 +73797,493 @@ public abstract interface class com/letta/mobile/data/voice/engine/VoiceResponde
 	public abstract fun respond (Lcom/letta/mobile/data/voice/VoiceUtterance;)Lcom/letta/mobile/data/voice/engine/VoiceReply;
 }
 
+public final class com/letta/mobile/data/voice/host/HostSpeechSetup {
+	public static final field Companion Lcom/letta/mobile/data/voice/host/HostSpeechSetup$Companion;
+	public fun <init> ()V
+	public fun <init> (ZLjava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (ZLjava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (ZLjava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/voice/host/HostSpeechSetup;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/host/HostSpeechSetup;ZLjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/host/HostSpeechSetup;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAvailable ()Z
+	public final fun getModel ()Ljava/lang/String;
+	public final fun getVoice ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/voice/host/HostSpeechSetup$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/host/HostSpeechSetup$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/voice/host/HostSpeechSetup;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/voice/host/HostSpeechSetup;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostSpeechSetup$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostTranscriptionSetup {
+	public static final field Companion Lcom/letta/mobile/data/voice/host/HostTranscriptionSetup$Companion;
+	public fun <init> ()V
+	public fun <init> (ZLjava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (ZLjava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (ZLjava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/voice/host/HostTranscriptionSetup;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/host/HostTranscriptionSetup;ZLjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/host/HostTranscriptionSetup;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAvailable ()Z
+	public final fun getLanguage ()Ljava/lang/String;
+	public final fun getModel ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/voice/host/HostTranscriptionSetup$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/host/HostTranscriptionSetup$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/voice/host/HostTranscriptionSetup;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/voice/host/HostTranscriptionSetup;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostTranscriptionSetup$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceCatalogEntry {
+	public static final field Companion Lcom/letta/mobile/data/voice/host/HostVoiceCatalogEntry$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/voice/host/HostVoiceCatalogEntry;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/host/HostVoiceCatalogEntry;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/host/HostVoiceCatalogEntry;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/voice/host/HostVoiceCatalogEntry$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/host/HostVoiceCatalogEntry$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/voice/host/HostVoiceCatalogEntry;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/voice/host/HostVoiceCatalogEntry;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceCatalogEntry$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceConnectionCandidate {
+	public static final field Companion Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidate$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/model/provider/wire/SecretWriteValue;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/model/provider/wire/SecretWriteValue;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getApiKey ()Lcom/letta/mobile/data/model/provider/wire/SecretWriteValue;
+	public final fun getBaseUrl-QU7wm-U ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceConnectionCandidate$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceConnectionCandidateSerializer : kotlinx/serialization/KSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidateSerializer;
+	public fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidate;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidate;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceConsent {
+	public static final field Companion Lcom/letta/mobile/data/voice/host/HostVoiceConsent$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/voice/host/HostVoiceGrants;Ljava/lang/Long;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/voice/host/HostVoiceGrants;Ljava/lang/Long;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/host/HostVoiceGrants;
+	public final fun component3 ()Ljava/lang/Long;
+	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/data/voice/host/HostVoiceGrants;Ljava/lang/Long;)Lcom/letta/mobile/data/voice/host/HostVoiceConsent;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/host/HostVoiceConsent;Ljava/lang/String;Lcom/letta/mobile/data/voice/host/HostVoiceGrants;Ljava/lang/Long;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/host/HostVoiceConsent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getGrantedAtMs ()Ljava/lang/Long;
+	public final fun getGrants ()Lcom/letta/mobile/data/voice/host/HostVoiceGrants;
+	public final fun getOrigin ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/voice/host/HostVoiceConsent$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/host/HostVoiceConsent$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/voice/host/HostVoiceConsent;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/voice/host/HostVoiceConsent;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceConsent$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/data/voice/host/HostVoiceEndpoint {
+	public abstract fun clearSetup (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun clearSetup$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun models (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun status (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun synthesize-8iZQIHs (Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+	public abstract fun testConnection (Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun testConnection$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidate;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun transcribe-SW44lzk (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun transcribe-SW44lzk$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun writeSetup (Lcom/letta/mobile/data/voice/host/HostVoiceSetupCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceEndpoint$DefaultImpls {
+	public static synthetic fun clearSetup$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun testConnection$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidate;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun transcribe-SW44lzk$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceEndpointChoice {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-QU7wm-U ()Ljava/lang/String;
+	public final fun component2-51y9yWM ()Ljava/lang/String;
+	public final fun component3-51y9yWM ()Ljava/lang/String;
+	public final fun component4-TO5Ku9Y ()Ljava/lang/String;
+	public final fun component5-VV7C9BA ()Ljava/lang/String;
+	public final fun copy-IBqnw74 (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/voice/host/HostVoiceEndpointChoice;
+	public static synthetic fun copy-IBqnw74$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpointChoice;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/host/HostVoiceEndpointChoice;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBaseUrl-QU7wm-U ()Ljava/lang/String;
+	public final fun getLanguage-VV7C9BA ()Ljava/lang/String;
+	public final fun getSpeechModel-51y9yWM ()Ljava/lang/String;
+	public final fun getTranscriptionModel-51y9yWM ()Ljava/lang/String;
+	public final fun getVoice-TO5Ku9Y ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceErrorCode : java/lang/Enum {
+	public static final field BUSY Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field CANCELLED Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field CONSENT_REQUIRED Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field Companion Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode$Companion;
+	public static final field INSECURE_TRANSPORT Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field INTERNAL Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field INVALID_REQUEST Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field NOT_AUTHORIZED Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field NOT_CONFIGURED Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field PAYLOAD_TOO_LARGE Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field REVISION_CONFLICT Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field UNSUPPORTED Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field UPSTREAM_BAD_RESPONSE Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field UPSTREAM_REJECTED Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field UPSTREAM_TIMEOUT Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field UPSTREAM_UNAUTHORIZED Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field UPSTREAM_UNREACHABLE Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getRetryable ()Z
+	public final fun getVoiceCode ()Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public final fun getWire ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static fun values ()[Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceErrorCode$Companion {
+	public final fun fromWire (Ljava/lang/String;)Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceException : java/lang/Exception {
+	public fun <init> (Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;)V
+	public final fun getCode ()Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceGrants {
+	public static final field Companion Lcom/letta/mobile/data/voice/host/HostVoiceGrants$Companion;
+	public fun <init> ()V
+	public fun <init> (ZZ)V
+	public synthetic fun <init> (ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Z
+	public final fun copy (ZZ)Lcom/letta/mobile/data/voice/host/HostVoiceGrants;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/host/HostVoiceGrants;ZZILjava/lang/Object;)Lcom/letta/mobile/data/voice/host/HostVoiceGrants;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAudioForTranscription ()Z
+	public final fun getTextForSynthesis ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/voice/host/HostVoiceGrants$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/host/HostVoiceGrants$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/voice/host/HostVoiceGrants;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/voice/host/HostVoiceGrants;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceGrants$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/data/voice/host/HostVoiceKeyChange {
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceKeyChange$Keep : com/letta/mobile/data/voice/host/HostVoiceKeyChange {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/host/HostVoiceKeyChange$Keep;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceKeyChange$Remove : com/letta/mobile/data/voice/host/HostVoiceKeyChange {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/host/HostVoiceKeyChange$Remove;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceKeyChange$Replace : com/letta/mobile/data/voice/host/HostVoiceKeyChange {
+	public fun <init> (Lcom/letta/mobile/data/model/provider/wire/SecretWriteValue;)V
+	public final fun getKey ()Lcom/letta/mobile/data/model/provider/wire/SecretWriteValue;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceListSource : java/lang/Enum {
+	public static final field CONFIGURED Lcom/letta/mobile/data/voice/host/HostVoiceListSource;
+	public static final field Companion Lcom/letta/mobile/data/voice/host/HostVoiceListSource$Companion;
+	public static final field UPSTREAM Lcom/letta/mobile/data/voice/host/HostVoiceListSource;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/host/HostVoiceListSource;
+	public static fun values ()[Lcom/letta/mobile/data/voice/host/HostVoiceListSource;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceListSource$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceModels {
+	public static final field Companion Lcom/letta/mobile/data/voice/host/HostVoiceModels$Companion;
+	public fun <init> (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/voice/host/HostVoiceListSource;J)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Lcom/letta/mobile/data/voice/host/HostVoiceListSource;
+	public final fun component4 ()J
+	public final fun copy (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/voice/host/HostVoiceListSource;J)Lcom/letta/mobile/data/voice/host/HostVoiceModels;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/host/HostVoiceModels;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/voice/host/HostVoiceListSource;JILjava/lang/Object;)Lcom/letta/mobile/data/voice/host/HostVoiceModels;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCheckedAtMs ()J
+	public final fun getModels ()Ljava/util/List;
+	public final fun getVoices ()Ljava/util/List;
+	public final fun getVoicesSource ()Lcom/letta/mobile/data/voice/host/HostVoiceListSource;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/voice/host/HostVoiceModels$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/host/HostVoiceModels$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/voice/host/HostVoiceModels;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/voice/host/HostVoiceModels;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceModels$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceReachability {
+	public static final field Companion Lcom/letta/mobile/data/voice/host/HostVoiceReachability$Companion;
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/voice/host/HostVoiceReachabilityState;Ljava/lang/Long;Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/host/HostVoiceReachabilityState;Ljava/lang/Long;Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/host/HostVoiceReachabilityState;
+	public final fun component2 ()Ljava/lang/Long;
+	public final fun component3 ()Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public final fun copy (Lcom/letta/mobile/data/voice/host/HostVoiceReachabilityState;Ljava/lang/Long;Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;)Lcom/letta/mobile/data/voice/host/HostVoiceReachability;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/host/HostVoiceReachability;Lcom/letta/mobile/data/voice/host/HostVoiceReachabilityState;Ljava/lang/Long;Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/host/HostVoiceReachability;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCheckedAtMs ()Ljava/lang/Long;
+	public final fun getError ()Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public final fun getState ()Lcom/letta/mobile/data/voice/host/HostVoiceReachabilityState;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/voice/host/HostVoiceReachability$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/host/HostVoiceReachability$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/voice/host/HostVoiceReachability;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/voice/host/HostVoiceReachability;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceReachability$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceReachabilityState : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/data/voice/host/HostVoiceReachabilityState$Companion;
+	public static final field FAILED Lcom/letta/mobile/data/voice/host/HostVoiceReachabilityState;
+	public static final field REACHABLE Lcom/letta/mobile/data/voice/host/HostVoiceReachabilityState;
+	public static final field UNKNOWN Lcom/letta/mobile/data/voice/host/HostVoiceReachabilityState;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/host/HostVoiceReachabilityState;
+	public static fun values ()[Lcom/letta/mobile/data/voice/host/HostVoiceReachabilityState;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceReachabilityState$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceSetupCommand {
+	public static final field Companion Lcom/letta/mobile/data/voice/host/HostVoiceSetupCommand$Companion;
+	public fun <init> (Lcom/letta/mobile/data/voice/host/HostVoiceEndpointChoice;Lcom/letta/mobile/data/voice/host/HostVoiceKeyChange;Lcom/letta/mobile/data/voice/host/HostVoiceGrants;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/host/HostVoiceEndpointChoice;Lcom/letta/mobile/data/voice/host/HostVoiceKeyChange;Lcom/letta/mobile/data/voice/host/HostVoiceGrants;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getApiKey ()Lcom/letta/mobile/data/voice/host/HostVoiceKeyChange;
+	public final fun getEndpoint ()Lcom/letta/mobile/data/voice/host/HostVoiceEndpointChoice;
+	public final fun getExpectedRevision ()Ljava/lang/String;
+	public final fun getGrants ()Lcom/letta/mobile/data/voice/host/HostVoiceGrants;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceSetupCommand$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceSetupCommandSerializer : kotlinx/serialization/KSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/host/HostVoiceSetupCommandSerializer;
+	public fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/voice/host/HostVoiceSetupCommand;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/voice/host/HostVoiceSetupCommand;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceSetupStatus {
+	public static final field Companion Lcom/letta/mobile/data/voice/host/HostVoiceSetupStatus$Companion;
+	public fun <init> (IZLjava/lang/String;Ljava/lang/String;ZLcom/letta/mobile/data/voice/host/HostTranscriptionSetup;Lcom/letta/mobile/data/voice/host/HostSpeechSetup;Lcom/letta/mobile/data/voice/host/HostVoiceConsent;Lcom/letta/mobile/data/voice/host/HostVoiceReachability;)V
+	public synthetic fun <init> (IZLjava/lang/String;Ljava/lang/String;ZLcom/letta/mobile/data/voice/host/HostTranscriptionSetup;Lcom/letta/mobile/data/voice/host/HostSpeechSetup;Lcom/letta/mobile/data/voice/host/HostVoiceConsent;Lcom/letta/mobile/data/voice/host/HostVoiceReachability;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Z
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Z
+	public final fun component6 ()Lcom/letta/mobile/data/voice/host/HostTranscriptionSetup;
+	public final fun component7 ()Lcom/letta/mobile/data/voice/host/HostSpeechSetup;
+	public final fun component8 ()Lcom/letta/mobile/data/voice/host/HostVoiceConsent;
+	public final fun component9 ()Lcom/letta/mobile/data/voice/host/HostVoiceReachability;
+	public final fun copy (IZLjava/lang/String;Ljava/lang/String;ZLcom/letta/mobile/data/voice/host/HostTranscriptionSetup;Lcom/letta/mobile/data/voice/host/HostSpeechSetup;Lcom/letta/mobile/data/voice/host/HostVoiceConsent;Lcom/letta/mobile/data/voice/host/HostVoiceReachability;)Lcom/letta/mobile/data/voice/host/HostVoiceSetupStatus;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/host/HostVoiceSetupStatus;IZLjava/lang/String;Ljava/lang/String;ZLcom/letta/mobile/data/voice/host/HostTranscriptionSetup;Lcom/letta/mobile/data/voice/host/HostSpeechSetup;Lcom/letta/mobile/data/voice/host/HostVoiceConsent;Lcom/letta/mobile/data/voice/host/HostVoiceReachability;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/host/HostVoiceSetupStatus;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBaseUrl ()Ljava/lang/String;
+	public final fun getConfigured ()Z
+	public final fun getConsent ()Lcom/letta/mobile/data/voice/host/HostVoiceConsent;
+	public final fun getContractVersion ()I
+	public final fun getHasApiKey ()Z
+	public final fun getReachability ()Lcom/letta/mobile/data/voice/host/HostVoiceReachability;
+	public final fun getRevision ()Ljava/lang/String;
+	public final fun getSpeech ()Lcom/letta/mobile/data/voice/host/HostSpeechSetup;
+	public final fun getTranscription ()Lcom/letta/mobile/data/voice/host/HostTranscriptionSetup;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/voice/host/HostVoiceSetupStatus$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/host/HostVoiceSetupStatus$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/voice/host/HostVoiceSetupStatus;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/voice/host/HostVoiceSetupStatus;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceSetupStatus$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceTestResult {
+	public static final field Companion Lcom/letta/mobile/data/voice/host/HostVoiceTestResult$Companion;
+	public fun <init> (IJ)V
+	public final fun component1 ()I
+	public final fun component2 ()J
+	public final fun copy (IJ)Lcom/letta/mobile/data/voice/host/HostVoiceTestResult;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/host/HostVoiceTestResult;IJILjava/lang/Object;)Lcom/letta/mobile/data/voice/host/HostVoiceTestResult;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCheckedAtMs ()J
+	public final fun getModelCount ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/voice/host/HostVoiceTestResult$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/host/HostVoiceTestResult$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/voice/host/HostVoiceTestResult;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/voice/host/HostVoiceTestResult;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceTestResult$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/voice/host/HostVoiceWire {
+	public static final field CANCEL_FRAME_TYPE Ljava/lang/String;
+	public static final field CAPABILITY Ljava/lang/String;
+	public static final field CONTRACT_VERSION I
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/host/HostVoiceWire;
+	public static final field MAX_SPEECH_TEXT_CHARS I
+	public static final field MAX_STREAM_AUDIO_BYTES I
+	public static final field MAX_TRANSCRIPTION_AUDIO_BYTES I
+	public static final field MAX_TRANSCRIPTION_AUDIO_MS J
+	public static final field MODELS_LIST Ljava/lang/String;
+	public static final field SETUP_CLEAR Ljava/lang/String;
+	public static final field SETUP_GET Ljava/lang/String;
+	public static final field SETUP_SET Ljava/lang/String;
+	public static final field SETUP_TEST Ljava/lang/String;
+	public static final field SPEECH Ljava/lang/String;
+	public static final field STREAM_FRAME_TYPE Ljava/lang/String;
+	public static final field TRANSCRIBE Ljava/lang/String;
+	public final fun getMETHODS ()Ljava/util/Set;
+}
+
 public final class com/letta/mobile/data/voice/loop/VoiceEngines {
 	public fun <init> (Lcom/letta/mobile/data/voice/engine/VoiceEar;Lcom/letta/mobile/data/voice/engine/VoiceResponder;Lcom/letta/mobile/data/voice/engine/VoiceMouth;)V
 	public final fun component1 ()Lcom/letta/mobile/data/voice/engine/VoiceEar;
