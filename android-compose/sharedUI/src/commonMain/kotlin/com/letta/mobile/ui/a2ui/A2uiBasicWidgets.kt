@@ -891,25 +891,7 @@ internal fun A2uiModal(
             { Text(title) }
         },
         text = {
-            if (child == null) {
-                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
-            } else {
-                val childComponent = surface.components[child]
-                if (childComponent == null) {
-                    A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
-                } else {
-                    A2uiComponentNode(
-                        component = childComponent,
-                        surface = surface,
-                        visited = visited,
-                        onAction = onAction,
-                        surfaceSubmitting = surfaceSubmitting,
-                        onPendingActionDelta = onPendingActionDelta,
-                        actionResolutionToken = actionResolutionToken,
-                        renderScope = renderScope,
-                    )
-                }
-            }
+            A2uiFirstChild(child, surface, visited, onAction, surfaceSubmitting, onPendingActionDelta, actionResolutionToken, renderScope)
         },
         confirmButton = {
             TextButton(onClick = { dismissed = true }) {
@@ -1025,27 +1007,38 @@ internal fun A2uiCard(
     ) {
         val child = component.child ?: component.children.firstOrNull()
         Box(modifier = Modifier.padding(LettaDimens.Space.lg)) {
-            if (child == null) {
-                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
-            } else {
-                val childComponent = surface.components[child]
-                if (childComponent == null) {
-                    A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
-                } else {
-                    A2uiComponentNode(
-                        component = childComponent,
-                        surface = surface,
-                        visited = visited,
-                        onAction = onAction,
-                        surfaceSubmitting = surfaceSubmitting,
-                        onPendingActionDelta = onPendingActionDelta,
-                        actionResolutionToken = actionResolutionToken,
-                        renderScope = renderScope,
-                    )
-                }
-            }
+            A2uiFirstChild(child, surface, visited, onAction, surfaceSubmitting, onPendingActionDelta, actionResolutionToken, renderScope)
         }
     }
+}
+
+/** The one child a container (a Card, a Modal) wraps, or a placeholder when it is missing. */
+@Composable
+private fun A2uiFirstChild(
+    child: String?,
+    surface: A2uiSurfaceState,
+    visited: Set<String>,
+    onAction: (A2uiAction) -> Unit,
+    surfaceSubmitting: Boolean,
+    onPendingActionDelta: (Int) -> Unit,
+    actionResolutionToken: Int,
+    renderScope: A2uiRenderScope,
+) {
+    val childComponent = child?.let { surface.components[it] }
+    if (childComponent == null) {
+        A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
+        return
+    }
+    A2uiComponentNode(
+        component = childComponent,
+        surface = surface,
+        visited = visited,
+        onAction = onAction,
+        surfaceSubmitting = surfaceSubmitting,
+        onPendingActionDelta = onPendingActionDelta,
+        actionResolutionToken = actionResolutionToken,
+        renderScope = renderScope,
+    )
 }
 
 @Composable
