@@ -185,6 +185,8 @@ Conversation system-prompt recompile requests and their Iroh RPC adapter. Recomp
 
 # Package com.letta.mobile.data.chat.routing
 
+Composer submission routing captures the current graph and conversation, preserves client-local routes, and projects confirmed command output and retryable errors.
+
 Target-conversation selection when following an inter-agent message. Sender and recipient have separate conversation spaces, so navigation cannot assume one shared conversation identifier. Keep navigation and conversation creation outside recipient selection; callers supply conversation candidates to [pickOtherAgentConversation](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.routing/pick-other-agent-conversation.html).
 
 # Package com.letta.mobile.data.chat.runtime
@@ -937,6 +939,6 @@ Existing Home shortcut identities, separated from Home controllers and storage. 
 
 Portable slash-command listing contracts, advertised rows and built-in descriptions. They do not depend on composer routing or the App Server protocol; the session graph constructs the protocol adapter over these contracts.
 
-# Package com.letta.mobile.ui.chat.commands
+# Package com.letta.mobile.data.transport.delivery
 
-Composer submission routing for host-advertised slash commands. The shared session decorator captures a graph and conversation before execution, preserves client-local commands, reports confirmed output through the existing live-command status and keeps failed drafts available for retry.
+Internal delivery failures shared by transport implementations; the App Server socket retains its existing bounded-drain policy.

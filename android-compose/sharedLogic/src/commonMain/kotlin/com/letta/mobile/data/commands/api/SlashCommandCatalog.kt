@@ -12,13 +12,13 @@ import kotlinx.serialization.json.contentOrNull
 internal class SlashCommandCatalog {
     private val state = MutableStateFlow(SlashCommandCatalogState())
 
-    fun ingest(agentId: String?, status: JsonObject, generation: Long? = null) {
+    fun ingest(query: SlashCommandQuery?, status: JsonObject, generation: Long? = null) {
         state.update { previous ->
             if (isStale(previous, generation)) return@update previous
             val current = if (generation != null && generation != previous.generation) SlashCommandCatalogState(generation) else previous
             current.copy(
                 supported = strings(status["supported_commands"]) ?: current.supported,
-                mods = if (agentId == null) current.mods else current.mods + (agentId to mods(status["mod_commands"])),
+                mods = if (query == null) current.mods else current.mods + (query.agentId to mods(status["mod_commands"])),
             )
         }
     }
@@ -30,7 +30,7 @@ internal class SlashCommandCatalog {
     }
 
     /** Rows and whether the host has supplied its built-in catalog, from the same snapshot. */
-    fun listing(agentId: String?): Pair<List<AgentSlashCommand>, Boolean> {
+    fun listing(query: SlashCommandQuery?): Pair<List<AgentSlashCommand>, Boolean> {
         val snapshot = state.value
         val builtin = (snapshot.supported ?: AppServerCommandDescriptions.DEFAULT_SUPPORTED_COMMANDS)
             .filterNot { it in HIDDEN }.map { id ->
@@ -40,7 +40,7 @@ internal class SlashCommandCatalog {
                 )
             }
         val ids = builtin.mapTo(mutableSetOf()) { it.command }
-        return (builtin + snapshot.mods[agentId].orEmpty().filterNot { it.command in ids }) to (snapshot.supported != null)
+        return (builtin + snapshot.mods[query?.agentId].orEmpty().filterNot { it.command in ids }) to (snapshot.supported != null)
     }
 
     private fun strings(value: JsonElement?): List<String>? = (value as? JsonArray)?.mapNotNull {

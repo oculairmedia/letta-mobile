@@ -42,7 +42,7 @@ internal fun openedChatViewModel(
 internal data class FixtureSession(
     val tag: String,
     val contextReadings: ContextTokenReadings = ContextTokenReadings(),
-    val slashCommands: com.letta.mobile.data.session.graph.AppServerSlashCommandApi? = null,
+    val slashCommands: com.letta.mobile.data.transport.appserver.AppServerSlashCommandApi? = null,
     /** The app-wide run registry the ViewModel publishes into. */
     val runRegistry: ConversationRunRegistry = ConversationRunRegistry(),
     /** The subagent registry the ViewModel's roster reads; relaxed (empty) by default. */

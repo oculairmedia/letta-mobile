@@ -56,7 +56,9 @@ class WebChatSessionPortTest {
     @Test
     fun hydratesTheConversationIntoTheSharedPageState() = runTest {
         val server = FakeAppServer(history = HISTORY)
-        val port = WebChatSessionPort(WebChatBinding(target, server.transport(), TimelineChatRunControls(), slashCommands = { null }), scope)
+        val port = WebChatSessionPort(
+            WebChatBinding(target, server.transport(), TimelineChatRunControls(), slashCommands = { null }), scope,
+        )
 
         val state = awaitState(port) { it.conversationState is ConversationState.Ready && it.messages.size == 2 }
 
@@ -68,7 +70,9 @@ class WebChatSessionPortTest {
     @Test
     fun aSendRunsATurnAndItsStreamedReplyLands() = runTest {
         val server = FakeAppServer(history = EMPTY_HISTORY, reply = REPLY_DELTA)
-        val port = WebChatSessionPort(WebChatBinding(target, server.transport(), TimelineChatRunControls(), slashCommands = { null }), scope)
+        val port = WebChatSessionPort(
+            WebChatBinding(target, server.transport(), TimelineChatRunControls(), slashCommands = { null }), scope,
+        )
         awaitState(port) { it.conversationState is ConversationState.Ready }
 
         port.actions.updateComposerText("ping")

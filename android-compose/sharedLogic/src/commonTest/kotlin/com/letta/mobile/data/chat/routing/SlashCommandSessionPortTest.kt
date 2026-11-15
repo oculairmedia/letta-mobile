@@ -1,5 +1,6 @@
-package com.letta.mobile.ui.chat.commands
+package com.letta.mobile.data.chat.routing
 
+import com.letta.mobile.data.commands.api.SlashCommandQuery
 import com.letta.mobile.data.session.graph.SharedSessionGraph
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -10,6 +11,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.ui.chat.session.FakeChatSessionPort
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -36,6 +38,7 @@ class SlashCommandSessionPortTest {
             val owner = FakeChatSessionPort()
             val target = AppServerRuntimeScope("agent-$platform", "conversation-$platform")
             val port = SlashCommandSessionPort(owner, backgroundScope) { api to target }
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.liveStatus.collect {} }
             owner.actions.updateComposerText("/deploy staging --check")
             port.actions.send()
             runCurrent()
@@ -56,12 +59,13 @@ class SlashCommandSessionPortTest {
         val api = SharedSessionGraph.transportBound(channel, backgroundScope).slashCommands
         val owner = FakeChatSessionPort()
         val port = SlashCommandSessionPort(owner, backgroundScope) { api to AppServerRuntimeScope("a", "c") }
-        for (text in listOf("hello", "/recompile", "/fork new branch", "/unknown args")) {
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.liveStatus.collect {} }
+        for (text in listOf("hello", "/recompile", "/fork new branch", "/bug project", "/goal status", "/unknown args")) {
             owner.actions.updateComposerText(text)
             port.actions.send()
             runCurrent()
         }
-        assertEquals(listOf("hello", "/recompile", "/fork new branch", "/unknown args"), owner.sent)
+        assertEquals(listOf("hello", "/recompile", "/fork new branch", "/bug project", "/goal status", "/unknown args"), owner.sent)
         assertTrue(channel.executions.isEmpty())
     }
 
@@ -71,6 +75,7 @@ class SlashCommandSessionPortTest {
         val api = SharedSessionGraph.transportBound(channel, backgroundScope).slashCommands
         val owner = FakeChatSessionPort()
         val port = SlashCommandSessionPort(owner, backgroundScope) { api to AppServerRuntimeScope("a", "c") }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.liveStatus.collect {} }
         owner.actions.updateComposerText("/deploy")
         port.actions.send()
         runCurrent()
@@ -86,6 +91,7 @@ class SlashCommandSessionPortTest {
         val owner = FakeChatSessionPort()
         var target = AppServerRuntimeScope("a", "old")
         val port = SlashCommandSessionPort(owner, backgroundScope) { api to target }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.liveStatus.collect {} }
         owner.actions.updateComposerText("/deploy")
         port.actions.send()
         target = AppServerRuntimeScope("a", "new")
@@ -101,6 +107,7 @@ class SlashCommandSessionPortTest {
         val api = SharedSessionGraph.transportBound(channel, backgroundScope).slashCommands
         val owner = FakeChatSessionPort()
         val port = SlashCommandSessionPort(owner, backgroundScope) { api to AppServerRuntimeScope("a", "c") }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.liveStatus.collect {} }
         owner.actions.updateComposerText("/deploy")
         port.actions.send()
         port.actions.send()
@@ -116,7 +123,9 @@ class SlashCommandSessionPortTest {
         port.actions.send()
         runCurrent()
         assertEquals(2, channel.executions.size)
-        assertNotEquals(firstActivity, port.liveStatus.value.commands.single().commandId, "a dismissed result must not hide the next result")
+        assertNotEquals(
+            firstActivity, port.liveStatus.value.commands.single().commandId, "a dismissed result must not hide the next result",
+        )
     }
 
     @Test
@@ -128,6 +137,7 @@ class SlashCommandSessionPortTest {
         var api = SharedSessionGraph.transportBound(channel, backgroundScope).slashCommands
         val owner = FakeChatSessionPort()
         val port = SlashCommandSessionPort(owner, backgroundScope) { api to AppServerRuntimeScope("a", "c") }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.liveStatus.collect {} }
         owner.actions.updateComposerText("/deploy")
         port.actions.send()
         runCurrent()
@@ -150,10 +160,10 @@ class SlashCommandSessionPortTest {
                 "device_status":{"supported_commands":["doctor"],"mod_commands":[{"id":"deploy","description":"Deploy safely"}]}}""",
         ))
         runCurrent()
-        val commands = api.listAgentSlashCommands("a")
+        val commands = api.listAgentSlashCommands(SlashCommandQuery("a"))
         assertEquals(listOf("doctor", "deploy"), commands.map { it.command })
         assertEquals("Deploy safely", commands.last().description)
-        assertEquals(listOf("doctor"), api.listAgentSlashCommands("other").map { it.command })
+        assertEquals(listOf("doctor"), api.listAgentSlashCommands(SlashCommandQuery("other")).map { it.command })
         val runtime = AppServerRuntimeScope("a", "c")
         api.executeCommand("deploy", "staging", runtime)
         assertEquals(runtime, client.executed?.runtime)
@@ -163,7 +173,9 @@ class SlashCommandSessionPortTest {
     private class DirectClient : AppServerClient {
         override val events = MutableSharedFlow<AppServerReceivedFrame>(replay = 1)
         var executed: AppServerCommand.ExecuteCommand? = null
-        override suspend fun executeCommand(command: AppServerCommand.ExecuteCommand): AppServerInboundFrame.ExecuteCommandResponse {
+        override suspend fun executeCommand(
+            command: AppServerCommand.ExecuteCommand,
+        ): AppServerInboundFrame.ExecuteCommandResponse {
             executed = command
             return AppServerInboundFrame.ExecuteCommandResponse(command.requestId, true)
         }
@@ -172,7 +184,9 @@ class SlashCommandSessionPortTest {
         override suspend fun sync(command: AppServerCommand.Sync) = error("Unexpected sync")
         override suspend fun abort(command: AppServerCommand.AbortMessage) = error("Unexpected abort")
         override suspend fun adminRpc(command: AppServerCommand.AdminRpc) = error("Unexpected admin RPC")
-        override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse): Unit = error("Unexpected tool response")
+        override suspend fun sendExternalToolResponse(
+            command: AppServerCommand.ExternalToolCallResponse,
+        ): Unit = error("Unexpected tool response")
     }
 
     private class CommandChannel : NoOpChannelTransport() {

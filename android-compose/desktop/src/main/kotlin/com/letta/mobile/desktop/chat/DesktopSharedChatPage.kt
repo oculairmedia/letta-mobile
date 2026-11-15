@@ -99,7 +99,7 @@ internal data class DesktopSharedChatPageNavigation(
 
 internal data class DesktopSharedChatPageState(
     val port: DesktopChatSessionPort,
-    val slashCommands: com.letta.mobile.ui.chat.commands.SlashCommandBinding,
+    val slashCommands: com.letta.mobile.data.chat.routing.SlashCommandBinding,
     val pagedTimeline: CanonicalTimelinePresentation?,
     val hostInputs: ChatComposerHostInputs,
     /** Tints the ambient glow "failed" (the controller keeps its error until the next send). */

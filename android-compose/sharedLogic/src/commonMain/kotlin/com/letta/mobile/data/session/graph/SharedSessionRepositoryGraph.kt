@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session.graph
 
+import com.letta.mobile.data.transport.appserver.AppServerSlashCommandApi
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.context.ContextBreakdownLoader
 import com.letta.mobile.data.context.ContextTokenReadings

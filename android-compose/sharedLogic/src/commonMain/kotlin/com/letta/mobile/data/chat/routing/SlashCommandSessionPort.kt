@@ -1,11 +1,12 @@
-package com.letta.mobile.ui.chat.commands
+package com.letta.mobile.data.chat.routing
 
+import com.letta.mobile.data.commands.api.SlashCommandQuery
 import com.letta.mobile.data.chat.branch.BranchSlashCommand
 import com.letta.mobile.data.commands.ClientSlashCommand
 import com.letta.mobile.data.runtime.CommandActivity
 import com.letta.mobile.data.runtime.CommandState
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
-import com.letta.mobile.data.session.graph.AppServerSlashCommandApi
+import com.letta.mobile.data.transport.appserver.AppServerSlashCommandApi
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSessionPort
@@ -34,6 +35,7 @@ class SlashCommandSessionPort(
     private var submission: Job? = null
     private var activityTarget: Pair<AppServerSlashCommandApi, AppServerRuntimeScope>? = null
     private val activity = MutableStateFlow<CommandActivity?>(null)
+    private val clientRoutedCommands = setOf(BranchSlashCommand.FORK, BranchSlashCommand.BTW, "bug", "goal")
 
     override val liveStatus: StateFlow<RuntimeLiveStatus> = combine(
         delegate.liveStatus, activity, delegate.uiState,
@@ -41,7 +43,7 @@ class SlashCommandSessionPort(
         if (command == null || activityTarget != binding.capture()) live else {
             live.copy(commands = live.commands.filterNot { it.commandId == command.commandId } + command)
         }
-    }.stateIn(scope, SharingStarted.Eagerly, delegate.liveStatus.value)
+    }.stateIn(scope, SharingStarted.WhileSubscribed(), delegate.liveStatus.value)
 
     override val actions: ChatActions = object : ChatActions by delegate.actions {
         override fun send() = submit(delegate.composer.value.text, clearDraft = true)
@@ -67,9 +69,11 @@ class SlashCommandSessionPort(
     }
 
     private fun isLocal(id: String): Boolean =
-        ClientSlashCommand.fromId(id) != null || id == BranchSlashCommand.FORK || id == BranchSlashCommand.BTW ||
+        ClientSlashCommand.fromId(id) != null || id in clientRoutedCommands ||
             delegate.composer.value.commands.any { !it.fillsComposer && it.id.removePrefix("/") == id }
 
+    // This UI boundary reports transport failures; cancellation still escapes to its owner.
+    @Suppress("TooGenericExceptionCaught")
     private suspend fun runCommand(request: HostCommandSubmission) {
         try {
             dispatchCommand(request)
@@ -82,7 +86,7 @@ class SlashCommandSessionPort(
     }
 
     private suspend fun dispatchCommand(request: HostCommandSubmission) {
-        val advertised = request.binding.first.listAgentSlashCommands(request.binding.second.agentId)
+        val advertised = request.binding.first.listAgentSlashCommands(SlashCommandQuery(request.binding.second.agentId))
         if (!isCurrent(request)) {
             clearActivity(request)
             return

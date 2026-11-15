@@ -1,6 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
-import com.letta.mobile.data.session.graph.AppServerSlashCommandApi
+import com.letta.mobile.data.commands.AppServerCommandDescriptions
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.GoalStatusResponse
 import com.letta.mobile.data.model.SlashCommandsResponse
@@ -40,7 +40,7 @@ class SlashCommandAndGoalAdminHandlersTest {
     fun beforeAnyDeviceStatusTheBuiltinListIsServedAndLabelled() {
         val listing = NativeSlashCommandCatalog().global()
         assertEquals(SlashCommandCatalogOrigin.BuiltinDefault, listing.origin)
-        assertEquals(AppServerSlashCommandApi.DEFAULT_SUPPORTED_COMMANDS, listing.commands.map { it.id })
+        assertEquals(AppServerCommandDescriptions.DEFAULT_SUPPORTED_COMMANDS, listing.commands.map { it.id })
     }
 
     @Test
@@ -177,6 +177,8 @@ class SlashCommandAndGoalAdminHandlersTest {
         assertEquals("doctor", received?.commandId)
         assertEquals("--verbose", received?.args)
         assertEquals("conv-1", received?.runtime?.conversationId)
+        assertEquals("agent-1", received?.runtime?.agentId)
+        assertTrue(!received?.requestId.isNullOrBlank())
         succeeds = false
         val error = dispatch(router, "slash_command.execute", params)
         assertFalse(error.getValue("success").jsonPrimitive.boolean)

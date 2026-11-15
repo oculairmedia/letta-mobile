@@ -6,6 +6,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import com.letta.mobile.ui.chat.session.ChatSessionPort
+import com.letta.mobile.data.chat.routing.SlashCommandBinding
+import com.letta.mobile.data.chat.routing.SlashCommandSessionPort
 
 /** Binds host-command submission to the page lifetime while reading the host's current target. */
 @Composable

@@ -294,7 +294,8 @@ class AdminChatSessionPortTest {
             viewModel = vm
             val owner = AdminChatSessionPort(vm, vm.viewModelScope)
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { owner.composer.collect {} }
-            val port = com.letta.mobile.ui.chat.commands.SlashCommandSessionPort(owner, vm.viewModelScope, AdminSlashCommandBinding(vm))
+            val port = com.letta.mobile.data.chat.routing.SlashCommandSessionPort(owner, vm.viewModelScope, AdminSlashCommandBinding(vm))
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.liveStatus.collect {} }
             port.actions.updateComposerText("/deploy staging --check")
             port.actions.send()
             val params = channel.executions.single()

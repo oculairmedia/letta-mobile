@@ -7,6 +7,7 @@ import com.letta.mobile.desktop.chat.TEST_ROSTER
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -34,12 +35,13 @@ class SlashCommandComposerTest {
             )
         }.create()
         try {
-            val port = com.letta.mobile.ui.chat.commands.SlashCommandSessionPort(
+            val port = com.letta.mobile.data.chat.routing.SlashCommandSessionPort(
                 owner, backgroundScope,
                 com.letta.mobile.desktop.commands.DesktopSlashCommandBinding(
                     { graph }, { controller.state.value.selectedConversation }, controller::isSelectionCurrent,
                 ),
             )
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.liveStatus.collect {} }
             port.actions.updateComposerText("/deploy staging --check")
             runCurrent()
             port.actions.send()

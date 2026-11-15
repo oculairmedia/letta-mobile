@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
-import com.letta.mobile.data.commands.api.AppServerCommandDescriptions
+import com.letta.mobile.data.commands.api.SlashCommandQuery
+import com.letta.mobile.data.commands.AppServerCommandDescriptions
 import com.letta.mobile.data.commands.api.SlashCommandCatalog
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -53,7 +54,9 @@ class NativeSlashCommandCatalog {
 
     private fun ingest(frame: AppServerInboundFrame, generation: Long?) {
         if (frame !is AppServerInboundFrame.UpdateDeviceStatus) return
-        catalog.ingest(frame.runtime.agentId.takeUnless { frame.runtime.isAgentFree }, frame.deviceStatus, generation)
+        catalog.ingest(
+            frame.runtime.agentId.takeUnless { frame.runtime.isAgentFree }?.let(::SlashCommandQuery), frame.deviceStatus, generation,
+        )
     }
 
     fun start(scope: CoroutineScope, events: Flow<AppServerReceivedFrame>): Job =
@@ -66,7 +69,7 @@ class NativeSlashCommandCatalog {
     fun forAgent(agent: AgentId): NativeSlashCommandListing = listing(agent.value)
 
     private fun listing(agent: String?): NativeSlashCommandListing {
-        val (commands, observed) = catalog.listing(agent)
+        val (commands, observed) = catalog.listing(agent?.let(::SlashCommandQuery))
         return NativeSlashCommandListing(
             commands.map { NativeSlashCommand(it.command, it.description, it.source) },
             if (observed) SlashCommandCatalogOrigin.DeviceStatus else SlashCommandCatalogOrigin.BuiltinDefault,

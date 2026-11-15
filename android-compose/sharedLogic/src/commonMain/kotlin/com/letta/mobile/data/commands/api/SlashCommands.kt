@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 /** Commands advertised for the focused agent; selection fills the composer for submission. */
 interface SlashCommandsApi : AutoCloseable {
     /** Reads the agent's host catalog, including mod metadata when the host supplies it. */
-    suspend fun listAgentSlashCommands(agentId: String): List<AgentSlashCommand>
+    suspend fun listAgentSlashCommands(query: SlashCommandQuery): List<AgentSlashCommand>
     override fun close() = Unit
 }
 
@@ -55,7 +55,10 @@ object AppServerCommandDescriptions {
         "monitor_stop" to "Stop a running background monitor",
     )
 
-    fun descriptionFor(commandId: String): String =
-        DESCRIPTIONS[commandId.removePrefix("/")] ?: "App Server command"
+    fun descriptionFor(commandName: String): String =
+        DESCRIPTIONS[commandName.removePrefix("/")] ?: "App Server command"
 }
 
+
+/** Agent-scoped wire query; keeps raw protocol identity at the request boundary. */
+data class SlashCommandQuery(val agentId: String)

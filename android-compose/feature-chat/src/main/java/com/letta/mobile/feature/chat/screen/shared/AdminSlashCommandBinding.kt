@@ -1,9 +1,9 @@
 package com.letta.mobile.feature.chat.screen.shared
 
-import com.letta.mobile.data.session.graph.AppServerSlashCommandApi
+import com.letta.mobile.data.transport.appserver.AppServerSlashCommandApi
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
-import com.letta.mobile.ui.chat.commands.SlashCommandBinding
+import com.letta.mobile.data.chat.routing.SlashCommandBinding
 
 /** The graph and conversation currently displayed by Android's chat host. */
 internal class AdminSlashCommandBinding(private val viewModel: AdminChatViewModel) : SlashCommandBinding {

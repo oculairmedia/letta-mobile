@@ -9,8 +9,8 @@ import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineTransport
 import com.letta.mobile.ui.chat.render.ChatUiState
-import com.letta.mobile.ui.chat.commands.SlashCommandSessionPort
-import com.letta.mobile.ui.chat.commands.SlashCommandBinding
+import com.letta.mobile.data.chat.routing.SlashCommandSessionPort
+import com.letta.mobile.data.chat.routing.SlashCommandBinding
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatApprovalStateSource
 import com.letta.mobile.ui.chat.session.ChatComposerHostInputs

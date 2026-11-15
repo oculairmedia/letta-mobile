@@ -3,7 +3,7 @@ package com.letta.mobile.data.repository.iroh
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.chat.send.lettaWireJson
 import com.letta.mobile.data.commands.AgentSlashCommand
-import com.letta.mobile.data.commands.SlashCommandsResponse
+import com.letta.mobile.data.commands.api.SlashCommandsResponse
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams

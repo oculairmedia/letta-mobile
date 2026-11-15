@@ -60,7 +60,10 @@ class WireContractsTest {
                 val name = case.getValue("name").jsonPrimitive.content
                 val host = case.getValue("host_state").jsonObject
                 // New fixture families must supply a real host-state adapter, never be skipped.
-                val known = setOf("controller_state", "conversations", "hidden_agent_ids", "visibility_index", "reflection_settings", "execute_command_response")
+                val known = setOf(
+                    "controller_state", "conversations", "hidden_agent_ids", "visibility_index",
+                    "reflection_settings", "execute_command_response",
+                )
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
                 val state = when (host.getValue("controller_state").jsonPrimitive.content) {

@@ -1,12 +1,9 @@
 package com.letta.mobile.data.session.graph
 
-import com.letta.mobile.data.commands.api.AgentSlashCommand
-import com.letta.mobile.data.commands.api.AppServerCommandDescriptions
-import com.letta.mobile.data.commands.api.SlashCommandsApi
+import com.letta.mobile.data.commands.api.SlashCommandQuery
+import com.letta.mobile.data.transport.appserver.AppServerSlashCommandApi
 import com.letta.mobile.data.transport.appserver.AppServerClient
-import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.commands.api.SlashCommandsResponse
 import com.letta.mobile.data.commands.api.SlashCommandCatalog
@@ -17,64 +14,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
+import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
-
-/**
- * App Server implementation of [SlashCommandsApi].
- * Populates commands from the server's advertised supported commands.
- */
-class AppServerSlashCommandApi(
-    private val execute: suspend (AppServerCommand.ExecuteCommand) -> AppServerInboundFrame.ExecuteCommandResponse,
-    private val supportedCommandsProvider: (suspend (String) -> List<String>)? = null,
-    private val requestId: (String) -> String = { "cmd-$it" },
-    private val commandsProvider: (suspend (String) -> List<AgentSlashCommand>)? = null,
-) : SlashCommandsApi {
-    constructor(
-        client: AppServerClient,
-        supportedCommandsProvider: (suspend (String) -> List<String>)? = null,
-        requestId: (String) -> String = { "cmd-$it" },
-    ) : this(client::executeCommand, supportedCommandsProvider, requestId)
-
-    override suspend fun listAgentSlashCommands(agentId: String): List<AgentSlashCommand> {
-        commandsProvider?.let { return it(agentId) }
-        val commands = supportedCommandsProvider?.invoke(agentId) ?: DEFAULT_SUPPORTED_COMMANDS
-        return commands.map { cmd ->
-            AgentSlashCommand(
-                rawCommand = "/$cmd",
-                name = cmd,
-                description = AppServerCommandDescriptions.descriptionFor(cmd),
-                source = "appserver",
-                installed = false,
-            )
-        }
-    }
-
-    suspend fun executeCommand(
-        commandId: String,
-        args: String? = null,
-        runtime: AppServerRuntimeScope? = null,
-    ): AppServerInboundFrame.ExecuteCommandResponse =
-        execute(
-            AppServerCommand.ExecuteCommand(
-                requestId = requestId(commandId),
-                commandId = commandId,
-                args = args,
-                runtime = runtime,
-            ),
-        )
-
-    override fun close() = Unit
-
-    companion object {
-        val DEFAULT_SUPPORTED_COMMANDS: List<String> = AppServerCommandDescriptions.DEFAULT_SUPPORTED_COMMANDS
-    }
-}
 
 /** The shared session's command adapter, using the wrapper's confirmed admin responses. */
 @OptIn(ExperimentalUuidApi::class)
@@ -84,7 +30,7 @@ internal fun sessionSlashCommands(
     clientProvider: (suspend () -> AppServerClient)?,
 ): AppServerSlashCommandApi {
     if (clientProvider != null) return directSessionSlashCommands(scope, clientProvider)
-    val json = Json { ignoreUnknownKeys = true }
+    val json = LettaJson.wire
     suspend fun call(method: String, params: JsonObject): JsonObject {
         val response = transport.adminRpc(method, "", params.toString())
         check(response.success) { response.error ?: "$method failed" }
@@ -116,6 +62,8 @@ internal fun sessionSlashCommands(
 }
 
 /** Direct App Server bindings use the same catalog projection as the wrapper routes. */
+// Transport implementations expose heterogeneous failures through the command boundary.
+@Suppress("TooGenericExceptionCaught")
 @OptIn(ExperimentalUuidApi::class)
 private fun directSessionSlashCommands(
     scope: CoroutineScope,
@@ -131,7 +79,8 @@ private fun directSessionSlashCommands(
             connected.events.collect { received ->
                 val status = received.frame as? AppServerInboundFrame.UpdateDeviceStatus ?: return@collect
                 catalog.ingest(
-                    status.runtime.agentId.takeUnless { status.runtime.isAgentFree }, status.deviceStatus, received.connectionGeneration,
+                    status.runtime.agentId.takeUnless { status.runtime.isAgentFree }?.let(::SlashCommandQuery),
+                    status.deviceStatus, received.connectionGeneration,
                 )
             }
         } catch (cancelled: CancellationException) {
@@ -150,7 +99,7 @@ private fun directSessionSlashCommands(
         },
         commandsProvider = { agent ->
             unavailable.value?.let { throw it }
-            catalog.listing(agent).first
+            catalog.listing(SlashCommandQuery(agent)).first
         },
         requestId = { "slash-$it-${Uuid.random()}" },
     )
