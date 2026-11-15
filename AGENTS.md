@@ -423,7 +423,7 @@ before changing widget payloads, catalog IDs, bindings, or renderer dispatch.
 - Use **input chips** for user-added items such as editable tags or removable selections.
 - Use **assist chips** for read-only metadata or lightweight status labels.
 - Use **bottom sheets** / `ActionSheet` for contextual and destructive action menus.
-- Use **dialogs** / `ConfirmDialog` for confirmation and blocking decisions.
+- Use **dialogs** / sharedUI `LettaConfirmPane` (or `LettaAlertPane`) for confirmation and blocking decisions.
 - Use **switches** for direct on/off settings, not for choosing between multiple modes.
 - Use **cards** and **surfaces** to communicate emphasis and hierarchy, not arbitrary decoration.
 
@@ -542,7 +542,7 @@ Do not duplicate these — use `MaterialTheme.customColors.warningContainerColor
 
 - Before inventing a new UI pattern, search for an existing implementation in the repo and reuse/adapt it.
 - New portable UI foundations belong in `android-compose/sharedUI/commonMain`; `android-compose/designsystem` retains Android-specific components and legacy adapters.
-- Current reusable foundations include `ActionSheet`, `ConfirmDialog`, `EmptyState`, `ErrorContent`, themed top-bar defaults, and the shared design-system theme layer.
+- Current reusable foundations include `ActionSheet`, sharedUI `LettaConfirmPane`, `LettaEmptyState`, `LettaInlineError`, the `ui.components.foundation` components, themed top-bar defaults, and the shared design-system theme layer.
 
 ### 9. Design-system direction issues
 
@@ -559,7 +559,7 @@ This list predates the shared UI hard cut. Many named screens were removed; it i
 - **ActionSheet targets**
   - `FolderAdminScreen`, `ProviderAdminScreen`, `IdentityListScreen`, and other admin list cards with inline edit/delete icon rows should converge on an overflow or long-press `ActionSheet` for contextual actions.
   - Detail screens that currently expose multiple secondary actions inside dialogs should prefer `ActionSheet` when the action set is contextual rather than confirmational.
-- **ConfirmDialog / TextInputDialog targets**
+- **ConfirmDialog / TextInputDialog targets** (both components have since been deleted; use sharedUI `LettaConfirmPane` / `LettaAlertPane`)
   - Use `ConfirmDialog` for dismissible error/info dialogs only when the interaction is a single acknowledge/confirm step; keep destructive confirmations on `ConfirmDialog` rather than raw `AlertDialog`.
   - Use `TextInputDialog` for single-field rename/create flows before reaching for raw `AlertDialog`.
   - Multi-field editor flows such as `FolderAdminScreen`, `ProviderAdminScreen`, `ScheduleListScreen`, `EditAgentScreen`, `McpScreen`, and `AgentListScreen` should converge on reusable dialog wrappers instead of bespoke `AlertDialog` forms over time.

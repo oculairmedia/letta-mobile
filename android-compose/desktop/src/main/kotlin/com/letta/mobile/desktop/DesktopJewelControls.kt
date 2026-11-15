@@ -19,12 +19,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.MaterialTheme
 import org.jetbrains.jewel.foundation.theme.LocalContentColor as JewelLocalContentColor
-import org.jetbrains.jewel.ui.component.Chip as JewelChip
-import org.jetbrains.jewel.ui.component.DefaultButton as JewelDefaultButton
 import org.jetbrains.jewel.ui.component.Icon as JewelIcon
 import org.jetbrains.jewel.ui.component.IconButton as JewelIconButton
-import org.jetbrains.jewel.ui.component.OutlinedButton as JewelOutlinedButton
-import org.jetbrains.jewel.ui.component.RadioButtonChip as JewelRadioButtonChip
 import org.jetbrains.jewel.ui.component.TextArea as JewelTextArea
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import org.jetbrains.jewel.ui.component.Text as JewelText
@@ -52,70 +48,6 @@ internal fun DesktopRichTooltip(
     content: @Composable () -> Unit,
 ) {
     PointerTooltipArea(tooltip = { PointerTooltipSurface(title, timeLabel, body) }, modifier = modifier, content = content)
-}
-
-@Composable
-internal fun DesktopDefaultButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    content: @Composable () -> Unit,
-) {
-    JewelDefaultButton(
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled,
-        content = content,
-    )
-}
-
-@Composable
-internal fun DesktopOutlinedButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    content: @Composable () -> Unit,
-) {
-    JewelOutlinedButton(
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled,
-        content = content,
-    )
-}
-
-@Composable
-internal fun DesktopRadioChip(
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    content: @Composable () -> Unit,
-) {
-    JewelRadioButtonChip(
-        selected = selected,
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled,
-        content = content,
-    )
-}
-
-@Composable
-internal fun DesktopSelectableChip(
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    content: @Composable () -> Unit,
-) {
-    JewelChip(
-        selected = selected,
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled,
-        content = content,
-    )
 }
 
 @Composable

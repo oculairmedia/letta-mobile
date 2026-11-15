@@ -138,7 +138,7 @@ class MobileDesignSystemRulesTest {
             val j = Modifier.clickable(source, null, true) { open() }
             val k = Modifier.clickable(source, null, enabled) { open() }
         """.trimIndent()
-        assertEquals(6, BareClickable().lintAt(root, FEATURE, code).size)
+        assertEquals(7, BareClickable().lintAt(root, FEATURE, code).size)
         assertEquals(0, BareClickable().lintAt(root, COMPONENT, code).size)
         assertEquals(0, BareClickable().lintAt(root, NOT_UI, code).size)
     }
@@ -158,5 +158,81 @@ class MobileDesignSystemRulesTest {
         val clean = "sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/clean/Row.kt"
         assertEquals(1, BareClickable(config).lintAt(root, clean, code).size)
         assertEquals(0, BareClickable(config).lintAt(root, FEATURE, code).size)
+    }
+
+    @Test
+    fun `transparent stops and named alpha tokens pass while token files may define low alphas`(@TempDir root: File) {
+        val code = """
+            val a = c.copy(alpha = 0f)
+            val b = c.copy(alpha = 0.0f)
+            val d = c.copy(alpha = 0)
+            val e = c.copy(alpha = LettaAlpha.disabled)
+            val f = c.copy(alpha = 0.38f)
+        """.trimIndent()
+        assertEquals(1, LowContentAlpha().lintAt(root, FEATURE, code).size)
+        assertEquals(0, LowContentAlpha().lintAt(root, THEME, code).size)
+    }
+
+    @Test
+    fun `combinedClickable, selectable and toggleable need a role too`(@TempDir root: File) {
+        val code = """
+            val a = Modifier.combinedClickable(onLongClick = {}) { open() }
+            val b = Modifier.selectable(selected = on, onClick = { pick() })
+            val c = Modifier.toggleable(value = on, onValueChange = { flip(it) })
+            val d = Modifier.combinedClickable(role = Role.Button, onLongClick = {}) { open() }
+            val e = Modifier.selectable(on, true, Role.RadioButton) { pick() }
+            val f = Modifier.toggleable(on, source, null, true, Role.Switch) { flip(it) }
+        """.trimIndent()
+        assertEquals(3, BareClickable().lintAt(root, FEATURE, code).size)
+    }
+
+    @Test
+    fun `a status icon held in a local of the same function is followed`(@TempDir root: File) {
+        val code = """
+            fun a(ok: Boolean) {
+                val icon = when (ok) {
+                    true -> LettaIcons.CheckCircle
+                    false -> LettaIcons.Error
+                }
+                Icon(icon, contentDescription = null)
+            }
+            fun b() {
+                val glyph = LettaIcons.Warning
+                Image(rememberVectorPainter(glyph), null)
+            }
+            fun c(icon: ImageVector) = Icon(icon, contentDescription = null)
+            fun d() {
+                val icon = LettaIcons.Close
+                Icon(icon, contentDescription = null)
+            }
+        """.trimIndent()
+        assertEquals(1, RawStatusGlyph().lintAt(root, FEATURE, code).size)
+    }
+
+    @Test
+    fun `composable components in theme paths fail while value accessors and theme wrappers pass`(@TempDir root: File) {
+        val code = """
+            @Composable
+            fun LettaPill(text: String) { Text(text) }
+            @Composable
+            fun LettaSectionLabel(text: String): Unit = Text(text)
+            @Composable
+            @ReadOnlyComposable
+            fun pillColor(): Color { return MaterialTheme.colorScheme.primary }
+            @Composable
+            fun mutedTint() = MaterialTheme.colorScheme.onSurfaceVariant
+            @Composable
+            fun LettaTheme(content: @Composable () -> Unit) { MaterialTheme(content = content) }
+            @Composable
+            fun ProvidePolicy(content: @Composable () -> Unit) {
+                CompositionLocalProvider(LocalPolicy provides p, content)
+            }
+            fun helper() { }
+        """.trimIndent()
+        val tokens = "designsystem/src/main/java/com/letta/mobile/ui/tokens/Pills.kt"
+        assertEquals(2, ComponentInExemptPath().lintAt(root, THEME, code).size)
+        assertEquals(2, ComponentInExemptPath().lintAt(root, tokens, code).size)
+        assertEquals(0, ComponentInExemptPath().lintAt(root, COMPONENT, code).size)
+        assertEquals(0, ComponentInExemptPath().lintAt(root, FEATURE, code).size)
     }
 }

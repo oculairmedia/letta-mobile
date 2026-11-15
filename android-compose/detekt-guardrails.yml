@@ -426,3 +426,9 @@ letta-mobile-design-system:
       - "**/sharedUI/src/*/kotlin/com/letta/mobile/ui/theme/**"
       - "**/app/src/**"
       - "**/designsystem/src/**"
+  # Starts scoped to nothing: the composables parked in ui/theme have to move to ui/components first.
+  # The change that moves them replaces this glob with the theme paths it cleared.
+  ComponentInExemptPath:
+    active: true
+    includes:
+      - "**/design-system-scope-not-yet-cleared/**"
