@@ -34,6 +34,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.unit.width
+import androidx.compose.ui.unit.height
 
 /**
  * The older shared surfaces rebuilt on the foundation components (the catalog card and info box on
