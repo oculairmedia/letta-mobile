@@ -116,6 +116,13 @@ internal fun SchedulesPageState.deleteTarget(id: String): ScheduleDeleteTarget? 
     return ScheduleDeleteTarget.Native(NativeScheduleRef(native.agentId, native.id))
 }
 
+/** Only live cron tasks have pause/resume operations; native schedule IDs use a different API. */
+internal fun SchedulesPageState.canTogglePause(id: CronTaskId): Boolean =
+    (crons + library.crons).any {
+        it.id == id.value && (it.status == null || it.status == "active" || it.status == "paused") &&
+            (focusedAgentId == null || it.agentId == null || it.agentId == focusedAgentId)
+    } && id.value !in library.pendingCronIds
+
 internal fun SchedulesPageActions.delete(target: ScheduleDeleteTarget?) {
     when (target) {
         is ScheduleDeleteTarget.Cron -> onDeleteCron(target.id)

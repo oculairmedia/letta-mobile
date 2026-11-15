@@ -1,0 +1,86 @@
+{
+  "method": "cron.resume",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/CronAdminHandlers.kt",
+  "cases": [
+    {
+      "name": "success",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "cron_control": {
+          "success": true,
+          "task": {
+            "id": "task-1",
+            "status": "active"
+          }
+        }
+      },
+      "params": {
+        "task_id": "task-1",
+        "scheduled_for": "2026-12-01T09:00:00Z"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "task": {
+            "id": "task-1",
+            "status": "active"
+          }
+        }
+      }
+    },
+    {
+      "name": "failure",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "cron_control": {
+          "success": false,
+          "error": "Task cannot change state"
+        }
+      },
+      "params": {
+        "task_id": "task-1",
+        "scheduled_for": "2026-12-01T09:00:00Z"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "Task cannot change state"
+      }
+    },
+    {
+      "name": "missing-param",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "cron_control": {
+          "success": true,
+          "task": {
+            "id": "task-1",
+            "status": "active"
+          }
+        }
+      },
+      "params": {
+        "scheduled_for": "2026-12-01T09:00:00Z"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "task_id required"
+      }
+    }
+  ]
+}

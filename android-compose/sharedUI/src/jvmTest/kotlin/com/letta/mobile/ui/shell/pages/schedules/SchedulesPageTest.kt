@@ -77,6 +77,45 @@ class SchedulesPageTest {
     }
 
     @Test
+    fun aHostFailureRemainsVisibleBesideExistingRows() = runComposeUiTest {
+        show(
+            state(library = ScheduleLibraryState(isLoading = false, selectedAgentId = "a1", errorMessage = "Host refused resume")),
+            initialView = SchedulesView.Rules,
+        )
+        onNodeWithText("Host refused resume").assertExists()
+        onNodeWithTag(SchedulesPageTags.rule("c1")).assertExists()
+    }
+
+    @Test
+    fun rulesOfferPauseAndResumeAndWaitForHostState() = runComposeUiTest {
+        val calls = mutableListOf<Pair<String, Boolean>>()
+        val current = androidx.compose.runtime.mutableStateOf(state(crons = listOf(standup)))
+        setContent {
+            MaterialTheme {
+                Box(Modifier.width(WIDE).height(PAGE_HEIGHT)) {
+                    SchedulesPage(
+                        current.value,
+                        SchedulesPageActions(onTogglePause = { id, resume -> calls += id to resume }),
+                        options = SchedulesPageOptions(initialView = SchedulesView.Rules, fixedClock = clock),
+                    )
+                }
+            }
+        }
+        onNodeWithText("Pause").performClick()
+        assertEquals(listOf("c1" to false), calls)
+        onNodeWithText("Resume").assertDoesNotExist()
+        runOnIdle { current.value = state(crons = listOf(standup.copy(status = "paused"))) }
+        onNodeWithTag(SchedulesPageTags.PAUSED_FILTER).performClick()
+        onNodeWithTag(SchedulesPageTags.rule("c1")).assertDoesNotExist()
+        onNodeWithTag(SchedulesPageTags.PAUSED_FILTER).performClick()
+        onNodeWithText("Resume").performClick()
+        assertEquals(listOf("c1" to false, "c1" to true), calls)
+        runOnIdle { current.value = state(crons = listOf(standup.copy(status = "active"))) }
+        onNodeWithText("Pause").assertExists()
+        onNodeWithTag(SchedulesPageTags.PAUSED_FILTER).assertDoesNotExist()
+    }
+
+    @Test
     fun eachTabShowsItsView() = runComposeUiTest {
         show(state())
         onNodeWithTag(SchedulesPageTags.view(SchedulesView.Week)).assertExists()

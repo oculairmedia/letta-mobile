@@ -82,9 +82,12 @@ class TimelinePageProjectionTest {
             com.letta.mobile.data.chat.projection.ChatDisplayMode.Interactive,
             "own-agent",
         ).renderItems.single()
+        // The live overlay keys a run by its own oldest record, as the reopened page does.
+        val liveRun = assertIs<com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock>(live)
+            .copy(keyOverride = "run-four-tools-from-id-1")
 
-        assertEquals(live.key, hydrated.key)
-        assertEquals(live, hydrated)
+        assertEquals(liveRun.key, hydrated.key)
+        assertEquals(liveRun, hydrated)
     }
 
     @Test fun syntheticSkillEnvelopeDoesNotSplitNullRunColdProjection() = runTest {
@@ -116,7 +119,10 @@ class TimelinePageProjectionTest {
         val hydrated = page.records.mapNotNull {
             (it.preparedPresentation as? TimelineSettledPresentation.Render)?.item
         }
-        assertEquals(listOf(live), hydrated)
+        // The live overlay keys a run by its own oldest record, as the reopened page does.
+        val liveRun = assertIs<com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock>(live)
+            .copy(keyOverride = "run-hydrated-id-1-from-id-1")
+        assertEquals(listOf(liveRun), hydrated)
         val block = assertIs<com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock>(hydrated.single())
         assertEquals(6, block.messages.sumOf { it.first.toolCalls.orEmpty().size })
 

@@ -48,7 +48,7 @@ internal object OverlapTurn {
 
 /** What one frame of the Android list shows: the raw live overlay and one settled snapshot. */
 internal data class OverlapFrame(val live: List<ChatRenderItem>, val settledKeys: List<String?>) {
-    val rows: TimelineRowAssembly get() = TimelineRowAssembly.assemble(live, settledKeys)
+    val rows: TimelineRowAssembly get() = TimelineRowAssembly.assemble(live, TimelineRowAssembly.Settled(settledKeys))
     val keys: List<String?> get() = rows.let { assembled -> (0 until assembled.size).map(assembled::key) }
 }
 

@@ -72,8 +72,10 @@ internal class LocalBackendTurnHarness(name: String) {
         assertEquals(TimelineEnginePageOutcome.Applied, writer.reconcilePage(request, page))
     }
 
+    /** The live overlay's render: grouped, then each run keyed by its own records (projectLiveItems). */
     private fun renderItems(events: List<TimelineEvent>) =
-        buildChatRenderModel(events.mapNotNull { timelineEventToUiMessage(it) }, ChatDisplayMode.Interactive).renderItems
+        buildChatRenderModel(events.mapNotNull { timelineEventToUiMessage(it) }, ChatDisplayMode.Interactive)
+            .renderItems.map { it.keyedByOwnRecords() }
 
     companion object {
         private const val BASE_EPOCH_MS = 1_790_051_400_000L

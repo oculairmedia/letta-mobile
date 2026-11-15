@@ -1,7 +1,6 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.chat.projection.ChatRenderItem
-import com.letta.mobile.data.chat.projection.TimelineRowAssembly
 import com.letta.mobile.data.chat.send.ChatSendCoordinator
 import com.letta.mobile.data.chat.send.ChatSendUiSink
 import com.letta.mobile.data.chat.send.QueueConversationId
@@ -541,7 +540,7 @@ class PendingSendReconnectProjectionTest {
             val settled = presenter.snapshot().items
             screen.onResidentRows(settled)
             test.runCurrent()
-            val assembly = TimelineRowAssembly.assemble(screen.live.value, settled.map { it.item.key })
+            val assembly = CanonicalTimelinePresentation.assemble(screen.live.value, settled)
             assertEquals(emptyMap(), assembly.duplicates)
             collection.cancel()
             residency.cancel()

@@ -31,17 +31,18 @@ import kotlin.uuid.Uuid
  * holds ([client]), for a host with no JVM Iroh binding (the browser reaches an Iroh host's App
  * Server on `/letta/appserver/0` through iroh-wasm). It carries what the graph's Iroh admin sources
  * need: `admin_rpc` (the same [appServerAdminRpcParams] request the JVM Iroh transport sends) and
- * the connection state. Chat turns ride the App Server turn engine, not this channel; cron and
- * subagent RPCs are not bridged yet, so they fail as on [NoOpChannelTransport]. [state] and [events]
- * are shared on [scope] only while something observes them. Toolset status is retained eagerly
- * until the session disconnects; [scope] bounds its collector as well.
+ * the connection state. Chat turns ride the App Server turn engine, not this channel; cron RPCs use the
+ * same bridge as the JVM channel. Subagent RPCs are not bridged yet, so they fail as on
+ * [NoOpChannelTransport]. [state] and [events] are shared on [scope] only while something observes
+ * them. Toolset status is retained eagerly until the session disconnects; [scope] bounds its
+ * collector as well.
  */
 class AppServerClientChannel(
     private val client: AppServerClient,
     scope: CoroutineScope,
     /** What the host advertised when this session authenticated (its `auth_response` capabilities). */
     override val hostCapabilities: Set<String> = emptySet(),
-) : NoOpChannelTransport() {
+) : CronRpcChannel(appServerCronRpc(client)) {
     private val toolsets = ToolsetStatusStore()
     override val toolsetStates = toolsets.states
 
@@ -74,16 +75,6 @@ class AppServerClientChannel(
         .mapNotNull { received -> (received.frame as? AppServerInboundFrame.Unknown)?.let { hostPush(it.raw) } }
         .shareIn(scope, SharingStarted.WhileSubscribed())
 
-    @OptIn(ExperimentalUuidApi::class)
-    override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
-        client.adminRpc(
-            AppServerCommand.AdminRpc(
-                requestId = "admin-${Uuid.random()}",
-                method = method,
-                params = appServerAdminRpcParams(path = path, body = body),
-            ),
-        )
-
     private companion object {
         /**
          * A host push this channel carries, or null for any other frame; an unreadable one is
@@ -100,4 +91,15 @@ class AppServerClientChannel(
         val CONNECTED = ChannelTransportState.Connected(serverId = "app-server", sessionId = "app-server", deviceId = null)
         val DISCONNECTED = ChannelTransportState.Disconnected(code = 1000, reason = "App Server session closed")
     }
+}
+
+@OptIn(ExperimentalUuidApi::class)
+private fun appServerCronRpc(client: AppServerClient):
+    suspend (String, String, String?) -> AppServerInboundFrame.AdminRpcResponse = { method, path, body ->
+    client.adminRpc(
+        AppServerCommand.AdminRpc(
+            requestId = "admin-${Uuid.random()}", method = method,
+            params = appServerAdminRpcParams(path = path, body = body),
+        ),
+    )
 }
