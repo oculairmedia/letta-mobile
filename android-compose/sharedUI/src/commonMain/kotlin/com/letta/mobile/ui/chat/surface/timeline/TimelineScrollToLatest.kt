@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
+import com.letta.mobile.ui.chat.surface.timeline.rows.TimelineArrow
+import com.letta.mobile.ui.components.line.ArrowDirection
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
@@ -11,7 +13,6 @@ import androidx.compose.foundation.gestures.ScrollScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.runtime.Composable
@@ -28,7 +29,6 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_scroll_to_latest
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -174,10 +174,7 @@ internal fun TouchScrollToLatestButton(visible: Boolean, onClick: () -> Unit, mo
                 pressedElevation = ChatTimelineDimens.scrollToLatestTouchPressedElevation,
             ),
         ) {
-            Icon(
-                imageVector = LettaIcons.KeyboardArrowDown,
-                contentDescription = stringResource(Res.string.timeline_scroll_to_latest),
-            )
+            TimelineArrow(ArrowDirection.Down, stringResource(Res.string.timeline_scroll_to_latest))
         }
     }
 }

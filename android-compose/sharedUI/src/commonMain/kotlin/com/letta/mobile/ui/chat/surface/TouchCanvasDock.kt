@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -104,6 +103,7 @@ import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.TouchComposerDimens
+import com.letta.mobile.ui.theme.headAnchoredShape
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
@@ -673,7 +673,7 @@ internal fun TouchInputTray(content: @Composable ColumnScope.() -> Unit) {
                 .fillMaxWidth()
                 .heightIn(max = maxHeight * INPUT_TRAY_MAX_HEIGHT_FRACTION)
                 .testTag(TOUCH_INPUT_TRAY_TAG),
-            shape = RoundedCornerShape(LettaDimens.Radius.lg),
+            shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainer,
             contentColor = MaterialTheme.colorScheme.onSurface,
             shadowElevation = ChatSurfaceDimens.dockedReplyElevation,

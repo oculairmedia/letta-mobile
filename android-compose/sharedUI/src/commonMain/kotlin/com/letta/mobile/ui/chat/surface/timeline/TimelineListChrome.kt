@@ -1,10 +1,12 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
+import androidx.compose.foundation.shape.CircleShape
+import com.letta.mobile.ui.chat.surface.timeline.rows.TimelineArrow
+import com.letta.mobile.ui.components.line.ArrowDirection
+import com.letta.mobile.ui.theme.ChatRowInsetShape
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,9 +14,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,7 +41,6 @@ import com.letta.mobile.sharedui.resources.timeline_today
 import com.letta.mobile.sharedui.resources.timeline_yesterday
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -189,17 +187,13 @@ internal fun ScrollToLatestButton(onClick: () -> Unit, modifier: Modifier = Modi
     Surface(
         onClick = onClick,
         modifier = modifier.size(LettaDimens.Control.iconButton).testTag(ChatTimelineTags.SCROLL_TO_LATEST),
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        shape = ChatRowInsetShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = LettaIcons.KeyboardArrowDown,
-                contentDescription = stringResource(Res.string.timeline_scroll_to_latest),
-                modifier = Modifier.size(LettaDimens.Control.icon),
-            )
+            TimelineArrow(ArrowDirection.Down, stringResource(Res.string.timeline_scroll_to_latest), size = LettaDimens.Control.icon)
         }
     }
 }
@@ -236,7 +230,7 @@ internal fun DayDividerRow(date: LocalDate, today: LocalDate, modifier: Modifier
         modifier = modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth().padding(vertical = LettaDimens.Space.sm),
         contentAlignment = Alignment.Center,
     ) {
-        Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(percent = PILL_PERCENT)) {
+        Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = CircleShape) {
             Text(
                 text = label,
                 modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
@@ -248,4 +242,3 @@ internal fun DayDividerRow(date: LocalDate, today: LocalDate, modifier: Modifier
     }
 }
 
-private const val PILL_PERCENT = 50

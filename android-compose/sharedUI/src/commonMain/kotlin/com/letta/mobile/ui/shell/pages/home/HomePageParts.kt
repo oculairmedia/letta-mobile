@@ -10,13 +10,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowUpward
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,12 +31,15 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.ArrowUp
+import com.composables.icons.lucide.Lucide
 import com.letta.mobile.ui.components.LettaInlineError
+import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.components.foundation.LettaSearchField
 import com.letta.mobile.ui.components.foundation.LettaSearchOptions
+import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
@@ -52,7 +51,7 @@ internal fun HomeHeader(page: HomePageScope) {
                     Text(PAGE_TITLE, style = MaterialTheme.typography.headlineSmall)
                 }
             }
-            if (page.wide && page.options.showSearch) HomeSearchField(page, Modifier.width(WideSearchWidth))
+            if (page.wide && page.options.showSearch) HomeSearchField(page, Modifier.width(ShellDimens.pageSearchWidth))
             page.options.headerActions?.invoke(this)
         }
         if (!page.wide && page.options.showSearch) HomeSearchField(page, Modifier.fillMaxWidth())
@@ -96,7 +95,7 @@ internal fun HomeComposer(page: HomePageScope, modifier: Modifier = Modifier) {
     }
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LettaDimens.Radius.lg),
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
@@ -124,12 +123,12 @@ private class ComposerField(
 private fun HomeComposerField(field: ComposerField, modifier: Modifier = Modifier) {
     val text = field.text
     val onSubmit = field.onSubmit
-    val textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
+    val textStyle = MaterialTheme.typography.bodyLarge.merge(TextStyle(color = MaterialTheme.colorScheme.onSurface))
     BasicTextField(
         value = text,
         onValueChange = field.onTextChanged,
         modifier = modifier
-            .heightIn(min = LettaDimens.Control.fieldHeight, max = ComposerMaxHeight)
+            .heightIn(min = LettaDimens.Control.fieldHeight, max = ShellDimens.homeComposerMaxHeight)
             .padding(vertical = LettaDimens.Space.xs)
             .testTag(HomePageTags.COMPOSER)
             .onPreviewKeyEvent { event ->
@@ -165,33 +164,11 @@ private fun HomeSendButton(canSend: Boolean, onSend: () -> Unit) {
         contentColor = if (canSend) colors.onPrimary else colors.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(Icons.Outlined.ArrowUpward, contentDescription = SEND_LABEL, modifier = Modifier.size(LettaDimens.Control.iconButtonLg))
+            LettaIcon(Lucide.ArrowUp, contentDescription = SEND_LABEL)
         }
     }
 }
 
-@Composable
-internal fun HomeSectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = MUTED_ALPHA),
-        fontWeight = FontWeight.SemiBold,
-        modifier = modifier.padding(top = LettaDimens.Space.md, bottom = LettaDimens.Space.hair),
-    )
-}
-
-@Composable
-internal fun HomeEmptyLine(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(vertical = LettaDimens.Space.lg),
-    )
-}
-
-internal const val MUTED_ALPHA = 0.72f
 private const val PAGE_TITLE = "Home"
 /** What Home searches, for a host field (desktop's header) that searches the page in its place. */
 const val HomeSearchPlaceholder: String = "Search agents, tools, blocks and messages"
@@ -199,5 +176,3 @@ const val HomeSearchPlaceholder: String = "Search agents, tools, blocks and mess
 private const val SEND_LABEL = "Send message"
 internal const val NO_CONVERSATIONS = "No conversations yet. Start one from the chatbox."
 private const val COMPOSER_MAX_LINES = 5
-private val WideSearchWidth = 320.dp
-private val ComposerMaxHeight = 120.dp

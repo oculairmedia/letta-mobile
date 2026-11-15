@@ -19,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.A2uiLink
 import com.letta.mobile.data.a2ui.A2uiLinkDecision
 import com.letta.mobile.data.a2ui.A2uiLinkPolicy
@@ -27,6 +26,7 @@ import com.letta.mobile.data.a2ui.A2uiRenderBudget
 import com.letta.mobile.data.a2ui.A2uiRenderClaim
 import com.letta.mobile.data.a2ui.A2uiSurfaceLimits
 import com.letta.mobile.data.model.A2uiComponentId
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** The render budget of the surface pass being composed; null outside a surface. */
 internal val LocalA2uiRenderBudget = compositionLocalOf<A2uiRenderBudget?> { null }
@@ -107,7 +107,7 @@ internal fun A2uiSurfaceTooLarge(modifier: Modifier = Modifier) {
     ) {
         Text(
             text = "This surface is too large to display.",
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

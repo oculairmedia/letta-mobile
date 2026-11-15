@@ -27,8 +27,9 @@ data class SpeechThresholds(
  * a turn once [minVoiced] of voice has been heard, and is dropped if [trailingSilence] passes first
  * or it reaches [maxTurn] unconfirmed.
  * A dropped candidate is never transcribed. A turn ends after [trailingSilence] without voice (the
- * hangover that keeps pauses between words inside one turn) or at [maxTurn]. While the app speaks,
- * the raised [echoGuard] thresholds apply and a turn needs [bargeInSustain] of voice.
+ * hangover that keeps pauses between words inside one turn) or at [maxTurn]. While the app speaks
+ * (and through the ear's output tail after it), the raised [echoGuard] thresholds apply and a turn
+ * needs [bargeInSustain] of voice.
  */
 data class EndOfTurnPolicy(
     /** Thresholds while the app is silent. */
@@ -65,8 +66,14 @@ enum class TurnDiscardReason {
     /** The transcript held no words (punctuation, a stray letter). */
     NO_WORDS,
 
-    /** A short, quiet turn transcribed as one of the recogniser's stock noise phrases. */
+    /** A short turn transcribed as one of the recogniser's stock noise phrases. */
     STOCK_PHRASE,
+
+    /** A very short turn transcribed as a lone filler word ("so", "okay"). */
+    FILLER_WORD,
+
+    /** The recogniser itself reported the audio as not speech (high no-speech probability or very low confidence). */
+    NOT_SPEECH,
 
     /**
      * Half-duplex: the sound was captured while the app's own speech was queued or playing (or in

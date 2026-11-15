@@ -1,9 +1,6 @@
 package com.letta.mobile.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,16 +11,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
+import com.letta.mobile.ui.components.foundation.LettaPanel
+import com.letta.mobile.ui.components.foundation.lettaClickable
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 
 /*
  * Building blocks for the catalog-style pages (Channels, Skills, Tools, ...) on desktop and
@@ -47,24 +47,15 @@ fun LettaCatalogCard(
     footer: @Composable ColumnScope.() -> Unit = {},
     trailing: @Composable () -> Unit = {},
 ) {
-    Row(
-        modifier = modifier
-            .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = CARD_BORDER_ALPHA), MaterialTheme.shapes.medium)
-            .clickable(onClick = onClick)
-            .padding(LettaDimens.Space.lg),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier.size(LettaDimens.Control.actionButton).clip(MaterialTheme.shapes.small).background(accent.copy(alpha = AVATAR_ALPHA)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(leadingLabel, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = accent)
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+    LettaPanel(modifier = modifier) {
+        CatalogCardRow(leadingLabel, accent, onClick, trailing) {
+            Text(
+                title,
+                style = LettaTextStyles.titleSemibold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             // Two description lines are always reserved so cards in a grid row line up.
             Text(
                 text = description?.takeIf { it.isNotBlank() }.orEmpty(),
@@ -76,6 +67,31 @@ fun LettaCatalogCard(
             )
             footer()
         }
+    }
+}
+
+@Composable
+private fun CatalogCardRow(
+    leadingLabel: String,
+    accent: Color,
+    onClick: () -> Unit,
+    trailing: @Composable () -> Unit,
+    body: @Composable ColumnScope.() -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .lettaClickable(role = Role.Button, onClick = onClick)
+            .padding(LettaDimens.Space.lg),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(LettaDimens.Control.actionButton).clip(MaterialTheme.shapes.small).background(accent.copy(alpha = AVATAR_ALPHA)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(leadingLabel, style = LettaTextAccents.monogram, color = accent)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair), content = body)
         trailing()
     }
 }
@@ -88,14 +104,13 @@ fun LettaInfoBox(
     contentPadding: PaddingValues = PaddingValues(horizontal = LettaDimens.Space.xxl, vertical = LettaDimens.Space.md),
 ) {
     Box(modifier.fillMaxWidth().padding(contentPadding)) {
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = INFO_FILL_ALPHA),
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            shape = MaterialTheme.shapes.medium,
-            border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = INFO_BORDER_ALPHA)),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(text = message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(LettaDimens.Space.lg))
+        LettaPanel(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(LettaDimens.Space.lg),
+            )
         }
     }
 }
@@ -104,7 +119,4 @@ fun LettaInfoBox(
 val LettaCatalogGridPadding: PaddingValues =
     PaddingValues(start = LettaDimens.Space.xxl, end = LettaDimens.Space.xxl, top = LettaDimens.Space.lg, bottom = LettaDimens.Space.lg)
 
-private const val CARD_BORDER_ALPHA = 0.6f
 private const val AVATAR_ALPHA = 0.2f
-private const val INFO_FILL_ALPHA = 0.42f
-private const val INFO_BORDER_ALPHA = 0.48f

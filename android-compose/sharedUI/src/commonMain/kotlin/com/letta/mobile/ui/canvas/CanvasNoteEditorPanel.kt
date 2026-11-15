@@ -2,7 +2,6 @@ package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -16,21 +15,16 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,7 +38,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -52,12 +45,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ALargeSmall
-import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Copy
 import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.ListTodo
@@ -67,11 +59,20 @@ import com.composables.icons.lucide.Redo2
 import com.composables.icons.lucide.SquarePlus
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.Undo2
-import com.composables.icons.lucide.X
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasTextStyle
 import com.letta.mobile.data.model.CanvasNoteId
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaColorSwatch
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaSwatch
+import com.letta.mobile.ui.host.LettaMenu
+import com.letta.mobile.ui.host.LettaPane
+import com.letta.mobile.ui.host.LettaPaneKind
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -124,7 +125,7 @@ fun CanvasNoteEditorPanel(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                NoteIcon(NoteButton(Lucide.ArrowLeft, "Close note editor"), onCard, onClick = onClose)
+                NoteIcon(NoteButton(LettaIcons.ArrowBack, "Close note editor"), onCard, onClick = onClose)
             }
             NoteTitleField(session, document, onCard, compact)
             CanvasBlockEditor(
@@ -145,9 +146,9 @@ fun CanvasNoteEditorPanel(
         }
     }
     if (compact) {
-        ModalBottomSheet(onDismissRequest = onClose, modifier = modifier.canvasChrome(chromeRegions)) {
+        LettaPane(kind = LettaPaneKind.Sheet, onDismiss = onClose, modifier = modifier.canvasChrome(chromeRegions)) {
             Surface(
-                modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f).heightIn(min = 280.dp)
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f).heightIn(min = NOTE_EDITOR_SHEET_MIN_HEIGHT)
                     .semantics { contentDescription = "Note editor" },
                 color = background,
             ) {
@@ -160,7 +161,7 @@ fun CanvasNoteEditorPanel(
         modifier = modifier
             .fillMaxSize()
             .canvasChrome(chromeRegions)
-            .background(if (compact) background else MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f))
+            .background(if (compact) background else BottomSheetDefaults.ScrimColor)
             // A tap on the scrim closes; taps on the note stay in the note.
             .pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) },
         contentAlignment = Alignment.Center,
@@ -170,10 +171,18 @@ fun CanvasNoteEditorPanel(
                 .fillMaxSize()
                 // Clear of the system bars, and of the keyboard, which the foot bar rides on.
                 .windowInsetsPadding(insets)
-                .then(if (compact) Modifier else Modifier.padding(horizontal = LettaDimens.Space.xl, vertical = 56.dp).widthIn(max = 880.dp))
+                .then(
+                    if (compact) {
+                        Modifier
+                    } else {
+                        Modifier
+                            .padding(horizontal = LettaDimens.Space.xl, vertical = NOTE_EDITOR_VERTICAL_MARGIN)
+                            .widthIn(max = NOTE_EDITOR_MAX_WIDTH)
+                    },
+                )
                 .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                 .semantics { contentDescription = "Note editor" },
-            shape = if (compact) RectangleShape else RoundedCornerShape(LettaDimens.Radius.lg),
+            shape = if (compact) RectangleShape else MaterialTheme.shapes.large,
             color = background,
             tonalElevation = if (compact) 0.dp else LettaDimens.Space.xs,
             shadowElevation = if (compact) 0.dp else LettaDimens.Space.md,
@@ -199,9 +208,9 @@ private fun NoteTitleField(session: CanvasSession, document: CanvasSceneDocument
             runCatching { session.retitleDocument(CanvasNoteId(latest.id), title) }
         }
     }
-    val style = MaterialTheme.typography.headlineSmall.copy(color = onCard, fontWeight = FontWeight.Medium)
+    val style = NoteTitleTextStyle.merge(TextStyle(color = onCard))
     Box(modifier = Modifier.fillMaxWidth().padding(horizontal = if (compact) LettaDimens.Space.lg else LettaDimens.Space.xl + LettaDimens.Space.xs)) {
-        if (title.isEmpty()) Text("Title", style = style.copy(color = onCard.copy(alpha = 0.5f)))
+        if (title.isEmpty()) Text("Title", style = style, color = onCard.copy(alpha = LettaDimens.Alpha.disabled))
         BasicTextField(
             value = title,
             onValueChange = { title = it.replace('\n', ' ') },
@@ -234,7 +243,7 @@ private fun NoteFootBar(note: OpenNote, toolbar: NoteToolbar?, actions: NoteEdit
         ) {
             if (foot == NoteFoot.FORMAT && toolbar != null) {
                 CanvasFormattingBar(toolbar = toolbar, modifier = Modifier.weight(1f))
-                NoteIcon(NoteButton(Lucide.X, "Close formatting"), onCard) { foot = NoteFoot.ICONS }
+                NoteIcon(NoteButton(LettaIcons.Close, "Close formatting"), onCard) { foot = NoteFoot.ICONS }
                 return@Row
             }
             NoteAddMenu(toolbar, onCard)
@@ -259,7 +268,7 @@ private fun NoteAddMenu(toolbar: NoteToolbar?, onCard: Color) {
     val todo = BlockButtons.firstOrNull { it.label == "To-do" }
     Box {
         NoteIcon(NoteButton(Lucide.SquarePlus, "Add to note", enabled = toolbar != null && todo != null), onCard) { open = true }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        LettaMenu(expanded = open, onDismiss = { open = false }) {
             if (toolbar != null && todo != null) {
                 MenuRow(Lucide.ListTodo, "Checkboxes") {
                     open = false
@@ -275,7 +284,7 @@ private fun NoteMoreMenu(actions: NoteEditorActions, onCard: Color) {
     var open by remember { mutableStateOf(false) }
     Box {
         NoteIcon(NoteButton(Lucide.EllipsisVertical, "More"), onCard) { open = true }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        LettaMenu(expanded = open, onDismiss = { open = false }) {
             actions.onDuplicate?.let { duplicate ->
                 MenuRow(Lucide.Copy, "Make a copy") {
                     open = false
@@ -327,15 +336,7 @@ private fun SwatchRow(palette: List<NamedColor>, current: Color?, onPick: (Color
     ) {
         palette.forEach { swatch ->
             val selected = current != null && swatch.color.toHex() == current.toHex()
-            Box(
-                modifier = Modifier
-                    .size(SWATCH)
-                    .clip(CircleShape)
-                    .background(swatch.color)
-                    .border(if (selected) 3.dp else 1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                    .clickable { onPick(swatch.color) }
-                    .semantics { contentDescription = swatch.name },
-            )
+            LettaColorSwatch(LettaSwatch(swatch.color, selected, name = swatch.name), onClick = { onPick(swatch.color) })
         }
     }
 }
@@ -344,7 +345,7 @@ private fun SwatchRow(palette: List<NamedColor>, current: Color?, onPick: (Color
 private fun MenuRow(icon: ImageVector, label: String, onClick: () -> Unit) {
     DropdownMenuItem(
         text = { Text(label) },
-        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
+        leadingIcon = { LettaIcon(icon, contentDescription = null) },
         onClick = onClick,
     )
 }
@@ -359,18 +360,14 @@ private data class NoteButton(
 
 @Composable
 private fun NoteIcon(button: NoteButton, tint: Color, onClick: () -> Unit) {
-    IconButton(
+    // The note's own colour is not a theme role, so the glyph is drawn in its contrast ink, dimmed to
+    // the shared disabled floor when off, and the open panel's button is ringed in that ink.
+    val shown = if (button.enabled) tint else tint.copy(alpha = LettaDimens.Alpha.disabled)
+    LettaIconButton(
+        icon = LettaButtonIcon(button.icon, button.label, size = NOTE_EDITOR_BUTTON, glyph = LettaIconStyle(tint = shown)),
         onClick = onClick,
         enabled = button.enabled,
-        modifier = Modifier
-            .size(LettaDimens.Orb.lg)
-            .then(if (button.selected) Modifier.clip(CircleShape).background(tint.copy(alpha = 0.12f)) else Modifier)
-            .semantics { contentDescription = button.label },
-    ) {
-        val shown = if (button.enabled) tint else tint.copy(alpha = 0.38f)
-        Icon(button.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon), tint = shown)
-    }
+        modifier = if (button.selected) Modifier.border(LettaDimens.Stroke.hairline, tint, CircleShape) else Modifier,
+    )
 }
-
-private val SWATCH = 40.dp
 private const val TITLE_SAVE_DELAY_MS = 400L

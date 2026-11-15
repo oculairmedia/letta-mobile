@@ -1,11 +1,11 @@
 package com.letta.mobile.data.voice.vad.ear
 
 import com.letta.mobile.data.voice.CapturedAudioHandle
-import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioFrameFormat
 import com.letta.mobile.data.voice.audio.AudioFrameSource
 import com.letta.mobile.data.voice.endpoint.EndpointTranscriber
+import com.letta.mobile.data.voice.endpoint.SpeechTranscript
 import com.letta.mobile.data.voice.engine.VoiceEar
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
@@ -25,8 +25,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * reported as TRANSCRIPTION_FAILED.
  */
 fun interface SpeechTranscriber {
-    /** The words spoken in [audio] (a WAVE clip). */
-    suspend fun transcribe(audio: AudioClip): VoiceText
+    /** The words spoken in [audio] (a WAVE clip), with the recogniser's numbers when it has them. */
+    suspend fun transcribe(audio: AudioClip): SpeechTranscript
 
     /** Adapters. */
     companion object {
@@ -53,10 +53,14 @@ data class VadEarConfig(
      * Half-duplex, for a microphone without echo cancellation: while the app's output is active
      * ([VadVoiceEar.setOutputActive]) and for [outputTail] after it ends, the microphone is ignored
      * altogether (no turn opens, nothing is kept for transcription, no barge-in). Off: the echo
-     * guard's raised thresholds apply instead, and speech over the output interrupts it.
+     * guard's raised thresholds apply instead, over the output and for [outputTail] after it, and
+     * speech over the output interrupts it.
      */
     val halfDuplex: Boolean = false,
-    /** Half-duplex: how long after the output ends the microphone is still ignored (room reverb, device latency). */
+    /**
+     * How long after the output ends it may still be heard (room reverb, device latency): half-duplex
+     * ignores the microphone for this long, otherwise the echo guard stays up for this long.
+     */
     val outputTail: Duration = DEFAULT_OUTPUT_TAIL,
 ) {
     init {
@@ -80,8 +84,8 @@ data class VadEarConfig(
  * [transcriber]. It decides end of turn itself (trailing silence, the hard cap, or [commitTurn]) and
  * then transcribes the turn, pre-roll included. A sound that never had enough voice is dropped
  * before transcription, and a transcript the [VadEarConfig.transcripts] policy drops (empty, no
- * words, a stock noise phrase from a short quiet turn) ends the turn as an empty utterance, so the
- * loop listens on and nothing is sent.
+ * words, judged not speech by the recogniser, a stock noise phrase or filler from a short turn)
+ * ends the turn as an empty utterance, so the loop listens on and nothing is sent.
  *
  * Events: [VoiceEarEvent.ListeningStarted] with the first frame, [VoiceEarEvent.InputLevel] per
  * frame, [VoiceEarEvent.SpeechStarted] once speech has lasted the policy's minimum (the barge-in

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,6 +40,7 @@ import com.letta.mobile.ui.theme.ChatExpressiveMotion
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.TouchComposerDimens
+import com.letta.mobile.ui.theme.chatSheetRowShape
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -100,7 +100,7 @@ private fun TouchSheetRow(item: TouchSheetItem, onClick: () -> Unit) {
             .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs)
             .then(item.stateDescription?.let { state -> Modifier.semantics { stateDescription = state } } ?: Modifier)
             .testTag(ComposerTestTags.TOUCH_SHEET_ROW),
-        shape = RoundedCornerShape(look.corner),
+        shape = chatSheetRowShape(look.corner),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = look.elevation,
         interactionSource = interaction,

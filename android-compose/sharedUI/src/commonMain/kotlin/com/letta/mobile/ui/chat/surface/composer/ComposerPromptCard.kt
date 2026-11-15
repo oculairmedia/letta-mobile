@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -41,7 +40,6 @@ private val DockedFieldStyle = ComposerFieldStyle(
 )
 
 /** The prompt card's and the docked bar's shape; voice mode's outline follows it. */
-private val PromptShape = RoundedCornerShape(LettaDimens.Radius.lg)
 
 /** The keyboard is up (always false on desktop, where there is no IME inset). */
 @Composable
@@ -62,9 +60,9 @@ internal fun ComposerPromptCard(model: ComposerModel, onAttachImage: () -> Unit)
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .swipeUpToCanvas(enabled = swipeEnabled, onTrigger = { model.onIntent(ChatSurfaceIntent.OpenCanvas) })
-            .voiceOutline(PromptShape)
+            .voiceOutline(MaterialTheme.shapes.large)
             .testTag(ComposerTestTags.CARD),
-        shape = PromptShape,
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
         // Low-contrast hairline: the fill alone is barely a step off the page background.
@@ -124,9 +122,9 @@ private fun DockedBarRow(model: ComposerModel, onAttachImage: () -> Unit, fieldH
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .voiceOutline(PromptShape)
+            .voiceOutline(MaterialTheme.shapes.large)
             .testTag(ComposerTestTags.DOCKED_BAR),
-        shape = PromptShape,
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(

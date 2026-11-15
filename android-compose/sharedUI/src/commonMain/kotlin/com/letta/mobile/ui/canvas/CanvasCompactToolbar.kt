@@ -1,16 +1,13 @@
 package com.letta.mobile.ui.canvas
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -22,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
@@ -34,7 +30,11 @@ import com.letta.mobile.sharedui.resources.canvas_foot_more
 import com.letta.mobile.sharedui.resources.canvas_foot_more_status
 import com.letta.mobile.sharedui.resources.canvas_foot_redo
 import com.letta.mobile.sharedui.resources.canvas_foot_undo
+import com.letta.mobile.ui.components.foundation.LettaStatusDot
+import com.letta.mobile.ui.components.foundation.LettaVerticalDivider
+import com.letta.mobile.ui.host.LettaMenu
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaShapes
 import org.jetbrains.compose.resources.stringResource
 import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
@@ -78,7 +78,7 @@ internal fun CanvasCompactToolbar(
     Surface(
         modifier = modifier.testTag(CANVAS_COMPACT_TOOLBAR_TAG),
         // A full pill, the shape Craft, Freeform and Obsidian's canvas all float their tools in.
-        shape = RoundedCornerShape(percent = 50),
+        shape = LettaShapes.pill,
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
         tonalElevation = LettaDimens.Space.hair,
         shadowElevation = LettaDimens.Space.sm,
@@ -89,7 +89,7 @@ internal fun CanvasCompactToolbar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CompactPrimaryModes.forEach { (mode, label) ->
-                ControlButton(Control(iconFor(mode), label, selected = state.currentMode == mode), size = COMPACT_BUTTON) {
+                ControlButton(Control(iconFor(mode), label, selected = state.currentMode == mode), size = COMPACT_TOOL_BUTTON) {
                     dispatch(ControlsBarIntent.SelectMode(mode))
                 }
             }
@@ -101,7 +101,7 @@ internal fun CanvasCompactToolbar(
                 dispatchProperty = actions.dispatchProperty,
                 label = "Stroke color",
                 placement = PropertyPopoverPlacement.ABOVE,
-                modifier = Modifier.size(COMPACT_BUTTON),
+                modifier = Modifier.size(COMPACT_TOOL_BUTTON),
             )
             if (trailing != null) {
                 ToolbarDivider()
@@ -121,12 +121,12 @@ internal fun CanvasCompactToolbar(
 internal fun CompactBoardActions(undo: CanvasUndoActions, overflow: CanvasOverflow) {
     ControlButton(
         Control(Lucide.Undo2, stringResource(Res.string.canvas_foot_undo), enabled = undo.canUndo),
-        size = COMPACT_BUTTON,
+        size = COMPACT_TOOL_BUTTON,
         onClick = undo.onUndo,
     )
     ControlButton(
         Control(Lucide.Redo2, stringResource(Res.string.canvas_foot_redo), enabled = undo.canRedo),
-        size = COMPACT_BUTTON,
+        size = COMPACT_TOOL_BUTTON,
         onClick = undo.onRedo,
     )
     var open by remember { mutableStateOf(false) }
@@ -137,15 +137,9 @@ internal fun CompactBoardActions(undo: CanvasUndoActions, overflow: CanvasOverfl
         stringResource(Res.string.canvas_foot_more_status, canvasSyncStatusText(sync).label)
     }
     Box(Modifier.testTag(CANVAS_FOOT_MORE_TAG)) {
-        ControlButton(Control(Lucide.EllipsisVertical, label), size = COMPACT_BUTTON) { open = true }
+        ControlButton(Control(Lucide.EllipsisVertical, label), size = COMPACT_TOOL_BUTTON) { open = true }
         if (sync != null) {
-            Box(
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(LettaDimens.Space.xs)
-                    .size(SYNC_DOT)
-                    .background(canvasSyncDotColor(sync), CircleShape),
-            )
+            LettaStatusDot(canvasSyncTone(sync), Modifier.align(Alignment.TopEnd).padding(LettaDimens.Space.xs))
         }
         CanvasOverflowMenu(overflow, expanded = open, onDismiss = { open = false })
     }
@@ -153,12 +147,7 @@ internal fun CompactBoardActions(undo: CanvasUndoActions, overflow: CanvasOverfl
 
 @Composable
 private fun ToolbarDivider() {
-    Box(
-        Modifier
-            .padding(horizontal = LettaDimens.Space.xs)
-            .size(width = LettaDimens.Stroke.hairline, height = LettaDimens.Space.xl)
-            .background(MaterialTheme.colorScheme.outlineVariant),
-    )
+    LettaVerticalDivider(Modifier.padding(horizontal = LettaDimens.Space.xs).height(LettaDimens.Space.xl))
 }
 
 /** The bar's one way to put things on the board; the same entries a long press offers. */
@@ -166,8 +155,8 @@ private fun ToolbarDivider() {
 private fun AddButton(insert: BoardInsertActions, addAt: () -> Offset) {
     var open by remember { mutableStateOf(false) }
     Box {
-        ControlButton(Control(Lucide.Plus, "Add"), size = COMPACT_BUTTON) { open = true }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        ControlButton(Control(Lucide.Plus, "Add"), size = COMPACT_TOOL_BUTTON) { open = true }
+        LettaMenu(expanded = open, onDismiss = { open = false }) {
             CanvasInsertMenuItems(insert, at = addAt(), onDismiss = { open = false })
         }
     }
@@ -176,6 +165,3 @@ private fun AddButton(insert: BoardInsertActions, addAt: () -> Offset) {
 /** The tools that keep a button of their own on the phone bar, in bar order. */
 internal val CompactPrimaryModes: List<Pair<Mode, String>> =
     CanvasModes.filter { (mode, _) -> mode in setOf(Mode.SELECT, Mode.PEN, Mode.ERASER) }
-
-/** Big enough for a fingertip and small enough that the bar fits a 360dp phone. */
-private val COMPACT_BUTTON = 40.dp

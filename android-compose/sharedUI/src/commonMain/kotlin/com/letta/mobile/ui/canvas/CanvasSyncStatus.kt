@@ -1,30 +1,25 @@
 package com.letta.mobile.ui.canvas
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasSyncHealth
+import com.letta.mobile.ui.components.foundation.LettaStatusDot
+import com.letta.mobile.ui.components.foundation.lettaPanelBorder
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaStatusTone
 
 /** What the badge says for [health]: the words a user reads, and the fuller line a screen reader does. */
 internal data class CanvasSyncStatusText(val label: String, val description: String)
@@ -40,14 +35,13 @@ internal fun canvasSyncStatusText(health: CanvasSyncHealth): CanvasSyncStatusTex
     is CanvasSyncHealth.Failed -> CanvasSyncStatusText("Sync failed", "Sync failed: ${health.reason}")
 }
 
-/** The status dot's colour: green in sync, amber offline, the scheme's own for the rest. */
-@Composable
-internal fun canvasSyncDotColor(health: CanvasSyncHealth): Color = when (health) {
-    CanvasSyncHealth.Synced -> Color(0xFF22C55E)
-    CanvasSyncHealth.Connecting -> MaterialTheme.colorScheme.primary
-    is CanvasSyncHealth.OfflineQueued -> Color(0xFFF59E0B)
-    is CanvasSyncHealth.LocalOnly -> MaterialTheme.colorScheme.outline
-    is CanvasSyncHealth.Failed -> MaterialTheme.colorScheme.error
+/** The status dot's tone: success in sync, running while syncing, warning offline, idle local only, error failed. */
+internal fun canvasSyncTone(health: CanvasSyncHealth): LettaStatusTone = when (health) {
+    CanvasSyncHealth.Synced -> LettaStatusTone.Success
+    CanvasSyncHealth.Connecting -> LettaStatusTone.Running
+    is CanvasSyncHealth.OfflineQueued -> LettaStatusTone.Warning
+    is CanvasSyncHealth.LocalOnly -> LettaStatusTone.Idle
+    is CanvasSyncHealth.Failed -> LettaStatusTone.Error
 }
 
 /**
@@ -64,7 +58,7 @@ internal fun CanvasSyncStatusLine(health: CanvasSyncHealth, modifier: Modifier =
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        Box(Modifier.size(SYNC_DOT).background(canvasSyncDotColor(health), CircleShape))
+        LettaStatusDot(canvasSyncTone(health))
         Text(
             text = text.label,
             style = MaterialTheme.typography.labelMedium,
@@ -83,7 +77,7 @@ internal fun CanvasSyncStatusLine(health: CanvasSyncHealth, modifier: Modifier =
 @Composable
 internal fun CanvasSyncStatusBadge(health: CanvasSyncHealth, modifier: Modifier = Modifier) {
     val text = canvasSyncStatusText(health)
-    val dot = canvasSyncDotColor(health)
+    val tone = canvasSyncTone(health)
     val words = health != CanvasSyncHealth.Synced
     // In the header bar it is part of the bar; on its own it is a pill of its own.
     val inBar = LocalInHeaderBar.current
@@ -92,16 +86,16 @@ internal fun CanvasSyncStatusBadge(health: CanvasSyncHealth, modifier: Modifier 
             contentDescription = text.description
             liveRegion = LiveRegionMode.Polite
         },
-        shape = RoundedCornerShape(LettaDimens.Radius.md),
+        shape = MaterialTheme.shapes.medium,
         color = if (inBar) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
-        border = if (inBar) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        border = if (inBar) null else lettaPanelBorder(),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
-            Box(Modifier.size(SYNC_DOT).background(dot, CircleShape))
+            LettaStatusDot(tone)
             if (words) {
                 Text(
                     text = text.label,
@@ -109,12 +103,9 @@ internal fun CanvasSyncStatusBadge(health: CanvasSyncHealth, modifier: Modifier 
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 280.dp),
+                    modifier = Modifier.widthIn(max = SYNC_BADGE_MAX_WIDTH),
                 )
             }
         }
     }
 }
-
-/** The status dot, on the badge, in the menu and on the phone bar's more button. */
-internal val SYNC_DOT = 8.dp

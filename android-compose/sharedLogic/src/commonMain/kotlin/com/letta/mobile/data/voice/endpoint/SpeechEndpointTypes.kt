@@ -108,3 +108,19 @@ data class SpeechRequest(
     /** The audio format to return. */
     val encoding: AudioEncoding = AudioEncoding.MP3,
 )
+
+/** What the recogniser itself reported about whether one segment is speech: numbers only, never text. */
+data class RecognizerConfidence(
+    /** The segment's `no_speech_prob`, 0..1: how sure the recogniser is nothing was said. */
+    val noSpeechProbability: Double,
+    /** The segment's `avg_logprob` (natural log; 0 is certain, lower is less sure). */
+    val averageLogProbability: Double,
+)
+
+/** One transcription: the text, and the recogniser's own numbers for each segment when the server reported them. */
+data class SpeechTranscript(
+    /** The words heard. */
+    val text: VoiceText,
+    /** One entry per segment; empty when the server sent no usable segments (plain `json`, or `verbose_json` ignored). */
+    val segments: List<RecognizerConfidence> = emptyList(),
+)

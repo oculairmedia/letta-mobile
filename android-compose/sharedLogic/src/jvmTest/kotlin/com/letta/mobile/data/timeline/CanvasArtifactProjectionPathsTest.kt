@@ -85,7 +85,10 @@ class CanvasArtifactProjectionPathsTest {
             },
             envelope = TimelineRunEnvelope(TimelineRunBoundary.Ends, TimelineRunBoundary.Ends),
         )
-        val prepared = input.aggregatePreparedRuns(input.project(DefaultTimelineSettledProjectionAdapter))
+        val prepared = input.aggregatePreparedRuns(
+            input.project(DefaultTimelineSettledProjectionAdapter),
+            TimelineMetadataPage(rows = emptyList(), older = null, newer = null, revision = 1),
+        )
         val messages = prepared.mapNotNull { (it.preparedPresentation as? TimelineSettledPresentation.Render)?.item }
             .flatMap { item ->
                 when (item) {

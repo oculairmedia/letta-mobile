@@ -6,7 +6,6 @@ import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.theme.ChatRowMotion
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -15,22 +14,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.AgentPresence
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_open_chat
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.surface.timeline.ThinkingStatusText
-import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.LettaUnfoldButton
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.theme.ChatMotionTokens
@@ -150,19 +146,10 @@ internal fun companionWorking(uiState: ChatUiState, presence: AgentPresence?): B
 /** The canvas bar's way up to the chat: a chevron at its start (swiping the bar up does the same). */
 @Composable
 internal fun TouchOpenChatButton(onOpen: () -> Unit) {
-    Box(
-        Modifier
-            .size(TouchComposerDimens.actionTarget)
-            .clip(CircleShape)
-            .clickable(role = Role.Button, onClick = onOpen)
-            .testTag(ComposerTestTags.TOUCH_RESTORE),
-        contentAlignment = Alignment.Center,
-    ) {
-        DisclosureChevron(
-            expanded = false,
-            modifier = Modifier.size(LettaDimens.Space.xl),
-            contentDescription = stringResource(Res.string.composer_open_chat),
-            opensUpward = true,
-        )
-    }
+    LettaUnfoldButton(
+        onClick = onOpen,
+        contentDescription = stringResource(Res.string.composer_open_chat),
+        modifier = Modifier.size(TouchComposerDimens.actionTarget).testTag(ComposerTestTags.TOUCH_RESTORE),
+        glyphSize = TouchComposerDimens.actionIcon,
+    )
 }

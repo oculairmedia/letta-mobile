@@ -1,5 +1,9 @@
 package com.letta.mobile.ui.shell.pages.projects
 
+import com.letta.mobile.ui.components.foundation.LettaInlineNotice
+import com.letta.mobile.ui.components.foundation.LettaNotice
+import com.letta.mobile.ui.components.foundation.LettaNoticeAction
+import com.letta.mobile.ui.theme.tokens.LettaPanelTone
 import com.letta.mobile.ui.components.LocalObjectVerbs
 import com.letta.mobile.ui.components.items
 import com.letta.mobile.data.objectverbs.ObjectRef
@@ -225,10 +229,11 @@ private fun ProjectsLoadError(message: String, onRetry: () -> Unit) {
 
 @Composable
 private fun ProjectsNotice(message: String, onDismiss: () -> Unit) {
-    Row(Modifier.fillMaxWidth().testTag(ProjectsPageTags.NOTICE), verticalAlignment = Alignment.CenterVertically) {
-        Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-        TextButton(onClick = onDismiss) { Text(DISMISS) }
-    }
+    LettaInlineNotice(
+        notice = LettaNotice(message, tone = LettaPanelTone.Neutral),
+        modifier = Modifier.testTag(ProjectsPageTags.NOTICE),
+        dismiss = LettaNoticeAction(DISMISS, onDismiss),
+    )
 }
 
 /**

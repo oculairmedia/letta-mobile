@@ -1,5 +1,11 @@
 package com.letta.mobile.ui.shell.rail
 
+import androidx.compose.ui.semantics.Role
+import com.letta.mobile.ui.shell.tokens.ShellType
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.tokens.LettaShapes
 import com.letta.mobile.ui.components.LocalObjectVerbs
 
 import androidx.compose.animation.core.animateDpAsState
@@ -22,11 +28,9 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material3.Icon
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -44,7 +48,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.data.model.view.RuntimeViewId
@@ -168,7 +171,7 @@ private fun RailHeaderRow(onClick: () -> Unit, label: String?, icon: @Composable
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (label != null) Modifier.clickable(onClick = onClick) else Modifier),
+            .then(if (label != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(modifier = Modifier.width(LettaDimens.Pane.railWidth), contentAlignment = Alignment.Center) { icon() }
@@ -276,8 +279,7 @@ fun ShellRailAgentTile(
     ) {
         Text(
             text = entry.initial,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
+            style = ShellType.orbInitial,
             color = Color.White,
         )
     }
@@ -288,7 +290,7 @@ private fun SelectedRailMarker(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(width = LettaDimens.Space.xs, height = LettaDimens.Control.iconButton)
-            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(LettaDimens.Radius.sm)),
+            .background(MaterialTheme.colorScheme.primary, LettaShapes.pill),
     )
 }
 
@@ -312,7 +314,7 @@ private fun RailActionIcon(icon: ImageVector, description: String, selected: Boo
 private fun NewSessionButton(onNewSession: () -> Unit) {
     RailCircleButton(
         RailCircleButtonStyle(
-            icon = Icons.Outlined.Add,
+            icon = LettaIcons.Add,
             description = "New",
             diameter = LettaDimens.Control.iconButton,
             container = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -338,15 +340,10 @@ private fun RailCircleButton(style: RailCircleButtonStyle, onClick: () -> Unit) 
                 .size(style.diameter)
                 .clip(CircleShape)
                 .background(style.container)
-                .clickable(onClick = onClick),
+                .clickable(role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = style.icon,
-                contentDescription = style.description,
-                tint = style.tint,
-                modifier = Modifier.size(LettaDimens.Control.icon),
-            )
+            LettaIcon(style.icon, contentDescription = style.description, style = LettaIconStyle(tint = style.tint))
         }
     }
 }

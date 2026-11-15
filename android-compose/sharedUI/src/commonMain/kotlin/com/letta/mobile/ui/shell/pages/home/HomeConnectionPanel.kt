@@ -14,15 +14,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
 import com.letta.mobile.data.chat.runtime.isConnectionRetryable
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.ui.shell.tokens.ShellType
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Test tags for [HomeConnectionPanel]. */
@@ -74,7 +72,7 @@ fun HomeConnectionPanel(
                 style = MaterialTheme.typography.bodyLarge,
                 color = if (headline != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = ConnectionProseMaxWidth),
+                modifier = Modifier.widthIn(max = ShellDimens.connectionProseMaxWidth),
             )
             if (state.status.isConnectionRetryable) {
                 Button(
@@ -95,20 +93,15 @@ private fun ConnectionHeadline(headline: String?, wordmark: String) {
     if (headline != null) {
         Text(
             text = headline,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
+            style = ShellType.heroHeadline,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
     } else {
         Text(
             text = wordmark,
-            style = MaterialTheme.typography.displayLarge.copy(
-                fontFamily = FontFamily.Serif,
-                color = MaterialTheme.colorScheme.onSurface,
-                letterSpacing = 0.sp,
-            ),
-            fontWeight = FontWeight.SemiBold,
+            style = ShellType.wordmark,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -133,9 +126,6 @@ fun connectionFailureHeadline(status: ChatScreenStatus, errorMessage: String?): 
 // Prefixes of AppServerProbeResult.summary() for the terminal kinds.
 private const val AUTHENTICATION_FAILED_PREFIX = "Authentication failed:"
 private const val INCOMPATIBLE_SERVER_PREFIX = "Incompatible server:"
-
-/** Readable measure for the panel's centred prose (narrower than the chat column on purpose). */
-private val ConnectionProseMaxWidth = 520.dp
 
 internal fun connectionHeroBody(status: ChatScreenStatus): String = when (status) {
     is ChatScreenStatus.ConfigNeeded -> "Configure a backend, then ask questions, inspect tools, and continue work across sessions."

@@ -8,11 +8,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,11 +17,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.ui.text.LettaSelectionContainer
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
+import com.letta.mobile.ui.components.foundation.LettaStatusDot
 
 /**
  * A labelled single-value bar: [caption] is label to value ("Context" to "801 / 1,000,000
@@ -44,7 +42,7 @@ internal fun LettaMeter(caption: Pair<String, String>, fraction: Float?, colour:
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            Text(value, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(value, style = LettaTextAccents.labelMediumSemibold, maxLines = 1)
         }
         LettaMeterTrack(fraction, colour)
     }
@@ -52,7 +50,7 @@ internal fun LettaMeter(caption: Pair<String, String>, fraction: Float?, colour:
 
 @Composable
 private fun LettaMeterTrack(fraction: Float?, colour: Color) {
-    val shape = RoundedCornerShape(LettaDimens.Radius.sm)
+    val shape = MaterialTheme.shapes.small
     Box(Modifier.fillMaxWidth().height(LettaDimens.Space.xs).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
         val filled = fraction ?: 0f
         if (filled > 0f) {
@@ -67,7 +65,7 @@ internal fun LettaFactRow(label: String, value: String, modifier: Modifier = Mod
     Row(modifier, verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         LettaFactLabel(label)
         LettaSelectionContainer(Modifier.weight(1f)) {
-            Text(value, style = MaterialTheme.typography.bodySmall, fontFamily = if (monospace) FontFamily.Monospace else null)
+            Text(value, style = if (monospace) LettaTextStyles.mono else MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -83,8 +81,8 @@ internal fun LettaFactLabel(label: String) {
     )
 }
 
-/** A small round colour swatch: a legend key, a status light, a kind marker. */
+/** A small round colour swatch: a legend key, a status light, a kind marker. It is the status dot in [colour]. */
 @Composable
 internal fun LettaSwatch(colour: Color, modifier: Modifier = Modifier) {
-    Box(modifier.size(LettaDimens.Space.sm).clip(CircleShape).background(colour))
+    LettaStatusDot(color = colour, modifier = modifier)
 }

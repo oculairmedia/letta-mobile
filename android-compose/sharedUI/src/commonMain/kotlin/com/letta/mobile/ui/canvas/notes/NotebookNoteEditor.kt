@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.canvas.notes
 
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -20,7 +21,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import com.letta.mobile.data.canvas.notes.NotebookNoteSession
 import com.letta.mobile.data.canvas.notes.NotebookNoteState
 import com.letta.mobile.sharedui.resources.Res
@@ -99,7 +99,7 @@ private fun NoteBody(session: NotebookNoteSession, state: NotebookNoteState, mod
             onValueChange = session::edit,
             enabled = state.baseline != null,
             label = { Text(stringResource(Res.string.notebook_note_markdown)) },
-            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+            textStyle = LettaTextStyles.monoBody,
             modifier = Modifier.fillMaxSize().testTag("notebook-note-markdown"),
         )
     }
