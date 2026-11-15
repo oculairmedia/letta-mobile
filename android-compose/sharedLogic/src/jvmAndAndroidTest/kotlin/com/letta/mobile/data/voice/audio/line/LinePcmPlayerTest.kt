@@ -4,12 +4,19 @@ import com.letta.mobile.data.voice.AudioLevel
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioEncoding
+import com.letta.mobile.data.voice.audio.PcmChunk
 import com.letta.mobile.data.voice.audio.PcmFormat
 import com.letta.mobile.data.voice.audio.pcm.PcmAudio
 import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
 import com.letta.mobile.data.voice.audio.pcm.WavCodec
+import com.letta.mobile.data.voice.audio.pcm.play
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.Collections
@@ -268,5 +275,96 @@ class LinePcmPlayerCancellationTest {
         playing.cancelAndJoin()
         assertEquals("abort", speaker.events.first())
         assertEquals(0, speaker.writesAfterAbort)
+    }
+}
+
+/**
+ * A speaker that keeps the most recent write unplayed until the next write or the end of the stream,
+ * like a platform buffer that waits for more audio before playing a short tail.
+ */
+private class TailHoldingSpeaker : PcmOutputDevice {
+    val written = Collections.synchronizedList(mutableListOf<Short>())
+    val events = Collections.synchronizedList(mutableListOf<String>())
+    private val held = AtomicLong()
+
+    override fun open(format: PcmFormat): PcmOutputLine = lineAt(format)
+
+    private fun lineAt(opened: PcmFormat) = object : PcmOutputLine {
+        override val format = opened
+
+        override fun write(samples: ShortArray, count: Int): Int {
+            for (index in 0 until count) written += samples[index]
+            held.set(count.toLong())
+            return count
+        }
+
+        override fun playedFrames(): Long = written.size - held.get()
+
+        override fun endOfStream() = held.set(0)
+
+        override fun abort() {
+            events += "abort"
+        }
+
+        override fun release() {
+            events += "release"
+        }
+    }
+}
+
+/** Audio written as it streams in: waits for input are underruns, and stopping still cuts at once. */
+class LinePcmPlayerStreamTest {
+    private fun chunk(samples: Int) = PcmChunk(ShortArray(samples) { 1_000 }, PcmFormat(24_000))
+
+    @Test
+    fun aPauseBetweenChunksLongerThanTheStallBudgetIsAnUnderrunNotAFailure() = runBlocking {
+        val speaker = TailHoldingSpeaker()
+        val levels = mutableListOf<AudioLevel>()
+        val stream = flow {
+            emit(chunk(480))
+            delay(200.milliseconds)
+            emit(chunk(480))
+        }
+        LinePcmPlayer(speaker, options).play(stream) { levels += it }
+        assertEquals(960, speaker.written.size, "both chunks were written")
+        assertEquals(2, levels.size, "one level per 20 ms of audio")
+        assertEquals(listOf("release"), speaker.events.toList(), "played out, not aborted")
+    }
+
+    @Test
+    fun audioIsWrittenBeforeTheStreamEnds() = runBlocking {
+        val speaker = FakeSpeaker(SpeakerScript())
+        val more = CompletableDeferred<Unit>()
+        val stream = flow {
+            emit(chunk(480))
+            more.await()
+            emit(chunk(240))
+        }
+        val playing = launch(Dispatchers.IO) { LinePcmPlayer(speaker, options).play(stream) { } }
+        assertTrue(speaker.writing.await(5, TimeUnit.SECONDS), "the first chunk reached the line while the stream was open")
+        more.complete(Unit)
+        playing.join()
+        assertEquals(720, speaker.written.size)
+    }
+
+    @Test
+    fun cancellingWhileWaitingForTheNextChunkAbortsAndReleasesTheLine() = runBlocking {
+        val speaker = FakeSpeaker(SpeakerScript())
+        val stream = flow {
+            emit(chunk(480))
+            awaitCancellation()
+        }
+        val playing = launch(Dispatchers.IO) { LinePcmPlayer(speaker, options).play(stream) { } }
+        assertTrue(speaker.writing.await(5, TimeUnit.SECONDS))
+        playing.cancelAndJoin()
+        assertEquals(listOf("abort", "release"), speaker.events.toList())
+        assertEquals(0, speaker.writesAfterAbort)
+    }
+
+    @Test
+    fun anEmptyStreamOpensNothing() = runBlocking {
+        val speaker = FakeSpeaker(SpeakerScript())
+        LinePcmPlayer(speaker, options).play(emptyFlow()) { }
+        assertEquals(0, speaker.opens)
     }
 }

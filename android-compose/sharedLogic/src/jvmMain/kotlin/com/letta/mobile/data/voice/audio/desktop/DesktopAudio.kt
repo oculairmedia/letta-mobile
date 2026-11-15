@@ -50,9 +50,8 @@ object DesktopAudio {
         FrameAudioCapture({ format -> frameSource(format, device) })
 
     /**
-     * A speaker on `SourceDataLine`. Plays WAVE clips; refuses anything else (compressed audio with
-     * UNSUPPORTED_FORMAT), so build the endpoint synthesizer with `AudioEncoding.WAV`. Opens the
-     * line at the clip's rate, or at 48 kHz with resampling when the device refuses it.
+     * A speaker on `SourceDataLine`, playing PCM as it arrives. Opens the line at the stream's
+     * rate, or at 48 kHz with resampling when the device refuses it.
      */
     fun player(device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault): AudioPlayer =
         LinePcmPlayer(JavaSoundOutputDevice(device), PlayerOptions())

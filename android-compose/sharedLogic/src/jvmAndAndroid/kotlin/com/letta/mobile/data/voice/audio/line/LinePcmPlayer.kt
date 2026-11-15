@@ -2,21 +2,24 @@ package com.letta.mobile.data.voice.audio.line
 
 import com.letta.mobile.data.voice.AudioLevel
 import com.letta.mobile.data.voice.VoiceErrorCode
-import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioPlayer
+import com.letta.mobile.data.voice.audio.PcmChunk
 import com.letta.mobile.data.voice.audio.PcmFormat
-import com.letta.mobile.data.voice.audio.pcm.ClipDecoder
-import com.letta.mobile.data.voice.audio.pcm.PcmAudio
 import com.letta.mobile.data.voice.audio.pcm.PcmLevels
 import com.letta.mobile.data.voice.audio.pcm.StreamingResampler
 import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.produceIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
@@ -38,29 +41,37 @@ internal data class PlayerOptions(
 )
 
 /**
- * An [AudioPlayer] on a blocking [PcmOutputDevice]. It decodes the clip ([ClipDecoder]: WAVE only;
- * anything else is refused with a [VoiceAudioException]), mixes it down to mono, resamples
- * when the line opened at another rate, and writes it in short chunks, reporting each chunk's
- * level. It returns once the line has played everything it was given. A line that stops playing
- * queued audio for the stall timeout fails PLAYBACK_FAILED, also while a write or the end-of-stream
- * call is still blocked on it (the line is then aborted and released).
+ * An [AudioPlayer] on a blocking [PcmOutputDevice]. It opens the line at the first chunk's rate,
+ * then writes the audio as it arrives in short chunks, mixed down to mono and resampled when the
+ * line opened at another rate, reporting each chunk's level. A wait for the next chunk is an
+ * underrun, not the end: it returns once the stream has ended and the line has played everything
+ * it was given. A line that stops playing queued audio for the stall timeout while the writer is
+ * not waiting for input fails PLAYBACK_FAILED, also while a write or the end-of-stream call is
+ * still blocked on it (the line is then aborted and released).
  *
  * Cancelling stops at once and never drains: the cancelling coroutine aborts the line (stop and
- * discard queued audio) whatever the writer was doing (writing, or waiting for queued audio to play
- * out), waits for the writer to exit and releases the line before the cancellation completes.
- * Nothing is written after the abort.
+ * discard queued audio) whatever the writer was doing (writing, waiting for input, or waiting for
+ * queued audio to play out), stops collecting the stream, waits for the writer to exit and
+ * releases the line before the cancellation completes. Nothing is written after the abort.
  */
 internal class LinePcmPlayer(
     private val device: PcmOutputDevice,
     private val options: PlayerOptions = PlayerOptions(),
 ) : AudioPlayer {
-    override suspend fun play(clip: AudioClip, onLevel: (AudioLevel) -> Unit) {
-        val pcm = ClipDecoder.decode(clip).toMono()
-        val line = acquire(options.dispatcher) { device.open(PcmFormat(pcm.format.sampleRateHz)) }
+    override suspend fun play(chunks: Flow<PcmChunk>, onLevel: (AudioLevel) -> Unit) {
+        coroutineScope {
+            // overflow: the source is one sentence's audio, already held in memory by its producer.
+            val source = chunks.buffer(Channel.UNLIMITED).produceIn(this)
+            receiveNext(source)?.let { first -> playOn(first, source, onLevel) }
+        }
+    }
+
+    private suspend fun playOn(first: PcmChunk, source: ReceiveChannel<PcmChunk>, onLevel: (AudioLevel) -> Unit) {
+        val line = acquire(options.dispatcher) { device.open(PcmFormat(first.format.sampleRateHz)) }
         try {
             coroutineScope {
                 val progress = WriteProgress()
-                val writer = launch(options.dispatcher) { LineWriter(line, options, onLevel, progress).playAll(pcm) }
+                val writer = launch(options.dispatcher) { LineWriter(line, options, onLevel, progress).playAll(first, source) }
                 val watchdog = launch { watchWrites(line, progress, options) }
                 var ended = false
                 try {
@@ -78,16 +89,22 @@ internal class LinePcmPlayer(
             withContext(options.dispatcher + NonCancellable) { line.release() }
         }
     }
+}
 
-    private fun PcmAudio.toMono(): PcmAudio {
-        val channels = format.channels
-        if (channels == 1) return this
-        val mono = ShortArray(frames) { frame ->
-            var sum = 0
-            for (channel in 0 until channels) sum += samples[frame * channels + channel]
-            (sum / channels).toShort()
-        }
-        return PcmAudio(mono, PcmFormat(format.sampleRateHz))
+/** The next chunk of [source], or null once it has ended; a stream that failed throws its error. */
+private suspend fun receiveNext(source: ReceiveChannel<PcmChunk>): PcmChunk? {
+    val next = source.receiveCatching()
+    next.exceptionOrNull()?.let { throw it }
+    return next.getOrNull()
+}
+
+/** [samples] mixed down to mono when they hold [channels] interleaved channels. */
+private fun monoOf(samples: ShortArray, channels: Int): ShortArray {
+    if (channels == 1) return samples
+    return ShortArray(samples.size / channels) { frame ->
+        var sum = 0
+        for (channel in 0 until channels) sum += samples[frame * channels + channel]
+        (sum / channels).toShort()
     }
 }
 
@@ -103,6 +120,10 @@ private class WriteProgress {
 
     @Volatile
     var inCall = false
+
+    /** Whether the writer is waiting for the next chunk of the stream (an underrun is not a stall). */
+    @Volatile
+    var awaitingInput = false
 
     /** Whether the writer failed on its own (the line stopped playing): it has nothing left to discard. */
     @Volatile
@@ -133,8 +154,10 @@ private data class LineProgress(val played: Long, val queued: Long)
  * Fails with PLAYBACK_FAILED when, during the write phase, neither playback nor the accepted
  * audio moves for the stall timeout while the writer waits on the line: blocked inside `write()` or
  * `endOfStream()` (even the very first write, or after everything earlier has played), or retrying
- * writes the line will not take while accepted audio sits unplayed. Failing cancels the scope, whose
- * caller aborts the line so the blocked call returns, then releases it.
+ * writes the line will not take while accepted audio sits unplayed. Time the writer spends waiting
+ * for the stream's next chunk never counts: a line may hold a short tail unplayed until more audio
+ * arrives. Failing cancels the scope, whose caller aborts the line so the blocked call returns,
+ * then releases it.
  */
 private suspend fun watchWrites(line: PcmOutputLine, progress: WriteProgress, options: PlayerOptions) {
     var last = LineProgress(line.playedFrames(), progress.queued.get())
@@ -142,14 +165,14 @@ private suspend fun watchWrites(line: PcmOutputLine, progress: WriteProgress, op
     while (progress.writing) {
         delay(options.drainPoll)
         val now = LineProgress(line.playedFrames(), progress.queued.get())
-        val waiting = progress.inCall || now.queued > now.played
+        val waiting = !progress.awaitingInput && (progress.inCall || now.queued > now.played)
         stalled = if (now == last && waiting) stalled + options.drainPoll else Duration.ZERO
         if (stalled >= options.stallTimeout) throw VoiceAudioException(VoiceErrorCode.PLAYBACK_FAILED)
         last = now
     }
 }
 
-/** Writes one clip to one line, then waits for it to be played. */
+/** Writes one stream to one line as it arrives, then waits for it to be played. */
 private class LineWriter(
     private val line: PcmOutputLine,
     private val options: PlayerOptions,
@@ -158,19 +181,39 @@ private class LineWriter(
 ) {
     private var written = 0L
 
-    suspend fun playAll(pcm: PcmAudio) {
-        val resampler = pcm.format.sampleRateHz.takeIf { it != line.format.sampleRateHz }
-            ?.let { StreamingResampler(pcm.format, PcmFormat(line.format.sampleRateHz)) }
-        val step = (pcm.format.sampleRateHz * options.chunk.toDouble(DurationUnit.SECONDS)).toInt().coerceAtLeast(1)
-        for (start in pcm.samples.indices step step) {
-            val chunk = pcm.samples.copyOfRange(start, minOf(start + step, pcm.samples.size))
-            writeFully(resampler?.process(chunk) ?: chunk)
-            onLevel(PcmLevels.level(chunk))
+    suspend fun playAll(first: PcmChunk, rest: ReceiveChannel<PcmChunk>) {
+        val format = first.format
+        val resampler = format.sampleRateHz.takeIf { it != line.format.sampleRateHz }
+            ?.let { StreamingResampler(PcmFormat(it), PcmFormat(line.format.sampleRateHz)) }
+        val step = (format.sampleRateHz * options.chunk.toDouble(DurationUnit.SECONDS)).toInt().coerceAtLeast(1)
+        var chunk: PcmChunk? = first
+        while (chunk != null) {
+            if (chunk.format != format) throw VoiceAudioException(VoiceErrorCode.UNSUPPORTED_FORMAT)
+            writeSteps(monoOf(chunk.samples, format.channels), step, resampler)
+            chunk = awaitInput(rest)
         }
         resampler?.let { writeFully(it.finish()) }
         progress.blocking { line.endOfStream() }
         progress.writing = false
         awaitPlayed()
+    }
+
+    private suspend fun writeSteps(samples: ShortArray, step: Int, resampler: StreamingResampler?) {
+        for (start in samples.indices step step) {
+            val chunk = samples.copyOfRange(start, minOf(start + step, samples.size))
+            writeFully(resampler?.process(chunk) ?: chunk)
+            onLevel(PcmLevels.level(chunk))
+        }
+    }
+
+    /** The stream's next chunk, waited for without the watchdog counting the wait as a stall. */
+    private suspend fun awaitInput(rest: ReceiveChannel<PcmChunk>): PcmChunk? {
+        progress.awaitingInput = true
+        try {
+            return receiveNext(rest)
+        } finally {
+            progress.awaitingInput = false
+        }
     }
 
     private suspend fun writeFully(samples: ShortArray) {
