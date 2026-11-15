@@ -788,7 +788,6 @@
     "com.letta.mobile.ui.shell.header -> com.letta.mobile.ui.host",
     "com.letta.mobile.ui.shell.header -> com.letta.mobile.ui.search",
     "com.letta.mobile.ui.shell.header -> com.letta.mobile.ui.shell.pages.home",
-    "com.letta.mobile.ui.shell.header -> com.letta.mobile.ui.shell.shortcuts",
     "com.letta.mobile.ui.shell.header -> com.letta.mobile.ui.theme",
     "com.letta.mobile.ui.shell.pages.channels -> com.letta.mobile.data.channel",
     "com.letta.mobile.ui.shell.pages.channels -> com.letta.mobile.ui.components",

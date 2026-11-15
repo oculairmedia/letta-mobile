@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.shell.rail
 
+import com.letta.mobile.ui.components.foundation.LettaStatusDot
+import com.letta.mobile.ui.theme.tokens.LettaStatusTone
 import com.letta.mobile.ui.components.LocalObjectVerbs
 
 import androidx.compose.foundation.background
@@ -9,8 +11,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -167,7 +167,7 @@ internal fun librarySections(groups: List<AgentRailGroup>, entries: List<ShellRa
 @Composable
 private fun SpaceHeaderEnd(count: Int, working: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-        if (working) Box(Modifier.size(LettaDimens.Space.sm).background(MaterialTheme.colorScheme.primary, CircleShape))
+        if (working) LettaStatusDot(LettaStatusTone.Running)
         Text(count.toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -176,7 +176,7 @@ private fun SpaceHeaderEnd(count: Int, working: Boolean) {
 @Composable
 private fun LibraryAgentTile(entry: ShellRailEntry) {
     Box(contentAlignment = Alignment.Center) {
-        if (entry.thinking) ShellThinkingAura(entry, size = LettaDimens.Orb.lg, cornerRadius = LettaDimens.Radius.md)
+        if (entry.thinking) ShellThinkingAura(entry, size = LettaDimens.Orb.lg, shape = MaterialTheme.shapes.medium)
         ShellRailAgentTile(entry = entry, size = LettaDimens.Orb.lg, cornerRadius = LettaDimens.Radius.md)
     }
 }

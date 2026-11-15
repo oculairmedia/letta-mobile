@@ -94,7 +94,4 @@ android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/Canvas
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasSelectionBar.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasSelectionBar.kt 5
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/composer/ComposerAutocompleteViews.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/composer/ComposerAutocompleteViews.kt 14
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/search/LettaSearch.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/search/LettaSearch.kt 14
-android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/channels/ChannelsPageParts.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/skills/SkillsPageParts.kt 8
-android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/memfs/MemfsPageList.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/vault/AgentVaultPage.kt 8
-android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/skills/SkillsPageParts.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/skills/SkillsPageParts.kt 7
 android-compose/sharedUI/src/jvmMain/kotlin/com/letta/mobile/ui/canvas/CanvasImages.jvm.kt|android-compose/sharedUI/src/wasmJsMain/kotlin/com/letta/mobile/ui/canvas/CanvasImages.wasmJs.kt 6

@@ -1,8 +1,6 @@
 package com.letta.mobile.ui.shell.pages.channels
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -13,14 +11,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
@@ -29,11 +21,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
+import com.letta.mobile.ui.shell.tokens.ShellType
 import com.letta.mobile.data.channel.ChannelDisplayItem
 import com.letta.mobile.data.channel.ChannelDisplayStatus
 import com.letta.mobile.ui.components.LettaCatalogCard
 import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.LettaChipTabRow
+import com.letta.mobile.ui.components.LettaPageHeader
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaSearchField
+import com.letta.mobile.ui.components.foundation.LettaSearchOptions
+import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.theme.LettaPill
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshIconButton
@@ -71,15 +71,7 @@ data class ChannelsPageSlots(
 }
 
 private val DefaultChannelsSearchField = ChannelsSearchFieldSlot { query, onQueryChange, placeholder, modifier ->
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        placeholder = { Text(placeholder) },
-        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-        singleLine = true,
-        shape = MaterialTheme.shapes.medium,
-        modifier = modifier,
-    )
+    LettaSearchField(query, onQueryChange, modifier, LettaSearchOptions(placeholder = placeholder))
 }
 
 private val DefaultChannelsRefreshAction = ChannelsRefreshActionSlot { onRefresh, modifier ->
@@ -88,34 +80,19 @@ private val DefaultChannelsRefreshAction = ChannelsRefreshActionSlot { onRefresh
 
 @Composable
 internal fun ChannelsHeader(page: ChannelsPageScope) {
-    val horizontal = if (page.wide) LettaDimens.Space.xxl else LettaDimens.Space.lg
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(start = horizontal, end = horizontal, top = LettaDimens.Space.lg, bottom = LettaDimens.Space.sm),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) { if (page.options.showTitle) ChannelsTitle(page) }
-            if (page.wide) {
-                ChannelsSearch(page, Modifier.width(WideSearchWidth))
-            }
+    LettaPageHeader(
+        title = PAGE_TITLE.takeIf { page.options.showTitle },
+        caption = page.state.library.summaryLabel.takeIf { page.options.showTitle && !page.wide },
+        // The header puts the search beside the title on a wide page and on a row of its own on a phone.
+        context = { ChannelsSearch(page, if (page.wide) Modifier.width(ShellDimens.pageSearchWidth) else Modifier.fillMaxWidth()) },
+        refresh = {
             // Pointer only: touch pulls the list (ChannelsPage's LettaRefreshable).
             LettaRefreshAction(refreshing = false, onRefresh = page.actions::refresh, modifier = Modifier.testTag(ChannelsPageTags.REFRESH)) { onRefresh, modifier ->
                 page.slots.refreshAction.Content(onRefresh, modifier)
             }
-        }
-        if (!page.wide) ChannelsSearch(page, Modifier.fillMaxWidth())
-        ChannelsFilterChips(page)
-    }
-}
-
-@Composable
-private fun ChannelsTitle(page: ChannelsPageScope) {
-    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
-        Text(PAGE_TITLE, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        if (!page.wide) {
-            Text(page.state.library.summaryLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
+        },
+        controls = { ChannelsFilterChips(page) },
+    )
 }
 
 @Composable
@@ -131,11 +108,7 @@ private fun ChannelsSearch(page: ChannelsPageScope, modifier: Modifier) {
 @Composable
 private fun ChannelsFilterChips(page: ChannelsPageScope) {
     val chipModifier = if (page.options.touch) Modifier.minimumInteractiveComponentSize() else Modifier
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    LettaChipTabRow(Modifier.fillMaxWidth()) {
         val filter = page.state.statusFilter
         LettaChipTab(ALL_CHANNELS, filter == null, { page.actions.selectStatusFilter(null) }, chipModifier.testTag(ChannelsPageTags.filter(ALL_CHANNELS)))
         page.state.projection.statuses.forEach { status ->
@@ -187,10 +160,12 @@ internal fun ChannelDetail(channel: ChannelDisplayItem, page: ChannelsPageScope)
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(channel.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            IconButton(onClick = page.actions::clearSelection, modifier = Modifier.testTag(ChannelsPageTags.DETAIL_CLOSE)) {
-                Icon(Icons.Outlined.Close, contentDescription = CLOSE_LABEL)
-            }
+            Text(channel.title, style = ShellType.detailTitle, modifier = Modifier.weight(1f))
+            LettaIconButton(
+                icon = LettaButtonIcon(LettaIcons.Close, CLOSE_LABEL),
+                onClick = page.actions::clearSelection,
+                modifier = Modifier.testTag(ChannelsPageTags.DETAIL_CLOSE),
+            )
         }
         PillFlow { ChannelPills(channel, accent) }
         DetailField(SUBTITLE_LABEL, channel.subtitle)
@@ -249,4 +224,3 @@ private const val CLOSE_LABEL = "Close"
 private const val SUBTITLE_LABEL = "Status"
 private const val DETAIL_LABEL = "Transport"
 private const val STALE_NOTICE = "This channel is not live: anything it shows may be stale."
-private val WideSearchWidth = LettaDimens.Pane.navWidth

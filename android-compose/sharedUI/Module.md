@@ -343,6 +343,10 @@ Shortcut catalog, dispatch and help overlay. Provide ShortcutHub and shell short
 
 Agent panel/conversation sidebar with rename, archive and options dialogs. Supply sidebar row models and dialog/action callbacks; archive, rename and navigation effects stay in the owning controller/navigator.
 
+# Package com.letta.mobile.ui.shell.tokens
+
+Sizes and text styles that belong to one shell surface each (the Home fleet table's columns, the header's search trigger, the connection hero's wordmark), named so pages read them instead of writing literals. General spacing, control sizes, shapes and text styles come from the shared theme tokens instead.
+
 # Package com.letta.mobile.ui.shell.workspace
 
 The workspace mounted by desktop/browser hosts. LettaShellWorkspaceState and LettaShellWorkspaceHost connect product layout to hosts; native windows, backend repositories and transport lifecycles stay outside workspace composition.

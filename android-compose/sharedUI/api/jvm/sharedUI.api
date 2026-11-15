@@ -2740,6 +2740,11 @@ public final class com/letta/mobile/ui/components/foundation/LettaNoticeAction {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/components/foundation/LettaPagerButtonsKt {
+	public static final fun LettaNextButton (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/Modifier;ZLandroidx/compose/runtime/Composer;II)V
+	public static final fun LettaPreviousButton (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/Modifier;ZLandroidx/compose/runtime/Composer;II)V
+}
+
 public final class com/letta/mobile/ui/components/foundation/LettaPanelKt {
 	public static final fun LettaPanel (Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/theme/tokens/LettaPanelTone;ZLkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun containerColor (Lcom/letta/mobile/ui/theme/tokens/LettaPanelTone;Landroidx/compose/runtime/Composer;I)J
@@ -8004,13 +8009,6 @@ public final class com/letta/mobile/ui/shell/conversations/TimelineConversationP
 	public final fun getPinsLoaded ()Z
 }
 
-public final class com/letta/mobile/ui/shell/header/ComposableSingletons$ShellHeaderSearchBarKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/shell/header/ComposableSingletons$ShellHeaderSearchBarKt;
-	public fun <init> ()V
-	public final fun getLambda$-2426704$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-265897963$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-}
-
 public abstract interface class com/letta/mobile/ui/shell/header/HeaderAction {
 }
 
@@ -8677,8 +8675,6 @@ public final class com/letta/mobile/ui/shell/pages/channels/ComposableSingletons
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/channels/ComposableSingletons$ChannelsPagePartsKt;
 	public fun <init> ()V
 	public final fun getLambda$-1159786437$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-1212556935$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-1467905620$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-729690899$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
@@ -8819,12 +8815,6 @@ public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$Hom
 	public final fun getLambda$122529946$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
-public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomePinnedGridKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomePinnedGridKt;
-	public fun <init> ()V
-	public final fun getLambda$-2053074142$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-}
-
 public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeRecentsKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeRecentsKt;
 	public fun <init> ()V
@@ -8842,9 +8832,7 @@ public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$Hom
 public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeSectionsKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeSectionsKt;
 	public fun <init> ()V
-	public final fun getLambda$-1593592053$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-772144012$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1304579417$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1395988123$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/shell/pages/home/HomeConnectionPanelKt {
@@ -8994,19 +8982,7 @@ public final class com/letta/mobile/ui/shell/pages/home/HomePageTags {
 public final class com/letta/mobile/ui/shell/pages/memfs/ComposableSingletons$MemfsPageEditorKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/memfs/ComposableSingletons$MemfsPageEditorKt;
 	public fun <init> ()V
-	public final fun getLambda$1278598360$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$1913235727$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$675408647$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$866273834$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-}
-
-public final class com/letta/mobile/ui/shell/pages/memfs/ComposableSingletons$MemfsPageListKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/memfs/ComposableSingletons$MemfsPageListKt;
-	public fun <init> ()V
-	public final fun getLambda$-1578047088$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-1924162010$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$1121571230$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$364131377$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/shell/pages/memfs/MemfsPageKt {
@@ -9181,7 +9157,6 @@ public final class com/letta/mobile/ui/shell/pages/projects/ComposableSingletons
 	public fun <init> ()V
 	public final fun getLambda$-1954189777$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-2061115327$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-935785056$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/shell/pages/projects/ProjectChatIntent : java/lang/Enum {
@@ -9410,13 +9385,6 @@ public final class com/letta/mobile/ui/shell/pages/schedules/ComposableSingleton
 	public final fun getLambda$338603605$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
-public final class com/letta/mobile/ui/shell/pages/schedules/ComposableSingletons$SchedulesPageHeaderKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/schedules/ComposableSingletons$SchedulesPageHeaderKt;
-	public fun <init> ()V
-	public final fun getLambda$-1185704907$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1799522860$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-}
-
 public final class com/letta/mobile/ui/shell/pages/schedules/CronTaskId {
 	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/ui/shell/pages/schedules/CronTaskId;
 	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
@@ -9546,10 +9514,8 @@ public final class com/letta/mobile/ui/shell/pages/schedules/SchedulesPageTags {
 public final class com/letta/mobile/ui/shell/pages/skills/ComposableSingletons$SkillsPagePartsKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/skills/ComposableSingletons$SkillsPagePartsKt;
 	public fun <init> ()V
-	public final fun getLambda$-335291260$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$181182409$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$21341314$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$363897146$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$904829909$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
@@ -9771,7 +9737,6 @@ public final class com/letta/mobile/ui/shell/pages/workspace/ComposableSingleton
 	public fun <init> ()V
 	public final fun getLambda$-1015287559$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-131602520$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-888697685$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-894820228$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$1996153867$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$2120303523$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
@@ -9779,16 +9744,9 @@ public final class com/letta/mobile/ui/shell/pages/workspace/ComposableSingleton
 	public final fun getLambda$458716397$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
-public final class com/letta/mobile/ui/shell/pages/workspace/ComposableSingletons$WorkspaceFileLinkKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/workspace/ComposableSingletons$WorkspaceFileLinkKt;
-	public fun <init> ()V
-	public final fun getLambda$2036942693$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-}
-
 public final class com/letta/mobile/ui/shell/pages/workspace/ComposableSingletons$WorkspaceFileViewerKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/workspace/ComposableSingletons$WorkspaceFileViewerKt;
 	public fun <init> ()V
-	public final fun getLambda$-1914604163$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-676852416$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
@@ -10181,7 +10139,7 @@ public final class com/letta/mobile/ui/shell/rail/ShellRailPinBindingKt {
 }
 
 public final class com/letta/mobile/ui/shell/rail/ShellThinkingAuraKt {
-	public static final fun ShellThinkingAura-icBs0wY (Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;FLandroidx/compose/ui/Modifier;FLandroidx/compose/runtime/Composer;II)V
+	public static final fun ShellThinkingAura-DzVHIIc (Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;FLandroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/Shape;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/shell/scaffold/LettaPageScaffoldDefaults {

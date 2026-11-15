@@ -16,10 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -33,6 +30,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.data.secrets.AgentVaultActions
 import com.letta.mobile.data.secrets.AgentVaultLoad
 import com.letta.mobile.data.secrets.AgentVaultState
@@ -158,7 +157,7 @@ private fun VaultHeader(page: AgentVaultPageScope) {
                 enabled = page.state.agentId != null && !page.state.saving,
                 modifier = Modifier.testTag(AgentVaultPageTags.ADD),
             ) {
-                Icon(Icons.Outlined.Add, contentDescription = null)
+                LettaIcon(LettaIcons.Add, contentDescription = null)
                 Text(ADD_LABEL, modifier = Modifier.padding(start = LettaDimens.Space.xs))
             }
         }
