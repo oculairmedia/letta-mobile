@@ -204,13 +204,7 @@ internal fun A2uiBooleanInput(
         surface.dataModel.applyPatch(path = effectivePath, value = JsonPrimitive(next))
     }
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(enabled = !surfaceSubmitting, role = kind.role) { update(!checked) },
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    A2uiControlRow(A2uiRowAction(kind.role, !surfaceSubmitting) { update(!checked) }, label, modifier) {
         when (kind) {
             A2uiBooleanInputKind.Checkbox -> Checkbox(
                 checked = checked,
@@ -225,17 +219,6 @@ internal fun A2uiBooleanInput(
                 modifier = Modifier.testTag(kind.testTag),
             )
         }
-        label?.let {
-            Text(
-                text = it,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (surfaceSubmitting) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-            )
-        }
     }
 }
 
@@ -244,6 +227,31 @@ private val A2uiBooleanInputKind.role: Role
         A2uiBooleanInputKind.Checkbox -> Role.Checkbox
         A2uiBooleanInputKind.Switch -> Role.Switch
     }
+
+/** What tapping an [A2uiControlRow] does: the [role] it announces, whether it is [enabled], and the [onClick]. */
+private class A2uiRowAction(val role: Role, val enabled: Boolean, val onClick: () -> Unit)
+
+/**
+ * One choice row of an input (a checkbox, switch or radio choice): the [control], then its [label],
+ * the whole row the tap target. The label dims while the surface is submitting.
+ */
+@Composable
+private fun A2uiControlRow(action: A2uiRowAction, label: String?, modifier: Modifier = Modifier, control: @Composable () -> Unit) {
+    Row(
+        modifier = modifier.fillMaxWidth().clickable(enabled = action.enabled, role = action.role, onClick = action.onClick),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        control()
+        label?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (action.enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
 
 @Composable
 internal fun A2uiRadio(
@@ -286,26 +294,11 @@ internal fun A2uiRadio(
             )
         }
         options.forEach { option ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = !surfaceSubmitting, role = Role.RadioButton) { update(option.key) },
-                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            A2uiControlRow(A2uiRowAction(Role.RadioButton, !surfaceSubmitting) { update(option.key) }, option.label) {
                 RadioButton(
                     selected = value == option.key,
                     onClick = { update(option.key) },
                     enabled = !surfaceSubmitting,
-                )
-                Text(
-                    text = option.label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (surfaceSubmitting) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
                 )
             }
         }
@@ -405,16 +398,11 @@ internal fun A2uiChoicePicker(
             }
         } else {
             options.forEach { option ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(A2uiTestTags.CHOICE_PICKER_LIST_OPTION)
-                        .clickable(
-                            enabled = !surfaceSubmitting,
-                            role = if (multiSelect) Role.Checkbox else Role.RadioButton,
-                        ) { update(option.key) },
-                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-                    verticalAlignment = Alignment.CenterVertically,
+                val role = if (multiSelect) Role.Checkbox else Role.RadioButton
+                A2uiControlRow(
+                    A2uiRowAction(role, !surfaceSubmitting) { update(option.key) },
+                    option.label,
+                    Modifier.testTag(A2uiTestTags.CHOICE_PICKER_LIST_OPTION),
                 ) {
                     if (multiSelect) {
                         Checkbox(
@@ -429,15 +417,6 @@ internal fun A2uiChoicePicker(
                             enabled = !surfaceSubmitting,
                         )
                     }
-                    Text(
-                        text = option.label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (surfaceSubmitting) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
                 }
             }
         }
