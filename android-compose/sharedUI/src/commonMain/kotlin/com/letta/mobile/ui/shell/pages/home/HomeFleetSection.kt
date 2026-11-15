@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.shell.pages.home
 
+import com.letta.mobile.ui.shell.tokens.ShellType
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LocalObjectVerbs
 import com.letta.mobile.ui.components.LettaEmptyHint
@@ -178,7 +179,7 @@ private fun FleetAgentIdentity(agent: FleetAgentStat, page: HomePageScope, modif
             // An unresolved name is the raw backend id; it renders as the technical fallback it is.
             Text(
                 text = agent.name,
-                style = if (agent.nameIsIdFallback) LettaTextStyles.mono else MaterialTheme.typography.titleSmall,
+                style = if (agent.nameIsIdFallback) ShellType.idFallback else ShellType.bodyEmphasis,
                 color = if (agent.nameIsIdFallback) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

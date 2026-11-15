@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import com.letta.mobile.ui.shell.tokens.ShellType
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.skills.SkillCategories
@@ -256,7 +257,7 @@ internal fun SkillDetail(skill: Skill, page: SkillsPageScope) {
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(skill.name, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            Text(skill.name, style = ShellType.detailTitle, modifier = Modifier.weight(1f))
             LettaIconButton(
                 icon = LettaButtonIcon(LettaIcons.Close, CLOSE),
                 onClick = { page.controls.onSelectSkill(null) },

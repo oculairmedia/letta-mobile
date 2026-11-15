@@ -29,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import com.letta.mobile.ui.shell.tokens.ShellType
+import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.data.schedules.CronBuilder
 import com.letta.mobile.data.schedules.CronBuilderState
 import com.letta.mobile.data.schedules.CronCadence
@@ -61,7 +63,7 @@ internal fun ScheduleFormPane(
         kind = LettaPaneKind.Modal,
         onDismiss = onDismiss,
         title = "New schedule",
-        size = PaneSize(width = LettaDimens.Pane.modalWidth),
+        size = PaneSize(width = ShellDimens.scheduleFormWidth),
         testTag = SchedulesPageTags.FORM,
     ) {
         Column(
@@ -175,7 +177,7 @@ private fun CadencePreview(state: CronBuilderState, clock: ScheduleClock) {
         Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(LettaDimens.Space.md).testTag(SchedulesPageTags.FORM_PREVIEW),
     ) {
-        Text(CronBuilder.preview(state), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+        Text(CronBuilder.preview(state), style = ShellType.bodyEmphasis, color = MaterialTheme.colorScheme.onSurface)
         CronBuilder.previewRuns(state, clock.now, clock.zone, PREVIEW_RUNS).forEach {
             Text(
                 "• ${ScheduleFormat.dateLabel(it, clock.zone)} · ${ScheduleFormat.timeOfDay(it, clock.zone)}",

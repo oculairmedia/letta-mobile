@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.shell.pages.schedules
 
 import androidx.compose.material3.minimumInteractiveComponentSize
+import com.letta.mobile.ui.shell.tokens.ShellType
 import com.letta.mobile.ui.components.foundation.LettaDivider
 import com.letta.mobile.ui.components.foundation.LettaNextButton
 import com.letta.mobile.ui.components.foundation.LettaPreviousButton
@@ -117,7 +118,7 @@ private fun RangeNavigation(range: SchedulesRange, shown: Boolean, compact: Bool
         )
         Text(
             range.label,
-            style = MaterialTheme.typography.titleSmall,
+            style = if (compact) MaterialTheme.typography.titleSmall else ShellType.bodyEmphasis,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
             maxLines = 1,

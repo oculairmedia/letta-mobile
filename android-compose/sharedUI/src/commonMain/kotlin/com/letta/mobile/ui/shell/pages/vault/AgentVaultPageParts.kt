@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import com.letta.mobile.ui.shell.tokens.ShellType
 import com.letta.mobile.ui.components.foundation.LettaButtonIcon
 import com.letta.mobile.ui.components.foundation.LettaIconButton
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
@@ -40,7 +41,7 @@ internal fun SecretRow(key: String, page: AgentVaultPageScope) {
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
-                Text(key, style = LettaTextStyles.monoBody)
+                Text(key, style = ShellType.secretKey)
                 Text(
                     page.state.displayValue(key),
                     style = LettaTextStyles.mono,

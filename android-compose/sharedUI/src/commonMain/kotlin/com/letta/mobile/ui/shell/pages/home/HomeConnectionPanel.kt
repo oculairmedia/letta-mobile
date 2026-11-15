@@ -16,12 +16,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
 import com.letta.mobile.data.chat.runtime.isConnectionRetryable
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.shell.tokens.ShellType
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /** Test tags for [HomeConnectionPanel]. */
 object HomeConnectionPanelTags {
@@ -72,7 +72,7 @@ fun HomeConnectionPanel(
                 style = MaterialTheme.typography.bodyLarge,
                 color = if (headline != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = LettaDimens.Pane.noticeMaxWidth),
+                modifier = Modifier.widthIn(max = ShellDimens.connectionProseMaxWidth),
             )
             if (state.status.isConnectionRetryable) {
                 Button(
@@ -93,7 +93,7 @@ private fun ConnectionHeadline(headline: String?, wordmark: String) {
     if (headline != null) {
         Text(
             text = headline,
-            style = LettaTextStyles.pageTitle,
+            style = ShellType.heroHeadline,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )

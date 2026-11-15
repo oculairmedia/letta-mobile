@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.shell.sidebar
 
 import androidx.compose.ui.semantics.Role
+import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.ObjectVerbMenus
@@ -260,7 +261,7 @@ private fun RowMarkIcon(icon: ImageVector, description: String, tag: String) {
         imageVector = icon,
         contentDescription = description,
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.size(LettaDimens.Control.iconSm).testTag(tag),
+        modifier = Modifier.size(ShellDimens.conversationMarkIcon).testTag(tag),
     )
 }
 

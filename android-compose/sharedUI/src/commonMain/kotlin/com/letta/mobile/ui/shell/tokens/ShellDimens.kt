@@ -41,4 +41,16 @@ internal object ShellDimens {
 
     /** A schedule's detail sheet on a phone. */
     val scheduleDetailSheetHeight: Dp = 520.dp
+
+    /** The new-schedule form pane: wide enough for the cadence presets on one row. */
+    val scheduleFormWidth: Dp = 560.dp
+
+    /** Readable measure for the connection hero's centred prose (narrower than the chat column on purpose). */
+    val connectionProseMaxWidth: Dp = 520.dp
+
+    /** How far the thinking aura's glow spreads past the agent's silhouette. */
+    val thinkingAuraBlur: Dp = 6.dp
+
+    /** A conversation row's settled / pinned marks: smaller than the small glyph, so two sit beside the title. */
+    val conversationMarkIcon: Dp = 12.dp
 }

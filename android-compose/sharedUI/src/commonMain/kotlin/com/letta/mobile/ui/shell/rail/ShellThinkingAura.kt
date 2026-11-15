@@ -26,10 +26,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.util.lerp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Shape
+import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.chat.AGENT_TILE_OVERSCALE
 import com.letta.mobile.ui.chat.agentOrbBrush
 import com.letta.mobile.ui.chat.agentTileStill
-import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /**
@@ -54,7 +54,7 @@ fun ShellThinkingAura(
             scaleY = scale
             alpha = lerp(ALPHA_REST, ALPHA_PEAK, breath.value)
         }
-        .blur(LettaDimens.Space.sm, BlurredEdgeTreatment.Unbounded)
+        .blur(ShellDimens.thinkingAuraBlur, BlurredEdgeTreatment.Unbounded)
     val identity = entry.identity
     val still = identity?.let { agentTileStill(it) }
     if (identity != null && still != null) {

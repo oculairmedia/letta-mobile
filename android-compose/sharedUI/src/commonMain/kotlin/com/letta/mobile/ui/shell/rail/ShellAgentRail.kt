@@ -1,11 +1,11 @@
 package com.letta.mobile.ui.shell.rail
 
 import androidx.compose.ui.semantics.Role
+import com.letta.mobile.ui.shell.tokens.ShellType
 import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.tokens.LettaShapes
-import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.components.LocalObjectVerbs
 
 import androidx.compose.animation.core.animateDpAsState
@@ -279,7 +279,7 @@ fun ShellRailAgentTile(
     ) {
         Text(
             text = entry.initial,
-            style = LettaTextStyles.labelSemibold,
+            style = ShellType.orbInitial,
             color = Color.White,
         )
     }

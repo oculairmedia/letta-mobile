@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import com.letta.mobile.ui.shell.tokens.ShellType
 import com.letta.mobile.data.channel.ChannelDisplayItem
 import com.letta.mobile.data.channel.ChannelDisplayStatus
 import com.letta.mobile.ui.components.LettaCatalogCard
@@ -159,7 +160,7 @@ internal fun ChannelDetail(channel: ChannelDisplayItem, page: ChannelsPageScope)
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(channel.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            Text(channel.title, style = ShellType.detailTitle, modifier = Modifier.weight(1f))
             LettaIconButton(
                 icon = LettaButtonIcon(LettaIcons.Close, CLOSE_LABEL),
                 onClick = page.actions::clearSelection,
