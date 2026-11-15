@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.chat.subagents
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,9 +29,11 @@ import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterRowSlots
 import com.letta.mobile.ui.components.list.RosterRowState
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaDoneGlyph
-import com.letta.mobile.ui.theme.LettaFailedGlyph
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.components.line.StatusTone
+import com.letta.mobile.ui.components.foundation.StatusGlyph
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 @Composable
 internal fun RunningCard(
@@ -42,7 +43,11 @@ internal fun RunningCard(
 ) {
     var expanded by remember(item.key) { mutableStateOf(false) }
     val canExpand = item.activity.size > 1
-    val expandToggle = if (canExpand) Modifier.clickable(role = Role.Button) { expanded = !expanded } else Modifier
+    val expandToggle = if (canExpand) {
+        Modifier.lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = { expanded = !expanded })
+    } else {
+        Modifier
+    }
     val orbActivity = if (item.status == SubagentRosterStatus.QUIET) AgentActivity.Idle else AgentActivity.Working
     val visibleLines = if (expanded) item.activity else item.activity.takeLast(1)
     Surface(
@@ -86,7 +91,7 @@ internal fun EndedRow(
         spec = LettaListRowSpec(title = item.title, subtitle = item.subtitle(), trailing = item.identity.label),
         row = row,
         slots = RosterRowSlots(
-            leading = { StatusGlyph(item.status) },
+            leading = { RosterStatusGlyph(item.status) },
             end = {
                 ConversationAction(item, onOpenConversation)
                 if (onDismiss != null) TextButton(onClick = { onDismiss(item) }) { Text("Dismiss") }
@@ -100,13 +105,17 @@ internal fun EndedRow(
 
 /** A check or an error mark once ended; a background run still going keeps its orb. */
 @Composable
-private fun StatusGlyph(status: SubagentRosterStatus) {
+private fun RosterStatusGlyph(status: SubagentRosterStatus) {
     if (!status.isTerminal) {
         AgentActivityOrb(size = LettaDimens.Control.icon, activity = AgentActivity.Working)
         return
     }
     val failed = status == SubagentRosterStatus.FAILED || status == SubagentRosterStatus.CANCELLED
-    if (failed) LettaFailedGlyph(contentDescription = statusWord(status)) else LettaDoneGlyph(contentDescription = statusWord(status))
+    StatusGlyph(
+        tone = if (failed) StatusTone.Failed else StatusTone.Completed,
+        contentDescription = statusWord(status),
+        size = LettaDimens.Control.icon,
+    )
 }
 
 @Composable

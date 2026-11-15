@@ -25,7 +25,7 @@ import com.letta.mobile.sharedui.resources.shell_new_conversation_tab
 import com.letta.mobile.sharedui.resources.shell_sidebar_hide
 import com.letta.mobile.sharedui.resources.shell_sidebar_show
 import com.letta.mobile.sharedui.resources.shell_workspace_title
-import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.tabs.LettaTab
 import com.letta.mobile.ui.components.tabs.LettaTabStrip
 import com.letta.mobile.ui.components.tabs.LettaTabStripActions

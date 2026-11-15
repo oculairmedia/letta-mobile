@@ -68,7 +68,7 @@ import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.timeline.timelineLogger
 import com.letta.mobile.ui.icons.lettaIconByName
-import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaSpinner
 import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.foundation.LettaPanel

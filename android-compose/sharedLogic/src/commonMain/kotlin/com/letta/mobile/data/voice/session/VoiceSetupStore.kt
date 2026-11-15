@@ -32,6 +32,8 @@ data class VoiceSetup(
      * echo-cancelled (they use headphones). Where it is echo-cancelled, speaking always interrupts.
      */
     val interruptBySpeaking: Boolean = false,
+    /** Which ear voice mode listens with. */
+    val listening: VoiceListening = VoiceListening.AUTOMATIC,
 ) {
     /** Whether speaking over a reply interrupts it, on a microphone path that is [echoCancelled] or not. */
     fun bargeInByVoice(echoCancelled: Boolean): Boolean = echoCancelled || interruptBySpeaking
@@ -154,6 +156,12 @@ class VoiceSetupStore(
         state.value = read()
     }
 
+    /** Stores which ear voice mode listens with; takes effect from the next start. */
+    fun setListening(listening: VoiceListening) {
+        settings.putString(KEY_LISTENING, listening.name)
+        state.value = read()
+    }
+
     /** The key a [draft] would leave stored: the typed one, none when blanked, else the stored one. */
     fun keyAfter(draft: VoiceSetupDraft): String? = when {
         secrets == null -> null
@@ -175,6 +183,7 @@ class VoiceSetupStore(
         grants = VoiceEndpointGrants(parseGrants(settings.getString(KEY_GRANTS).orEmpty())),
         hasApiKey = storedKey() != null,
         interruptBySpeaking = settings.getString(KEY_INTERRUPT_BY_SPEAKING) == true.toString(),
+        listening = VoiceListening.entries.firstOrNull { it.name == settings.getString(KEY_LISTENING) } ?: VoiceListening.AUTOMATIC,
     )
 
     private fun parseGrants(text: String): Set<VoiceEndpointGrant> = text.split(GRANT_SEPARATOR).mapNotNull { entry ->
@@ -195,6 +204,9 @@ class VoiceSetupStore(
 
         /** Whether to interrupt replies by speaking on a microphone without echo cancellation. */
         const val KEY_INTERRUPT_BY_SPEAKING: String = "voice.interruptBySpeaking"
+
+        /** Which ear voice mode listens with ([VoiceListening]). */
+        const val KEY_LISTENING: String = "voice.listening"
 
         private const val GRANT_SEPARATOR = "\n"
         private const val FIELD_SEPARATOR = " "

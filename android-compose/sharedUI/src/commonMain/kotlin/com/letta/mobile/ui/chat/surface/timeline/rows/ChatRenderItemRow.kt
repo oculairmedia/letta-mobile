@@ -14,7 +14,7 @@ import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.common.GroupPosition
-import com.letta.mobile.ui.components.LocalStatusGlyphAnimated
+import com.letta.mobile.ui.components.foundation.LocalStatusGlyphAnimated
 
 /**
  * Renders one timeline item (a single message or a run block) with

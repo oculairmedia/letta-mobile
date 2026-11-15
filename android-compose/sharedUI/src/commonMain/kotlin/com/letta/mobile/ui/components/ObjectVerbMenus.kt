@@ -16,6 +16,7 @@ import com.letta.mobile.data.objectverbs.registry.VerbRegistry
 import com.letta.mobile.ui.icons.LettaIcons
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 
 /** A lens supplies identity, presentation context and an optional desired pin action. */
 typealias ObjectVerbMenus = (ObjectRef, String, Boolean?) -> List<LettaMenuItem>

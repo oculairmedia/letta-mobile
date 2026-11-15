@@ -28,7 +28,7 @@ import com.letta.mobile.sharedui.resources.canvas_viewer_load_failed
 import com.letta.mobile.sharedui.resources.canvas_viewer_retry
 import com.letta.mobile.ui.canvas.lifetime.CanvasWorkspaceLoadState
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaSpinner
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController

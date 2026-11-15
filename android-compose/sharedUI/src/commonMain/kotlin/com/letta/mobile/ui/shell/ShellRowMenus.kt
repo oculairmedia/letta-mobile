@@ -21,7 +21,7 @@ import com.letta.mobile.data.objectverbs.ObjectRef
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.ui.components.ObjectVerbMenus
 import com.letta.mobile.ui.components.items
-import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.host.LocalRowHoldDrag
 import com.letta.mobile.ui.host.RowDragTracker

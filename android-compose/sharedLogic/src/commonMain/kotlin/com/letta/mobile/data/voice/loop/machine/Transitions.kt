@@ -49,6 +49,7 @@ internal object Transitions {
                 speaking = null,
                 outputLevel = AudioLevel.Silent,
                 failure = failure,
+                partial = null,
                 turnFailure = null,
                 retryUtterance = null,
             ),

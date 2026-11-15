@@ -25,6 +25,8 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.mascot.mascotAtWork
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.components.disclosure.LettaMenuIndicator
+import com.letta.mobile.ui.components.disclosure.LettaMenuIndicatorStyle
 
 internal object AgentIdentityPillTestTags {
     /** The pill's surface: one per screen, wherever it is drawn. */
@@ -117,11 +119,10 @@ fun AgentIdentityPill(identity: AgentIdentity, modifier: Modifier = Modifier) {
                     tint = MaterialTheme.colorScheme.tertiary,
                 )
             }
-            Icon(
-                LettaIcons.ArrowDropDown,
-                contentDescription = "Switch agent",
+            LettaMenuIndicator(
                 modifier = Modifier.size(MarkSize),
-                tint = LocalContentColor.current,
+                contentDescription = "Switch agent",
+                style = LettaMenuIndicatorStyle(tint = LocalContentColor.current),
             )
         }
     }

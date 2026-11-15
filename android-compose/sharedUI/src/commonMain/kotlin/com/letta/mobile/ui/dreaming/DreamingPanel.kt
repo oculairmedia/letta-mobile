@@ -40,7 +40,7 @@ import com.letta.mobile.data.dreaming.DreamingState
 import com.letta.mobile.data.dreaming.DreamTrigger
 import com.letta.mobile.data.model.reflection.ReflectionModelChoice
 import com.letta.mobile.ui.shell.pages.memfs.MemfsFileDiffView
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.util.time.TimeLabels
 import androidx.compose.ui.semantics.Role

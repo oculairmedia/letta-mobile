@@ -25,14 +25,17 @@ import com.letta.mobile.data.repository.modelcontrol.ProviderConnectMethod
 import com.letta.mobile.data.repository.modelcontrol.ProviderSection
 import com.letta.mobile.data.repository.modelcontrol.connectMethod
 import com.letta.mobile.data.repository.modelcontrol.connectMethodOn
-import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.foundation.LettaStatusDot
 import com.letta.mobile.ui.providers.icons.ProviderIcon
 import com.letta.mobile.ui.providers.icons.ProviderIdentity
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaTonalPill
+import com.letta.mobile.ui.components.foundation.LettaTonalPill
 import com.letta.mobile.ui.theme.pill.LettaPillColors
 import com.letta.mobile.ui.theme.tokens.LettaStatusTone
+import com.letta.mobile.ui.components.disclosure.DisclosureRow
+import com.letta.mobile.ui.components.disclosure.DisclosureRowStyle
+import com.letta.mobile.ui.components.line.LineDisclosure
+import androidx.compose.foundation.layout.PaddingValues
 
 /** Rows of [ProviderManagementPane]: the provider card header, its action strip, and one model. */
 
@@ -44,15 +47,13 @@ private val rowIndent = LettaDimens.Orb.md + LettaDimens.Space.sm + LettaDimens.
 @Composable
 internal fun ProviderHeaderRow(section: ProviderSection, expanded: Boolean, inAppSignIn: Boolean, onClick: () -> Unit) {
     Surface(
-        onClick = onClick,
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth().testTag("${ProviderManagementTags.PROVIDER_PREFIX}${section.key}"),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        DisclosureRow(
+            disclosure = LineDisclosure(expanded = expanded, onToggle = onClick),
+            style = ProviderHeaderStyle,
         ) {
             ProviderMark(section)
             Column(modifier = Modifier.weight(1f)) {
@@ -69,10 +70,12 @@ internal fun ProviderHeaderRow(section: ProviderSection, expanded: Boolean, inAp
                 }
             }
             if (section.models.isNotEmpty()) CountPill(section)
-            DisclosureChevron(expanded = expanded, compact = true)
         }
     }
 }
+
+/** A provider header's line: the card's inset inside the toggle, the small chevron. */
+private val ProviderHeaderStyle = DisclosureRowStyle(contentPadding = PaddingValues(LettaDimens.Space.md), compactChevron = true)
 
 /** The provider's logo, or its initial, filled when it is connected. */
 @Composable

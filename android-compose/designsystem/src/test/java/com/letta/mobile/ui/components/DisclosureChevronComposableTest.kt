@@ -23,6 +23,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import com.letta.mobile.ui.components.disclosure.ChevronEmphasis
+import com.letta.mobile.ui.components.disclosure.ChevronIndication
+import com.letta.mobile.ui.components.disclosure.DisclosureChevron
+import com.letta.mobile.ui.components.disclosure.DisclosureChevronDefaults
 
 /**
  * Wires [DisclosureChevron] through composition. The pure-function tests live

@@ -71,7 +71,7 @@ import com.letta.mobile.ui.host.showPasteBlockedHint
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.text.ClipboardTextRead
 import com.letta.mobile.ui.text.readPlainText
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.launch
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles

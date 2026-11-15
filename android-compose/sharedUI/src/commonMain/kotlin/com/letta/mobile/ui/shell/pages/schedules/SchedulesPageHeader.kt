@@ -6,7 +6,7 @@ import com.letta.mobile.ui.components.foundation.LettaDivider
 import com.letta.mobile.ui.components.foundation.LettaNextButton
 import com.letta.mobile.ui.components.foundation.LettaPreviousButton
 import com.letta.mobile.ui.components.LettaRefreshAction
-import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,8 +23,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.data.schedules.SchedulesView
-import com.letta.mobile.ui.components.LettaChipTab
-import com.letta.mobile.ui.components.LettaChipTabRow
+import com.letta.mobile.ui.components.foundation.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTabRow
 import com.letta.mobile.ui.components.LettaPageHeader
 import com.letta.mobile.ui.theme.LettaDimens
 

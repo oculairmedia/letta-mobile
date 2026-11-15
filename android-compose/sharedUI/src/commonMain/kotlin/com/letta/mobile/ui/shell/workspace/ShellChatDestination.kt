@@ -61,7 +61,7 @@ import com.letta.mobile.ui.chat.surface.LocalChatCanvasOnBoard
 import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
 import com.letta.mobile.ui.shell.LocalShellFloatingChromeInset
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaSpinner
 import org.jetbrains.compose.resources.stringResource
 
 /** Where a conversation's board is kept, and how its edits and presence reach other devices. */

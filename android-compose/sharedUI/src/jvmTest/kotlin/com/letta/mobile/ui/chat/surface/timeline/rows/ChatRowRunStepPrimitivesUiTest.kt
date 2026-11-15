@@ -28,7 +28,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
-import com.letta.mobile.ui.components.DisclosureChevronDefaults
+import com.letta.mobile.ui.components.disclosure.DisclosureChevronDefaults
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

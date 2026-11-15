@@ -27,6 +27,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 
 /**
  * The one header every shared page draws, so a title, its actions and its controls sit in the same
@@ -36,7 +37,7 @@ import com.letta.mobile.ui.theme.tokens.LettaTextStyles
  *    end the icon [actions], the [refresh] slot and the one labelled [primaryAction];
  * 2. on a page narrower than [LettaDimens.Pane.wideBreakpoint], [context] on a row of its own
  *    (never above the title);
- * 3. [controls]: the page's view switch or filters (a [LettaChipTabRow]), with any paging beside it;
+ * 3. [controls]: the page's view switch or filters (a LettaChipTabRow), with any paging beside it;
  * 4. [caption]: one muted line (the zone times read in, where a secret is stored);
  * 5. [content]: what only this page has (a search field, an error banner, a stats strip).
  *

@@ -12,7 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.repository.modelcontrol.ConnectableProvider
 import com.letta.mobile.data.transport.appserver.AppServerToolset
-import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.theme.LettaDimens

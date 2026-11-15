@@ -73,7 +73,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.shell.sidebar.LocalSharedNotesToggle
 import com.letta.mobile.ui.shell.sidebar.SharedNotesToggle
 import com.letta.mobile.ui.shell.modules.UnavailableModule
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.flowOf

@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.IntOffset
 import com.letta.mobile.data.canvas.CanvasPresence
 import kotlin.math.roundToInt
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaTonalPill
+import com.letta.mobile.ui.components.foundation.LettaTonalPill
 import com.letta.mobile.ui.theme.pill.LettaPillColors
 
 /**

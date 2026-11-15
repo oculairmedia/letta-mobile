@@ -42,7 +42,7 @@ import com.letta.mobile.sharedui.resources.document_workspace_unsupported_refere
 import com.letta.mobile.ui.canvas.notes.NotebookNoteEditorContent
 import com.letta.mobile.ui.canvas.references.NotebookReferencePreview
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch

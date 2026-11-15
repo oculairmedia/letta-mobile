@@ -368,4 +368,32 @@ class VoiceModeControllerTest {
         runCurrent()
         assertEquals(VoiceModeState.NeedsConversation, controller.state.value)
     }
+
+    @Test
+    fun theWordsInProgressAreSessionStateUntilTheTurnEnds() = runTest {
+        val h = ControllerHarness(this)
+        h.configure()
+        h.press()
+        h.ear.hear(VoiceEarEvent.SpeechStarted)
+        h.ear.hear(VoiceEarEvent.PartialTranscript(VoiceText("what time")))
+        h.settle()
+        assertEquals(VoiceText("what time"), h.controller.partialTranscript.value)
+
+        h.ear.say(VoiceText("what time is it"))
+        h.settle()
+        assertEquals(null, h.controller.partialTranscript.value)
+    }
+
+    @Test
+    fun stoppingClearsTheWordsInProgress() = runTest {
+        val h = ControllerHarness(this)
+        h.configure()
+        h.press()
+        h.ear.hear(VoiceEarEvent.PartialTranscript(VoiceText("what")))
+        h.settle()
+        h.controller.stop()
+        h.settle()
+
+        assertEquals(null, h.controller.partialTranscript.value)
+    }
 }

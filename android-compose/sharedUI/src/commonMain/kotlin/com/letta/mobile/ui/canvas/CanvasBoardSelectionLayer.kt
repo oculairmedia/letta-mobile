@@ -6,9 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -25,6 +23,8 @@ import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.model.CanvasNoteId
 import io.ak1.drawbox.domain.model.Element
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.components.foundation.LettaMenuEntry
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 
 private const val QUICK_ARROW_HEAD_PX = 16f
 private const val QUICK_ARROW_HEAD_SPREAD = 0.6f
@@ -176,13 +176,7 @@ private fun QuickCreateDropMenu(board: CanvasBoard, drop: QuickCreateDrag, activ
     Box(modifier = Modifier.offset { IntOffset(drop.to.x.toInt(), drop.to.y.toInt()) }) {
         LettaMenu(expanded = true, onDismiss = { board.ui.quickDrop = null }) {
             quickCreateKinds(activeNote, board.session != null).forEach { kind ->
-                DropdownMenuItem(
-                    text = { Text(kind.label) },
-                    onClick = {
-                        board.ui.quickDrop = null
-                        board.quickCreateAt(drop, kind)
-                    },
-                )
+                LettaMenuEntry(LettaMenuItem(kind.label) { board.quickCreateAt(drop, kind) }, onDismiss = { board.ui.quickDrop = null })
             }
         }
     }
