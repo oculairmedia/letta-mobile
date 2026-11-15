@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.LettaDimens
+import androidx.compose.runtime.CompositionLocalProvider
 
 @Composable
 fun FormItem(
@@ -34,13 +35,11 @@ fun FormItem(
             ProvideTextStyle(value = MaterialTheme.typography.titleMedium) {
                 label()
             }
-            ProvideTextStyle(
-                value = MaterialTheme.typography.labelSmall.copy(
-                    color = LocalContentColor.current.copy(alpha = 0.6f)
-                )
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-                    description?.invoke()
+            CompositionLocalProvider(LocalContentColor provides LocalContentColor.current.copy(alpha = LettaDimens.Alpha.disabled)) {
+                ProvideTextStyle(value = MaterialTheme.typography.labelSmall) {
+                    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+                        description?.invoke()
+                    }
                 }
             }
             content()

@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.RunActivityProjection
 import com.letta.mobile.data.chat.projection.projectRunActivity
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.model.isCommand
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatRunId
@@ -329,15 +330,16 @@ private fun Modifier.pullUp(distance: () -> Dp): Modifier = layout { measurable,
  */
 @Composable
 private fun RunSteps(steps: List<RunStep>, body: RunBodyState, row: RunRowScope) {
+    val imageCallsBeforeMessage = remember(body.messages) { runImageCallsBeforeMessages(body.messages) }
     Column(modifier = Modifier.fillMaxWidth()) {
         steps.forEachIndexed { index, step ->
             key(step.key) {
                 val positioned = PositionedRunStep(step, stepPosition(index, steps.size))
                 if (step.isWork()) {
                     RunWorkStep(positioned, body, row)
-                    // Image output is conversation content, not work hidden by the run's disclosure.
-                    RunStepImages(positioned, body, row)
                 } else {
+                    val message = (step as RunStep.Message).message
+                    RunStepImages(imageCallsBeforeMessage[message.id].orEmpty(), positioned, body, row)
                     // Prose the run's visible steps follow reserves no hover-actions line: the next step
                     // sits one beat under its words, as it does on a touch host.
                     val followed = steps.subList(index + 1, steps.size).any { it.showsIn(body) }
@@ -345,6 +347,13 @@ private fun RunSteps(steps: List<RunStep>, body: RunBodyState, row: RunRowScope)
                         RunStepRow(positioned, row, Modifier.padding(top = positioned.top()))
                     }
                 }
+            }
+        }
+        val trailingImages = imageCallsBeforeMessage[null].orEmpty()
+        if (trailingImages.isNotEmpty()) {
+            key("run-image-output-trailing") {
+                val positioned = PositionedRunStep(steps.last(), stepPosition(steps.lastIndex, steps.size))
+                RunStepImages(trailingImages, positioned, body, row)
             }
         }
     }
@@ -358,12 +367,27 @@ private fun RunStep.hasImages(): Boolean =
 
 @Composable
 @NonRestartableComposable
-private fun RunStepImages(positioned: PositionedRunStep, body: RunBodyState, row: RunRowScope) {
-    if (!positioned.step.hasImages()) return
-    val step = positioned.step as RunStep.ToolCalls
+private fun RunStepImages(calls: List<UiToolCall>, positioned: PositionedRunStep, body: RunBodyState, row: RunRowScope) {
+    if (calls.isEmpty()) return
     Column(modifier = positioned.workPadding(body, row.context.runWidthPx)) {
-        step.calls.toolCalls.forEach { call -> ToolGeneratedImages(call, row.callbacks) }
+        calls.forEach { call -> key("run-image-${call.toolCallId}") { ToolGeneratedImages(call, row.callbacks) } }
     }
+}
+
+/** Images belong before the next prose step after their Read, or after the run if none follows. */
+private fun runImageCallsBeforeMessages(messages: List<UiMessage>): Map<String?, List<UiToolCall>> {
+    val images = linkedMapOf<String?, MutableList<UiToolCall>>()
+    val pending = mutableListOf<UiToolCall>()
+    messages.forEach { message ->
+        message.toolCalls.orEmpty().filter { it.generatedImageAttachments.isNotEmpty() }.let(pending::addAll)
+        // Only a step drawn as prose shows images: a work step (reasoning, a folded command report) never does.
+        if (pending.isNotEmpty() && message.ownRunStep()?.isWork() == false) {
+            images.getOrPut(message.id) { mutableListOf() }.addAll(pending)
+            pending.clear()
+        }
+    }
+    if (pending.isNotEmpty()) images.getOrPut(null) { mutableListOf() }.addAll(pending)
+    return images
 }
 
 @Composable

@@ -150,6 +150,12 @@ internal class HardcodedComposeColor(config: Config = Config.empty) : MobileRule
  * This is the barely-visible-control bug: `onSurfaceVariant` is already the
  * muted role, and halving it again puts a disabled button under the contrast it
  * needs to still read as a control on a dark theme.
+ *
+ * Only numeric literals are checked. A sub-floor alpha that is meant (Material's
+ * 0.38 disabled content, a scrim) is a named token defined in a theme/token file,
+ * which this rule exempts, and call sites read it by name
+ * (`alpha = LettaAlpha.disabled`). `alpha = 0f` passes: a fully transparent stop of
+ * the same hue is how gradients fade out, not dimmed content.
  */
 internal class LowContentAlpha(config: Config = Config.empty) : MobileRule(
     config,
@@ -158,25 +164,25 @@ internal class LowContentAlpha(config: Config = Config.empty) : MobileRule(
 ) {
     override fun visitCallExpression(expression: KtCallExpression) {
         super.visitCallExpression(expression)
-        val file = expression.containingKtFile
-        if (!file.isUiSource()) return
         if (expression.calleeExpression?.text != "copy") return
-
-        val alpha = expression.valueArguments.firstOrNull { it.alphaValue() != null } ?: return
-        val value = alpha.alphaValue() ?: return
-        if (value >= FLOOR) return
+        val value = expression.valueArguments.firstNotNullOfOrNull { it.alphaValue() }
+        if (!isDimmed(value) || !expression.containingKtFile.isStyledSource()) return
 
         report(
             expression,
             "alpha $value is below the $FLOOR legibility floor. Muted content roles are already " +
-                "dimmed; dimming them again makes the control unreadable on dark themes.",
+                "dimmed; dimming them again makes the control unreadable on dark themes. A deliberate " +
+                "sub-$FLOOR alpha (disabled, scrim) must be a named token in a theme/token file.",
         )
     }
 
+    private fun isDimmed(value: Double?): Boolean = value != null && value > 0.0 && value < FLOOR
+
+    private fun KtFile.isStyledSource(): Boolean = isUiSource() && !isTokenFile()
+
     private fun KtValueArgument.alphaValue(): Double? {
-        if (getArgumentName()?.asName?.asString() != "alpha") return null
-        val text = getArgumentExpression()?.text?.removeSuffix("f") ?: return null
-        return text.toDoubleOrNull()
+        val named = getArgumentName()?.asName?.asString() == "alpha"
+        return getArgumentExpression()?.text?.removeSuffix("f")?.toDoubleOrNull()?.takeIf { named }
     }
 
     private companion object {
@@ -199,6 +205,7 @@ class MobileDesignSystemProvider : RuleSetProvider {
             DisclosureOutsideSharedRow(config),
             RawStatusGlyph(config),
             BareClickable(config),
+            ComponentInExemptPath(config),
         ),
     )
 }
