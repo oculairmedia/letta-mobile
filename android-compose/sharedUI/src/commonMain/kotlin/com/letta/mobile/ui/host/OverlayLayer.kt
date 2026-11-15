@@ -207,7 +207,9 @@ private fun OverlayBannerCard(host: OverlayHost, entry: OverlayEntry) {
     val visible = remember(entry.id) { MutableTransitionState(reduced).apply { targetState = true } }
     val enter = if (reduced) EnterTransition.None else fadeIn(tween(LettaMotionTokens.ENTER_MILLIS)) + slideInVertically { -it / 2 }
     AnimatedVisibility(visibleState = visible, enter = enter, exit = ExitTransition.None) {
-        val action = overlay.action?.let { LettaNoticeAction(it.label, onClick = { host.performAction(entry.id) }, tag = OverlayTags.ACTION) }
+        val action = overlay.action?.let {
+            LettaNoticeAction(it.label, onClick = { host.performAction(entry.id) }, tag = OverlayTags.ACTION)
+        }
         val dismiss = if (overlay.dismissible) {
             LettaNoticeAction(DISMISS_LABEL, onClick = { host.dismiss(entry.id) }, tag = OverlayTags.DISMISS, icon = LettaIcons.Close)
         } else {

@@ -151,7 +151,12 @@ private fun NewTabButton(label: String, onNew: () -> Unit) {
         modifier = Modifier.size(LettaDimens.Space.xl).semantics { contentDescription = label },
     ) {
         // Explicit tint: a title bar's content colour is a dimmed chrome role, which made the "+" all but invisible.
-        Icon(LettaIcons.Add, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon), tint = MaterialTheme.colorScheme.onSurface)
+        Icon(
+            LettaIcons.Add,
+            contentDescription = null,
+            modifier = Modifier.size(LettaDimens.Control.icon),
+            tint = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

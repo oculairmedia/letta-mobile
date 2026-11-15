@@ -280,7 +280,12 @@ private fun ScheduleRunDetailRail(run: ScheduleRun, params: ScheduleRailParams) 
 @Composable
 private fun BackToOverview(description: String, onBack: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(role = Role.Button, onClick = onBack)) {
-        Icon(LettaIcons.ArrowBack, description, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(LettaDimens.Control.icon))
+        Icon(
+            LettaIcons.ArrowBack,
+            description,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(LettaDimens.Control.icon),
+        )
         Spacer(Modifier.width(LettaDimens.Space.sm))
         Text("Overview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

@@ -411,7 +411,8 @@ private fun NoteProperties(note: NoteBarActions, style: CanvasTextStyle) {
     }
     SectionLabel("Alignment")
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-        Toggle("Align start", LettaIcons.AlignLeft, selected = (style.align ?: "start") == "start") { note.onStyle(style.copy(align = "start")) }
+        val alignStart = (style.align ?: "start") == "start"
+        Toggle("Align start", LettaIcons.AlignLeft, selected = alignStart) { note.onStyle(style.copy(align = "start")) }
         Toggle("Align center", LettaIcons.AlignCenter, selected = style.align == "center") { note.onStyle(style.copy(align = "center")) }
         Toggle("Align end", LettaIcons.AlignRight, selected = style.align == "end") { note.onStyle(style.copy(align = "end")) }
     }

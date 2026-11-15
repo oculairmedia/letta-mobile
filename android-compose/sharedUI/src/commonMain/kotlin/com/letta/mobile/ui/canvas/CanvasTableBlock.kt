@@ -128,7 +128,9 @@ internal object TableBlockRenderer : ScopedBlockRenderer<TableBlockType> {
                     SmallAction(LettaIcons.Rows2, "Add table row") { write(rows + listOf(List(rows.firstOrNull()?.size ?: 1) { "" })) }
                     SmallAction(LettaIcons.Columns2, "Add table column") { write(rows.map { it + "" }) }
                     if (rows.size > 1) SmallAction(LettaIcons.Remove, "Remove table row") { write(rows.dropLast(1)) }
-                    if ((rows.firstOrNull()?.size ?: 0) > 1) SmallAction(LettaIcons.Remove, "Remove table column") { write(rows.map { it.dropLast(1) }) }
+                    if ((rows.firstOrNull()?.size ?: 0) > 1) {
+                        SmallAction(LettaIcons.Remove, "Remove table column") { write(rows.map { it.dropLast(1) }) }
+                    }
                 }
             }
         }

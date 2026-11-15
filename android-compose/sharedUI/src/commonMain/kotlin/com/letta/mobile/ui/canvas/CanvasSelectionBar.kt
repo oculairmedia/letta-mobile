@@ -36,6 +36,7 @@ import com.letta.mobile.ui.components.foundation.LettaVerticalDivider
 import com.letta.mobile.ui.host.LettaMenu
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.icons.LettaIcons
+import io.ak1.drawbox.domain.model.TextAlignment
 
 /**
  * The contextual bar that floats on the selection, the way Miro shows what applies to it: one master control ([CanvasPropertyControl]) for every colour and property of the
@@ -201,9 +202,9 @@ private fun PhoneSelectionButtons(actions: SelectionActions) {
                     onClick = {},
                 )
                 val (icon, next) = when (text.alignment) {
-                    io.ak1.drawbox.domain.model.TextAlignment.LEFT -> LettaIcons.AlignLeft to io.ak1.drawbox.domain.model.TextAlignment.CENTER
-                    io.ak1.drawbox.domain.model.TextAlignment.CENTER -> LettaIcons.AlignCenter to io.ak1.drawbox.domain.model.TextAlignment.RIGHT
-                    io.ak1.drawbox.domain.model.TextAlignment.RIGHT -> LettaIcons.AlignRight to io.ak1.drawbox.domain.model.TextAlignment.LEFT
+                    TextAlignment.LEFT -> LettaIcons.AlignLeft to TextAlignment.CENTER
+                    TextAlignment.CENTER -> LettaIcons.AlignCenter to TextAlignment.RIGHT
+                    TextAlignment.RIGHT -> LettaIcons.AlignRight to TextAlignment.LEFT
                 }
                 item(icon, "Text alignment") { text.onAlignment(next) }()
             }
@@ -286,9 +287,9 @@ private fun ShapeTextButtons(text: ShapeTextActions) {
     BarButton(LettaIcons.AArrowDown, "Smaller text") { text.onFontSize(steppedFontSize(text.fontSize, up = false)) }
     BarButton(LettaIcons.AArrowUp, "Larger text") { text.onFontSize(steppedFontSize(text.fontSize, up = true)) }
     val (icon, next) = when (text.alignment) {
-        io.ak1.drawbox.domain.model.TextAlignment.LEFT -> LettaIcons.AlignLeft to io.ak1.drawbox.domain.model.TextAlignment.CENTER
-        io.ak1.drawbox.domain.model.TextAlignment.CENTER -> LettaIcons.AlignCenter to io.ak1.drawbox.domain.model.TextAlignment.RIGHT
-        io.ak1.drawbox.domain.model.TextAlignment.RIGHT -> LettaIcons.AlignRight to io.ak1.drawbox.domain.model.TextAlignment.LEFT
+        TextAlignment.LEFT -> LettaIcons.AlignLeft to TextAlignment.CENTER
+        TextAlignment.CENTER -> LettaIcons.AlignCenter to TextAlignment.RIGHT
+        TextAlignment.RIGHT -> LettaIcons.AlignRight to TextAlignment.LEFT
     }
     BarButton(icon, "Text alignment") { text.onAlignment(next) }
 }

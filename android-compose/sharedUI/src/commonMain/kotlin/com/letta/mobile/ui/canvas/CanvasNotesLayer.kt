@@ -604,7 +604,11 @@ private fun TextMoveGrip(
             .semantics { contentDescription = "Move text" },
         contentAlignment = Alignment.Center,
     ) {
-        LettaIcon(LettaIcons.GripVertical, contentDescription = null, style = LettaIconStyle(tint = MaterialTheme.colorScheme.onSurfaceVariant))
+        LettaIcon(
+            LettaIcons.GripVertical,
+            contentDescription = null,
+            style = LettaIconStyle(tint = MaterialTheme.colorScheme.onSurfaceVariant),
+        )
     }
 }
 
