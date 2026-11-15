@@ -4960,7 +4960,10 @@ abstract fun interface com.letta.mobile.data.runtime/ConversationRowsSource { //
 }
 
 abstract fun interface com.letta.mobile.data.schedules/CronScheduleSource { // com.letta.mobile.data.schedules/CronScheduleSource|null[0]
-    abstract suspend fun listCrons(kotlin/String?): kotlin.collections/List<com.letta.mobile.data.schedules/CronTask> // com.letta.mobile.data.schedules/CronScheduleSource.listCrons|listCrons(kotlin.String?){}[0]
+    open val repository // com.letta.mobile.data.schedules/CronScheduleSource.repository|{}repository[0]
+        open fun <get-repository>(): com.letta.mobile.data.repository.api/ICronRepository? // com.letta.mobile.data.schedules/CronScheduleSource.repository.<get-repository>|<get-repository>(){}[0]
+
+    abstract suspend fun listCrons(com.letta.mobile.data.model/AgentId?): kotlin.collections/List<com.letta.mobile.data.schedules/CronTask> // com.letta.mobile.data.schedules/CronScheduleSource.listCrons|listCrons(com.letta.mobile.data.model.AgentId?){}[0]
 }
 
 abstract fun interface com.letta.mobile.data.search/ConversationMessageReader { // com.letta.mobile.data.search/ConversationMessageReader|null[0]
@@ -60529,7 +60532,7 @@ final class com.letta.mobile.data.schedules/CronExpr { // com.letta.mobile.data.
 }
 
 final class com.letta.mobile.data.schedules/CronTask { // com.letta.mobile.data.schedules/CronTask|null[0]
-    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Int = ...) // com.letta.mobile.data.schedules/CronTask.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Int){}[0]
+    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Int = ..., kotlin/String? = ...) // com.letta.mobile.data.schedules/CronTask.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Int;kotlin.String?){}[0]
 
     final val agentId // com.letta.mobile.data.schedules/CronTask.agentId|{}agentId[0]
         final fun <get-agentId>(): kotlin/String? // com.letta.mobile.data.schedules/CronTask.agentId.<get-agentId>|<get-agentId>(){}[0]
@@ -60553,6 +60556,8 @@ final class com.letta.mobile.data.schedules/CronTask { // com.letta.mobile.data.
         final fun <get-prompt>(): kotlin/String? // com.letta.mobile.data.schedules/CronTask.prompt.<get-prompt>|<get-prompt>(){}[0]
     final val recurring // com.letta.mobile.data.schedules/CronTask.recurring|{}recurring[0]
         final fun <get-recurring>(): kotlin/Boolean // com.letta.mobile.data.schedules/CronTask.recurring.<get-recurring>|<get-recurring>(){}[0]
+    final val scheduledFor // com.letta.mobile.data.schedules/CronTask.scheduledFor|{}scheduledFor[0]
+        final fun <get-scheduledFor>(): kotlin/String? // com.letta.mobile.data.schedules/CronTask.scheduledFor.<get-scheduledFor>|<get-scheduledFor>(){}[0]
     final val status // com.letta.mobile.data.schedules/CronTask.status|{}status[0]
         final fun <get-status>(): kotlin/String? // com.letta.mobile.data.schedules/CronTask.status.<get-status>|<get-status>(){}[0]
     final val timezone // com.letta.mobile.data.schedules/CronTask.timezone|{}timezone[0]
@@ -60563,6 +60568,7 @@ final class com.letta.mobile.data.schedules/CronTask { // com.letta.mobile.data.
     final fun component11(): kotlin/String? // com.letta.mobile.data.schedules/CronTask.component11|component11(){}[0]
     final fun component12(): kotlin/String? // com.letta.mobile.data.schedules/CronTask.component12|component12(){}[0]
     final fun component13(): kotlin/Int // com.letta.mobile.data.schedules/CronTask.component13|component13(){}[0]
+    final fun component14(): kotlin/String? // com.letta.mobile.data.schedules/CronTask.component14|component14(){}[0]
     final fun component2(): kotlin/String? // com.letta.mobile.data.schedules/CronTask.component2|component2(){}[0]
     final fun component3(): kotlin/String? // com.letta.mobile.data.schedules/CronTask.component3|component3(){}[0]
     final fun component4(): kotlin/String? // com.letta.mobile.data.schedules/CronTask.component4|component4(){}[0]
@@ -60571,7 +60577,7 @@ final class com.letta.mobile.data.schedules/CronTask { // com.letta.mobile.data.
     final fun component7(): kotlin/String? // com.letta.mobile.data.schedules/CronTask.component7|component7(){}[0]
     final fun component8(): kotlin/Boolean // com.letta.mobile.data.schedules/CronTask.component8|component8(){}[0]
     final fun component9(): kotlin/String? // com.letta.mobile.data.schedules/CronTask.component9|component9(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Int = ...): com.letta.mobile.data.schedules/CronTask // com.letta.mobile.data.schedules/CronTask.copy|copy(kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Int){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Int = ..., kotlin/String? = ...): com.letta.mobile.data.schedules/CronTask // com.letta.mobile.data.schedules/CronTask.copy|copy(kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Int;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.schedules/CronTask.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.schedules/CronTask.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.schedules/CronTask.toString|toString(){}[0]
@@ -60607,6 +60613,15 @@ final class com.letta.mobile.data.schedules/HistorySummary { // com.letta.mobile
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.schedules/HistorySummary.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.schedules/HistorySummary.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.schedules/HistorySummary.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.schedules/RepositoryCronScheduleSource : com.letta.mobile.data.schedules/CronScheduleSource { // com.letta.mobile.data.schedules/RepositoryCronScheduleSource|null[0]
+    constructor <init>(com.letta.mobile.data.repository.api/ICronRepository) // com.letta.mobile.data.schedules/RepositoryCronScheduleSource.<init>|<init>(com.letta.mobile.data.repository.api.ICronRepository){}[0]
+
+    final val repository // com.letta.mobile.data.schedules/RepositoryCronScheduleSource.repository|{}repository[0]
+        final fun <get-repository>(): com.letta.mobile.data.repository.api/ICronRepository // com.letta.mobile.data.schedules/RepositoryCronScheduleSource.repository.<get-repository>|<get-repository>(){}[0]
+
+    final suspend fun listCrons(com.letta.mobile.data.model/AgentId?): kotlin.collections/List<com.letta.mobile.data.schedules/CronTask> // com.letta.mobile.data.schedules/RepositoryCronScheduleSource.listCrons|listCrons(com.letta.mobile.data.model.AgentId?){}[0]
 }
 
 final class com.letta.mobile.data.schedules/RunRecord { // com.letta.mobile.data.schedules/RunRecord|null[0]
@@ -60781,6 +60796,7 @@ final class com.letta.mobile.data.schedules/ScheduleLibraryController : kotlin/A
     final fun loadData() // com.letta.mobile.data.schedules/ScheduleLibraryController.loadData|loadData(){}[0]
     final fun selectAgent(kotlin/String) // com.letta.mobile.data.schedules/ScheduleLibraryController.selectAgent|selectAgent(kotlin.String){}[0]
     final fun start() // com.letta.mobile.data.schedules/ScheduleLibraryController.start|start(){}[0]
+    final fun toggleCronPause(com.letta.mobile.data.schedules/CronTask, kotlin/Boolean) // com.letta.mobile.data.schedules/ScheduleLibraryController.toggleCronPause|toggleCronPause(com.letta.mobile.data.schedules.CronTask;kotlin.Boolean){}[0]
 }
 
 final class com.letta.mobile.data.schedules/ScheduleLibraryItem { // com.letta.mobile.data.schedules/ScheduleLibraryItem|null[0]
@@ -60803,7 +60819,7 @@ final class com.letta.mobile.data.schedules/ScheduleLibraryItem { // com.letta.m
 }
 
 final class com.letta.mobile.data.schedules/ScheduleLibraryState { // com.letta.mobile.data.schedules/ScheduleLibraryState|null[0]
-    constructor <init>(kotlin.collections/List<com.letta.mobile.data.model/AgentSummary> = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.model/ScheduledMessage> = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.schedules/CronTask> = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.schedules/RunRecord>> = ..., kotlin.collections/List<com.letta.mobile.data.schedules.leases/Lease> = ...) // com.letta.mobile.data.schedules/ScheduleLibraryState.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.model.AgentSummary>;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.model.ScheduledMessage>;kotlin.Boolean;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.schedules.CronTask>;kotlin.Boolean;kotlin.collections.Map<kotlin.String,kotlin.collections.List<com.letta.mobile.data.schedules.RunRecord>>;kotlin.collections.List<com.letta.mobile.data.schedules.leases.Lease>){}[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.data.model/AgentSummary> = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.model/ScheduledMessage> = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.schedules/CronTask> = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.schedules/RunRecord>> = ..., kotlin.collections/List<com.letta.mobile.data.schedules.leases/Lease> = ..., kotlin.collections/Set<kotlin/String> = ...) // com.letta.mobile.data.schedules/ScheduleLibraryState.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.model.AgentSummary>;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.model.ScheduledMessage>;kotlin.Boolean;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.schedules.CronTask>;kotlin.Boolean;kotlin.collections.Map<kotlin.String,kotlin.collections.List<com.letta.mobile.data.schedules.RunRecord>>;kotlin.collections.List<com.letta.mobile.data.schedules.leases.Lease>;kotlin.collections.Set<kotlin.String>){}[0]
 
     final val agents // com.letta.mobile.data.schedules/ScheduleLibraryState.agents|{}agents[0]
         final fun <get-agents>(): kotlin.collections/List<com.letta.mobile.data.model/AgentSummary> // com.letta.mobile.data.schedules/ScheduleLibraryState.agents.<get-agents>|<get-agents>(){}[0]
@@ -60823,6 +60839,8 @@ final class com.letta.mobile.data.schedules/ScheduleLibraryState { // com.letta.
         final fun <get-isLoading>(): kotlin/Boolean // com.letta.mobile.data.schedules/ScheduleLibraryState.isLoading.<get-isLoading>|<get-isLoading>(){}[0]
     final val leases // com.letta.mobile.data.schedules/ScheduleLibraryState.leases|{}leases[0]
         final fun <get-leases>(): kotlin.collections/List<com.letta.mobile.data.schedules.leases/Lease> // com.letta.mobile.data.schedules/ScheduleLibraryState.leases.<get-leases>|<get-leases>(){}[0]
+    final val pendingCronIds // com.letta.mobile.data.schedules/ScheduleLibraryState.pendingCronIds|{}pendingCronIds[0]
+        final fun <get-pendingCronIds>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.schedules/ScheduleLibraryState.pendingCronIds.<get-pendingCronIds>|<get-pendingCronIds>(){}[0]
     final val runHistory // com.letta.mobile.data.schedules/ScheduleLibraryState.runHistory|{}runHistory[0]
         final fun <get-runHistory>(): kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.schedules/RunRecord>> // com.letta.mobile.data.schedules/ScheduleLibraryState.runHistory.<get-runHistory>|<get-runHistory>(){}[0]
     final val scheduleAdminAvailable // com.letta.mobile.data.schedules/ScheduleLibraryState.scheduleAdminAvailable|{}scheduleAdminAvailable[0]
@@ -60837,6 +60855,7 @@ final class com.letta.mobile.data.schedules/ScheduleLibraryState { // com.letta.
     final fun component1(): kotlin.collections/List<com.letta.mobile.data.model/AgentSummary> // com.letta.mobile.data.schedules/ScheduleLibraryState.component1|component1(){}[0]
     final fun component10(): kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.schedules/RunRecord>> // com.letta.mobile.data.schedules/ScheduleLibraryState.component10|component10(){}[0]
     final fun component11(): kotlin.collections/List<com.letta.mobile.data.schedules.leases/Lease> // com.letta.mobile.data.schedules/ScheduleLibraryState.component11|component11(){}[0]
+    final fun component12(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.schedules/ScheduleLibraryState.component12|component12(){}[0]
     final fun component2(): kotlin/String? // com.letta.mobile.data.schedules/ScheduleLibraryState.component2|component2(){}[0]
     final fun component3(): kotlin.collections/List<com.letta.mobile.data.model/ScheduledMessage> // com.letta.mobile.data.schedules/ScheduleLibraryState.component3|component3(){}[0]
     final fun component4(): kotlin/Boolean // com.letta.mobile.data.schedules/ScheduleLibraryState.component4|component4(){}[0]
@@ -60845,7 +60864,7 @@ final class com.letta.mobile.data.schedules/ScheduleLibraryState { // com.letta.
     final fun component7(): kotlin/String? // com.letta.mobile.data.schedules/ScheduleLibraryState.component7|component7(){}[0]
     final fun component8(): kotlin.collections/List<com.letta.mobile.data.schedules/CronTask> // com.letta.mobile.data.schedules/ScheduleLibraryState.component8|component8(){}[0]
     final fun component9(): kotlin/Boolean // com.letta.mobile.data.schedules/ScheduleLibraryState.component9|component9(){}[0]
-    final fun copy(kotlin.collections/List<com.letta.mobile.data.model/AgentSummary> = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.model/ScheduledMessage> = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.schedules/CronTask> = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.schedules/RunRecord>> = ..., kotlin.collections/List<com.letta.mobile.data.schedules.leases/Lease> = ...): com.letta.mobile.data.schedules/ScheduleLibraryState // com.letta.mobile.data.schedules/ScheduleLibraryState.copy|copy(kotlin.collections.List<com.letta.mobile.data.model.AgentSummary>;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.model.ScheduledMessage>;kotlin.Boolean;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.schedules.CronTask>;kotlin.Boolean;kotlin.collections.Map<kotlin.String,kotlin.collections.List<com.letta.mobile.data.schedules.RunRecord>>;kotlin.collections.List<com.letta.mobile.data.schedules.leases.Lease>){}[0]
+    final fun copy(kotlin.collections/List<com.letta.mobile.data.model/AgentSummary> = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.model/ScheduledMessage> = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.schedules/CronTask> = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.schedules/RunRecord>> = ..., kotlin.collections/List<com.letta.mobile.data.schedules.leases/Lease> = ..., kotlin.collections/Set<kotlin/String> = ...): com.letta.mobile.data.schedules/ScheduleLibraryState // com.letta.mobile.data.schedules/ScheduleLibraryState.copy|copy(kotlin.collections.List<com.letta.mobile.data.model.AgentSummary>;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.model.ScheduledMessage>;kotlin.Boolean;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.schedules.CronTask>;kotlin.Boolean;kotlin.collections.Map<kotlin.String,kotlin.collections.List<com.letta.mobile.data.schedules.RunRecord>>;kotlin.collections.List<com.letta.mobile.data.schedules.leases.Lease>;kotlin.collections.Set<kotlin.String>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.schedules/ScheduleLibraryState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.schedules/ScheduleLibraryState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.schedules/ScheduleLibraryState.toString|toString(){}[0]
@@ -67473,7 +67492,7 @@ final class com.letta.mobile.data.tools/ToolLibraryState { // com.letta.mobile.d
     final fun toString(): kotlin/String // com.letta.mobile.data.tools/ToolLibraryState.toString|toString(){}[0]
 }
 
-final class com.letta.mobile.data.transport.api/AppServerClientChannel : com.letta.mobile.data.transport.api/NoOpChannelTransport { // com.letta.mobile.data.transport.api/AppServerClientChannel|null[0]
+final class com.letta.mobile.data.transport.api/AppServerClientChannel : com.letta.mobile.data.transport.api/CronRpcChannel { // com.letta.mobile.data.transport.api/AppServerClientChannel|null[0]
     constructor <init>(com.letta.mobile.data.transport.appserver/AppServerClient, kotlinx.coroutines/CoroutineScope, kotlin.collections/Set<kotlin/String> = ...) // com.letta.mobile.data.transport.api/AppServerClientChannel.<init>|<init>(com.letta.mobile.data.transport.appserver.AppServerClient;kotlinx.coroutines.CoroutineScope;kotlin.collections.Set<kotlin.String>){}[0]
 
     final val events // com.letta.mobile.data.transport.api/AppServerClientChannel.events|{}events[0]
@@ -67482,8 +67501,6 @@ final class com.letta.mobile.data.transport.api/AppServerClientChannel : com.let
         final fun <get-hostCapabilities>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.transport.api/AppServerClientChannel.hostCapabilities.<get-hostCapabilities>|<get-hostCapabilities>(){}[0]
     final val state // com.letta.mobile.data.transport.api/AppServerClientChannel.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.transport/ChannelTransportState> // com.letta.mobile.data.transport.api/AppServerClientChannel.state.<get-state>|<get-state>(){}[0]
-
-    final suspend fun adminRpc(kotlin/String, kotlin/String, kotlin/String?): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AdminRpcResponse // com.letta.mobile.data.transport.api/AppServerClientChannel.adminRpc|adminRpc(kotlin.String;kotlin.String;kotlin.String?){}[0]
 }
 
 final class com.letta.mobile.data.transport.api/CronPauseCommand { // com.letta.mobile.data.transport.api/CronPauseCommand|null[0]
@@ -75474,6 +75491,21 @@ open class com.letta.mobile.data.timeline/TimelineRepository : com.letta.mobile.
     open suspend fun turnStarted(kotlin/String?, kotlin/String, kotlin/String?, kotlin/String?) // com.letta.mobile.data.timeline/TimelineRepository.turnStarted|turnStarted(kotlin.String?;kotlin.String;kotlin.String?;kotlin.String?){}[0]
 }
 
+open class com.letta.mobile.data.transport.api/CronRpcChannel : com.letta.mobile.data.transport.api/NoOpChannelTransport { // com.letta.mobile.data.transport.api/CronRpcChannel|null[0]
+    constructor <init>(kotlin.coroutines/SuspendFunction3<kotlin/String, kotlin/String, kotlin/String?, com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AdminRpcResponse>) // com.letta.mobile.data.transport.api/CronRpcChannel.<init>|<init>(kotlin.coroutines.SuspendFunction3<kotlin.String,kotlin.String,kotlin.String?,com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse>){}[0]
+
+    open suspend fun adminRpc(kotlin/String, kotlin/String, kotlin/String?): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AdminRpcResponse // com.letta.mobile.data.transport.api/CronRpcChannel.adminRpc|adminRpc(kotlin.String;kotlin.String;kotlin.String?){}[0]
+    open suspend fun sendCronAdd(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Boolean, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/Long): com.letta.mobile.data.transport/ServerFrame.CronAddResponse // com.letta.mobile.data.transport.api/CronRpcChannel.sendCronAdd|sendCronAdd(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Long){}[0]
+    open suspend fun sendCronDelete(kotlin/String, kotlin/Long): com.letta.mobile.data.transport/ServerFrame.CronDeleteResponse // com.letta.mobile.data.transport.api/CronRpcChannel.sendCronDelete|sendCronDelete(kotlin.String;kotlin.Long){}[0]
+    open suspend fun sendCronDeleteAll(kotlin/String, kotlin/Long): com.letta.mobile.data.transport/ServerFrame.CronDeleteAllResponse // com.letta.mobile.data.transport.api/CronRpcChannel.sendCronDeleteAll|sendCronDeleteAll(kotlin.String;kotlin.Long){}[0]
+    open suspend fun sendCronGet(kotlin/String, kotlin/Long): com.letta.mobile.data.transport/ServerFrame.CronGetResponse // com.letta.mobile.data.transport.api/CronRpcChannel.sendCronGet|sendCronGet(kotlin.String;kotlin.Long){}[0]
+    open suspend fun sendCronList(kotlin/String?, kotlin/String?, kotlin/Long): com.letta.mobile.data.transport/ServerFrame.CronListResponse // com.letta.mobile.data.transport.api/CronRpcChannel.sendCronList|sendCronList(kotlin.String?;kotlin.String?;kotlin.Long){}[0]
+    open suspend fun sendCronPause(com.letta.mobile.data.transport.api/CronPauseCommand): com.letta.mobile.data.transport/ServerFrame.CronPauseResponse // com.letta.mobile.data.transport.api/CronRpcChannel.sendCronPause|sendCronPause(com.letta.mobile.data.transport.api.CronPauseCommand){}[0]
+    open suspend fun sendCronResume(com.letta.mobile.data.transport.api/CronResumeCommand): com.letta.mobile.data.transport/ServerFrame.CronResumeResponse // com.letta.mobile.data.transport.api/CronRpcChannel.sendCronResume|sendCronResume(com.letta.mobile.data.transport.api.CronResumeCommand){}[0]
+
+    final object Companion // com.letta.mobile.data.transport.api/CronRpcChannel.Companion|null[0]
+}
+
 open class com.letta.mobile.data.transport.api/NoOpChannelTransport : com.letta.mobile.data.transport.api/CronControlTransport, com.letta.mobile.data.transport.api/IChannelTransport { // com.letta.mobile.data.transport.api/NoOpChannelTransport|null[0]
     constructor <init>() // com.letta.mobile.data.transport.api/NoOpChannelTransport.<init>|<init>(){}[0]
 
@@ -81232,7 +81264,7 @@ final suspend fun com.letta.mobile.data.transport.appserver/awaitAppServerReadin
 final suspend fun com.letta.mobile.data.transport.appserver/openAppServerWebSocket(com.letta.mobile.data.transport.appserver/AppServerWebSocketDial, io.ktor.client/HttpClient, kotlinx.coroutines/CoroutineScope): com.letta.mobile.data.transport.appserver/AppServerWebSocketConnection // com.letta.mobile.data.transport.appserver/openAppServerWebSocket|openAppServerWebSocket(com.letta.mobile.data.transport.appserver.AppServerWebSocketDial;io.ktor.client.HttpClient;kotlinx.coroutines.CoroutineScope){}[0]
 final suspend inline fun <#A: kotlin/Any?> com.letta.mobile.util/runCatchingCancellable(kotlin.coroutines/SuspendFunction0<#A>): kotlin/Result<#A> // com.letta.mobile.util/runCatchingCancellable|runCatchingCancellable(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
 
-// Targets: [mingwX64.hostNative]
+// Targets: [mingwX64.hostNative, wasmJs]
 final class com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta : kotlinx.atomicfu.locks/SynchronizedObject { // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta|null[0]
     constructor <init>() // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta.<init>|<init>(){}[0]
 
@@ -81277,7 +81309,7 @@ final class com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta : kot
     }
 }
 
-// Targets: [wasmJs]
+// Targets: [mingwX64.hostNative, wasmJs]
 final class com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta { // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta|null[0]
     constructor <init>() // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta.<init>|<init>(){}[0]
 

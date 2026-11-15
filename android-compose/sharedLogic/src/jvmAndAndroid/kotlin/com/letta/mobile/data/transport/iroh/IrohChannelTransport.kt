@@ -25,6 +25,7 @@ import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.data.transport.ChannelTransportDefaults
 import com.letta.mobile.data.transport.api.SubagentScopeAwareChannelTransport
+import com.letta.mobile.data.transport.api.CronRpcChannel
 import com.letta.mobile.data.transport.api.CronControlTransport
 import com.letta.mobile.data.transport.api.CronPauseCommand
 import com.letta.mobile.data.transport.api.CronResumeCommand
@@ -341,8 +342,8 @@ class IrohChannelTransport(
         ),
     )
 
-    private val cronRpcClient = IrohCronRpcClient(
-        adminRpc = { method, path, body -> adminRpc(method, path, body) },
+    private val cronRpcClient = CronRpcChannel(
+        rpcCall = { method, path, body -> adminRpc(method, path, body) },
     )
 
     private val subagentRpcClient = IrohSubagentRpcClient(
@@ -918,10 +919,10 @@ class IrohChannelTransport(
     }
 
     override suspend fun sendCronPause(command: CronPauseCommand): ServerFrame.CronPauseResponse =
-        IrohTransportSupport.executeCronPause(this, command)
+        cronRpcClient.sendCronPause(command)
 
     override suspend fun sendCronResume(command: CronResumeCommand): ServerFrame.CronResumeResponse =
-        IrohTransportSupport.executeCronResume(this, command)
+        cronRpcClient.sendCronResume(command)
 
     internal suspend fun <T : ServerFrame> cronTaskAction(
         op: String,
