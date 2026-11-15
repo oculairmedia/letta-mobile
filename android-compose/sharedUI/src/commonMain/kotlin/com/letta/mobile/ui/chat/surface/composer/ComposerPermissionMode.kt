@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.chat.surface.composer
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,9 +54,12 @@ import com.letta.mobile.sharedui.resources.composer_permission_mode_unrestricted
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
 import com.letta.mobile.ui.theme.ChatComposerDimens
-import com.letta.mobile.ui.theme.LettaCheckGlyph
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
+import com.letta.mobile.ui.components.line.StatusTone
+import com.letta.mobile.ui.components.foundation.StatusGlyph
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 // The permission mode is one entry, drawn two ways: a quiet line under the pointer card, and a row of
 // the Touch bar's "+" sheet. Both show the mode the server confirmed (or, while a change waits for
@@ -133,7 +135,12 @@ internal fun ComposerPermissionModeLine(
         Row(
             modifier = Modifier
                 .clip(MaterialTheme.shapes.small)
-                .clickable(enabled = entry.enabled, role = Role.Button, onClickLabel = entry.title) { open = true }
+                .lettaClickable(
+                    role = Role.Button,
+                    onClickLabel = entry.title,
+                    target = LettaClickTarget.Inline,
+                    onClick = if (entry.enabled) ({ open = true }) else null,
+                )
                 .semantics(mergeDescendants = true) {
                     contentDescription = entry.title
                     stateDescription = entry.state
@@ -281,7 +288,7 @@ private fun PermissionModePopover(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (selected) LettaCheckGlyph()
+                if (selected) StatusGlyph(StatusTone.Chosen, size = LettaDimens.Control.icon)
             }
         }
     }

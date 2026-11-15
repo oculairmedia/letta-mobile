@@ -16,7 +16,7 @@ import com.letta.mobile.ui.components.foundation.LettaToggleRow
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.display.ChatTextSize
 import com.letta.mobile.ui.ambient.ThinkingGlowStyle
-import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import com.letta.mobile.ui.host.LettaAlertPane
 import com.letta.mobile.ui.host.LettaAlertSpec
 import com.letta.mobile.ui.host.LettaPaneButton

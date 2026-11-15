@@ -88,7 +88,7 @@ import com.letta.mobile.ui.host.LettaPaneButtons
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaTonalPill
+import com.letta.mobile.ui.components.foundation.LettaTonalPill
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.pill.LettaPillColors
 import org.jetbrains.compose.resources.StringResource

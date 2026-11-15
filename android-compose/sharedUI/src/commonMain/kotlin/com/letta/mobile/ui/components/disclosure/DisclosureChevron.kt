@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.components
+package com.letta.mobile.ui.components.disclosure
 
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -16,8 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.theme.tokens.LettaControlTokens
+import com.letta.mobile.ui.theme.tokens.LocalLettaReducedMotion
 
 /**
  * Visual emphasis tier for [DisclosureChevron].
@@ -62,7 +62,7 @@ object DisclosureChevronDefaults {
      * Resolves sizing token according to [compact] mode.
      */
     fun size(compact: Boolean): Dp =
-        if (compact) LettaDimens.Control.iconSm else LettaDimens.Control.icon
+        if (compact) LettaControlTokens.iconSm else LettaControlTokens.icon
 
     /**
      * Resolves animation spec honoring reduced motion.
@@ -114,10 +114,12 @@ object DisclosureChevronDefaults {
  * @param enabled When false, renders at reduced opacity (0.4 alpha) overriding emphasis.
  * @param emphasis Visual emphasis tier ([ChevronEmphasis.Neutral] or [ChevronEmphasis.Emphasized]).
  * @param indicates Destination role ([ChevronIndication.Expansion] animated rotation vs [ChevronIndication.Sheet] static).
- * @param compact When true, renders at [LettaDimens.Control.iconSm] (13dp); otherwise [LettaDimens.Control.icon] (18dp).
+ * @param compact When true, renders at [LettaControlTokens.iconSm] (13dp); otherwise [LettaControlTokens.icon] (18dp).
  * @param contentDescription Optional accessibility label override. When null, derived from state.
  * @param opensUpward The content it discloses unfolds above it (a dock or chat folded down to the
  * bottom of the screen): the glyph points up while collapsed and down while expanded.
+ * @param tint The glyph's colour when the chevron should take its host's ink (a pill's content
+ * colour) instead of the emphasis tier's; [Color.Unspecified] keeps the tier's. Disabled still dims.
  */
 @Composable
 fun DisclosureChevron(
@@ -129,9 +131,10 @@ fun DisclosureChevron(
     compact: Boolean = false,
     contentDescription: String? = null,
     opensUpward: Boolean = false,
+    tint: Color = Color.Unspecified,
 ) {
     val isSheet = indicates == ChevronIndication.Sheet
-    val reducedMotion = LocalReducedMotion.current
+    val reducedMotion = LocalLettaReducedMotion.current
 
     val targetRot = DisclosureChevronDefaults.targetRotation(indicates, expanded)
     val spec = DisclosureChevronDefaults.animationSpec(indicates, reducedMotion)
@@ -145,12 +148,16 @@ fun DisclosureChevron(
     val stateRotation = if (isSheet) DisclosureChevronDefaults.RotationCollapsed else animatedRotation
     val rotation = if (opensUpward) stateRotation + DisclosureChevronDefaults.RotationExpanded else stateRotation
 
-    val tint = DisclosureChevronDefaults.tint(
-        enabled = enabled,
-        emphasis = emphasis,
-        onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant,
-        primary = MaterialTheme.colorScheme.primary,
-    )
+    val resolvedTint = when {
+        tint == Color.Unspecified -> DisclosureChevronDefaults.tint(
+            enabled = enabled,
+            emphasis = emphasis,
+            onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant,
+            primary = MaterialTheme.colorScheme.primary,
+        )
+        enabled -> tint
+        else -> tint.copy(alpha = DisclosureChevronDefaults.TintDisabledAlpha)
+    }
 
     val effectiveContentDescription = contentDescription
         ?: DisclosureChevronDefaults.contentDescription(indicates, expanded)
@@ -160,7 +167,7 @@ fun DisclosureChevron(
     Icon(
         imageVector = LettaIcons.ExpandMore,
         contentDescription = effectiveContentDescription,
-        tint = tint,
+        tint = resolvedTint,
         // TestTag keeps the outer value. The caller modifier is outside the
         // default tag, so a caller tag wins and the default remains when absent.
         modifier = modifier

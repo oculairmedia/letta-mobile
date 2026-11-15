@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.components.disclosure.DisclosureChevron
 
 @Composable
 fun Accordions(

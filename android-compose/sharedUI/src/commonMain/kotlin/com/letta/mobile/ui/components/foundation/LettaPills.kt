@@ -1,11 +1,10 @@
-package com.letta.mobile.ui.theme
+package com.letta.mobile.ui.components.foundation
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -17,10 +16,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.ui.theme.pill.LettaPillColors
+import com.letta.mobile.ui.theme.tokens.LettaControlTokens
+import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
+import com.letta.mobile.ui.theme.tokens.LettaStrokeTokens
 
 /*
  * The pill family: every small label that sits beside content (a tag, a status, a count, a scope)
- * shares one shape (LettaDimens.Radius.sm), one inset and one type role, so two pills on one row
+ * shares one shape (MaterialTheme.shapes.small), one inset and one type role, so two pills on one row
  * always agree. Pick the variant by what carries the colour:
  *
  *   LettaPill          a role colour tints the fill, the hairline and the words (tags, kinds)
@@ -28,11 +30,9 @@ import com.letta.mobile.ui.theme.pill.LettaPillColors
  *   LettaOutlinedPill  no colour: a neutral, read-only scope
  *   LettaChip          the tonal pill as a control: it opens something, with a 48dp touch target
  *
- * LettaStatusLabel (no container: a dot or a glyph, then the words) lives with LettaStatusDot in
- * ui.components.
+ * LettaStatusLabel (no container: a dot or a glyph, then the words) lives with LettaStatusDot.
  *
- * Never colour alone: every variant carries its words. They live beside the tokens (not in
- * ui.components) so any page can use them through the theme import it already has.
+ * Never colour alone: every variant carries its words.
  */
 
 /** A small tinted pill (tags, kinds, type labels): [color] tints its fill, hairline and words. */
@@ -42,7 +42,7 @@ fun LettaPill(text: String, color: Color, modifier: Modifier = Modifier, icon: I
         container = color.copy(alpha = PILL_FILL_ALPHA),
         content = color,
         modifier = modifier,
-        border = BorderStroke(LettaDimens.Stroke.hairline, color.copy(alpha = PILL_BORDER_ALPHA)),
+        border = BorderStroke(LettaStrokeTokens.hairline, color.copy(alpha = PILL_BORDER_ALPHA)),
     ) { PillContent(text, icon) }
 }
 
@@ -59,24 +59,25 @@ fun LettaOutlinedPill(text: String, modifier: Modifier = Modifier, icon: ImageVe
         container = Color.Transparent,
         content = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier,
-        border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(LettaStrokeTokens.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) { PillContent(text, icon) }
 }
 
 /**
- * The tonal pill as a control: a neutral chip that opens something (the effort in force, then a
- * chevron as [trailingIcon]). Its touch target is the platform minimum even though it draws small.
+ * The tonal pill as a control: a neutral chip that opens something (the effort in force, then the
+ * shared menu indicator as [LettaChipSlots.trailing]; a live mark such as a pulsing dot as
+ * [LettaChipSlots.leading]). Its touch target is the platform minimum even though it draws small.
  */
 @Composable
-fun LettaChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, trailingIcon: ImageVector? = null) {
+fun LettaChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, slots: LettaChipSlots = LettaChipSlots.None) {
     Surface(
         onClick = onClick,
         // A clickable Surface reserves the platform's minimum touch target around the small pill.
         modifier = modifier,
-        shape = PillShape,
+        shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    ) { PillContent(text, icon = null, trailingIcon = trailingIcon) }
+    ) { PillContent(text, icon = null, slots = slots) }
 }
 
 @Composable
@@ -87,24 +88,30 @@ private fun PillSurface(
     border: BorderStroke?,
     body: @Composable () -> Unit,
 ) {
-    Surface(modifier = modifier, shape = PillShape, color = container, contentColor = content, border = border, content = body)
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.small,
+        color = container,
+        contentColor = content,
+        border = border,
+        content = body,
+    )
 }
 
 @Composable
-private fun PillContent(text: String, icon: ImageVector?, trailingIcon: ImageVector? = null) {
+private fun PillContent(text: String, icon: ImageVector?, slots: LettaChipSlots = LettaChipSlots.None) {
     Row(
-        modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
+        modifier = Modifier.padding(horizontal = LettaSpaceTokens.sm, vertical = LettaSpaceTokens.hair),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+        horizontalArrangement = Arrangement.spacedBy(LettaSpaceTokens.xs),
     ) {
-        icon?.let { Icon(it, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm)) }
+        slots.leading?.invoke()
+        icon?.let { Icon(it, contentDescription = null, modifier = Modifier.size(LettaControlTokens.iconSm)) }
         Text(text, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        trailingIcon?.let { Icon(it, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm)) }
+        slots.trailing?.invoke()
     }
 }
 
-/** The family's one shape. */
-private val PillShape = RoundedCornerShape(LettaDimens.Radius.sm)
 
 private const val PILL_FILL_ALPHA = 0.12f
 private const val PILL_BORDER_ALPHA = 0.18f

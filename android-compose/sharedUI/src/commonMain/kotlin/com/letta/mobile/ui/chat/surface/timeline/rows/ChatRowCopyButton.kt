@@ -1,6 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
-import com.letta.mobile.ui.components.StatusGlyph
+import com.letta.mobile.ui.components.foundation.StatusGlyph
 import com.letta.mobile.ui.components.line.StatusTone
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween

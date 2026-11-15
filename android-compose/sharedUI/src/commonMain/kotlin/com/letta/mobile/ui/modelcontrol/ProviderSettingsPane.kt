@@ -39,7 +39,7 @@ import com.letta.mobile.data.repository.modelcontrol.connectMethod
 import com.letta.mobile.data.repository.modelcontrol.settingsLists
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshable
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** The sub-pages of Providers, in navigation order. */

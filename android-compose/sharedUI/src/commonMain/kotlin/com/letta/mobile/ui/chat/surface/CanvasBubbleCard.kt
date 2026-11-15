@@ -60,7 +60,7 @@ import com.letta.mobile.sharedui.resources.chat_surface_bubble_collapse
 import com.letta.mobile.sharedui.resources.chat_surface_recents_close
 import com.letta.mobile.sharedui.resources.chat_surface_recents_open
 import com.letta.mobile.ui.chat.surface.recents.RecentInteractionsList
-import com.letta.mobile.ui.components.LettaFoldButton
+import com.letta.mobile.ui.components.disclosure.LettaFoldButton
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatHeadDimens
 import com.letta.mobile.ui.theme.ChatRowMotion

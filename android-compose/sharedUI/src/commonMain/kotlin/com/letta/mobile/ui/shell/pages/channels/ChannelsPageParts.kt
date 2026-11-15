@@ -25,8 +25,8 @@ import com.letta.mobile.ui.shell.tokens.ShellType
 import com.letta.mobile.data.channel.ChannelDisplayItem
 import com.letta.mobile.data.channel.ChannelDisplayStatus
 import com.letta.mobile.ui.components.LettaCatalogCard
-import com.letta.mobile.ui.components.LettaChipTab
-import com.letta.mobile.ui.components.LettaChipTabRow
+import com.letta.mobile.ui.components.foundation.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTabRow
 import com.letta.mobile.ui.components.LettaPageHeader
 import com.letta.mobile.ui.components.foundation.LettaButtonIcon
 import com.letta.mobile.ui.components.foundation.LettaIconButton
@@ -34,7 +34,7 @@ import com.letta.mobile.ui.components.foundation.LettaSearchField
 import com.letta.mobile.ui.components.foundation.LettaSearchOptions
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.shell.tokens.ShellDimens
-import com.letta.mobile.ui.theme.LettaPill
+import com.letta.mobile.ui.components.foundation.LettaPill
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshIconButton
 import com.letta.mobile.ui.components.list.RosterRowState

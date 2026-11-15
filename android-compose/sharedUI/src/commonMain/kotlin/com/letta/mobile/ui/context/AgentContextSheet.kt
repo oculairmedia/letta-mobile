@@ -51,7 +51,7 @@ import com.letta.mobile.ui.modelcontrol.ModelPickerActions
 import com.letta.mobile.ui.modelcontrol.ModelPickerContent
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
-import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaSpinner
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.components.foundation.LettaNavChevron

@@ -43,8 +43,8 @@ import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.home.sortFleet
 import com.letta.mobile.data.home.statTiles
 import com.letta.mobile.data.model.view.RuntimeViewId
-import com.letta.mobile.ui.components.LettaChipTab
-import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.components.foundation.LettaButtonIcon
 import com.letta.mobile.ui.components.foundation.LettaIconButton
@@ -56,9 +56,9 @@ import com.letta.mobile.ui.home.FleetBarSpark
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.shell.tokens.ShellDimens
-import com.letta.mobile.ui.theme.LettaChip
+import com.letta.mobile.ui.components.foundation.LettaChip
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSectionHeader
+import com.letta.mobile.ui.components.foundation.LettaSectionHeader
 import com.letta.mobile.ui.theme.tokens.LettaStatusTone
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 

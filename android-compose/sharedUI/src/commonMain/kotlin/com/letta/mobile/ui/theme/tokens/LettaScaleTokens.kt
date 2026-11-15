@@ -31,9 +31,24 @@ object LettaControlTokens {
     val fieldHeight: Dp = 32.dp
     val actionButton: Dp = 38.dp
     val minTouchTarget: Dp = 48.dp
+
+    /** Spinner sizes by role (LettaSpinner): inside text or a chip, in place of an icon, a pane loading. */
+    val spinnerSm: Dp = iconSm
+    val spinnerMd: Dp = icon
+    val spinnerLg: Dp = 40.dp
 }
 
 /** Strokes; see LettaDimens.Stroke. [hairline] is the only border width. */
 object LettaStrokeTokens {
     val hairline: Dp = 1.dp
+
+    /** A spinner's arc, not a border: [spinner] for the small and medium sizes, [spinnerLg] for the large. */
+    val spinner: Dp = 2.dp
+    val spinnerLg: Dp = 4.dp
+}
+
+/** Content alphas; see LettaDimens.Alpha. */
+object LettaAlphaTokens {
+    /** Quiet text one step below `onSurfaceVariant`: section labels. */
+    const val muted: Float = 0.72f
 }

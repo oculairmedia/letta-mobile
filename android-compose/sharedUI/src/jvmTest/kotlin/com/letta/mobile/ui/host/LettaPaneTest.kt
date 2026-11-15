@@ -22,7 +22,7 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.context.ContextTokenReadings
-import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.context.AgentContextCardBinding
 import com.letta.mobile.ui.context.AgentContextCardDeps

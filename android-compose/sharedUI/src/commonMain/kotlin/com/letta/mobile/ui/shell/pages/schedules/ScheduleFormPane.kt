@@ -37,12 +37,12 @@ import com.letta.mobile.data.schedules.CronCadence
 import com.letta.mobile.data.schedules.ScheduleClock
 import com.letta.mobile.data.schedules.ScheduleFormDraft
 import com.letta.mobile.data.schedules.ScheduleFormat
-import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.host.PaneSize
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import com.letta.mobile.ui.theme.customColors
 
 /**

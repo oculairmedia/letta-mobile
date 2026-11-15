@@ -28,7 +28,7 @@ import com.letta.mobile.data.memory.memfs.MemfsFileKind
 import com.letta.mobile.data.memory.memfs.MemfsLoad
 import com.letta.mobile.data.memory.memfs.MemfsTab
 import com.letta.mobile.ui.components.row.LettaListRowSpec
-import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 import com.letta.mobile.ui.components.foundation.LettaEmptyContent
 import com.letta.mobile.ui.components.foundation.LettaEmptyState
 import com.letta.mobile.ui.components.foundation.LettaInlineNotice
@@ -37,7 +37,7 @@ import com.letta.mobile.ui.components.foundation.LettaNoticeAction
 import com.letta.mobile.ui.components.foundation.LettaSearchField
 import com.letta.mobile.ui.components.foundation.LettaSearchOptions
 import com.letta.mobile.ui.theme.tokens.LettaPanelTone
-import com.letta.mobile.ui.components.LettaChipTabRow
+import com.letta.mobile.ui.components.foundation.LettaChipTabRow
 import com.letta.mobile.ui.components.LettaPageHeader
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterListRow
@@ -46,7 +46,7 @@ import com.letta.mobile.ui.components.list.RosterOptions
 import com.letta.mobile.ui.components.list.RosterSection
 import com.letta.mobile.ui.components.list.RosterSelection
 import com.letta.mobile.ui.components.list.RosterSpec
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**

@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,7 +45,6 @@ import com.letta.mobile.sharedui.resources.canvas_menu_share
 import com.letta.mobile.ui.components.foundation.LettaButtonIcon
 import com.letta.mobile.ui.components.foundation.LettaColorSwatch
 import com.letta.mobile.ui.components.foundation.LettaDivider
-import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.components.foundation.LettaIconButton
 import com.letta.mobile.ui.components.foundation.LettaSwatch
 import com.letta.mobile.ui.components.foundation.LettaVerticalDivider
@@ -57,6 +54,9 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import org.jetbrains.compose.resources.stringResource
+import com.letta.mobile.ui.components.foundation.LettaMenuEntry
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 
 /**
  * The board's chrome, in the layout whiteboard tools converge on: a small title pill top-left,
@@ -155,18 +155,19 @@ internal class CanvasOverflow(
 internal fun CanvasOverflowMenu(overflow: CanvasOverflow, expanded: Boolean, onDismiss: () -> Unit) {
     LettaMenu(expanded = expanded, onDismiss = onDismiss) {
         overflow.sync?.let { CanvasSyncStatusLine(it) }
-        overflow.host.forEach { entry -> MenuEntry(entry.icon, entry.label) { onDismiss(); entry.onClick() } }
+        overflow.host.forEach { entry -> LettaMenuEntry(LettaMenuItem(entry.label, entry.icon, onClick = entry.onClick), onDismiss) }
         if (overflow.sync != null || overflow.host.isNotEmpty()) LettaDivider()
         overflow.onShare?.let { share ->
-            MenuEntry(Lucide.Share2, stringResource(Res.string.canvas_menu_share)) { onDismiss(); share() }
+            LettaMenuEntry(LettaMenuItem(stringResource(Res.string.canvas_menu_share), Lucide.Share2, onClick = share), onDismiss)
         }
         if (overflow.compact) {
             val zoom = overflow.zoom
-            MenuEntry(Lucide.ZoomIn, "Zoom in (${zoom.scalePercent}%)", onClick = zoom.onZoomIn)
-            MenuEntry(Lucide.ZoomOut, "Zoom out", onClick = zoom.onZoomOut)
-            MenuEntry(Lucide.Maximize, "Fit to content") { onDismiss(); zoom.onReset() }
+            val zoomIn = LettaMenuItem("Zoom in (${zoom.scalePercent}%)", Lucide.ZoomIn, keepsMenuOpen = true, onClick = zoom.onZoomIn)
+            LettaMenuEntry(zoomIn, onDismiss)
+            LettaMenuEntry(LettaMenuItem("Zoom out", Lucide.ZoomOut, keepsMenuOpen = true, onClick = zoom.onZoomOut), onDismiss)
+            LettaMenuEntry(LettaMenuItem("Fit to content", Lucide.Maximize, onClick = zoom.onReset), onDismiss)
             overflow.onHistory?.let { history ->
-                MenuEntry(Lucide.History, "History (${overflow.checkpointCount ?: 0})") { onDismiss(); history() }
+                LettaMenuEntry(LettaMenuItem("History (${overflow.checkpointCount ?: 0})", Lucide.History, onClick = history), onDismiss)
             }
         }
         BoardMenuEntries(overflow.menu, overflow.background, onDismiss)
@@ -237,11 +238,11 @@ private fun ZoomControls(zoom: CanvasZoom) {
 /** The overflow's board commands and background settings, shared by both layouts. */
 @Composable
 private fun BoardMenuEntries(menu: CanvasMenuActions, background: CanvasBackgroundActions, close: () -> Unit) {
-    MenuEntry(Lucide.Import, "Import Build Cycle") { close(); menu.onImportBuildCycle() }
-    MenuEntry(Lucide.Import, "Import Daily Loop") { close(); menu.onImportDailyLoop() }
-    MenuEntry(Lucide.FileJson, "Export JSON") { close(); menu.onExportJson() }
-    MenuEntry(Lucide.Download, "Export SVG") { close(); menu.onExportSvg() }
-    MenuEntry(Lucide.Trash2, "Clear") { close(); menu.onClear() }
+    LettaMenuEntry(LettaMenuItem("Import Build Cycle", Lucide.Import, onClick = menu.onImportBuildCycle), close)
+    LettaMenuEntry(LettaMenuItem("Import Daily Loop", Lucide.Import, onClick = menu.onImportDailyLoop), close)
+    LettaMenuEntry(LettaMenuItem("Export JSON", Lucide.FileJson, onClick = menu.onExportJson), close)
+    LettaMenuEntry(LettaMenuItem("Export SVG", Lucide.Download, onClick = menu.onExportSvg), close)
+    LettaMenuEntry(LettaMenuItem("Clear", Lucide.Trash2, onClick = menu.onClear), close)
     Text(
         text = "Background",
         style = MaterialTheme.typography.labelSmall,
@@ -305,12 +306,7 @@ private fun BackgroundPatternRows(background: CanvasBackgroundActions) {
 
 @Composable
 private fun MenuChip(label: String, description: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label) },
-        modifier = Modifier.semantics { contentDescription = description },
-    )
+    LettaChipTab(text = label, active = selected, onClick = onClick, modifier = Modifier.semantics { contentDescription = description })
 }
 
 @Composable
@@ -416,11 +412,3 @@ private fun PillIconButton(icon: ImageVector, label: String, enabled: Boolean = 
     LettaIconButton(LettaButtonIcon(icon, label, size = LettaDimens.Control.iconButtonLg), onClick = onClick, enabled = enabled)
 }
 
-@Composable
-private fun MenuEntry(icon: ImageVector, label: String, onClick: () -> Unit) {
-    DropdownMenuItem(
-        text = { Text(label) },
-        leadingIcon = { LettaIcon(icon, contentDescription = null) },
-        onClick = onClick,
-    )
-}

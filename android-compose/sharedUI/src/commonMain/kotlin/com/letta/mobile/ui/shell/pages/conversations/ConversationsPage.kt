@@ -24,7 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.components.LettaRefreshAction

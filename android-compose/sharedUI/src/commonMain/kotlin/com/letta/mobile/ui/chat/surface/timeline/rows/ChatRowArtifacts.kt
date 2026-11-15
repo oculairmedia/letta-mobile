@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
-import com.letta.mobile.ui.components.StatusGlyph
+import com.letta.mobile.ui.components.foundation.StatusGlyph
 import com.letta.mobile.ui.components.line.StatusTone
 import com.letta.mobile.ui.theme.ChatRowCardShape
 import com.letta.mobile.ui.theme.ChatRowInsetShape
@@ -73,7 +73,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaSpinner
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource

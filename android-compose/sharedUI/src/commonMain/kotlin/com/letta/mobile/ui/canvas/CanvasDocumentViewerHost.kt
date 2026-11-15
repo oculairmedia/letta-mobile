@@ -1,7 +1,5 @@
 package com.letta.mobile.ui.canvas
 
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -10,9 +8,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -37,6 +32,8 @@ import com.letta.mobile.ui.canvas.plugin.CanvasViewerLeaveChecks
 import com.letta.mobile.ui.canvas.plugin.LocalCanvasViewerLeaveChecks
 import com.letta.mobile.ui.canvas.plugin.LocalCanvasDocumentCanvasContent
 import com.letta.mobile.ui.canvas.plugin.LocalCanvasDocumentViewers
+import com.letta.mobile.ui.components.foundation.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTabRow
 
 /**
  * Selects a rendering of [session] while keeping that exact session mounted by its owner. Viewer
@@ -107,12 +104,12 @@ private fun CanvasDocumentViewerToggle(
     onSelect: (CanvasDocumentViewerId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier = modifier.testTag(CANVAS_VIEWER_TOGGLE_TAG).horizontalScroll(rememberScrollState())) {
+    LettaChipTabRow(modifier = modifier.testTag(CANVAS_VIEWER_TOGGLE_TAG)) {
         viewers.all.forEach { viewer ->
-            FilterChip(
-                selected = selectedId == viewer.id,
+            LettaChipTab(
+                text = viewer.label(),
+                active = selectedId == viewer.id,
                 onClick = { onSelect(viewer.id) },
-                label = { Text(viewer.label()) },
                 modifier = Modifier.testTag(canvasViewerOptionTag(viewer.id)),
             )
         }

@@ -17,7 +17,7 @@ import com.letta.mobile.ui.canvas.boards.CanvasBoardSource
 import com.letta.mobile.ui.canvas.boards.LocalCanvasBoardSource
 import com.letta.mobile.ui.shell.modules.UnavailableModule
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaSpinner
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
 import kotlinx.coroutines.CancellationException

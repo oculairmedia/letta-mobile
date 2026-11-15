@@ -53,7 +53,7 @@ import com.letta.mobile.ui.chat.tools.LocalToolStepExpansions
 import com.letta.mobile.ui.chat.tools.title
 import com.letta.mobile.ui.components.LineFrame
 import com.letta.mobile.ui.components.LocalLineRail
-import com.letta.mobile.ui.components.StatusGlyph
+import com.letta.mobile.ui.components.foundation.StatusGlyph
 import com.letta.mobile.ui.components.line.LineDisclosure
 import com.letta.mobile.ui.components.line.LineRail
 import com.letta.mobile.ui.components.line.StatusTone

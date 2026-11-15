@@ -15,7 +15,7 @@ import com.letta.mobile.ui.mascot.MascotSeatVacancy
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.theme.ChatMascotDimens
-import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaSpinner
 
 /** Test tags for the agent's mascot in the timeline. */
 internal object TimelineMascotTags {

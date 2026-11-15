@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
@@ -88,6 +89,24 @@ class CanvasChromeGeometryUiTest {
                 val swatch = onNodeWithContentDescription("Background ${entry.name}").getBoundsInRoot()
                 assertEquals(LettaComponentDimens.swatch.value, swatch.width.value, 0.5f, "${entry.name} swatch at $width")
                 assertTrue(swatch.left >= 0.dp && swatch.right <= width, "${entry.name} swatch inside $width")
+            }
+        }
+    }
+
+    @Test
+    fun theOverflowMenuIsTheSharedRowsAndChipsAndStaysOnScreen() = widths.forEach { width ->
+        runComposeUiTest {
+            showAt(width) { actionsPill(compact = width < COMPACT_CANVAS_WIDTH) }
+            onNodeWithContentDescription("More").performClick()
+            val rows = listOf("Export JSON", "Export SVG", "Clear").map { onNodeWithText(it).getBoundsInRoot() }
+            rows.forEach { row -> assertEquals(rows.first().height.value, row.height.value, 0.5f, "one menu row height at $width") }
+            val chips = listOf("Pattern none", "Pattern dots", "Pattern grid").mapNotNull { description ->
+                runCatching { onNodeWithContentDescription(description).getBoundsInRoot() }.getOrNull()
+            }
+            assertTrue(chips.isNotEmpty(), "the background pattern chips are shown at $width")
+            chips.forEach { chip ->
+                assertEquals(chips.first().height.value, chip.height.value, 0.5f, "one chip height at $width")
+                assertTrue(chip.left >= 0.dp && chip.right <= width, "chip $chip inside $width")
             }
         }
     }
