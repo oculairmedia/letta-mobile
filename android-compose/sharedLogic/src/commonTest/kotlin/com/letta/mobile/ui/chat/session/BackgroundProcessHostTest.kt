@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.session
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import kotlinx.atomicfu.atomic
@@ -42,8 +44,8 @@ class BackgroundProcessHostTest {
         backgroundScope.launch { port.composer.collect {} }
         runCurrent()
         assertEquals(listOf("p"), port.composer.value.backgroundProcesses.map { it.id })
-        port.actions.stopBackgroundProcess("p")
-        port.actions.stopBackgroundProcess("p")
+        port.actions.stopBackgroundProcess(ProcessId("p"))
+        port.actions.stopBackgroundProcess(ProcessId("p"))
         runCurrent()
         assertEquals(listOf(runtime to "p"), calls)
         runCurrent()
@@ -72,7 +74,7 @@ class BackgroundProcessHostTest {
         runCurrent()
         frames.emit(snapshot("""[{"id":"p"}]"""))
         runCurrent()
-        port.actions.stopBackgroundProcess("p")
+        port.actions.stopBackgroundProcess(ProcessId("p"))
         runCurrent()
         assertEquals("host refused", port.composer.value.error)
         runCurrent()

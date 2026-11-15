@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.api.stopBackgroundProcess
 import com.letta.mobile.data.model.MessageId
@@ -188,7 +190,8 @@ class IrohAdminRpcChatGateway(
     override val deviceStatusFrames get() = transport.deviceStatusFrames
 
     override val stopBackgroundProcess:
-        suspend (com.letta.mobile.data.transport.appserver.AppServerRuntimeScope, String) -> Unit = transport::stopBackgroundProcess
+        suspend (com.letta.mobile.data.transport.appserver.AppServerRuntimeScope, String) -> Unit =
+            { runtime, id -> transport.stopBackgroundProcess(runtime, ProcessId(id)) }
 
     override val permissionModes: com.letta.mobile.data.runtime.PermissionModeRegistry?
         get() = approvalControls?.modes?.takeIf { it.supported }?.modes

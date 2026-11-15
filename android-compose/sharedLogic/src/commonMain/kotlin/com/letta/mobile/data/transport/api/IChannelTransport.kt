@@ -1,5 +1,7 @@
 package com.letta.mobile.data.transport.api
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.ChannelTransportDefaults
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -182,12 +184,12 @@ data class RedialWhileTurnActive(
 /** Stop one host-owned process. The next host snapshot, rather than this acknowledgement, removes its row. */
 suspend fun IChannelTransport.stopBackgroundProcess(
     runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
-    processId: String,
+    processId: ProcessId,
 ) {
     val body = kotlinx.serialization.json.buildJsonObject {
         put("agent_id", kotlinx.serialization.json.JsonPrimitive(runtime.agentId))
         put("conversation_id", kotlinx.serialization.json.JsonPrimitive(runtime.conversationId))
-        put("process_id", kotlinx.serialization.json.JsonPrimitive(processId))
+        put("process_id", kotlinx.serialization.json.JsonPrimitive(processId.value))
     }
     val response = adminRpc("monitor.stop", "", body.toString())
     check(response.success) { response.error ?: "Could not stop background process" }

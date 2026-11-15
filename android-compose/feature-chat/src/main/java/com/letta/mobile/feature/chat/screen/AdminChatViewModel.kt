@@ -155,7 +155,7 @@ internal class AdminChatViewModel @Inject constructor(
     /** letta-mobile-7mys7 (G37): forks record their parent here; null in tests. */
     private val conversationLineage: com.letta.mobile.data.chat.branch.ConversationLineage? = null,
     /** letta-mobile-bzvro.40: the Iroh host's parked approvals and the permission-mode chip; null leaves both off. */
-    val approvalRelay: com.letta.mobile.feature.chat.coordination.ChatApprovalRelay? = null,
+    internal val approvalRelay: com.letta.mobile.feature.chat.coordination.ChatApprovalRelay? = null,
 ) : ViewModel() {
     /** Initialize before startup because cached runtime events can arrive during construction. */
     private val runPhases = com.letta.mobile.data.presence.ConversationRunPhasePublisher(runRegistry)

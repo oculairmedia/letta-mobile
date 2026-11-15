@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.session
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.chat.projection.CanvasArtifactReceipt
@@ -33,9 +35,6 @@ interface ChatActions :
     // Run
     /** Stops the active run. A second call while a stop is outstanding force-clears locally. */
     fun stopRun()
-
-    /** Stops a background process or monitor on the server. */
-    fun stopBackgroundProcess(processId: String) = Unit
 
     fun rerun(message: UiMessage)
 
@@ -86,6 +85,9 @@ interface ChatComposerActions {
 
 /** What the host's own commands answer: composer commands, `/recompile`'s status and A2UI actions. */
 interface ChatHostCommandActions {
+    /** Stops a background process or monitor on the host. */
+    fun stopBackgroundProcess(processId: ProcessId) = Unit
+
     fun runComposerCommand(command: ChatComposerCommand)
 
     fun uninstallComposerCommand(command: ChatComposerCommand)

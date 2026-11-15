@@ -14545,6 +14545,8 @@ public final class com/letta/mobile/data/chat/runtime/ChatConversationSummary {
 
 public abstract interface class com/letta/mobile/data/chat/runtime/ChatGateway : com/letta/mobile/data/chat/runtime/ChatConversationStore, com/letta/mobile/data/timeline/TimelineTransport {
 	public fun getConversationChanges ()Lkotlinx/coroutines/flow/Flow;
+	public fun getDeviceStatusFrames ()Lkotlinx/coroutines/flow/Flow;
+	public fun getStopBackgroundProcess ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/data/chat/runtime/ChatGateway$DefaultImpls {
@@ -14553,6 +14555,8 @@ public final class com/letta/mobile/data/chat/runtime/ChatGateway$DefaultImpls {
 	public static fun getConversation-1iDlvEA (Lcom/letta/mobile/data/chat/runtime/ChatGateway;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun getConversationChanges (Lcom/letta/mobile/data/chat/runtime/ChatGateway;)Lkotlinx/coroutines/flow/Flow;
 	public static fun getDeleteBehavior (Lcom/letta/mobile/data/chat/runtime/ChatGateway;)Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;
+	public static fun getDeviceStatusFrames (Lcom/letta/mobile/data/chat/runtime/ChatGateway;)Lkotlinx/coroutines/flow/Flow;
+	public static fun getStopBackgroundProcess (Lcom/letta/mobile/data/chat/runtime/ChatGateway;)Lkotlin/jvm/functions/Function3;
 	public static fun getToolReturn-cWSMi4k (Lcom/letta/mobile/data/chat/runtime/ChatGateway;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun listConversationMessagePage (Lcom/letta/mobile/data/chat/runtime/ChatGateway;Lcom/letta/mobile/data/timeline/TimelineRemotePageRequest;Lcom/letta/mobile/data/timeline/TimelinePageProgress;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun listConversationMessagesBefore--chhp7Y (Lcom/letta/mobile/data/chat/runtime/ChatGateway;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -20088,6 +20092,7 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint {
 	public final fun addr ()Lcomputer/iroh/EndpointAddr;
 	public final fun agentChangeTarget ()Lcom/letta/mobile/data/controller/node/iroh/AgentChangeTarget;
 	public final fun attachAppToolRelay (Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayHost;)V
+	public final fun attachBackgroundProcesses (Lcom/letta/mobile/data/transport/appserver/AppServerClient;)V
 	public final fun attachPendingApprovalsPublisher (Lcom/letta/mobile/data/controller/node/iroh/PendingApprovalsPublisher;)V
 	public final fun attachPermissionModePublisher (Lcom/letta/mobile/data/controller/node/iroh/PermissionModePublisher;)V
 	public final fun attachSubagentPublisher (Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistryPublisher;)V
@@ -20930,6 +20935,7 @@ public abstract interface class com/letta/mobile/data/controller/node/iroh/Viewe
 	public fun receivesAgentEvents ()Z
 	public fun receivesConversationActivity-qkT7gGE (Ljava/lang/String;)Z
 	public fun receivesConversationEvents ()Z
+	public fun writeDeviceStatus (Lcom/letta/mobile/data/transport/appserver/AppServerInboundFrame$UpdateDeviceStatus;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun writeFrame (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -20938,6 +20944,7 @@ public final class com/letta/mobile/data/controller/node/iroh/ViewerHandle$Defau
 	public static fun receivesAgentEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
 	public static fun receivesConversationActivity-qkT7gGE (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Ljava/lang/String;)Z
 	public static fun receivesConversationEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
+	public static fun writeDeviceStatus (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Lcom/letta/mobile/data/transport/appserver/AppServerInboundFrame$UpdateDeviceStatus;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class com/letta/mobile/data/controller/node/iroh/ViewerJoinedListener {
@@ -45396,10 +45403,12 @@ public final class com/letta/mobile/data/repository/iroh/IrohAdminRpcChatGateway
 	public fun getConversation-1iDlvEA (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getConversationChanges ()Lkotlinx/coroutines/flow/Flow;
 	public fun getDeleteBehavior ()Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;
+	public fun getDeviceStatusFrames ()Lkotlinx/coroutines/flow/Flow;
 	public fun getPendingApprovalDetails ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getPermissionModeRuntime ()Lcom/letta/mobile/data/runtime/PermissionModeRuntime;
 	public fun getPermissionModes ()Lcom/letta/mobile/data/runtime/PermissionModeRegistry;
 	public fun getQueuedApprovalRequestIds ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun getStopBackgroundProcess ()Lkotlin/jvm/functions/Function3;
 	public fun getToolReturn-cWSMi4k (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listAgentConversations (Lcom/letta/mobile/data/chat/runtime/AgentConversationPage;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listAgentMessages-bjCLa7g (Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -62144,6 +62153,7 @@ public final class com/letta/mobile/data/transport/api/AppServerClientChannel : 
 	public fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lkotlinx/coroutines/CoroutineScope;Ljava/util/Set;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lkotlinx/coroutines/CoroutineScope;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun adminRpc (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getDeviceStatusFrames ()Lkotlinx/coroutines/flow/Flow;
 	public fun getEvents ()Lkotlinx/coroutines/flow/SharedFlow;
 	public fun getHostCapabilities ()Ljava/util/Set;
 	public fun getState ()Lkotlinx/coroutines/flow/StateFlow;
@@ -62232,6 +62242,7 @@ public abstract interface class com/letta/mobile/data/transport/api/IChannelTran
 	public abstract fun connect (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun disconnect (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getActiveTurnEvents ()Lcom/letta/mobile/data/transport/api/RuntimeTurnEventSource;
+	public fun getDeviceStatusFrames ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getEvents ()Lkotlinx/coroutines/flow/SharedFlow;
 	public abstract fun getFrameEvents ()Lkotlinx/coroutines/flow/SharedFlow;
 	public fun getHasAnyActiveChatTurn ()Z
@@ -62262,6 +62273,7 @@ public abstract interface class com/letta/mobile/data/transport/api/IChannelTran
 public final class com/letta/mobile/data/transport/api/IChannelTransport$DefaultImpls {
 	public static fun adminRpc (Lcom/letta/mobile/data/transport/api/IChannelTransport;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun getActiveTurnEvents (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Lcom/letta/mobile/data/transport/api/RuntimeTurnEventSource;
+	public static fun getDeviceStatusFrames (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Lkotlinx/coroutines/flow/Flow;
 	public static fun getHasAnyActiveChatTurn (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Z
 	public static fun getHostCapabilities (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Ljava/util/Set;
 	public static fun getHostNodeId (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Ljava/lang/String;
@@ -62277,6 +62289,10 @@ public final class com/letta/mobile/data/transport/api/IChannelTransport$Default
 	public static synthetic fun subscribe$default (Lcom/letta/mobile/data/transport/api/IChannelTransport;Ljava/lang/String;JILjava/lang/Object;)Z
 }
 
+public final class com/letta/mobile/data/transport/api/IChannelTransportKt {
+	public static final fun stopBackgroundProcess-zL0S0Vc (Lcom/letta/mobile/data/transport/api/IChannelTransport;Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public abstract interface class com/letta/mobile/data/transport/api/LivenessProbingChannelTransport {
 	public abstract fun probeNow ()V
 }
@@ -62289,6 +62305,7 @@ public class com/letta/mobile/data/transport/api/NoOpChannelTransport : com/lett
 	public fun connect (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun disconnect (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getActiveTurnEvents ()Lcom/letta/mobile/data/transport/api/RuntimeTurnEventSource;
+	public fun getDeviceStatusFrames ()Lkotlinx/coroutines/flow/Flow;
 	public fun getEvents ()Lkotlinx/coroutines/flow/SharedFlow;
 	public fun getFrameEvents ()Lkotlinx/coroutines/flow/SharedFlow;
 	public fun getHasAnyActiveChatTurn ()Z
@@ -65000,6 +65017,7 @@ public final class com/letta/mobile/data/transport/appserver/AppServerDeviceStat
 
 public final class com/letta/mobile/data/transport/appserver/AppServerDeviceStatusKt {
 	public static final fun getSnapshot (Lcom/letta/mobile/data/transport/appserver/AppServerInboundFrame$UpdateDeviceStatus;)Lcom/letta/mobile/data/transport/appserver/AppServerDeviceStatusSnapshot;
+	public static final fun stopBackgroundProcess-zL0S0Vc (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/transport/appserver/AppServerDeviceStatusSnapshot {
@@ -69780,6 +69798,7 @@ public final class com/letta/mobile/data/transport/iroh/IrohChannelTransport : c
 	public fun dismissSubagent-mymyBZk (Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getActiveTurnEvents ()Lcom/letta/mobile/data/transport/api/RuntimeTurnEventSource;
 	public fun getCollectorOverflows ()Lkotlinx/coroutines/flow/SharedFlow;
+	public fun getDeviceStatusFrames ()Lkotlinx/coroutines/flow/Flow;
 	public fun getEvents ()Lkotlinx/coroutines/flow/SharedFlow;
 	public fun getFrameCollectorConnectionGeneration ()J
 	public fun getFrameEvents ()Lkotlinx/coroutines/flow/SharedFlow;
@@ -74746,6 +74765,12 @@ public final class com/letta/mobile/ui/chat/session/A2uiSurfaceId {
 	public final synthetic fun unbox-impl ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/chat/session/BackgroundProcessHostKt {
+	public static final fun backgroundProcessHost (Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/chat/runtime/ChatGateway;Lcom/letta/mobile/ui/chat/session/TimelineChatTarget;)Lkotlinx/coroutines/flow/StateFlow;
+	public static final fun backgroundProcessHost (Lkotlinx/coroutines/CoroutineScope;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function0;)Lkotlinx/coroutines/flow/StateFlow;
+	public static final fun backgroundProcessHost (Lkotlinx/coroutines/CoroutineScope;Lkotlinx/coroutines/flow/Flow;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function3;)Lkotlinx/coroutines/flow/StateFlow;
+}
+
 public abstract interface class com/letta/mobile/ui/chat/session/ChatActions : com/letta/mobile/ui/chat/session/ChatBranchActions, com/letta/mobile/ui/chat/session/ChatComposerActions, com/letta/mobile/ui/chat/session/ChatConversationSettingsActions, com/letta/mobile/ui/chat/session/ChatHostCommandActions, com/letta/mobile/ui/chat/session/ChatSendQueueActions, com/letta/mobile/ui/chat/session/ChatTimelineViewActions {
 	public abstract fun clearError ()V
 	public abstract fun clearSearch ()V
@@ -74756,7 +74781,6 @@ public abstract interface class com/letta/mobile/ui/chat/session/ChatActions : c
 	public abstract fun rerun (Lcom/letta/mobile/data/model/UiMessage;)V
 	public abstract fun retryLoad ()V
 	public abstract fun setFontScale (F)V
-	public fun stopBackgroundProcess (Ljava/lang/String;)V
 	public abstract fun stopRun ()V
 	public abstract fun submitApproval (Lcom/letta/mobile/ui/chat/session/ChatApprovalAnswer;)V
 	public abstract fun updateSearchQuery (Ljava/lang/String;)V
@@ -74768,7 +74792,7 @@ public final class com/letta/mobile/ui/chat/session/ChatActions$DefaultImpls {
 	public static fun forkFromMessage (Lcom/letta/mobile/ui/chat/session/ChatActions;Lcom/letta/mobile/data/model/UiMessage;Ljava/lang/String;)V
 	public static fun rerunInFork (Lcom/letta/mobile/ui/chat/session/ChatActions;Lcom/letta/mobile/data/model/UiMessage;)V
 	public static fun setPermissionMode (Lcom/letta/mobile/ui/chat/session/ChatActions;Lcom/letta/mobile/data/transport/appserver/AppServerPermissionMode;)V
-	public static fun stopBackgroundProcess (Lcom/letta/mobile/ui/chat/session/ChatActions;Ljava/lang/String;)V
+	public static fun stopBackgroundProcess-TKul5ZM (Lcom/letta/mobile/ui/chat/session/ChatActions;Ljava/lang/String;)V
 }
 
 public final class com/letta/mobile/ui/chat/session/ChatApprovalAnswer {
@@ -74918,19 +74942,27 @@ public final class com/letta/mobile/ui/chat/session/ChatComposerCommand$Companio
 
 public final class com/letta/mobile/ui/chat/session/ChatComposerHostInputs {
 	public fun <init> ()V
-	public fun <init> (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/context/ContextWindowUsageState;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/context/ContextWindowUsageState;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/context/ContextWindowUsageState;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/context/ContextWindowUsageState;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
 	public final fun component2 ()Ljava/util/List;
 	public final fun component3 ()Lcom/letta/mobile/data/context/ContextWindowUsageState;
 	public final fun component4 ()Ljava/lang/String;
-	public final fun copy (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/context/ContextWindowUsageState;Ljava/lang/String;)Lcom/letta/mobile/ui/chat/session/ChatComposerHostInputs;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/chat/session/ChatComposerHostInputs;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/context/ContextWindowUsageState;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/chat/session/ChatComposerHostInputs;
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Lkotlin/jvm/functions/Function1;
+	public final fun component8 ()Lkotlin/jvm/functions/Function0;
+	public final fun copy (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/context/ContextWindowUsageState;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/chat/session/ChatComposerHostInputs;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/chat/session/ChatComposerHostInputs;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/context/ContextWindowUsageState;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/chat/session/ChatComposerHostInputs;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBackgroundProcessError ()Ljava/lang/String;
+	public final fun getBackgroundProcesses ()Ljava/util/List;
+	public final fun getClearBackgroundProcessError ()Lkotlin/jvm/functions/Function0;
 	public final fun getCommands ()Ljava/util/List;
 	public final fun getContextUsage ()Lcom/letta/mobile/data/context/ContextWindowUsageState;
 	public final fun getMentionables ()Ljava/util/List;
 	public final fun getPlaceholder ()Ljava/lang/String;
+	public final fun getStopBackgroundProcess ()Lkotlin/jvm/functions/Function1;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -75163,6 +75195,7 @@ public abstract class com/letta/mobile/ui/chat/session/ChatExtensionActions : co
 	public fun editAndResend (Lcom/letta/mobile/data/model/UiMessage;)V
 	public fun expandTruncatedToolResult-RCShRf4 (Ljava/lang/String;)V
 	public fun forkFromMessage (Lcom/letta/mobile/data/model/UiMessage;Ljava/lang/String;)V
+	protected final fun getBackgroundProcessErrorClear ()Lkotlin/jvm/functions/Function0;
 	public fun loadOlderMessages ()V
 	public fun markA2uiSnackbarShown-Np_SJdY (J)V
 	public fun refreshGoalStatus ()V
@@ -75175,7 +75208,7 @@ public abstract class com/letta/mobile/ui/chat/session/ChatExtensionActions : co
 	public fun sendQueuedNow-XbArkYg (Ljava/lang/String;)V
 	public fun setFontScale (F)V
 	public fun setPermissionMode (Lcom/letta/mobile/data/transport/appserver/AppServerPermissionMode;)V
-	public fun stopBackgroundProcess (Ljava/lang/String;)V
+	public fun stopBackgroundProcess-TKul5ZM (Ljava/lang/String;)V
 	public fun submitA2uiAction (Lcom/letta/mobile/data/a2ui/A2uiAction;)V
 	public fun toggleReasoningExpanded-RCShRf4 (Ljava/lang/String;)V
 	public fun toggleRunCollapsed-IA8NAhU (Ljava/lang/String;)V
@@ -75224,12 +75257,14 @@ public final class com/letta/mobile/ui/chat/session/ChatHostCommand {
 public abstract interface class com/letta/mobile/ui/chat/session/ChatHostCommandActions {
 	public fun dismissRecompileStatus ()V
 	public abstract fun runComposerCommand (Lcom/letta/mobile/ui/chat/session/ChatComposerCommand;)V
+	public fun stopBackgroundProcess-TKul5ZM (Ljava/lang/String;)V
 	public abstract fun submitA2uiAction (Lcom/letta/mobile/data/a2ui/A2uiAction;)V
 	public abstract fun uninstallComposerCommand (Lcom/letta/mobile/ui/chat/session/ChatComposerCommand;)V
 }
 
 public final class com/letta/mobile/ui/chat/session/ChatHostCommandActions$DefaultImpls {
 	public static fun dismissRecompileStatus (Lcom/letta/mobile/ui/chat/session/ChatHostCommandActions;)V
+	public static fun stopBackgroundProcess-TKul5ZM (Lcom/letta/mobile/ui/chat/session/ChatHostCommandActions;Ljava/lang/String;)V
 }
 
 public final class com/letta/mobile/ui/chat/session/ChatHostExtensionPointsKt {
@@ -75913,27 +75948,29 @@ public final class com/letta/mobile/ui/chat/session/TimelineChatSessionMappingKt
 
 public final class com/letta/mobile/ui/chat/session/TimelineChatSessionOptions {
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;)V
-	public synthetic fun <init> (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;
-	public final fun component10 ()Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;
-	public final fun component11 ()Lkotlinx/coroutines/flow/Flow;
-	public final fun component12 ()Lcom/letta/mobile/data/attachment/AttachmentLimits;
-	public final fun component13 ()Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;
+	public final fun component10 ()Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;
+	public final fun component11 ()Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;
+	public final fun component12 ()Lkotlinx/coroutines/flow/Flow;
+	public final fun component13 ()Lcom/letta/mobile/data/attachment/AttachmentLimits;
+	public final fun component14 ()Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;
 	public final fun component2 ()Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;
 	public final fun component3 ()Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;
 	public final fun component4 ()Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;
 	public final fun component5 ()Lcom/letta/mobile/ui/chat/session/ChatModelSource;
 	public final fun component6 ()Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;
 	public final fun component7 ()Lkotlinx/coroutines/flow/StateFlow;
-	public final fun component8 ()Lkotlin/jvm/functions/Function1;
-	public final fun component9 ()Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;
-	public final fun copy (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;)Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;ILjava/lang/Object;)Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;
+	public final fun component8 ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun component9 ()Lkotlin/jvm/functions/Function1;
+	public final fun copy (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;)Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;ILjava/lang/Object;)Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getActiveTurnCoordinator ()Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;
 	public final fun getApprovals ()Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;
 	public final fun getAttachmentLimits ()Lcom/letta/mobile/data/attachment/AttachmentLimits;
+	public final fun getBackgroundProcesses ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getBranching ()Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;
 	public final fun getComposerHost ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getControls ()Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;

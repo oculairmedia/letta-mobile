@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import com.letta.mobile.data.transport.teardown.TransportTeardown
 import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
@@ -202,7 +204,8 @@ class DesktopAppServerChatGateway internal constructor(
     /** letta-mobile-ckmub.17.2: the shared engine-side mode change the web's chat page binds too. */
     override val deviceStatusFrames get() = client.events
 
-    override val stopBackgroundProcess: suspend (AppServerRuntimeScope, String) -> Unit = client::stopBackgroundProcess
+    override val stopBackgroundProcess: suspend (AppServerRuntimeScope, String) -> Unit =
+        { runtime, id -> client.stopBackgroundProcess(runtime, ProcessId(id)) }
 
     private val modeChanges = EnginePermissionModes(turnEngine as? AppServerTurnEngine, permissionModes)
 

@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.surface
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
@@ -103,9 +105,9 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
 
     val stoppedProcesses = mutableListOf<String>()
 
-    override fun stopBackgroundProcess(processId: String) {
-        record("stopBackgroundProcess:$processId")
-        stoppedProcesses += processId
+    override fun stopBackgroundProcess(processId: ProcessId) {
+        record("stopBackgroundProcess:${processId.value}")
+        stoppedProcesses += processId.value
     }
 
     override fun rerun(message: UiMessage) {

@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.transport.api.AppServerClientChannel
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
@@ -91,7 +93,7 @@ class BackgroundProcessGatewayTest {
             listOf("""{"type":"monitor_stop_response","request_id":"${command.requestId}","success":true}""")
         }
         val client = DefaultAppServerClient(socket, parentScope = backgroundScope)
-        client.stopBackgroundProcess(AppServerRuntimeScope("agent-1", "conv-1"), "p")
+        client.stopBackgroundProcess(AppServerRuntimeScope("agent-1", "conv-1"), ProcessId("p"))
         val call = socket.sent.single()
         assertEquals("monitor_stop", call["type"]?.jsonPrimitive?.content)
         assertEquals("p", call["process_id"]?.jsonPrimitive?.content)

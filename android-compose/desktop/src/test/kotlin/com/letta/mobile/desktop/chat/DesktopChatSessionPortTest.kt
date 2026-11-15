@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import com.letta.mobile.ui.shell.workspace.escapeCollapsesToCanvas
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -704,8 +706,8 @@ class DesktopChatSessionPortTest {
         frames.emit(status("""[{"id":"p"}]"""))
         runCurrent()
         assertEquals(listOf("p"), port.composer.value.backgroundProcesses.map { it.id })
-        port.actions.stopBackgroundProcess("p")
-        port.actions.stopBackgroundProcess("p")
+        port.actions.stopBackgroundProcess(ProcessId("p"))
+        port.actions.stopBackgroundProcess(ProcessId("p"))
         runCurrent()
         assertEquals(listOf(AppServerRuntimeScope("agent-0", "conv-1") to "p"), stopped)
         assertEquals(1, port.composer.value.backgroundProcesses.size)

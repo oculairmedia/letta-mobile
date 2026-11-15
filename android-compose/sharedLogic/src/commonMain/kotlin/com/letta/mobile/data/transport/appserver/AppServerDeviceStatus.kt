@@ -1,5 +1,7 @@
 package com.letta.mobile.data.transport.appserver
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -228,9 +230,9 @@ private fun JsonObject.stringListOrEmpty(vararg keys: String): List<String> =
 
 /** Native binding for the shared process shelf; only a host snapshot changes the visible rows. */
 @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-suspend fun AppServerClient.stopBackgroundProcess(runtime: AppServerRuntimeScope, processId: String) {
+suspend fun AppServerClient.stopBackgroundProcess(runtime: AppServerRuntimeScope, processId: ProcessId) {
     val response = monitorStop(AppServerCommand.MonitorStop(
-        requestId = kotlin.uuid.Uuid.random().toString(), processId = processId, runtime = runtime,
+        requestId = kotlin.uuid.Uuid.random().toString(), processId = processId.value, runtime = runtime,
     ))
     check(response.success) { response.error ?: "Could not stop background process" }
 }

@@ -22,3 +22,7 @@ and keeping parsing or permission decisions in its owning subsystem.
 # Package com.letta.mobile.data.model.view
 
 `RuntimeViewId` names a trusted view implementation; `RuntimeViewMountId` names a host-owned mount. They remain distinct from canonical object references and schema/contract versions, and both preserve bare-string serialization for persisted runtime bindings. These IDs grant no capabilities and import no canvas or UI types.
+
+# Package com.letta.mobile.data.model.process
+
+`ProcessId` identifies a host-owned background process independently of chat runs and conversations. Its bare-string wire representation is opaque; authorization and lifecycle belong to the host.

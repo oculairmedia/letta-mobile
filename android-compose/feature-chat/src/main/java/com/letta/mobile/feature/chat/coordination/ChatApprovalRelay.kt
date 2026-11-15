@@ -1,5 +1,7 @@
 package com.letta.mobile.feature.chat.coordination
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import com.letta.mobile.data.chat.approval.ApprovalOutboxCoordinator
 import com.letta.mobile.data.chat.approval.OutboxApproval
 import com.letta.mobile.data.chat.approval.OutboxSubmitResult
@@ -41,7 +43,7 @@ class ChatApprovalRelay @Inject constructor(
     val deviceStatusFrames get() = transport.deviceStatusFrames
 
     suspend fun stopBackgroundProcess(runtime: AppServerRuntimeScope, processId: String) =
-        transport.stopBackgroundProcess(runtime, processId)
+        transport.stopBackgroundProcess(runtime, ProcessId(processId))
 
     val pendingDetails: StateFlow<Map<String, PendingApprovalDetails>> get() = client.pending
 

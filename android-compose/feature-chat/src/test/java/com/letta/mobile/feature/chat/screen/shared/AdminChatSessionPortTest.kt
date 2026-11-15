@@ -1,5 +1,7 @@
 package com.letta.mobile.feature.chat.screen.shared
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import com.letta.mobile.data.model.LlmModel
@@ -32,11 +34,13 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
@@ -70,7 +74,8 @@ class AdminChatSessionPortTest {
             every { relay.outbox.queuedRequestIds } returns MutableStateFlow(emptySet())
             every { relay.outbox.notices } returns MutableSharedFlow()
             every { relay.permissionMode(any()) } returns flowOf(null)
-            coEvery { relay.stopBackgroundProcess(any(), any()) } returns Unit
+            val stopped = CompletableDeferred<Unit>()
+            coEvery { relay.stopBackgroundProcess(any(), any()) } coAnswers { stopped.complete(Unit); Unit }
             val agent = TestData.agent("agent-process", "Process")
             val vm = openedChatViewModel(canonicalPagingHost(), agent, "conversation-process",
                 FixtureSession("process", approvalRelay = relay))
@@ -83,13 +88,14 @@ class AdminChatSessionPortTest {
                     "device_status":{"background_processes":$processes}}""",
             )
             frames.emit(status("""[{"id":"p"}]"""))
-            assertEquals(listOf("p"), port.composer.value.backgroundProcesses.map { it.id })
-            port.actions.stopBackgroundProcess("p")
-            port.actions.stopBackgroundProcess("p")
+            assertEquals(listOf("p"), port.composer.first { it.backgroundProcesses.isNotEmpty() }.backgroundProcesses.map { it.id })
+            port.actions.stopBackgroundProcess(ProcessId("p"))
+            port.actions.stopBackgroundProcess(ProcessId("p"))
+            stopped.await()
             coVerify(exactly = 1) { relay.stopBackgroundProcess(AppServerRuntimeScope("agent-process", "conversation-process"), "p") }
             assertEquals(1, port.composer.value.backgroundProcesses.size)
             frames.emit(status("[]"))
-            assertTrue(port.composer.value.backgroundProcesses.isEmpty())
+            assertTrue(port.composer.first { it.backgroundProcesses.isEmpty() }.backgroundProcesses.isEmpty())
         } finally {
             viewModel?.viewModelScope?.cancel()
             Dispatchers.resetMain()

@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+
 package com.letta.mobile.ui.chat.session
 
 import com.letta.mobile.data.chat.runtime.ChatGateway
@@ -6,6 +8,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.snapshot
+import kotlin.uuid.Uuid
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
@@ -82,7 +85,7 @@ private suspend fun followBackgroundProcesses(
     stop: suspend (AppServerRuntimeScope, String) -> Unit,
 ) = coroutineScope {
     val lock = SynchronizedObject()
-    val pending = mutableMapOf<String, Any>()
+    val pending = mutableMapOf<String, Uuid>()
     var active = true
     var generation: Long? = null
     var processes = emptyList<AppServerBackgroundProcess>()
@@ -91,7 +94,7 @@ private suspend fun followBackgroundProcesses(
         launch {
             stopBackgroundProcessRequest({ stop(runtime, id) }) { error ->
                 synchronized(lock) {
-                    if (pending[id] === request) {
+                    if (pending[id] == request) {
                         if (error != null) pending.remove(id)
                         host.value = host.value.copy(backgroundProcessError = error)
                     }
@@ -141,12 +144,12 @@ private fun claimBackgroundProcess(
     id: String,
     active: Boolean,
     processes: List<AppServerBackgroundProcess>,
-    pending: MutableMap<String, Any>,
-): Any? {
+    pending: MutableMap<String, Uuid>,
+): Uuid? {
     if (!active) return null
     if (id in pending) return null
     if (processes.none { it.id == id }) return null
-    return Any().also { pending[id] = it }
+    return Uuid.random().also { pending[id] = it }
 }
 
 private fun isOlderConnectionSnapshot(incoming: Long?, current: Long?): Boolean =

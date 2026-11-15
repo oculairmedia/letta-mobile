@@ -39,6 +39,30 @@ final class com.letta.mobile.data.model/CanvasId { // com.letta.mobile.data.mode
     }
 }
 
+final value class com.letta.mobile.data.model.process/ProcessId { // com.letta.mobile.data.model.process/ProcessId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model.process/ProcessId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model.process/ProcessId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model.process/ProcessId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model.process/ProcessId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model.process/ProcessId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model.process/ProcessId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model.process/ProcessId> { // com.letta.mobile.data.model.process/ProcessId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model.process/ProcessId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model.process/ProcessId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model.process/ProcessId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model.process/ProcessId // com.letta.mobile.data.model.process/ProcessId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model.process/ProcessId) // com.letta.mobile.data.model.process/ProcessId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.process.ProcessId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model.process/ProcessId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model.process/ProcessId> // com.letta.mobile.data.model.process/ProcessId.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final value class com.letta.mobile.data.model.view/RuntimeViewId { // com.letta.mobile.data.model.view/RuntimeViewId|null[0]
     constructor <init>(kotlin/String) // com.letta.mobile.data.model.view/RuntimeViewId.<init>|<init>(kotlin.String){}[0]
 
