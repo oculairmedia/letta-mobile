@@ -130,6 +130,7 @@ class AdminRpcContractTest {
             "model.list",
             "model.list.embedding",
             "model.update",
+            "toolset.update",
             "model.exposure.get",
             "model.exposure.set",
             "passage.create",

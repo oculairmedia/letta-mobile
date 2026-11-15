@@ -62,7 +62,7 @@ class WireContractsTest {
                 // New fixture families must supply a real host-state adapter, never be skipped.
                 val known = setOf(
                     "controller_state", "conversations", "hidden_agent_ids", "visibility_index",
-                    "reflection_settings", "cron_control", "execute_command_response",
+                    "reflection_settings", "toolset_response", "cron_control", "execute_command_response",
                 )
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
@@ -209,6 +209,20 @@ class WireContractsTest {
         }
     } as AppServerClient
 
+    private fun toolsetNative(host: JsonObject): AppServerClient = Proxy.newProxyInstance(
+        AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java),
+    ) { _, method, args ->
+        check(method.name == "updateToolset") { "Unexpected native call: ${method.name}" }
+        val command = args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.UpdateToolset
+        val answer = host.getValue("toolset_response").jsonObject
+        com.letta.mobile.data.transport.appserver.AppServerInboundFrame.UpdateToolsetResponse(
+            requestId = command.requestId.orEmpty(),
+            success = answer.getValue("success").jsonPrimitive.boolean,
+            currentToolset = answer.getValue("current_toolset").jsonPrimitive.content,
+            error = answer.getValue("error").jsonPrimitive.content,
+        )
+    } as AppServerClient
+
     private fun cronControlNative(host: JsonObject): AppServerClient = Proxy.newProxyInstance(
         AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java),
     ) { _, method, args ->
@@ -247,6 +261,7 @@ class WireContractsTest {
     } as AppServerClient
 
     private fun fixtureNative(host: JsonObject?): AppServerClient = when {
+        host?.containsKey("toolset_response") == true -> toolsetNative(host)
         host?.containsKey("cron_control") == true -> cronControlNative(host)
         host?.containsKey("execute_command_response") == true -> commandNative(host)
         host?.containsKey("conversations") == true -> conversationNative(host)

@@ -389,6 +389,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [Slash command execution v1](reference/contracts/slash_command.execute/execute-v1.md)
 
+### reference/contracts/toolset.update
+
+- [toolset.update v1](reference/contracts/toolset.update/toolset-v1.md)
+
 ### testing
 
 - [5s9lq.1 Chat Hydration Trace Baseline](testing/5s9lq-1-chat-hydration-trace.md)

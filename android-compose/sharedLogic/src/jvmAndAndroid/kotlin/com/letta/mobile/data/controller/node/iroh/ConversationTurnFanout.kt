@@ -50,6 +50,36 @@ internal class ObserverWriteQueue(
         }
     }
 
+    private val latestWrites = mutableMapOf<ViewerHandle, MutableMap<AppServerRuntimeScope, suspend () -> Unit>>()
+
+    /** Coalesces pending runtime snapshots, retaining at most 64 per viewer behind its ordered writes. */
+    fun enqueueLatest(viewer: ViewerHandle, runtime: AppServerRuntimeScope, write: suspend () -> Unit) {
+        synchronized(latestWrites) {
+            val start = viewer !in latestWrites
+            val pending = latestWrites.getOrPut(viewer) { linkedMapOf() }
+            pending[runtime] = write
+            if (pending.size > 64) pending.remove(pending.keys.first())
+            // Dispatch the drain so enqueueing under a publisher lock never enters a stream write.
+            if (start) scope.launch { enqueue(viewer) { drainLatest(viewer) } }
+        }
+    }
+
+    private suspend fun drainLatest(viewer: ViewerHandle) {
+        while (true) {
+            val next = synchronized(latestWrites) {
+                val entries = latestWrites[viewer]
+                val key = entries?.keys?.firstOrNull()
+                if (key == null) {
+                    latestWrites.remove(viewer)
+                    null
+                } else {
+                    entries.remove(key)
+                }
+            } ?: break
+            next()
+        }
+    }
+
     /**
      * Await this viewer's currently-queued writes. Frames enqueued after this
      * call are NOT waited for — the point is to flush what is already pending,

@@ -950,3 +950,8 @@ Internal delivery failures shared by transport implementations; the App Server s
 # Package com.letta.mobile.data.schedules.control
 
 Internal query-generation tokens for schedule controller work. A captured revision keeps delayed load and mutation results scoped to the selected target.
+
+# Package com.letta.mobile.data.toolsets
+
+Host-confirmed toolset choices and preference selection. ToolsetControl sends one request and waits
+for the runtime's device-status echo; hosts bind their shared channel state and admin RPC.

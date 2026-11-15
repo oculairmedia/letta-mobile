@@ -17,6 +17,9 @@ import kotlinx.serialization.json.JsonArray
 interface IChannelTransport {
     /** Present only when this captured transport can observe and abort exact turns authoritatively. */
     val activeTurnEvents: RuntimeTurnEventSource? get() = null
+    /** Host toolset choices and confirmed preferences for this connection, scoped by runtime. */
+    val toolsetStates: StateFlow<Map<com.letta.mobile.data.toolsets.ToolsetRuntime, com.letta.mobile.data.toolsets.ToolsetState>>
+        get() = com.letta.mobile.data.toolsets.EmptyToolsets
     val state: StateFlow<ChannelTransportState>
     val events: SharedFlow<ServerFrame>
     val frameEvents: SharedFlow<TransportFrameEvent>

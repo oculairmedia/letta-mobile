@@ -34,6 +34,7 @@ fun interface AdminRpcRoutes {
 
 object AdminRpcRegistry {
     val canonicalMethods: Set<String> = setOf(
+        "toolset.update",
         "conversation.list",
         "conversation.list_agent",
         // P2.6 (audit): conversation.get is registered by ConversationAdminHandlers

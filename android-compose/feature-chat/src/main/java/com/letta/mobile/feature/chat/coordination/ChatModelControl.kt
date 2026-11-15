@@ -16,16 +16,17 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 
-/**
- * letta-mobile-w4q4p: the chat picker's view of the host model catalog
- * (reasoning variants per handle) and the per-conversation model switch.
- * Thin binding over the sharedLogic repositories.
- */
+/** Binds the shared host catalog, conversation model switch and toolset picker. */
 class ChatModelControl @Inject constructor(
+    private val session: com.letta.mobile.data.repository.modelcontrol.ModelControlSession,
     private val catalog: ModelCatalogRepository,
     private val conversationModels: ConversationModelRepository,
     private val providers: ProviderConnectionRepository,
 ) {
+    fun toolsets(scope: CoroutineScope, target: ConversationModelTarget?) = session.toolsets(
+        scope, target?.let { com.letta.mobile.data.toolsets.ToolsetRuntime(it.agentId, it.conversationId) },
+    )
+
     suspend fun refreshCatalog() {
         catalog.refresh()
     }
