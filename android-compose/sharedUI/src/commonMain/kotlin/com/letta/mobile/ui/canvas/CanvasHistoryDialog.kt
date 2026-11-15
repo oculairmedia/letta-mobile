@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.canvas
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,18 +9,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasCheckpoint
 import com.letta.mobile.data.canvas.CanvasDeletedElement
+import com.letta.mobile.ui.components.foundation.LettaPanel
 import com.letta.mobile.ui.host.LettaAlertPane
 import com.letta.mobile.ui.host.LettaAlertSpec
 import com.letta.mobile.ui.host.LettaPaneButton
@@ -60,7 +56,7 @@ private fun CanvasHistoryContent(
         Text("No revision checkpoints recorded yet.", style = MaterialTheme.typography.bodyMedium)
     } else {
         LazyColumn(
-            modifier = Modifier.fillMaxWidth().height(300.dp),
+            modifier = Modifier.fillMaxWidth().height(HISTORY_LIST_HEIGHT),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             if (deletedElements.isNotEmpty()) {
@@ -86,14 +82,7 @@ private fun CanvasHistoryCard(
     cp: CanvasCheckpoint,
     onRestore: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = LettaDimens.Alpha.hairline),
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-    ) {
+    LettaPanel(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.sm),
             horizontalArrangement = Arrangement.SpaceBetween,

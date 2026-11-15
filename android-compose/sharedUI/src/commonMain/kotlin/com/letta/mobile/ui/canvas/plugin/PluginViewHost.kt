@@ -1,10 +1,10 @@
 package com.letta.mobile.ui.canvas.plugin
 
-import androidx.compose.foundation.BorderStroke
+import com.letta.mobile.ui.components.foundation.lettaPanelBorder
+import com.letta.mobile.ui.theme.tokens.LettaShapes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -85,9 +85,9 @@ fun PluginLiveCard(
     val title = view.title ?: stringResource(Res.string.canvas_plugin_untitled)
     Surface(
         modifier = modifier.fillMaxSize().testTag(CanvasPluginTestTags.live(view.element.id)),
-        shape = RoundedCornerShape(LettaDimens.Radius.md),
+        shape = LettaShapes.panel,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
+        border = lettaPanelBorder(),
         shadowElevation = LettaDimens.Space.xs,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {

@@ -1,17 +1,12 @@
 package com.letta.mobile.ui.canvas
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -22,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ArrowRight
 import com.composables.icons.lucide.Circle
 import com.composables.icons.lucide.Eraser
@@ -40,6 +34,8 @@ import com.composables.icons.lucide.Undo2
 import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
+import com.letta.mobile.ui.components.foundation.LettaDivider
+import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -58,6 +54,8 @@ import com.letta.mobile.ui.theme.LettaDimens
  * text and note tools are ours: [onAddText] places a plain block-editor text element and
  * [onAddNote] a sticky note, both block documents; each button is only offered when a host wires
  * it. DrawBox's own TEXT mode is not in the rail: text on this board is the block editor.
+ * The property control is offered when the host passes the selection's [properties]; without them
+ * the rail has no colour or property to show, so it leaves the control out.
  */
 @Composable
 fun CanvasControlsBar(
@@ -71,7 +69,7 @@ fun CanvasControlsBar(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(LettaDimens.Radius.lg),
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
         tonalElevation = LettaDimens.Space.hair,
         shadowElevation = LettaDimens.Space.sm,
@@ -98,27 +96,18 @@ fun CanvasControlsBar(
             RailDivider()
             // The rail's swatch is the same master control the selection bar opens: one place
             // for every colour and property, targeting the selection or else the current tool.
-            CanvasPropertyControl(
-                state = state,
-                properties = properties ?: CanvasProperties(
-                    selectionCount = 0,
-                    strokeWidth = 4f,
-                    opacity = 1f,
-                    strokeStyle = io.ak1.drawbox.domain.model.StrokeStyle.SOLID,
-                    cornerRadius = 0f,
-                    showCornerRadius = false,
-                    fontSize = DEFAULT_FONT_SIZE,
-                    fontFamily = io.ak1.drawbox.domain.model.BuiltinFontFamilyKeys.SANS,
-                    textAlignment = io.ak1.drawbox.domain.model.TextAlignment.LEFT,
-                    showFontSize = false,
-                ),
-                dispatch = dispatch,
-                dispatchProperty = dispatchProperty,
-                label = "Stroke color",
-                placement = PropertyPopoverPlacement.BESIDE,
-                modifier = Modifier.size(BUTTON_SIZE),
-            )
-            RailDivider()
+            if (properties != null) {
+                CanvasPropertyControl(
+                    state = state,
+                    properties = properties,
+                    dispatch = dispatch,
+                    dispatchProperty = dispatchProperty,
+                    label = "Stroke color",
+                    placement = PropertyPopoverPlacement.BESIDE,
+                    modifier = Modifier.size(BUTTON_SIZE),
+                )
+                RailDivider()
+            }
             ControlButton(Control(Lucide.Undo2, "Undo", enabled = state.canUndo)) { dispatch(ControlsBarIntent.Undo) }
             ControlButton(Control(Lucide.Redo2, "Redo", enabled = state.canRedo)) { dispatch(ControlsBarIntent.Redo) }
         }
@@ -149,19 +138,13 @@ internal fun ControlButton(control: Control, size: androidx.compose.ui.unit.Dp =
             IconButtonDefaults.iconButtonColors()
         },
     ) {
-        Icon(imageVector = control.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
+        LettaIcon(control.icon, contentDescription = null)
     }
 }
 
 @Composable
 private fun RailDivider() {
-    Box(
-        modifier = Modifier
-            .padding(vertical = LettaDimens.Space.xs)
-            .height(1.dp)
-            .width(LettaDimens.Space.xl)
-            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)),
-    )
+    LettaDivider(Modifier.padding(vertical = LettaDimens.Space.xs).width(LettaDimens.Space.xl))
 }
 
 /** The tools that pick and move, in rail order, with the label a click target reads out. */
@@ -203,6 +186,3 @@ internal fun iconFor(mode: Mode): ImageVector = when (mode) {
 }
 
 private val BUTTON_SIZE = LettaDimens.Control.actionButton
-
-/** DrawBox's own starting size for text, for a bar with no state to read yet. */
-private const val DEFAULT_FONT_SIZE = 24f

@@ -77,7 +77,6 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import io.ak1.drawbox.domain.model.BackgroundPattern
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.linePath
@@ -332,7 +331,7 @@ fun DrawBox(
     val handleHitPx by rememberUpdatedState(with(density) { selectionStyle.hitRadius.toPx() })
     val rotationOffsetPx by rememberUpdatedState(with(density) { selectionStyle.rotationOffset.toPx() })
     val densityNow by rememberUpdatedState(density)
-    fun pickTolerancePx(): Float = with(densityNow) { (pickToleranceNow?.invoke() ?: 12.dp).toPx() }
+    fun pickTolerancePx(): Float = with(densityNow) { (pickToleranceNow?.invoke() ?: DEFAULT_PICK_TOLERANCE).toPx() }
     // Screen-space metrics for the selection chrome. Kept in px here (resolved
     // once per density change) and scaled by inverseScale at draw time so the
     // box, handles, and padding stay a constant on-screen size at any zoom.
@@ -1072,8 +1071,6 @@ fun DrawingPreview(
     }
 }
 
-private val GridLightOnDark = Color(0x40FFFFFF)  // ~25% white over dark bgs
-private val GridDarkOnLight = Color(0x33000000)  // ~20% black over light bgs
 internal const val GRID_BASE_STEP_WORLD = 50f
 
 /**
@@ -1320,15 +1317,15 @@ private fun rotationHandleWorld(
  * @property accent Accent color of the box, handles, and marquee.
  */
 data class SelectionChromeStyle(
-    val padding: Dp = 6.dp,
-    val handleSize: Dp = 11.dp,
-    val cornerRadius: Dp = 8.dp,
-    val strokeWidth: Dp = 1.5.dp,
-    val accent: Color = Color(0xFF2196F3),
+    val padding: Dp = SELECTION_PADDING,
+    val handleSize: Dp = SELECTION_HANDLE_SIZE,
+    val cornerRadius: Dp = SELECTION_CORNER_RADIUS,
+    val strokeWidth: Dp = SELECTION_STROKE_WIDTH,
+    val accent: Color = SELECTION_ACCENT,
     /** How near a handle a press still grabs it; a finger needs more than a mouse. */
-    val hitRadius: Dp = 16.dp,
+    val hitRadius: Dp = SELECTION_HIT_RADIUS,
     /** How far above the box the rotation handle floats. */
-    val rotationOffset: Dp = 28.dp,
+    val rotationOffset: Dp = SELECTION_ROTATION_OFFSET,
 ) {
     companion object {
         val Default = SelectionChromeStyle()
@@ -1379,7 +1376,7 @@ private fun DrawScope.drawSelectionChrome(
         )
         val cornerWorld = metrics.cornerRadiusPx * inverseScale
         drawRoundRect(
-            color = metrics.accent.copy(alpha = 0.13f),
+            color = metrics.accent.copy(alpha = MARQUEE_FILL_ALPHA),
             topLeft = r.topLeft,
             size = Size(r.width, r.height),
             cornerRadius = CornerRadius(cornerWorld, cornerWorld),
@@ -1551,7 +1548,7 @@ private fun BackgroundPattern.toTiledBrush(
             intrinsic.height.toInt().coerceAtLeast(1),
         )
     } else {
-        val fallback = with(density) { 64.dp.toPx().toInt() }.coerceAtLeast(1)
+        val fallback = with(density) { IMAGE_FALLBACK_SIZE.toPx().toInt() }.coerceAtLeast(1)
         IntSize(fallback, fallback)
     }
     val bitmap = painter.rasterize(tileSize, density, layoutDirection, tint)
@@ -1697,7 +1694,7 @@ private fun DrawScope.drawTextElement(
         // Preview path: outline the wrap box so the reader can see the
         // placeholder. No layout cost.
         drawRect(
-            color = Color(0x33888888),
+            color = TEXT_PREVIEW_OUTLINE,
             topLeft = element.topLeft,
             size = Size(wrapWidth, element.measuredHeight.coerceAtLeast(1f)),
             style = Stroke(width = 1f),
@@ -1756,12 +1753,12 @@ private fun DrawScope.drawImageElement(
         // Visible placeholder so a corrupt / unsupported payload doesn't render
         // as an invisible hole that's still selectable/movable.
         drawRect(
-            color = Color(0xFFE0E0E0),
+            color = IMAGE_PLACEHOLDER_FILL,
             topLeft = topLeft,
             size = Size(targetW, targetH),
         )
         drawRect(
-            color = Color(0xFFB0B0B0),
+            color = IMAGE_PLACEHOLDER_OUTLINE,
             topLeft = topLeft,
             size = Size(targetW, targetH),
             style = Stroke(width = 1.5f),

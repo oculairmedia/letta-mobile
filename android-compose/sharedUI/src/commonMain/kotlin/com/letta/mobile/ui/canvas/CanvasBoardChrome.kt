@@ -15,7 +15,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
 import com.letta.mobile.data.canvas.CanvasCheckpoint
 import com.letta.mobile.data.canvas.CanvasDeletedElement
@@ -327,7 +326,7 @@ private fun BoxScope.CanvasBoardToolRail(board: CanvasBoard, tools: CanvasBoardT
         modifier = Modifier
             .align(Alignment.CenterStart)
             .windowInsetsPadding(board.view.insets.chrome)
-            .padding(start = CANVAS_CHROME_INSET, top = 72.dp, bottom = 64.dp)
+            .padding(start = CANVAS_CHROME_INSET, top = CANVAS_RAIL_TOP_CLEARANCE, bottom = CANVAS_RAIL_BOTTOM_CLEARANCE)
             .canvasChrome(board.ui.chromeRegions),
     )
 }

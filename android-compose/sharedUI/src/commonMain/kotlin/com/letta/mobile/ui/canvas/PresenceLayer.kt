@@ -1,14 +1,10 @@
 package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -16,16 +12,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.letta.mobile.data.canvas.CanvasPresence
 import kotlin.math.roundToInt
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaTonalPill
+import com.letta.mobile.ui.theme.pill.LettaPillColors
 
 /**
  * Parses hex color strings (#RRGGBB or #RRGGBBAA) into Compose [Color].
  */
-fun parsePresenceColor(hex: String, fallback: Color = Color(0xFF2196F3)): Color {
+fun parsePresenceColor(hex: String, fallback: Color = PresenceFallbackColor): Color {
     val clean = hex.trim().removePrefix("#")
     return try {
         when (clean.length) {
@@ -86,19 +82,12 @@ fun PresenceLayer(
                     drawPath(path, color)
                 }
 
-                // Name badge pill
-                Box(
-                    modifier = Modifier
-                        .offset { IntOffset(14, 14) }
-                        .background(color, RoundedCornerShape(LettaDimens.Radius.sm))
-                        .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair)
-                ) {
-                    Text(
-                        text = presence.displayName,
-                        color = Color.White,
-                        fontSize = LettaDimens.Type.caption,
-                    )
-                }
+                // Name badge pill, in the peer's own colour.
+                LettaTonalPill(
+                    text = presence.displayName,
+                    colors = LettaPillColors(container = color, content = Color.White),
+                    modifier = Modifier.offset { IntOffset(14, 14) },
+                )
             }
         }
     }

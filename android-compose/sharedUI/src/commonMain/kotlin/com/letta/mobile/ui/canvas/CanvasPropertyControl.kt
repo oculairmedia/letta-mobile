@@ -1,11 +1,9 @@
 package com.letta.mobile.ui.canvas
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,9 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -34,28 +31,34 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.composables.icons.lucide.AlignCenter
 import com.composables.icons.lucide.AlignLeft
 import com.composables.icons.lucide.AlignRight
-import com.composables.icons.lucide.Ban
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.PaintBucket
 import com.composables.icons.lucide.PenLine
 import com.composables.icons.lucide.SlidersHorizontal
 import com.composables.icons.lucide.StickyNote
 import com.composables.icons.lucide.Type
-import com.composables.icons.lucide.X
 import com.letta.mobile.data.canvas.CanvasTextStyle
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaColorSwatch
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaSwatch
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import io.ak1.drawbox.domain.model.StrokeStyle
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
@@ -98,19 +101,17 @@ fun CanvasPropertyControl(
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
-                .size(OPENER_SIZE)
-                .background(swatch, CircleShape)
-                .border(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), CircleShape)
-                .semantics { contentDescription = label }
-                .clickable { open = !open },
+                .clip(CircleShape)
+                .clickable(role = Role.Button) { open = !open }
+                .semantics { contentDescription = label },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                Lucide.SlidersHorizontal,
-                contentDescription = null,
-                modifier = Modifier.size(OPENER_SIZE * 0.55f),
-                tint = if (swatch.alpha == 0f) MaterialTheme.colorScheme.onSurface else contrastOn(swatch),
-            )
+            // The swatch shows the colour in force; the sliders glyph over it says it opens every property.
+            LettaColorSwatch(LettaSwatch(swatch, size = OPENER_SIZE))
+            if (swatch.alpha != 0f) {
+                val glyph = LettaIconStyle(OPENER_SIZE * OPENER_GLYPH_RATIO, contrastOn(swatch))
+                LettaIcon(Lucide.SlidersHorizontal, contentDescription = null, style = glyph)
+            }
         }
         if (open) {
             val gap = with(androidx.compose.ui.platform.LocalDensity.current) { (OPENER_SIZE + LettaDimens.Space.md).roundToPx() }
@@ -186,7 +187,7 @@ private fun CanvasPropertyPanel(
         ColorTarget.CARD -> note?.color ?: Color.Transparent
     }
     Surface(
-        shape = RoundedCornerShape(LettaDimens.Radius.lg),
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shadowElevation = LettaDimens.Space.sm,
         modifier = Modifier
@@ -195,8 +196,8 @@ private fun CanvasPropertyPanel(
     ) {
         Column(
             modifier = Modifier
-                .width(if (compact) COMPACT_PANEL_WIDTH else PANEL_WIDTH)
-                .heightIn(max = if (compact) COMPACT_PANEL_MAX_HEIGHT else androidx.compose.ui.unit.Dp.Infinity)
+                .width(if (compact) COMPACT_PROPERTY_PANEL_WIDTH else PROPERTY_PANEL_WIDTH)
+                .heightIn(max = if (compact) COMPACT_PROPERTY_PANEL_MAX_HEIGHT else androidx.compose.ui.unit.Dp.Infinity)
                 .verticalScroll(rememberScrollState())
                 .padding(if (compact) LettaDimens.Space.sm else LettaDimens.Space.md),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -209,13 +210,11 @@ private fun CanvasPropertyPanel(
                         note.plain -> "Text"
                         else -> "Note"
                     },
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    style = LettaTextStyles.labelSemibold,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = onClose, modifier = Modifier.size(LettaDimens.Control.iconButton).semantics { contentDescription = "Close properties" }) {
-                    Icon(Lucide.X, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
-                }
+                val close = LettaButtonIcon(LettaIcons.Close, "Close properties", glyph = LettaIconStyle(LettaDimens.Control.iconSm))
+                LettaIconButton(close, onClick = onClose)
             }
 
             // Colour: pick which colour of the target, then the one picker edits it.
@@ -429,48 +428,23 @@ private fun NoteProperties(note: NoteBarActions, style: CanvasTextStyle) {
 
 @Composable
 private fun TargetChip(target: ColorTarget, color: Color, selected: Boolean, onClick: () -> Unit) {
-    Surface(
+    FilterChip(
+        selected = selected,
         onClick = onClick,
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-        modifier = Modifier.height(CHIP_HEIGHT).semantics { contentDescription = "Target ${target.label}" },
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(LettaDimens.Control.icon)
-                    .background(color, CircleShape)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (color.alpha == 0f) Icon(Lucide.Ban, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm), tint = MaterialTheme.colorScheme.outline)
-            }
-            Icon(target.glyph, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
-        }
-    }
+        label = { LettaIcon(target.glyph, contentDescription = null, style = LettaIconStyle(LettaDimens.Control.iconSm)) },
+        leadingIcon = { LettaColorSwatch(LettaSwatch(color, size = LettaDimens.Control.icon)) },
+        modifier = Modifier.semantics { contentDescription = "Target ${target.label}" },
+    )
 }
 
 @Composable
 private fun Chip(label: String, description: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(
+    FilterChip(
+        selected = selected,
         onClick = onClick,
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLowest,
-        modifier = Modifier.height(CHIP_HEIGHT).semantics { contentDescription = description },
-    ) {
-        Box(modifier = Modifier.padding(horizontal = LettaDimens.Space.sm), contentAlignment = Alignment.Center) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
-            )
-        }
-    }
+        label = { Text(label) },
+        modifier = Modifier.semantics { contentDescription = description },
+    )
 }
 
 @Composable
@@ -480,7 +454,7 @@ private fun Toggle(label: String, icon: ImageVector, selected: Boolean, onClick:
         modifier = Modifier.size(CHIP_HEIGHT).semantics { contentDescription = label },
         colors = if (selected) IconButtonDefaults.filledTonalIconButtonColors() else IconButtonDefaults.iconButtonColors(),
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
+        LettaIcon(icon, contentDescription = null)
     }
 }
 
@@ -536,11 +510,7 @@ internal val StrokeStyles: List<Pair<String, StrokeStyle>> = listOf(
 
 private const val MAX_CORNER_RADIUS = 64f
 private val OPENER_SIZE = LettaDimens.Space.xl
+
+/** The sliders glyph fills this much of the opener's swatch. */
+private const val OPENER_GLYPH_RATIO = 0.55f
 private val CHIP_HEIGHT = LettaDimens.Control.fieldHeight
-private val PANEL_WIDTH = 280.dp
-
-/** Narrow enough to sit on a 360dp phone with room either side. */
-private val COMPACT_PANEL_WIDTH = 296.dp
-
-/** Short enough to leave the element it edits in view. */
-private val COMPACT_PANEL_MAX_HEIGHT = 320.dp

@@ -14,7 +14,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import io.ak1.drawbox.domain.model.Intent
@@ -23,12 +22,6 @@ import io.ak1.drawbox.domain.model.bounds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-
-/**
- * Room kept at the top of the board when the keyboard moves the camera: for the title and sync bar
- * where there is one, and for the selection bar (a note's colour and size) floating over the target.
- */
-private val KEYBOARD_TOP_RESERVE = 72.dp
 
 /** Between what is typed into and the bars riding on the keyboard, beyond the chrome's own inset. */
 private val KEYBOARD_MARGIN = LettaDimens.Space.md
