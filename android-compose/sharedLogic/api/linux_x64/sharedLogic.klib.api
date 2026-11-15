@@ -4781,6 +4781,10 @@ abstract fun interface com.letta.mobile.data.chat.branch/BranchOpener { // com.l
     abstract suspend fun open(com.letta.mobile.data.chat.branch/BranchOutcome) // com.letta.mobile.data.chat.branch/BranchOpener.open|open(com.letta.mobile.data.chat.branch.BranchOutcome){}[0]
 }
 
+abstract fun interface com.letta.mobile.data.chat.routing/SlashCommandBinding { // com.letta.mobile.data.chat.routing/SlashCommandBinding|null[0]
+    abstract fun capture(): kotlin/Pair<com.letta.mobile.data.transport.appserver/AppServerSlashCommandApi, com.letta.mobile.data.transport.appserver/AppServerRuntimeScope>? // com.letta.mobile.data.chat.routing/SlashCommandBinding.capture|capture(){}[0]
+}
+
 abstract fun interface com.letta.mobile.data.context.estimate/TokenEstimator { // com.letta.mobile.data.context.estimate/TokenEstimator|null[0]
     abstract fun tokensForChars(kotlin/Long): kotlin/Int // com.letta.mobile.data.context.estimate/TokenEstimator.tokensForChars|tokensForChars(kotlin.Long){}[0]
 }
@@ -5591,9 +5595,9 @@ abstract interface com.letta.mobile.data.chat.tools/ToolPresenter { // com.letta
     abstract fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools/ToolPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
 }
 
-abstract interface com.letta.mobile.data.commands/SlashCommandsApi : kotlin/AutoCloseable { // com.letta.mobile.data.commands/SlashCommandsApi|null[0]
-    abstract suspend fun listAgentSlashCommands(kotlin/String): kotlin.collections/List<com.letta.mobile.data.commands/AgentSlashCommand> // com.letta.mobile.data.commands/SlashCommandsApi.listAgentSlashCommands|listAgentSlashCommands(kotlin.String){}[0]
-    open fun close() // com.letta.mobile.data.commands/SlashCommandsApi.close|close(){}[0]
+abstract interface com.letta.mobile.data.commands.api/SlashCommandsApi : kotlin/AutoCloseable { // com.letta.mobile.data.commands.api/SlashCommandsApi|null[0]
+    abstract suspend fun listAgentSlashCommands(com.letta.mobile.data.commands.api/SlashCommandQuery): kotlin.collections/List<com.letta.mobile.data.commands.api/AgentSlashCommand> // com.letta.mobile.data.commands.api/SlashCommandsApi.listAgentSlashCommands|listAgentSlashCommands(com.letta.mobile.data.commands.api.SlashCommandQuery){}[0]
+    open fun close() // com.letta.mobile.data.commands.api/SlashCommandsApi.close|close(){}[0]
 }
 
 abstract interface com.letta.mobile.data.compaction/CompactionRepository { // com.letta.mobile.data.compaction/CompactionRepository|null[0]
@@ -6834,6 +6838,8 @@ abstract interface com.letta.mobile.data.session/SessionRepositoryGraph { // com
         open fun <get-blockRepository>(): com.letta.mobile.data.repository.api/IAgentBlockRepository? // com.letta.mobile.data.session/SessionRepositoryGraph.blockRepository.<get-blockRepository>|<get-blockRepository>(){}[0]
     open val conversationLanes // com.letta.mobile.data.session/SessionRepositoryGraph.conversationLanes|{}conversationLanes[0]
         open fun <get-conversationLanes>(): com.letta.mobile.data.lanes/ConversationLaneProjection? // com.letta.mobile.data.session/SessionRepositoryGraph.conversationLanes.<get-conversationLanes>|<get-conversationLanes>(){}[0]
+    open val slashCommands // com.letta.mobile.data.session/SessionRepositoryGraph.slashCommands|{}slashCommands[0]
+        open fun <get-slashCommands>(): com.letta.mobile.data.transport.appserver/AppServerSlashCommandApi? // com.letta.mobile.data.session/SessionRepositoryGraph.slashCommands.<get-slashCommands>|<get-slashCommands>(){}[0]
 
     abstract fun close() // com.letta.mobile.data.session/SessionRepositoryGraph.close|close(){}[0]
 }
@@ -35801,7 +35807,7 @@ final class com.letta.mobile.data.chat.conversations/ClientCommandRoutes { // co
 }
 
 final class com.letta.mobile.data.chat.conversations/ComposerHostCommandSources { // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources|null[0]
-    constructor <init>(com.letta.mobile.data.chat.conversations/ClientCommandRoutes, kotlin/Function1<kotlin/String, kotlin/Unit>, kotlin/Boolean = ..., kotlin.collections/List<com.letta.mobile.ui.chat.session/ChatHostCommand> = ..., kotlin.collections/List<com.letta.mobile.data.commands/AgentSlashCommand> = ...) // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.<init>|<init>(com.letta.mobile.data.chat.conversations.ClientCommandRoutes;kotlin.Function1<kotlin.String,kotlin.Unit>;kotlin.Boolean;kotlin.collections.List<com.letta.mobile.ui.chat.session.ChatHostCommand>;kotlin.collections.List<com.letta.mobile.data.commands.AgentSlashCommand>){}[0]
+    constructor <init>(com.letta.mobile.data.chat.conversations/ClientCommandRoutes, kotlin/Function1<kotlin/String, kotlin/Unit>, kotlin/Boolean = ..., kotlin.collections/List<com.letta.mobile.ui.chat.session/ChatHostCommand> = ..., kotlin.collections/List<com.letta.mobile.data.commands.api/AgentSlashCommand> = ...) // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.<init>|<init>(com.letta.mobile.data.chat.conversations.ClientCommandRoutes;kotlin.Function1<kotlin.String,kotlin.Unit>;kotlin.Boolean;kotlin.collections.List<com.letta.mobile.ui.chat.session.ChatHostCommand>;kotlin.collections.List<com.letta.mobile.data.commands.api.AgentSlashCommand>){}[0]
 
     final val canFork // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.canFork|{}canFork[0]
         final fun <get-canFork>(): kotlin/Boolean // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.canFork.<get-canFork>|<get-canFork>(){}[0]
@@ -35812,14 +35818,14 @@ final class com.letta.mobile.data.chat.conversations/ComposerHostCommandSources 
     final val pages // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.pages|{}pages[0]
         final fun <get-pages>(): kotlin.collections/List<com.letta.mobile.ui.chat.session/ChatHostCommand> // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.pages.<get-pages>|<get-pages>(){}[0]
     final val server // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.server|{}server[0]
-        final fun <get-server>(): kotlin.collections/List<com.letta.mobile.data.commands/AgentSlashCommand> // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.server.<get-server>|<get-server>(){}[0]
+        final fun <get-server>(): kotlin.collections/List<com.letta.mobile.data.commands.api/AgentSlashCommand> // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.server.<get-server>|<get-server>(){}[0]
 
     final fun component1(): com.letta.mobile.data.chat.conversations/ClientCommandRoutes // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.component1|component1(){}[0]
     final fun component2(): kotlin/Function1<kotlin/String, kotlin/Unit> // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.component2|component2(){}[0]
     final fun component3(): kotlin/Boolean // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.component3|component3(){}[0]
     final fun component4(): kotlin.collections/List<com.letta.mobile.ui.chat.session/ChatHostCommand> // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.component4|component4(){}[0]
-    final fun component5(): kotlin.collections/List<com.letta.mobile.data.commands/AgentSlashCommand> // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.component5|component5(){}[0]
-    final fun copy(com.letta.mobile.data.chat.conversations/ClientCommandRoutes = ..., kotlin/Function1<kotlin/String, kotlin/Unit> = ..., kotlin/Boolean = ..., kotlin.collections/List<com.letta.mobile.ui.chat.session/ChatHostCommand> = ..., kotlin.collections/List<com.letta.mobile.data.commands/AgentSlashCommand> = ...): com.letta.mobile.data.chat.conversations/ComposerHostCommandSources // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.copy|copy(com.letta.mobile.data.chat.conversations.ClientCommandRoutes;kotlin.Function1<kotlin.String,kotlin.Unit>;kotlin.Boolean;kotlin.collections.List<com.letta.mobile.ui.chat.session.ChatHostCommand>;kotlin.collections.List<com.letta.mobile.data.commands.AgentSlashCommand>){}[0]
+    final fun component5(): kotlin.collections/List<com.letta.mobile.data.commands.api/AgentSlashCommand> // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.component5|component5(){}[0]
+    final fun copy(com.letta.mobile.data.chat.conversations/ClientCommandRoutes = ..., kotlin/Function1<kotlin/String, kotlin/Unit> = ..., kotlin/Boolean = ..., kotlin.collections/List<com.letta.mobile.ui.chat.session/ChatHostCommand> = ..., kotlin.collections/List<com.letta.mobile.data.commands.api/AgentSlashCommand> = ...): com.letta.mobile.data.chat.conversations/ComposerHostCommandSources // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.copy|copy(com.letta.mobile.data.chat.conversations.ClientCommandRoutes;kotlin.Function1<kotlin.String,kotlin.Unit>;kotlin.Boolean;kotlin.collections.List<com.letta.mobile.ui.chat.session.ChatHostCommand>;kotlin.collections.List<com.letta.mobile.data.commands.api.AgentSlashCommand>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.conversations/ComposerHostCommandSources.toString|toString(){}[0]
@@ -36562,6 +36568,23 @@ final class com.letta.mobile.data.chat.recompile/IrohConversationRecompileClient
         final const val HOST_NEEDS_UPDATE // com.letta.mobile.data.chat.recompile/IrohConversationRecompileClient.Companion.HOST_NEEDS_UPDATE|{}HOST_NEEDS_UPDATE[0]
             final fun <get-HOST_NEEDS_UPDATE>(): kotlin/String // com.letta.mobile.data.chat.recompile/IrohConversationRecompileClient.Companion.HOST_NEEDS_UPDATE.<get-HOST_NEEDS_UPDATE>|<get-HOST_NEEDS_UPDATE>(){}[0]
     }
+}
+
+final class com.letta.mobile.data.chat.routing/SlashCommandSessionPort : com.letta.mobile.ui.chat.session/ChatSessionPort { // com.letta.mobile.data.chat.routing/SlashCommandSessionPort|null[0]
+    constructor <init>(com.letta.mobile.ui.chat.session/ChatSessionPort, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.chat.routing/SlashCommandBinding) // com.letta.mobile.data.chat.routing/SlashCommandSessionPort.<init>|<init>(com.letta.mobile.ui.chat.session.ChatSessionPort;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.chat.routing.SlashCommandBinding){}[0]
+
+    final val actions // com.letta.mobile.data.chat.routing/SlashCommandSessionPort.actions|{}actions[0]
+        final fun <get-actions>(): com.letta.mobile.ui.chat.session/ChatActions // com.letta.mobile.data.chat.routing/SlashCommandSessionPort.actions.<get-actions>|<get-actions>(){}[0]
+    final val capabilities // com.letta.mobile.data.chat.routing/SlashCommandSessionPort.capabilities|{}capabilities[0]
+        final fun <get-capabilities>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.ui.chat.session/ChatSurfaceCapabilities> // com.letta.mobile.data.chat.routing/SlashCommandSessionPort.capabilities.<get-capabilities>|<get-capabilities>(){}[0]
+    final val composer // com.letta.mobile.data.chat.routing/SlashCommandSessionPort.composer|{}composer[0]
+        final fun <get-composer>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.ui.chat.session/ChatComposerUiState> // com.letta.mobile.data.chat.routing/SlashCommandSessionPort.composer.<get-composer>|<get-composer>(){}[0]
+    final val liveStatus // com.letta.mobile.data.chat.routing/SlashCommandSessionPort.liveStatus|{}liveStatus[0]
+        final fun <get-liveStatus>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.runtime/RuntimeLiveStatus> // com.letta.mobile.data.chat.routing/SlashCommandSessionPort.liveStatus.<get-liveStatus>|<get-liveStatus>(){}[0]
+    final val recompileStatus // com.letta.mobile.data.chat.routing/SlashCommandSessionPort.recompileStatus|{}recompileStatus[0]
+        final fun <get-recompileStatus>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.chat.recompile/RecompileStatus> // com.letta.mobile.data.chat.routing/SlashCommandSessionPort.recompileStatus.<get-recompileStatus>|<get-recompileStatus>(){}[0]
+    final val uiState // com.letta.mobile.data.chat.routing/SlashCommandSessionPort.uiState|{}uiState[0]
+        final fun <get-uiState>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.ui.chat.render/ChatUiState> // com.letta.mobile.data.chat.routing/SlashCommandSessionPort.uiState.<get-uiState>|<get-uiState>(){}[0]
 }
 
 final class com.letta.mobile.data.chat.runtime/AgentConversationPage { // com.letta.mobile.data.chat.runtime/AgentConversationPage|null[0]
@@ -37815,55 +37838,64 @@ final class com.letta.mobile.data.chat.tools/ToolStepLine { // com.letta.mobile.
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools/ToolStepLine.toString|toString(){}[0]
 }
 
-final class com.letta.mobile.data.commands/AgentSlashCommand { // com.letta.mobile.data.commands/AgentSlashCommand|null[0]
-    constructor <init>(kotlin/String, kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String = ..., kotlin/Boolean = ...) // com.letta.mobile.data.commands/AgentSlashCommand.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String;kotlin.Boolean){}[0]
+final class com.letta.mobile.data.commands.api/AgentSlashCommand { // com.letta.mobile.data.commands.api/AgentSlashCommand|null[0]
+    constructor <init>(kotlin/String, kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String = ..., kotlin/Boolean = ...) // com.letta.mobile.data.commands.api/AgentSlashCommand.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String;kotlin.Boolean){}[0]
 
-    final val command // com.letta.mobile.data.commands/AgentSlashCommand.command|{}command[0]
-        final fun <get-command>(): kotlin/String // com.letta.mobile.data.commands/AgentSlashCommand.command.<get-command>|<get-command>(){}[0]
-    final val description // com.letta.mobile.data.commands/AgentSlashCommand.description|{}description[0]
-        final fun <get-description>(): kotlin/String // com.letta.mobile.data.commands/AgentSlashCommand.description.<get-description>|<get-description>(){}[0]
-    final val installed // com.letta.mobile.data.commands/AgentSlashCommand.installed|{}installed[0]
-        final fun <get-installed>(): kotlin/Boolean // com.letta.mobile.data.commands/AgentSlashCommand.installed.<get-installed>|<get-installed>(){}[0]
-    final val name // com.letta.mobile.data.commands/AgentSlashCommand.name|{}name[0]
-        final fun <get-name>(): kotlin/String // com.letta.mobile.data.commands/AgentSlashCommand.name.<get-name>|<get-name>(){}[0]
-    final val rawCommand // com.letta.mobile.data.commands/AgentSlashCommand.rawCommand|{}rawCommand[0]
-        final fun <get-rawCommand>(): kotlin/String // com.letta.mobile.data.commands/AgentSlashCommand.rawCommand.<get-rawCommand>|<get-rawCommand>(){}[0]
-    final val skillName // com.letta.mobile.data.commands/AgentSlashCommand.skillName|{}skillName[0]
-        final fun <get-skillName>(): kotlin/String? // com.letta.mobile.data.commands/AgentSlashCommand.skillName.<get-skillName>|<get-skillName>(){}[0]
-    final val source // com.letta.mobile.data.commands/AgentSlashCommand.source|{}source[0]
-        final fun <get-source>(): kotlin/String // com.letta.mobile.data.commands/AgentSlashCommand.source.<get-source>|<get-source>(){}[0]
+    final val command // com.letta.mobile.data.commands.api/AgentSlashCommand.command|{}command[0]
+        final fun <get-command>(): kotlin/String // com.letta.mobile.data.commands.api/AgentSlashCommand.command.<get-command>|<get-command>(){}[0]
+    final val description // com.letta.mobile.data.commands.api/AgentSlashCommand.description|{}description[0]
+        final fun <get-description>(): kotlin/String // com.letta.mobile.data.commands.api/AgentSlashCommand.description.<get-description>|<get-description>(){}[0]
+    final val installed // com.letta.mobile.data.commands.api/AgentSlashCommand.installed|{}installed[0]
+        final fun <get-installed>(): kotlin/Boolean // com.letta.mobile.data.commands.api/AgentSlashCommand.installed.<get-installed>|<get-installed>(){}[0]
+    final val name // com.letta.mobile.data.commands.api/AgentSlashCommand.name|{}name[0]
+        final fun <get-name>(): kotlin/String // com.letta.mobile.data.commands.api/AgentSlashCommand.name.<get-name>|<get-name>(){}[0]
+    final val rawCommand // com.letta.mobile.data.commands.api/AgentSlashCommand.rawCommand|{}rawCommand[0]
+        final fun <get-rawCommand>(): kotlin/String // com.letta.mobile.data.commands.api/AgentSlashCommand.rawCommand.<get-rawCommand>|<get-rawCommand>(){}[0]
+    final val skillName // com.letta.mobile.data.commands.api/AgentSlashCommand.skillName|{}skillName[0]
+        final fun <get-skillName>(): kotlin/String? // com.letta.mobile.data.commands.api/AgentSlashCommand.skillName.<get-skillName>|<get-skillName>(){}[0]
+    final val source // com.letta.mobile.data.commands.api/AgentSlashCommand.source|{}source[0]
+        final fun <get-source>(): kotlin/String // com.letta.mobile.data.commands.api/AgentSlashCommand.source.<get-source>|<get-source>(){}[0]
 
-    final fun component1(): kotlin/String // com.letta.mobile.data.commands/AgentSlashCommand.component1|component1(){}[0]
-    final fun component2(): kotlin/String // com.letta.mobile.data.commands/AgentSlashCommand.component2|component2(){}[0]
-    final fun component3(): kotlin/String // com.letta.mobile.data.commands/AgentSlashCommand.component3|component3(){}[0]
-    final fun component4(): kotlin/String? // com.letta.mobile.data.commands/AgentSlashCommand.component4|component4(){}[0]
-    final fun component5(): kotlin/String // com.letta.mobile.data.commands/AgentSlashCommand.component5|component5(){}[0]
-    final fun component6(): kotlin/Boolean // com.letta.mobile.data.commands/AgentSlashCommand.component6|component6(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String = ..., kotlin/Boolean = ...): com.letta.mobile.data.commands/AgentSlashCommand // com.letta.mobile.data.commands/AgentSlashCommand.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String;kotlin.Boolean){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.commands/AgentSlashCommand.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.commands/AgentSlashCommand.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.commands/AgentSlashCommand.toString|toString(){}[0]
+    final fun component1(): kotlin/String // com.letta.mobile.data.commands.api/AgentSlashCommand.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.commands.api/AgentSlashCommand.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.commands.api/AgentSlashCommand.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.data.commands.api/AgentSlashCommand.component4|component4(){}[0]
+    final fun component5(): kotlin/String // com.letta.mobile.data.commands.api/AgentSlashCommand.component5|component5(){}[0]
+    final fun component6(): kotlin/Boolean // com.letta.mobile.data.commands.api/AgentSlashCommand.component6|component6(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String = ..., kotlin/Boolean = ...): com.letta.mobile.data.commands.api/AgentSlashCommand // com.letta.mobile.data.commands.api/AgentSlashCommand.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.commands.api/AgentSlashCommand.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.commands.api/AgentSlashCommand.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.commands.api/AgentSlashCommand.toString|toString(){}[0]
 
-    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.commands/AgentSlashCommand> { // com.letta.mobile.data.commands/AgentSlashCommand.$serializer|null[0]
-        final val descriptor // com.letta.mobile.data.commands/AgentSlashCommand.$serializer.descriptor|{}descriptor[0]
-            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.commands/AgentSlashCommand.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.commands.api/AgentSlashCommand> { // com.letta.mobile.data.commands.api/AgentSlashCommand.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.commands.api/AgentSlashCommand.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.commands.api/AgentSlashCommand.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
 
-        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.commands/AgentSlashCommand.$serializer.childSerializers|childSerializers(){}[0]
-        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.commands/AgentSlashCommand // com.letta.mobile.data.commands/AgentSlashCommand.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
-        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.commands/AgentSlashCommand) // com.letta.mobile.data.commands/AgentSlashCommand.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.commands.AgentSlashCommand){}[0]
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.commands.api/AgentSlashCommand.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.commands.api/AgentSlashCommand // com.letta.mobile.data.commands.api/AgentSlashCommand.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.commands.api/AgentSlashCommand) // com.letta.mobile.data.commands.api/AgentSlashCommand.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.commands.api.AgentSlashCommand){}[0]
     }
 
-    final object Companion { // com.letta.mobile.data.commands/AgentSlashCommand.Companion|null[0]
-        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.commands/AgentSlashCommand> // com.letta.mobile.data.commands/AgentSlashCommand.Companion.serializer|serializer(){}[0]
+    final object Companion { // com.letta.mobile.data.commands.api/AgentSlashCommand.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.commands.api/AgentSlashCommand> // com.letta.mobile.data.commands.api/AgentSlashCommand.Companion.serializer|serializer(){}[0]
     }
 }
 
-final class com.letta.mobile.data.commands/AppServerSlashCommandApi : com.letta.mobile.data.commands/SlashCommandsApi { // com.letta.mobile.data.commands/AppServerSlashCommandApi|null[0]
-    constructor <init>(com.letta.mobile.data.transport.appserver/AppServerClient, kotlin.coroutines/SuspendFunction1<kotlin/String, kotlin.collections/List<kotlin/String>>? = ..., kotlin/Function1<kotlin/String, kotlin/String> = ...) // com.letta.mobile.data.commands/AppServerSlashCommandApi.<init>|<init>(com.letta.mobile.data.transport.appserver.AppServerClient;kotlin.coroutines.SuspendFunction1<kotlin.String,kotlin.collections.List<kotlin.String>>?;kotlin.Function1<kotlin.String,kotlin.String>){}[0]
+final class com.letta.mobile.data.commands.api/SlashCommandQuery { // com.letta.mobile.data.commands.api/SlashCommandQuery|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.commands.api/SlashCommandQuery.<init>|<init>(kotlin.String){}[0]
 
-    final fun close() // com.letta.mobile.data.commands/AppServerSlashCommandApi.close|close(){}[0]
-    final suspend fun executeCommand(kotlin/String, kotlin/String? = ..., com.letta.mobile.data.transport.appserver/AppServerRuntimeScope? = ...): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.ExecuteCommandResponse // com.letta.mobile.data.commands/AppServerSlashCommandApi.executeCommand|executeCommand(kotlin.String;kotlin.String?;com.letta.mobile.data.transport.appserver.AppServerRuntimeScope?){}[0]
-    final suspend fun listAgentSlashCommands(kotlin/String): kotlin.collections/List<com.letta.mobile.data.commands/AgentSlashCommand> // com.letta.mobile.data.commands/AppServerSlashCommandApi.listAgentSlashCommands|listAgentSlashCommands(kotlin.String){}[0]
+    final val agentId // com.letta.mobile.data.commands.api/SlashCommandQuery.agentId|{}agentId[0]
+        final fun <get-agentId>(): kotlin/String // com.letta.mobile.data.commands.api/SlashCommandQuery.agentId.<get-agentId>|<get-agentId>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.commands.api/SlashCommandQuery.component1|component1(){}[0]
+    final fun copy(kotlin/String = ...): com.letta.mobile.data.commands.api/SlashCommandQuery // com.letta.mobile.data.commands.api/SlashCommandQuery.copy|copy(kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.commands.api/SlashCommandQuery.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.commands.api/SlashCommandQuery.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.commands.api/SlashCommandQuery.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.commands/AppServerSlashCommandApi : com.letta.mobile.data.transport.appserver/AppServerSlashCommandApi { // com.letta.mobile.data.commands/AppServerSlashCommandApi|null[0]
+    constructor <init>(com.letta.mobile.data.transport.appserver/AppServerClient, kotlin.coroutines/SuspendFunction1<kotlin/String, kotlin.collections/List<kotlin/String>>? = ..., kotlin/Function1<kotlin/String, kotlin/String> = ...) // com.letta.mobile.data.commands/AppServerSlashCommandApi.<init>|<init>(com.letta.mobile.data.transport.appserver.AppServerClient;kotlin.coroutines.SuspendFunction1<kotlin.String,kotlin.collections.List<kotlin.String>>?;kotlin.Function1<kotlin.String,kotlin.String>){}[0]
 
     final object Companion { // com.letta.mobile.data.commands/AppServerSlashCommandApi.Companion|null[0]
         final val DEFAULT_SUPPORTED_COMMANDS // com.letta.mobile.data.commands/AppServerSlashCommandApi.Companion.DEFAULT_SUPPORTED_COMMANDS|{}DEFAULT_SUPPORTED_COMMANDS[0]
@@ -57777,7 +57809,7 @@ final class com.letta.mobile.data.repository.iroh/IrohAdminRpcAgentDirectory { /
     final suspend fun getSchedule(com.letta.mobile.data.repository.iroh/ScheduleId, com.letta.mobile.data.model/AgentId? = ...): com.letta.mobile.data.model/ScheduledMessage? // com.letta.mobile.data.repository.iroh/IrohAdminRpcAgentDirectory.getSchedule|getSchedule(com.letta.mobile.data.repository.iroh.ScheduleId;com.letta.mobile.data.model.AgentId?){}[0]
     final suspend fun installSkill(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.repository.iroh/SkillName) // com.letta.mobile.data.repository.iroh/IrohAdminRpcAgentDirectory.installSkill|installSkill(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.repository.iroh.SkillName){}[0]
     final suspend fun listAgentBlocks(com.letta.mobile.data.model/AgentId): kotlin.collections/List<com.letta.mobile.data.model/Block> // com.letta.mobile.data.repository.iroh/IrohAdminRpcAgentDirectory.listAgentBlocks|listAgentBlocks(com.letta.mobile.data.model.AgentId){}[0]
-    final suspend fun listAgentSlashCommands(com.letta.mobile.data.model/AgentId): kotlin.collections/List<com.letta.mobile.data.commands/AgentSlashCommand> // com.letta.mobile.data.repository.iroh/IrohAdminRpcAgentDirectory.listAgentSlashCommands|listAgentSlashCommands(com.letta.mobile.data.model.AgentId){}[0]
+    final suspend fun listAgentSlashCommands(com.letta.mobile.data.model/AgentId): kotlin.collections/List<com.letta.mobile.data.commands.api/AgentSlashCommand> // com.letta.mobile.data.repository.iroh/IrohAdminRpcAgentDirectory.listAgentSlashCommands|listAgentSlashCommands(com.letta.mobile.data.model.AgentId){}[0]
     final suspend fun listAgents(kotlin/Int = ...): kotlin.collections/List<com.letta.mobile.data.model/Agent> // com.letta.mobile.data.repository.iroh/IrohAdminRpcAgentDirectory.listAgents|listAgents(kotlin.Int){}[0]
     final suspend fun listSchedules(com.letta.mobile.data.model/AgentId? = ...): kotlin.collections/List<com.letta.mobile.data.model/ScheduledMessage> // com.letta.mobile.data.repository.iroh/IrohAdminRpcAgentDirectory.listSchedules|listSchedules(com.letta.mobile.data.model.AgentId?){}[0]
     final suspend fun listSkills(com.letta.mobile.data.model/AgentId? = ...): kotlin.collections/List<com.letta.mobile.data.skills/Skill> // com.letta.mobile.data.repository.iroh/IrohAdminRpcAgentDirectory.listSkills|listSkills(com.letta.mobile.data.model.AgentId?){}[0]
@@ -57907,10 +57939,10 @@ final class com.letta.mobile.data.repository.iroh/IrohSkillsApi : com.letta.mobi
     final suspend fun uninstallSkill(kotlin/String, kotlin/String) // com.letta.mobile.data.repository.iroh/IrohSkillsApi.uninstallSkill|uninstallSkill(kotlin.String;kotlin.String){}[0]
 }
 
-final class com.letta.mobile.data.repository.iroh/IrohSlashCommandApi : com.letta.mobile.data.commands/SlashCommandsApi { // com.letta.mobile.data.repository.iroh/IrohSlashCommandApi|null[0]
+final class com.letta.mobile.data.repository.iroh/IrohSlashCommandApi : com.letta.mobile.data.commands.api/SlashCommandsApi { // com.letta.mobile.data.repository.iroh/IrohSlashCommandApi|null[0]
     constructor <init>(com.letta.mobile.data.repository.iroh/IrohAdminRpcAgentDirectory) // com.letta.mobile.data.repository.iroh/IrohSlashCommandApi.<init>|<init>(com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory){}[0]
 
-    final suspend fun listAgentSlashCommands(kotlin/String): kotlin.collections/List<com.letta.mobile.data.commands/AgentSlashCommand> // com.letta.mobile.data.repository.iroh/IrohSlashCommandApi.listAgentSlashCommands|listAgentSlashCommands(kotlin.String){}[0]
+    final suspend fun listAgentSlashCommands(com.letta.mobile.data.commands.api/SlashCommandQuery): kotlin.collections/List<com.letta.mobile.data.commands.api/AgentSlashCommand> // com.letta.mobile.data.repository.iroh/IrohSlashCommandApi.listAgentSlashCommands|listAgentSlashCommands(com.letta.mobile.data.commands.api.SlashCommandQuery){}[0]
 }
 
 final class com.letta.mobile.data.repository.modelcontrol/AuthCodeGrant { // com.letta.mobile.data.repository.modelcontrol/AuthCodeGrant|null[0]
@@ -62187,6 +62219,8 @@ final class com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph : c
         final fun <get-scheduleRepository>(): com.letta.mobile.data.repository.api/IScheduleRepository // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.scheduleRepository.<get-scheduleRepository>|<get-scheduleRepository>(){}[0]
     final val selfTodoRepository // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.selfTodoRepository|{}selfTodoRepository[0]
         final fun <get-selfTodoRepository>(): com.letta.mobile.data.repository.api/ISelfTodoRepository // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.selfTodoRepository.<get-selfTodoRepository>|<get-selfTodoRepository>(){}[0]
+    final val slashCommands // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.slashCommands|{}slashCommands[0]
+        final fun <get-slashCommands>(): com.letta.mobile.data.transport.appserver/AppServerSlashCommandApi // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.slashCommands.<get-slashCommands>|<get-slashCommands>(){}[0]
     final val stepRepository // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.stepRepository|{}stepRepository[0]
         final fun <get-stepRepository>(): com.letta.mobile.data.repository.api/IStepRepository // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.stepRepository.<get-stepRepository>|<get-stepRepository>(){}[0]
     final val subagentRepository // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.subagentRepository|{}subagentRepository[0]
@@ -62206,6 +62240,8 @@ final class com.letta.mobile.data.session.graph/TransportBoundSessionRepositorie
         final fun <get-cronRepository>(): com.letta.mobile.data.repository/CronRepository // com.letta.mobile.data.session.graph/TransportBoundSessionRepositories.cronRepository.<get-cronRepository>|<get-cronRepository>(){}[0]
     final val selfTodoRepository // com.letta.mobile.data.session.graph/TransportBoundSessionRepositories.selfTodoRepository|{}selfTodoRepository[0]
         final fun <get-selfTodoRepository>(): com.letta.mobile.data.repository/SelfTodoRepository // com.letta.mobile.data.session.graph/TransportBoundSessionRepositories.selfTodoRepository.<get-selfTodoRepository>|<get-selfTodoRepository>(){}[0]
+    final val slashCommands // com.letta.mobile.data.session.graph/TransportBoundSessionRepositories.slashCommands|{}slashCommands[0]
+        final fun <get-slashCommands>(): com.letta.mobile.data.transport.appserver/AppServerSlashCommandApi // com.letta.mobile.data.session.graph/TransportBoundSessionRepositories.slashCommands.<get-slashCommands>|<get-slashCommands>(){}[0]
     final val subagentRepository // com.letta.mobile.data.session.graph/TransportBoundSessionRepositories.subagentRepository|{}subagentRepository[0]
         final fun <get-subagentRepository>(): com.letta.mobile.data.repository/SubagentRepository // com.letta.mobile.data.session.graph/TransportBoundSessionRepositories.subagentRepository.<get-subagentRepository>|<get-subagentRepository>(){}[0]
 }
@@ -75504,6 +75540,15 @@ open class com.letta.mobile.data.transport.api/NoOpChannelTransport : com.letta.
     open suspend fun sendSubagentTodos(kotlin/String, kotlin/Long): com.letta.mobile.data.transport/ServerFrame.SubagentTodosResponse // com.letta.mobile.data.transport.api/NoOpChannelTransport.sendSubagentTodos|sendSubagentTodos(kotlin.String;kotlin.Long){}[0]
 }
 
+open class com.letta.mobile.data.transport.appserver/AppServerSlashCommandApi : com.letta.mobile.data.commands.api/SlashCommandsApi { // com.letta.mobile.data.transport.appserver/AppServerSlashCommandApi|null[0]
+    constructor <init>(com.letta.mobile.data.transport.appserver/AppServerClient, kotlin.coroutines/SuspendFunction1<kotlin/String, kotlin.collections/List<kotlin/String>>? = ..., kotlin/Function1<kotlin/String, kotlin/String> = ...) // com.letta.mobile.data.transport.appserver/AppServerSlashCommandApi.<init>|<init>(com.letta.mobile.data.transport.appserver.AppServerClient;kotlin.coroutines.SuspendFunction1<kotlin.String,kotlin.collections.List<kotlin.String>>?;kotlin.Function1<kotlin.String,kotlin.String>){}[0]
+    constructor <init>(kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.transport.appserver/AppServerCommand.ExecuteCommand, com.letta.mobile.data.transport.appserver/AppServerInboundFrame.ExecuteCommandResponse>, kotlin.coroutines/SuspendFunction1<kotlin/String, kotlin.collections/List<kotlin/String>>? = ..., kotlin/Function1<kotlin/String, kotlin/String> = ..., kotlin.coroutines/SuspendFunction1<kotlin/String, kotlin.collections/List<com.letta.mobile.data.commands.api/AgentSlashCommand>>? = ...) // com.letta.mobile.data.transport.appserver/AppServerSlashCommandApi.<init>|<init>(kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.transport.appserver.AppServerCommand.ExecuteCommand,com.letta.mobile.data.transport.appserver.AppServerInboundFrame.ExecuteCommandResponse>;kotlin.coroutines.SuspendFunction1<kotlin.String,kotlin.collections.List<kotlin.String>>?;kotlin.Function1<kotlin.String,kotlin.String>;kotlin.coroutines.SuspendFunction1<kotlin.String,kotlin.collections.List<com.letta.mobile.data.commands.api.AgentSlashCommand>>?){}[0]
+
+    final suspend fun executeCommand(kotlin/String, kotlin/String? = ..., com.letta.mobile.data.transport.appserver/AppServerRuntimeScope? = ...): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.ExecuteCommandResponse // com.letta.mobile.data.transport.appserver/AppServerSlashCommandApi.executeCommand|executeCommand(kotlin.String;kotlin.String?;com.letta.mobile.data.transport.appserver.AppServerRuntimeScope?){}[0]
+    open fun close() // com.letta.mobile.data.transport.appserver/AppServerSlashCommandApi.close|close(){}[0]
+    open suspend fun listAgentSlashCommands(com.letta.mobile.data.commands.api/SlashCommandQuery): kotlin.collections/List<com.letta.mobile.data.commands.api/AgentSlashCommand> // com.letta.mobile.data.transport.appserver/AppServerSlashCommandApi.listAgentSlashCommands|listAgentSlashCommands(com.letta.mobile.data.commands.api.SlashCommandQuery){}[0]
+}
+
 sealed class com.letta.mobile.data.canvas.compose/ComposeItem { // com.letta.mobile.data.canvas.compose/ComposeItem|null[0]
     abstract val key // com.letta.mobile.data.canvas.compose/ComposeItem.key|{}key[0]
         abstract fun <get-key>(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.key.<get-key>|<get-key>(){}[0]
@@ -77873,8 +77918,11 @@ final object com.letta.mobile.data.chat.tools/ToolArguments { // com.letta.mobil
     final fun target(com.letta.mobile.data.chat.tools/ToolCallFacts): kotlin/String // com.letta.mobile.data.chat.tools/ToolArguments.target|target(com.letta.mobile.data.chat.tools.ToolCallFacts){}[0]
 }
 
-final object com.letta.mobile.data.commands/AppServerCommandDescriptions { // com.letta.mobile.data.commands/AppServerCommandDescriptions|null[0]
-    final fun descriptionFor(kotlin/String): kotlin/String // com.letta.mobile.data.commands/AppServerCommandDescriptions.descriptionFor|descriptionFor(kotlin.String){}[0]
+final object com.letta.mobile.data.commands.api/AppServerCommandDescriptions { // com.letta.mobile.data.commands.api/AppServerCommandDescriptions|null[0]
+    final val DEFAULT_SUPPORTED_COMMANDS // com.letta.mobile.data.commands.api/AppServerCommandDescriptions.DEFAULT_SUPPORTED_COMMANDS|{}DEFAULT_SUPPORTED_COMMANDS[0]
+        final fun <get-DEFAULT_SUPPORTED_COMMANDS>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.commands.api/AppServerCommandDescriptions.DEFAULT_SUPPORTED_COMMANDS.<get-DEFAULT_SUPPORTED_COMMANDS>|<get-DEFAULT_SUPPORTED_COMMANDS>(){}[0]
+
+    final fun descriptionFor(kotlin/String): kotlin/String // com.letta.mobile.data.commands.api/AppServerCommandDescriptions.descriptionFor|descriptionFor(kotlin.String){}[0]
 }
 
 final object com.letta.mobile.data.commands/ClientSlashCommands { // com.letta.mobile.data.commands/ClientSlashCommands|null[0]
@@ -79650,7 +79698,7 @@ final object com.letta.mobile.data.serialization/LettaJson { // com.letta.mobile
 }
 
 final object com.letta.mobile.data.session.graph/SharedSessionGraph { // com.letta.mobile.data.session.graph/SharedSessionGraph|null[0]
-    final fun transportBound(com.letta.mobile.data.transport.api/IChannelTransport, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.context/ContextReadingSnapshots? = ..., com.letta.mobile.data.session.graph/SubagentListing = ...): com.letta.mobile.data.session.graph/TransportBoundSessionRepositories // com.letta.mobile.data.session.graph/SharedSessionGraph.transportBound|transportBound(com.letta.mobile.data.transport.api.IChannelTransport;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.context.ContextReadingSnapshots?;com.letta.mobile.data.session.graph.SubagentListing){}[0]
+    final fun transportBound(com.letta.mobile.data.transport.api/IChannelTransport, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.context/ContextReadingSnapshots? = ..., com.letta.mobile.data.session.graph/SubagentListing = ..., kotlin.coroutines/SuspendFunction0<com.letta.mobile.data.transport.appserver/AppServerClient>? = ...): com.letta.mobile.data.session.graph/TransportBoundSessionRepositories // com.letta.mobile.data.session.graph/SharedSessionGraph.transportBound|transportBound(com.letta.mobile.data.transport.api.IChannelTransport;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.context.ContextReadingSnapshots?;com.letta.mobile.data.session.graph.SubagentListing;kotlin.coroutines.SuspendFunction0<com.letta.mobile.data.transport.appserver.AppServerClient>?){}[0]
 }
 
 final object com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement { // com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement|null[0]
@@ -80858,6 +80906,7 @@ final fun (com.letta.mobile.data.chat.runtime/ChatSessionState).com.letta.mobile
 final fun (com.letta.mobile.data.chat.tools.shell/ShellCommand).com.letta.mobile.data.chat.tools.shell/programWords(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools.shell/programWords|programWords@com.letta.mobile.data.chat.tools.shell.ShellCommand(){}[0]
 final fun (com.letta.mobile.data.chat.tools/ToolPresenterRegistry).com.letta.mobile.data.plugin/contributedBy(kotlin.collections/List<com.letta.mobile.data.plugin/PluginManifest>): com.letta.mobile.data.chat.tools/ToolPresenterRegistry // com.letta.mobile.data.plugin/contributedBy|contributedBy@com.letta.mobile.data.chat.tools.ToolPresenterRegistry(kotlin.collections.List<com.letta.mobile.data.plugin.PluginManifest>){}[0]
 final fun (com.letta.mobile.data.chat.tools/ToolPreviewKind).com.letta.mobile.data.chat.tools/target(kotlin/String, kotlin.ranges/IntRange? = ...): com.letta.mobile.data.chat.tools/ToolPreviewTarget // com.letta.mobile.data.chat.tools/target|target@com.letta.mobile.data.chat.tools.ToolPreviewKind(kotlin.String;kotlin.ranges.IntRange?){}[0]
+final fun (com.letta.mobile.data.commands.api/AgentSlashCommand).com.letta.mobile.data.repository.iroh/toSlashCommand(): com.letta.mobile.data.model/SlashCommand // com.letta.mobile.data.repository.iroh/toSlashCommand|toSlashCommand@com.letta.mobile.data.commands.api.AgentSlashCommand(){}[0]
 final fun (com.letta.mobile.data.compaction/CommandAnswer).com.letta.mobile.data.context.limit/toOutcome(kotlin/Int): com.letta.mobile.data.context.limit/ContextLimitOutcome // com.letta.mobile.data.context.limit/toOutcome|toOutcome@com.letta.mobile.data.compaction.CommandAnswer(kotlin.Int){}[0]
 final fun (com.letta.mobile.data.compaction/CommandAnswer).com.letta.mobile.data.dreaming/toDreamOutcome(): com.letta.mobile.data.dreaming/DreamOutcome<com.letta.mobile.data.dreaming/DreamRunStart> // com.letta.mobile.data.dreaming/toDreamOutcome|toDreamOutcome@com.letta.mobile.data.compaction.CommandAnswer(){}[0]
 final fun (com.letta.mobile.data.compaction/CompactionRepository).com.letta.mobile.data.compaction/orElse(com.letta.mobile.data.compaction/CompactionRepository): com.letta.mobile.data.compaction/CompactionRepository // com.letta.mobile.data.compaction/orElse|orElse@com.letta.mobile.data.compaction.CompactionRepository(com.letta.mobile.data.compaction.CompactionRepository){}[0]
