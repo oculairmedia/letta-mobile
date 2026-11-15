@@ -96,6 +96,8 @@ internal data class LateState(
 /** What the page sees that does not drive transitions. */
 internal data class LoopView(
     val transcript: VoiceText? = null,
+    /** The words of the turn in progress, until its end (or the microphone closing) clears them. */
+    val partial: VoiceText? = null,
     val speaking: VoiceText? = null,
     val inputLevel: AudioLevel = AudioLevel.Silent,
     val outputLevel: AudioLevel = AudioLevel.Silent,

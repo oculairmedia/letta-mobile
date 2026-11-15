@@ -24,6 +24,11 @@ data class VoiceLoopState(
     val phase: VoicePhase = VoicePhase.IDLE,
     /** The live transcript of the current turn, or the last finished one. */
     val transcript: VoiceText? = null,
+    /**
+     * The words of the turn the person is speaking right now, as the ear recognises them; null once
+     * the turn ends (its words then become the utterance) or is dropped, and while nobody speaks.
+     */
+    val partialTranscript: VoiceText? = null,
     /** The segment being spoken right now. */
     val speaking: VoiceText? = null,
     /** Microphone loudness, for a meter. */

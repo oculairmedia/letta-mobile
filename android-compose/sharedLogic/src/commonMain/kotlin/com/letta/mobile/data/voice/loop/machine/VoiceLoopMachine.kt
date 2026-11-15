@@ -23,7 +23,7 @@ internal object VoiceLoopMachine {
 
     private fun closeMicView(step: Step): Step {
         if (step.model.micWanted) return step
-        return step.copy(model = step.model.withView { copy(micOpen = false, inputLevel = AudioLevel.Silent) })
+        return step.copy(model = step.model.withView { copy(micOpen = false, inputLevel = AudioLevel.Silent, partial = null) })
     }
 }
 

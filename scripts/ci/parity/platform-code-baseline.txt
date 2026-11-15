@@ -295,7 +295,6 @@ android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/subagen
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/subagent/WsActiveSubagentSource.kt 179
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/util/PlatformFileExtensions.kt 110
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/voice/VoiceInputViewModel.kt 166
-android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/voice/VoiceRecognizer.kt 137
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/BrowserRouteBinding.kt 34
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/WebMemoryPressureMonitor.kt 30
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/WebSettingsServices.kt 29

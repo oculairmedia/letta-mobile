@@ -12,7 +12,14 @@ import com.letta.mobile.data.voice.engine.VoiceMouthEvent
 
 /** What the ear reports. Its failures stop the loop: without the microphone there is nothing to go on with. */
 internal object EarRules {
-    fun on(model: LoopModel, event: VoiceEarEvent): Step = when (event) {
+    fun on(model: LoopModel, event: VoiceEarEvent): Step {
+        val step = react(model, event)
+        // A turn's end or the ear's failure ends its words in progress.
+        val ends = event is VoiceEarEvent.EndOfTurn || event is VoiceEarEvent.Failed
+        return if (ends) step.copy(model = step.model.withView { copy(partial = null) }) else step
+    }
+
+    private fun react(model: LoopModel, event: VoiceEarEvent): Step = when (event) {
         is VoiceEarEvent.InputLevel, is VoiceEarEvent.PartialTranscript -> Step(shown(model, event))
         VoiceEarEvent.ListeningStarted -> listening(model)
         VoiceEarEvent.SpeechStarted -> speechStarted(model)
@@ -24,7 +31,7 @@ internal object EarRules {
     /** What the ear reports only for display: the input level and a partial transcript. */
     private fun shown(model: LoopModel, event: VoiceEarEvent): LoopModel = when (event) {
         is VoiceEarEvent.InputLevel -> model.withView { copy(inputLevel = event.level) }
-        is VoiceEarEvent.PartialTranscript -> model.withView { copy(transcript = event.text) }
+        is VoiceEarEvent.PartialTranscript -> model.withView { copy(transcript = event.text, partial = event.text) }
         else -> model
     }
 

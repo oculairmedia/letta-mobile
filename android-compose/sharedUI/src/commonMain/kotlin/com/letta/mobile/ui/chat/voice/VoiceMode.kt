@@ -9,6 +9,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.voice.VoiceErrorCode
+import com.letta.mobile.data.voice.VoiceText
+import com.letta.mobile.data.voice.local.LocalHandoverReason
+import com.letta.mobile.data.voice.local.LocalSpeechAvailability
 import com.letta.mobile.data.voice.session.VoiceModeController
 import com.letta.mobile.data.voice.session.VoiceModeState
 import com.letta.mobile.data.voice.session.VoicePress
@@ -26,6 +29,8 @@ class VoiceSetupAccess(
     val store: VoiceSetupStore,
     /** Whether this platform's voice microphone cancels its own echo (then speaking always interrupts). */
     val echoCancelled: Boolean = false,
+    /** Whether, and how, this device recognises speech itself (the Listening setting says so). */
+    val localListening: LocalSpeechAvailability = LocalSpeechAvailability.UNAVAILABLE,
     /** Whether a draft's server answers: null when it does, else why not. */
     val check: suspend (VoiceSetupDraft) -> VoiceErrorCode?,
 )
@@ -53,14 +58,15 @@ fun rememberVoiceSetupAccess(settings: SecureSettingsStore): VoiceSetupAccess? {
     return remember(settings, audio) {
         val store = VoiceSetupStore(settings = settings, secrets = settings)
         val echoCancelled = audio?.echoCancelled == true
-        VoiceSetupAccess(store, echoCancelled) { draft -> store.check(draft, newSpeechHttpEngine()) }
+        val local = audio?.localRecognizer()?.availability(null) ?: LocalSpeechAvailability.UNAVAILABLE
+        VoiceSetupAccess(store, echoCancelled, local) { draft -> store.check(draft, newSpeechHttpEngine()) }
     }
 }
 
 /**
- * A page's voice mode: its controller, what the chat bar shows of it (its state and the smoothed
- * microphone and playback levels, the controller's own unless a test pins them) and whether the
- * Voice settings pane is open over the chat.
+ * A page's voice mode: its controller, what the chat bar shows of it (its state, the smoothed
+ * microphone and playback levels, the words heard so far and a hand-over to the server; the
+ * controller's own unless a test pins them) and whether the Voice settings pane is open over the chat.
  */
 @Stable
 class VoiceModeHandle internal constructor(
@@ -69,7 +75,13 @@ class VoiceModeHandle internal constructor(
     internal val state: StateFlow<VoiceModeState> = controller.state,
     internal val microphoneLevel: StateFlow<Float> = controller.microphoneLevel,
     internal val playbackLevel: StateFlow<Float> = controller.playbackLevel,
+    internal val partialTranscript: StateFlow<VoiceText?> = controller.partialTranscript,
 ) {
+    internal val handover: StateFlow<LocalHandoverReason?> = controller.handover
+
+    /** Whether the person closed this session's hand-over notice; reset when the session ends. */
+    internal var handoverClosed: Boolean by mutableStateOf(false)
+
     /** Whether the Voice settings pane is showing (a press found the setup incomplete). */
     var setupOpen: Boolean by mutableStateOf(false)
 

@@ -17,6 +17,9 @@ object VoiceSettingsKeys {
     /** Interrupting replies by speaking: a toggle, or a note where the microphone cancels its own echo. */
     const val INTERRUPT: String = "voice-interrupt"
 
+    /** Which ear voice mode listens with: Automatic, this device only, or the speech server. */
+    const val LISTENING: String = "voice-listening"
+
     /** The Save button. */
     const val SAVE: String = "voice-save"
 

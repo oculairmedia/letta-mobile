@@ -18,6 +18,9 @@ import com.letta.mobile.data.voice.engine.VoiceMouthEvent
 import com.letta.mobile.data.voice.engine.VoiceReply
 import com.letta.mobile.data.voice.engine.VoiceReplyEvent
 import com.letta.mobile.data.voice.engine.VoiceResponder
+import com.letta.mobile.data.voice.local.LocalEarObserver
+import com.letta.mobile.data.voice.local.LocalHandoverReason
+import com.letta.mobile.data.voice.local.LocalRecognitionError
 import com.letta.mobile.data.voice.loop.VoiceLoopObserver
 import com.letta.mobile.data.voice.loop.VoiceLoopState
 import com.letta.mobile.data.voice.responder.ClientMessageId
@@ -143,6 +146,24 @@ internal class VoiceEarTelemetry(private val telemetry: VoiceTelemetry) : EarObs
         telemetry.earTurn("turn.discarded", reason.name, report)
 
     override fun transcriptAccepted(characters: Int) = telemetry.event("transcript.accepted", "characters" attr characters)
+}
+
+/**
+ * Reports the local ear's decisions through [telemetry]: `local.heard` with the characters and
+ * `endToFinalMs` (end of speech to final result), `local.discarded`, `local.failed` with the
+ * platform-neutral error and the failures in a row, and `local.handover` with its reason.
+ */
+internal class LocalEarTelemetry(private val telemetry: VoiceTelemetry) : LocalEarObserver {
+    override fun heard(characters: Int, sinceEndOfSpeech: Duration?) =
+        telemetry.event("local.heard", "characters" attr characters, "endToFinalMs" attr sinceEndOfSpeech?.inWholeMilliseconds)
+
+    override fun discarded(reason: TurnDiscardReason) = telemetry.event("local.discarded", "reason" attr reason.name)
+
+    override fun failed(error: LocalRecognitionError, attempt: Int) =
+        telemetry.event("local.failed", "error" attr error.name, "attempt" attr attempt)
+
+    override fun handedOver(reason: LocalHandoverReason, toServer: Boolean) =
+        telemetry.event("local.handover", "reason" attr reason.name, "toServer" attr toServer)
 }
 
 /** Reports endpoint failures of [delegate] by kind and HTTP status, then rethrows them. */
