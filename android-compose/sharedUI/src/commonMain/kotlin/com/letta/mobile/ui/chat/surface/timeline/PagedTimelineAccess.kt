@@ -130,7 +130,7 @@ internal fun rememberPagedRows(
     val presented = settled.presentedSnapshot
     val snapshot = presented.second
     return remember(live, presented.first, leading) {
-        val assembly = TimelineRowAssembly.assemble(live, snapshot.map { it?.item?.key })
+        val assembly = CanonicalTimelinePresentation.assemble(live, snapshot)
         PagedRows(leading, assembly, identity = live to snapshot, presented = presented.first)
     }
 }

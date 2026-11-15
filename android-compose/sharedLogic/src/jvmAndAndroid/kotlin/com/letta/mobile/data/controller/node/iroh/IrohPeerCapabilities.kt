@@ -182,6 +182,7 @@ object IrohPeerCapabilities {
         // desktop-manageable config edit as agent.update. Provider connect/
         // disconnect and model.exposure.set change what EVERY client sees, so
         // they stay admin.full via the else branch.
+        method == "toolset.update" -> CONVERSATION_MANAGE
         method == "model.update" -> CONVERSATION_MANAGE
         // letta-mobile-joigh: the context limit is the same model-settings edit (agent or
         // conversation `context_window_limit`, via letta-code's /context-limit).

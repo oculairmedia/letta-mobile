@@ -62,7 +62,8 @@ class SettledRunDisclosureTest {
         try {
             harness.settle()
             val (run, prompt) = harness.rows()
-            assertEquals("run-${promptOwnedRunId(PROMPT_ID)}", run.key)
+            // A reopened run is keyed by its own oldest record, the thought.
+            assertEquals("run-${promptOwnedRunId(PROMPT_ID)}-from-ui-msg-9173298:REASONING", run.key)
             assertCompletedRun(run, RunActivityState.Thought, DURABLE_TURN_MILLIS, tools = 0)
             assertEquals(listOf("user"), rowsOf(prompt).map { it.role })
         } finally {

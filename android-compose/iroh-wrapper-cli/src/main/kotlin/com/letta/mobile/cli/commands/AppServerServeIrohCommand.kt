@@ -645,6 +645,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 adminRpcRouter, store, com.letta.mobile.data.canvas.authority.FileNotebookGrantStore(grantPath),
             )
         }
+        admin.nativeClient?.let(endpoint::attachToolsetStatuses)
         endpoint.attachPermissionModePublisher(permissionModes)
         endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
         subagentPublisher?.let(endpoint::attachSubagentPublisher)

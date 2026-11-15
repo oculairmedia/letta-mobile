@@ -1,0 +1,90 @@
+{
+  "method": "toolset.update",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ModelAdminHandlers.kt",
+  "cases": [
+    {
+      "name": "host-confirmed",
+      "context": {
+        "authenticated": true,
+        "authorized_agent_ids": [
+          "agent-1"
+        ],
+        "authorized_conversation_ids": [
+          "conv-1"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "toolset_response": {
+          "success": true,
+          "current_toolset": "default",
+          "error": "unsupported toolset"
+        }
+      },
+      "params": {
+        "agent_id": "agent-1",
+        "conversation_id": "conv-1",
+        "toolset_preference": "auto"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "current_toolset": "default"
+        }
+      }
+    },
+    {
+      "name": "host-refused",
+      "context": {
+        "authenticated": true,
+        "authorized_agent_ids": [
+          "agent-1"
+        ],
+        "authorized_conversation_ids": [
+          "conv-1"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "toolset_response": {
+          "success": false,
+          "current_toolset": "default",
+          "error": "unsupported toolset"
+        }
+      },
+      "params": {
+        "agent_id": "agent-1",
+        "conversation_id": "conv-1",
+        "toolset_preference": "auto"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "unsupported toolset"
+      }
+    },
+    {
+      "name": "missing-preference",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected"
+      },
+      "params": {
+        "agent_id": "agent-1",
+        "conversation_id": "conv-1"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "toolset_preference required"
+      }
+    }
+  ]
+}

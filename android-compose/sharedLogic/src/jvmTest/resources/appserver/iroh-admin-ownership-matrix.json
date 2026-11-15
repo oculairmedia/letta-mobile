@@ -915,6 +915,25 @@
       "notes": "letta-mobile-w4q4p: model_handle/model_id plus reasoning_effort (explicit null restores the provider default)."
     },
     {
+      "method": "toolset.update",
+      "handler": "ModelAdminHandlers.kt",
+      "current_backend": "app_server_v2 update_toolset for one agent + conversation runtime scope",
+      "owner": "app_server_v2",
+      "public_contract": "docs/reference/contracts/toolset.update/toolset-v1.md",
+      "native_contract": [
+        "update_toolset",
+        "update_toolset_response"
+      ],
+      "authorization_class": "conversation_scoped",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none",
+      "notes": "Forwards toolset_preference unchanged; the picker follows the scoped host device-status echo."
+    },
+    {
       "method": "model.exposure.get",
       "current_backend": "controller_native model exposure decisions (model-exposure.json beside host-canvases.json)",
       "public_contract": "wrapper model exposure allow-list keyed by model handle",
@@ -1829,6 +1848,8 @@
       "post_shim_owner": "app_server_v2",
       "post_shim_fallback": "none"
     },
+    {"method": "cron.pause", "handler": "CronAdminHandlers.kt", "current_backend": "native App Server v2 (no shim path ever existed over Iroh)", "owner": "app_server_v2", "public_contract": "cron_pause", "native_contract": ["cron_pause", "cron_pause_response"], "authorization_class": "admin_write", "data_store": "letta_local_backend", "fallback": "none", "migration_slice": "none", "notes": "Forwards the existing App Server cron command; the shared schedules page refreshes host state after confirmation.", "production_first_route": "app_server_v2", "post_shim_owner": "app_server_v2", "post_shim_fallback": "none"},
+    {"method": "cron.resume", "handler": "CronAdminHandlers.kt", "current_backend": "native App Server v2 (no shim path ever existed over Iroh)", "owner": "app_server_v2", "public_contract": "cron_resume", "native_contract": ["cron_resume", "cron_resume_response"], "authorization_class": "admin_write", "data_store": "letta_local_backend", "fallback": "none", "migration_slice": "none", "notes": "Forwards the existing App Server cron command; the shared schedules page refreshes host state after confirmation.", "production_first_route": "app_server_v2", "post_shim_owner": "app_server_v2", "post_shim_fallback": "none"},
     {
       "method": "cron.trigger",
       "handler": "CronAdminHandlers.kt",

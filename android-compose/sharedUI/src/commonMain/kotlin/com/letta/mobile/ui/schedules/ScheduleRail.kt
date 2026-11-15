@@ -307,7 +307,7 @@ fun ScheduleDefRow(label: String, value: String) {
 
 /** The rail's words, pure. */
 object ScheduleRailText {
-    const val CONTROL_NOTE = "Run now / Pause need a backend control endpoint (not available yet)."
+    const val CONTROL_NOTE = "Run now needs a backend control endpoint (not available yet)."
 
     fun cadence(def: ScheduleDef): String =
         def.cron?.let { CronSchedule.parse(it)?.let(CronSchedule::describe) ?: it } ?: "One-time"

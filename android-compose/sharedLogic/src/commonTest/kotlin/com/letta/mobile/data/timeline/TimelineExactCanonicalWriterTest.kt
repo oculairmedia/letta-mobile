@@ -70,7 +70,7 @@ class TimelineExactCanonicalWriterTest {
             "Durable ordering lives in TimelinePageKey; decoded canonical facts must match live")
         val liveItems = com.letta.mobile.data.chat.projection.buildChatRenderModel(
             messages = live.mapNotNull { com.letta.mobile.data.chat.projection.timelineEventToUiMessage(it) },
-            mode = com.letta.mobile.data.chat.projection.ChatDisplayMode.Interactive).renderItems
+            mode = com.letta.mobile.data.chat.projection.ChatDisplayMode.Interactive).renderItems.map { it.keyedByOwnRecords() }
         val reopenedItems = page.records.mapNotNull {
             (it.preparedPresentation as? TimelineSettledPresentation.Render)?.item
         }

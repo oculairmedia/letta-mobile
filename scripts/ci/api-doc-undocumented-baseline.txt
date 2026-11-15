@@ -1382,7 +1382,6 @@
 :sharedLogic com.letta.mobile.data.timeline/timelineNow/#/ (hostNative)
 :sharedLogic com.letta.mobile.data.timeline/timelineNow/#/ (jvm)
 :sharedLogic com.letta.mobile.data.timeline/timelineNow/#/ (wasmJs)
-:sharedLogic com.letta.mobile.data.transport.api/AppServerClientChannel/adminRpc/#kotlin.String#kotlin.String#kotlin.String?/ (common)
 :sharedLogic com.letta.mobile.data.transport.api/AppServerClientChannel/state/#/ (common)
 :sharedLogic com.letta.mobile.data.transport.api/CronControlTransport/sendCronPause/#com.letta.mobile.data.transport.api.CronPauseCommand/ (common)
 :sharedLogic com.letta.mobile.data.transport.api/CronControlTransport/sendCronResume/#com.letta.mobile.data.transport.api.CronResumeCommand/ (common)

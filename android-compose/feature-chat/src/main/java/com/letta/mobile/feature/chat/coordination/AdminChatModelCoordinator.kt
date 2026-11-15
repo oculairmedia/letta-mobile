@@ -65,7 +65,7 @@ internal class AdminChatModelCoordinator(
             onModelSelected = { entry -> updateActiveAgentModel(ModelPick(entry.handle)) },
             onEffortSelected = { entry, effort -> updateActiveAgentModel(ModelPick(entry.handle, EffortSelection.Set(effort))) },
             onAddProvider = onAddProvider,
-        )
+        ).withToolsets(control?.let { model -> { pickerScope -> model.toolsets(pickerScope, conversationModelTarget()) } })
     }
 
     /**
@@ -83,7 +83,6 @@ internal class AdminChatModelCoordinator(
         }
     }
 
-    /** letta-mobile-3io8k: a pick goes to `model.update` on the conversation (else it updates the agent). */
     fun picksTargetConversation(): Boolean = conversationModelTarget() != null
 
     private fun conversationModelTarget(): ConversationModelTarget? {
