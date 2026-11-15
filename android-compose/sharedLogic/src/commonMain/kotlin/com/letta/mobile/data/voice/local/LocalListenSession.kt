@@ -187,10 +187,13 @@ internal class LocalListenSession(private val parts: LocalListenParts, private v
     /** Handles one event; returns how the recognition ended once it has ([event] null: it ended without saying). */
     private suspend fun onEvent(event: LocalRecognitionEvent?, turn: LocalTurn): RecognitionOutcome? = when (event) {
         null -> RecognitionOutcome.Failed(LocalRecognitionError.OTHER, turn.ready)
-        is LocalRecognitionEvent.Final -> RecognitionOutcome.Heard.also { turn.final(event.text, memory.output.value || memory.outputStarts.value != turn.outputStartsAt) }
+        is LocalRecognitionEvent.Final -> RecognitionOutcome.Heard.also { turn.final(event.text, heardOutput(turn)) }
         is LocalRecognitionEvent.Failed -> RecognitionOutcome.Failed(event.error, turn.ready)
         else -> null.also { onProgress(event, turn) }
     }
+
+    /** Whether the app's output was active at any point during [turn]'s recognition, or is now. */
+    private fun heardOutput(turn: LocalTurn): Boolean = memory.output.value || memory.outputStarts.value != turn.outputStartsAt
 
     /** An event of a recognition still under way. */
     private suspend fun onProgress(event: LocalRecognitionEvent, turn: LocalTurn) {

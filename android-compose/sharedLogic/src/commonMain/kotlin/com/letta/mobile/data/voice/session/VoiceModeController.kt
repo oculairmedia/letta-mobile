@@ -148,14 +148,9 @@ class VoiceModeController(
 
     /**
      * Why listening moved from the device's recogniser to the speech server in the current session,
-     * until [dismissHandover] or the session ends; null otherwise. The chat bar tells the person once.
+     * until the session ends; null otherwise. The chat bar tells the person once.
      */
     val handover: StateFlow<LocalHandoverReason?> = mutableHandover.asStateFlow()
-
-    /** The person has read the hand-over notice. */
-    fun dismissHandover() {
-        mutableHandover.value = null
-    }
 
     init {
         runtime.scope.launch(runtime.dispatcher) { store.setup.collect { offer(Command.SetupChanged) } }

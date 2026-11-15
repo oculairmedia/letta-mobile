@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -172,7 +173,9 @@ internal fun ComposerVoiceNotice() {
 @Composable
 private fun HandoverNotice(handle: VoiceModeHandle) {
     val reason by handle.handover.collectAsState()
-    if (reason == null) return
+    // A session's end clears the reason: the next hand-over is told again.
+    LaunchedEffect(reason) { if (reason == null) handle.handoverClosed = false }
+    if (reason == null || handle.handoverClosed) return
     LettaInlineNotice(
         message = stringResource(Res.string.voice_notice_handover),
         modifier = Modifier
@@ -180,7 +183,7 @@ private fun HandoverNotice(handle: VoiceModeHandle) {
             .testTag(VoiceModeTags.HANDOVER)
             .semantics { liveRegion = LiveRegionMode.Polite },
         dismissLabel = stringResource(Res.string.voice_action_notice_close),
-        onDismiss = handle.controller::dismissHandover,
+        onDismiss = { handle.handoverClosed = true },
         dismissTag = VoiceModeTags.HANDOVER_CLOSE,
     )
 }

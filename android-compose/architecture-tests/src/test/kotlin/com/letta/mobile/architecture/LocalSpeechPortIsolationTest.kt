@@ -11,7 +11,7 @@ import kotlin.io.path.readText
  * live in sharedLogic's common code and name no platform type, so every client (Android, the web,
  * the desktop) supplies only its binding of the port and inherits the behaviour unchanged.
  */
-class LocalSpeechPortRepositoryArchitectureTest {
+class LocalSpeechPortIsolationTest {
     private val projectRoot: Path = Path.of(requireNotNull(System.getProperty("architecture.projectRoot")))
     private val localPackage = projectRoot.resolve("android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/voice/local")
 

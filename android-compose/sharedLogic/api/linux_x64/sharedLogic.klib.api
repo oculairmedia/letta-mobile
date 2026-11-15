@@ -70593,7 +70593,6 @@ final class com.letta.mobile.data.voice.session/VoiceModeController { // com.let
     final val state // com.letta.mobile.data.voice.session/VoiceModeController.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.voice.session/VoiceModeState> // com.letta.mobile.data.voice.session/VoiceModeController.state.<get-state>|<get-state>(){}[0]
 
-    final fun dismissHandover() // com.letta.mobile.data.voice.session/VoiceModeController.dismissHandover|dismissHandover(){}[0]
     final fun press(): com.letta.mobile.data.voice.session/VoicePress // com.letta.mobile.data.voice.session/VoiceModeController.press|press(){}[0]
     final fun retry() // com.letta.mobile.data.voice.session/VoiceModeController.retry|retry(){}[0]
     final fun start() // com.letta.mobile.data.voice.session/VoiceModeController.start|start(){}[0]

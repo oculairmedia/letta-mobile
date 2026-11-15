@@ -79,6 +79,9 @@ class VoiceModeHandle internal constructor(
 ) {
     internal val handover: StateFlow<LocalHandoverReason?> = controller.handover
 
+    /** Whether the person closed this session's hand-over notice; reset when the session ends. */
+    internal var handoverClosed: Boolean by mutableStateOf(false)
+
     /** Whether the Voice settings pane is showing (a press found the setup incomplete). */
     var setupOpen: Boolean by mutableStateOf(false)
 
