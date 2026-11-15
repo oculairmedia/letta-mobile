@@ -54,6 +54,8 @@ import kotlinx.coroutines.test.setMain
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.context.ContextWindowUsage
 import com.letta.mobile.data.transport.ServerFrame
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -326,6 +328,55 @@ class AdminChatSessionPortTest {
         } finally {
             viewModel?.viewModelScope?.cancel()
             Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `host advertised command runs from the Android composer through the graph adapter`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        var viewModel: AdminChatViewModel? = null
+        try {
+            val channel = SlashCommandChannel()
+            val api = com.letta.mobile.data.session.graph.SharedSessionGraph.transportBound(channel, backgroundScope).slashCommands
+            val vm = openedChatViewModel(
+                canonicalPagingHost(), TestData.agent("agent-command", "Command"), "conversation-command",
+                FixtureSession("commands", slashCommands = api),
+            )
+            viewModel = vm
+            val owner = AdminChatSessionPort(vm, vm.viewModelScope)
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { owner.composer.collect {} }
+            val port = com.letta.mobile.data.chat.routing.SlashCommandSessionPort(owner, vm.viewModelScope, AdminSlashCommandBinding(vm))
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.liveStatus.collect {} }
+            port.actions.updateComposerText("/deploy staging --check")
+            port.actions.send()
+            val params = channel.executions.single()
+            assertEquals("deploy", params.getValue("command_id").jsonPrimitive.content)
+            assertEquals("staging --check", params.getValue("args").jsonPrimitive.content)
+            assertEquals("agent-command", params.getValue("agent_id").jsonPrimitive.content)
+            assertEquals("conversation-command", params.getValue("conversation_id").jsonPrimitive.content)
+            assertEquals("", vm.composerState.value.inputText)
+            assertEquals("deployed", port.liveStatus.value.commands.single().output)
+        } finally {
+            viewModel?.viewModelScope?.cancel()
+            Dispatchers.resetMain()
+        }
+    }
+
+    private class SlashCommandChannel : com.letta.mobile.data.transport.api.NoOpChannelTransport() {
+        val executions = mutableListOf<kotlinx.serialization.json.JsonObject>()
+        override suspend fun adminRpc(method: String, path: String, body: String?):
+            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse {
+            val result = when (method) {
+                "slash_command.list_agent" -> kotlinx.serialization.json.Json.parseToJsonElement(
+                    """{"commands":[{"command":"/deploy","description":"Deploy safely","source":"mod","installed":true}]}""",
+                )
+                "slash_command.execute" -> {
+                    executions += kotlinx.serialization.json.Json.parseToJsonElement(requireNotNull(body)).jsonObject
+                    kotlinx.serialization.json.Json.parseToJsonElement("""{"output":"deployed"}""")
+                }
+                else -> error("Unexpected RPC: $method")
+            }
+            return com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse("command", true, result = result)
         }
     }
 

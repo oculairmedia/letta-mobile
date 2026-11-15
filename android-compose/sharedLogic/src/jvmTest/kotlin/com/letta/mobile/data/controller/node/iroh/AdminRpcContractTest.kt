@@ -114,6 +114,7 @@ class AdminRpcContractTest {
             "goal.get",
             "slash_command.list",
             "slash_command.list_agent",
+            "slash_command.execute",
             "skill.install",
             "skill.list",
             "skill.list_agent",

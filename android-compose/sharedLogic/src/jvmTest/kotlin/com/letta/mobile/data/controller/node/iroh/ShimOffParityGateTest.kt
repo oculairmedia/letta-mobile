@@ -377,6 +377,7 @@ class ShimOffParityGateTest {
 
     private fun params(method: String) = buildJsonObject {
         put("agent_id", "agent-1")
+        put("command_id", "doctor")
         put("conversation_id", "conv-1")
         put("message_id", "m-1")
         put("identifier", "p-1")

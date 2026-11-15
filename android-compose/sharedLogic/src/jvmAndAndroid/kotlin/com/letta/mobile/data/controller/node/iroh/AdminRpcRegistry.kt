@@ -57,6 +57,7 @@ object AdminRpcRegistry {
         "goal.command",
         "slash_command.list",
         "slash_command.list_agent",
+        "slash_command.execute",
         "skill.list",
         "skill.list_agent",
         "skill.install",
@@ -124,7 +125,8 @@ object AdminRpcRegistry {
         McpAdminHandlers.register(router)
         // letta-mobile-by4vm.84: goals have no App Server owner; slash commands come from device status.
         GoalAdminHandlers.register(router)
-        SlashCommandAdminHandlers.register(router, native.slashCommands ?: native.nativeClient?.let { NativeSlashCommandCatalog() })
+        val slashCatalog = native.slashCommands ?: native.nativeClient?.let { NativeSlashCommandCatalog() }
+        SlashCommandAdminHandlers.register(router, slashCatalog, native.nativeClient)
         SkillAdminHandlers.register(
             router,
             nativeClient = native.nativeClient,

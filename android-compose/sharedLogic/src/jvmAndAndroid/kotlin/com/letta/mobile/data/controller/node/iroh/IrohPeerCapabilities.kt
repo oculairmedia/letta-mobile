@@ -170,6 +170,7 @@ object IrohPeerCapabilities {
         // are NOT listed here and stay admin.full via the else branch.
         method in ADMIN_READ_METHODS -> CHAT_READ
         method == "monitor.stop" -> CHAT_SEND
+        method == "slash_command.execute" -> ADMIN_FULL
         method in CHAT_SEND_METHODS -> CHAT_SEND
         method in CONVERSATION_MANAGE_METHODS -> CONVERSATION_MANAGE
         // A paired desktop must be able to edit its own agents' config — most

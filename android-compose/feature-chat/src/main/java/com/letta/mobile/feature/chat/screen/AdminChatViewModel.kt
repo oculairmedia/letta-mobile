@@ -913,7 +913,7 @@ internal class AdminChatViewModel @Inject constructor(
     private val isRuntimeBound: Boolean
         get() = !routeArgs.workspaceOwned ||
             (selectedRuntime?.generation?.let { it == routeArgs.requestToken()?.sourceGeneration } ?: true)
-    private val focusCanSend: Boolean
+    internal val focusCanSend: Boolean
         get() = routeArgs.isCurrent() && isRuntimeBound &&
             routeArgs.workspace?.agentAvailability != com.letta.mobile.data.shell.FocusAvailability.Unavailable &&
             routeArgs.workspace?.conversationAvailability != com.letta.mobile.data.shell.FocusAvailability.Unavailable

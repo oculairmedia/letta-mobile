@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.transport.appserver.AppServerSlashCommandApi
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.Agent
@@ -44,6 +45,8 @@ interface SessionRepositoryGraph {
     val conversationLanes: ConversationLaneProjection? get() = null
     /** Foreground owners live for this trusted backend generation, independently of subscribers. */
     val activeTurns: com.letta.mobile.data.presence.ActiveTurnSession? get() = null
+    /** Host commands built once for this transport generation. */
+    val slashCommands: AppServerSlashCommandApi? get() = null
     val id: Long
     val backendDescriptor: BackendDescriptor
     val agentRepository: IAgentRepository

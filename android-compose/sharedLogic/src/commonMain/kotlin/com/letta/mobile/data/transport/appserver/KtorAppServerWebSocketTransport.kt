@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.appserver
 
+import com.letta.mobile.data.transport.delivery.AppServerDeliveryDrainTimeoutException
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.webSocket
@@ -193,12 +194,6 @@ class KtorAppServerWebSocketTransport(
         const val DELIVERY_DRAIN_TIMEOUT_MILLIS = 1_000L
     }
 }
-
-private class AppServerDeliveryDrainTimeoutException(
-    timeoutMillis: Long,
-) : IllegalStateException(
-    "App Server delivery queues did not drain within ${timeoutMillis}ms after socket EOF",
-)
 
 /**
  * A close is terminal (must not be blindly retried) when the peer signals an
