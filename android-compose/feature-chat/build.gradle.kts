@@ -207,6 +207,7 @@ tasks.register<Test>("rowGoldenReport") {
     classpath = testTask.classpath
     maxHeapSize = testTask.maxHeapSize
     jvmArgs(testTask.jvmArgs ?: emptyList<String>())
+    systemProperty("user.timezone", "UTC")
 
     useJUnitPlatform()
     filter { includeTestsMatching("com.letta.mobile.feature.chat.parity.RowParityScreenshotTest") }
