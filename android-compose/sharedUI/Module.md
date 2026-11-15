@@ -367,9 +367,14 @@ Material theme construction, semantic colors, dimensions, motion and accessibili
 # Package com.letta.mobile.ui.theme.tokens
 
 Leaf design values shared by low-level components and the broader dimension facade. [LettaRowDimens] holds the spacing, icon size and muted opacity that LettaDimens also exposes, so a component can use them without depending on the whole theme package. The space, control, stroke and alpha scales (LettaSpaceTokens, LettaControlTokens, LettaStrokeTokens, LettaAlphaTokens), the CustomColors roles and the reduced-motion preference (LocalLettaReducedMotion) live here for the same reason: ui.components.foundation reads them without importing ui.theme. Named shapes (LettaShapes), text styles (LettaTextStyles), component sizes (LettaComponentDimens) and the panel and status tones (LettaPanelTone, LettaStatusTone) are the names call sites use instead of a literal shape, a typography override or a hand-picked colour.
+
+# Package com.letta.mobile.ui.theme.tokens.desktop
+
+Desktop-only (JVM) design values for what the desktop host draws itself rather than a shared page: its OS window and title-bar sizes (DesktopWindowTokens), the phone preview's simulated device chrome (PhoneChromeTokens), and the fixed palettes of its developer tools (RiveWorkbenchColors, ShaderLookdevTokens). Desktop call sites read these names instead of literals; the package imports only Compose units and graphics.
+
 # Package com.letta.mobile.ui.theme.pill
 
-[LettaPillColors](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.theme.pill/-letta-pill-colors/index.html), the container / on-container pair a tonal pill draws with. The package imports nothing of the app's, so any page can name it without an import cycle; the pills themselves are LettaTonalPill and its family in ui.theme.
+[LettaPillColors](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.theme.pill/-letta-pill-colors/index.html), the container / on-container pair a tonal pill draws with. The package imports nothing of the app's, so any page can name it without an import cycle; the pills themselves are LettaTonalPill and its family in ui.components.foundation.
 
 # Package com.letta.mobile.ui.theme.graph
 

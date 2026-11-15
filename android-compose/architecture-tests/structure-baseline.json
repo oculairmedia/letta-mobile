@@ -663,7 +663,6 @@
     "com.letta.mobile.ui.chat.surface.timeline.rows -> com.letta.mobile.ui.shell.pages.workspace",
     "com.letta.mobile.ui.chat.surface.timeline.rows -> com.letta.mobile.ui.theme",
     "com.letta.mobile.ui.common -> com.letta.mobile.ui.host",
-    "com.letta.mobile.ui.components -> com.letta.mobile.data.model",
     "com.letta.mobile.ui.components -> com.letta.mobile.ui.common",
     "com.letta.mobile.ui.components -> com.letta.mobile.ui.host",
     "com.letta.mobile.ui.components -> com.letta.mobile.ui.motion",
@@ -936,7 +935,6 @@
     "com.letta.mobile.ui.chat.session": 119,
     "com.letta.mobile.ui.chat.surface": 56,
     "com.letta.mobile.ui.chat.surface.timeline": 60,
-    "com.letta.mobile.ui.components": 51,
     "com.letta.mobile.ui.host": 55,
     "com.letta.mobile.ui.mascot": 54,
     "com.letta.mobile.ui.theme": 69

@@ -41,7 +41,7 @@ import dev.nucleusframework.window.styling.TitleBarStyle
 
 /** Title-bar height: taller than a stock 32-44dp caption bar to comfortably
  * fit the two-line agent identity block (title over agent name). */
-private val TitleBarHeight = 48.dp
+private val TitleBarHeight = com.letta.mobile.ui.theme.tokens.desktop.DesktopWindowTokens.titleBarHeight
 
 /** Text-selection handles at twice the mouse-sized default, so a fingertip can take hold of them. */
 private const val TOUCH_HANDLE_SCALE = 2f
@@ -130,7 +130,7 @@ internal fun DesktopJewelWindow(
 }
 
 /** Always leaves an unobstructed title-bar lane for native window dragging. */
-private val MinimumTitleBarDragWidth = 96.dp
+private val MinimumTitleBarDragWidth = com.letta.mobile.ui.theme.tokens.desktop.DesktopWindowTokens.titleBarMinDragWidth
 
 /**
  * The shared workspace header in the title bar (letta-mobile-ckmub.17.4): the workspace hoists it

@@ -16,13 +16,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.desktop.RiveWorkbenchColors
 
 /**
  * The bench's half of MOTION-PIPELINE section 6, tier 2: the probe numbers a `--probe` build of the
@@ -202,13 +202,13 @@ fun TelemetryPanel(tracks: List<TelemetryTrack>, windowSeconds: Float, modifier:
     Column(modifier, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Text(
             "telemetry - ${tracks.size} probed properties, last %.0f s".format(windowSeconds),
-            color = Color(0xFFBBBBBB),
+            color = RiveWorkbenchColors.heading,
             style = MaterialTheme.typography.labelLarge,
         )
         if (tracks.isEmpty()) {
             Text(
                 "no `$TELEMETRY_PREFIX*` properties in this file - build one with `gen_scene.py --probe`",
-                color = Color(0xFF808080),
+                color = RiveWorkbenchColors.hint,
                 style = MaterialTheme.typography.labelSmall,
             )
         }
@@ -223,7 +223,7 @@ private fun TelemetryRow(track: TelemetryTrack) {
         Text(
             "${track.name.removePrefix(TELEMETRY_PREFIX).trimStart('_', '.')}  %+.2f  d %+.3f  ${spacingOf(samples).label}"
                 .format(track.value, track.delta),
-            color = Color(0xFFDDDDDD),
+            color = RiveWorkbenchColors.readout,
             style = MaterialTheme.typography.labelSmall,
         )
         Sparkline(samples, Modifier.fillMaxWidth().height(LettaDimens.Space.xxl).padding(vertical = LettaDimens.Space.hair))
@@ -241,7 +241,7 @@ private fun Sparkline(samples: List<Float>, modifier: Modifier) {
             val fraction = level / SPARK_LEVELS.toFloat()
             val height = size.height * fraction
             drawRect(
-                color = Color(0xFF6FA8FF).copy(alpha = 0.35f + 0.65f * (i / max(1f, levels.size - 1f))),
+                color = RiveWorkbenchColors.sparkBar.copy(alpha = 0.35f + 0.65f * (i / max(1f, levels.size - 1f))),
                 topLeft = Offset(i * barWidth, size.height - height),
                 size = Size(max(1f, barWidth - 1f), height),
             )

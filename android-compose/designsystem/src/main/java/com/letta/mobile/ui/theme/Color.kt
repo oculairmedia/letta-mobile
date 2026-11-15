@@ -56,3 +56,15 @@ val LightOnSurface = Color(LettaColorTokens.LIGHT_ON_SURFACE)
 val LightOnSurfaceVariant = Color(LettaColorTokens.LIGHT_ON_SURFACE_VARIANT)
 val LightError = Color(LettaColorTokens.LIGHT_ERROR)
 val LightOnError = Color(LettaColorTokens.LIGHT_ON_ERROR)
+
+/** Light theme's `outlineVariant` in Theme.kt: the outline at hairline strength, a hairline, not text. */
+internal const val LIGHT_OUTLINE_VARIANT_ALPHA = 0.45f
+
+/** Theme.kt's reasoning bubble: a tinted fill over the chat background, not text. */
+internal const val REASONING_BUBBLE_FILL_ALPHA = 0.45f
+
+/** Theme.kt's selected-item fill: a wash of the complementary accent, not text. */
+internal const val SELECTION_FILL_ALPHA = 0.15f
+
+/** Theme.kt's disabled text ink: onSurfaceVariant at half strength. */
+internal const val TEXT_DISABLED_ALPHA = 0.5f

@@ -12,7 +12,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.shell.LocalShellPageFramed
 import com.letta.mobile.ui.shell.ShellPage
@@ -82,7 +81,7 @@ private fun MainDestination(inputs: DesktopMainContentInputs) {
 @Composable
 private fun AgentEditorSidePane(editor: ShellDestination.AgentEditor, inputs: DesktopMainContentInputs, actions: DesktopMainContentActions) {
     val title = if (editor.agentId == null) "New agent" else "Edit agent"
-    LettaSidePane(title = title, onClose = actions.onEditAgentClose, initialWidth = 460.dp) {
+    LettaSidePane(title = title, onClose = actions.onEditAgentClose) {
         // The pane draws the title and close, so the editor draws no Back.
         CompositionLocalProvider(LocalShellPageFramed provides true) {
             ShellPage(destination = editor, deps = inputs.pages, modifier = Modifier.fillMaxSize())
@@ -96,7 +95,6 @@ private fun CanvasSidePane(session: CanvasSession, actions: DesktopMainContentAc
     LettaSidePane(
         title = canvasDocument?.title ?: "Canvas",
         onClose = actions.onCloseCanvas,
-        initialWidth = 540.dp,
         // The board's own title pill (with its back arrow) is the header: a full pane
         // header above it only pushed the board down.
         showHeader = false,
