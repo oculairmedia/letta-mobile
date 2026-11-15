@@ -126,7 +126,10 @@ private class AndroidRecognition(private val session: AndroidRecognizerSession) 
             listener.detach()
             if (!ended) session.discard()
         }
-    }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.Main.immediate)
+    }
+        // overflow: one utterance's callbacks are few and end with its result, which must never be dropped.
+        .buffer(Channel.UNLIMITED)
+        .flowOn(Dispatchers.Main.immediate)
 
     override fun finish() = session.finish()
 }
