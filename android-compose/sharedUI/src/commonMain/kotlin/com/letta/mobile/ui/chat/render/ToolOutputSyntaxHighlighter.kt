@@ -174,7 +174,7 @@ fun toolOutputSyntaxColors(isError: Boolean): ToolOutputSyntaxColors {
         literal = scheme.primary.copy(alpha = 0.88f),
         keyword = scheme.primary,
         function = scheme.secondary,
-        comment = scheme.onSurfaceVariant.copy(alpha = 0.58f),
+        comment = scheme.onSurfaceVariant.copy(alpha = 0.6f),
         punctuation = scheme.onSurfaceVariant.copy(alpha = 0.62f),
         prompt = scheme.primary,
         success = customColors.successColor,

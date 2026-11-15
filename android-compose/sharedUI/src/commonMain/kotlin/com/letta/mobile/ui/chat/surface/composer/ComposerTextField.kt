@@ -129,7 +129,8 @@ internal fun ComposerTextField(
     LaunchedEffect(text) { fieldValue = reconcileComposerFieldValue(fieldValue, text) }
     // letta-mobile-bglj6.1.23: greyed and unfocusable while the owner takes no input (legacy canSendMessages).
     val enabled = model.composer.acceptsInput
-    val textStyle = MaterialTheme.typography.bodyLarge.copy(color = composerFieldTextColor(enabled))
+    // Only the ink changes with enabled; the type role stays bodyLarge.
+    val textStyle = MaterialTheme.typography.bodyLarge.merge(TextStyle(color = composerFieldTextColor(enabled)))
     val primary = LocalComposerPrimary.current
     val handoff = LocalComposerFocusHandoff.current
     // The mascot's eyes follow the caret while the field has focus (letta-mobile-te3n1.2).

@@ -85,6 +85,10 @@ import com.letta.mobile.ui.canvas.LocalWheelZoomRegions
 import com.letta.mobile.ui.chat.surface.composer.MinimisedBarLayout
 import com.letta.mobile.ui.components.ResizeDirection
 import com.letta.mobile.ui.components.resizePointerIcon
+import com.letta.mobile.ui.theme.BUBBLE_LAYOUT_REVEAL_LINGER_MS
+import com.letta.mobile.ui.theme.BubbleLayoutControlSize
+import com.letta.mobile.ui.theme.BubbleLayoutEdgeStrip
+import com.letta.mobile.ui.theme.BubbleLayoutMenuWidth
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
@@ -168,7 +172,7 @@ internal fun rememberMinimisedBarLayout(state: ChatDockState, collapsed: Boolean
  */
 @Composable
 private fun BoxScope.MinimisedBarHandles(state: ChatDockState, prefs: CanvasBubbleLayoutPrefs) {
-    val strip = BubbleLayoutDimens.edgeStrip
+    val strip = BubbleLayoutEdgeStrip
     val heightLabel = stringResource(Res.string.chat_surface_bubble_layout_resize_height)
     Box(
         Modifier
@@ -313,7 +317,7 @@ internal fun BubbleLayoutButton(mascotHovered: Boolean, modifier: Modifier = Mod
             IconButton(
                 onClick = { open = !open },
                 modifier = Modifier
-                    .size(BubbleLayoutDimens.control)
+                    .size(BubbleLayoutControlSize)
                     .semantics { layoutButtonRevealed = revealed }
                     .testTag(BUBBLE_LAYOUT_BUTTON_TAG),
                 interactionSource = interactions,
@@ -337,7 +341,7 @@ private class LayoutButtonReveal(val mascotHovered: Boolean, val button: Interac
 
 /**
  * Whether the layout button shows: at once when anything in [reveal] wants it, and for
- * [BubbleLayoutDimens.REVEAL_LINGER_MS] after the last of them lets go.
+ * [BUBBLE_LAYOUT_REVEAL_LINGER_MS] after the last of them lets go.
  */
 @Composable
 private fun rememberLayoutButtonReveal(reveal: LayoutButtonReveal): Boolean {
@@ -349,7 +353,7 @@ private fun rememberLayoutButtonReveal(reveal: LayoutButtonReveal): Boolean {
         if (wanted) {
             lingering = true
         } else if (lingering) {
-            delay(BubbleLayoutDimens.REVEAL_LINGER_MS)
+            delay(BUBBLE_LAYOUT_REVEAL_LINGER_MS)
             lingering = false
         }
     }
@@ -366,7 +370,7 @@ internal fun BubbleLayoutMenu(prefs: CanvasBubbleLayoutPrefs) {
     val layout by prefs.layout.collectAsState()
     Column(
         Modifier
-            .width(BubbleLayoutDimens.menuWidth)
+            .width(BubbleLayoutMenuWidth)
             .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm)
             .testTag(BUBBLE_LAYOUT_MENU_TAG),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
@@ -387,7 +391,7 @@ internal fun BubbleLayoutMenu(prefs: CanvasBubbleLayoutPrefs) {
         )
         TextButton(
             onClick = prefs::reset,
-            modifier = Modifier.align(Alignment.End).heightIn(min = BubbleLayoutDimens.control).testTag(BUBBLE_LAYOUT_RESET_TAG),
+            modifier = Modifier.align(Alignment.End).heightIn(min = BubbleLayoutControlSize).testTag(BUBBLE_LAYOUT_RESET_TAG),
         ) { Text(stringResource(Res.string.chat_surface_bubble_layout_reset)) }
     }
 }
@@ -467,7 +471,7 @@ private fun LayoutSlider(row: SliderRow, onChange: (Float) -> Unit) {
             steps = row.steps,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = BubbleLayoutDimens.control)
+                .heightIn(min = BubbleLayoutControlSize)
                 .semantics {
                     contentDescription = row.label
                     stateDescription = row.valueText
@@ -475,20 +479,6 @@ private fun LayoutSlider(row: SliderRow, onChange: (Float) -> Unit) {
                 .testTag(row.tag),
         )
     }
-}
-
-/** The minimised chat's layout controls. */
-internal object BubbleLayoutDimens {
-    /** The layout button, the slider rows and Reset: comfortable touch targets. */
-    val control: Dp = 44.dp
-
-    /** The invisible strip straddling each side and the top of the bar that resizes it. */
-    val edgeStrip: Dp = 10.dp
-
-    val menuWidth: Dp = 300.dp
-
-    /** How long the layout button stays once the pointer leaves the mascot: time to reach it. */
-    const val REVEAL_LINGER_MS: Long = 1_500L
 }
 
 /** Where the hold slider sits while the hold is automatic. */

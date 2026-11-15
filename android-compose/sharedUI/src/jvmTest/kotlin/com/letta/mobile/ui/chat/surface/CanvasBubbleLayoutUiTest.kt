@@ -34,6 +34,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import com.letta.mobile.ui.mascot.FakeMascotShell
+import com.letta.mobile.ui.theme.BUBBLE_LAYOUT_REVEAL_LINGER_MS
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -161,9 +162,9 @@ class CanvasBubbleLayoutUiTest {
 
         // Off the mascot it lingers long enough to be reached, then goes.
         onRoot().performMouseInput { moveTo(Offset(1f, 1f)) }
-        settle(BubbleLayoutDimens.REVEAL_LINGER_MS / 2)
+        settle(BUBBLE_LAYOUT_REVEAL_LINGER_MS / 2)
         assertEquals(true, layoutButtonRevealed(), "still there on the way to it")
-        settle(BubbleLayoutDimens.REVEAL_LINGER_MS)
+        settle(BUBBLE_LAYOUT_REVEAL_LINGER_MS)
         assertEquals(false, layoutButtonRevealed(), "gone once the pointer left")
     }
 

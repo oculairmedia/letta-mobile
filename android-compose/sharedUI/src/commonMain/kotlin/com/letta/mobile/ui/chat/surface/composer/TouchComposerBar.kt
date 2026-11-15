@@ -37,7 +37,6 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonColors
@@ -87,6 +86,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.TouchComposerDimens
+import com.letta.mobile.ui.theme.chatBottomBarShape
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -232,7 +232,7 @@ private fun TouchBarSurface(model: ComposerModel, content: @Composable androidx.
     var focused by remember { mutableStateOf(false) }
     val look = animatedTouchBarLook(model, focused)
     val padding = touchBarPadding()
-    val shape = RoundedCornerShape(topStart = look.corner, topEnd = look.corner)
+    val shape = chatBottomBarShape(look.corner)
     Surface(
         // Voice mode's outline follows the bar's shape: the bar runs flush to the screen's sides and
         // bottom, so what shows is a glowing top edge and its rounded corners.

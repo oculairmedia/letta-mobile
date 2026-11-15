@@ -13,20 +13,26 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import com.letta.mobile.ui.mascot.MascotAvatar
 import com.letta.mobile.ui.mascot.mascotAtWork
+import com.letta.mobile.ui.theme.AgentOrbGradients
+import com.letta.mobile.ui.theme.AgentSphereCore
+import com.letta.mobile.ui.theme.AgentSphereHighlight
+import com.letta.mobile.ui.theme.AgentSphereHighlightClear
+import com.letta.mobile.ui.theme.AgentSphereMid
+import com.letta.mobile.ui.theme.AgentSphereRim
+import com.letta.mobile.ui.theme.agentOrbShape
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -36,19 +42,10 @@ import com.letta.mobile.ui.theme.LettaDimens
  * agent avatar uses the radial teal "sphere" with a soft highlight.
  */
 
-/** Diagonal linear-gradient color pairs for the rail/sidebar agent orbs. */
-private val AgentOrbGradients: List<Pair<Color, Color>> = listOf(
-    Color(0xFFF0A03C) to Color(0xFFE0457B),
-    Color(0xFFE0457B) to Color(0xFF8E5CFF),
-    Color(0xFF3FA0F0) to Color(0xFF3FE0C0),
-    Color(0xFF7AD08F) to Color(0xFF3FA0A0),
-    Color(0xFF8E7CFF) to Color(0xFF3F6EF0),
-    Color(0xFF3FC0D0) to Color(0xFF3F90A0),
-)
-
 /** Brush for the agent orb at [index] (cycles through the palette). */
 fun agentOrbBrush(index: Int): Brush {
-    val (start, end) = AgentOrbGradients[((index % AgentOrbGradients.size) + AgentOrbGradients.size) % AgentOrbGradients.size]
+    val gradients = AgentOrbGradients
+    val (start, end) = gradients[((index % gradients.size) + gradients.size) % gradients.size]
     // Penpot gradient runs ~(0.2,0.1) -> (0.9,0.95); a default linear gradient
     // (top-left -> bottom-right over the full bounds) approximates it closely.
     return Brush.linearGradient(colors = listOf(start, end))
@@ -68,7 +65,7 @@ fun AgentOrb(
     live: Boolean = mascotAtWork(agentId),
     content: @Composable (() -> Unit)? = null,
 ) {
-    val shape = RoundedCornerShape(cornerRadius)
+    val shape = agentOrbShape(cornerRadius)
     // With an identity in MascotIdentityRegistry and a renderer in LocalMascotHost, the orb IS
     // the mascot (one shared scene per agent when [live] is true); the gradient stands in otherwise.
     MascotAvatar(agentId = agentId, size = size, modifier = modifier, cornerRadius = cornerRadius, onClick = onClick, live = live) {
@@ -80,7 +77,7 @@ fun AgentOrb(
                 .size(size)
                 .clip(shape)
                 .background(agentOrbBrush(index))
-                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+                .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
             content?.invoke()
@@ -100,14 +97,14 @@ fun AgentSphere(
     val density = androidx.compose.ui.platform.LocalDensity.current
     val sizePx = with(density) { size.toPx() }
     val sphere = Brush.radialGradient(
-        0.0f to Color(0xFF7CF0DE),
-        0.55f to Color(0xFF00BFA5),
-        1.0f to Color(0xFF00897B),
+        0.0f to AgentSphereCore,
+        0.55f to AgentSphereMid,
+        1.0f to AgentSphereRim,
     )
     // Soft highlight near the top-left for a glossy sphere look.
     val highlight = Brush.radialGradient(
-        0.0f to Color(0x80FFFFFF),
-        0.45f to Color(0x00FFFFFF),
+        0.0f to AgentSphereHighlight,
+        0.45f to AgentSphereHighlightClear,
         center = Offset(sizePx * 0.32f, sizePx * 0.28f),
         radius = sizePx * 0.7f,
     )
@@ -185,7 +182,7 @@ fun AgentActivityOrb(
                     val p = progress.value
                     val radius = innerRadius + (maxRadius - innerRadius) * p
                     drawCircle(
-                        color = color.copy(alpha = (1f - p) * 0.55f),
+                        color = color.copy(alpha = (1f - p) * ActivityRingPeakAlpha),
                         radius = radius,
                         center = Offset(this.size.width / 2f, this.size.height / 2f),
                         style = Stroke(width = stroke),
@@ -200,3 +197,6 @@ fun AgentActivityOrb(
 private const val SphereFraction = 0.62f
 private const val ActivityRingCount = 2
 private const val ActivityRingPeriodMs = 1600
+
+/** A ring's opacity as it leaves the sphere; it fades to clear as it reaches the footprint's edge. */
+private const val ActivityRingPeakAlpha = 0.55f
