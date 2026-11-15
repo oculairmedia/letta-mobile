@@ -85,8 +85,6 @@ android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiRend
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiRendererSupport.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiToolApprovalWidgets.kt 6
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiScheduleWidgets.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiToolApprovalWidgets.kt 24
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiSelectionWidgets.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiSelectionWidgets.kt 66
-android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasChrome.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasChrome.kt 7
-android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasChrome.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasPropertyControl.kt 6
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasChromeRegions.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/WheelZoomRegions.kt 10
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasCompactToolbar.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasSelectionBar.kt 10
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasNotesLayer.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/plugin/CanvasPluginLayer.kt 18
