@@ -38,7 +38,7 @@ internal class VoiceRequestHandlers(
 
     /** One clip to text. */
     suspend fun transcribe(params: JsonObject?, context: AdminRpcRequestContext): JsonElement {
-        val clip = VoiceParams.clip(params)
+        val clip = VoiceRequestParams.clip(params)
         val snapshot = configured()
         val model = snapshot.setup.transcriptionModel ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
         requireGrant(snapshot.setup.grants.audioForTranscription)
@@ -83,7 +83,7 @@ internal class VoiceRequestHandlers(
     }
 
     private suspend fun synthesize(call: AdminRpcStreamedCall): AdminRpcStreamOutcome {
-        val text = VoiceParams.speechText(call.params)
+        val text = VoiceRequestParams.speechText(call.params)
         val snapshot = configured()
         val request = speechCall(snapshot.setup, text)
         requireGrant(snapshot.setup.grants.textForSynthesis)
@@ -138,7 +138,7 @@ internal class VoiceRequestHandlers(
         suspend fun push(bytes: ByteArray) {
             val chunk = try {
                 decoder.push(bytes)
-            } catch (refused: VoiceAudioException) {
+            } catch (expectedRefusal: VoiceAudioException) {
                 throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE)
             }
             val format = decoder.format

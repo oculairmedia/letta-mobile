@@ -20,8 +20,8 @@ import kotlinx.serialization.json.JsonObject
 
 /**
  * The voice endpoint v1 routes (`docs/reference/contracts/voice-endpoint-v1.md`): the host keeps one
- * speech server setup for every paired device and calls the server for them. Pass [forHost] to
- * `AdminRpcHostServices.voiceRoutes`; it registers all seven `voice.*` methods and advertises
+ * speech server setup for every paired device and calls the server for them. Register [forHost] on
+ * the host's built admin router; it registers all seven `voice.*` methods and advertises
  * `voice_endpoint_v1`. The transport's capability matrix gates each method before it gets here.
  */
 object VoiceEndpointRoutes {
@@ -86,9 +86,9 @@ internal class VoiceRoutes(
             adminError(refusal.code.wire)
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (failure: Exception) {
+        } catch (expectedFailure: Exception) {
             VoiceTelemetry.answered(method, INTERNAL, started)
-            throw failure
+            throw expectedFailure
         }
     }
 

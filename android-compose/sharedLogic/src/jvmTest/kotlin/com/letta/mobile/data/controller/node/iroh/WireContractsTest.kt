@@ -142,7 +142,7 @@ class WireContractsTest {
         val inputs = mapOf(
             AdminRpcHostServices::class.java to setOf(
                 "controller", "subagentRegistrySource", "vibesyncBaseUrl", "beadsBaseUrl", "beadsTokenFile", "beadsRoutes", "pluginRoutes",
-                "canvasMountRoutes", "secretRequestRoutes", "voiceRoutes",
+                "canvasMountRoutes", "secretRequestRoutes",
             ),
             AdminRpcNativeSources::class.java to setOf(
                 "nativeClient", "localBackendDir", "skillsListing", "slashCommands", "modelExposureFile", "wrapperRecords",
@@ -328,6 +328,8 @@ class WireContractsTest {
                     permissionModes = PermissionModePublisher(plugins.scope),
                 ),
             )
+            // The production wrapper registers the voice routes on the built router; so does this host.
+            voiceRoutes(dir).register(router)
             block(router)
         } finally {
             runtime.close()
@@ -349,7 +351,6 @@ class WireContractsTest {
         pluginRoutes = pluginRoutes,
         canvasMountRoutes = canvasMountRoutes(dir),
         secretRequestRoutes = secretRequestRoutes(),
-        voiceRoutes = voiceRoutes(dir),
     )
 
     /** The real voice routes over file stores in the test's directory; any speech server call fails the test. */

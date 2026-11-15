@@ -141,7 +141,6 @@ fun buildProductionAdminRouter(
             },
             pluginRoutes = pluginRoutes,
             canvasMountRoutes = canvasMountRoutes,
-            voiceRoutes = voiceRoutes,
         ),
         pairing = AdminRpcPairing(
             pairingService = pairingService,
@@ -169,5 +168,7 @@ fun buildProductionAdminRouter(
         ),
     ).also { router ->
         if (nativeSource?.changeListener != null) router.featureCapabilities += ControllerSubagentRegistrySource.PUSH_CAPABILITY
+        // All seven voice endpoint routes or none; they advertise voice_endpoint_v1 themselves.
+        voiceRoutes?.register(router)
     }
 }

@@ -135,8 +135,14 @@ internal class AdminRpcStreamServer(
         connection = connection,
         internalError = ADMIN_RPC_INTERNAL_ERROR,
         report = { name: String, fields: Map<String, String> ->
-            val attrs = fields.map { (key, value) -> key attr value }
-            Telemetry.event("IrohNode", "admin_rpc.stream.$name", "remoteEndpointId" attr remoteEndpointId, *attrs.toTypedArray())
+            val detail = (fields - REQUEST_ID_FIELD - METHOD_FIELD).entries.joinToString(",") { "${it.key}=${it.value}" }
+            Telemetry.event(
+                "IrohNode", "admin_rpc.stream.$name",
+                "remoteEndpointId" attr remoteEndpointId,
+                REQUEST_ID_FIELD attr fields[REQUEST_ID_FIELD],
+                METHOD_FIELD attr fields[METHOD_FIELD],
+                "detail" attr detail,
+            )
         },
     )
 
@@ -182,7 +188,14 @@ internal class AdminRpcStreamServer(
     suspend fun handleStream(stream: AdminRpcBiStream) {
         val sendStream = stream.send()
         try {
-            val nextFrame = frameReader(stream.recv())
+            // Chunked (frame_part) requests may only widen reassembly memory
+            // beyond a single frame once the peer has authenticated AND advertised
+            // the capability — otherwise a peer holding just the ticket could pin
+            // maxReassembled bytes per stream before presenting any token.
+            val decoder = IrohFrameCodec.Decoder(maxFrameBytes, maxReassembledBytesProvider = {
+                if (authenticated.get() && peerSupportsFrameParts()) maxReassembledBytes else maxFrameBytes
+            })
+            val nextFrame = frameReader(stream.recv(), decoder)
             val frameJson = withTimeoutOrNull(firstFrameTimeoutMs.milliseconds) { nextFrame() }
             var streamed: AdminRpcStreamedRequest? = null
             val response = if (frameJson == null) {
@@ -273,29 +286,6 @@ internal class AdminRpcStreamServer(
             level = Telemetry.Level.WARN,
         )
         return listOf(IrohFrameCodec.encodeFrame(errorEnvelope(requestId, detail), maxFrameBytes))
-    }
-
-    /** Reads the request stream frame by frame, keeping frames that arrived together; null once the peer finished. */
-    private fun frameReader(recv: AdminRpcRecvStream): suspend () -> String? {
-        // Chunked (frame_part) requests may only widen reassembly memory
-        // beyond a single frame once the peer has authenticated AND advertised
-        // the capability — otherwise a peer holding just the ticket could pin
-        // maxReassembled bytes per stream before presenting any token.
-        val decoder = IrohFrameCodec.Decoder(maxFrameBytes, maxReassembledBytesProvider = {
-            if (authenticated.get() && peerSupportsFrameParts()) maxReassembledBytes else maxFrameBytes
-        })
-        val pending = ArrayDeque<String>()
-        return reader@{
-            while (pending.isEmpty()) {
-                val chunk = recv.read(READ_CHUNK_SIZE.toUInt())
-                if (chunk.isEmpty()) {
-                    decoder.finish()
-                    return@reader null
-                }
-                pending.addAll(decoder.feed(chunk))
-            }
-            pending.removeFirst()
-        }
     }
 
     /**
@@ -478,7 +468,26 @@ internal class AdminRpcStreamServer(
     companion object {
         const val DEFAULT_MAX_ACTIVE_HANDLERS = 16
         const val DEFAULT_FIRST_FRAME_TIMEOUT_MS = 15_000L
-        private const val READ_CHUNK_SIZE = 8192
+        private const val REQUEST_ID_FIELD = "requestId"
+        private const val METHOD_FIELD = "method"
         private const val HEALTH_CHECK_METHOD = "health.check"
+    }
+}
+
+private const val READ_CHUNK_SIZE = 8192
+
+/** Reads [recv] frame by frame through [decoder], keeping frames that arrived together; null once the peer finished. */
+private fun frameReader(recv: AdminRpcRecvStream, decoder: IrohFrameCodec.Decoder): suspend () -> String? {
+    val pending = ArrayDeque<String>()
+    return reader@{
+        while (pending.isEmpty()) {
+            val chunk = recv.read(READ_CHUNK_SIZE.toUInt())
+            if (chunk.isEmpty()) {
+                decoder.finish()
+                return@reader null
+            }
+            pending.addAll(decoder.feed(chunk))
+        }
+        pending.removeFirst()
     }
 }

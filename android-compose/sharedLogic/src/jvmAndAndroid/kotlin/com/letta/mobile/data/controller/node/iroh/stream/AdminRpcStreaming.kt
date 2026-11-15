@@ -15,8 +15,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -133,13 +131,13 @@ internal class AdminRpcStreamedExchange(
 
     private suspend fun run(request: AdminRpcStreamedRequest, frames: StreamFrames): AdminRpcStreamOutcome = try {
         request.handler.serve(frames)
-    } catch (writeFailed: AdminRpcStreamWriteFailed) {
+    } catch (expectedWriteFailure: AdminRpcStreamWriteFailed) {
         report("cancelled", fields(request, "reason" to "write_failed"))
         AdminRpcStreamOutcome.Failure(request.handler.cancelledError)
     } catch (cancelled: CancellationException) {
         throw cancelled
-    } catch (unexpected: Exception) {
-        report("handler_failed", fields(request, "class" to unexpected::class.simpleName.orEmpty()))
+    } catch (expectedHandlerFailure: Exception) {
+        report("handler_failed", fields(request, "class" to expectedHandlerFailure::class.simpleName.orEmpty()))
         AdminRpcStreamOutcome.Failure(internalError)
     }
 

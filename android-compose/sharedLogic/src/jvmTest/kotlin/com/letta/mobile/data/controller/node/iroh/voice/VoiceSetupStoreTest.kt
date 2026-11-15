@@ -78,7 +78,8 @@ class VoiceSetupStoreTest {
     @Test
     fun keepingAKeyOverPlainHttpOffLoopbackIsRefused(): Unit = runBlocking {
         val refusal = assertFailsWith<VoiceRefusal> {
-            store.write(command(SpeechEndpointUrl("http://speech.example.invalid"), HostVoiceKeyChange.Replace(SecretWriteValue(KEY)), both))
+            val plainHttp = SpeechEndpointUrl("http://speech.example.invalid")
+            store.write(command(plainHttp, HostVoiceKeyChange.Replace(SecretWriteValue(KEY)), both))
         }
         assertEquals(HostVoiceErrorCode.INSECURE_TRANSPORT, refusal.code)
         assertNull(keys.read("http://speech.example.invalid:80"))

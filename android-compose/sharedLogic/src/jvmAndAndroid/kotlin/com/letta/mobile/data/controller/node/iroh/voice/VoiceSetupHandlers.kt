@@ -54,7 +54,7 @@ internal class VoiceSetupHandlers(
         val models = checked(snapshot) { upstream.models(snapshot.target) }
         val listed = try {
             upstream.voices(snapshot.target)
-        } catch (failure: VoiceUpstreamFailure) {
+        } catch (expectedFailure: VoiceUpstreamFailure) {
             null
         }
         val catalog = HostVoiceModels(
@@ -85,6 +85,6 @@ internal class VoiceSetupHandlers(
 /** Runs an upstream call, turning its failure into the route's refusal with the same code. */
 internal suspend fun <T> upstreamCall(call: suspend () -> T): T = try {
     call()
-} catch (failure: VoiceUpstreamFailure) {
-    throw VoiceRefusal(failure.code)
+} catch (expectedFailure: VoiceUpstreamFailure) {
+    throw VoiceRefusal(expectedFailure.code)
 }

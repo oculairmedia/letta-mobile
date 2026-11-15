@@ -7,13 +7,8 @@ import com.letta.mobile.data.voice.endpoint.TranscriptResponse
 import com.letta.mobile.data.voice.host.HostVoiceErrorCode
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
-import io.ktor.client.network.sockets.ConnectTimeoutException
-import io.ktor.client.network.sockets.SocketTimeoutException
-import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.client.request.forms.MultiPartFormDataContent
-import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -24,27 +19,16 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
-import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
-import io.ktor.http.Url
 import io.ktor.http.content.TextContent
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * [VoiceSpeechUpstream] over HTTP on a Ktor [engine]: an isolated client with no logging, no redirects
@@ -81,19 +65,20 @@ internal class KtorVoiceSpeechUpstream(
     private suspend fun listModels(target: VoiceUpstreamTarget): List<String> {
         val response = client.get { aimAt(target, MODELS_ROUTE) }
         requireSuccess(response)
-        return ids(parse(response.bodyAsText()), "data", "models") ?: throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE)
+        val models = VoiceUpstreamWire.ids(VoiceUpstreamWire.parse(response.bodyAsText()), "data", "models")
+        return models ?: throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE)
     }
 
     private suspend fun listVoices(target: VoiceUpstreamTarget): List<String>? {
         val response = client.get { aimAt(target, VOICES_ROUTE) }
-        if (statusFailure(response.status.value) != null) return null
-        return ids(parse(response.bodyAsText()), "voices", "data")?.takeIf { it.isNotEmpty() }
+        if (VoiceUpstreamWire.statusFailure(response.status.value) != null) return null
+        return VoiceUpstreamWire.ids(VoiceUpstreamWire.parse(response.bodyAsText()), "voices", "data")?.takeIf { it.isNotEmpty() }
     }
 
     private suspend fun postTranscription(target: VoiceUpstreamTarget, request: VoiceTranscriptionCall): VoiceTranscriptionAnswer {
         val response = client.post {
             aimAt(target, TRANSCRIPTIONS_ROUTE)
-            setBody(transcriptionBody(request))
+            setBody(VoiceUpstreamWire.transcriptionBody(request))
         }
         if (request.verbose && response.status.value in FORMAT_REFUSED_STATUSES) return VoiceTranscriptionAnswer.FormatRefused
         requireSuccess(response)
@@ -113,7 +98,7 @@ internal class KtorVoiceSpeechUpstream(
                 }
                 client.preparePost {
                     aimAt(target, SPEECH_ROUTE)
-                    setBody(TextContent(speechBody(request), ContentType.Application.Json))
+                    setBody(TextContent(VoiceUpstreamWire.speechBody(request), ContentType.Application.Json))
                 }.execute { response ->
                     answered.complete(Unit)
                     requireSuccess(response)
@@ -158,101 +143,36 @@ internal class KtorVoiceSpeechUpstream(
             return channel.readAvailable(buffer, 0, buffer.size)
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (timedOut: SocketTimeoutException) {
-            throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT, status)
         } catch (expectedBreak: Exception) {
-            throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE, status)
+            throw VoiceUpstreamWire.readFailure(expectedBreak, status)
         }
     }
 
     private fun requireSuccess(response: HttpResponse) {
-        statusFailure(response.status.value)?.let { throw VoiceUpstreamFailure(it, response.status.value) }
+        VoiceUpstreamWire.statusFailure(response.status.value)?.let { throw VoiceUpstreamFailure(it, response.status.value) }
     }
-
-    private fun transcriptionBody(request: VoiceTranscriptionCall): MultiPartFormDataContent {
-        val fileHeaders = Headers.build {
-            append(HttpHeaders.ContentType, WAV_MIME)
-            append(HttpHeaders.ContentDisposition, "filename=\"audio.wav\"")
-        }
-        return MultiPartFormDataContent(
-            formData {
-                append("model", request.model)
-                append("response_format", if (request.verbose) VERBOSE_JSON else PLAIN_JSON)
-                request.language?.let { append("language", it) }
-                append("file", request.audio, fileHeaders)
-            },
-        )
-    }
-
-    private fun speechBody(request: VoiceSpeechCall): String = buildJsonObject {
-        put("model", request.model)
-        put("voice", request.voice)
-        put("input", request.text)
-        put("response_format", WAV)
-    }.toString()
 
     /**
-     * Runs [block] within [totalMs], mapping every failure to the closed set ([classify]). Cancellation
-     * passes through.
+     * Runs [block] within [totalMs], mapping every failure to the closed set ([VoiceUpstreamWire.classify]);
+     * running out of time is `voice.upstream_timeout`. Cancellation passes through.
      */
     private suspend fun <T> guarded(totalMs: Long, block: suspend () -> T): T {
+        val answer = withTimeoutOrNull(totalMs) { Answer(classified(block)) }
+        return (answer ?: throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)).value
+    }
+
+    private suspend fun <T> classified(block: suspend () -> T): T {
         try {
-            return withTimeout(totalMs) { block() }
-        } catch (timedOut: TimeoutCancellationException) {
-            throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
+            return block()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (expectedFailure: Exception) {
-            throw classify(expectedFailure)
+            throw VoiceUpstreamWire.classify(expectedFailure)
         }
     }
 
-    /**
-     * A client timeout is `voice.upstream_timeout`; anything else that is not already a
-     * [VoiceUpstreamFailure] means the server could not be reached.
-     */
-    private fun classify(error: Exception): Exception {
-        return when (error) {
-            is VoiceUpstreamFailure -> error
-            is HttpRequestTimeoutException, is ConnectTimeoutException, is SocketTimeoutException ->
-                VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
-            else -> VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_UNREACHABLE)
-        }
-    }
-
-    /**
-     * The code for an HTTP status, or null for success: 401/403 unauthorized, 408/504 timeout,
-     * 502/503 unreachable, any other 4xx rejected, any other answer a bad response.
-     */
-    private fun statusFailure(status: Int): HostVoiceErrorCode? {
-        return when (status) {
-            in OK_FIRST..OK_LAST -> null
-            in failureByStatus -> failureByStatus.getValue(status)
-            in CLIENT_ERROR_FIRST..CLIENT_ERROR_LAST -> HostVoiceErrorCode.UPSTREAM_REJECTED
-            else -> HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE
-        }
-    }
-
-    private fun parse(body: String): JsonElement? {
-        return runCatching { Json.parseToJsonElement(body) }.getOrNull()
-    }
-
-    /**
-     * The ids in a listing: a top-level array, or the array under the first of [fields] present; each
-     * entry a string or an object with an `id`, `name` or `voice_id` string. Null when the body is not
-     * such a listing.
-     */
-    private fun ids(root: JsonElement?, vararg fields: String): List<String>? {
-        val list = root as? JsonArray ?: (root as? JsonObject)?.let { obj -> fields.firstNotNullOfOrNull { obj[it] as? JsonArray } }
-        return list?.map { entry -> idOf(entry) ?: return null }
-    }
-
-    private fun idOf(entry: JsonElement): String? {
-        val primitive = (entry as? JsonPrimitive) ?: (entry as? JsonObject)?.let { obj ->
-            ID_FIELDS.firstNotNullOfOrNull { obj[it] as? JsonPrimitive }
-        }
-        return primitive?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }
-    }
+    /** Holds a result that may itself be null, so a timeout is told apart from a null answer. */
+    private class Answer<T>(val value: T)
 
     private companion object {
         val MODELS_ROUTE = listOf("v1", "models")
@@ -262,23 +182,6 @@ internal class KtorVoiceSpeechUpstream(
 
         /** A `verbose_json` request refused with these is retried as plain `json`. */
         val FORMAT_REFUSED_STATUSES = setOf(400, 415, 422)
-        val ID_FIELDS = listOf("id", "name", "voice_id")
-        const val VERBOSE_JSON = "verbose_json"
-        const val PLAIN_JSON = "json"
-        const val WAV = "wav"
-        const val WAV_MIME = "audio/wav"
         const val CHUNK_BYTES = 8 * 1024
-        val failureByStatus = mapOf(
-            401 to HostVoiceErrorCode.UPSTREAM_UNAUTHORIZED,
-            403 to HostVoiceErrorCode.UPSTREAM_UNAUTHORIZED,
-            408 to HostVoiceErrorCode.UPSTREAM_TIMEOUT,
-            504 to HostVoiceErrorCode.UPSTREAM_TIMEOUT,
-            502 to HostVoiceErrorCode.UPSTREAM_UNREACHABLE,
-            503 to HostVoiceErrorCode.UPSTREAM_UNREACHABLE,
-        )
-        const val OK_FIRST = 200
-        const val OK_LAST = 299
-        const val CLIENT_ERROR_FIRST = 400
-        const val CLIENT_ERROR_LAST = 499
     }
 }
