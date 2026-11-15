@@ -5,19 +5,13 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.StopCircle
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -30,8 +24,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.graphicsLayer
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaStatusDot
+import com.letta.mobile.ui.theme.tokens.LettaStatusTone
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.data.presence.ActiveTurnPhase
 import com.letta.mobile.data.presence.ActiveTurnState
 import com.letta.mobile.data.chat.runtime.NowActiveStatus
@@ -95,7 +95,7 @@ val NowActiveStatus.label: String
 fun NowActiveIdentity(state: NowActiveBarState, actions: NowActiveBarActions, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
+            .clip(MaterialTheme.shapes.small)
             .clickable(role = Role.Button, onClick = actions.onOpenConversation)
             .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs)
             .testTag(NowActiveBarTags.IDENTITY),
@@ -111,8 +111,7 @@ fun NowActiveIdentity(state: NowActiveBarState, actions: NowActiveBarActions, mo
         Column {
             Text(
                 text = state.conversationTitle,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
+                style = LettaTextStyles.labelSemibold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -169,21 +168,15 @@ fun NowActiveRunControls(state: NowActiveBarState, actions: NowActiveBarActions,
 
 @Composable
 private fun StopRunButton(stopping: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(LettaDimens.Control.iconButton)
-            .clip(CircleShape)
-            .clickable(role = Role.Button, onClick = onClick)
-            .testTag(NowActiveBarTags.STOP),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
+    LettaIconButton(
+        icon = LettaButtonIcon(
             imageVector = Icons.Outlined.StopCircle,
             contentDescription = if (stopping) "Stopping run — click again to force stop" else "Stop run",
-            tint = MaterialTheme.colorScheme.error,
-            modifier = Modifier.size(LettaDimens.Control.icon),
-        )
-    }
+            glyph = LettaIconStyle(tint = MaterialTheme.colorScheme.error),
+        ),
+        onClick = onClick,
+        modifier = Modifier.testTag(NowActiveBarTags.STOP),
+    )
 }
 
 @Composable
@@ -199,17 +192,14 @@ private fun StatusDot(status: NowActiveStatus) {
         animationSpec = infiniteRepeatable(tween(STATUS_PULSE_MS), RepeatMode.Reverse),
         label = "nowActiveDotAlpha",
     )
-    Box(
-        modifier = Modifier
-            .size(LettaDimens.Space.sm)
-            .background(statusColor(status).copy(alpha = alpha), CircleShape),
-    )
+    val tone = if (status == NowActiveStatus.Error) LettaStatusTone.Error else LettaStatusTone.Running
+    LettaStatusDot(tone, Modifier.graphicsLayer { this.alpha = alpha })
 }
 
 @Composable
 private fun BackgroundWorkChip(agentName: String, onClick: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.clickable(role = Role.Button, onClick = onClick).testTag(NowActiveBarTags.BACKGROUND_WORK),
     ) {

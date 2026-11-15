@@ -88,7 +88,7 @@ private fun lettaDarkScheme(): ColorScheme = darkColorScheme(
 private fun lettaLightScheme(): ColorScheme = lightColorScheme(
     primary = Color(LettaColorTokens.LIGHT_PRIMARY),
     onPrimary = Color.White,
-    primaryContainer = Color(LettaColorTokens.LIGHT_PRIMARY).copy(alpha = 0.16f),
+    primaryContainer = Color(LettaColorTokens.LIGHT_PRIMARY).copy(alpha = LIGHT_PRIMARY_CONTAINER_TINT),
     onPrimaryContainer = Color(LettaColorTokens.LIGHT_ON_SURFACE),
     secondary = Color(LettaColorTokens.LIGHT_PRIMARY),
     onSecondary = Color.White,
@@ -128,7 +128,7 @@ fun lettaCustomColors(scheme: ColorScheme): CustomColors =
         dateSeparatorColor = scheme.onSurfaceVariant,
         textPrimary = scheme.onSurface,
         textSecondary = scheme.onSurfaceVariant,
-        textDisabled = scheme.onSurface.copy(alpha = 0.5f),
+        textDisabled = scheme.onSurface.copy(alpha = TEXT_DISABLED_ALPHA),
         textLink = scheme.primary,
         textOnPrimary = scheme.onPrimary,
         errorTextColor = scheme.error,
@@ -199,3 +199,12 @@ val SharedShapes: Shapes = Shapes(
     large = RoundedCornerShape(LettaDimens.Radius.lg),
     extraLarge = RoundedCornerShape(16.dp),
 )
+
+/**
+ * How strongly the light theme's primary container is tinted with primary. It is a fill under content
+ * (the user's bubble, a selected row), not content, so it sits far below the content alpha floor.
+ */
+private const val LIGHT_PRIMARY_CONTAINER_TINT = 0.16f
+
+/** How strongly disabled text keeps `onSurface` (customColors.textDisabled). */
+private const val TEXT_DISABLED_ALPHA = 0.5f

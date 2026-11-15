@@ -58,6 +58,7 @@ import kotlinx.coroutines.launch
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.input.pointerInputPassThrough
 import com.letta.mobile.ui.theme.LettaDimens
+import androidx.compose.ui.semantics.Role
 
 /**
  * The places an agent's mascot can stand. One character per agent, in one place at a time: it
@@ -582,7 +583,7 @@ private fun MascotEditBadge(onEdit: () -> Unit, modifier: Modifier) {
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .pointerHoverIcon(PointerIcon.Hand)
-            .clickable(onClick = onEdit),
+            .clickable(onClickLabel = "Edit mascot", role = Role.Button, onClick = onEdit),
         contentAlignment = Alignment.Center,
     ) {
         Text(

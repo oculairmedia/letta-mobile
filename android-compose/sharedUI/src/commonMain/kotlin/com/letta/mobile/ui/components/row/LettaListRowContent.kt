@@ -10,9 +10,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.ui.theme.tokens.LettaRowDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 
 @Composable
 internal fun RowScope.RowContents(spec: LettaListRowSpec, leading: (@Composable () -> Unit)?, end: (@Composable () -> Unit)?) {
@@ -45,14 +45,12 @@ internal fun RowScope.RowContents(spec: LettaListRowSpec, leading: (@Composable 
 private fun RowTitle(spec: LettaListRowSpec, modifier: Modifier) {
     val subtitle = spec.subtitle
     val textModifier = textSemantics(spec)
-    val weight = if (spec.emphasized) FontWeight.SemiBold else FontWeight.Normal
     val color = if (spec.quiet) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
     Column(modifier.testTag(LettaListRowDefaults.TitleTestTag)) {
         Text(
             text = spec.title,
             modifier = textModifier,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = weight,
+            style = if (spec.emphasized) LettaTextAccents.bodySemibold else MaterialTheme.typography.bodyMedium,
             color = color,
             maxLines = spec.titleLines,
             overflow = TextOverflow.Ellipsis,

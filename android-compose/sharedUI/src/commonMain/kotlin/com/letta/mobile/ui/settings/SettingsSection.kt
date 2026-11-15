@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -44,8 +43,6 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -77,6 +74,8 @@ import com.letta.mobile.ui.text.readPlainText
 import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.components.foundation.LettaNavChevron
 
 /** Test handles of the settings primitives; a row's tag is its prefix plus the row key. */
 object SettingsSectionTags {
@@ -114,8 +113,7 @@ fun SettingsSection(header: SettingsHeader, modifier: Modifier = Modifier, conte
             if (header.showTitle) {
                 Text(
                     header.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    style = LettaTextStyles.titleSemibold,
                     modifier = Modifier.padding(top = LettaDimens.Space.sm),
                 )
             }
@@ -228,7 +226,9 @@ object SettingsScope {
             tag = SettingsSectionTags.ROW_PREFIX + row.key,
             words = RowWords(row.title, row.supporting),
             enabled = true,
-            interaction = Modifier.clickable(onClickLabel = COPY_LABEL) { clipboard.setText(AnnotatedString(row.value)) },
+            interaction = Modifier.clickable(onClickLabel = COPY_LABEL, role = Role.Button) {
+                clipboard.setText(AnnotatedString(row.value))
+            },
         ) {
             Text(
                 row.value,
@@ -269,7 +269,7 @@ object SettingsScope {
             },
         ) {
             row.value?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            if (!row.destructive) Chevron()
+            if (!row.destructive) LettaNavChevron()
         }
         if (asking && confirm != null) {
             LettaConfirmPane(
@@ -301,12 +301,11 @@ object SettingsScope {
     fun CodeRow(row: SettingsRow.Code) {
         Text(
             text = row.text,
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
+            style = LettaTextStyles.mono,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(LettaDimens.Radius.sm))
+                .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.small)
                 .padding(LettaDimens.Space.md)
                 .testTag(SettingsSectionTags.ROW_PREFIX + row.key),
         )
@@ -387,7 +386,7 @@ private fun ListChoice(row: SettingsRow.Choice, lock: String?) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Chevron()
+                LettaNavChevron()
             }
             if (open) {
                 ChoicePicker(row, onPick = { picked ->
@@ -397,16 +396,6 @@ private fun ListChoice(row: SettingsRow.Choice, lock: String?) {
             }
         }
     }
-}
-
-@Composable
-private fun Chevron() {
-    Icon(
-        LettaIcons.ChevronRight,
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.size(LettaDimens.Control.icon),
-    )
 }
 
 /** A field's trailing controls and what they act on. */

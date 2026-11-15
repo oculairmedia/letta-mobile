@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -22,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.runtime.CommandActivity
 import com.letta.mobile.data.runtime.CommandState
@@ -53,6 +51,7 @@ import com.letta.mobile.sharedui.resources.run_status_waiting
 import com.letta.mobile.sharedui.resources.run_status_working
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -236,7 +235,7 @@ private fun NoticeText(notice: LiveNotice) {
 private fun CommandCard(command: CommandActivity, onDismiss: () -> Unit) {
     val failed = command.state == CommandState.Failed
     Surface(
-        shape = RoundedCornerShape(LettaDimens.Space.sm),
+        shape = MaterialTheme.shapes.small,
         color = if (failed) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
         contentColor = if (failed) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.fillMaxWidth().testTag(RunStatusTestTags.COMMAND),
@@ -267,8 +266,7 @@ private fun CommandOutput(output: String, command: CommandActivity) {
     SelectionContainer {
         Text(
             text = output,
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = if (command.preformatted) FontFamily.Monospace else null,
+            style = if (command.preformatted) LettaTextStyles.mono else MaterialTheme.typography.bodySmall,
             maxLines = OUTPUT_MAX_LINES,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier

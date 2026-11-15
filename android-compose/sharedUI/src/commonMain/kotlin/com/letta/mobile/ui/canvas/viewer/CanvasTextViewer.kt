@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.canvas.viewer
 
+import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -12,8 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.canvas_viewer_waiting
 import org.jetbrains.compose.resources.stringResource
@@ -33,13 +33,17 @@ internal fun CanvasTextViewer(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(start = 16.dp, top = 112.dp, end = 16.dp, bottom = 16.dp),
+                    .padding(
+                        start = LettaSpaceTokens.lg,
+                        top = TEXT_VIEWER_TOP_CLEARANCE,
+                        end = LettaSpaceTokens.lg,
+                        bottom = LettaSpaceTokens.lg,
+                    ),
             ) {
                 Text(
                     text = sceneJson ?: stringResource(Res.string.canvas_viewer_waiting),
                     modifier = Modifier.testTag(CANVAS_TEXT_VIEWER_CONTENT_TAG),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace,
+                    style = LettaTextStyles.monoBody,
                 )
             }
         }

@@ -1,18 +1,11 @@
 package com.letta.mobile.ui.search
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,18 +19,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.host.PaneAnchor
 import com.letta.mobile.ui.host.PaneSize
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
 
 /** What an anchored search searches: the live [query] and where edits, picks and dismissal go. */
 @Immutable
@@ -145,7 +144,7 @@ fun LettaSearchAnchoredField(
 internal class AnchoredPlacement private constructor(val anchor: PaneAnchor, val width: Dp) {
     /** The pane's content: the field's width when it covers the field, the panel's reading width otherwise. */
     fun contentModifier(): Modifier = if (width == Dp.Unspecified) {
-        Modifier.widthIn(min = AnchoredPanelMinWidth, max = AnchoredPanelMaxWidth)
+        Modifier.widthIn(min = LettaSearchDimens.anchoredMinWidth, max = LettaSearchDimens.anchoredMaxWidth)
     } else {
         Modifier.fillMaxWidth()
     }
@@ -173,7 +172,7 @@ private fun AnchoredSearchPane(
             onClose()
             source.onDismiss()
         },
-        size = PaneSize(width = placement.width, maxHeight = AnchoredPanelMaxPaneHeight),
+        size = PaneSize(width = placement.width, maxHeight = LettaSearchDimens.anchoredMaxPaneHeight),
         testTag = SearchPanelTestTag,
     ) {
         LettaSearchScaffold(
@@ -185,7 +184,10 @@ private fun AnchoredSearchPane(
                 source.onRowSelected(row)
             },
             modifier = placement.contentModifier(),
-            config = config.copy(autoFocus = true, maxResultsHeight = config.maxResultsHeight ?: AnchoredPanelMaxHeight),
+            config = config.copy(
+                autoFocus = true,
+                maxResultsHeight = config.maxResultsHeight ?: LettaSearchDimens.anchoredMaxResultsHeight,
+            ),
             parts = if (config.showResults) LettaSearchParts.All else LettaSearchParts.FieldOnly,
         )
     }
@@ -194,13 +196,12 @@ private fun AnchoredSearchPane(
 /** The icon trigger: a search icon, tinted while a query is live. */
 @Composable
 private fun LettaSearchIconTrigger(active: Boolean, label: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick, modifier = Modifier.testTag(SearchTriggerTestTag)) {
-        Icon(
-            imageVector = Icons.Outlined.Search,
-            contentDescription = label,
-            tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    val tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    LettaIconButton(
+        LettaButtonIcon(LettaIcons.Search, label, glyph = LettaIconStyle(tint = tint)),
+        onClick = onClick,
+        modifier = Modifier.testTag(SearchTriggerTestTag),
+    )
 }
 
 /**
@@ -215,18 +216,14 @@ private fun LettaSearchFieldTrigger(text: String, live: Boolean, covered: Boolea
             .fillMaxWidth()
             .testTag(SearchTriggerTestTag)
             .alpha(if (covered) 0f else 1f)
-            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
-            .clickable(onClick = onClick)
+            .clip(MaterialTheme.shapes.small)
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Search,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Control.iconSm),
-        )
+        val glyph = LettaIconStyle(LettaDimens.Control.iconSm, MaterialTheme.colorScheme.onSurfaceVariant)
+        LettaIcon(LettaIcons.Search, contentDescription = null, style = glyph)
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,
@@ -237,8 +234,3 @@ private fun LettaSearchFieldTrigger(text: String, live: Boolean, covered: Boolea
     }
 }
 
-// Panel geometry: reading-width decisions, not points on the spacing scale.
-private val AnchoredPanelMinWidth = 280.dp
-private val AnchoredPanelMaxWidth = 380.dp
-private val AnchoredPanelMaxHeight = 280.dp
-private val AnchoredPanelMaxPaneHeight = 480.dp

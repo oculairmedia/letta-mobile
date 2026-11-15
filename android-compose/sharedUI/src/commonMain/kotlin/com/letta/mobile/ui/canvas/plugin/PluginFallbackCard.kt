@@ -1,6 +1,8 @@
 package com.letta.mobile.ui.canvas.plugin
 
-import androidx.compose.foundation.BorderStroke
+import com.letta.mobile.ui.components.foundation.lettaPanelBorder
+import com.letta.mobile.ui.theme.tokens.LettaShapes
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -32,7 +33,6 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.CircleArrowUp
 import com.composables.icons.lucide.Cpu
@@ -97,9 +97,9 @@ fun PluginFallbackCard(view: PluginElementView, chrome: PluginElementChrome, mod
                 contentDescription = description
                 if (open != null) customActions = listOf(CustomAccessibilityAction(openLabel) { open(); true })
             },
-        shape = RoundedCornerShape(LettaDimens.Radius.md),
+        shape = LettaShapes.panel,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
+        border = lettaPanelBorder(),
         shadowElevation = LettaDimens.Space.xs,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -155,8 +155,7 @@ internal fun PluginCardHeader(title: String, icon: ImageVector, handle: Modifier
         Spacer(modifier = Modifier.size(LettaDimens.Space.sm))
         Text(
             text = title,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
+            style = LettaTextStyles.labelSemibold,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -238,7 +237,7 @@ private fun PluginStatusStrip(status: PluginElementStatus, modifier: Modifier) {
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         statusLabel(status)?.let { label ->
-            Text(text = label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = color, maxLines = 1)
+            Text(text = label, style = LettaTextStyles.labelSmallSemibold, color = color, maxLines = 1)
         }
         status.progress?.let { progress ->
             LinearProgressIndicator(

@@ -183,7 +183,7 @@ internal fun ScheduleMetaLine(label: String, value: String) {
             text = label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.widthIn(min = LettaDimens.Orb.railSlotWidth, max = 72.dp),
+            modifier = Modifier.widthIn(min = LettaDimens.Orb.railSlotWidth, max = A2uiDimens.keyColumnWidth),
         )
         Text(
             text = value,

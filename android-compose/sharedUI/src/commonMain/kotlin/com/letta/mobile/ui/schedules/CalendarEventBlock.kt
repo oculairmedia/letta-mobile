@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,7 +26,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.CircleAlert
 import com.composables.icons.lucide.CircleCheck
@@ -36,6 +34,7 @@ import com.composables.icons.lucide.LoaderCircle
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.SkipForward
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /**
  * How strongly a calendar block reads: [Upcoming] is the default, [Highlighted] picks out one block
@@ -84,7 +83,7 @@ data class CalendarEventSpec(
  */
 @Composable
 fun CalendarEventBlock(spec: CalendarEventSpec, onClick: (() -> Unit)?, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(LettaDimens.Radius.sm / 2)
+    val shape = MaterialTheme.shapes.extraSmall
     val tone = spec.tone
     val highlighted = tone == CalendarTone.Highlighted
     Row(
@@ -93,7 +92,7 @@ fun CalendarEventBlock(spec: CalendarEventSpec, onClick: (() -> Unit)?, modifier
             .clip(shape)
             .background(spec.accent.copy(alpha = tone.washAlpha))
             .then(if (highlighted) Modifier.border(LettaDimens.Stroke.hairline, spec.accent, shape) else Modifier)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .clearAndSetSemantics {
                 contentDescription = spec.description
                 if (onClick != null) role = Role.Button
@@ -126,8 +125,7 @@ private fun BlockText(spec: CalendarEventSpec, modifier: Modifier) {
         }
         Text(
             spec.title,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
+            style = LettaTextStyles.labelSmallSemibold,
             color = color,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

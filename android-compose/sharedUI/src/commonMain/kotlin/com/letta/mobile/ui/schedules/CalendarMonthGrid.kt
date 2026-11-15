@@ -90,7 +90,7 @@ private fun MonthCell(
         modifier
             .drawBehind { drawLine(rule, Offset(0f, 0f), Offset(size.width, 0f)) }
             .then(if (day.selected) Modifier.background(selectedWash, MaterialTheme.shapes.small) else Modifier)
-            .clickable { onSelect(day) }
+            .clickable(role = Role.Tab) { onSelect(day) }
             .semantics {
                 contentDescription = day.description
                 selected = day.selected

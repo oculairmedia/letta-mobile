@@ -42,11 +42,11 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.components.row.LettaListRow
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.math.roundToInt
+import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 
 /** The plain roster row: the shared [LettaListRow], selected or under the cursor, clicking through the roster. */
 @Composable
@@ -130,7 +130,7 @@ private fun SwipeRow(action: RosterAction, tag: RosterRowTag, content: @Composab
     var offset by remember { mutableFloatStateOf(0f) }
     // The action is rebuilt on each composition; the gesture must not restart with it.
     val current by rememberUpdatedState(action)
-    val threshold = with(LocalDensity.current) { SWIPE_THRESHOLD.toPx() }
+    val threshold = with(LocalDensity.current) { LettaSurfaceSizes.rosterSwipeThreshold.toPx() }
     Box {
         if (offset < 0f) SwipeBackdrop(action, Modifier.matchParentSize().testTag(tag.swipeBackdrop))
         Box(
@@ -199,5 +199,4 @@ private fun QuickActionButton(action: RosterAction, tag: RosterRowTag) {
     }
 }
 
-private val SWIPE_THRESHOLD = 72.dp
 private const val SWIPE_OVERSHOOT = 1.5f

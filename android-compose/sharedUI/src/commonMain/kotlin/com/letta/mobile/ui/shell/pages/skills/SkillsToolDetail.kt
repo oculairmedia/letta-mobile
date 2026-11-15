@@ -12,7 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.data.chat.tools.ToolInset
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.chat.surface.timeline.rows.ToolInsetView
@@ -43,7 +43,7 @@ internal fun ToolDetailPane(tool: Tool, onClose: () -> Unit) {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             toolSource(tool)?.let { (label, text) ->
-                Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Text(label, style = LettaTextStyles.labelSemibold)
                 ToolInsetView(ToolInset.Text(text))
             }
             Text(READ_ONLY, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -25,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.memory.MemoryParityAgentOption
 import com.letta.mobile.data.memory.MemoryParityControllerState
@@ -40,6 +39,7 @@ import com.letta.mobile.ui.components.LettaPageHeader
 import com.letta.mobile.ui.components.lettaCount
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /** The host's presentation choices, and [canCreateBlock]: offer "New block". */
 internal data class MemoryChromeOptions(val page: MemoryPageOptions, val canCreateBlock: Boolean)
@@ -130,7 +130,7 @@ private fun MemorySummaryStrip(summary: MemoryParitySummary) {
         summary.metrics.filter { it.kind != MemorySummaryMetricKind.Context }.forEach { metric ->
             Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.Bottom) {
                 val value = metric.value.toIntOrNull()?.let(::lettaCount) ?: metric.value
-                Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(value, style = LettaTextStyles.figure)
                 Text(metric.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.customColors.onSurfaceMutedColor)
             }
         }

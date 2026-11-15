@@ -22,7 +22,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.schedules.CalendarDay
 import com.letta.mobile.data.schedules.CalendarEvent
 import com.letta.mobile.data.schedules.CalendarLabels
@@ -50,6 +49,7 @@ import com.letta.mobile.ui.schedules.ScheduleRailParams
 import com.letta.mobile.ui.schedules.ScheduleRailState
 import com.letta.mobile.ui.schedules.ScheduleRailText
 import com.letta.mobile.ui.schedules.CalendarDimens
+import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.toLocalDateTime
@@ -274,7 +274,7 @@ internal fun SchedulesPageLayout(ui: SchedulesPageUi, input: SchedulesPageInput,
         }
         if (!docked && ui.rail !is ScheduleRailState.Overview) {
             LettaPane(LettaPaneKind.Sheet, onDismiss = { ui.rail = ScheduleRailState.Overview }, testTag = SchedulesPageTags.DETAIL_SHEET) {
-                ScheduleRail(railParams(ui, input), Modifier.fillMaxWidth().height(DetailSheetHeight))
+                ScheduleRail(railParams(ui, input), Modifier.fillMaxWidth().height(ShellDimens.scheduleDetailSheetHeight))
             }
         }
     }
@@ -354,8 +354,6 @@ internal fun SchedulesPageDialogs(ui: SchedulesPageUi, state: SchedulesPageState
         )
     }
 }
-
-private val DetailSheetHeight = 520.dp
 
 private const val RAIL_TITLE = "Schedule details"
 

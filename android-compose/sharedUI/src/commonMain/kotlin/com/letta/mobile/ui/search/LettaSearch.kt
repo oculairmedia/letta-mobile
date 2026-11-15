@@ -21,12 +21,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -49,14 +45,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.shell.shortcuts.shortcutTextInput
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * The one search surface.
@@ -133,8 +135,7 @@ internal fun LettaSearchScaffold(
             config.title?.let { title ->
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = LettaTextStyles.titleMediumSemibold,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(
                         start = LettaDimens.Space.lg,
@@ -261,12 +262,8 @@ private fun LettaSearchField(
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         if (prefix == null) {
-            Icon(
-                imageVector = Icons.Outlined.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(LettaDimens.Control.iconSm),
-            )
+            val glyph = LettaIconStyle(LettaDimens.Control.iconSm, MaterialTheme.colorScheme.onSurfaceVariant)
+            LettaIcon(LettaIcons.Search, contentDescription = null, style = glyph)
         } else {
             // The prefix replaces the magnifier: "To:" already says what the
             // field is for, and both together read as two labels on one input.
@@ -295,9 +292,7 @@ private fun LettaSearchField(
                 if (it.text != query) onQueryChange(it.text)
             },
             singleLine = true,
-            textStyle = MaterialTheme.typography.bodyMedium.copy(
-                color = MaterialTheme.colorScheme.onSurface,
-            ),
+            textStyle = MaterialTheme.typography.bodyMedium.merge(TextStyle(color = MaterialTheme.colorScheme.onSurface)),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             modifier = Modifier
                 .fillMaxWidth()
@@ -343,7 +338,7 @@ private fun LettaSearchScopeRow(config: LettaSearchConfig) {
             val selected = scope.id == config.selectedScopeId
             Surface(
                 onClick = { config.onScopeSelected(scope.id) },
-                shape = RoundedCornerShape(LettaDimens.Radius.sm),
+                shape = MaterialTheme.shapes.small,
                 color = if (selected) {
                     MaterialTheme.colorScheme.surfaceContainerHighest
                 } else {
@@ -381,16 +376,18 @@ private fun LettaSearchToggleRow(toggle: LettaSearchToggle) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(
+            .toggleable(
+                value = toggle.checked,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = { toggle.onCheckedChange(!toggle.checked) },
+                role = Role.Checkbox,
+                onValueChange = toggle.onCheckedChange,
             )
             .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
-        Checkbox(checked = toggle.checked, onCheckedChange = toggle.onCheckedChange)
+        Checkbox(checked = toggle.checked, onCheckedChange = null)
         Text(
             text = toggle.label,
             style = MaterialTheme.typography.labelLarge,
@@ -417,13 +414,7 @@ private fun LettaSearchActionRow(action: LettaSearchAction, query: String) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
-            action.icon?.let { icon ->
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(LettaDimens.Control.icon),
-                )
-            }
+            action.icon?.let { icon -> LettaIcon(icon, contentDescription = null) }
             Text(text = action.labelForQuery(query), style = MaterialTheme.typography.bodyMedium)
         }
     }
@@ -447,10 +438,11 @@ private fun LettaSearchRecentsStrip(
         rows.forEach { row ->
             Column(
                 modifier = Modifier
-                    .width(RecentTileWidth)
+                    .width(LettaSearchDimens.recentTileWidth)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
+                        role = Role.Button,
                         onClick = { onRowSelected(row) },
                     ),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -533,11 +525,10 @@ private fun LettaSearchResultRow(row: LettaSearchRow, onClick: () -> Unit) {
 fun LettaSearchRowLeading(leading: LettaSearchLeading, label: String) {
     when (leading) {
         is LettaSearchLeading.None -> Unit
-        is LettaSearchLeading.Icon -> Icon(
-            imageVector = leading.image,
+        is LettaSearchLeading.Icon -> LettaIcon(
+            leading.image,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Control.icon),
+            style = LettaIconStyle(tint = MaterialTheme.colorScheme.onSurfaceVariant),
         )
         is LettaSearchLeading.Orb -> AgentAvatar(
             agentId = leading.agentId,
@@ -591,9 +582,9 @@ fun LettaSearchDropdownContent(
         onQueryChange = onQueryChange,
         sections = sections,
         onRowSelected = onRowSelected,
-        modifier = modifier.widthIn(min = DropdownMinWidth, max = DropdownMaxWidth),
+        modifier = modifier.widthIn(min = LettaSearchDimens.dropdownMinWidth, max = LettaSearchDimens.dropdownMaxWidth),
         config = config.copy(
-            maxResultsHeight = config.maxResultsHeight ?: DropdownMaxResultsHeight,
+            maxResultsHeight = config.maxResultsHeight ?: LettaSearchDimens.dropdownMaxResultsHeight,
             lazyResults = false,
         ),
     )
@@ -616,23 +607,22 @@ fun LettaSearchPopover(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = ScrimAlpha))
+            .background(MaterialTheme.colorScheme.scrim.copy(alpha = ScrimAlpha))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
+                onClickLabel = "Dismiss",
+                role = Role.Button,
                 onClick = onDismiss,
             ),
         contentAlignment = Alignment.Center,
     ) {
         Surface(
             modifier = modifier
-                .widthIn(min = PopoverMinWidth, max = PopoverMaxWidth)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {},
-                ),
-            shape = RoundedCornerShape(LettaDimens.Radius.lg),
+                .widthIn(min = LettaSearchDimens.popoverMinWidth, max = LettaSearchDimens.popoverMaxWidth)
+                // Taps on the panel stop here rather than reaching the scrim's dismiss.
+                .pointerInput(Unit) { detectTapGestures {} },
+            shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainer,
             contentColor = MaterialTheme.colorScheme.onSurface,
             shadowElevation = PopoverElevation,
@@ -643,7 +633,7 @@ fun LettaSearchPopover(
                 sections = sections,
                 onRowSelected = onRowSelected,
                 config = config.copy(
-                    maxResultsHeight = config.maxResultsHeight ?: PopoverMaxResultsHeight,
+                    maxResultsHeight = config.maxResultsHeight ?: LettaSearchDimens.popoverMaxResultsHeight,
                 ),
             )
         }
@@ -662,9 +652,6 @@ const val SearchPanelTestTag: String = "letta-search-panel"
 private const val WEIGHT_FILL = 1f
 private const val ScrimAlpha = 0.45f
 
-// Panel geometry: reading-width decisions, not points on the spacing scale, so
-// they are named here rather than tokenised.
-private val DropdownMinWidth = 280.dp
 
 /** A results section's label sits on the rows' own inset. */
 private val SearchSectionPadding = PaddingValues(
@@ -673,10 +660,4 @@ private val SearchSectionPadding = PaddingValues(
     top = LettaDimens.Space.sm,
     bottom = LettaDimens.Space.hair,
 )
-private val DropdownMaxWidth = 360.dp
-private val DropdownMaxResultsHeight = 320.dp
-private val PopoverMinWidth = 520.dp
-private val PopoverMaxWidth = 640.dp
-private val PopoverMaxResultsHeight = 420.dp
 private val PopoverElevation = LettaDimens.Space.sm
-private val RecentTileWidth = 64.dp

@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -17,9 +16,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,7 +43,6 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
@@ -58,7 +53,6 @@ import androidx.compose.ui.graphics.Color
 import com.composables.icons.lucide.GripVertical
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Maximize2
-import com.composables.icons.lucide.X
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasTextStyle
@@ -69,7 +63,13 @@ import com.letta.mobile.data.canvas.compose.ComposeBounds
 import io.ak1.drawbox.domain.model.Viewport
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /**
  * The canvas's block documents as elements on the board, one card per document, placed in the
@@ -419,7 +419,7 @@ private fun CanvasNoteCard(
                             }
                         }
                         .pointerInput(document.id) { detectTapGestures(onTap = {}) },
-                    shape = RoundedCornerShape(NOTE_CORNER),
+                    shape = MaterialTheme.shapes.medium,
                     color = cardColor,
                     // Selection is drawn by CanvasSelectionChrome, the same chrome a shape gets. The card's
                     // own border is only the resting outline of a coloured note.
@@ -570,43 +570,23 @@ private fun NoteHandleBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(HANDLE_HEIGHT)
-            .background(onCard.copy(alpha = 0.08f))
             .dragHandle(onDragStart, onDrag, onDragEnd)
             .padding(start = LettaDimens.Space.sm, end = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = Lucide.GripVertical,
-            contentDescription = "Move note",
-            modifier = Modifier.size(LettaDimens.Control.icon),
-            tint = onCard,
-        )
+        LettaIcon(Lucide.GripVertical, contentDescription = "Move note", style = LettaIconStyle(tint = onCard))
         Spacer(modifier = Modifier.size(LettaDimens.Space.sm))
         Text(
             text = title?.takeIf { it.isNotBlank() } ?: "Note",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
+            style = LettaTextStyles.labelSmallSemibold,
             color = onCard,
             maxLines = 1,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        IconButton(onClick = onExpand, modifier = Modifier.size(HANDLE_HEIGHT)) {
-            Icon(
-                imageVector = Lucide.Maximize2,
-                contentDescription = "Open note",
-                modifier = Modifier.size(LettaDimens.Control.icon),
-                tint = onCard,
-            )
-        }
-        IconButton(onClick = onRemove, modifier = Modifier.size(HANDLE_HEIGHT)) {
-            Icon(
-                imageVector = Lucide.X,
-                contentDescription = "Remove note",
-                modifier = Modifier.size(LettaDimens.Control.icon),
-                tint = onCard,
-            )
-        }
+        val glyph = LettaIconStyle(tint = onCard)
+        LettaIconButton(LettaButtonIcon(Lucide.Maximize2, "Open note", size = HANDLE_HEIGHT, glyph = glyph), onClick = onExpand)
+        LettaIconButton(LettaButtonIcon(LettaIcons.Close, "Remove note", size = HANDLE_HEIGHT, glyph = glyph), onClick = onRemove)
     }
 }
 
@@ -625,12 +605,7 @@ private fun TextMoveGrip(
             .semantics { contentDescription = "Move text" },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = Lucide.GripVertical,
-            contentDescription = null,
-            modifier = Modifier.size(LettaDimens.Control.icon),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        LettaIcon(Lucide.GripVertical, contentDescription = null, style = LettaIconStyle(tint = MaterialTheme.colorScheme.onSurfaceVariant))
     }
 }
 
@@ -716,7 +691,6 @@ private const val NOTE_STAGGER = 64f
 /** How far a new note will cascade before it is left to overlap: a board can be crowded. */
 private const val MAX_CASCADE = 24
 private const val NOTE_MIN_SIZE = 140f
-private val NOTE_CORNER = LettaDimens.Radius.md
 private val HANDLE_HEIGHT = LettaDimens.Control.iconButton
 
 /**

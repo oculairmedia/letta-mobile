@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -75,7 +74,7 @@ private fun AttachmentThumbnail(
         Surface(
             onClick = onPreview,
             modifier = Modifier.size(ChatComposerDimens.attachmentThumbnail),
-            shape = RoundedCornerShape(LettaDimens.Radius.sm),
+            shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.surfaceVariant,
         ) {
             AttachmentImage(bitmap = bitmap, contentScale = ContentScale.Crop)
@@ -123,7 +122,7 @@ private fun AttachmentPreviewDialog(image: MessageContentPart.Image, onDismiss: 
         ) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(LettaDimens.Radius.md),
+                shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
                 AttachmentImage(bitmap = bitmap, contentScale = ContentScale.Fit)

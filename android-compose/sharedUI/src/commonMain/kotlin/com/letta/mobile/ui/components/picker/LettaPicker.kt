@@ -44,7 +44,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
-import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.foundation.LettaNavChevron
 import com.letta.mobile.ui.components.row.LettaListRow
@@ -56,6 +55,7 @@ import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.host.PaneSize
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /**
  *  (hard cut S8, primitive P5): what a picker shows. [selected] holds item
@@ -349,7 +349,7 @@ private fun PickerBackHeader(level: PickerLevel) {
         IconButton(onClick = level.onBack, modifier = Modifier.testTag(LettaPickerTags.BACK)) {
             Icon(LettaIcons.ArrowBack, contentDescription = LettaPickerStrings.BACK)
         }
-        Text(level.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(level.title, style = LettaTextStyles.titleSemibold)
     }
 }
 

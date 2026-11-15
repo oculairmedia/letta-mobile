@@ -7,26 +7,29 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.memory.memfs.MemfsEditor
 import com.letta.mobile.data.memory.memfs.MemfsNavigation
+import com.letta.mobile.ui.components.LettaInlineError
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaInlineNotice
+import com.letta.mobile.ui.components.foundation.LettaNotice
+import com.letta.mobile.ui.components.foundation.LettaNoticeAction
 import com.letta.mobile.ui.host.LettaConfirmPane
+import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.tokens.LettaPanelTone
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.host.LettaConfirmTags
 import com.letta.mobile.ui.theme.LettaBusyBar
@@ -41,11 +44,10 @@ internal fun MemfsEditorPane(editor: MemfsEditor, page: MemfsPageScope) {
         if (editor.loading || editor.saving) LettaBusyBar()
         if (editor.conflict) ConflictBanner(page)
         editor.error?.let { message ->
-            Text(
+            LettaInlineError(
                 message,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
+                Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+                title = null,
             )
         }
         when {
@@ -55,7 +57,7 @@ internal fun MemfsEditorPane(editor: MemfsEditor, page: MemfsPageScope) {
                 value = editor.draft,
                 onValueChange = page.actions::editDraft,
                 readOnly = page.options.readOnly,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                textStyle = LettaTextStyles.monoBody,
                 modifier = Modifier.fillMaxSize().padding(LettaDimens.Space.md).testTag(MemfsPageTags.EDITOR_FIELD),
             )
         }
@@ -69,18 +71,22 @@ private fun MemfsEditorToolbar(editor: MemfsEditor, page: MemfsPageScope) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
-        IconButton(onClick = page.actions::closeFile, modifier = Modifier.testTag(MemfsPageTags.BACK)) {
-            Icon(if (page.wide) Icons.Outlined.Close else Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = CLOSE_LABEL)
-        }
+        LettaIconButton(
+            icon = LettaButtonIcon(if (page.wide) LettaIcons.Close else LettaIcons.ArrowBack, CLOSE_LABEL),
+            onClick = page.actions::closeFile,
+            modifier = Modifier.testTag(MemfsPageTags.BACK),
+        )
         Column(Modifier.weight(1f)) {
             Text(editor.path, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (editor.dirty) {
                 Text(UNSAVED_LABEL, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.warningTextColor)
             }
         }
-        IconButton(onClick = { page.actions.showHistory(editor.path) }, modifier = Modifier.testTag(MemfsPageTags.FILE_HISTORY)) {
-            Icon(Icons.Outlined.History, contentDescription = FILE_HISTORY_LABEL)
-        }
+        LettaIconButton(
+            icon = LettaButtonIcon(Icons.Outlined.History, FILE_HISTORY_LABEL),
+            onClick = { page.actions.showHistory(editor.path) },
+            modifier = Modifier.testTag(MemfsPageTags.FILE_HISTORY),
+        )
         if (!page.options.readOnly && !editor.isImage) {
             TextButton(onClick = page.actions::revertDraft, enabled = editor.dirty, modifier = Modifier.testTag(MemfsPageTags.REVERT)) {
                 Text(REVERT_LABEL)
@@ -94,30 +100,12 @@ private fun MemfsEditorToolbar(editor: MemfsEditor, page: MemfsPageScope) {
 
 @Composable
 private fun ConflictBanner(page: MemfsPageScope) {
-    Surface(
-        color = MaterialTheme.customColors.warningContainerColor,
-        shape = MaterialTheme.shapes.small,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs).testTag(MemfsPageTags.CONFLICT),
-    ) {
-        Row(
-            modifier = Modifier.padding(LettaDimens.Space.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        ) {
-            Text(
-                CONFLICT_MESSAGE,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.customColors.warningTextColor,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(onClick = page.actions::reloadFromServer, modifier = Modifier.testTag(MemfsPageTags.CONFLICT_RELOAD)) {
-                Text(RELOAD_LABEL)
-            }
-            TextButton(onClick = page.actions::keepDraft, modifier = Modifier.testTag(MemfsPageTags.CONFLICT_KEEP)) {
-                Text(KEEP_LABEL)
-            }
-        }
-    }
+    LettaInlineNotice(
+        notice = LettaNotice(CONFLICT_MESSAGE, tone = LettaPanelTone.Warning),
+        modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs).testTag(MemfsPageTags.CONFLICT),
+        action = LettaNoticeAction(RELOAD_LABEL, page.actions::reloadFromServer, tag = MemfsPageTags.CONFLICT_RELOAD),
+        dismiss = LettaNoticeAction(KEEP_LABEL, page.actions::keepDraft, tag = MemfsPageTags.CONFLICT_KEEP),
+    )
 }
 
 /** Asks before a step that would throw away the open file's unsaved edits. */

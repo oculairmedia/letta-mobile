@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -35,6 +34,9 @@ import com.letta.mobile.data.pairing.QrModules
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 
 /** What the joining device can do from the status card and the scanner. */
 class PairingScanActions(
@@ -130,7 +132,11 @@ private fun VerifyingContent(onCancel: () -> Unit) {
 
 @Composable
 private fun PairedContent(state: PairingState.Paired, onOpenChat: () -> Unit) {
-    Icon(LettaIcons.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+    LettaIcon(
+        LettaIcons.CheckCircle,
+        contentDescription = null,
+        style = LettaIconStyle(LettaSurfaceSizes.pairingResultGlyph, MaterialTheme.colorScheme.primary),
+    )
     Text(PairingStrings.pairedTitle(state), style = MaterialTheme.typography.titleMedium)
     Text(
         text = if (state.alreadyPaired) PairingStrings.ALREADY_PAIRED_BODY else PairingStrings.PAIRED_BODY,
@@ -150,7 +156,11 @@ private fun PairedContent(state: PairingState.Paired, onOpenChat: () -> Unit) {
 
 @Composable
 private fun FailedContent(state: PairingState.Failed, actions: PairingScanActions) {
-    Icon(LettaIcons.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+    LettaIcon(
+        LettaIcons.Error,
+        contentDescription = null,
+        style = LettaIconStyle(LettaSurfaceSizes.pairingResultGlyph, MaterialTheme.colorScheme.error),
+    )
     Text(
         text = PairingStrings.error(state.error),
         textAlign = TextAlign.Center,

@@ -12,9 +12,6 @@ android-compose/core/android-data/src/main/java/com/letta/mobile/data/repository
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/storage/DataStoreSettingsPreferencesStore.kt|android-compose/core/android-data/src/main/java/com/letta/mobile/data/storage/DataStoreSettingsPreferencesStore.kt 8
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/timeline/IrohAdminRpcTimelineTransport.kt|android-compose/core/android-data/src/main/java/com/letta/mobile/data/timeline/IrohAdminRpcTimelineTransport.kt 7
 android-compose/core/testutil/src/main/java/com/letta/mobile/testutil/FakeRunApi.kt|android-compose/core/testutil/src/main/java/com/letta/mobile/testutil/FakeStepApi.kt 14
-android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/ConfirmDialog.kt|android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/ConfirmDialog.kt 19
-android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/ShimmerPlaceholder.kt|android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/ShimmerPlaceholder.kt 9
-android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/StatusTimeline.kt|android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/StatusTimeline.kt 12
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/audio/AudioAnimation.kt|android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/audio/AudioAnimation.kt 8
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/theme/Theme.kt|android-compose/designsystem/src/main/java/com/letta/mobile/ui/theme/Theme.kt 12
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/canvas/CanvasDebugWindow.kt|android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/canvas/CanvasDebugWindow.kt 14
@@ -79,14 +76,12 @@ android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/trans
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohFrameFlowContent.kt|android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohTransportSupport.kt 5
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohObserverIngestor.kt|android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohTransportSupport.kt 6
 android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/timeline/TimelinePlatform.jvm.kt|android-compose/sharedLogic/src/wasmJsMain/kotlin/com/letta/mobile/data/timeline/TimelinePlatform.wasmJs.kt 11
-android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiBasicWidgets.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiBasicWidgets.kt 52
+android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiBasicWidgets.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiBasicWidgets.kt 31
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiBasicWidgets.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiSelectionWidgets.kt 87
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiRendererSupport.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiScheduleWidgets.kt 20
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiRendererSupport.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiToolApprovalWidgets.kt 6
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiScheduleWidgets.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiToolApprovalWidgets.kt 24
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiSelectionWidgets.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiSelectionWidgets.kt 66
-android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasChrome.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasChrome.kt 7
-android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasChrome.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasPropertyControl.kt 6
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasChromeRegions.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/WheelZoomRegions.kt 10
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasCompactToolbar.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasSelectionBar.kt 10
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasNotesLayer.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/plugin/CanvasPluginLayer.kt 18
@@ -94,7 +89,4 @@ android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/Canvas
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasSelectionBar.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasSelectionBar.kt 5
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/composer/ComposerAutocompleteViews.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/composer/ComposerAutocompleteViews.kt 14
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/search/LettaSearch.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/search/LettaSearch.kt 14
-android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/channels/ChannelsPageParts.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/skills/SkillsPageParts.kt 8
-android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/memfs/MemfsPageList.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/vault/AgentVaultPage.kt 8
-android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/skills/SkillsPageParts.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/skills/SkillsPageParts.kt 7
 android-compose/sharedUI/src/jvmMain/kotlin/com/letta/mobile/ui/canvas/CanvasImages.jvm.kt|android-compose/sharedUI/src/wasmJsMain/kotlin/com/letta/mobile/ui/canvas/CanvasImages.wasmJs.kt 6

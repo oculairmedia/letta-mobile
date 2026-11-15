@@ -77,12 +77,6 @@ internal fun CanvasLayout.resolveMeasured(widthPx: Int, width: Dp): CanvasLayout
 /** What the floating selection bar keeps clear of on the left: the tool rail, when there is one. */
 internal fun CanvasLayout?.railClearance(): Dp = if (this == CanvasLayout.EXPANDED) RAIL_CLEARANCE else 0.dp
 
-/** The tool rail's width and its inset. */
-private val RAIL_CLEARANCE: Dp = 64.dp
-
-/** Below this width the board is phone-sized: Material's compact window class. */
-internal val COMPACT_CANVAS_WIDTH: Dp = 600.dp
-
 /** The board's actions pill (top-right, or the header bar with a title). */
 internal const val CANVAS_ACTIONS_TAG = "canvas-actions"
 

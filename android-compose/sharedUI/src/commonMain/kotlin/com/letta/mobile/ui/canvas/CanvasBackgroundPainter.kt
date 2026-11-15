@@ -15,7 +15,7 @@ import com.letta.mobile.data.canvas.CanvasBackgroundPattern
  * board. Null for `none`.
  */
 fun CanvasBackgroundPattern.painter(): Painter? {
-    val color = parseHexColor(colorHex) ?: Color(0xFF9CA3AF)
+    val color = parseHexColor(colorHex) ?: PatternDefaultTint
     val size = spacing.coerceAtLeast(MIN_SPACING)
     return when (kind) {
         CanvasBackgroundPattern.GRID -> PatternTilePainter(size, color, PatternTilePainter.Shape.GRID)
@@ -26,7 +26,7 @@ fun CanvasBackgroundPattern.painter(): Painter? {
 }
 
 /** The tile's tint, the colour DrawBox filters the rasterised tile with. */
-fun CanvasBackgroundPattern.tint(): Color = parseHexColor(colorHex) ?: Color(0xFF9CA3AF)
+fun CanvasBackgroundPattern.tint(): Color = parseHexColor(colorHex) ?: PatternDefaultTint
 
 internal class PatternTilePainter(
     private val spacing: Float,

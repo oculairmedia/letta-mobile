@@ -1,7 +1,8 @@
 package com.letta.mobile.ui.shell.pages.home
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,18 +11,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,12 +28,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.home.FleetAgentStat
 import com.letta.mobile.data.home.FleetSort
 import com.letta.mobile.data.home.HomeAgentRef
@@ -51,11 +43,24 @@ import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.home.sortFleet
 import com.letta.mobile.data.home.statTiles
 import com.letta.mobile.data.model.view.RuntimeViewId
-import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.LettaPopupMenu
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaNavChevron
+import com.letta.mobile.ui.components.foundation.LettaStatusDot
+import com.letta.mobile.ui.components.foundation.lettaClickable
 import com.letta.mobile.ui.home.FleetBarSpark
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
+import com.letta.mobile.ui.shell.tokens.ShellDimens
+import com.letta.mobile.ui.theme.LettaChip
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSectionHeader
+import com.letta.mobile.ui.theme.tokens.LettaStatusTone
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /**
  * Draws one Home section of the home lane as list items. Sections stay lazy: each emits keyed
@@ -120,7 +125,7 @@ private fun NowStrip(running: List<FleetAgentStat>, page: HomePageScope) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
-            Box(Modifier.size(LettaDimens.Space.sm).clip(CircleShape).background(MaterialTheme.colorScheme.tertiary))
+            LettaStatusDot(LettaStatusTone.Running)
             Text(
                 text = nowLine(running),
                 style = MaterialTheme.typography.labelLarge,
@@ -128,7 +133,7 @@ private fun NowStrip(running: List<FleetAgentStat>, page: HomePageScope) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Icon(LettaIcons.ChevronRight, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
+            LettaNavChevron()
         }
     }
 }
@@ -172,9 +177,8 @@ private fun AgentAvatarRow(agents: List<HomeAgentRef>, page: HomePageScope) {
 private fun AgentAvatarTile(agent: HomeAgentRef, page: HomePageScope) {
     Column(
         modifier = Modifier
-            .width(AvatarTileWidth)
-            .clip(MaterialTheme.shapes.small)
-            .clickable { page.navigation.onOpenAgent(agent.id) }
+            .width(ShellDimens.homeAvatarTile)
+            .lettaClickable(role = Role.Button, shape = MaterialTheme.shapes.small, onClick = { page.navigation.onOpenAgent(agent.id) })
             .testTag(HomePageTags.agentAvatar(agent.id))
             .padding(vertical = LettaDimens.Space.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -207,15 +211,23 @@ private fun HomeStatsStrip(page: HomePageScope) {
     val tiles = page.state.statTiles()
     Column(Modifier.fillMaxWidth().testTag(HomePageTags.STATS_STRIP)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // Centred: a figure that opens a page reserves the 48dp touch target around itself, so
+            // centring keeps it on the same line as the figures that do not.
             Row(
                 modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 tiles.forEach { tile -> StatPair(tile, page) }
             }
-            IconButton(onClick = { expanded = !expanded }, modifier = Modifier.testTag(HomePageTags.STATS_EXPAND)) {
-                DisclosureChevron(expanded = expanded, compact = true, contentDescription = if (expanded) HIDE_TREND else SHOW_TREND)
-            }
+            LettaChipTab(
+                text = TREND_LABEL,
+                active = expanded,
+                onClick = { expanded = !expanded },
+                // The chip says it is selected; a checkbox also says whether it is checked.
+                modifier = Modifier.semantics { toggleableState = ToggleableState(expanded) }.testTag(HomePageTags.STATS_EXPAND),
+                role = Role.Checkbox,
+            )
             StatsMenu(page)
         }
         if (expanded) StatsTrend(tiles)
@@ -225,15 +237,22 @@ private fun HomeStatsStrip(page: HomePageScope) {
 @Composable
 private fun StatPair(tile: HomeStatTile, page: HomePageScope) {
     val target = tile.shortcut?.takeIf(page::offers)
-    val clickable = if (target != null) Modifier.clickable { page.navigation.onOpenShortcut(target) } else Modifier
+    val opens = if (target != null) {
+        Modifier.lettaClickable(
+            role = Role.Button,
+            shape = MaterialTheme.shapes.small,
+            onClick = { page.navigation.onOpenShortcut(target) },
+        )
+    } else {
+        Modifier
+    }
     Column(
         modifier = Modifier
-            .clip(MaterialTheme.shapes.small)
-            .then(clickable)
+            .then(opens)
             .testTag(HomePageTags.stat(tile.label))
             .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
     ) {
-        Text(tile.value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(tile.value, style = LettaTextStyles.figure, maxLines = 1)
         Text(tile.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }
 }
@@ -250,7 +269,7 @@ private fun StatsTrend(tiles: List<HomeStatTile>) {
                 Text(
                     text = "${tile.label}: $caption",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = MUTED_ALPHA),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.muted),
                 )
             }
         }
@@ -262,19 +281,16 @@ private fun StatsMenu(page: HomePageScope) {
     if (!page.state.canCustomizePins) return
     var open by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { open = true }, modifier = Modifier.testTag(HomePageTags.STATS_MENU)) {
-            Icon(LettaIcons.MoreVert, contentDescription = MORE_LABEL, modifier = Modifier.size(LettaDimens.Control.iconSm))
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(
-                text = { Text(CUSTOMIZE_LABEL) },
-                onClick = {
-                    open = false
-                    page.onEditingPinsChange(true)
-                },
-                modifier = Modifier.testTag(HomePageTags.CUSTOMIZE),
-            )
-        }
+        LettaIconButton(
+            icon = LettaButtonIcon(LettaIcons.MoreVert, MORE_LABEL, glyph = LettaIconStyle(LettaDimens.Control.iconSm)),
+            onClick = { open = true },
+            modifier = Modifier.testTag(HomePageTags.STATS_MENU),
+        )
+        LettaPopupMenu(
+            expanded = open,
+            onDismiss = { open = false },
+            items = listOf(LettaMenuItem(CUSTOMIZE_LABEL) { page.onEditingPinsChange(true) }),
+        )
     }
 }
 
@@ -297,12 +313,9 @@ private fun LazyListScope.homePinnedShortcutRow(page: HomePageScope) {
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             shortcuts.forEach { item ->
-                AssistChip(
+                LettaChip(
+                    text = item.shortcut.label,
                     onClick = { page.navigation.onOpenShortcut(item.shortcut) },
-                    label = { Text(item.shortcut.label) },
-                    leadingIcon = {
-                        Icon(item.shortcut.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
-                    },
                     modifier = Modifier.testTag(HomePageTags.pin(item)),
                 )
             }
@@ -314,21 +327,22 @@ private fun LazyListScope.homePinnedShortcutRow(page: HomePageScope) {
 
 @Composable
 internal fun SeeAllHeader(label: String, target: HomeShortcut, page: HomePageScope, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        HomeSectionLabel(label, Modifier.weight(1f))
-        if (page.offers(target)) {
+    val seeAll: (@Composable () -> Unit)? = if (page.offers(target)) {
+        {
             TextButton(onClick = { page.navigation.onOpenShortcut(target) }, modifier = Modifier.testTag(HomePageTags.seeAll(target))) {
                 Text(SEE_ALL)
             }
         }
+    } else {
+        null
     }
+    LettaSectionHeader(title = label, modifier = modifier, action = seeAll)
 }
 
 private const val AGENT_ROW_LIMIT = 12
 private const val AGENTS_LABEL = "Agents"
 private const val SEE_ALL = "See all"
-private const val SHOW_TREND = "Show trend"
-private const val HIDE_TREND = "Hide trend"
+private const val TREND_LABEL = "Trend"
 private const val MORE_LABEL = "More"
 private const val CUSTOMIZE_LABEL = "Customize Home"
-private val AvatarTileWidth = 64.dp
+

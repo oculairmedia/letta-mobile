@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,7 +24,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
 import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.search.LettaSearchAnchor
@@ -197,7 +199,7 @@ private fun RowScope.HeaderTitleSlot(title: HeaderTitle) {
                     color = if (onClick != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
+                    modifier = if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier,
                 )
             }
         }
@@ -219,9 +221,12 @@ private fun RowScope.HeaderActionSlot(action: HeaderAction) {
 
 @Composable
 private fun HeaderIconButton(icon: ImageVector, contentDescription: String, onClick: () -> Unit, tag: String?) {
-    IconButton(onClick = onClick, modifier = if (tag == null) Modifier else Modifier.testTag(tag)) {
-        Icon(icon, contentDescription = contentDescription)
-    }
+    LettaIconButton(
+        // The app bar's navigation and actions are primary targets: the large icon button.
+        icon = LettaButtonIcon(icon, contentDescription, size = LettaDimens.Control.iconButtonLg),
+        onClick = onClick,
+        modifier = if (tag == null) Modifier else Modifier.testTag(tag),
+    )
 }
 
 /**
@@ -247,10 +252,10 @@ private fun SearchSlotField(slot: SearchSlot, compact: Boolean) {
 /** The header's fixed sizes. */
 object ShellHeaderDefaults {
     /** A phone app bar's height. A pointer window's title bar sets its own. */
-    val TouchMinHeight = 64.dp
+    val TouchMinHeight = ShellDimens.headerTouchMinHeight
 
     /** The search trigger's width in a pointer header. */
-    val SearchWidth = 260.dp
+    val SearchWidth = ShellDimens.headerSearchWidth
 }
 
 /** Test handles for the header's parts. */

@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -17,6 +15,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaRowLabel
+import com.letta.mobile.ui.components.foundation.LettaToggleRow
 import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginHealth
 import com.letta.mobile.data.plugin.PluginState
@@ -48,13 +51,7 @@ internal fun PluginsError(message: String, onDismiss: () -> Unit) {
 /** This device's "Live plugin views" switch: plugin pages render live here, or as static cards. */
 @Composable
 internal fun LiveViewsRow(on: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(LIVE_VIEWS, style = MaterialTheme.typography.bodyLarge)
-            Text(LIVE_VIEWS_HELP, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Switch(checked = on, onCheckedChange = onChange, modifier = Modifier.testTag(PluginsPageTags.LIVE_VIEWS))
-    }
+    LettaToggleRow(LettaRowLabel(LIVE_VIEWS, supporting = LIVE_VIEWS_HELP), on, onChange, Modifier.testTag(PluginsPageTags.LIVE_VIEWS))
 }
 
 /** "Install from file…", then the picked file's name and sha256 with Review / Discard. */
@@ -71,7 +68,7 @@ internal fun InstallSection(state: PluginsPageState, actions: PluginsPageActions
 @Composable
 private fun PickButton(onPickPackage: () -> Unit, busy: Boolean) {
     TextButton(onClick = onPickPackage, enabled = !busy, modifier = Modifier.testTag(PluginsPageTags.PICK)) {
-        Icon(LettaIcons.FileOpen, contentDescription = null)
+        LettaIcon(LettaIcons.FileOpen, contentDescription = null)
         Text(INSTALL_FROM_FILE, modifier = Modifier.padding(start = LettaDimens.Space.xs))
     }
 }
@@ -127,9 +124,12 @@ private fun PluginRowEnd(plugin: PluginSummary, busy: Boolean, actions: PluginsP
             enabled = !busy && plugin.state != PluginState.Updating,
             modifier = Modifier.testTag(PluginsPageTags.toggle(plugin.id)),
         )
-        IconButton(onClick = { actions.askRemove(plugin.id) }, enabled = !busy, modifier = Modifier.testTag(PluginsPageTags.remove(plugin.id))) {
-            Icon(LettaIcons.Delete, contentDescription = "Remove ${plugin.name}")
-        }
+        LettaIconButton(
+            icon = LettaButtonIcon(LettaIcons.Delete, "Remove ${plugin.name}"),
+            onClick = { actions.askRemove(plugin.id) },
+            modifier = Modifier.testTag(PluginsPageTags.remove(plugin.id)),
+            enabled = !busy,
+        )
     }
 }
 

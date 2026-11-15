@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.components
 
-import com.letta.mobile.ui.theme.LettaCodeFont
 
 import android.util.Patterns
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -33,10 +31,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
@@ -59,6 +55,16 @@ import com.letta.mobile.ui.text.RichInlineAtomKind
 import com.letta.mobile.ui.text.RichInlineItem
 import com.letta.mobile.ui.text.prepareRichInlineItems
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.MarkdownCollapsedFallbackMaxHeight
+import com.letta.mobile.ui.theme.MarkdownInlineCodeCorner
+import com.letta.mobile.ui.theme.MarkdownInlineCodeMargin
+import com.letta.mobile.ui.theme.MarkdownInlineCodePaddingHorizontal
+import com.letta.mobile.ui.theme.MarkdownInlineCodePaddingVertical
+import com.letta.mobile.ui.theme.markdownBodyStyle
+import com.letta.mobile.ui.theme.markdownBulletStyle
+import com.letta.mobile.ui.theme.markdownCodeBlockStyle
+import com.letta.mobile.ui.theme.markdownHeadingStyle
+import com.letta.mobile.ui.theme.markdownQuoteStyle
 
 @Composable
 fun MarkdownText(
@@ -526,13 +532,13 @@ private fun MarkdownTextRaw(
     val extendedSpans = markdownExtendedSpans {
         ExtendedSpans(
             RoundedCornerSpanPainter(
-                cornerRadius = 4.sp,
+                cornerRadius = MarkdownInlineCodeCorner,
                 padding = RoundedCornerSpanPainter.TextPaddingValues(
-                    horizontal = 4.sp,
-                    vertical = 2.sp,
+                    horizontal = MarkdownInlineCodePaddingHorizontal,
+                    vertical = MarkdownInlineCodePaddingVertical,
                 ),
-                topMargin = 2.sp,
-                bottomMargin = 2.sp,
+                topMargin = MarkdownInlineCodeMargin,
+                bottomMargin = MarkdownInlineCodeMargin,
             ),
         )
     }
@@ -541,6 +547,7 @@ private fun MarkdownTextRaw(
     // This works because sp → px conversion uses Density.fontScale, so changing
     // it effectively scales all text rendered inside the provider — including
     // the library's internal rendering that ignores external typography changes.
+    val type = MaterialTheme.typography
     val currentDensity = LocalDensity.current
     val scaledDensity = remember(currentDensity, fontScale) {
         Density(
@@ -580,60 +587,18 @@ private fun MarkdownTextRaw(
                 dividerColor = MaterialTheme.colorScheme.outlineVariant,
             ),
             typography = markdownTypography(
-                text = MaterialTheme.typography.bodyMedium.copy(color = textColor),
-                // letta-mobile-pcir: code style for fenced blocks. Tuned for
-                // ASCII-art alignment:
-                //   - JetBrains Mono via LettaCodeFont (full Unicode coverage
-                //     including box-drawing glyphs).
-                //   - bodySmall (12sp) instead of labelSmall (11sp) — at 11sp
-                //     subpixel rounding makes adjacent column widths visibly
-                //     drift even with a true monospace font.
-                //   - letterSpacing = 0 so glyph-to-glyph advance stays a
-                //     constant em-width.
-                //   - liga/calt off via fontFeatureSettings — JetBrains Mono
-                //     ligates `=>`, `==`, `!=`, `->`, etc. into composite
-                //     glyphs that don't keep monospace cell width and visibly
-                //     break ASCII art that uses these sequences.
-                code = MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = LettaCodeFont,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    letterSpacing = 0.sp,
-                    fontFeatureSettings = "liga 0, calt 0",
-                ),
-                h1 = MaterialTheme.typography.headlineSmall.copy(
-                    color = textColor,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-                h2 = MaterialTheme.typography.titleLarge.copy(
-                    color = textColor,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-                h3 = MaterialTheme.typography.titleMedium.copy(
-                    color = textColor,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-                h4 = MaterialTheme.typography.titleSmall.copy(
-                    color = textColor,
-                    fontWeight = FontWeight.Medium,
-                ),
-                h5 = MaterialTheme.typography.bodyLarge.copy(
-                    color = textColor,
-                    fontWeight = FontWeight.Medium,
-                ),
-                h6 = MaterialTheme.typography.bodyMedium.copy(
-                    color = textColor,
-                    fontWeight = FontWeight.Medium,
-                ),
-                quote = MaterialTheme.typography.bodyMedium.copy(
-                    color = textColor.copy(alpha = 0.7f),
-                    fontWeight = FontWeight.Medium,
-                ),
-                bullet = MaterialTheme.typography.bodyMedium.copy(
-                    color = textColor,
-                    fontWeight = FontWeight.Medium,
-                ),
-                list = MaterialTheme.typography.bodyMedium.copy(color = textColor),
-                ordered = MaterialTheme.typography.bodyMedium.copy(color = textColor),
+                text = markdownBodyStyle(type, textColor),
+                code = markdownCodeBlockStyle(type, MaterialTheme.colorScheme.onSurfaceVariant),
+                h1 = markdownHeadingStyle(1, type, textColor),
+                h2 = markdownHeadingStyle(2, type, textColor),
+                h3 = markdownHeadingStyle(3, type, textColor),
+                h4 = markdownHeadingStyle(4, type, textColor),
+                h5 = markdownHeadingStyle(5, type, textColor),
+                h6 = markdownHeadingStyle(6, type, textColor),
+                quote = markdownQuoteStyle(type, textColor),
+                bullet = markdownBulletStyle(type, textColor),
+                list = markdownBodyStyle(type, textColor),
+                ordered = markdownBodyStyle(type, textColor),
             ),
         )
     }
@@ -658,7 +623,7 @@ private fun CodeFenceWithHeader(
     var expanded by remember(content) { mutableStateOf(false) }
 
     Surface(
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.xs),
     ) {
@@ -777,6 +742,6 @@ private fun extractCodeFenceInfo(content: String, node: ASTNode): Pair<String, S
     return language to codeText
 }
 
-private val A2UI_JSON_FALLBACK_COLLAPSED_MAX_HEIGHT = 240.dp
+private val A2UI_JSON_FALLBACK_COLLAPSED_MAX_HEIGHT = MarkdownCollapsedFallbackMaxHeight
 private const val A2UI_JSON_FALLBACK_COLLAPSE_CHAR_LIMIT = 1_600
 private const val A2UI_JSON_FALLBACK_COLLAPSE_LINE_LIMIT = 18

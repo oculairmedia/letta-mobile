@@ -38,12 +38,12 @@ internal fun canvasSelectionStyle(): SelectionChromeStyle = if (LocalCanvasCompa
     // enough out that reaching for it does not grab a corner.
     SelectionChromeStyle(
         padding = LettaDimens.Space.sm,
-        handleSize = TOUCH_HANDLE,
+        handleSize = SELECTION_TOUCH_HANDLE,
         cornerRadius = 0.dp,
         strokeWidth = LettaDimens.Stroke.hairline,
         accent = MaterialTheme.colorScheme.primary,
-        hitRadius = TOUCH_HIT_RADIUS,
-        rotationOffset = TOUCH_ROTATION_OFFSET,
+        hitRadius = SELECTION_TOUCH_HIT_RADIUS,
+        rotationOffset = SELECTION_TOUCH_ROTATION_OFFSET,
     )
 } else SelectionChromeStyle(
     padding = LettaDimens.Space.xs,
@@ -160,6 +160,3 @@ private val HANDLE_GRID = listOf(
 /** Below this the outline stops being visible at all on a zoomed-out board. */
 private const val MIN_STROKE_PX = 1f
 
-private val TOUCH_HANDLE = 16.dp
-private val TOUCH_HIT_RADIUS = 24.dp
-private val TOUCH_ROTATION_OFFSET = 44.dp
