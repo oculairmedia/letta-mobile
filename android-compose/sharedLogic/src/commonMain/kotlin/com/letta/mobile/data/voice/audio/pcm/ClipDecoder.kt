@@ -4,6 +4,9 @@ import com.letta.mobile.data.voice.AudioLevel
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioEncoding
+import com.letta.mobile.data.voice.audio.AudioPlayer
+import com.letta.mobile.data.voice.audio.PcmChunk
+import kotlinx.coroutines.flow.flowOf
 import kotlin.math.log10
 import kotlin.math.sqrt
 
@@ -28,6 +31,15 @@ object ClipDecoder {
         is WavParse.Decoded -> parsed.audio
         is WavParse.Refused -> throw VoiceAudioException(parsed.code)
     }
+}
+
+/**
+ * Plays [clip] whole on this player, decoded by [ClipDecoder]: a clip it refuses throws
+ * [VoiceAudioException] before the output is opened.
+ */
+suspend fun AudioPlayer.play(clip: AudioClip, onLevel: (AudioLevel) -> Unit) {
+    val pcm = ClipDecoder.decode(clip)
+    play(flowOf(PcmChunk(pcm.samples, pcm.format)), onLevel)
 }
 
 /** Recognises a RIFF container by its leading bytes. */

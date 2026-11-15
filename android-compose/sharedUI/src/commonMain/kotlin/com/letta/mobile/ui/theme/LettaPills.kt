@@ -1,13 +1,10 @@
 package com.letta.mobile.ui.theme
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -30,7 +27,9 @@ import com.letta.mobile.ui.theme.pill.LettaPillColors
  *   LettaTonalPill     a LettaPillColors container / on-container pair (a status, a badge)
  *   LettaOutlinedPill  no colour: a neutral, read-only scope
  *   LettaChip          the tonal pill as a control: it opens something, with a 48dp touch target
- *   LettaStatusLabel   no container: a dot or a glyph, then the words, in one colour
+ *
+ * LettaStatusLabel (no container: a dot or a glyph, then the words) lives with LettaStatusDot in
+ * ui.components.
  *
  * Never colour alone: every variant carries its words. They live beside the tokens (not in
  * ui.components) so any page can use them through the theme import it already has.
@@ -78,26 +77,6 @@ fun LettaChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, 
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
     ) { PillContent(text, icon = null, trailingIcon = trailingIcon) }
-}
-
-/**
- * A status in words after a dot, or after [icon] when the tone has a glyph, all in [color] and with
- * no container ("✓ Connected", "• Syncing").
- */
-@Composable
-fun LettaStatusLabel(text: String, color: Color, modifier: Modifier = Modifier, icon: ImageVector? = null) {
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-    ) {
-        if (icon != null) {
-            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(LettaDimens.Control.iconSm))
-        } else {
-            Box(Modifier.size(LettaDimens.Space.sm).background(color, CircleShape))
-        }
-        Text(text, style = MaterialTheme.typography.labelMedium, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
 }
 
 @Composable

@@ -136,6 +136,10 @@ Reusable menus, list parts, chips, errors, refresh and pane primitives. Supply m
 # Package com.letta.mobile.ui.components.row
 
 The one list row every roster, recents and history list uses. [LettaListRow] owns the row's interaction source, hover, focus and press states, the rounded background ladder, the pointer cursor, muting and the tooltip entry point, so callers describe a row with [LettaListRowSpec] and never re-implement any of it. The tooltip is injected by the host, so this package depends on no host, shell or chat package.
+# Package com.letta.mobile.ui.components.foundation
+
+The shared building blocks every page uses instead of hand-building its own: LettaIcon and LettaIconButton, LettaSearchField and LettaInlineSearchField, LettaToggleRow and LettaControlRow, LettaPanel and LettaInlineNotice, LettaStatusDot and LettaStatusLabel, LettaColorSwatch, LettaEmptyState, LettaNavChevron, LettaDivider and LettaVerticalDivider, and Modifier.lettaClickable. The package imports only Compose, `ui.icons` and `ui.theme.tokens`, never `ui.theme` or a page, so any page or component package can import it without closing a package cycle; keep it that way. Callers own their state and callbacks; these own size, shape, colour, semantics and touch target.
+
 # Package com.letta.mobile.ui.components.list
 
 Roster models, sections, row parts and drag/reorder affordances. Extend through roster models, row-content slots and action callbacks; ordering persistence and deletion policy belong to the owner of the list.
@@ -349,7 +353,7 @@ Material theme construction, semantic colors, dimensions, motion and accessibili
 
 # Package com.letta.mobile.ui.theme.tokens
 
-Leaf design values shared by low-level components and the broader dimension facade. [LettaRowDimens] holds the spacing, icon size and muted opacity that LettaDimens also exposes, so a component can use them without depending on the whole theme package.
+Leaf design values shared by low-level components and the broader dimension facade. [LettaRowDimens] holds the spacing, icon size and muted opacity that LettaDimens also exposes, so a component can use them without depending on the whole theme package. The space, control and stroke scales (LettaSpaceTokens, LettaControlTokens, LettaStrokeTokens) and the CustomColors roles live here for the same reason: ui.components.foundation reads them without importing ui.theme. Named shapes (LettaShapes), text styles (LettaTextStyles), component sizes (LettaComponentDimens) and the panel and status tones (LettaPanelTone, LettaStatusTone) are the names call sites use instead of a literal shape, a typography override or a hand-picked colour.
 # Package com.letta.mobile.ui.theme.pill
 
 [LettaPillColors](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.theme.pill/-letta-pill-colors/index.html), the container / on-container pair a tonal pill draws with. The package imports nothing of the app's, so any page can name it without an import cycle; the pills themselves are LettaTonalPill and its family in ui.theme.

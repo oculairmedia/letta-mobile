@@ -4,6 +4,7 @@ import com.letta.mobile.data.voice.SpeechEndpointUrl
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.audio.AudioChunk
 import com.letta.mobile.data.voice.audio.AudioClip
+import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.network.sockets.ConnectTimeoutException
@@ -101,7 +102,11 @@ class SpeechEndpointClient(
             setBody(transcriptionBody(request, if (verbose) VERBOSE_JSON else PLAIN_JSON))
         }
 
-    /** Synthesises [request], handing the audio to [onChunk] as it streams in. */
+    /**
+     * Synthesises [request], handing the audio to [onChunk] as it streams in. A
+     * [VoiceAudioException] thrown by [onChunk] (a decoder refusing the audio) fails the request with
+     * that exception's code.
+     */
     suspend fun synthesize(request: SpeechRequest, onChunk: suspend (AudioChunk) -> Unit) {
         call(SpeechOperation.SPEECH) {
             val target = requestUrl(SPEECH_ROUTE, SpeechOperation.SPEECH)
@@ -222,6 +227,7 @@ class SpeechEndpointClient(
 
     private fun classify(operation: SpeechOperation, error: Throwable): SpeechEndpointException = when (error) {
         is SpeechEndpointException -> error
+        is VoiceAudioException -> SpeechEndpointException(operation, error.code)
         is HttpRequestTimeoutException, is ConnectTimeoutException, is SocketTimeoutException ->
             SpeechEndpointException(operation, VoiceErrorCode.TIMED_OUT)
         else -> SpeechEndpointException(operation, VoiceErrorCode.UNREACHABLE)

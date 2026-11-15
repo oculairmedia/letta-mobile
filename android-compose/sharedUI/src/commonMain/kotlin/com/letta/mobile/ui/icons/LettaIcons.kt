@@ -6,6 +6,7 @@ import com.composables.icons.lucide.ListFilter
 import com.composables.icons.lucide.LoaderCircle
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.ArrowRight
+import com.composables.icons.lucide.Ban
 import com.composables.icons.lucide.Bot
 import com.composables.icons.lucide.Brain
 import com.composables.icons.lucide.Camera
@@ -134,6 +135,9 @@ object LettaIcons {
 
     // Status
     val Check: ImageVector get() = Lucide.Check
+
+    /** No colour, no value: a transparent swatch, an unset choice. */
+    val NoneSet: ImageVector get() = Lucide.Ban
     val Loader: ImageVector get() = Lucide.LoaderCircle
     val ListFilter: ImageVector get() = Lucide.ListFilter
     val CheckCircle: ImageVector get() = Lucide.CircleCheck
