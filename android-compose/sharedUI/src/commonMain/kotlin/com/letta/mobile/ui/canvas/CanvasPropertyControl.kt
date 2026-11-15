@@ -109,7 +109,7 @@ fun CanvasPropertyControl(
             // The swatch shows the colour in force; the sliders glyph over it says it opens every property.
             LettaColorSwatch(LettaSwatch(swatch, size = OPENER_SIZE))
             if (swatch.alpha != 0f) {
-                val glyph = LettaIconStyle(LettaDimens.Control.iconSm, contrastOn(swatch))
+                val glyph = LettaIconStyle(OPENER_SIZE * OPENER_GLYPH_RATIO, contrastOn(swatch))
                 LettaIcon(Lucide.SlidersHorizontal, contentDescription = null, style = glyph)
             }
         }
@@ -510,4 +510,7 @@ internal val StrokeStyles: List<Pair<String, StrokeStyle>> = listOf(
 
 private const val MAX_CORNER_RADIUS = 64f
 private val OPENER_SIZE = LettaDimens.Space.xl
+
+/** The sliders glyph fills this much of the opener's swatch. */
+private const val OPENER_GLYPH_RATIO = 0.55f
 private val CHIP_HEIGHT = LettaDimens.Control.fieldHeight

@@ -2,7 +2,6 @@ package com.letta.mobile.ui.canvas
 
 import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
-import com.letta.mobile.ui.theme.LettaDimens
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -124,7 +123,7 @@ private fun QuickCreateTarget(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.primary,
         contentColor = MaterialTheme.colorScheme.onPrimary,
-        shadowElevation = LettaDimens.Space.hair,
+        shadowElevation = QUICK_CREATE_ELEVATION,
         modifier = Modifier
             .size(if (compact) QUICK_CREATE_TOUCH_TARGET else QUICK_CREATE_TARGET)
             .canvasChrome(chromeRegions)

@@ -52,6 +52,12 @@ internal val QUICK_CREATE_TOUCH_TARGET: Dp = 40.dp
 internal val QUICK_CREATE_TOUCH_ICON: Dp = 20.dp
 internal val QUICK_CREATE_TOUCH_OFFSET: Dp = 46.dp
 
+/** A quick-create disc's lift off the board. */
+internal val QUICK_CREATE_ELEVATION: Dp = 2.dp
+
+/** The note editor's foot-bar and back buttons: Keep-sized, a fingertip's reach on a phone. */
+internal val NOTE_EDITOR_BUTTON: Dp = 40.dp
+
 /** A fingertip covers far more than a line is wide. The mouse and pen keep DrawBox's 12dp. */
 internal val FINGER_PICK_TOLERANCE: Dp = 24.dp
 internal val POINTER_PICK_TOLERANCE: Dp = 12.dp

@@ -115,7 +115,8 @@ fun ColorSwatchPicker(
             // tells a fill swatch from a stroke one.
             LettaColorSwatch(LettaSwatch(current, size = swatchSize))
             if (glyph != null && current.alpha != 0f) {
-                LettaIcon(glyph, contentDescription = null, style = LettaIconStyle(LettaDimens.Control.iconSm, contrastOn(current)))
+                val mark = LettaIconStyle(swatchSize * SWATCH_GLYPH_RATIO, contrastOn(current))
+                LettaIcon(glyph, contentDescription = null, style = mark)
             }
         }
         if (open) {
@@ -345,3 +346,6 @@ fun parseHexColor(hex: String?): Color? {
 }
 
 private const val RECENT_LIMIT = 8
+
+/** The glyph over a swatch fills this much of it, so it scales with the swatch. */
+private const val SWATCH_GLYPH_RATIO = 0.6f

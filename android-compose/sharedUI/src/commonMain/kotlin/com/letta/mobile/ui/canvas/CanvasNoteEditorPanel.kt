@@ -208,7 +208,7 @@ private fun NoteTitleField(session: CanvasSession, document: CanvasSceneDocument
             runCatching { session.retitleDocument(CanvasNoteId(latest.id), title) }
         }
     }
-    val style = MaterialTheme.typography.headlineSmall.merge(TextStyle(color = onCard))
+    val style = NoteTitleTextStyle.merge(TextStyle(color = onCard))
     Box(modifier = Modifier.fillMaxWidth().padding(horizontal = if (compact) LettaDimens.Space.lg else LettaDimens.Space.xl + LettaDimens.Space.xs)) {
         if (title.isEmpty()) Text("Title", style = style, color = onCard.copy(alpha = LettaDimens.Alpha.disabled))
         BasicTextField(
@@ -364,7 +364,7 @@ private fun NoteIcon(button: NoteButton, tint: Color, onClick: () -> Unit) {
     // the shared disabled floor when off, and the open panel's button is ringed in that ink.
     val shown = if (button.enabled) tint else tint.copy(alpha = LettaDimens.Alpha.disabled)
     LettaIconButton(
-        icon = LettaButtonIcon(button.icon, button.label, size = LettaDimens.Control.iconButtonLg, glyph = LettaIconStyle(tint = shown)),
+        icon = LettaButtonIcon(button.icon, button.label, size = NOTE_EDITOR_BUTTON, glyph = LettaIconStyle(tint = shown)),
         onClick = onClick,
         enabled = button.enabled,
         modifier = if (button.selected) Modifier.border(LettaDimens.Stroke.hairline, tint, CircleShape) else Modifier,
