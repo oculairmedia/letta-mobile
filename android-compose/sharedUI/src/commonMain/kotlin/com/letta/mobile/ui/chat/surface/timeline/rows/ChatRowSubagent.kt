@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
@@ -65,7 +66,6 @@ import com.letta.mobile.ui.components.line.LineTags
 import com.letta.mobile.ui.components.line.StatusTone
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.theme.ChatRowAlpha
-import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaTonalPill
 import com.letta.mobile.ui.theme.pill.LettaPillColors
@@ -258,7 +258,7 @@ private fun NotificationFooter(notification: UiSubagentNotification) {
             SelectionContainer(Modifier.weight(1f)) {
                 Text(
                     text = stringResource(Res.string.rows_transcript, transcript),
-                    style = ChatRowType.monoLabel,
+                    style = LettaTextStyles.monoLabel,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag(ChatRowTestTags.NOTIFICATION_TRANSCRIPT),
                 )

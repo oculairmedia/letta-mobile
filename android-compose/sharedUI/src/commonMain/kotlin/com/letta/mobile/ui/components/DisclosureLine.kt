@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +26,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import com.letta.mobile.ui.components.foundation.LettaDivider
 import com.letta.mobile.ui.components.line.LineDisclosure
 import com.letta.mobile.ui.components.line.LineRail
 import com.letta.mobile.ui.components.line.LineSpec
@@ -166,9 +166,9 @@ internal fun StepLine(spec: LineSpec, disclosure: LineDisclosure?, modifier: Mod
 @Composable
 internal fun DividerLine(label: String, tag: String, rail: LineRail, disclosure: LineDisclosure?) {
     LineFrame(rail = rail, tag = tag, disclosure = disclosure) {
-        HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+        LettaDivider(Modifier.weight(1f))
         LineText(label, rail.titleStyle(), MaterialTheme.colorScheme.onSurfaceVariant, Modifier)
-        HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+        LettaDivider(Modifier.weight(1f))
     }
 }
 

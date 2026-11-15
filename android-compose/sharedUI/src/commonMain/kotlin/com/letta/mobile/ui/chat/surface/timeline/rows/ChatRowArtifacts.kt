@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.components.StatusGlyph
 import com.letta.mobile.ui.components.line.StatusTone
 import com.letta.mobile.ui.theme.ChatRowCardShape
@@ -114,7 +115,7 @@ internal fun ArtifactCard(
                 }
                 Text(
                     text = title,
-                    style = ChatRowType.cardTitle,
+                    style = LettaTextStyles.labelSemibold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -135,7 +136,7 @@ internal fun CodeBlock(text: String) {
         SelectionContainer {
             Text(
                 text = text,
-                style = ChatRowType.monoBody,
+                style = LettaTextStyles.mono,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
             )

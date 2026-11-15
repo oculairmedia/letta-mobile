@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -41,18 +40,6 @@ object ChatRowType {
     /** A work step's line ("Ran  ./gradlew test"), the label every step-rail line shares. */
     internal val stepTitle: TextStyle
         @Composable @ReadOnlyComposable get() = MaterialTheme.typography.bodyMedium
-
-    /** Command lines, output and arguments: the body size in monospace. */
-    internal val monoBody: TextStyle
-        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-
-    /** A path or a stream label: the small label size in monospace. */
-    internal val monoLabel: TextStyle
-        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace)
-
-    /** A card's title (an approval, a question, generated UI). */
-    internal val cardTitle: TextStyle
-        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
 
     /** A named item inside a card (a tool's name, a diff's path, an artifact's status). */
     internal val itemTitle: TextStyle

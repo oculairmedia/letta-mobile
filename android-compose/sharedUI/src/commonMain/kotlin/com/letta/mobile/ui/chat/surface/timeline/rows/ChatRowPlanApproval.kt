@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.theme.ChatRowInsetShape
-import com.letta.mobile.ui.theme.ChatRowType
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -100,7 +100,7 @@ private fun PlanPreviewBlock(plan: PlanPreview) {
             plan.shortFilePath?.let { path ->
                 Text(
                     text = path,
-                    style = ChatRowType.monoLabel,
+                    style = LettaTextStyles.monoLabel,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

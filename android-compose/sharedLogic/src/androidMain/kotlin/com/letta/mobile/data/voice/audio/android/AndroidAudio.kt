@@ -9,9 +9,9 @@ import android.media.audiofx.AcousticEchoCanceler
 import com.letta.mobile.data.voice.AudioLevel
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.audio.AudioCapture
-import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioFrameFormat
 import com.letta.mobile.data.voice.audio.AudioPlayer
+import com.letta.mobile.data.voice.audio.PcmChunk
 import com.letta.mobile.data.voice.audio.device.AudioDeviceId
 import com.letta.mobile.data.voice.audio.device.AudioDeviceOption
 import com.letta.mobile.data.voice.audio.device.AudioDeviceSelection
@@ -101,10 +101,9 @@ class AndroidAudio(private val context: Context) {
         FrameAudioCapture({ format -> frameSource(format, options) })
 
     /**
-     * A speaker on a streaming `AudioTrack` with assistant usage. Each clip holds transient audio
-     * focus that lets other apps duck, abandoned when the clip ends; losing focus stops the clip
-     * with PLAYBACK_FAILED. Plays WAVE clips; refuses anything else
-     * (build the endpoint synthesizer with `AudioEncoding.WAV`).
+     * A speaker on a streaming `AudioTrack` with assistant usage, playing PCM as it arrives. Each
+     * stream holds transient audio focus that lets other apps duck, abandoned when it has played
+     * out; losing focus stops it with PLAYBACK_FAILED.
      */
     fun player(device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault): AudioPlayer =
         FocusedPlayer(LinePcmPlayer(AudioTrackOutputDevice(context, device), PlayerOptions()), manager)
@@ -132,10 +131,10 @@ class AndroidAudio(private val context: Context) {
 /** Whether the device offers an acoustic echo canceller; a platform that throws counts as none. */
 private fun echoCancellerAvailable(): Boolean = runCatching { AcousticEchoCanceler.isAvailable() }.getOrDefault(false)
 
-/** Holds transient, duck-allowing audio focus around each clip; a focus loss stops the clip. */
+/** Holds transient, duck-allowing audio focus around each segment's stream; a focus loss stops it. */
 internal class FocusedPlayer(private val delegate: AudioPlayer, private val manager: AudioManager) : AudioPlayer {
-    override suspend fun play(clip: AudioClip, onLevel: (AudioLevel) -> Unit) = coroutineScope {
-        val playing = launch(start = CoroutineStart.LAZY) { delegate.play(clip, onLevel) }
+    override suspend fun play(chunks: Flow<PcmChunk>, onLevel: (AudioLevel) -> Unit) = coroutineScope {
+        val playing = launch(start = CoroutineStart.LAZY) { delegate.play(chunks, onLevel) }
         val lost = AtomicBoolean(false)
         val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
             .setAudioAttributes(assistantAttributes)

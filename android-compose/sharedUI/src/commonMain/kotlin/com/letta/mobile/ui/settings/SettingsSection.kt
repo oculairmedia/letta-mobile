@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -27,7 +26,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,6 +53,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.settings.SettingsAction
 import com.letta.mobile.data.settings.SettingsDrafts
 import com.letta.mobile.data.settings.SettingsRow
+import com.letta.mobile.ui.components.foundation.LettaRowLabel
+import com.letta.mobile.ui.components.foundation.LettaToggleRow
 import com.letta.mobile.ui.components.picker.LettaPicker
 import com.letta.mobile.ui.components.picker.LettaPickerSpec
 import com.letta.mobile.ui.components.picker.PickMode
@@ -138,14 +138,12 @@ object SettingsScope {
     fun ToggleRow(row: SettingsRow.Toggle) {
         val lock = LocalSettingsLock.current
         val enabled = row.enabled && lock == null
-        SettingsRowFrame(
-            tag = SettingsSectionTags.ROW_PREFIX + row.key,
-            words = RowWords(row.title, lock ?: row.supporting),
-            enabled = enabled,
-            interaction = Modifier.toggleable(value = row.checked, enabled = enabled, role = Role.Switch, onValueChange = row.onChange),
-        ) {
-            Switch(checked = row.checked, onCheckedChange = null, enabled = enabled)
-        }
+        LettaToggleRow(
+            label = LettaRowLabel(row.title, lock ?: row.supporting, enabled),
+            checked = row.checked,
+            onCheckedChange = row.onChange,
+            modifier = Modifier.testTag(SettingsSectionTags.ROW_PREFIX + row.key),
+        )
     }
 
     /**

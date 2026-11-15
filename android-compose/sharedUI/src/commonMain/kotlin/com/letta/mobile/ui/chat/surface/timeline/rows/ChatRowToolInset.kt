@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.theme.ChatRowInsetShape
-import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.components.successTint
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -207,7 +207,7 @@ private fun HoverCopy(text: String, label: StringResource, content: @Composable 
 }
 
 @Composable
-private fun monoStyle(): TextStyle = ChatRowType.monoBody
+private fun monoStyle(): TextStyle = LettaTextStyles.mono
 
 /**
  * The inks an inset's text reads in: muted output, muted red for stderr, and the before / after of

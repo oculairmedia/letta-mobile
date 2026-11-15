@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.theme.ChatRowInsetShape
-import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.components.successTint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -82,7 +82,7 @@ private fun diffRowStyle(kind: DiffLineKind): DiffRowStyle {
 @Composable
 private fun DiffBlockRow(line: DiffLine) {
     val style = diffRowStyle(line.kind)
-    val mono = ChatRowType.monoBody
+    val mono = LettaTextStyles.mono
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -106,7 +106,7 @@ private fun DiffBlockRow(line: DiffLine) {
 private fun DiffGutter(lineNumber: Int?) {
     Text(
         text = lineNumber?.toString().orEmpty(),
-        style = ChatRowType.monoLabel,
+        style = LettaTextStyles.monoLabel,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1,
         modifier = Modifier.width(LettaDimens.Space.xxl).padding(end = LettaDimens.Space.sm),

@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.components.line.StatusTone
 import com.letta.mobile.ui.theme.ChatRowType
 import androidx.compose.animation.AnimatedVisibility
@@ -331,7 +332,7 @@ internal fun ApprovalChrome(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        Text(text = title, style = ChatRowType.cardTitle)
+        Text(text = title, style = LettaTextStyles.labelSemibold)
         content()
     }
 }
@@ -590,7 +591,7 @@ private fun QuestionBlock(question: AskUserQuestionItem, answers: QuestionAnswer
     val selected = answers.selections[question.question].orEmpty()
     Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), modifier = Modifier.fillMaxWidth()) {
         question.header?.takeIf { it.isNotBlank() }?.let {
-            Text(text = it, style = ChatRowType.cardTitle)
+            Text(text = it, style = LettaTextStyles.labelSemibold)
         }
         Text(text = question.question, style = MaterialTheme.typography.bodySmall)
         FlowRow(
@@ -653,7 +654,7 @@ internal fun ToolArgumentLine(arguments: String) {
     SelectionContainer {
         Text(
             text = stringResource(Res.string.rows_tool_argument_line, primary),
-            style = ChatRowType.monoBody,
+            style = LettaTextStyles.mono,
             color = MaterialTheme.colorScheme.onSurface,
         )
     }

@@ -1,6 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
-import com.letta.mobile.ui.theme.ChatRowType
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -139,7 +139,7 @@ internal fun FullOutputPane(text: String, onClose: () -> Unit) {
         SelectionContainer {
             LazyColumn(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xl)) {
                 itemsIndexed(lines) { _, line ->
-                    Text(line, style = ChatRowType.monoBody)
+                    Text(line, style = LettaTextStyles.mono)
                 }
             }
         }
