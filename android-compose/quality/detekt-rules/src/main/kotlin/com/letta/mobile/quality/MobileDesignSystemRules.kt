@@ -16,9 +16,10 @@ import org.jetbrains.kotlin.psi.KtValueArgument
  * controls on the same row to agree, so scale, spacing and contrast drift per
  * file and the fix for one screen never reaches the next.
  *
- * `scripts/ui-design-lint.py` applies the same three rules without Gradle, for
+ * `scripts/ui-design-lint.py` applies the first three rules without Gradle, for
  * working through the backlog at speed. These are the CI copy: slower, but
- * they run on every PR, so cleaned surfaces stay clean.
+ * they run on every PR, so cleaned surfaces stay clean. The structural rules that
+ * ban hand-built copies of shared elements live in MobileDesignSystemStructureRules.kt.
  */
 
 /** Source roots that hold Compose UI. Nothing else is checked. */
@@ -49,19 +50,34 @@ private val TOKEN_FILE_MARKERS = listOf(
 /** Spikes, benches and previews are not product surfaces. */
 private val EXEMPT_MARKERS = listOf("Spike", "Bench", "Preview")
 
-private fun KtFile.uiPath(): String = virtualFilePath.replace('\\', '/')
+internal fun KtFile.uiPath(): String = virtualFilePath.replace('\\', '/')
 
-private fun KtFile.isUiSource(): Boolean {
+internal fun KtFile.isUiSource(): Boolean {
     val path = uiPath()
-    if (EXEMPT_MARKERS.any { it in path }) return false
-    if ("/build/" in path || "/generated/" in path) return false
-    if (path.substringAfter("/src/", "").substringBefore('/').contains("test", ignoreCase = true)) {
-        return false
-    }
-    return UI_PATH_MARKERS.any { it in path }
+    val marker = UI_PATH_MARKERS.firstOrNull { it in path } ?: return false
+    // Judge only the part from the module root on, so checkout directories named src or build do not count.
+    return !path.substring(path.lastIndexOf(marker)).isExemptFromUiChecks()
 }
 
-private fun KtFile.isTokenFile(): Boolean = TOKEN_FILE_MARKERS.any { it in uiPath() }
+/** Spikes, previews, build output and test source sets, in a path that starts at the module root. */
+private fun String.isExemptFromUiChecks(): Boolean {
+    val sourceSet = substringAfter("/src/", "").substringBefore('/')
+    val buildOutput = "/build/" in this || "/generated/" in this
+    return EXEMPT_MARKERS.any { it in this } || buildOutput || sourceSet.contains("test", ignoreCase = true)
+}
+
+internal fun KtFile.isTokenFile(): Boolean = TOKEN_FILE_MARKERS.any { it in uiPath() }
+
+/**
+ * Where shared UI elements are BUILT. The structural rules ban hand-built copies of these
+ * elements everywhere else, so the shared implementations themselves must stay free to use
+ * the raw parts. `ui/icons/` is the icon registry that names every glyph.
+ */
+private val SHARED_COMPONENT_MARKERS = listOf("/ui/components/", "/ui/icons/")
+
+/** UI source outside token files and outside the shared component and icon packages. */
+internal fun KtFile.isFeatureUiSource(): Boolean =
+    isUiSource() && !isTokenFile() && SHARED_COMPONENT_MARKERS.none { it in uiPath() }
 
 /**
  * `12.dp` / `14.sp` written at a call site instead of read from a token.
@@ -134,6 +150,12 @@ internal class HardcodedComposeColor(config: Config = Config.empty) : MobileRule
  * This is the barely-visible-control bug: `onSurfaceVariant` is already the
  * muted role, and halving it again puts a disabled button under the contrast it
  * needs to still read as a control on a dark theme.
+ *
+ * Only numeric literals are checked. A sub-floor alpha that is meant (Material's
+ * 0.38 disabled content, a scrim) is a named token defined in a theme/token file,
+ * which this rule exempts, and call sites read it by name
+ * (`alpha = LettaAlpha.disabled`). `alpha = 0f` passes: a fully transparent stop of
+ * the same hue is how gradients fade out, not dimmed content.
  */
 internal class LowContentAlpha(config: Config = Config.empty) : MobileRule(
     config,
@@ -142,25 +164,25 @@ internal class LowContentAlpha(config: Config = Config.empty) : MobileRule(
 ) {
     override fun visitCallExpression(expression: KtCallExpression) {
         super.visitCallExpression(expression)
-        val file = expression.containingKtFile
-        if (!file.isUiSource()) return
         if (expression.calleeExpression?.text != "copy") return
-
-        val alpha = expression.valueArguments.firstOrNull { it.alphaValue() != null } ?: return
-        val value = alpha.alphaValue() ?: return
-        if (value >= FLOOR) return
+        val value = expression.valueArguments.firstNotNullOfOrNull { it.alphaValue() }
+        if (!isDimmed(value) || !expression.containingKtFile.isStyledSource()) return
 
         report(
             expression,
             "alpha $value is below the $FLOOR legibility floor. Muted content roles are already " +
-                "dimmed; dimming them again makes the control unreadable on dark themes.",
+                "dimmed; dimming them again makes the control unreadable on dark themes. A deliberate " +
+                "sub-$FLOOR alpha (disabled, scrim) must be a named token in a theme/token file.",
         )
     }
 
+    private fun isDimmed(value: Double?): Boolean = value != null && value > 0.0 && value < FLOOR
+
+    private fun KtFile.isStyledSource(): Boolean = isUiSource() && !isTokenFile()
+
     private fun KtValueArgument.alphaValue(): Double? {
-        if (getArgumentName()?.asName?.asString() != "alpha") return null
-        val text = getArgumentExpression()?.text?.removeSuffix("f") ?: return null
-        return text.toDoubleOrNull()
+        val named = getArgumentName()?.asName?.asString() == "alpha"
+        return getArgumentExpression()?.text?.removeSuffix("f")?.toDoubleOrNull()?.takeIf { named }
     }
 
     private companion object {
@@ -177,6 +199,13 @@ class MobileDesignSystemProvider : RuleSetProvider {
             RawDimensionLiteral(config),
             HardcodedComposeColor(config),
             LowContentAlpha(config),
+            RawShapeLiteral(config),
+            TypographyOverride(config),
+            RawDisclosureIcon(config),
+            DisclosureOutsideSharedRow(config),
+            RawStatusGlyph(config),
+            BareClickable(config),
+            ComponentInExemptPath(config),
         ),
     )
 }

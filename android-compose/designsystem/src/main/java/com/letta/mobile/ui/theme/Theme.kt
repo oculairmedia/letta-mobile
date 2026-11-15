@@ -134,7 +134,7 @@ private fun buildLightScheme(
     surfaceVariant = surfaceVariant,
     onSurfaceVariant = LightOnSurfaceVariant,
     outline = outline,
-    outlineVariant = outline.copy(alpha = 0.45f),
+    outlineVariant = outline.copy(alpha = LIGHT_OUTLINE_VARIANT_ALPHA),
     scrim = Color.Black,
     inverseSurface = DarkSurface,
     inverseOnSurface = DarkOnSurface,
@@ -350,13 +350,13 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
     return CustomColors(
         userBubbleBgColor = colorScheme.primaryContainer,
         agentBubbleBgColor = colorScheme.surfaceContainerLow,
-        reasoningBubbleBgColor = colorScheme.tertiaryContainer.copy(alpha = 0.45f),
+        reasoningBubbleBgColor = colorScheme.tertiaryContainer.copy(alpha = REASONING_BUBBLE_FILL_ALPHA),
         toolBubbleBgColor = colorScheme.secondaryContainer,
         systemMessageColor = colorScheme.surfaceContainerHigh,
         dateSeparatorColor = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
         textPrimary = colorScheme.onSurface,
         textSecondary = colorScheme.onSurfaceVariant,
-        textDisabled = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+        textDisabled = colorScheme.onSurfaceVariant.copy(alpha = TEXT_DISABLED_ALPHA),
         textLink = colorScheme.primary,
         textOnPrimary = colorScheme.onPrimaryContainer,
         errorTextColor = colorScheme.onErrorContainer,
@@ -397,7 +397,7 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
         freshAccentContainer = freshAccentContainer,
         onFreshAccentContainer = colorScheme.onSurface,
         listItemContainerColor = colorScheme.surfaceBright,
-        selectionContainer = complementary.copy(alpha = 0.15f),
+        selectionContainer = complementary.copy(alpha = SELECTION_FILL_ALPHA),
         onSelectionContainer = colorScheme.onSurface,
         selectionIndicator = complementary,
         borderDefault = colorScheme.outlineVariant,
@@ -504,6 +504,8 @@ fun LettaTheme(
         CompositionLocalProvider(LocalCustomColors provides customColors) {
             MaterialExpressiveTheme(
                 colorScheme = colorScheme,
+                // The one corner scale, shared with desktop and the web.
+                shapes = SharedShapes,
                 typography = Typography,
                 motionScheme = MotionScheme.expressive(),
                 content = content,

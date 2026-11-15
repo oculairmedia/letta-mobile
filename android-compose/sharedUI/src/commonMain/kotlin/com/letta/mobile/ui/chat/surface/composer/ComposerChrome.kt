@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.Folder
@@ -62,7 +63,7 @@ internal fun ComposerWorkingDirectoryRow(
         modifier = Modifier
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
-            .clickable(enabled = onPick != null && !state.isLoading) { onPick?.invoke() }
+            .clickable(enabled = onPick != null && !state.isLoading, role = Role.Button) { onPick?.invoke() }
             .testTag(ComposerTestTags.WORKING_DIRECTORY)
             .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,11 +27,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Shield
 import com.letta.mobile.data.runtime.PermissionModeRuntime
@@ -57,6 +55,7 @@ import com.letta.mobile.sharedui.resources.composer_permission_mode_unrestricted
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
 import com.letta.mobile.ui.theme.ChatComposerDimens
+import com.letta.mobile.ui.theme.LettaCheckGlyph
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
@@ -268,11 +267,7 @@ private fun PermissionModePopover(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onSelect(mode) }
-                    .semantics {
-                        role = Role.RadioButton
-                        this.selected = selected
-                    }
+                    .selectable(selected = selected, role = Role.RadioButton) { onSelect(mode) }
                     .testTag(ComposerTestTags.PERMISSION_MODE_OPTION + mode.name)
                     .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
                 verticalAlignment = Alignment.CenterVertically,
@@ -286,13 +281,7 @@ private fun PermissionModePopover(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (selected) {
-                    Icon(
-                        imageVector = Lucide.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(LettaDimens.Control.iconSm),
-                    )
-                }
+                if (selected) LettaCheckGlyph()
             }
         }
     }

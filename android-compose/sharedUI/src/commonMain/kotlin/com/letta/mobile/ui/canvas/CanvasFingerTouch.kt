@@ -3,15 +3,11 @@ package com.letta.mobile.ui.canvas
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 
 /** How far a double tap on open board zooms in, and how long it takes to ease there. */
 internal const val DOUBLE_TAP_ZOOM = 2f
 internal const val DOUBLE_TAP_ZOOM_MILLIS = 220
 
-/** A fingertip covers far more than a line is wide. The mouse and pen keep DrawBox's 12dp. */
-internal val FINGER_PICK_TOLERANCE = 24.dp
-private val POINTER_PICK_TOLERANCE = 12.dp
 
 /**
  * Whether the press DrawBox is picking for came from a finger.

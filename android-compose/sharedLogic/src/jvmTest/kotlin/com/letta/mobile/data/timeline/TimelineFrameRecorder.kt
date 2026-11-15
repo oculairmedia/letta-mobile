@@ -159,6 +159,41 @@ internal class TimelineFrameRecorder private constructor(
     }
 
     /**
+     * One more recent page lands in the ledger (a maintenance reconcile, or a later window of
+     * history: the App Server page is bounded, so a long conversation reaches the ledger as several).
+     */
+    suspend fun reconcile(durable: List<LettaMessage>, step: String = "reconcile") {
+        this.step = step
+        transport.durable = durable
+        reconcileUntilApplied()
+        settleUi()
+        presenter.awaitIdle()
+    }
+
+    /** Scrolls to the oldest edge, as a reader would, until Paging holds every settled page. */
+    suspend fun readAllSettledPages() {
+        step = "read older"
+        var held = -1
+        while (presenter.size != held) {
+            held = presenter.size
+            if (held > 0) presenter[held - 1]
+            settleUi()
+            presenter.awaitIdle()
+        }
+    }
+
+    /** The settled keys Paging holds now, newest first, as the list keys them before the guard. */
+    fun settledKeys(): List<String?> = presenter.snapshot().map { it?.item?.key }
+
+    /** The identities of the newest settled page, as the ledger cuts it for the first Paging load. */
+    suspend fun newestPageIdentities(): List<String> =
+        owner.session.engine.let { engine ->
+            val selection = checkNotNull(engine.publication.value.selection)
+            engine.preparePage(selection, TimelineReadPosition.Tail, engine.budget.maxMetadataRows, null)
+                .records.map { it.key.identity.value }
+        }
+
+    /**
      * The Paging mediator's own recent-page refresh also begins a reconcile when the presenter first
      * collects, and a newer begin supersedes the older request, so under load (Kover instrumentation
      * in the Codecov run) this explicit reconcile can lose that race and answer Stale. Stale carries

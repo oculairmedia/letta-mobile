@@ -94,7 +94,10 @@ class TimelineExactCanonicalWriter(
             ownerEvent.toolReturnTruncationByCallId,
             listOf(callId to returned),
         )
-        transaction.deleteEvidence(deferredReturnKey(callId))
+        val deferredKey = deferredReturnKey(callId)
+        if (transaction.evidence(deferredKey, DEFERRED_RETURN_MAX_BYTES) != null) {
+            transaction.deleteEvidence(deferredKey)
+        }
         val body = fold.contentByCallId[callId] ?: ""
         val enriched = ownerEvent.copy(
             approvalDecided = ownerEvent.approvalDecided || ownerEvent.willCompleteWith(callId),

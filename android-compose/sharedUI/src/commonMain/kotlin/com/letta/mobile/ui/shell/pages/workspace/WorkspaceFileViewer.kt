@@ -3,8 +3,6 @@ package com.letta.mobile.ui.shell.pages.workspace
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,7 +18,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -28,9 +25,11 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import com.letta.mobile.ui.components.foundation.LettaEmptyContent
+import com.letta.mobile.ui.components.foundation.LettaEmptyState
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.data.workspace.WorkspaceFileContent
 import com.letta.mobile.data.workspace.WorkspaceFileViewerActions
 import com.letta.mobile.data.workspace.WorkspaceFileViewerState
@@ -109,7 +108,7 @@ private fun HighlightedFile(content: WorkspaceFileContent.Text, lines: IntRange?
     val lineCount = remember(content.text) { content.text.count { it == '\n' } + 1 }
     val gutter = remember(lineCount) { (1..lineCount).joinToString("\n") }
     val highlighted = remember(content, colors, lines, wash) { highlight(content, colors, lines, wash) }
-    val codeStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+    val codeStyle = LettaTextStyles.mono
     val scroll = rememberScrollState()
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     LaunchedEffect(layout, lines) {
@@ -140,13 +139,8 @@ private fun HighlightedFile(content: WorkspaceFileContent.Text, lines: IntRange?
 }
 
 @Composable
-private fun Placeholder(message: String, actions: @Composable () -> Unit = {}) {
-    Box(Modifier.fillMaxWidth().padding(LettaDimens.Space.xl).testTag(WorkspaceFileViewerTags.PLACEHOLDER), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
-            Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-            actions()
-        }
-    }
+private fun Placeholder(message: String, actions: (@Composable () -> Unit)? = null) {
+    LettaEmptyState(LettaEmptyContent(message), Modifier.testTag(WorkspaceFileViewerTags.PLACEHOLDER), action = actions)
 }
 
 /** The file's text with the shared tool-output highlighter's colours, and [lines] washed in [wash]. */

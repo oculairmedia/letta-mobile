@@ -7,14 +7,20 @@ import com.letta.mobile.data.chat.recompile.asAdminRpcLink
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.HiddenListFilter
 import com.letta.mobile.data.model.decodeConversationList
 import com.letta.mobile.data.model.visibleConversationsInLists
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.serialization.LettaJson
+import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.reportSkippedConversationRows
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -36,6 +42,24 @@ class IrohAdminRpcConversationListSource(
      */
     suspend fun listAgentConversations(agent: AgentId, after: ConversationId?, limit: Int): List<Conversation> =
         conversationList(conversationListParams(agent, after, limit))
+
+    /**
+     * The host's visible recents ([visibleRecentsParams]). A failed answer is the host's own error
+     * (`capability_unavailable` without a visibility index) and a host that ignored the opt-in is
+     * unsupported, so the shared listing can keep its per-agent reads for such a host.
+     */
+    suspend fun listRecentConversations(limit: Int, after: ConversationId?): List<Conversation> {
+        val response = channelTransport.adminRpc(
+            method = "conversation.list",
+            path = "/v1/conversations",
+            body = visibleRecentsParams(limit, after).toString(),
+        )
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "Iroh admin_rpc visible recents failed")
+        }
+        val result = response.result ?: throw TimelineTransportHttpException(502, "Visible recents returned no result")
+        return json.decodeVisibleRecents(result)
+    }
 
     private suspend fun conversationList(params: JsonObject): List<Conversation> {
         val response = channelTransport.adminRpc(
@@ -157,6 +181,32 @@ internal fun conversationListParams(
     put("order", "desc")
     put("order_by", "last_message_at")
 }
+
+/** The host's `conversation.list` params for visible recents (`conversation.list/visible-recents-v1`). */
+internal fun visibleRecentsParams(limit: Int, after: ConversationId?): JsonObject = buildJsonObject {
+    put("visible_only", true)
+    put("limit", limit)
+    after?.let { put("after", it.value) }
+}
+
+/**
+ * A visible recents answer, decoded. A host that ignored `visible_only` answers agent-free, archived
+ * or hidden rows; that host is unsupported, checked on the raw rows before decoding can drop them.
+ */
+internal fun Json.decodeVisibleRecents(result: JsonElement): List<Conversation> {
+    if (result is JsonArray && result.any(::isLegacyRecentRow)) {
+        throw UnsupportedOperationException("Host ignored visible_only")
+    }
+    return decodeConversationList(result, ::reportSkippedConversationRows)
+}
+
+private fun isLegacyRecentRow(row: JsonElement): Boolean {
+    if (row !is JsonObject) return false
+    if (HiddenListFilter.isAgentFreeRow(row)) return true
+    return recentFlagIsTrue(row, "archived") || recentFlagIsTrue(row, "hidden")
+}
+
+private fun recentFlagIsTrue(row: JsonObject, key: String): Boolean = (row[key] as? JsonPrimitive)?.booleanOrNull == true
 
 /** Every conversation, active and archived: the lists filter archived rows themselves. */
 private const val ARCHIVE_STATUS_ALL = "all"

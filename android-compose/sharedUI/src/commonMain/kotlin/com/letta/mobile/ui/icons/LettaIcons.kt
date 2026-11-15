@@ -6,6 +6,7 @@ import com.composables.icons.lucide.ListFilter
 import com.composables.icons.lucide.LoaderCircle
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.ArrowRight
+import com.composables.icons.lucide.Ban
 import com.composables.icons.lucide.Bot
 import com.composables.icons.lucide.Brain
 import com.composables.icons.lucide.Camera
@@ -26,6 +27,7 @@ import com.composables.icons.lucide.Database
 import com.composables.icons.lucide.Ellipsis
 import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.FileText
+import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Flashlight
 import com.composables.icons.lucide.FlashlightOff
 import com.composables.icons.lucide.GitFork
@@ -134,6 +136,9 @@ object LettaIcons {
 
     // Status
     val Check: ImageVector get() = Lucide.Check
+
+    /** No colour, no value: a transparent swatch, an unset choice. */
+    val NoneSet: ImageVector get() = Lucide.Ban
     val Loader: ImageVector get() = Lucide.LoaderCircle
     val ListFilter: ImageVector get() = Lucide.ListFilter
     val CheckCircle: ImageVector get() = Lucide.CircleCheck
@@ -163,6 +168,9 @@ object LettaIcons {
     val Apps: ImageVector get() = Lucide.Grid2x2
     val ViewModule: ImageVector get() = Lucide.Grid2x2
     val FileOpen: ImageVector get() = Lucide.FileText
+
+    /** An image or photo: an attachment, a drop target for pictures. */
+    val Image: ImageVector get() = Lucide.Image
     val Inventory: ImageVector get() = Lucide.Package
     val Archive: ImageVector get() = Lucide.Archive
     val ForkRight: ImageVector get() = Lucide.GitFork

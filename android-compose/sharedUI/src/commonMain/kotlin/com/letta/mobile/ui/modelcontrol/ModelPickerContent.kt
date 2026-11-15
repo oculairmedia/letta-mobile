@@ -36,7 +36,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerController
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry
@@ -59,6 +58,9 @@ import com.letta.mobile.ui.providers.icons.ProviderIcons
 import com.letta.mobile.ui.theme.LettaChip
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaIcon
 
 /** Callbacks of [ModelPickerContent]; [bind] wires the controller-owned ones. */
 data class ModelPickerActions(
@@ -288,8 +290,7 @@ private fun PickerRow(model: PickerRowModel) {
             ) {
                 Text(
                     text = entry.displayName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (entry.selected) FontWeight.SemiBold else FontWeight.Normal,
+                    style = if (entry.selected) LettaTextAccents.bodySemibold else MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
@@ -299,11 +300,10 @@ private fun PickerRow(model: PickerRowModel) {
             }
             openSheet?.let { EffortPill(entry, model.effort?.menu?.current, it) }
             if (entry.selected) {
-                Icon(
-                    imageVector = LettaIcons.Check,
+                LettaIcon(
+                    LettaIcons.Check,
                     contentDescription = ModelControlStrings.CURRENT_MODEL,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(LettaDimens.Control.icon),
+                    style = LettaIconStyle(tint = MaterialTheme.colorScheme.primary),
                 )
             }
         }

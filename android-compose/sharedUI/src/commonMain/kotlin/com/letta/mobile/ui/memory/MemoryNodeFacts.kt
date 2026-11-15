@@ -11,7 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.memory.MemoryChannelStatus
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.MemoryParityItem
@@ -27,6 +26,8 @@ import com.letta.mobile.ui.components.lettaPercent
 import com.letta.mobile.ui.components.lettaUsage
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
+import androidx.compose.ui.semantics.Role
 
 /** The context window as a meter: "801 / 1,000,000 tokens · 0.1%". */
 @Composable
@@ -78,7 +79,7 @@ private fun MemoryRelatedBlockRow(block: MemoryRelatedNode, colour: androidx.com
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
-            .clickable { onOpen(block.nodeId) }
+            .clickable(role = Role.Button) { onOpen(block.nodeId) }
             .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.sm),
     )
 }
@@ -110,7 +111,7 @@ internal fun MemoryChannelFacts(channel: MemoryParityItem.Channel, palette: Memo
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         LettaFactLabel("Status")
         LettaSwatch(palette.statusColor(channel.status))
-        Text(channel.status.label(), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+        Text(channel.status.label(), style = LettaTextAccents.bodySmallSemibold)
     }
     val address = listOf(channel.title, channel.subtitle, channel.detailText).firstOrNull { "://" in it } ?: channel.subtitle
     LettaFactRow("Address", address, monospace = "://" in address)

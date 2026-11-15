@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.projection.toChatDisplayMode
 import com.letta.mobile.data.chat.recompile.ConversationRecompileController
@@ -276,9 +275,11 @@ private fun rememberClientCommandPort(
 ): ChatSessionPort {
     if (commands == null) return port
     val current by rememberUpdatedState(commands)
+    // letta-mobile-09m53: the page's scope, never the ViewModel's (see rememberAdminChatSessionPort).
+    val scope = rememberCoroutineScope()
     return remember(port, viewModel, commands.offered) {
         val recompile = ConversationRecompileController(
-            scope = viewModel.viewModelScope,
+            scope = scope,
             gateway = { current.recompileGateway },
             unavailableReason = { current.recompileUnavailableReason },
         )
@@ -295,7 +296,7 @@ private fun rememberClientCommandPort(
             },
             recompile = recompile,
         )
-        ClientCommandSessionPort(port, routing, viewModel.viewModelScope)
+        ClientCommandSessionPort(port, routing, scope)
     }
 }
 
@@ -314,11 +315,15 @@ private fun rememberAdminChatSessionPort(
     val currentOnBugCommand by rememberUpdatedState(navigation.onBugCommand)
     val currentOpenConversation by rememberUpdatedState(navigation.onOpenConversation)
     val canOpenConversation = navigation.onOpenConversation != null
+    // letta-mobile-09m53: the port holds the screen's callbacks (its NavController, its Activity), so
+    // it lives in the page's scope, cancelled when the page leaves composition. Never the ViewModel's:
+    // it outlives the Activity on a configuration change and kept the destroyed one reachable.
+    val scope = rememberCoroutineScope()
     return remember(viewModel, canOpenConversation, workspaceFiles) {
         AdminChatSessionPort(
             fileMentions = workspaceFiles?.mentionablesFor(viewModel.agentId.value) ?: flowOf(emptyList()),
             viewModel = viewModel,
-            scope = viewModel.viewModelScope,
+            scope = scope,
             onOpenBugReport = { currentOnBugCommand?.invoke() },
             onOpenConversation = if (canOpenConversation) {
                 { agentId, conversationId -> currentOpenConversation?.invoke(agentId, conversationId) }

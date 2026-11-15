@@ -132,6 +132,30 @@ class TimelineUiFramesTest {
         )
     }
 
+    /**
+     * letta-mobile-o1hju S1 (H2/H3, invariants I3 and I5): the post-send schedule
+     * (ChatSendCoordinator.postSendReconcileDelaysMs: 750 ms, 2.5 s, 6 s) reads back the page that
+     * settled the turn. Nothing changed, so no drawn row may leave the list or change height.
+     */
+    @Test
+    fun postSendReconcileScheduleOverAFinishedTurnLeavesEveryDrawnRowInPlace() = replyTurn(
+        afterSettle = { rig, recorder ->
+            POST_SEND_DELAYS_MS.forEach { delay ->
+                runBlocking { rig.settle(listOf(usage, stop, reply(tokens.last()), prompt) + history) }
+                recorder.advance("reconcile-$delay", RECONCILE_FRAMES)
+            }
+        },
+    ) { frames ->
+        val settled = frames.last { it.step == "settle" }
+        val reconcile = listOf(settled) + frames.filter { it.step.startsWith("reconcile-") }
+        val vanished = vanishedRows(reconcile)
+        val jumps = heightJumps(reconcile, MAX_HEIGHT_JUMP_DP)
+        assertTrue(
+            vanished.isEmpty() && jumps.isEmpty(),
+            (vanished + jumps).joinToString("\n") + "\n\n" + reconcile.joinToString("\n"),
+        )
+    }
+
     /** One reply turn over some history; [assertFrames] reads every frame it drew. */
     private fun replyTurn(
         afterSettle: (TimelineDomainRig, TimelineUiFrameRecorder) -> Unit = { _, _ -> },
@@ -187,6 +211,7 @@ class TimelineUiFramesTest {
         const val SETTLE_FRAMES = 20
         /** Long enough for the replaced generation's page to load (25 ms read latency) and draw. */
         const val RECONCILE_FRAMES = 24
+        val POST_SEND_DELAYS_MS = listOf(750L, 2_500L, 6_000L)
         val scope = TimelineScope("backend", "conv-frames", "agent")
 
         val history: List<LettaMessage> = (0 until HISTORY_EXCHANGES).flatMap { i ->

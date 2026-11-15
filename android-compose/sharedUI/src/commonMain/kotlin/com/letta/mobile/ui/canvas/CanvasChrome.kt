@@ -1,12 +1,7 @@
 package com.letta.mobile.ui.canvas
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,13 +9,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,10 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.ChevronLeft
 import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.FileJson
@@ -55,7 +44,18 @@ import com.letta.mobile.data.canvas.CanvasBackgroundPattern
 import com.letta.mobile.data.canvas.CanvasSyncHealth
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.canvas_menu_share
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaColorSwatch
+import com.letta.mobile.ui.components.foundation.LettaDivider
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaSwatch
+import com.letta.mobile.ui.components.foundation.LettaVerticalDivider
+import com.letta.mobile.ui.components.foundation.lettaPanelBorder
+import com.letta.mobile.ui.host.LettaMenu
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -76,16 +76,15 @@ internal fun CanvasTitlePill(
 ) {
     ChromePill(modifier = modifier) {
         if (onNavigateBack != null) {
-            PillIconButton(Lucide.ChevronLeft, "Back", onClick = onNavigateBack)
+            PillIconButton(LettaIcons.ArrowBack, "Back", onClick = onNavigateBack)
         }
         Column(modifier = Modifier.padding(start = if (onNavigateBack == null) LettaDimens.Space.md else LettaDimens.Space.hair, end = LettaDimens.Space.lg)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
+                style = LettaTextStyles.titleSemibold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = if (compact) COMPACT_TITLE_WIDTH else 220.dp),
+                modifier = Modifier.widthIn(max = if (compact) COMPACT_TITLE_WIDTH else CANVAS_TITLE_MAX_WIDTH),
             )
             if (revision != null) {
                 Text(
@@ -154,10 +153,10 @@ internal class CanvasOverflow(
 /** The overflow menu itself, anchored to whichever button opened it. */
 @Composable
 internal fun CanvasOverflowMenu(overflow: CanvasOverflow, expanded: Boolean, onDismiss: () -> Unit) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+    LettaMenu(expanded = expanded, onDismiss = onDismiss) {
         overflow.sync?.let { CanvasSyncStatusLine(it) }
         overflow.host.forEach { entry -> MenuEntry(entry.icon, entry.label) { onDismiss(); entry.onClick() } }
-        if (overflow.sync != null || overflow.host.isNotEmpty()) HorizontalDivider()
+        if (overflow.sync != null || overflow.host.isNotEmpty()) LettaDivider()
         overflow.onShare?.let { share ->
             MenuEntry(Lucide.Share2, stringResource(Res.string.canvas_menu_share)) { onDismiss(); share() }
         }
@@ -254,26 +253,14 @@ private fun BoardMenuEntries(menu: CanvasMenuActions, background: CanvasBackgrou
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         BoardBackgrounds.forEach { entry ->
-            Box(
-                modifier = Modifier
-                    .size(LettaDimens.Control.iconButton)
-                    .background(entry.color, CircleShape)
-                    .border(
-                        width = if (entry.color == background.color) LettaDimens.Space.hair else 1.dp,
-                        color = if (entry.color == background.color) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                        shape = CircleShape,
-                    )
-                    .semantics { contentDescription = "Background ${entry.name}" }
-                    .clickable { background.onColor(entry.color) },
-            )
+            val swatch = LettaSwatch(entry.color, selected = entry.color == background.color, name = "Background ${entry.name}")
+            LettaColorSwatch(swatch, onClick = { background.onColor(entry.color) })
         }
         ColorSwatchPicker(
             current = background.color,
             palette = BoardBackgrounds,
             label = "Background color",
             onPick = background.onColor,
-            swatchSize = LettaDimens.Space.xl,
-            modifier = Modifier.size(LettaDimens.Control.iconButton),
         )
     }
     BackgroundPatternRows(background)
@@ -311,8 +298,6 @@ private fun BackgroundPatternRows(background: CanvasBackgroundActions) {
                 palette = StrokePalette,
                 label = "Pattern color",
                 onPick = { background.onPattern(pattern.copy(colorHex = it.toHex())) },
-                swatchSize = LettaDimens.Space.xl,
-                modifier = Modifier.size(LettaDimens.Control.iconButton),
             )
         }
     }
@@ -320,29 +305,17 @@ private fun BackgroundPatternRows(background: CanvasBackgroundActions) {
 
 @Composable
 private fun MenuChip(label: String, description: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(
+    FilterChip(
+        selected = selected,
         onClick = onClick,
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLowest,
+        label = { Text(label) },
         modifier = Modifier.semantics { contentDescription = description },
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
-        )
-    }
+    )
 }
 
 @Composable
 private fun PillDivider() {
-    Box(
-        modifier = Modifier
-            .padding(horizontal = LettaDimens.Space.xs)
-            .size(width = 1.dp, height = LettaDimens.Space.xl)
-            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)),
-    )
+    LettaVerticalDivider(Modifier.padding(horizontal = LettaDimens.Space.xs).height(LettaDimens.Space.xl))
 }
 
 /** Bottom-left: element count and the last thing that happened, small and out of the way. */
@@ -350,7 +323,7 @@ private fun PillDivider() {
 internal fun CanvasStatusLine(text: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.85f),
     ) {
         Text(
@@ -359,19 +332,21 @@ internal fun CanvasStatusLine(text: String, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs).widthIn(max = 360.dp),
+            modifier = Modifier
+                .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs)
+                .widthIn(max = CANVAS_STATUS_MAX_WIDTH),
         )
     }
 }
 
 /** Board backgrounds: paper whites, warm and cool tints, and the dark boards. */
 internal val BoardBackgrounds: List<NamedColor> = listOf(
-    NamedColor(Color(0xFFFFFFFF), "white"),
-    NamedColor(Color(0xFFF7F3EA), "paper"),
-    NamedColor(Color(0xFFEFF6FF), "sky"),
-    NamedColor(Color(0xFFF0FDF4), "mint"),
-    NamedColor(Color(0xFF1E1E22), "charcoal"),
-    NamedColor(Color(0xFF0B0F17), "midnight"),
+    NamedColor(BoardWhite, "white"),
+    NamedColor(BoardPaper, "paper"),
+    NamedColor(BoardSky, "sky"),
+    NamedColor(BoardMint, "mint"),
+    NamedColor(BoardCharcoal, "charcoal"),
+    NamedColor(BoardMidnight, "midnight"),
 )
 
 /** True inside [CanvasHeaderBar]: the pills there are parts of the one bar, not bars of their own. */
@@ -393,9 +368,9 @@ internal val CanvasHeaderBarHeight: androidx.compose.ui.unit.Dp =
 internal fun CanvasHeaderBar(modifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(LettaDimens.Radius.md),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        border = lettaPanelBorder(),
         shadowElevation = LettaDimens.Space.xs,
     ) {
         androidx.compose.runtime.CompositionLocalProvider(LocalInHeaderBar provides true) {
@@ -422,9 +397,9 @@ private fun ChromePill(modifier: Modifier = Modifier, content: @Composable () ->
     }
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(LettaDimens.Radius.md),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        border = lettaPanelBorder(),
         shadowElevation = LettaDimens.Space.xs,
     ) {
         Row(
@@ -438,19 +413,14 @@ private fun ChromePill(modifier: Modifier = Modifier, content: @Composable () ->
 
 @Composable
 private fun PillIconButton(icon: ImageVector, label: String, enabled: Boolean = true, onClick: () -> Unit) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(LettaDimens.Control.iconButtonLg).semantics { contentDescription = label }) {
-        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
-    }
+    LettaIconButton(LettaButtonIcon(icon, label, size = LettaDimens.Control.iconButtonLg), onClick = onClick, enabled = enabled)
 }
 
 @Composable
 private fun MenuEntry(icon: ImageVector, label: String, onClick: () -> Unit) {
     DropdownMenuItem(
         text = { Text(label) },
-        leadingIcon = { Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
+        leadingIcon = { LettaIcon(icon, contentDescription = null) },
         onClick = onClick,
     )
 }
-
-/** The title's width on a phone, leaving the row to the actions pill. */
-private val COMPACT_TITLE_WIDTH = 120.dp

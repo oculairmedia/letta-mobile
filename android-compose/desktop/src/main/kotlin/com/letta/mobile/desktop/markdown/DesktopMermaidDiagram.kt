@@ -26,7 +26,7 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.markdown.MermaidDiagramRenderer
@@ -184,7 +184,7 @@ private fun MermaidSourceFallback(source: String, reason: String) {
             text = source,
             modifier = Modifier.padding(top = LettaDimens.Space.sm).horizontalScroll(rememberScrollState()),
             color = MaterialTheme.colorScheme.onErrorContainer,
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            style = LettaTextStyles.mono,
         )
     }
 }

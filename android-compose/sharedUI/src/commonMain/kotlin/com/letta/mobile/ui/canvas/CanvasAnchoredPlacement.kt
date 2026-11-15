@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.canvas
 
+import com.letta.mobile.ui.theme.LettaDimens
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -24,8 +25,8 @@ import kotlin.math.roundToInt
 internal fun AnchoredToSelection(
     anchor: Rect?,
     modifier: Modifier = Modifier,
-    topClearance: Dp = 64.dp,
-    bottomClearance: Dp = 72.dp,
+    topClearance: Dp = CANVAS_TOP_CHROME_CLEARANCE,
+    bottomClearance: Dp = CANVAS_FOOT_CHROME_CLEARANCE,
     /** Room kept free on the left, for the desktop tool rail the bar must not slide under. */
     startClearance: Dp = 0.dp,
     /** Space between the anchor and the content; more when quick-create targets sit in it. */
@@ -83,5 +84,5 @@ internal fun selectionScreenRect(
     return Rect(viewport.worldToScreen(union.topLeft), viewport.worldToScreen(union.bottomRight))
 }
 
-private val EDGE_MARGIN = 8.dp
-private val ANCHOR_GAP = 12.dp
+private val EDGE_MARGIN = LettaDimens.Space.sm
+private val ANCHOR_GAP = LettaDimens.Space.md

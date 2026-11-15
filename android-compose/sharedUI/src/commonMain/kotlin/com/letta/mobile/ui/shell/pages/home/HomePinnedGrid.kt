@@ -1,6 +1,12 @@
 package com.letta.mobile.ui.shell.pages.home
 
+import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.components.LocalObjectVerbs
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.items
 import com.letta.mobile.data.pins.LegacyPinSources
 import com.letta.mobile.data.objectverbs.ObjectRef
@@ -17,16 +23,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -49,7 +50,9 @@ import com.letta.mobile.data.home.HomePinnedItem
 import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
+import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSectionHeader
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
 
@@ -68,8 +71,7 @@ internal fun LazyListScope.homePinnedSection(page: HomePageScope) {
 
 @Composable
 private fun PinnedHeader(page: HomePageScope) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        HomeSectionLabel(PINNED_LABEL, Modifier.weight(1f))
+    LettaSectionHeader(title = PINNED_LABEL) {
         TextButton(onClick = { page.onEditingPinsChange(!page.editingPins) }, modifier = Modifier.testTag(HomePageTags.EDIT_PINS)) {
             Text(if (page.editingPins) DONE_LABEL else EDIT_LABEL)
         }
@@ -114,7 +116,7 @@ private fun PinnedGrid(page: HomePageScope) {
 
 private fun gridHeight(cells: Int, columns: Int): Dp {
     val rows = (cells + columns - 1) / columns
-    return TileHeight * rows + LettaDimens.Space.md * (rows - 1).coerceAtLeast(0)
+    return ShellDimens.homePinTileHeight * rows + LettaDimens.Space.md * (rows - 1).coerceAtLeast(0)
 }
 
 @Composable
@@ -125,13 +127,13 @@ private fun PinnedTile(item: HomePinnedItem, page: HomePageScope, dragging: Bool
         label = "pinScale",
     )
     val tile = item.tileContent(page)
-    Box(modifier.fillMaxWidth().height(TileHeight).graphicsLayer { scaleX = scale; scaleY = scale }) {
+    Box(modifier.fillMaxWidth().height(ShellDimens.homePinTileHeight).graphicsLayer { scaleX = scale; scaleY = scale }) {
         Surface(
             onClick = tile.onClick,
             enabled = !page.editingPins,
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
-            tonalElevation = if (dragging) DRAG_ELEVATION else 0.dp,
+            tonalElevation = if (dragging) ShellDimens.homePinDragElevation else 0.dp,
             modifier = Modifier.fillMaxSize().testTag(HomePageTags.pin(item)),
         ) {
             TileBody(tile)
@@ -163,7 +165,8 @@ private fun TileBody(tile: TileContent) {
         if (agent != null) {
             AgentAvatar(agentId = agent.id, name = agent.name, size = LettaDimens.Control.iconButtonSm, cornerRadius = LettaDimens.Radius.sm)
         } else {
-            Icon(tile.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.iconButtonSm))
+            val glyph = LettaIconStyle(LettaDimens.Control.iconButtonSm, MaterialTheme.colorScheme.primary)
+            LettaIcon(tile.icon, contentDescription = null, style = glyph)
         }
         Spacer(Modifier.height(LettaDimens.Space.xs))
         tile.headline?.let {
@@ -181,14 +184,19 @@ private fun TileEditActions(item: HomePinnedItem, page: HomePageScope, modifier:
     Row(modifier) {
         val configure = page.navigation.onConfigureAgent
         if (item is HomePinnedItem.Agent && configure != null) {
-            IconButton(onClick = { configure(item.agent.id) }, modifier = Modifier.testTag(HomePageTags.configure(item.agent.id))) {
-                Icon(LettaIcons.Edit, contentDescription = CONFIGURE_LABEL, modifier = Modifier.size(LettaDimens.Control.iconSm))
-            }
+            LettaIconButton(
+                icon = LettaButtonIcon(LettaIcons.Edit, CONFIGURE_LABEL, glyph = SmallGlyph),
+                onClick = { configure(item.agent.id) },
+                modifier = Modifier.testTag(HomePageTags.configure(item.agent.id)),
+            )
         }
-        if (unpin != null) IconButton(
-            onClick = unpin.onClick, enabled = unpin.enabled, modifier = Modifier.testTag(HomePageTags.unpin(item)),
-        ) {
-            Icon(unpin.icon ?: LettaIcons.PinOff, contentDescription = unpin.label, modifier = Modifier.size(LettaDimens.Control.iconSm))
+        if (unpin != null) {
+            LettaIconButton(
+                icon = LettaButtonIcon(unpin.icon ?: LettaIcons.PinOff, unpin.label, glyph = SmallGlyph),
+                onClick = unpin.onClick,
+                enabled = unpin.enabled,
+                modifier = Modifier.testTag(HomePageTags.unpin(item)),
+            )
         }
     }
 }
@@ -197,7 +205,7 @@ private fun TileEditActions(item: HomePinnedItem, page: HomePageScope, modifier:
 private fun AddPinTile(page: HomePageScope) {
     var open by remember { mutableStateOf(false) }
     val verbs = LocalObjectVerbs.current
-    Box(Modifier.fillMaxWidth().height(TileHeight)) {
+    Box(Modifier.fillMaxWidth().height(ShellDimens.homePinTileHeight)) {
         Surface(
             onClick = { open = true },
             shape = MaterialTheme.shapes.large,
@@ -206,21 +214,11 @@ private fun AddPinTile(page: HomePageScope) {
         ) {
             TileBody(TileContent(LettaIcons.Add, null, ADD_LABEL) { open = true })
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            page.state.unpinnedShortcuts.forEach { shortcut ->
-                val pin = verbs?.items(ObjectRef("shortcut", shortcut.name), "home-tile", desiredPinState = true)?.singleOrNull()
-                DropdownMenuItem(
-                    enabled = pin?.enabled == true,
-                    text = { Text(shortcut.label) },
-                    leadingIcon = { Icon(shortcut.icon, contentDescription = null) },
-                    onClick = {
-                        open = false
-                        pin?.onClick?.invoke()
-                    },
-                    modifier = Modifier.testTag(HomePageTags.addShortcut(shortcut)),
-                )
-            }
+        val items = page.state.unpinnedShortcuts.map { shortcut ->
+            val pin = verbs?.items(ObjectRef("shortcut", shortcut.name), "home-tile", desiredPinState = true)?.singleOrNull()
+            LettaMenuItem(label = shortcut.label, icon = shortcut.icon, enabled = pin?.enabled == true) { pin?.onClick?.invoke() }
         }
+        LettaPopupMenu(expanded = open, onDismiss = { open = false }, items = items)
     }
 }
 
@@ -255,5 +253,6 @@ private const val ADD_KEY = "add-pin"
 private const val WIDE_PIN_COLUMNS = 6
 private const val COMPACT_PIN_COLUMNS = 3
 private const val DRAG_SCALE = 1.05f
-private val DRAG_ELEVATION = 8.dp
-private val TileHeight = 108.dp
+
+/** The tile edit actions' glyphs: small, so two fit in a tile's corner. */
+private val SmallGlyph = LettaIconStyle(LettaDimens.Control.iconSm)

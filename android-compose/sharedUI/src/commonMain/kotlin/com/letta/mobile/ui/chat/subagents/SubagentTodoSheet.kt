@@ -2,25 +2,26 @@ package com.letta.mobile.ui.chat.subagents
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,9 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -43,6 +42,9 @@ import com.letta.mobile.data.model.todoProgress
 import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaDoneGlyph
+import com.letta.mobile.ui.theme.LettaInProgressGlyph
+import com.letta.mobile.ui.theme.LettaPendingGlyph
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -265,9 +267,12 @@ fun SubagentTodoSheet(
             }
         },
     ) {
+        // The body takes what the pane has left under its header (docked, sheet or dialog: each
+        // bounds it), so the roster below can fill it instead of stopping at a fixed height.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .weight(1f, fill = false)
                 .padding(
                     start = LettaDimens.Space.lg,
                     end = LettaDimens.Space.lg,
@@ -295,8 +300,9 @@ fun SubagentTodoSheet(
             }
             roster?.let { section ->
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                // The roster is a list of its own: bounded, so the todos above stay in view.
-                Box(Modifier.fillMaxWidth().heightIn(max = SheetListMaxHeight)) { section() }
+                // The roster takes all the height the todos leave and scrolls only past it; the
+                // checklist above is the bounded part, so it can never push the roster out.
+                Box(Modifier.fillMaxWidth().weight(1f, fill = false).testTag(SubagentTodoSheetTags.ROSTER)) { section() }
             }
         }
     }
@@ -305,9 +311,12 @@ fun SubagentTodoSheet(
 /** Test tags of the todo sheet. */
 object SubagentTodoSheetTags {
     const val SHEET = "subagent-todo-sheet"
+
+    /** The roster's slot under the todos: it fills the height the sheet has left. */
+    const val ROSTER = "subagent-todo-sheet-roster"
 }
 
-/** The checklist and the roster each scroll inside the sheet past this height. */
+/** The checklist scrolls inside the sheet past this height, leaving the rest to the roster. */
 private val SheetListMaxHeight = LettaDimens.Pane.editorMinHeight * 2
 private const val STATE_FADE_MS = 200
 
@@ -322,27 +331,17 @@ private fun ViewConversationButton(
     description: String,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(LettaDimens.Radius.md))
-            .clickable(onClick = onClick)
-            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs)
-            .semantics { contentDescription = "View conversation: $description" },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier.semantics { contentDescription = "View conversation: $description" },
     ) {
         Icon(
             imageVector = LettaIcons.ExternalLink,
             contentDescription = null,
             modifier = Modifier.size(LettaDimens.Control.icon),
-            tint = MaterialTheme.colorScheme.primary,
         )
-        Text(
-            text = "View chat",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            maxLines = 1,
-        )
+        Spacer(Modifier.width(LettaDimens.Space.xs))
+        Text(text = "View chat", maxLines = 1)
     }
 }
 
@@ -419,7 +418,7 @@ private fun SubagentTodoContent(content: SubagentTodoSheetState.Content) {
 
 @Composable
 private fun SubagentTodoRow(item: SubagentTodoItem) {
-    val (icon, tint, accessibilityStatus) = item.status.rowVisuals()
+    val accessibilityStatus = item.status.accessibilityLabel()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -427,14 +426,7 @@ private fun SubagentTodoRow(item: SubagentTodoItem) {
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier
-                .padding(top = LettaDimens.Space.hair)
-                .size(LettaDimens.Space.lg),
-            tint = tint,
-        )
+        SubagentTodoGlyph(item.status)
         Text(
             text = item.label,
             style = MaterialTheme.typography.bodyMedium,
@@ -452,23 +444,20 @@ private fun SubagentTodoRow(item: SubagentTodoItem) {
     }
 }
 
-/** Per-status icon + tint + accessibility label. Composable for theme colors. */
+/** A todo's state as the shared status glyph. */
 @Composable
-private fun SubagentTodoStatus.rowVisuals(): Triple<ImageVector, Color, String> =
+private fun SubagentTodoGlyph(status: SubagentTodoStatus) {
+    when (status) {
+        SubagentTodoStatus.COMPLETED -> LettaDoneGlyph()
+        SubagentTodoStatus.IN_PROGRESS -> LettaInProgressGlyph()
+        SubagentTodoStatus.PENDING -> LettaPendingGlyph()
+    }
+}
+
+/** A todo's state in words, for its row's accessibility label. */
+private fun SubagentTodoStatus.accessibilityLabel(): String =
     when (this) {
-        SubagentTodoStatus.COMPLETED -> Triple(
-            LettaIcons.CheckCircle,
-            MaterialTheme.colorScheme.primary,
-            "Completed",
-        )
-        SubagentTodoStatus.IN_PROGRESS -> Triple(
-            LettaIcons.AccessTime,
-            MaterialTheme.colorScheme.primary,
-            "In progress",
-        )
-        SubagentTodoStatus.PENDING -> Triple(
-            LettaIcons.Circle,
-            MaterialTheme.colorScheme.onSurfaceVariant,
-            "Pending",
-        )
+        SubagentTodoStatus.COMPLETED -> "Completed"
+        SubagentTodoStatus.IN_PROGRESS -> "In progress"
+        SubagentTodoStatus.PENDING -> "Pending"
     }

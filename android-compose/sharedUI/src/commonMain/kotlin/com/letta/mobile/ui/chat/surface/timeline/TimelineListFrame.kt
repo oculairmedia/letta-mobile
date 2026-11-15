@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +35,9 @@ import com.letta.mobile.ui.chat.surface.sendflight.LocalSendFlight
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRenderItemRow
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowCallbacks
 import com.letta.mobile.ui.chat.surface.timeline.rows.LocalDockedPromptCompaction
+import com.letta.mobile.ui.chat.surface.timeline.rows.LocalNoticeContinued
+import com.letta.mobile.ui.chat.surface.timeline.rows.isBareStepRow
+import com.letta.mobile.ui.chat.surface.timeline.rows.isCompletedNotice
 import com.letta.mobile.ui.mascot.MascotGazeSurface
 import com.letta.mobile.ui.mascot.mascotAttention
 import com.letta.mobile.ui.mascot.mascotGazeTarget
@@ -196,21 +200,23 @@ private fun PinnedPromptCopy(prompt: ChatRenderItem, pinned: PinnedPrompt, bindi
         CompositionLocalProvider(LocalSendFlight provides null, LocalDockedPromptCompaction provides pinned.compaction) {
             // The bubble alone: without the row's leading space it holds snug under the chrome,
             // and bottom-aligned with its row it still rides the row seamlessly.
-            TimelineItemRow(prompt, bindings, leadingSpace = false)
+            TimelineItemRow(prompt, bindings, spacing = null)
         }
     }
 }
 
 /**
  * One render item, at the chat column's width, through the shared row seam. In the list it
- * carries its own leading space ([timelineLeadingSpace]); the pinned copy does not.
+ * carries its [spacing] ([rememberRowSpacing]: its leading space, and whether the row under it
+ * continues its report, so the report gives up its line's floor ([LocalNoticeContinued]) as a run
+ * header does over its body); the pinned copy passes null and takes none.
  */
 @Composable
 internal fun TimelineItemRow(
     item: ChatRenderItem,
     bindings: TimelineRowBindings,
     modifier: Modifier = Modifier,
-    leadingSpace: Boolean = true,
+    spacing: Pair<Dp, Boolean>? = rememberRowSpacing(item, older = null, newer = null),
 ) {
     val sticky = LocalStickyPrompt.current.takeIf { item.isUserPrompt() }
     val context = bindings.contexts.forItem(item)
@@ -219,21 +225,49 @@ internal fun TimelineItemRow(
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .hiddenUnderStickyCopy(sticky, item.key)
-            .padding(top = if (leadingSpace) timelineLeadingSpace(item) else 0.dp)
+            .padding(top = spacing?.first ?: 0.dp)
             // The newest message (your prompt as it lands, then the reply as it streams) draws the
             // mascot's eyes (te3n1.2); only the list's own row, never the pinned copy.
-            .mascotAttention(AttentionKey("message:${item.key}"), AttentionKind.MESSAGE, enabled = leadingSpace && context.isNewest),
+            .mascotAttention(AttentionKey("message:${item.key}"), AttentionKind.MESSAGE, enabled = spacing != null && context.isNewest),
     ) {
-        ChatRenderItemRow(item = item, context = context, callbacks = bindings.callbacks)
+        CompositionLocalProvider(LocalNoticeContinued provides (spacing?.second == true)) {
+            ChatRenderItemRow(item = item, context = context, callbacks = bindings.callbacks)
+        }
     }
 }
+
+/**
+ * A list row's spacing from the rows around it: its leading space against the [older] row above it,
+ * and whether the [newer] row under it continues its report. Remembered on those two values, so a
+ * neighbour that streams does not hand the row a new argument (and recompose it) every token.
+ */
+@Composable
+internal fun rememberRowSpacing(item: ChatRenderItem, older: ChatRenderItem?, newer: ChatRenderItem?): Pair<Dp, Boolean> {
+    val leading = timelineLeadingSpace(item, older)
+    val continued = newer != null && continuesNotice(item, newer)
+    return remember(leading, continued) { leading to continued }
+}
+
+/** [next] is the bare tool step that carries on [notice]'s completed report: the report's body, not a new block. */
+private fun continuesNotice(notice: ChatRenderItem, next: ChatRenderItem): Boolean =
+    notice.isCompletedNotice() && next.isBareStepRow()
 
 /**
  * The space above an item (feature-chat RenderChatMessage / ChatMessageListRenderRunItem): a
  * lone reasoning or tool row, or the continuation of one speaker's group, takes the tight beat;
  * anything that starts a new speaker or a new run takes the section break.
  */
-internal fun timelineLeadingSpace(item: ChatRenderItem): Dp = when (item) {
+internal fun timelineLeadingSpace(item: ChatRenderItem, older: ChatRenderItem? = null): Dp = when {
+    // The work a completed report woke sits under the report's label as a run's first step sits under
+    // its header: the report already gave up its floor, so no leading space either.
+    older != null && continuesNotice(older, item) -> 0.dp
+    // A notice (a report, a Monitor event, a task's state) is a run header's sibling on the header
+    // rail: it opens a block, so it takes the section break a run takes, wherever it falls in a group.
+    item is ChatRenderItem.Single && item.message.subagentNotification != null -> ChatRowSpacing.ungrouped
+    else -> blockLeadingSpace(item)
+}
+
+private fun blockLeadingSpace(item: ChatRenderItem): Dp = when (item) {
     // A run is a new turn: the section break above it, the same one the next speaker takes
     // below it, so its summary line sits evenly between the two (letta-mobile-bglj6.1.11). A run
     // of nothing but tool calls continues the turn above it and takes the tight beat, as the

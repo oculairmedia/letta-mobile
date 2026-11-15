@@ -2,22 +2,17 @@ package com.letta.mobile.ui.shell.sidebar
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
+import com.letta.mobile.ui.components.foundation.LettaRowLabel
+import com.letta.mobile.ui.components.foundation.LettaToggleRow
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.display.ChatTextSize
 import com.letta.mobile.ui.ambient.ThinkingGlowStyle
@@ -101,40 +96,37 @@ private fun ShellChatOptionsContent(state: ShellChatOptionsState, actions: Shell
     val display = state.display
     Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         LettaSectionLabel("Show in chat")
-        OptionSwitch("Reasoning", display.showReasoning, ShellChatOptionsTags.REASONING) {
-            actions.onDisplayChange(display.copy(showReasoning = it))
-        }
-        OptionSwitch("Compactions", display.showCompactions, ShellChatOptionsTags.COMPACTIONS) {
-            actions.onDisplayChange(display.copy(showCompactions = it))
-        }
-        OptionSwitch("Token usage", display.showTokenUsage, ShellChatOptionsTags.USAGE) {
-            actions.onDisplayChange(display.copy(showTokenUsage = it))
-        }
+        LettaToggleRow(
+            label = LettaRowLabel("Reasoning"),
+            checked = display.showReasoning,
+            onCheckedChange = { actions.onDisplayChange(display.copy(showReasoning = it)) },
+            modifier = Modifier.testTag(ShellChatOptionsTags.REASONING),
+        )
+        LettaToggleRow(
+            label = LettaRowLabel("Compactions"),
+            checked = display.showCompactions,
+            onCheckedChange = { actions.onDisplayChange(display.copy(showCompactions = it)) },
+            modifier = Modifier.testTag(ShellChatOptionsTags.COMPACTIONS),
+        )
+        LettaToggleRow(
+            label = LettaRowLabel("Token usage"),
+            checked = display.showTokenUsage,
+            onCheckedChange = { actions.onDisplayChange(display.copy(showTokenUsage = it)) },
+            modifier = Modifier.testTag(ShellChatOptionsTags.USAGE),
+        )
         LettaSectionLabel("Text size")
         SegmentedChoice(TEXT_SIZE_SEGMENTS, state.textSize, actions.onTextSizeChange)
         LettaSectionLabel("Thinking glow")
         SegmentedChoice(GLOW_SEGMENTS, display.thinkingGlow) { actions.onDisplayChange(display.copy(thinkingGlow = it)) }
         if (state.offersAutoPin) {
             LettaSectionLabel("Chats")
-            OptionSwitch("Pin new chats", state.autoPinNewChats, ShellChatOptionsTags.AUTO_PIN, actions.onAutoPinNewChatsChange)
+            LettaToggleRow(
+                label = LettaRowLabel("Pin new chats"),
+                checked = state.autoPinNewChats,
+                onCheckedChange = actions.onAutoPinNewChatsChange,
+                modifier = Modifier.testTag(ShellChatOptionsTags.AUTO_PIN),
+            )
         }
-    }
-}
-
-/** One on/off option: the whole row toggles, so the label is a target too. */
-@Composable
-private fun OptionSwitch(label: String, checked: Boolean, tag: String, onChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
-            .padding(vertical = LettaDimens.Space.hair)
-            .testTag(tag),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

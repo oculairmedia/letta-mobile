@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -13,9 +12,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,13 +24,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.X
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 
 /**
  * A secondary page that opens beside the main content, never over it.
@@ -50,9 +50,9 @@ fun LettaSidePane(
     title: String,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
-    initialWidth: Dp = 540.dp,
-    minWidth: Dp = 320.dp,
-    maxWidth: Dp = 1100.dp,
+    initialWidth: Dp = LettaSurfaceSizes.sidePaneWidth,
+    minWidth: Dp = LettaSurfaceSizes.sidePaneMinWidth,
+    maxWidth: Dp = LettaSurfaceSizes.sidePaneMaxWidth,
     resizable: Boolean = true,
     /** False when the content draws its own title, as the canvas does with its title pill. */
     showHeader: Boolean = true,
@@ -73,7 +73,7 @@ fun LettaSidePane(
                     .fillMaxHeight()
                     .pointerHoverIcon(horizontalResizePointerIcon())
                     .draggable(state = dragState, orientation = Orientation.Horizontal)
-                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaSurfaceSizes.resizeHandleAlpha)),
             )
         }
         Column(
@@ -105,20 +105,15 @@ fun LettaSidePaneHeader(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
+            style = LettaTextAccents.titleLargeSemibold,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
         actions()
-        Icon(
-            imageVector = Lucide.X,
-            contentDescription = "Close",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Control.icon).clickable(onClick = onClose),
-        )
+        val closeGlyph = LettaIconStyle(tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        LettaIconButton(LettaButtonIcon(LettaIcons.Close, "Close", glyph = closeGlyph), onClick = onClose)
     }
 }
 

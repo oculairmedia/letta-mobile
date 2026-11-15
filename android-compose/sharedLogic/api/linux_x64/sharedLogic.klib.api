@@ -4151,6 +4151,8 @@ final enum class com.letta.mobile.data.voice.session/VoiceSetupGap : kotlin/Enum
 
 final enum class com.letta.mobile.data.voice.vad/TurnDiscardReason : kotlin/Enum<com.letta.mobile.data.voice.vad/TurnDiscardReason> { // com.letta.mobile.data.voice.vad/TurnDiscardReason|null[0]
     enum entry EMPTY_TRANSCRIPT // com.letta.mobile.data.voice.vad/TurnDiscardReason.EMPTY_TRANSCRIPT|null[0]
+    enum entry FILLER_WORD // com.letta.mobile.data.voice.vad/TurnDiscardReason.FILLER_WORD|null[0]
+    enum entry NOT_SPEECH // com.letta.mobile.data.voice.vad/TurnDiscardReason.NOT_SPEECH|null[0]
     enum entry NO_ONSET // com.letta.mobile.data.voice.vad/TurnDiscardReason.NO_ONSET|null[0]
     enum entry NO_WORDS // com.letta.mobile.data.voice.vad/TurnDiscardReason.NO_WORDS|null[0]
     enum entry OUTPUT_ACTIVE // com.letta.mobile.data.voice.vad/TurnDiscardReason.OUTPUT_ACTIVE|null[0]
@@ -4725,6 +4727,10 @@ abstract fun interface com.letta.mobile.data.agenteditor/AgentCreator { // com.l
     abstract suspend fun create(com.letta.mobile.data.model/AgentCreateParams): com.letta.mobile.data.agenteditor/AgentCreated // com.letta.mobile.data.agenteditor/AgentCreator.create|create(com.letta.mobile.data.model.AgentCreateParams){}[0]
 }
 
+abstract fun interface com.letta.mobile.data.backend/ConversationListingFactory { // com.letta.mobile.data.backend/ConversationListingFactory|null[0]
+    abstract fun create(kotlin.coroutines/SuspendFunction3<com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId?, kotlin/Int, kotlin.collections/List<com.letta.mobile.data.model/Conversation>>, kotlin.coroutines/SuspendFunction2<kotlin/Int, com.letta.mobile.data.model/ConversationId?, kotlin.collections/List<com.letta.mobile.data.model/Conversation>>, kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/Conversation>): com.letta.mobile.data.backend/ConversationListing // com.letta.mobile.data.backend/ConversationListingFactory.create|create(kotlin.coroutines.SuspendFunction3<com.letta.mobile.data.model.AgentId,com.letta.mobile.data.model.ConversationId?,kotlin.Int,kotlin.collections.List<com.letta.mobile.data.model.Conversation>>;kotlin.coroutines.SuspendFunction2<kotlin.Int,com.letta.mobile.data.model.ConversationId?,kotlin.collections.List<com.letta.mobile.data.model.Conversation>>;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.model.ConversationId,com.letta.mobile.data.model.Conversation>){}[0]
+}
+
 abstract fun interface com.letta.mobile.data.canvas.plugin/PluginBoardKinds { // com.letta.mobile.data.canvas.plugin/PluginBoardKinds|null[0]
     abstract fun kindOf(kotlin/String): com.letta.mobile.data.canvas.plugin/PluginKindRef? // com.letta.mobile.data.canvas.plugin/PluginBoardKinds.kindOf|kindOf(kotlin.String){}[0]
 
@@ -5023,7 +5029,7 @@ abstract fun interface com.letta.mobile.data.voice.session/VoiceEngineFactory { 
 }
 
 abstract fun interface com.letta.mobile.data.voice.vad.ear/SpeechTranscriber { // com.letta.mobile.data.voice.vad.ear/SpeechTranscriber|null[0]
-    abstract suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip): com.letta.mobile.data.voice/VoiceText // com.letta.mobile.data.voice.vad.ear/SpeechTranscriber.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip){}[0]
+    abstract suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.vad.ear/SpeechTranscriber.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip){}[0]
 
     final object Companion { // com.letta.mobile.data.voice.vad.ear/SpeechTranscriber.Companion|null[0]
         final fun endpoint(com.letta.mobile.data.voice.endpoint/EndpointTranscriber): com.letta.mobile.data.voice.vad.ear/SpeechTranscriber // com.letta.mobile.data.voice.vad.ear/SpeechTranscriber.Companion.endpoint|endpoint(com.letta.mobile.data.voice.endpoint.EndpointTranscriber){}[0]
@@ -5183,6 +5189,16 @@ abstract interface com.letta.mobile.data.agenteditor/AgentEditorBackend { // com
     abstract suspend fun refreshCatalogs() // com.letta.mobile.data.agenteditor/AgentEditorBackend.refreshCatalogs|refreshCatalogs(){}[0]
     abstract suspend fun update(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/AgentUpdateParams) // com.letta.mobile.data.agenteditor/AgentEditorBackend.update|update(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.AgentUpdateParams){}[0]
     open fun reasoningEffortsFor(kotlin/String): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.agenteditor/AgentEditorBackend.reasoningEffortsFor|reasoningEffortsFor(kotlin.String){}[0]
+}
+
+abstract interface com.letta.mobile.data.backend/ConversationListing { // com.letta.mobile.data.backend/ConversationListing|null[0]
+    abstract val hasMore // com.letta.mobile.data.backend/ConversationListing.hasMore|{}hasMore[0]
+        abstract fun <get-hasMore>(): kotlin/Boolean // com.letta.mobile.data.backend/ConversationListing.hasMore.<get-hasMore>|<get-hasMore>(){}[0]
+
+    abstract suspend fun changed(kotlin.collections/Map<com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId?>, kotlin.collections/List<com.letta.mobile.data.model/Agent>): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.backend/ConversationListing.changed|changed(kotlin.collections.Map<com.letta.mobile.data.model.ConversationId,com.letta.mobile.data.model.AgentId?>;kotlin.collections.List<com.letta.mobile.data.model.Agent>){}[0]
+    abstract suspend fun loadMore(com.letta.mobile.data.model/AgentId? = ...): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.backend/ConversationListing.loadMore|loadMore(com.letta.mobile.data.model.AgentId?){}[0]
+    abstract suspend fun record(kotlin.collections/List<com.letta.mobile.data.model/Conversation>, kotlin.collections/List<com.letta.mobile.data.model/Agent>): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.backend/ConversationListing.record|record(kotlin.collections.List<com.letta.mobile.data.model.Conversation>;kotlin.collections.List<com.letta.mobile.data.model.Agent>){}[0]
+    abstract suspend fun refresh(kotlin.collections/List<com.letta.mobile.data.model/Agent>, kotlin.collections/Set<com.letta.mobile.data.model/AgentId>, kotlin/Function1<kotlin.collections/List<com.letta.mobile.data.model/Conversation>, kotlin/Unit>): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.backend/ConversationListing.refresh|refresh(kotlin.collections.List<com.letta.mobile.data.model.Agent>;kotlin.collections.Set<com.letta.mobile.data.model.AgentId>;kotlin.Function1<kotlin.collections.List<com.letta.mobile.data.model.Conversation>,kotlin.Unit>){}[0]
 }
 
 abstract interface com.letta.mobile.data.backend/UnservedRoute { // com.letta.mobile.data.backend/UnservedRoute|null[0]
@@ -5479,9 +5495,10 @@ abstract interface com.letta.mobile.data.chat.runtime/ChatConversationStore { //
     open val deleteBehavior // com.letta.mobile.data.chat.runtime/ChatConversationStore.deleteBehavior|{}deleteBehavior[0]
         open fun <get-deleteBehavior>(): com.letta.mobile.data.chat.runtime/ConversationDeleteBehavior // com.letta.mobile.data.chat.runtime/ChatConversationStore.deleteBehavior.<get-deleteBehavior>|<get-deleteBehavior>(){}[0]
 
-    abstract suspend fun getConversation(kotlin/String): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.chat.runtime/ChatConversationStore.getConversation|getConversation(kotlin.String){}[0]
     abstract suspend fun listAgentConversations(com.letta.mobile.data.chat.runtime/AgentConversationPage): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.chat.runtime/ChatConversationStore.listAgentConversations|listAgentConversations(com.letta.mobile.data.chat.runtime.AgentConversationPage){}[0]
     open suspend fun deleteConversation(kotlin/String) // com.letta.mobile.data.chat.runtime/ChatConversationStore.deleteConversation|deleteConversation(kotlin.String){}[0]
+    open suspend fun getConversation(com.letta.mobile.data.model/ConversationId): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.chat.runtime/ChatConversationStore.getConversation|getConversation(com.letta.mobile.data.model.ConversationId){}[0]
+    open suspend fun getConversation(kotlin/String): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.chat.runtime/ChatConversationStore.getConversation|getConversation(kotlin.String){}[0]
     open suspend fun listRecentConversations(kotlin/Int = ..., com.letta.mobile.data.model/ConversationId? = ...): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.chat.runtime/ChatConversationStore.listRecentConversations|listRecentConversations(kotlin.Int;com.letta.mobile.data.model.ConversationId?){}[0]
     open suspend fun restoreDeletedConversation(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.chat.runtime/ChatConversationStore.restoreDeletedConversation|restoreDeletedConversation(kotlin.String;kotlin.Boolean){}[0]
 }
@@ -7235,7 +7252,7 @@ abstract interface com.letta.mobile.data.voice.audio/AudioFrameSource { // com.l
 }
 
 abstract interface com.letta.mobile.data.voice.audio/AudioPlayer { // com.letta.mobile.data.voice.audio/AudioPlayer|null[0]
-    abstract suspend fun play(com.letta.mobile.data.voice.audio/AudioClip, kotlin/Function1<com.letta.mobile.data.voice/AudioLevel, kotlin/Unit>) // com.letta.mobile.data.voice.audio/AudioPlayer.play|play(com.letta.mobile.data.voice.audio.AudioClip;kotlin.Function1<com.letta.mobile.data.voice.AudioLevel,kotlin.Unit>){}[0]
+    abstract suspend fun play(kotlinx.coroutines.flow/Flow<com.letta.mobile.data.voice.audio/PcmChunk>, kotlin/Function1<com.letta.mobile.data.voice/AudioLevel, kotlin/Unit>) // com.letta.mobile.data.voice.audio/AudioPlayer.play|play(kotlinx.coroutines.flow.Flow<com.letta.mobile.data.voice.audio.PcmChunk>;kotlin.Function1<com.letta.mobile.data.voice.AudioLevel,kotlin.Unit>){}[0]
 }
 
 abstract interface com.letta.mobile.data.voice.engine/VoiceEar { // com.letta.mobile.data.voice.engine/VoiceEar|null[0]
@@ -58914,6 +58931,7 @@ final class com.letta.mobile.data.repository/IrohAdminRpcConversationListSource 
     final suspend fun listAgentConversations(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId?, kotlin/Int): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.listAgentConversations|listAgentConversations(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId?;kotlin.Int){}[0]
     final suspend fun listConversations(com.letta.mobile.data.model/AgentId): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.listConversations|listConversations(com.letta.mobile.data.model.AgentId){}[0]
     final suspend fun listConversationsForAgent(com.letta.mobile.data.model/AgentId, kotlin/Int? = ...): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.listConversationsForAgent|listConversationsForAgent(com.letta.mobile.data.model.AgentId;kotlin.Int?){}[0]
+    final suspend fun listRecentConversations(kotlin/Int, com.letta.mobile.data.model/ConversationId?): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.listRecentConversations|listRecentConversations(kotlin.Int;com.letta.mobile.data.model.ConversationId?){}[0]
     final suspend fun setConversationArchived(com.letta.mobile.data.model/ConversationId, kotlin/Boolean): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.setConversationArchived|setConversationArchived(com.letta.mobile.data.model.ConversationId;kotlin.Boolean){}[0]
     final suspend fun updateConversation(com.letta.mobile.data.model/ConversationId, kotlin/String): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.updateConversation|updateConversation(com.letta.mobile.data.model.ConversationId;kotlin.String){}[0]
 }
@@ -69806,6 +69824,17 @@ final class com.letta.mobile.data.voice.audio/AudioFrameFormat { // com.letta.mo
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.audio/AudioFrameFormat.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.voice.audio/PcmChunk { // com.letta.mobile.data.voice.audio/PcmChunk|null[0]
+    constructor <init>(kotlin/ShortArray, com.letta.mobile.data.voice.audio/PcmFormat) // com.letta.mobile.data.voice.audio/PcmChunk.<init>|<init>(kotlin.ShortArray;com.letta.mobile.data.voice.audio.PcmFormat){}[0]
+
+    final val format // com.letta.mobile.data.voice.audio/PcmChunk.format|{}format[0]
+        final fun <get-format>(): com.letta.mobile.data.voice.audio/PcmFormat // com.letta.mobile.data.voice.audio/PcmChunk.format.<get-format>|<get-format>(){}[0]
+    final val samples // com.letta.mobile.data.voice.audio/PcmChunk.samples|{}samples[0]
+        final fun <get-samples>(): kotlin/ShortArray // com.letta.mobile.data.voice.audio/PcmChunk.samples.<get-samples>|<get-samples>(){}[0]
+
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.audio/PcmChunk.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.voice.audio/PcmFormat { // com.letta.mobile.data.voice.audio/PcmFormat|null[0]
     constructor <init>(kotlin/Int = ..., kotlin/Int = ...) // com.letta.mobile.data.voice.audio/PcmFormat.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
 
@@ -69857,13 +69886,14 @@ final class com.letta.mobile.data.voice.consent/VoiceEndpointGrants { // com.let
 final class com.letta.mobile.data.voice.endpoint/EndpointSpeechSynthesizer { // com.letta.mobile.data.voice.endpoint/EndpointSpeechSynthesizer|null[0]
     constructor <init>(com.letta.mobile.data.voice.endpoint/SpeechEndpointClient, com.letta.mobile.data.voice.consent/VoiceEndpointGrantSource, com.letta.mobile.data.voice/VoiceEndpointSettings, com.letta.mobile.data.voice.audio/AudioEncoding = ...) // com.letta.mobile.data.voice.endpoint/EndpointSpeechSynthesizer.<init>|<init>(com.letta.mobile.data.voice.endpoint.SpeechEndpointClient;com.letta.mobile.data.voice.consent.VoiceEndpointGrantSource;com.letta.mobile.data.voice.VoiceEndpointSettings;com.letta.mobile.data.voice.audio.AudioEncoding){}[0]
 
+    final fun stream(com.letta.mobile.data.voice/VoiceText): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.voice.audio/PcmChunk> // com.letta.mobile.data.voice.endpoint/EndpointSpeechSynthesizer.stream|stream(com.letta.mobile.data.voice.VoiceText){}[0]
     final suspend fun synthesize(com.letta.mobile.data.voice/VoiceText): com.letta.mobile.data.voice.audio/AudioClip // com.letta.mobile.data.voice.endpoint/EndpointSpeechSynthesizer.synthesize|synthesize(com.letta.mobile.data.voice.VoiceText){}[0]
 }
 
 final class com.letta.mobile.data.voice.endpoint/EndpointTranscriber { // com.letta.mobile.data.voice.endpoint/EndpointTranscriber|null[0]
     constructor <init>(com.letta.mobile.data.voice.endpoint/SpeechEndpointClient, com.letta.mobile.data.voice.consent/VoiceEndpointGrantSource, com.letta.mobile.data.voice/VoiceEndpointSettings) // com.letta.mobile.data.voice.endpoint/EndpointTranscriber.<init>|<init>(com.letta.mobile.data.voice.endpoint.SpeechEndpointClient;com.letta.mobile.data.voice.consent.VoiceEndpointGrantSource;com.letta.mobile.data.voice.VoiceEndpointSettings){}[0]
 
-    final suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip): com.letta.mobile.data.voice/VoiceText // com.letta.mobile.data.voice.endpoint/EndpointTranscriber.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip){}[0]
+    final suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.endpoint/EndpointTranscriber.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip){}[0]
 }
 
 final class com.letta.mobile.data.voice.endpoint/EndpointVoiceMouth : com.letta.mobile.data.voice.engine/VoiceMouth { // com.letta.mobile.data.voice.endpoint/EndpointVoiceMouth|null[0]
@@ -69875,6 +69905,22 @@ final class com.letta.mobile.data.voice.endpoint/EndpointVoiceMouth : com.letta.
     final fun flush() // com.letta.mobile.data.voice.endpoint/EndpointVoiceMouth.flush|flush(){}[0]
     final fun speak(com.letta.mobile.data.voice.engine/SpeechSegment) // com.letta.mobile.data.voice.endpoint/EndpointVoiceMouth.speak|speak(com.letta.mobile.data.voice.engine.SpeechSegment){}[0]
     final suspend fun stop() // com.letta.mobile.data.voice.endpoint/EndpointVoiceMouth.stop|stop(){}[0]
+}
+
+final class com.letta.mobile.data.voice.endpoint/RecognizerConfidence { // com.letta.mobile.data.voice.endpoint/RecognizerConfidence|null[0]
+    constructor <init>(kotlin/Double, kotlin/Double) // com.letta.mobile.data.voice.endpoint/RecognizerConfidence.<init>|<init>(kotlin.Double;kotlin.Double){}[0]
+
+    final val averageLogProbability // com.letta.mobile.data.voice.endpoint/RecognizerConfidence.averageLogProbability|{}averageLogProbability[0]
+        final fun <get-averageLogProbability>(): kotlin/Double // com.letta.mobile.data.voice.endpoint/RecognizerConfidence.averageLogProbability.<get-averageLogProbability>|<get-averageLogProbability>(){}[0]
+    final val noSpeechProbability // com.letta.mobile.data.voice.endpoint/RecognizerConfidence.noSpeechProbability|{}noSpeechProbability[0]
+        final fun <get-noSpeechProbability>(): kotlin/Double // com.letta.mobile.data.voice.endpoint/RecognizerConfidence.noSpeechProbability.<get-noSpeechProbability>|<get-noSpeechProbability>(){}[0]
+
+    final fun component1(): kotlin/Double // com.letta.mobile.data.voice.endpoint/RecognizerConfidence.component1|component1(){}[0]
+    final fun component2(): kotlin/Double // com.letta.mobile.data.voice.endpoint/RecognizerConfidence.component2|component2(){}[0]
+    final fun copy(kotlin/Double = ..., kotlin/Double = ...): com.letta.mobile.data.voice.endpoint/RecognizerConfidence // com.letta.mobile.data.voice.endpoint/RecognizerConfidence.copy|copy(kotlin.Double;kotlin.Double){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.endpoint/RecognizerConfidence.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.endpoint/RecognizerConfidence.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.endpoint/RecognizerConfidence.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.data.voice.endpoint/SpeechApiKey { // com.letta.mobile.data.voice.endpoint/SpeechApiKey|null[0]
@@ -69912,7 +69958,7 @@ final class com.letta.mobile.data.voice.endpoint/SpeechEndpointClient { // com.l
     final suspend fun checkReachable() // com.letta.mobile.data.voice.endpoint/SpeechEndpointClient.checkReachable|checkReachable(){}[0]
     final suspend fun synthesize(com.letta.mobile.data.voice.endpoint/SpeechRequest, kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.voice.audio/AudioChunk, kotlin/Unit>) // com.letta.mobile.data.voice.endpoint/SpeechEndpointClient.synthesize|synthesize(com.letta.mobile.data.voice.endpoint.SpeechRequest;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.voice.audio.AudioChunk,kotlin.Unit>){}[0]
     final suspend fun synthesizeClip(com.letta.mobile.data.voice.endpoint/SpeechRequest): com.letta.mobile.data.voice.audio/AudioClip // com.letta.mobile.data.voice.endpoint/SpeechEndpointClient.synthesizeClip|synthesizeClip(com.letta.mobile.data.voice.endpoint.SpeechRequest){}[0]
-    final suspend fun transcribe(com.letta.mobile.data.voice.endpoint/TranscriptionRequest): com.letta.mobile.data.voice/VoiceText // com.letta.mobile.data.voice.endpoint/SpeechEndpointClient.transcribe|transcribe(com.letta.mobile.data.voice.endpoint.TranscriptionRequest){}[0]
+    final suspend fun transcribe(com.letta.mobile.data.voice.endpoint/TranscriptionRequest): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.endpoint/SpeechEndpointClient.transcribe|transcribe(com.letta.mobile.data.voice.endpoint.TranscriptionRequest){}[0]
 }
 
 final class com.letta.mobile.data.voice.endpoint/SpeechEndpointConfig { // com.letta.mobile.data.voice.endpoint/SpeechEndpointConfig|null[0]
@@ -69975,6 +70021,22 @@ final class com.letta.mobile.data.voice.endpoint/SpeechTimeouts { // com.letta.m
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.endpoint/SpeechTimeouts.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.endpoint/SpeechTimeouts.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.endpoint/SpeechTimeouts.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.voice.endpoint/SpeechTranscript { // com.letta.mobile.data.voice.endpoint/SpeechTranscript|null[0]
+    constructor <init>(com.letta.mobile.data.voice/VoiceText, kotlin.collections/List<com.letta.mobile.data.voice.endpoint/RecognizerConfidence> = ...) // com.letta.mobile.data.voice.endpoint/SpeechTranscript.<init>|<init>(com.letta.mobile.data.voice.VoiceText;kotlin.collections.List<com.letta.mobile.data.voice.endpoint.RecognizerConfidence>){}[0]
+
+    final val segments // com.letta.mobile.data.voice.endpoint/SpeechTranscript.segments|{}segments[0]
+        final fun <get-segments>(): kotlin.collections/List<com.letta.mobile.data.voice.endpoint/RecognizerConfidence> // com.letta.mobile.data.voice.endpoint/SpeechTranscript.segments.<get-segments>|<get-segments>(){}[0]
+    final val text // com.letta.mobile.data.voice.endpoint/SpeechTranscript.text|{}text[0]
+        final fun <get-text>(): com.letta.mobile.data.voice/VoiceText // com.letta.mobile.data.voice.endpoint/SpeechTranscript.text.<get-text>|<get-text>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.voice/VoiceText // com.letta.mobile.data.voice.endpoint/SpeechTranscript.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<com.letta.mobile.data.voice.endpoint/RecognizerConfidence> // com.letta.mobile.data.voice.endpoint/SpeechTranscript.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.voice/VoiceText = ..., kotlin.collections/List<com.letta.mobile.data.voice.endpoint/RecognizerConfidence> = ...): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.endpoint/SpeechTranscript.copy|copy(com.letta.mobile.data.voice.VoiceText;kotlin.collections.List<com.letta.mobile.data.voice.endpoint.RecognizerConfidence>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.endpoint/SpeechTranscript.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.endpoint/SpeechTranscript.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.endpoint/SpeechTranscript.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.data.voice.endpoint/TranscriptionRequest { // com.letta.mobile.data.voice.endpoint/TranscriptionRequest|null[0]
@@ -70397,13 +70459,40 @@ final class com.letta.mobile.data.voice.vad.ear/EarTurnReport { // com.letta.mob
     }
 }
 
-final class com.letta.mobile.data.voice.vad.ear/TranscriptPolicy { // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy|null[0]
-    constructor <init>(kotlin/Int = ..., kotlin.time/Duration = ..., kotlin/Double = ..., kotlin.collections/Set<kotlin/String> = ...) // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.<init>|<init>(kotlin.Int;kotlin.time.Duration;kotlin.Double;kotlin.collections.Set<kotlin.String>){}[0]
+final class com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds { // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds|null[0]
+    constructor <init>(kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ...) // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.<init>|<init>(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double){}[0]
 
+    final val certainNoSpeech // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.certainNoSpeech|{}certainNoSpeech[0]
+        final fun <get-certainNoSpeech>(): kotlin/Double // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.certainNoSpeech.<get-certainNoSpeech>|<get-certainNoSpeech>(){}[0]
+    final val likelyNoSpeech // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.likelyNoSpeech|{}likelyNoSpeech[0]
+        final fun <get-likelyNoSpeech>(): kotlin/Double // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.likelyNoSpeech.<get-likelyNoSpeech>|<get-likelyNoSpeech>(){}[0]
+    final val lowLogProbability // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.lowLogProbability|{}lowLogProbability[0]
+        final fun <get-lowLogProbability>(): kotlin/Double // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.lowLogProbability.<get-lowLogProbability>|<get-lowLogProbability>(){}[0]
+    final val veryLowLogProbability // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.veryLowLogProbability|{}veryLowLogProbability[0]
+        final fun <get-veryLowLogProbability>(): kotlin/Double // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.veryLowLogProbability.<get-veryLowLogProbability>|<get-veryLowLogProbability>(){}[0]
+
+    final fun component1(): kotlin/Double // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.component1|component1(){}[0]
+    final fun component2(): kotlin/Double // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.component2|component2(){}[0]
+    final fun component3(): kotlin/Double // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.component3|component3(){}[0]
+    final fun component4(): kotlin/Double // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.component4|component4(){}[0]
+    final fun copy(kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ...): com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.copy|copy(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.hashCode|hashCode(){}[0]
+    final fun matches(com.letta.mobile.data.voice.endpoint/RecognizerConfidence): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.matches|matches(com.letta.mobile.data.voice.endpoint.RecognizerConfidence){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.voice.vad.ear/TranscriptPolicy { // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin.collections/Set<kotlin/String> = ..., com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds = ...) // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.<init>|<init>(kotlin.Int;kotlin.time.Duration;kotlin.time.Duration;kotlin.collections.Set<kotlin.String>;kotlin.collections.Set<kotlin.String>;com.letta.mobile.data.voice.vad.ear.NotSpeechThresholds){}[0]
+
+    final val fillerVoice // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.fillerVoice|{}fillerVoice[0]
+        final fun <get-fillerVoice>(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.fillerVoice.<get-fillerVoice>|<get-fillerVoice>(){}[0]
+    final val fillerWords // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.fillerWords|{}fillerWords[0]
+        final fun <get-fillerWords>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.fillerWords.<get-fillerWords>|<get-fillerWords>(){}[0]
     final val minWords // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.minWords|{}minWords[0]
         final fun <get-minWords>(): kotlin/Int // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.minWords.<get-minWords>|<get-minWords>(){}[0]
-    final val quietPeakSnrDb // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.quietPeakSnrDb|{}quietPeakSnrDb[0]
-        final fun <get-quietPeakSnrDb>(): kotlin/Double // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.quietPeakSnrDb.<get-quietPeakSnrDb>|<get-quietPeakSnrDb>(){}[0]
+    final val notSpeech // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.notSpeech|{}notSpeech[0]
+        final fun <get-notSpeech>(): com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.notSpeech.<get-notSpeech>|<get-notSpeech>(){}[0]
     final val shortVoice // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.shortVoice|{}shortVoice[0]
         final fun <get-shortVoice>(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.shortVoice.<get-shortVoice>|<get-shortVoice>(){}[0]
     final val stockPhrases // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.stockPhrases|{}stockPhrases[0]
@@ -70411,15 +70500,19 @@ final class com.letta.mobile.data.voice.vad.ear/TranscriptPolicy { // com.letta.
 
     final fun component1(): kotlin/Int // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.component1|component1(){}[0]
     final fun component2(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.component2|component2(){}[0]
-    final fun component3(): kotlin/Double // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.component3|component3(){}[0]
+    final fun component3(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.component3|component3(){}[0]
     final fun component4(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.component4|component4(){}[0]
-    final fun copy(kotlin/Int = ..., kotlin.time/Duration = ..., kotlin/Double = ..., kotlin.collections/Set<kotlin/String> = ...): com.letta.mobile.data.voice.vad.ear/TranscriptPolicy // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.copy|copy(kotlin.Int;kotlin.time.Duration;kotlin.Double;kotlin.collections.Set<kotlin.String>){}[0]
-    final fun discardReason(com.letta.mobile.data.voice/VoiceText, com.letta.mobile.data.voice.vad.ear/EarTurnReport): com.letta.mobile.data.voice.vad/TurnDiscardReason? // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.discardReason|discardReason(com.letta.mobile.data.voice.VoiceText;com.letta.mobile.data.voice.vad.ear.EarTurnReport){}[0]
+    final fun component5(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.component5|component5(){}[0]
+    final fun component6(): com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.component6|component6(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin.collections/Set<kotlin/String> = ..., com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds = ...): com.letta.mobile.data.voice.vad.ear/TranscriptPolicy // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.copy|copy(kotlin.Int;kotlin.time.Duration;kotlin.time.Duration;kotlin.collections.Set<kotlin.String>;kotlin.collections.Set<kotlin.String>;com.letta.mobile.data.voice.vad.ear.NotSpeechThresholds){}[0]
+    final fun discardReason(com.letta.mobile.data.voice/VoiceText, com.letta.mobile.data.voice.vad.ear/EarTurnReport, kotlin.collections/List<com.letta.mobile.data.voice.endpoint/RecognizerConfidence> = ...): com.letta.mobile.data.voice.vad/TurnDiscardReason? // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.discardReason|discardReason(com.letta.mobile.data.voice.VoiceText;com.letta.mobile.data.voice.vad.ear.EarTurnReport;kotlin.collections.List<com.letta.mobile.data.voice.endpoint.RecognizerConfidence>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.toString|toString(){}[0]
 
     final object Companion { // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.Companion|null[0]
+        final val DEFAULT_FILLER_WORDS // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.Companion.DEFAULT_FILLER_WORDS|{}DEFAULT_FILLER_WORDS[0]
+            final fun <get-DEFAULT_FILLER_WORDS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.Companion.DEFAULT_FILLER_WORDS.<get-DEFAULT_FILLER_WORDS>|<get-DEFAULT_FILLER_WORDS>(){}[0]
         final val DEFAULT_STOCK_PHRASES // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.Companion.DEFAULT_STOCK_PHRASES|{}DEFAULT_STOCK_PHRASES[0]
             final fun <get-DEFAULT_STOCK_PHRASES>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.voice.vad.ear/TranscriptPolicy.Companion.DEFAULT_STOCK_PHRASES.<get-DEFAULT_STOCK_PHRASES>|<get-DEFAULT_STOCK_PHRASES>(){}[0]
     }
@@ -74968,7 +75061,7 @@ open class com.letta.mobile.data.repository/CachedAgentRepository : com.letta.mo
 }
 
 open class com.letta.mobile.data.repository/CachedAllConversationsRepository : com.letta.mobile.data.repository.api/IAllConversationsRepository, com.letta.mobile.data.session/BackendScopedCache { // com.letta.mobile.data.repository/CachedAllConversationsRepository|null[0]
-    constructor <init>(kotlin.coroutines/SuspendFunction0<kotlin.collections/List<com.letta.mobile.data.model/Agent>>, com.letta.mobile.data.backend/RemoteRoute<com.letta.mobile.data.repository.api/ConversationRemoteSource>, kotlin/Function0<com.letta.mobile.data.repository.api/AllConversationsLocalCache>? = ..., kotlinx.coroutines/CoroutineScope = ..., com.letta.mobile.data.repository/IrohAdminRpcConversationListSource? = ..., com.letta.mobile.data.transport.api/IChannelTransport? = ...) // com.letta.mobile.data.repository/CachedAllConversationsRepository.<init>|<init>(kotlin.coroutines.SuspendFunction0<kotlin.collections.List<com.letta.mobile.data.model.Agent>>;com.letta.mobile.data.backend.RemoteRoute<com.letta.mobile.data.repository.api.ConversationRemoteSource>;kotlin.Function0<com.letta.mobile.data.repository.api.AllConversationsLocalCache>?;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.repository.IrohAdminRpcConversationListSource?;com.letta.mobile.data.transport.api.IChannelTransport?){}[0]
+    constructor <init>(kotlin.coroutines/SuspendFunction0<kotlin.collections/List<com.letta.mobile.data.model/Agent>>, com.letta.mobile.data.backend/ConversationListingFactory, com.letta.mobile.data.backend/RemoteRoute<com.letta.mobile.data.repository.api/ConversationRemoteSource>, kotlin/Function0<com.letta.mobile.data.repository.api/AllConversationsLocalCache>? = ..., kotlinx.coroutines/CoroutineScope = ..., com.letta.mobile.data.repository/IrohAdminRpcConversationListSource? = ..., com.letta.mobile.data.transport.api/IChannelTransport? = ..., kotlin.coroutines/SuspendFunction0<kotlin.collections/Set<com.letta.mobile.data.model/AgentId>> = ...) // com.letta.mobile.data.repository/CachedAllConversationsRepository.<init>|<init>(kotlin.coroutines.SuspendFunction0<kotlin.collections.List<com.letta.mobile.data.model.Agent>>;com.letta.mobile.data.backend.ConversationListingFactory;com.letta.mobile.data.backend.RemoteRoute<com.letta.mobile.data.repository.api.ConversationRemoteSource>;kotlin.Function0<com.letta.mobile.data.repository.api.AllConversationsLocalCache>?;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.repository.IrohAdminRpcConversationListSource?;com.letta.mobile.data.transport.api.IChannelTransport?;kotlin.coroutines.SuspendFunction0<kotlin.collections.Set<com.letta.mobile.data.model.AgentId>>){}[0]
 
     open val conversations // com.letta.mobile.data.repository/CachedAllConversationsRepository.conversations|{}conversations[0]
         open fun <get-conversations>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/Conversation>> // com.letta.mobile.data.repository/CachedAllConversationsRepository.conversations.<get-conversations>|<get-conversations>(){}[0]
@@ -80829,10 +80922,10 @@ final fun (com.letta.mobile.data.model/UiGeneratedComponent).com.letta.mobile.da
 final fun (com.letta.mobile.data.model/UiMessage).com.letta.mobile.data.chat.projection/hasNoRenderableContent(): kotlin/Boolean // com.letta.mobile.data.chat.projection/hasNoRenderableContent|hasNoRenderableContent@com.letta.mobile.data.model.UiMessage(){}[0]
 final fun (com.letta.mobile.data.model/UiMessage).com.letta.mobile.data.chat.projection/runStepDotIcon(): com.letta.mobile.data.chat.projection/StepDotIcon // com.letta.mobile.data.chat.projection/runStepDotIcon|runStepDotIcon@com.letta.mobile.data.model.UiMessage(){}[0]
 final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.data.chat.display/activity(): com.letta.mobile.data.chat.display/TaskActivity // com.letta.mobile.data.chat.display/activity|activity@com.letta.mobile.data.model.UiSubagentNotification(){}[0]
-final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.data.chat.display/isCommand(): kotlin/Boolean // com.letta.mobile.data.chat.display/isCommand|isCommand@com.letta.mobile.data.model.UiSubagentNotification(){}[0]
 final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.data.chat.projection/isMonitorWatcher(): kotlin/Boolean // com.letta.mobile.data.chat.projection/isMonitorWatcher|isMonitorWatcher@com.letta.mobile.data.model.UiSubagentNotification(){}[0]
 final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.data.chat.projection/monitorEvent(): kotlin/String? // com.letta.mobile.data.chat.projection/monitorEvent|monitorEvent@com.letta.mobile.data.model.UiSubagentNotification(){}[0]
 final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.data.chat.projection/monitorEventCount(): kotlin/Int // com.letta.mobile.data.chat.projection/monitorEventCount|monitorEventCount@com.letta.mobile.data.model.UiSubagentNotification(){}[0]
+final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.data.model/isCommand(): kotlin/Boolean // com.letta.mobile.data.model/isCommand|isCommand@com.letta.mobile.data.model.UiSubagentNotification(){}[0]
 final fun (com.letta.mobile.data.objectverbs/ObjectRef.Companion).com.letta.mobile.data.objectverbs.refs/agent(com.letta.mobile.data.model/AgentId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs.refs/agent|agent@com.letta.mobile.data.objectverbs.ObjectRef.Companion(com.letta.mobile.data.model.AgentId){}[0]
 final fun (com.letta.mobile.data.objectverbs/ObjectRef.Companion).com.letta.mobile.data.objectverbs.refs/canvas(com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs.refs/canvas|canvas@com.letta.mobile.data.objectverbs.ObjectRef.Companion(com.letta.mobile.data.model.CanvasId){}[0]
 final fun (com.letta.mobile.data.objectverbs/ObjectRef.Companion).com.letta.mobile.data.objectverbs.refs/conversation(com.letta.mobile.data.model/ConversationId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs.refs/conversation|conversation@com.letta.mobile.data.objectverbs.ObjectRef.Companion(com.letta.mobile.data.model.ConversationId){}[0]
@@ -80956,6 +81049,7 @@ final fun com.letta.mobile.data.canvas/mayRunNotebookPlugin(com.letta.mobile.dat
 final fun com.letta.mobile.data.canvas/mayUseNotebookAgentTool(com.letta.mobile.data.canvas/NotebookItem, com.letta.mobile.data.canvas/NotebookItemContract?, com.letta.mobile.data.canvas/NotebookPeerGrant?, kotlin.collections/Set<kotlin/String>): kotlin/Boolean // com.letta.mobile.data.canvas/mayUseNotebookAgentTool|mayUseNotebookAgentTool(com.letta.mobile.data.canvas.NotebookItem;com.letta.mobile.data.canvas.NotebookItemContract?;com.letta.mobile.data.canvas.NotebookPeerGrant?;kotlin.collections.Set<kotlin.String>){}[0]
 final fun com.letta.mobile.data.canvas/traverseNotebookDocuments(com.letta.mobile.data.canvas/NotebookDocumentId, kotlin/Function1<com.letta.mobile.data.canvas/NotebookDocumentId, com.letta.mobile.data.canvas/NotebookDocument?>): kotlin.collections/List<com.letta.mobile.data.canvas/NotebookDocument> // com.letta.mobile.data.canvas/traverseNotebookDocuments|traverseNotebookDocuments(com.letta.mobile.data.canvas.NotebookDocumentId;kotlin.Function1<com.letta.mobile.data.canvas.NotebookDocumentId,com.letta.mobile.data.canvas.NotebookDocument?>){}[0]
 final fun com.letta.mobile.data.channel/projectChannelLibrary(kotlin.collections/List<com.letta.mobile.data.channel/ChannelDisplayItem>, com.letta.mobile.data.channel/ChannelDisplayStatus?, kotlin/String): com.letta.mobile.data.channel/ChannelLibraryProjection // com.letta.mobile.data.channel/projectChannelLibrary|projectChannelLibrary(kotlin.collections.List<com.letta.mobile.data.channel.ChannelDisplayItem>;com.letta.mobile.data.channel.ChannelDisplayStatus?;kotlin.String){}[0]
+final fun com.letta.mobile.data.chat.conversations.listing/repositoryConversationListingFactory(): com.letta.mobile.data.backend/ConversationListingFactory // com.letta.mobile.data.chat.conversations.listing/repositoryConversationListingFactory|repositoryConversationListingFactory(){}[0]
 final fun com.letta.mobile.data.chat.conversations/composerHostCommands(com.letta.mobile.data.chat.conversations/ComposerHostCommandSources): kotlin.collections/List<com.letta.mobile.ui.chat.session/ChatHostCommand> // com.letta.mobile.data.chat.conversations/composerHostCommands|composerHostCommands(com.letta.mobile.data.chat.conversations.ComposerHostCommandSources){}[0]
 final fun com.letta.mobile.data.chat.display/parseBackgroundCommandReport(kotlin/String): com.letta.mobile.data.chat.display/BackgroundCommandReport // com.letta.mobile.data.chat.display/parseBackgroundCommandReport|parseBackgroundCommandReport(kotlin.String){}[0]
 final fun com.letta.mobile.data.chat.projection/backfillMissingAssistantRunIds(kotlin.collections/List<com.letta.mobile.data.model/UiMessage>): kotlin.collections/List<com.letta.mobile.data.model/UiMessage> // com.letta.mobile.data.chat.projection/backfillMissingAssistantRunIds|backfillMissingAssistantRunIds(kotlin.collections.List<com.letta.mobile.data.model.UiMessage>){}[0]
@@ -81121,6 +81215,7 @@ final suspend fun (com.letta.mobile.data.timeline/TimelineTransport).com.letta.m
 final suspend fun (com.letta.mobile.data.transport.api/IChannelTransport).com.letta.mobile.data.transport.api/sendSubagentListFor(com.letta.mobile.data.repository.api/SubagentParentScope, kotlin/Boolean, kotlin/Long = ...): com.letta.mobile.data.transport/ServerFrame.SubagentListResponse // com.letta.mobile.data.transport.api/sendSubagentListFor|sendSubagentListFor@com.letta.mobile.data.transport.api.IChannelTransport(com.letta.mobile.data.repository.api.SubagentParentScope;kotlin.Boolean;kotlin.Long){}[0]
 final suspend fun (com.letta.mobile.data.transport.appserver/AppServerClient).com.letta.mobile.data.compaction/executeCommandAnswer(com.letta.mobile.data.transport.appserver/AppServerCommand.ExecuteCommand): com.letta.mobile.data.compaction/CommandAnswer // com.letta.mobile.data.compaction/executeCommandAnswer|executeCommandAnswer@com.letta.mobile.data.transport.appserver.AppServerClient(com.letta.mobile.data.transport.appserver.AppServerCommand.ExecuteCommand){}[0]
 final suspend fun (com.letta.mobile.data.transport.appserver/AppServerClient).com.letta.mobile.data.controller.reconnect/reattachRuntimes(kotlin.collections/List<com.letta.mobile.data.transport.appserver/AppServerRuntimeScope>, kotlin/Function1<com.letta.mobile.data.transport.appserver/AppServerRuntimeScope, com.letta.mobile.data.transport.appserver/AppServerCommand.RuntimeStart>) // com.letta.mobile.data.controller.reconnect/reattachRuntimes|reattachRuntimes@com.letta.mobile.data.transport.appserver.AppServerClient(kotlin.collections.List<com.letta.mobile.data.transport.appserver.AppServerRuntimeScope>;kotlin.Function1<com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,com.letta.mobile.data.transport.appserver.AppServerCommand.RuntimeStart>){}[0]
+final suspend fun (com.letta.mobile.data.voice.audio/AudioPlayer).com.letta.mobile.data.voice.audio.pcm/play(com.letta.mobile.data.voice.audio/AudioClip, kotlin/Function1<com.letta.mobile.data.voice/AudioLevel, kotlin/Unit>) // com.letta.mobile.data.voice.audio.pcm/play|play@com.letta.mobile.data.voice.audio.AudioPlayer(com.letta.mobile.data.voice.audio.AudioClip;kotlin.Function1<com.letta.mobile.data.voice.AudioLevel,kotlin.Unit>){}[0]
 final suspend fun <#A: kotlin/Any?> com.letta.mobile.data.repository/exhaustCursorPages(kotlin/Int = ..., kotlin/Int = ..., kotlin.coroutines/SuspendFunction2<kotlin/Int, kotlin/String?, kotlin.collections/List<#A>>, kotlin/Function1<#A, kotlin/String>): kotlin.collections/List<#A> // com.letta.mobile.data.repository/exhaustCursorPages|exhaustCursorPages(kotlin.Int;kotlin.Int;kotlin.coroutines.SuspendFunction2<kotlin.Int,kotlin.String?,kotlin.collections.List<0:0>>;kotlin.Function1<0:0,kotlin.String>){0§<kotlin.Any?>}[0]
 final suspend fun <#A: kotlin/Any?> com.letta.mobile.data.repository/exhaustCursorPages(kotlin/Int = ..., kotlin/Int = ..., kotlin.coroutines/SuspendFunction2<kotlin/Int, kotlin/String?, kotlin.collections/List<#A>>, kotlin/Function1<#A, kotlin/String>, kotlin/Function1<#A, kotlin/Any>): kotlin.collections/List<#A> // com.letta.mobile.data.repository/exhaustCursorPages|exhaustCursorPages(kotlin.Int;kotlin.Int;kotlin.coroutines.SuspendFunction2<kotlin.Int,kotlin.String?,kotlin.collections.List<0:0>>;kotlin.Function1<0:0,kotlin.String>;kotlin.Function1<0:0,kotlin.Any>){0§<kotlin.Any?>}[0]
 final suspend fun <#A: kotlin/Any?> com.letta.mobile.data.repository/exhaustPages(kotlin/Int = ..., kotlin/Int = ..., kotlin.coroutines/SuspendFunction2<kotlin/Int, kotlin/Int, kotlin.collections/List<#A>>, kotlin/Function1<#A, kotlin/Any>): kotlin.collections/List<#A> // com.letta.mobile.data.repository/exhaustPages|exhaustPages(kotlin.Int;kotlin.Int;kotlin.coroutines.SuspendFunction2<kotlin.Int,kotlin.Int,kotlin.collections.List<0:0>>;kotlin.Function1<0:0,kotlin.Any>){0§<kotlin.Any?>}[0]

@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.canvas
 
+import io.ak1.drawbox.text.FontRegistry
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -13,9 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasTextStyle
@@ -247,12 +246,9 @@ internal fun rememberCascadeTheme(forceLight: Boolean = false, style: CanvasText
 /** The document's [CanvasTextStyle] laid over a base theme: sizes scaled, family, colour, alignment. */
 internal fun CascadeEditorTheme.applyStyle(style: CanvasTextStyle): CascadeEditorTheme {
     val scale = style.fontScale ?: 1f
-    val family = when (style.fontFamily) {
-        "serif" -> FontFamily.Serif
-        "mono" -> FontFamily.Monospace
-        "sans" -> FontFamily.SansSerif
-        else -> null
-    }
+    // The stored key names a face DrawBox's font registry holds (sans, serif, mono, or one the host
+    // registered); an unknown key keeps the editor's own face.
+    val family = style.fontFamily?.takeIf { it in FontRegistry.keys() }?.let(FontRegistry::resolve)
     val align = when (style.align) {
         "center" -> TextAlign.Center
         "end" -> TextAlign.End
@@ -283,6 +279,4 @@ internal fun CascadeEditorTheme.applyStyle(style: CanvasTextStyle): CascadeEdito
 
 private const val PERSIST_INTERVAL_MS = 750L
 
-/** What the editor's rows need beyond the read-only layout of the same text. */
-private val CENTRED_SLACK = 4.dp
 private const val DARK_LUMINANCE_THRESHOLD = 0.5f

@@ -6,6 +6,12 @@ package com.letta.mobile.data.model
  */
 internal const val MONITOR_EVENT_STATUS = "event"
 
+/** The background tasks whose reports are shell output: `Bash` (`bash_N`) and `exec_command`. */
+fun UiSubagentNotification.isCommand(): Boolean =
+    COMMAND_TASK_PREFIXES.any { taskId?.startsWith(it) == true }
+
+private val COMMAND_TASK_PREFIXES = listOf("bash_", "exec_")
+
 fun extractSubagentNotification(raw: String): UiSubagentNotification? {
     if (raw.indexOf("<task-notification", ignoreCase = true) < 0) return null
     val blockStart = raw.indexOf("<task-notification", ignoreCase = true)

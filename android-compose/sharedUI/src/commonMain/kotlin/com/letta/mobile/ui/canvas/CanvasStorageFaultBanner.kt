@@ -1,13 +1,6 @@
 package com.letta.mobile.ui.canvas
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -18,7 +11,10 @@ import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasStorageFault
 import com.letta.mobile.data.canvas.affecting
+import com.letta.mobile.ui.components.foundation.LettaInlineNotice
+import com.letta.mobile.ui.components.foundation.LettaNotice
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaPanelTone
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
@@ -64,26 +60,11 @@ internal fun CanvasStorageFaultOverlay(session: CanvasSession?, modifier: Modifi
 internal fun CanvasStorageFaultBanner(faults: List<CanvasStorageFault>, modifier: Modifier = Modifier) {
     val fault = faults.maxByOrNull { it.atEpochMs } ?: return
     val text = canvasStorageFaultText(fault)
-    Surface(
-        // One merged node, so the live region announces the headline and detail, not nothing.
+    // One merged node, so the live region announces the headline and detail, not nothing.
+    val headline = text.headline + if (faults.size > 1) " (+${faults.size - 1} more)" else ""
+    LettaInlineNotice(
+        notice = LettaNotice(message = text.detail, tone = LettaPanelTone.Error, title = headline),
         modifier = modifier.widthIn(max = LettaDimens.Pane.noticeMaxWidth)
             .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Assertive },
-        shape = RoundedCornerShape(LettaDimens.Radius.md),
-        color = MaterialTheme.colorScheme.errorContainer,
-        border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.error.copy(alpha = 0.6f)),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm)) {
-            Text(
-                text = text.headline + if (faults.size > 1) " (+${faults.size - 1} more)" else "",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-            )
-            Text(
-                text = text.detail,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                maxLines = 3,
-            )
-        }
-    }
+    )
 }

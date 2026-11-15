@@ -17,11 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.text.font.FontFamily
 import com.letta.mobile.data.memory.graph.MemoryNodeEditor
 import com.letta.mobile.data.memory.graph.MemoryNodeSelection
 import com.letta.mobile.data.memory.graph.MemoryPageActions
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /**
  * In-card block editor. Saving goes through the controller, which writes the
@@ -40,7 +40,7 @@ internal fun ColumnScope.MemoryNodeEditorPane(
         onValueChange = actions::updateDraft,
         enabled = !editor.isSaving,
         isError = editor.exceeds(selection.detail.limit),
-        textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+        textStyle = LettaTextStyles.monoBody,
         supportingText = { MemoryDraftCounter(editor, selection.detail.limit) },
         modifier = Modifier
             .fillMaxWidth()

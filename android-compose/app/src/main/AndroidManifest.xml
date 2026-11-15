@@ -94,8 +94,13 @@
                 android:value="androidx.startup" />
         </provider>
 
+        <!-- letta-mobile-09m53: a rotation, fold or window resize recomposes the Compose UI instead
+             of recreating the Activity (which reloaded the mascot and replayed composition state).
+             Nothing here reads orientation- or size-qualified resources; dark mode, locale and font
+             scale still recreate it. -->
         <activity
             android:name="com.letta.mobile.MainActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
             android:exported="true"
             android:launchMode="singleTop"
             android:windowSoftInputMode="adjustNothing"

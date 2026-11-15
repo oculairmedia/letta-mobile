@@ -18,7 +18,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.context.AgentContextCardModel
 import com.letta.mobile.data.context.ContextMeterLevel
@@ -33,6 +32,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.math.roundToInt
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /** Test tags of the drawer context card and its sheet. */
 object AgentContextTags {
@@ -97,8 +97,7 @@ private fun CardModelLine(model: AgentContextCardModel) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         Text(
             text = modelLine(model),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
+            style = LettaTextStyles.labelSemibold,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

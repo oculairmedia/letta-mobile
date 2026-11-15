@@ -65,6 +65,9 @@ private class SeenObserver : EarObserver {
 /** The app's own speech as the microphone hears it: loud enough to pass any threshold (0.95). */
 private const val ECHO_VALUE = 950
 
+/** A voice the normal thresholds hear but the echo guard does not (0.6). */
+private const val MODERATE_VALUE = 600
+
 /** The output tail in 32 ms frames: 384 ms. */
 private const val TAIL_FRAMES = 12
 
@@ -168,6 +171,23 @@ class VadVoiceEarHalfDuplexTest {
         assertEquals(listOf(VoiceEarEvent.SpeechEnded, nothingSaid()), rig.events.takeLast(2))
         assertEquals(listOf("opened", "closed:COMMITTED", "discarded:OUTPUT_ACTIVE"), rig.observer.seen)
         assertTrue(rig.transcriber.clips.isEmpty())
+        rig.close()
+    }
+
+    @Test
+    fun withInterruptingBySpeakingOnTheEchoGuardHoldsThroughTheTailAfterTheOutput() = runTest {
+        // 0.6 is speech for the normal thresholds (enter 0.5) but not for the echo guard (enter 0.8).
+        val rig = HalfDuplexRig(this, halfDuplex = false, outcomes = listOf(heard("yes")))
+        rig.hear(frames(0, 4))
+        rig.ear.setOutputActive(true)
+        rig.hear(frames(0, 40))
+        rig.ear.setOutputActive(false)
+        rig.hear(frames(MODERATE_VALUE, TAIL_FRAMES - 1) + frames(0, 40))
+        assertEquals(listOf<VoiceEarEvent>(VoiceEarEvent.ListeningStarted), rig.events, "the output's tail opened no turn")
+        assertTrue(rig.transcriber.clips.isEmpty())
+        rig.hear(frames(PRE_ROLL_VALUE, 4) + frames(MODERATE_VALUE, 12) + frames(0, 32))
+        val answered = VoiceEarEvent.EndOfTurn(VoiceUtterance(VoiceText("yes")))
+        assertEquals(answered, rig.events.last(), "after the tail the same voice is a turn")
         rig.close()
     }
 

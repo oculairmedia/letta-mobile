@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import com.letta.mobile.ui.theme.tokens.desktop.RiveWorkbenchColors
 import kotlin.math.hypot
 import kotlin.math.min
 
@@ -122,9 +123,8 @@ fun SurroundLayer(
                 if (!editingNow) return@drawWithContent
                 spec.nodes.forEachIndexed { i, n ->
                     val c = Offset(n.x * size.width, n.y * size.height)
-                    val hot = i == selectedNow
-                    drawCircle(Color.Black.copy(alpha = 0.5f), 9f, c, style = Stroke(4f))
-                    drawCircle(if (hot) Color.White else Color(0xFFBBBBBB), 9f, c, style = Stroke(2f))
+                    drawCircle(RiveWorkbenchColors.nodeRingShadow, 9f, c, style = Stroke(4f))
+                    drawCircle(if (i == selectedNow) Color.White else RiveWorkbenchColors.nodeRing, 9f, c, style = Stroke(2f))
                     drawCircle(Color(n.argb).copy(alpha = 1f), 4f, c)
                 }
             },

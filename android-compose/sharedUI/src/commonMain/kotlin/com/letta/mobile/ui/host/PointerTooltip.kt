@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,13 +23,13 @@ import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Popup
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 // Tooltips and hover cards for every pointer host: desktop and web share this code. The hover
 // lifecycle mirrors foundation's desktop-only TooltipArea, so desktop looks and behaves as it did.
@@ -125,7 +124,7 @@ private fun Modifier.onHoverChange(onEnter: () -> Unit, onExit: () -> Unit): Mod
 @Composable
 fun PointerTooltipSurface(text: String, timeLabel: String? = null, body: String? = null) {
     Surface(
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
@@ -154,8 +153,7 @@ private fun RichTooltipBody(title: String, timeLabel: String?, body: String?) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
+                style = LettaTextStyles.labelSemibold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),

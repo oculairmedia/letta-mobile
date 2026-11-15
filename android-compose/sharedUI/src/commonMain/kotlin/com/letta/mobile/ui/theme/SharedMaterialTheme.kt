@@ -88,7 +88,7 @@ private fun lettaDarkScheme(): ColorScheme = darkColorScheme(
 private fun lettaLightScheme(): ColorScheme = lightColorScheme(
     primary = Color(LettaColorTokens.LIGHT_PRIMARY),
     onPrimary = Color.White,
-    primaryContainer = Color(LettaColorTokens.LIGHT_PRIMARY).copy(alpha = 0.16f),
+    primaryContainer = Color(LettaColorTokens.LIGHT_PRIMARY).copy(alpha = LIGHT_PRIMARY_CONTAINER_TINT),
     onPrimaryContainer = Color(LettaColorTokens.LIGHT_ON_SURFACE),
     secondary = Color(LettaColorTokens.LIGHT_PRIMARY),
     onSecondary = Color.White,
@@ -128,7 +128,7 @@ fun lettaCustomColors(scheme: ColorScheme): CustomColors =
         dateSeparatorColor = scheme.onSurfaceVariant,
         textPrimary = scheme.onSurface,
         textSecondary = scheme.onSurfaceVariant,
-        textDisabled = scheme.onSurface.copy(alpha = 0.5f),
+        textDisabled = scheme.onSurface.copy(alpha = TEXT_DISABLED_ALPHA),
         textLink = scheme.primary,
         textOnPrimary = scheme.onPrimary,
         errorTextColor = scheme.error,
@@ -157,6 +157,11 @@ fun lettaCustomColors(scheme: ColorScheme): CustomColors =
         borderCritical = scheme.error,
     )
 
+/**
+ * The compact type scale for desktop and the web: Material 3's roles, 2 to 5 sp smaller, for more words
+ * per line on a monitor. Android (LettaTheme, Inter) and desktop's phone preview keep Material 3's
+ * phone sizes; the split is by screen density, not drift, so it is not unified here.
+ */
 val SharedTypography: Typography = Typography().let { base ->
     base.copy(
         displayLarge = base.displayLarge.copy(fontSize = 44.sp, lineHeight = 52.sp),
@@ -177,10 +182,29 @@ val SharedTypography: Typography = Typography().let { base ->
     )
 }
 
+/**
+ * The one corner scale, on every host: Android's LettaTheme, desktop (both its own and its phone
+ * preview metrics) and the web all pass these shapes, so `MaterialTheme.shapes.medium` is the same
+ * corner everywhere. small, medium and large are [LettaDimens.Radius] sm, md and lg, so converting a
+ * `RoundedCornerShape(LettaDimens.Radius.x)` to the matching role moves nothing.
+ *
+ * extraSmall: menus, text fields' Material default, tooltips. small: chips, pills, small controls.
+ * medium: panels, cards, list rows (LettaShapes.panel). large: composer, popups. extraLarge: dialogs
+ * and sheets.
+ */
 val SharedShapes: Shapes = Shapes(
     extraSmall = RoundedCornerShape(4.dp),
-    small = RoundedCornerShape(6.dp),
-    medium = RoundedCornerShape(8.dp),
-    large = RoundedCornerShape(12.dp),
+    small = RoundedCornerShape(LettaDimens.Radius.sm),
+    medium = RoundedCornerShape(LettaDimens.Radius.md),
+    large = RoundedCornerShape(LettaDimens.Radius.lg),
     extraLarge = RoundedCornerShape(16.dp),
 )
+
+/**
+ * How strongly the light theme's primary container is tinted with primary. It is a fill under content
+ * (the user's bubble, a selected row), not content, so it sits far below the content alpha floor.
+ */
+private const val LIGHT_PRIMARY_CONTAINER_TINT = 0.16f
+
+/** How strongly disabled text keeps `onSurface` (customColors.textDisabled). */
+private const val TEXT_DISABLED_ALPHA = 0.5f

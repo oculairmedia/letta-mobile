@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.theme.ChatRowType
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,7 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.diff.UnifiedDiff
 import com.letta.mobile.data.runtime.PendingApprovalDetails
@@ -69,16 +69,14 @@ internal fun ApprovalDiffPreviewBlock(preview: ApprovalDiffPreview) {
         if (title != null && stats != null) {
             Text(
                 text = stringResource(Res.string.rows_approval_diff_stats, title, stats.first, stats.second),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
+                style = ChatRowType.itemTitle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         } else if (title != null) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
+                style = ChatRowType.itemTitle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

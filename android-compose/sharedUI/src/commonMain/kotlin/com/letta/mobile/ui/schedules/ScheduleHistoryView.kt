@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,14 +20,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.schedules.HistorySummary
 import com.letta.mobile.data.schedules.ScheduleReliability
 import com.letta.mobile.data.schedules.ScheduleFormat
 import kotlinx.datetime.TimeZone
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 
 /** Shows reliability and recorded wake reasons, with run times in [zone]. */
 @Composable
@@ -67,8 +66,7 @@ private fun ReliabilityRow(rel: ScheduleReliability, zone: TimeZone) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 rel.scheduleName,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = LettaTextAccents.bodySemibold,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
@@ -113,8 +111,7 @@ fun StatCell(value: String, label: String, valueColor: Color, modifier: Modifier
     Column(modifier.padding(horizontal = LettaDimens.Space.lg)) {
         Text(
             value,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
+            style = LettaTextStyles.pageTitle,
             color = valueColor,
         )
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
@@ -126,7 +123,7 @@ fun ReliabilityStrip(squares: List<Boolean?>, count: Int = 12) {
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         val padded = (squares.takeLast(count) + List(count) { null }).take(count)
         padded.forEach { ok ->
-            Box(Modifier.size(LettaDimens.Control.icon).clip(RoundedCornerShape(LettaDimens.Radius.sm)).background(reliabilitySquareColor(ok)))
+            Box(Modifier.size(LettaDimens.Control.icon).clip(MaterialTheme.shapes.small).background(reliabilitySquareColor(ok)))
         }
     }
 }

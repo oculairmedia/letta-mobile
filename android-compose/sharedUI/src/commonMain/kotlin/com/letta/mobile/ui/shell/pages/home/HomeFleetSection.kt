@@ -1,12 +1,18 @@
 package com.letta.mobile.ui.shell.pages.home
 
+import com.letta.mobile.ui.shell.tokens.ShellType
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LocalObjectVerbs
+import com.letta.mobile.ui.components.LettaEmptyHint
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaDivider
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaStatusDot
+import com.letta.mobile.ui.components.foundation.lettaClickable
 import com.letta.mobile.ui.components.items
 import com.letta.mobile.data.objectverbs.ObjectRef
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,34 +21,31 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.home.FleetAgentStat
 import com.letta.mobile.data.home.FleetSortKey
 import com.letta.mobile.util.time.TimeLabels
 import com.letta.mobile.ui.home.FleetBarSpark
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
+import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.theme.tokens.LettaStatusTone
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /**
  * The fleet: every agent with its model, chat count, last activity and 48-hour event strip. A wide
@@ -50,10 +53,10 @@ import com.letta.mobile.ui.theme.LettaDimens
  * the agent and its pin toggles the agent's tile in the pinned grid.
  */
 internal fun LazyListScope.homeFleetSection(page: HomePageScope) {
-    item(key = "fleet-label") { HomeSectionLabel(FLEET_LABEL) }
+    item(key = "fleet-label") { LettaSectionLabel(FLEET_LABEL) }
     item(key = "fleet-sort") { if (page.wide) FleetTableHeader(page) else FleetSortChips(page) }
     val rows = page.state.sortedAgents
-    if (rows.isEmpty()) item(key = "fleet-empty") { HomeEmptyLine(NO_AGENTS) }
+    if (rows.isEmpty()) item(key = "fleet-empty") { LettaEmptyHint(NO_AGENTS) }
     items(items = rows, key = { "fleet-${it.agentId}" }) { agent ->
         FleetAgentRow(agent, page)
     }
@@ -64,20 +67,19 @@ private fun FleetTableHeader(page: HomePageScope) {
     Column {
         Row(Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.sm), verticalAlignment = Alignment.CenterVertically) {
             SortHeaderCell(FleetSortKey.Agent, page, Modifier.weight(1f))
-            SortHeaderCell(FleetSortKey.Model, page, Modifier.width(ModelWidth))
-            SortHeaderCell(FleetSortKey.Conversations, page, Modifier.width(CountWidth), alignEnd = true)
-            SortHeaderCell(FleetSortKey.LastActivity, page, Modifier.width(TimeWidth), alignEnd = true)
+            SortHeaderCell(FleetSortKey.Model, page, Modifier.width(ShellDimens.fleetModelColumn))
+            SortHeaderCell(FleetSortKey.Conversations, page, Modifier.width(ShellDimens.fleetCountColumn), alignEnd = true)
+            SortHeaderCell(FleetSortKey.LastActivity, page, Modifier.width(ShellDimens.fleetTimeColumn), alignEnd = true)
             Text(
                 text = STRIP_LABEL,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = MUTED_ALPHA),
-                fontWeight = FontWeight.SemiBold,
+                style = LettaTextStyles.labelSmallSemibold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.muted),
                 textAlign = TextAlign.End,
-                modifier = Modifier.width(SparkWidth),
+                modifier = Modifier.width(ShellDimens.fleetSparkColumn),
             )
-            Box(Modifier.width(PinWidth))
+            Box(Modifier.width(LettaDimens.Control.iconButton))
         }
-        RowHairline()
+        LettaDivider()
     }
 }
 
@@ -87,8 +89,7 @@ private fun SortHeaderCell(key: FleetSortKey, page: HomePageScope, modifier: Mod
     val active = sort.key == key
     Row(
         modifier = modifier
-            .clip(MaterialTheme.shapes.small)
-            .clickable { page.actions.selectSort(key) }
+            .lettaClickable(role = Role.Button, shape = MaterialTheme.shapes.small, onClick = { page.actions.selectSort(key) })
             .testTag(HomePageTags.sort(key))
             .padding(vertical = LettaDimens.Space.xs, horizontal = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
@@ -96,9 +97,12 @@ private fun SortHeaderCell(key: FleetSortKey, page: HomePageScope, modifier: Mod
     ) {
         Text(
             text = key.label.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = MUTED_ALPHA),
+            style = LettaTextStyles.labelSmallSemibold,
+            color = if (active) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.muted)
+            },
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -132,26 +136,38 @@ private fun FleetAgentRow(agent: FleetAgentStat, page: HomePageScope) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(MaterialTheme.shapes.small)
-                .clickable { page.navigation.onOpenAgent(agent.agentId) }
+                .lettaClickable(
+                    role = Role.Button,
+                    shape = MaterialTheme.shapes.small,
+                    onClick = { page.navigation.onOpenAgent(agent.agentId) },
+                )
                 .testTag(HomePageTags.agentRow(agent))
                 .padding(vertical = LettaDimens.Space.sm, horizontal = LettaDimens.Space.hair),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FleetAgentIdentity(agent, page, Modifier.weight(1f))
             if (page.wide) {
-                FleetCell(agent.modelLabel, Modifier.width(ModelWidth))
-                FleetCell(agent.conversationCount.toString(), Modifier.width(CountWidth), strong = agent.conversationCount > 0, align = TextAlign.End)
+                FleetCell(agent.modelLabel, Modifier.width(ShellDimens.fleetModelColumn))
+                FleetCell(
+                    agent.conversationCount.toString(),
+                    Modifier.width(ShellDimens.fleetCountColumn),
+                    strong = agent.conversationCount > 0,
+                    align = TextAlign.End,
+                )
             }
-            FleetCell(agent.lastActivity?.let { TimeLabels.age(it) } ?: DASH, Modifier.width(TimeWidth), align = TextAlign.End)
+            val age = agent.lastActivity?.let { TimeLabels.age(it) } ?: DASH
+            FleetCell(age, Modifier.width(ShellDimens.fleetTimeColumn), align = TextAlign.End)
             if (page.wide) {
-                Box(Modifier.width(SparkWidth), contentAlignment = Alignment.CenterEnd) {
-                    FleetBarSpark(values = agent.activityByHour, modifier = Modifier.width(SparkBarsWidth).height(LettaDimens.Space.lg))
+                Box(Modifier.width(ShellDimens.fleetSparkColumn), contentAlignment = Alignment.CenterEnd) {
+                    FleetBarSpark(
+                        values = agent.activityByHour,
+                        modifier = Modifier.width(ShellDimens.fleetSparkBars).height(LettaDimens.Space.lg),
+                    )
                 }
             }
             AgentPinToggle(agent)
         }
-        RowHairline()
+        LettaDivider()
     }
 }
 
@@ -163,8 +179,7 @@ private fun FleetAgentIdentity(agent: FleetAgentStat, page: HomePageScope, modif
             // An unresolved name is the raw backend id; it renders as the technical fallback it is.
             Text(
                 text = agent.name,
-                style = if (agent.nameIsIdFallback) MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace) else MaterialTheme.typography.bodyMedium,
-                fontWeight = if (agent.nameIsIdFallback) FontWeight.Normal else FontWeight.Medium,
+                style = if (agent.nameIsIdFallback) ShellType.idFallback else ShellType.bodyEmphasis,
                 color = if (agent.nameIsIdFallback) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -174,7 +189,7 @@ private fun FleetAgentIdentity(agent: FleetAgentStat, page: HomePageScope, modif
             }
         }
         // Only running agents get a dot; idle is the absence of a marker.
-        if (agent.running) Box(Modifier.size(LettaDimens.Space.sm).clip(CircleShape).background(MaterialTheme.colorScheme.tertiary))
+        if (agent.running) LettaStatusDot(LettaStatusTone.Running)
     }
 }
 
@@ -182,18 +197,13 @@ private fun FleetAgentIdentity(agent: FleetAgentStat, page: HomePageScope, modif
 private fun AgentPinToggle(agent: FleetAgentStat) {
     val agentId = agent.agentId
     val pin = LocalObjectVerbs.current?.items(ObjectRef("agent", agentId), "home-tile")?.singleOrNull() ?: return
-    IconButton(
+    val glyph = LettaIconStyle(LettaDimens.Control.iconSm, MaterialTheme.colorScheme.onSurfaceVariant)
+    LettaIconButton(
+        icon = LettaButtonIcon(pin.icon ?: LettaIcons.Pin, pin.label, glyph = glyph),
         onClick = pin.onClick,
         enabled = pin.enabled,
-        modifier = Modifier.width(PinWidth).testTag(HomePageTags.pinAgent(agent)),
-    ) {
-        Icon(
-            imageVector = pin.icon ?: LettaIcons.Pin,
-            contentDescription = pin.label,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Control.iconSm),
-        )
-    }
+        modifier = Modifier.testTag(HomePageTags.pinAgent(agent)),
+    )
 }
 
 @Composable
@@ -209,20 +219,9 @@ private fun FleetCell(text: String, modifier: Modifier, strong: Boolean = false,
     )
 }
 
-@Composable
-private fun RowHairline() {
-    Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)))
-}
-
 private fun sortArrow(descending: Boolean): String = if (descending) "▼" else "▲"
 
 private const val FLEET_LABEL = "Fleet"
 private const val STRIP_LABEL = "LAST 48H"
 private const val NO_AGENTS = "No agents yet. Create one to see it here."
 private const val DASH = "—"
-private val ModelWidth = 150.dp
-private val CountWidth = 56.dp
-private val TimeWidth = 84.dp
-private val SparkWidth = 72.dp
-private val SparkBarsWidth = 60.dp
-private val PinWidth = 40.dp

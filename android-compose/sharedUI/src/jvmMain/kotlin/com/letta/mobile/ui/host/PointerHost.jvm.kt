@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.window.WindowDraggableArea
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -22,7 +21,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
@@ -31,6 +29,10 @@ import androidx.compose.ui.window.DialogWindowScope
 import androidx.compose.ui.window.rememberDialogState
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaDivider
+import androidx.compose.ui.semantics.Role
 
 /**
  * The desktop pointer host: the shared pointer containers and hover tooltips ([LettaHost.Pointer]) plus
@@ -61,7 +63,7 @@ private fun AlertWindow(spec: PaneSpec, content: @Composable ColumnScope.() -> U
         ) {
             Column {
                 AlertTitleBar(this@DialogWindow, spec.title.orEmpty(), spec.onDismiss)
-                Box(Modifier.fillMaxWidth().height(LettaDimens.Stroke.hairline).background(MaterialTheme.colorScheme.outlineVariant))
+                LettaDivider()
                 Column(Modifier.padding(top = LettaDimens.Space.lg).then(rememberPaneFocus(spec.onDismiss)).then(spec.testTag?.let { Modifier.testTag(it) } ?: Modifier)) {
                     content()
                 }
@@ -84,7 +86,6 @@ private fun AlertTitleBar(window: DialogWindowScope, title: String, onDismiss: (
                 Text(
                     text = title,
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -93,15 +94,11 @@ private fun AlertTitleBar(window: DialogWindowScope, title: String, onDismiss: (
                 Box(
                     modifier = Modifier
                         .size(width = LettaDimens.Orb.railSlotWidth, height = LettaDimens.Control.actionButton)
-                        .clickable(onClick = onDismiss),
+                        .clickable(onClickLabel = "Close", role = Role.Button, onClick = onDismiss),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = LettaIcons.Close,
-                        contentDescription = "Close",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(LettaDimens.Control.icon),
-                    )
+                    val glyph = LettaIconStyle(tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    LettaIcon(LettaIcons.Close, contentDescription = "Close", style = glyph)
                 }
             }
         }
