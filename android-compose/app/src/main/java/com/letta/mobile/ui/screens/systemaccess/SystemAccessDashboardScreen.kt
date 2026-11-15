@@ -43,7 +43,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -67,11 +66,12 @@ import com.letta.mobile.platform.systemaccess.SystemAccessProbe
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
-import com.letta.mobile.ui.components.ErrorContent
+import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshable
-import com.letta.mobile.ui.components.ShimmerCard
-import com.letta.mobile.ui.components.StatusChip
+import com.letta.mobile.ui.components.foundation.LettaStatusLabel
+import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.theme.tokens.LettaStatusTone
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.shell.header.HeaderAction
@@ -211,16 +211,8 @@ private fun SystemAccessDashboardBody(
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
-        is UiState.Loading -> {
-            Column(modifier = modifier.padding(LettaDimens.Space.lg)) {
-                ShimmerCard(modifier = Modifier.fillMaxWidth())
-            }
-        }
-        is UiState.Error -> ErrorContent(
-            message = uiState.message,
-            onRetry = onRetry,
-            modifier = modifier,
-        )
+        is UiState.Loading -> LettaBusyBar(modifier = modifier.fillMaxWidth())
+        is UiState.Error -> LettaInlineError(uiState.message, modifier.padding(LettaDimens.Space.lg), onRetry = onRetry)
         is UiState.Success -> SystemAccessDashboardContent(
             state = uiState.data,
             onPermissionIntentClick = onPermissionIntentClick,
@@ -299,7 +291,7 @@ private fun CapabilityHeadline(capability: SystemAccessCapability) {
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )
-            StatusChip(status = capability.status.label)
+            LettaStatusLabel(text = capability.status.label, tone = capability.status.tone())
         }
         Text(
             text = capability.summary,
@@ -456,6 +448,14 @@ private val SystemAccessCapabilityStatus.label: String
         SystemAccessCapabilityStatus.GrantedLimited -> "Limited"
         SystemAccessCapabilityStatus.Revoked -> "Revoked"
         SystemAccessCapabilityStatus.Error -> "Error"
+    }
+
+private fun SystemAccessCapabilityStatus.tone(): LettaStatusTone =
+    when (this) {
+        SystemAccessCapabilityStatus.Granted -> LettaStatusTone.Success
+        SystemAccessCapabilityStatus.GrantedLimited, SystemAccessCapabilityStatus.AvailableNeedsSetup -> LettaStatusTone.Warning
+        SystemAccessCapabilityStatus.Unavailable -> LettaStatusTone.Idle
+        else -> LettaStatusTone.Error // Denied, Revoked, Error
     }
 
 private val SystemAccessFlavorAvailability.label: String

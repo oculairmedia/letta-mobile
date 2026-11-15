@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -37,6 +36,7 @@ import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.tokens.desktop.PhoneChromeTokens
 
 /** Test tags for the phone screen's simulated system chrome. */
 internal object PhoneScreenTags {
@@ -73,7 +73,7 @@ private class PhoneFrameStyle(val backdrop: Color, val screen: Modifier)
 
 private fun phoneFrameStyle(state: DesktopPhoneState): PhoneFrameStyle {
     if (!state.deviceFrame) return PhoneFrameStyle(Color.Black, Modifier)
-    val glass = RoundedCornerShape((state.device.cornerRadiusDp * state.zoom).dp)
+    val glass = PhoneChromeTokens.glassShape((state.device.cornerRadiusDp * state.zoom).dp)
     val bezel = if (state.dark) BEZEL_DARK else BEZEL_LIGHT
     return PhoneFrameStyle(bezel, Modifier.padding(FRAME_WIDTH).border(FRAME_RIM, FRAME_RIM_COLOR, glass).clip(glass))
 }
@@ -191,11 +191,11 @@ private class KeyboardSessions(private val state: DesktopPhoneState, private val
     }
 }
 
-private val FRAME_WIDTH: Dp = 10.dp
+private val FRAME_WIDTH: Dp = PhoneChromeTokens.frameWidth
 private val FRAME_RIM: Dp = 1.dp
-private val FRAME_RIM_COLOR = Color(0xFF3A3D42)
-private val BEZEL_DARK = Color(0xFF0B0C0E)
-private val BEZEL_LIGHT = Color(0xFF1B1D21)
+private val FRAME_RIM_COLOR = PhoneChromeTokens.frameRimColor
+private val BEZEL_DARK = PhoneChromeTokens.bezelDark
+private val BEZEL_LIGHT = PhoneChromeTokens.bezelLight
 
 /** Close to Android's IME inset animation: ~285 ms on its fast-out-slow-in curve. */
 private val KEYBOARD_SLIDE = tween<Float>(285, easing = FastOutSlowInEasing)
