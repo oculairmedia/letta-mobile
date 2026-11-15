@@ -1,7 +1,6 @@
-package com.letta.mobile.ui.components
+package com.letta.mobile.ui.components.foundation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -17,18 +16,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.tokens.LettaTextAccents
+import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
 
 /**
  * The one filter / segment / toggle chip (the sidebar's Active / Archived / All, a page's view
- * switch, a legend that filters). [active] draws it raised and semibold. [leading] is a small mark
- * before the words (a legend's [LettaSwatch]); [role] is [Role.Tab] for one-of-many and
- * [Role.Checkbox] for a chip that toggles on its own.
+ * switch, a legend that filters, a canvas panel's options). [active] draws it raised and semibold.
+ * [leading] is a small mark before the words (a legend's [LettaSwatch]); a chip whose mark says it
+ * all (a colour target's swatch and glyph) passes null [text] and names itself through [modifier]'s
+ * semantics. [role] is [Role.Tab] for one-of-many and [Role.Checkbox] for a chip that toggles on its
+ * own.
  */
 @Composable
 fun LettaChipTab(
-    text: String,
+    text: String?,
     active: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -39,19 +40,21 @@ fun LettaChipTab(
         modifier = modifier
             .clip(MaterialTheme.shapes.small)
             .background(if (active) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)
-            .clickable(role = role, onClick = onClick)
+            .lettaClickable(role = role, target = LettaClickTarget.Inline, onClick = onClick)
             .semantics { selected = active }
-            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
+            .padding(horizontal = LettaSpaceTokens.md, vertical = LettaSpaceTokens.sm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+        horizontalArrangement = Arrangement.spacedBy(LettaSpaceTokens.xs),
     ) {
         leading?.invoke()
-        Text(
-            text = text,
-            style = if (active) LettaTextAccents.labelMediumSemibold else LettaTextAccents.labelMediumRegular,
-            color = if (active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-        )
+        text?.let {
+            Text(
+                text = it,
+                style = if (active) LettaTextAccents.labelMediumSemibold else LettaTextAccents.labelMediumRegular,
+                color = if (active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
     }
 }
 
@@ -63,7 +66,7 @@ fun LettaChipTab(
 fun LettaChipTabRow(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        horizontalArrangement = Arrangement.spacedBy(LettaSpaceTokens.sm),
         verticalAlignment = Alignment.CenterVertically,
         content = content,
     )

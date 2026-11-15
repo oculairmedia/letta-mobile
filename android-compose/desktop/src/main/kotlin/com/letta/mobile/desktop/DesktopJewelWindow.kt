@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
 import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
-import com.letta.mobile.ui.components.LocalMenuActionScope
+import com.letta.mobile.ui.components.foundation.LocalMenuActionScope
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.host.desktopPointer

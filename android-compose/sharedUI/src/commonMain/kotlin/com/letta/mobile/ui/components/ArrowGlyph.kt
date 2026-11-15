@@ -21,7 +21,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The one arrow a control points with (down to the newest message, back and on through pages), in
- * the content colour. A disclosure is never drawn with it: that is [DisclosureChevron]. [size] is the
+ * the content colour. A disclosure is never drawn with it: that is DisclosureChevron. [size] is the
  * icon's own when null.
  */
 @Composable

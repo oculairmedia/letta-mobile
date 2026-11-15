@@ -44,12 +44,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
-import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.disclosure.DisclosureChevron
 import com.letta.mobile.ui.components.foundation.LettaNavChevron
 import com.letta.mobile.ui.components.row.LettaListRow
 import com.letta.mobile.ui.components.row.LettaListRowSpec
-import com.letta.mobile.ui.theme.LettaBusyBar
-import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.host.PaneSize

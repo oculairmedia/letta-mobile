@@ -2,7 +2,6 @@ package com.letta.mobile.ui.chat.surface
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -39,7 +38,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
@@ -86,7 +84,7 @@ import com.letta.mobile.ui.chat.AgentSphere
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
-import com.letta.mobile.ui.components.LettaUnfoldButton
+import com.letta.mobile.ui.components.disclosure.LettaUnfoldButton
 import com.letta.mobile.ui.components.movePointerIcon
 import com.letta.mobile.ui.markdown.LocalSharedRichMarkdownRenderer
 import com.letta.mobile.ui.markdown.MarkdownPaint
@@ -110,6 +108,8 @@ import com.letta.mobile.ui.theme.ChatMascotDimens
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 /*
  * letta-mobile-bglj6.1: the docked chat minimised. No panel and no header: the agent's mascot
@@ -375,7 +375,7 @@ private fun CollapsedOwnSeat(content: CollapsedDockContent, size: Dp) {
                 val open = content.openAgent
                 AgentSphere(
                     size = collapsedFallbackSize(size),
-                    modifier = if (open != null) Modifier.clip(CircleShape).clickable(role = Role.Button, onClick = open) else Modifier,
+                    modifier = if (open != null) Modifier.lettaClickable(role = Role.Button, target = RoundInlineTarget, onClick = open) else Modifier,
                 )
             }
             MascotSeatVacancy.SEATED_ELSEWHERE -> CollapsedStandIn(content, size)
@@ -432,7 +432,12 @@ private fun ReplyBubble(turn: CollapsedTurn, agentName: String, actions: BubbleA
         Box {
             Column(
                 Modifier
-                    .clickable(onClickLabel = restoreLabel, role = Role.Button, onClick = actions.open)
+                    .lettaClickable(
+                        role = Role.Button,
+                        onClickLabel = restoreLabel,
+                        target = LettaClickTarget.Inline,
+                        onClick = actions.open,
+                    )
                     .semantics {
                         contentDescription = announcement
                         // Announced once it settles, not on every streamed token.
@@ -647,3 +652,6 @@ internal const val DOCK_COLLAPSED_BUBBLE_TAG = "chat-dock-collapsed-bubble"
 internal const val DOCK_COLLAPSED_DISMISS_TAG = "chat-dock-collapsed-dismiss"
 internal const val DOCK_COLLAPSED_THINKING_TAG = "chat-dock-collapsed-thinking"
 internal const val DOCK_COLLAPSED_NEEDS_INPUT_TAG = "chat-dock-collapsed-needs-input"
+
+/** The dock's round avatar target: its ripple clipped to the circle, no minimum around it. */
+private val RoundInlineTarget = LettaClickTarget(CircleShape, minimumTouchTarget = false)

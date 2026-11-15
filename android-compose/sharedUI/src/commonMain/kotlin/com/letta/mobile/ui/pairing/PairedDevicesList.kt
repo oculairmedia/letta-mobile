@@ -25,8 +25,8 @@ import com.letta.mobile.data.pairing.PairedDevice
 import com.letta.mobile.data.pairing.PendingInvite
 import com.letta.mobile.data.pairing.access
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaOutlinedPill
-import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.components.foundation.LettaOutlinedPill
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 
 /**
  * Settings > Paired devices: THIS DEVICE / OTHER DEVICES

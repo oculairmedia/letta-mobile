@@ -52,6 +52,8 @@ import com.letta.mobile.ui.components.foundation.LettaSwatch
 import com.letta.mobile.ui.components.foundation.LettaVerticalDivider
 import com.letta.mobile.ui.host.LettaMenu
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.components.foundation.LettaMenuEntry
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 
 /**
  * The contextual bar that floats on the selection, the way Miro shows what applies to it: one master control ([CanvasPropertyControl]) for every colour and property of the
@@ -201,14 +203,7 @@ private fun PhoneSelectionButtons(actions: SelectionActions) {
         BarButton(Lucide.EllipsisVertical, "More shape actions") { open = true }
         LettaMenu(expanded = open, onDismiss = { open = false }) {
             fun item(icon: ImageVector, label: String, onClick: () -> Unit) = @Composable {
-                DropdownMenuItem(
-                    text = { Text(label) },
-                    leadingIcon = { LettaIcon(icon, contentDescription = null) },
-                    onClick = {
-                        open = false
-                        onClick()
-                    },
-                )
+                LettaMenuEntry(LettaMenuItem(label, icon, onClick = onClick), onDismiss = { open = false })
             }
             actions.onEditText?.let { item(Lucide.TextCursorInput, "Edit text", it)() }
             if (text != null) {
@@ -316,15 +311,8 @@ private fun ShapeTypeButton(reshape: ShapeReshapeActions) {
         BarButton(shapeIcon(reshape.current ?: ShapeType.RECTANGLE), "Change shape") { open = true }
         LettaMenu(expanded = open, onDismiss = { open = false }) {
             CanvasReshape.Types.forEach { type ->
-                DropdownMenuItem(
-                    text = { Text(shapeLabel(type)) },
-                    leadingIcon = { LettaIcon(shapeIcon(type), contentDescription = null) },
-                    enabled = type != reshape.current,
-                    onClick = {
-                        open = false
-                        reshape.onPick(type)
-                    },
-                )
+                val item = LettaMenuItem(shapeLabel(type), shapeIcon(type), enabled = type != reshape.current) { reshape.onPick(type) }
+                LettaMenuEntry(item, onDismiss = { open = false })
             }
         }
     }

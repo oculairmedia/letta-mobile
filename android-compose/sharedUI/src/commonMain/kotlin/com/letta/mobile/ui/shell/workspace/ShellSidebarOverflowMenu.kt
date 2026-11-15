@@ -20,7 +20,7 @@ import com.letta.mobile.sharedui.resources.shell_new_chat
 import com.letta.mobile.sharedui.resources.shell_settings
 import com.letta.mobile.sharedui.resources.shell_sidebar_more
 import com.letta.mobile.sharedui.resources.shell_sidebar_more_description
-import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.icons.LettaIcons

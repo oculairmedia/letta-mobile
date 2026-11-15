@@ -21,7 +21,7 @@ import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.runs.RunFormat
 import com.letta.mobile.data.runs.RunMonitorController
 import com.letta.mobile.data.runs.RunMonitorState
-import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.components.LettaInlineErrorTags

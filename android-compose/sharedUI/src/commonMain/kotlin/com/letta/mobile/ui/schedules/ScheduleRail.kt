@@ -55,7 +55,7 @@ import kotlinx.datetime.TimeZone
 import kotlin.time.Instant
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.theme.tokens.LettaTextAccents
-import com.letta.mobile.ui.theme.LettaPill
+import com.letta.mobile.ui.components.foundation.LettaPill
 import com.letta.mobile.ui.components.foundation.LettaPanel
 import androidx.compose.ui.semantics.Role
 

@@ -45,9 +45,11 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
-import com.letta.mobile.ui.theme.LettaTonalPill
+import com.letta.mobile.ui.components.foundation.LettaTonalPill
 import com.letta.mobile.ui.theme.pill.LettaPillColors
 import org.jetbrains.compose.resources.stringResource
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 /**
  * The coding agent's working directory, with a picker to change it. Lifted from desktop's
@@ -63,7 +65,7 @@ internal fun ComposerWorkingDirectoryRow(
         modifier = Modifier
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
-            .clickable(enabled = onPick != null && !state.isLoading, role = Role.Button) { onPick?.invoke() }
+            .lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = onPick?.takeIf { !state.isLoading })
             .testTag(ComposerTestTags.WORKING_DIRECTORY)
             .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,

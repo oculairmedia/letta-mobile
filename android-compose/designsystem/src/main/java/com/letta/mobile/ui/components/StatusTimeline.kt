@@ -50,6 +50,7 @@ import com.letta.mobile.ui.motion.ChatMotionPolicy
 import com.letta.mobile.ui.motion.rememberChatMotionPolicy
 import com.letta.mobile.ui.theme.LettaTheme
 import com.letta.mobile.ui.theme.sectionTitle
+import com.letta.mobile.ui.components.disclosure.DisclosureChevron
 
 /**
  * Standard sizing and layout tokens for timeline components.

@@ -40,7 +40,7 @@ import com.letta.mobile.ui.chat.render.ToolOutputSyntaxColors
 import com.letta.mobile.ui.chat.render.cachedToolOutputHighlightSpans
 import com.letta.mobile.ui.chat.render.toolOutputSyntaxColors
 import com.letta.mobile.ui.host.InspectorPane
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**

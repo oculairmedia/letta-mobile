@@ -1,7 +1,7 @@
 package com.letta.mobile.desktop.components
 
 import androidx.compose.runtime.Composable
-import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 
 /**
  * A small, tokenized filter/segment chip used in desktop headers. The catalog cards, pills and

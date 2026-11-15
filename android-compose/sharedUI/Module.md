@@ -130,7 +130,7 @@ What the chat page's voice mode shares with the rest of the app, kept free of pa
 
 # Package com.letta.mobile.ui.components
 
-Reusable menus, list parts, chips, errors, refresh and pane primitives. Supply menu entries and callbacks through [LettaMenuItem](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.components/-letta-menu-item/index.html) and [LettaPopupMenu](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.components/-letta-popup-menu.html), and content through composable slots and modifiers; business workflows and repository access belong to callers.
+Reusable list parts, errors, refresh, page headers and pane primitives, and the chat timeline's disclosure and notice lines. Menus are [LettaPopupMenu](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.components/-letta-popup-menu.html) over [LettaMenuItem](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.components.foundation/-letta-menu-item/index.html); chips, pills, spinners and section labels live in `ui.components.foundation`, the disclosure chevron and its controls in `ui.components.disclosure`. Supply content through composable slots and modifiers; business workflows and repository access belong to callers.
 
 
 # Package com.letta.mobile.ui.components.row
@@ -139,11 +139,15 @@ The one list row every roster, recents and history list uses. [LettaListRow] own
 
 # Package com.letta.mobile.ui.components.line
 
-The plain values the shared line components in `ui.components` draw from: a status glyph's tone, the rail a line sits on (a run's header, a run's work step, or inside an open step), a line's label, tags and disclosure, and a pager's steps. Describe a summary, notice, step or divider line with these and draw it with the shared components; never hand-build the row, glyph, chevron or toggle. The package imports nothing of the UI, so any row package can name its values without joining an import cycle.
+The plain values the shared line components draw from: a status glyph's tone, the rail a line sits on (a run's header, a run's work step, or inside an open step), a line's label, tags and disclosure, and a pager's steps. Describe a summary, notice, step or divider line with these and draw it with the shared components; never hand-build the row, glyph, chevron or toggle. The package imports nothing of the UI, so any row package can name its values without joining an import cycle.
 
 # Package com.letta.mobile.ui.components.foundation
 
-The shared building blocks every page uses instead of hand-building its own: LettaIcon and LettaIconButton, LettaSearchField and LettaInlineSearchField, LettaToggleRow and LettaControlRow, LettaPanel and LettaInlineNotice, LettaStatusDot and LettaStatusLabel, LettaColorSwatch, LettaEmptyState, LettaNavChevron, LettaDivider and LettaVerticalDivider, and Modifier.lettaClickable. The package imports only Compose, `ui.icons` and `ui.theme.tokens`, never `ui.theme` or a page, so any page or component package can import it without closing a package cycle; keep it that way. Callers own their state and callbacks; these own size, shape, colour, semantics and touch target.
+The shared building blocks every page uses instead of hand-building its own: LettaIcon and LettaIconButton, LettaSearchField and LettaInlineSearchField, LettaToggleRow and LettaControlRow, LettaPanel and LettaInlineNotice, LettaStatusDot and LettaStatusLabel, the status glyph, LettaColorSwatch, LettaEmptyState, LettaNavChevron, LettaDivider and LettaVerticalDivider, LettaChipTab and LettaChipTabRow, the pill family (LettaPill, LettaTonalPill, LettaOutlinedPill, LettaChip), LettaSpinner and LettaBusyBar, LettaSectionLabel and LettaSectionHeader, the menu row and its LettaMenuItem, and Modifier.lettaClickable with its LettaClickTarget (standalone targets keep the 48 dp minimum; inline lines and dense rows opt out so their height never moves). The package imports only Compose, `ui.icons`, `ui.theme.tokens` and the leaf value packages `ui.theme.pill` and `ui.components.line`, never `ui.theme` or a page, so any page or component package can import it without closing a package cycle; keep it that way. Callers own their state and callbacks; these own size, shape, colour, semantics and touch target.
+
+# Package com.letta.mobile.ui.components.disclosure
+
+The one disclosure: DisclosureChevron and everything built on it. LettaDisclosureHeader is a header line whose whole width toggles what it discloses (the same line the chat timeline draws its disclosures with), LettaFoldButton and LettaUnfoldButton fold a dock or card down and back, and LettaMenuIndicator is the still mark at the end of a chip or picker button that opens a menu or sheet. Every disclosure clicks the same way: a button with an action label and an open / closed state, by pointer, touch or keyboard, with the segment tick. The package imports only Compose, `ui.icons`, `ui.haptics`, `ui.theme.tokens`, `ui.components.line` and `ui.components.foundation`, so any page, the chat root and the canvas among them, can import it without closing a package cycle.
 
 # Package com.letta.mobile.ui.components.list
 
@@ -179,7 +183,7 @@ Small fleet-activity chart components. Consume FleetBarSpark with supplied sampl
 
 # Package com.letta.mobile.ui.host
 
-Pane, overlay and host-container infrastructure with lifecycle/pointer bindings. Provide LettaHost, OverlayHost and InspectorHost and use their container/content seams; page business logic and native window ownership stay outside generic pane presentation.
+Pane, overlay and host-container infrastructure with lifecycle/pointer bindings. Provide LettaHost, OverlayHost and InspectorHost and use their container/content seams; LettaMenu is the host's menu container that LettaPopupMenu and every action menu draw in; page business logic and native window ownership stay outside generic pane presentation.
 
 # Package com.letta.mobile.ui.icons
 
@@ -362,7 +366,7 @@ Material theme construction, semantic colors, dimensions, motion and accessibili
 
 # Package com.letta.mobile.ui.theme.tokens
 
-Leaf design values shared by low-level components and the broader dimension facade. [LettaRowDimens] holds the spacing, icon size and muted opacity that LettaDimens also exposes, so a component can use them without depending on the whole theme package. The space, control and stroke scales (LettaSpaceTokens, LettaControlTokens, LettaStrokeTokens) and the CustomColors roles live here for the same reason: ui.components.foundation reads them without importing ui.theme. Named shapes (LettaShapes), text styles (LettaTextStyles), component sizes (LettaComponentDimens) and the panel and status tones (LettaPanelTone, LettaStatusTone) are the names call sites use instead of a literal shape, a typography override or a hand-picked colour.
+Leaf design values shared by low-level components and the broader dimension facade. [LettaRowDimens] holds the spacing, icon size and muted opacity that LettaDimens also exposes, so a component can use them without depending on the whole theme package. The space, control, stroke and alpha scales (LettaSpaceTokens, LettaControlTokens, LettaStrokeTokens, LettaAlphaTokens), the CustomColors roles and the reduced-motion preference (LocalLettaReducedMotion) live here for the same reason: ui.components.foundation reads them without importing ui.theme. Named shapes (LettaShapes), text styles (LettaTextStyles), component sizes (LettaComponentDimens) and the panel and status tones (LettaPanelTone, LettaStatusTone) are the names call sites use instead of a literal shape, a typography override or a hand-picked colour.
 # Package com.letta.mobile.ui.theme.pill
 
 [LettaPillColors](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.theme.pill/-letta-pill-colors/index.html), the container / on-container pair a tonal pill draws with. The package imports nothing of the app's, so any page can name it without an import cycle; the pills themselves are LettaTonalPill and its family in ui.theme.

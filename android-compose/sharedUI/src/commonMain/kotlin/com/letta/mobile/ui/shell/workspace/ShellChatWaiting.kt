@@ -10,7 +10,7 @@ import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.ui.settings.BackendConnectionNotice
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaSpinner
 
 /** A conversation that has not opened: whether it is on its way, the connection, and why it failed. */
 @Immutable

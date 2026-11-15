@@ -38,7 +38,7 @@ import com.letta.mobile.sharedui.resources.notebook_note_clean
 import com.letta.mobile.sharedui.resources.notebook_note_conflict
 import com.letta.mobile.sharedui.resources.notebook_note_not_found
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
-import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch

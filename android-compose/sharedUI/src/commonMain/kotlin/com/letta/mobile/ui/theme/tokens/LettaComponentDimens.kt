@@ -20,4 +20,7 @@ object LettaComponentDimens {
 
     /** The glyph above an empty state's words (LettaEmptyState). */
     val emptyStateIcon: Dp = 40.dp
+
+    /** The working status glyph's ring and spinner stroke (StatusGlyph). */
+    val statusGlyphStroke: Dp = 1.5.dp
 }

@@ -256,7 +256,7 @@ class RosterListTest {
                 Roster(
                     sections = listOf(RosterSection("fruit", listOf(banana))),
                     actions = RosterActions(
-                        menu = { item, _ -> listOf(com.letta.mobile.ui.components.LettaMenuItem("Peel") { events += "peel:${item.id}" }) },
+                        menu = { item, _ -> listOf(com.letta.mobile.ui.components.foundation.LettaMenuItem("Peel") { events += "peel:${item.id}" }) },
                         quick = { item -> listOf(RosterAction("Eat", onClick = { events += "eat:${item.id}" })) },
                         swipe = { item -> RosterAction("Toss", onClick = { events += "toss:${item.id}" }) },
                     ),

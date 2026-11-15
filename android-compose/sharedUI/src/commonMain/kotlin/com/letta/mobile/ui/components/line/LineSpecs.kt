@@ -9,9 +9,10 @@ import com.letta.mobile.sharedui.resources.rows_state_expanded
 import org.jetbrains.compose.resources.StringResource
 
 /*
- * The plain values the shared line components draw from (StatusGlyph, SummaryLine, StepLine,
- * DividerLine and the disclosure toggle in ui.components). They live in this leaf package, importing
- * nothing of the UI, so any row package can name them without joining an import cycle.
+ * The plain values the shared line components draw from (StatusGlyph in ui.components.foundation,
+ * SummaryLine, StepLine and DividerLine in ui.components, the disclosure toggle in
+ * ui.components.disclosure). They live in this leaf package, importing nothing of the UI, so any row
+ * package can name them without joining an import cycle.
  */
 
 /** What a status glyph says, and so which glyph and tint it draws. */
@@ -36,6 +37,18 @@ internal enum class StatusTone {
 
     /** A watch that keeps reporting (a Monitor watcher): an eye, muted. */
     Watching,
+
+    /** Not started (a todo, a task): an empty ring, muted. */
+    Pending,
+
+    /** Under way in a list that does not animate (a todo in progress): a clock in the primary tint. */
+    Underway,
+
+    /** Finished well in a list of tasks (a todo done, a subagent done): a ringed check in the success tint. */
+    Completed,
+
+    /** Chosen or included (the selected option, an installed command): a bare check in the content colour. */
+    Chosen,
 }
 
 /**

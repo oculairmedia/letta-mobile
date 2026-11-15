@@ -44,7 +44,7 @@ import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MarkdownText
-import com.letta.mobile.ui.components.LettaDisclosureHeader
+import com.letta.mobile.ui.components.disclosure.LettaDisclosureHeader
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaMotion
 import com.letta.mobile.ui.theme.listItemHeadline

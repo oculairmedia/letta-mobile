@@ -2,7 +2,7 @@ package com.letta.mobile.ui.shell.pages.conversations
 
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
-import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
 import com.letta.mobile.ui.shell.sidebar.ShellConversationMarks

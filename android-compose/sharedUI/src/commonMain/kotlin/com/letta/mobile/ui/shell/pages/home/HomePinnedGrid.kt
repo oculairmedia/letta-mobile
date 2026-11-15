@@ -1,6 +1,6 @@
 package com.letta.mobile.ui.shell.pages.home
 
-import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.components.LocalObjectVerbs
 import com.letta.mobile.ui.components.foundation.LettaButtonIcon
@@ -52,7 +52,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaSectionHeader
+import com.letta.mobile.ui.components.foundation.LettaSectionHeader
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
 

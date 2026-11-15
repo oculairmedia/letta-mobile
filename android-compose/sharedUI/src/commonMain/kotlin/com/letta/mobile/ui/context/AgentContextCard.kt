@@ -24,8 +24,6 @@ import com.letta.mobile.data.context.ContextMeterLevel
 import com.letta.mobile.data.context.ContextWindowUsage
 import com.letta.mobile.data.context.formatContextTokens
 import com.letta.mobile.data.repository.modelcontrol.ReasoningTier
-import com.letta.mobile.ui.components.ChevronIndication
-import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.modelcontrol.ModelControlStrings
 import com.letta.mobile.ui.theme.AgentContextDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -33,6 +31,7 @@ import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.math.roundToInt
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
+import com.letta.mobile.ui.components.disclosure.LettaMenuIndicator
 
 /** Test tags of the drawer context card and its sheet. */
 object AgentContextTags {
@@ -103,7 +102,7 @@ private fun CardModelLine(model: AgentContextCardModel) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).testTag(AgentContextTags.CARD_MODEL),
         )
-        DisclosureChevron(expanded = false, indicates = ChevronIndication.Sheet, compact = true)
+        LettaMenuIndicator()
     }
 }
 

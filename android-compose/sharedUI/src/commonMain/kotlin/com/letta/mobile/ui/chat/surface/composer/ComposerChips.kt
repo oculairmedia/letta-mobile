@@ -30,8 +30,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import com.letta.mobile.ui.components.LettaMenuIndicator
-import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.components.disclosure.LettaMenuIndicator
+import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 

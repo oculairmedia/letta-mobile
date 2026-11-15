@@ -36,7 +36,7 @@ import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.reflection.ReflectionModelChoice
 import com.letta.mobile.ui.chat.surface.composer.ModelListPicker
 import com.letta.mobile.ui.chat.surface.composer.rememberModelListPicker
-import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTab
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.flow.StateFlow

@@ -42,15 +42,14 @@ import com.letta.mobile.data.model.todoProgress
 import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LettaDoneGlyph
-import com.letta.mobile.ui.theme.LettaInProgressGlyph
-import com.letta.mobile.ui.theme.LettaPendingGlyph
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
+import com.letta.mobile.ui.components.line.StatusTone
+import com.letta.mobile.ui.components.foundation.StatusGlyph
 
 @Immutable
 data class SubagentTodoSheetTarget(
@@ -447,11 +446,12 @@ private fun SubagentTodoRow(item: SubagentTodoItem) {
 /** A todo's state as the shared status glyph. */
 @Composable
 private fun SubagentTodoGlyph(status: SubagentTodoStatus) {
-    when (status) {
-        SubagentTodoStatus.COMPLETED -> LettaDoneGlyph()
-        SubagentTodoStatus.IN_PROGRESS -> LettaInProgressGlyph()
-        SubagentTodoStatus.PENDING -> LettaPendingGlyph()
+    val tone = when (status) {
+        SubagentTodoStatus.COMPLETED -> StatusTone.Completed
+        SubagentTodoStatus.IN_PROGRESS -> StatusTone.Underway
+        SubagentTodoStatus.PENDING -> StatusTone.Pending
     }
+    StatusGlyph(tone, size = LettaDimens.Control.icon)
 }
 
 /** A todo's state in words, for its row's accessibility label. */

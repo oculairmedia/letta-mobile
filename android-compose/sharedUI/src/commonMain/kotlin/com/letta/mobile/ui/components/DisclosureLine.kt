@@ -7,9 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,7 +24,11 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import com.letta.mobile.ui.components.disclosure.DisclosureRow
+import com.letta.mobile.ui.components.disclosure.DisclosureRowStyle
+import com.letta.mobile.ui.components.disclosure.DisclosureRowWords
 import com.letta.mobile.ui.components.foundation.LettaDivider
+import com.letta.mobile.ui.components.foundation.StatusGlyph
 import com.letta.mobile.ui.components.line.LineDisclosure
 import com.letta.mobile.ui.components.line.LineRail
 import com.letta.mobile.ui.components.line.LineSpec
@@ -36,7 +38,6 @@ import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LocalReducedMotion
-import org.jetbrains.compose.resources.stringResource
 
 /**
  * The rail a line takes when its caller does not name one. A run provides [LineRail.Step] around its
@@ -48,8 +49,8 @@ internal val LocalLineRail = staticCompositionLocalOf { LineRail.Header }
 /**
  * The frame every disclosure and notice line in the timeline draws in: one row on [rail]'s column
  * (its start and end inset and its height floor), a fixed glyph slot when [glyph] is set, the
- * caller's [content], and, when [disclosure] is set, the one trailing [DisclosureChevron] with the
- * whole line as its [disclosureToggle]. Lines on one rail therefore share their glyph start, glyph
+ * caller's [content], and, when [disclosure] is set, the one trailing chevron with the whole line as
+ * its toggle: the shared DisclosureRow, on the rail's insets. Lines on one rail therefore share their glyph start, glyph
  * size, label start, chevron edge, chevron size and height floor. [minHeight] raises or lowers the
  * floor for a line whose height its parent depends on (a run's header). [stateDescription] is the
  * line's spoken state when the disclosure's open / closed is not what it should say.
@@ -65,22 +66,17 @@ internal fun LineFrame(
     minHeight: Dp = rail.minHeight(),
     content: @Composable RowScope.() -> Unit,
 ) {
-    Row(
+    DisclosureRow(
+        disclosure = disclosure,
         modifier = modifier
-            .fillMaxWidth()
             .heightIn(min = minHeight)
             .testTag(tag)
-            .then(if (disclosure != null) Modifier.disclosureToggle(disclosure, stateDescription) else inertLine(rail, stateDescription))
-            .padding(rail.insets()),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(ChatRowSpacing.lineGap),
+            .then(if (disclosure == null) inertLine(rail, stateDescription) else Modifier),
+        style = DisclosureRowStyle(gap = ChatRowSpacing.lineGap, contentPadding = rail.insets()),
+        words = DisclosureRowWords(stateDescription = stateDescription),
     ) {
         if (glyph != null) Box(Modifier.size(ChatRowSpacing.runGlyphSize), contentAlignment = Alignment.Center) { glyph() }
         content()
-        if (disclosure != null) {
-            val action = stringResource(if (disclosure.expanded) disclosure.labels.collapse else disclosure.labels.expand)
-            DisclosureChevron(expanded = disclosure.expanded, contentDescription = action)
-        }
     }
 }
 

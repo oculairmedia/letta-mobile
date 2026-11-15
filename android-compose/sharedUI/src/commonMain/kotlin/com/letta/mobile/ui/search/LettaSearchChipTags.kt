@@ -1,20 +1,18 @@
 package com.letta.mobile.ui.search
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.search.MessageSearchCapabilities
 import com.letta.mobile.data.search.MessageSearchSelection
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.components.foundation.LettaChipTab
+import com.letta.mobile.ui.components.foundation.LettaChipTabRow
+import androidx.compose.ui.semantics.Role
 
 /** Test tags for the shared search's mode and role chips. */
 object LettaSearchChipTags {
@@ -48,16 +46,14 @@ fun LettaSearchChipRows(rows: List<LettaSearchChipRow>, modifier: Modifier = Mod
 
 @Composable
 private fun ChipStrip(row: LettaSearchChipRow) {
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-    ) {
+    LettaChipTabRow(modifier = Modifier.fillMaxWidth()) {
         row.chips.forEach { chip ->
-            FilterChip(
-                selected = chip.selected,
+            LettaChipTab(
+                text = chip.label,
+                active = chip.selected,
                 onClick = chip.onClick,
-                label = { Text(chip.label) },
                 modifier = Modifier.testTag(LettaSearchChipTags.chip(chip.id)),
+                role = if (row.exclusive) Role.Tab else Role.Checkbox,
             )
         }
     }

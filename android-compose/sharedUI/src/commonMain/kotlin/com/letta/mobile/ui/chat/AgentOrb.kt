@@ -35,6 +35,8 @@ import com.letta.mobile.ui.theme.AgentSphereRim
 import com.letta.mobile.ui.theme.agentOrbShape
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaClickable
 
 /**
  * Gradient agent identity orbs, matching the Penpot "App Mockups v2" desktop
@@ -77,7 +79,9 @@ fun AgentOrb(
                 .size(size)
                 .clip(shape)
                 .background(agentOrbBrush(index))
-                .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier),
+                .then(
+                    if (onClick != null) Modifier.lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = onClick) else Modifier,
+                ),
             contentAlignment = Alignment.Center,
         ) {
             content?.invoke()

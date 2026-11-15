@@ -39,7 +39,7 @@ import com.letta.mobile.data.a2ui.A2uiBindingResolver
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiResolvedBinding
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
-import com.letta.mobile.ui.theme.LettaTonalPill
+import com.letta.mobile.ui.components.foundation.LettaTonalPill
 import com.letta.mobile.ui.theme.pill.LettaPillColors
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
