@@ -319,8 +319,9 @@ class AdminChatSessionPortTest {
             assertEquals(null, placeholder?.usage)
             assertTrue("the chip shows its placeholder rather than hiding", placeholder != null)
 
-            readings.record(usage("agent-context", "conversation-context", 28_864))
-            readings.record(usage("agent-context", "conversation-context", 29_193))
+            val runtime = AppServerRuntimeScope("agent-context", "conversation-context")
+            readings.record(usage(runtime, 28_864))
+            readings.record(usage(runtime, 29_193))
 
             val usage = port.composer.value.contextUsage?.usage
             assertEquals(29_193, usage?.usedTokens)
@@ -381,8 +382,8 @@ class AdminChatSessionPortTest {
         }
     }
 
-    private fun usage(agentId: String, conversationId: String, contextTokens: Long) =
-        ServerFrame.UsageStatistics(agentId = agentId, conversationId = conversationId, contextTokens = contextTokens)
+    private fun usage(runtime: AppServerRuntimeScope, contextTokens: Long) =
+        ServerFrame.UsageStatistics(agentId = runtime.agentId, conversationId = runtime.conversationId, contextTokens = contextTokens)
 
     @Test
     fun `open canvas from the full-screen page goes to canvas navigation`() {
