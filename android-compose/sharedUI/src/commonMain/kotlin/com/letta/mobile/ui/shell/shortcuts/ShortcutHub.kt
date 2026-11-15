@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.focus.onFocusChanged
 import com.letta.mobile.ui.chat.surface.composer.ComposerFocusHandoff
+import com.letta.mobile.ui.components.foundation.LocalLettaTextInputModifier
 
 /** Where keyboard focus sits when a stroke reaches the hub. */
 enum class ShortcutFocusOwner {
@@ -89,7 +90,13 @@ val LocalShortcutHub = staticCompositionLocalOf { ShortcutHub() }
 @Composable
 fun ProvideShortcutHub(content: @Composable () -> Unit) {
     val hub = remember { ShortcutHub() }
-    CompositionLocalProvider(LocalShortcutHub provides hub, content = content)
+    val textInput = remember { Modifier.shortcutTextInput() }
+    CompositionLocalProvider(
+        LocalShortcutHub provides hub,
+        // Shared inputs in ui.components.foundation cannot import this package; they read the marker here.
+        LocalLettaTextInputModifier provides textInput,
+        content = content,
+    )
 }
 
 /** Counts this field as a text input the shell chords must not steal from. */

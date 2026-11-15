@@ -40,7 +40,13 @@ internal class InMemoryTimelineStore(
         val oldEvidence = evidence.toMap()
         val toolCopy = tools[scope]?.snapshot() ?: TestToolIndexState()
         return try {
-            block(Tx(toolCopy)).also { tools[scope] = toolCopy }
+            val transaction = Tx(toolCopy)
+            block(transaction).also {
+                check(!transaction.changed || transaction.revisionRequested) {
+                    "Changed transaction needs nextRevision"
+                }
+                tools[scope] = toolCopy
+            }
         } catch (failure: Throwable) {
             current = before
             rows.clear(); rows.putAll(oldRows)
@@ -50,11 +56,16 @@ internal class InMemoryTimelineStore(
     }
 
     private inner class Tx(private val tools: TestToolIndexState) : TimelineStoreTransaction {
+        var changed = false
+            private set
+        var revisionRequested = false
+            private set
+
         override suspend fun toolCall(callId: String) = tools.entries[callId]
         override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int) = tools.unresolved(afterCallId, maxRows)
         override suspend fun toolSweepGeneration() = tools.generation
-        override suspend fun putToolCall(entry: TimelineToolIndexEntry) = tools.put(entry)
-        override suspend fun setToolSweepGeneration(next: Long) = tools.advance(next)
+        override suspend fun putToolCall(entry: TimelineToolIndexEntry) { changed = true; tools.put(entry) }
+        override suspend fun setToolSweepGeneration(next: Long) { changed = true; tools.advance(next) }
         override suspend fun checkpoint() = current
         override suspend fun locate(identity: TimelineMessageId) = rows.keys.singleOrNull { it.identity == identity }
 
@@ -92,24 +103,36 @@ internal class InMemoryTimelineStore(
             evidence[key]?.also { check(it.size <= maxBytes) }?.copyOf()
 
         override suspend fun put(record: TimelineStoredRecord) {
+            changed = true
             puts++
             rows[record.key] = record.copy(body = record.body.copyOf())
         }
 
-        override suspend fun putEvidence(key: String, value: ByteArray) { evidence[key] = value.copyOf() }
-        override suspend fun deleteEvidence(key: String) { evidence.remove(key) }
+        override suspend fun putEvidence(key: String, value: ByteArray) { changed = true; evidence[key] = value.copyOf() }
+        override suspend fun deleteEvidence(key: String) { changed = true; evidence.remove(key) }
 
         override suspend fun cursor(continuation: TimelineContinuation?, hasMore: Boolean) {
+            changed = true
             current = current.copy(continuation = continuation, hasMore = hasMore)
         }
 
         override suspend fun nextRevision(): Long {
+            revisionRequested = true
             current = current.copy(revision = current.revision + 1)
             return current.revision
         }
 
         override suspend fun delete(identity: TimelineMessageId, reason: TimelineDurableDeleteReason) {
+            changed = true
             rows.keys.removeAll { it.identity == identity }
         }
     }
+}
+
+/** Runs the same change/revision contract the canonical engine applies around a writer. */
+internal suspend fun InMemoryTimelineStore.engineTransaction(
+    scope: TimelineScope,
+    block: suspend TimelineStoreTransaction.() -> Boolean,
+): Boolean = transaction(scope) {
+    block().also { changed -> if (changed) nextRevision() }
 }
