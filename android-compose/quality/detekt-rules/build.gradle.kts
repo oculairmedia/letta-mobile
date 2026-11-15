@@ -70,57 +70,76 @@ tasks.check {
     dependsOn("guardrailDetekt")
 }
 
-// Local counting aid for design-system debt; deliberately not wired into check or CI.
-// -PdesignLintPaths takes comma-separated directories relative to android-compose/.
-val designLintPaths = providers.gradleProperty("designLintPaths").map { value ->
-    value.split(',').map(String::trim).filter(String::isNotEmpty).map(rootProject::file)
-}
-val designLintReport = layout.buildDirectory.file("reports/detekt/designSystemLintCount.xml")
+// Design-system rules over whole directories, ignoring the includes scoping in detekt-guardrails.yml.
+// designSystemLintCount is the local counting aid: -PdesignLintPaths takes comma-separated
+// directories relative to android-compose/ (default: every UI root) and it never fails.
+// designSystemLintGate always scans every UI root and fails on any finding; CI runs it so a clean
+// tree stays clean even in files a change did not touch. There is no baseline: it went in at zero.
+val designUiRoots = listOf("sharedUI/src", "desktop/src", "app/src", "feature-chat/src", "designsystem/src")
+val designLintPaths = providers.gradleProperty("designLintPaths")
+    .map { value -> value.split(',').map(String::trim).filter(String::isNotEmpty) }
+    .orElse(designUiRoots)
 
-val designSystemLintScan = tasks.register<io.gitlab.arturbosch.detekt.Detekt>("designSystemLintScan") {
-    description = "Run every design-system rule over -PdesignLintPaths, ignoring includes scoping."
-    group = "verification"
-    dependsOn(tasks.jar)
-    setSource(designLintPaths.orElse(emptyList()))
-    include("**/*.kt")
-    config.setFrom(file("design-system-count.yml"))
-    buildUponDefaultConfig = false
-    parallel = true
-    jvmTarget = "17"
-    ignoreFailures = true
-    outputs.upToDateWhen { false }
-    reports {
-        xml.required.set(true)
-        xml.outputLocation.set(designLintReport)
-        sarif.required.set(false)
-        html.required.set(false)
-        txt.required.set(false)
-        md.required.set(false)
+listOf(
+    Triple("designSystemLintCount", designLintPaths, false),
+    Triple("designSystemLintGate", providers.provider { designUiRoots }, true),
+).forEach { (taskName, paths, failOnFindings) ->
+    val report = layout.buildDirectory.file("reports/detekt/$taskName.xml")
+    val scan = tasks.register<io.gitlab.arturbosch.detekt.Detekt>("${taskName}Scan") {
+        description = "Run every design-system rule over whole directories for $taskName."
+        group = "verification"
+        dependsOn(tasks.jar)
+        setSource(paths.map { roots -> roots.map(rootProject::file) })
+        include("**/*.kt")
+        config.setFrom(file("design-system-count.yml"))
+        buildUponDefaultConfig = false
+        parallel = true
+        jvmTarget = "17"
+        ignoreFailures = true
+        outputs.upToDateWhen { false }
+        reports {
+            xml.required.set(true)
+            xml.outputLocation.set(report)
+            sarif.required.set(false)
+            html.required.set(false)
+            txt.required.set(false)
+            md.required.set(false)
+        }
     }
-}
-
-tasks.register("designSystemLintCount") {
-    description = "Print design-system findings per rule and per file for -PdesignLintPaths."
-    group = "verification"
-    dependsOn(designSystemLintScan)
-    val report = designLintReport
-    val base = rootProject.projectDir.parentFile
-    doLast {
-        val xml = report.get().asFile
-        check(xml.isFile) { "No report: pass -PdesignLintPaths=<dir>[,<dir>...] (relative to android-compose/)." }
-        val findings = Regex("""<file name="([^"]+)">(.*?)</file>""", RegexOption.DOT_MATCHES_ALL)
-            .findAll(xml.readText())
-            .flatMap { file ->
-                val path = File(file.groupValues[1]).relativeTo(base).invariantSeparatorsPath
-                Regex("""source="detekt\.([A-Za-z]+)"""").findAll(file.groupValues[2]).map { it.groupValues[1] to path }
+    tasks.register(taskName) {
+        description = if (failOnFindings) {
+            "Fail on any design-system finding in any UI root."
+        } else {
+            "Print design-system findings per rule and per file for -PdesignLintPaths (default: all UI roots)."
+        }
+        group = "verification"
+        dependsOn(scan)
+        val base = rootProject.projectDir.parentFile
+        doLast {
+            val xml = report.get().asFile
+            check(xml.isFile) { "No report at $xml: the directories held no Kotlin sources." }
+            val findings = Regex("""<file name="([^"]+)">(.*?)</file>""", RegexOption.DOT_MATCHES_ALL)
+                .findAll(xml.readText())
+                .flatMap { file ->
+                    val path = File(file.groupValues[1]).relativeTo(base).invariantSeparatorsPath
+                    Regex("""line="(\d+)"[^>]*source="detekt\.([A-Za-z]+)"""").findAll(file.groupValues[2])
+                        .map { it.groupValues[2] to "$path:${it.groupValues[1]}" }
+                }
+                .toList()
+            findings.groupBy({ it.first }, { it.second.substringBeforeLast(':') }).toSortedMap().forEach { (rule, files) ->
+                println("$rule: ${files.size}")
+                files.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.forEach { (path, count) ->
+                    println("  $count  $path")
+                }
             }
-            .toList()
-        findings.groupBy({ it.first }, { it.second }).toSortedMap().forEach { (rule, paths) ->
-            println("$rule: ${paths.size}")
-            paths.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.forEach { (path, count) ->
-                println("  $count  $path")
+            println("Total: ${findings.size} findings in ${findings.map { it.second.substringBeforeLast(':') }.distinct().size} files")
+            if (failOnFindings && findings.isNotEmpty()) {
+                findings.forEach { (rule, location) -> println("  $location  [$rule]") }
+                throw GradleException(
+                    "${findings.size} design-system findings. Fix them (rule messages name what to use); " +
+                        "there is no baseline. Rerun with :quality:detekt-rules:designSystemLintCount.",
+                )
             }
         }
-        println("Total: ${findings.size} findings in ${findings.map { it.second }.distinct().size} files")
     }
 }

@@ -359,6 +359,8 @@ jobs:
       # edges into :app, feature->feature, shell->shell, library->feature and
       # multiplatform->single-platform edges not in architecture-tests/boundary-baseline.txt
       # (letta-mobile-o4ygk.1). :build-logic:test proves each rule on synthetic graphs.
+      # :quality:detekt-rules:designSystemLintGate scans every UI root with the design-system rules
+      # and fails on any finding (no baseline), so files a PR did not touch stay clean as well.
       - name: Install Linux hotkey build prerequisites for desktop tests
         if: contains(steps.additive_modules.outputs.tasks, ':desktop:')
         run: |
@@ -380,6 +382,7 @@ jobs:
             :architecture-tests:architectureTest
             :architecture-tests:structureReport
             :quality:detekt-rules:check
+            :quality:detekt-rules:designSystemLintGate
           )
           if [[ -n "${ADDITIVE_TASKS}" ]]; then
             read -r -a additive_tasks <<< "${ADDITIVE_TASKS}"
