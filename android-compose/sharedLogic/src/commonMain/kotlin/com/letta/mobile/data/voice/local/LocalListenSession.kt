@@ -154,7 +154,9 @@ internal class LocalListenSession(private val parts: LocalListenParts, private v
     /** Runs [recognition] to its end, the app's output starting, or cancellation. */
     private suspend fun recognizeOnce(recognition: LocalRecognition): RecognitionOutcome = coroutineScope {
         val events = recognition.events.produceIn(this)
-        val startedAt = memory.outputStarts.value
+        // Paused for output: start from the count the quiet wait validated, so output that started
+        // after that wait (on another thread, before this line) still counts against this recognition.
+        val startedAt = if (config.pauseDuringOutput) quietAfter else memory.outputStarts.value
         val outputStarted = if (config.pauseDuringOutput) async { memory.outputStarts.first { it != startedAt } } else null
         val turn = LocalTurn(config, out, startedAt)
         try {
