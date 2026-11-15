@@ -131,7 +131,7 @@ fun ThinkingTextToken(
                     .alpha(contentAlpha)
                     .defaultMinSize(minHeight = ThinkingTextTokenTextMinHeight)
                     .testTag(THINKING_TEXT_TOKEN_TEST_TAG),
-                style = MaterialTheme.typography.bodyMedium.copy(brush = brush),
+                style = MaterialTheme.typography.bodyMedium.merge(androidx.compose.ui.text.TextStyle(brush = brush)),
             )
         }
     }
@@ -149,7 +149,7 @@ private const val SWEEP_TRAVEL_PX = 2_400f
  * realistic text bounds; phase 1 leaves it well to the right.
  */
 internal fun thinkingTextTokenBrush(scheme: ColorScheme, phase: Float): Brush {
-    val tail = scheme.onSurfaceVariant.copy(alpha = 0.45f)
+    val tail = scheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled)
     val startX = -SWEEP_BAND_PX + phase * SWEEP_TRAVEL_PX
     val endX = startX + SWEEP_BAND_PX
     return Brush.linearGradient(

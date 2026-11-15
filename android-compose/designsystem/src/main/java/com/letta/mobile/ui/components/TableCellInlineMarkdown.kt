@@ -5,10 +5,9 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
-import com.letta.mobile.ui.theme.LettaCodeFont
+import com.letta.mobile.ui.theme.MarkdownTextStyles
 
 /**
  * Lightweight inline markdown for table cells.
@@ -48,12 +47,9 @@ private data class TableCellInlineSpan(
 ) {
     fun style(inlineCodeBackground: Color): SpanStyle =
         when (kind) {
-            TableCellInlineSpanKind.Bold -> SpanStyle(fontWeight = FontWeight.Bold)
+            TableCellInlineSpanKind.Bold -> MarkdownTextStyles.strong
             TableCellInlineSpanKind.Italic -> SpanStyle(fontStyle = FontStyle.Italic)
-            TableCellInlineSpanKind.Code -> SpanStyle(
-                fontFamily = LettaCodeFont,
-                background = inlineCodeBackground,
-            )
+            TableCellInlineSpanKind.Code -> MarkdownTextStyles.inlineCode(inlineCodeBackground)
             TableCellInlineSpanKind.Strikethrough -> SpanStyle(textDecoration = TextDecoration.LineThrough)
             TableCellInlineSpanKind.Link -> SpanStyle(textDecoration = TextDecoration.Underline)
         }

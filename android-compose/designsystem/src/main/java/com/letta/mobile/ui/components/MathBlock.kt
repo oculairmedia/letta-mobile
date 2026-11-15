@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -83,7 +82,7 @@ fun MathBlock(
     }
 
     Surface(
-        shape = RoundedCornerShape(if (displayMode) LettaDimens.Space.sm else LettaDimens.Space.xs),
+        shape = if (displayMode) MaterialTheme.shapes.small else MaterialTheme.shapes.extraSmall,
         color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = modifier
             .then(if (displayMode) Modifier.fillMaxWidth() else Modifier)
@@ -92,7 +91,7 @@ fun MathBlock(
         AndroidView(
             modifier = Modifier
                 .then(if (displayMode) Modifier.fillMaxWidth() else Modifier)
-                .defaultMinSize(minHeight = if (displayMode) 60.dp else LettaDimens.Space.xxl)
+                .defaultMinSize(minHeight = if (displayMode) LettaDimens.Control.minTouchTarget else LettaDimens.Space.xxl)
                 .semantics { contentDescription = source }
                 .combinedClickable(
                     onClick = {},
@@ -182,7 +181,7 @@ private class KatexWebViewClient(private val ctx: android.content.Context) : Web
 @Composable
 private fun MathErrorFallback(source: String, errorMessage: String, modifier: Modifier = Modifier) {
     Surface(
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.errorContainer,
         modifier = modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.xs),
     ) {

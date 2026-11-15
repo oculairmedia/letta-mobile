@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,8 +25,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.VoiceOverlayTokens
 
 /**
  * letta-mobile-arhd: full-screen visual context for an in-flight
@@ -91,13 +90,13 @@ fun VoiceRecognizerOverlay(
             // taps don't fall through to the underlying chat content
             // while the user is mid-dictation.
             Surface(
-                shape = RoundedCornerShape(LettaDimens.Radius.lg),
+                shape = MaterialTheme.shapes.large,
                 color = Color.Black.copy(alpha = 0.6f),
                 contentColor = Color.White,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(bottom = 96.dp, start = LettaDimens.Space.xl, end = LettaDimens.Space.xl)
+                    .padding(bottom = VoiceOverlayTokens.instructionBottomInset, start = LettaDimens.Space.xl, end = LettaDimens.Space.xl)
                     .pointerInput(Unit) { /* eat all pointer events here */ },
             ) {
                 Column(

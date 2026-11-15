@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.components
 
-import com.letta.mobile.ui.theme.LettaCodeFont
 
 import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -57,6 +55,7 @@ import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSizing
 import com.letta.mobile.ui.theme.LettaSpacing
+import com.letta.mobile.ui.theme.MarkdownTextStyles
 import com.letta.mobile.ui.zoom.ZoomViewportState
 
 @Composable
@@ -160,7 +159,7 @@ private fun MermaidSvgDiagram(
     }
 
         Surface(
-            shape = RoundedCornerShape(LettaSpacing.CARD_GAP),
+            shape = MaterialTheme.shapes.small,
             color = Color.Transparent,
             modifier = modifier.fillMaxWidth().padding(vertical = LettaSpacing.CARD_GROUP_ITEM_GAP + LettaSpacing.CARD_GROUP_ITEM_GAP),
         ) {
@@ -212,7 +211,7 @@ private fun MermaidFullscreenDialog(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xE6000000)),
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.9f)),
         ) {
             val isCompact = maxWidth < LettaSizing.compactWidthBreakpoint
             val contentModifier = if (isCompact) {
@@ -271,8 +270,8 @@ private fun MermaidFullscreenDialog(
                             .fillMaxSize()
                             .padding(horizontal = LettaSpacing.INNER_PADDING_SMALL, vertical = LettaSpacing.CARD_GAP)
                             .onSizeChanged { viewportSize = it }
-                            .clip(RoundedCornerShape(LettaSpacing.INNER_PADDING))
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.08f))
+                            .clip(MaterialTheme.shapes.extraLarge)
+                            .background(MaterialTheme.colorScheme.surface)
                             .pointerInput(Unit) {
                                 detectTransformGestures { centroid, panChange, zoomChange, _ ->
                                     zoomState.onTransform(
@@ -342,7 +341,7 @@ private fun MermaidErrorFallback(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-            shape = RoundedCornerShape(LettaSpacing.CARD_GAP),
+            shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.errorContainer,
             modifier = modifier.fillMaxWidth().padding(vertical = LettaSpacing.CARD_GROUP_ITEM_GAP + LettaSpacing.CARD_GROUP_ITEM_GAP),
         ) {
@@ -354,7 +353,7 @@ private fun MermaidErrorFallback(
             )
             Text(
                 text = source,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = LettaCodeFont),
+                style = MarkdownTextStyles.codeBlock(MaterialTheme.typography, MaterialTheme.colorScheme.onErrorContainer),
                 color = MaterialTheme.colorScheme.onErrorContainer,
                     modifier = Modifier.padding(top = LettaSpacing.CARD_GAP),
             )

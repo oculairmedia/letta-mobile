@@ -16,7 +16,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import com.mikepenz.markdown.compose.LocalMarkdownColors
 import com.mikepenz.markdown.compose.LocalMarkdownPadding
 import dev.snipme.highlights.Highlights
@@ -27,6 +26,7 @@ import dev.snipme.highlights.model.SyntaxThemes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.MarkdownTextStyles
 
 /**
  * One syntax-highlight span, renderer-neutral so it can be cached and carried between
@@ -156,7 +156,7 @@ internal fun annotate(revision: HighlightedRevision): AnnotatedString = buildAnn
     append(code)
     for (span in revision.spans) {
         if (span.end > code.length || span.start >= span.end) continue
-        val style = if (span.rgb != null) SpanStyle(color = Color(span.rgb).copy(alpha = 1f)) else SpanStyle(fontWeight = FontWeight.Bold)
+        val style = if (span.rgb != null) SpanStyle(color = Color(span.rgb).copy(alpha = 1f)) else MarkdownTextStyles.strong
         addStyle(style, span.start, span.end)
     }
 }

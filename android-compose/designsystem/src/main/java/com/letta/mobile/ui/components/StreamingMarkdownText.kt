@@ -45,7 +45,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -59,6 +58,7 @@ import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.MarkdownTextStyles
 /**
  * Streaming-aware markdown renderer with a stable committed-prefix path.
  *
@@ -218,7 +218,7 @@ fun StreamingMarkdownText(
     val layoutDirection = LocalLayoutDirection.current
     val chatFontScale = LocalChatFontScale.current
     val geometryMeasurer = rememberChatTextGeometryMeasurer()
-    val activeTextStyle = MaterialTheme.typography.bodyMedium.copy(color = textColor)
+    val activeTextStyle = MarkdownTextStyles.body(MaterialTheme.typography, textColor)
     val scaledDensity = remember(density, chatFontScale) {
         Density(
             density = density.density,
@@ -660,8 +660,7 @@ private fun StreamingMarkdownTable(
                 textColor = textColor,
                 containerColor = headerContainer,
                 outlineColor = outlineColor,
-                fontWeight = FontWeight.SemiBold,
-                cellTextStyle = cellTextStyle,
+                cellTextStyle = MarkdownTextStyles.tableHeader(MaterialTheme.typography),
                 alignments = table.alignments,
                 columnWeights = columnWeights,
                 inlineCodeBackground = inlineCodeBackground,
@@ -674,7 +673,6 @@ private fun StreamingMarkdownTable(
                     textColor = textColor,
                     containerColor = bodyContainer,
                     outlineColor = outlineColor,
-                    fontWeight = null,
                     cellTextStyle = cellTextStyle,
                     alignments = table.alignments,
                     columnWeights = columnWeights,
@@ -691,7 +689,6 @@ private fun StreamingMarkdownTableRow(
     textColor: Color,
     containerColor: Color,
     outlineColor: Color,
-    fontWeight: FontWeight?,
     cellTextStyle: androidx.compose.ui.text.TextStyle,
     alignments: List<ParsedTableColumnAlignment>,
     columnWeights: List<Int>,
@@ -716,11 +713,7 @@ private fun StreamingMarkdownTableRow(
                     )
                 },
                 color = textColor,
-                style = if (fontWeight != null) {
-                    cellTextStyle.copy(fontWeight = fontWeight, textAlign = textAlign)
-                } else {
-                    cellTextStyle.copy(textAlign = textAlign)
-                },
+                style = cellTextStyle.copy(textAlign = textAlign),
                 modifier = Modifier
                     .weight(columnWeight)
                     .fillMaxHeight()

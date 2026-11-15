@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.LocalContentColor
@@ -23,16 +22,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEachIndexed
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.listItemColors
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.ui.theme.LettaDimens
-
-private val CardGroupCorner = 20.dp
-private val CardGroupItemSpacing = 2.dp
-private val CardGroupInnerCorner = 4.dp
+import androidx.compose.foundation.shape.CornerSize
+import com.letta.mobile.ui.theme.CardGroupTokens
 
 data class CardGroupItem(
     val onClick: (() -> Unit)?,
@@ -92,12 +88,12 @@ private fun CardGroupListItem(
     val isPressed by interactionSource.collectIsPressedAsState()
 
     val topCorner by animateDpAsState(
-        targetValue = if (isPressed || count == 1 || isFirst) CardGroupCorner else CardGroupInnerCorner,
+        targetValue = if (isPressed || count == 1 || isFirst) CardGroupTokens.outerCorner else CardGroupTokens.innerCorner,
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "topCorner",
     )
     val bottomCorner by animateDpAsState(
-        targetValue = if (isPressed || count == 1 || isLast) CardGroupCorner else CardGroupInnerCorner,
+        targetValue = if (isPressed || count == 1 || isLast) CardGroupTokens.outerCorner else CardGroupTokens.innerCorner,
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "bottomCorner",
     )
@@ -107,11 +103,11 @@ private fun CardGroupListItem(
         modifier = item.modifier
             .fillMaxWidth()
             .clip(
-                RoundedCornerShape(
-                    topStart = topCorner,
-                    topEnd = topCorner,
-                    bottomStart = bottomCorner,
-                    bottomEnd = bottomCorner,
+                MaterialTheme.shapes.large.copy(
+                    topStart = CornerSize(topCorner),
+                    topEnd = CornerSize(topCorner),
+                    bottomStart = CornerSize(bottomCorner),
+                    bottomEnd = CornerSize(bottomCorner),
                 )
             )
             .then(
@@ -154,7 +150,7 @@ fun CardGroup(
         scope.items.fastForEachIndexed { index, item ->
             CardGroupListItem(item = item, count = count, index = index)
             if (index != count - 1) {
-                Spacer(modifier = Modifier.height(CardGroupItemSpacing))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
             }
         }
     }

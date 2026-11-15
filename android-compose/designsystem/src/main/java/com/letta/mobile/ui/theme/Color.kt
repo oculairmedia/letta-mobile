@@ -56,3 +56,18 @@ val LightOnSurface = Color(LettaColorTokens.LIGHT_ON_SURFACE)
 val LightOnSurfaceVariant = Color(LettaColorTokens.LIGHT_ON_SURFACE_VARIANT)
 val LightError = Color(LettaColorTokens.LIGHT_ERROR)
 val LightOnError = Color(LettaColorTokens.LIGHT_ON_ERROR)
+
+/**
+ * Alphas Theme.kt builds its derived colour roles with. Each is a fill or a hairline laid over a
+ * surface, never text: text roles stay at or above [LettaDimens.Alpha.disabled].
+ */
+internal object ThemeRoleAlpha {
+    /** Light theme's `outlineVariant`: the outline at hairline strength. */
+    const val LIGHT_OUTLINE_VARIANT = 0.45f
+
+    /** The reasoning bubble's tinted fill over the chat background. */
+    const val REASONING_BUBBLE_FILL = 0.45f
+
+    /** The selected-item fill, a wash of the complementary accent. */
+    const val SELECTION_FILL = 0.15f
+}

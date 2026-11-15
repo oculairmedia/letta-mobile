@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import com.letta.mobile.desktop.DesktopEffectTokens
+import com.letta.mobile.desktop.RiveWorkbenchColors
 import kotlin.math.hypot
 import kotlin.math.min
 
@@ -52,15 +54,14 @@ fun DrawScope.drawSurround(spec: Surround) {
             rotate(n.rotation, Offset.Zero)
             scale(n.aspect, 1f, Offset.Zero)
         }) {
-            drawCircle(Brush.radialGradient(listOf(c, c.copy(alpha = 0f)), Offset.Zero, r), r, Offset.Zero)
+            drawCircle(Brush.radialGradient(listOf(c, c.copy(alpha = DesktopEffectTokens.GLOW_EDGE_ALPHA)), Offset.Zero, r), r, Offset.Zero)
         }
     }
 }
 
 /**
- * Draws a [Surround] behind `content`, and when `editing` lets the nodes be dragged on the
- * canvas (a ring marks each; the selected one is brighter). A tap that is not on a node calls
- * `onTap` - the bench opens the base-colour palette from it.
+ * Draws a [Surround] behind `content`, and when `editing` lets the nodes be dragged on the canvas (a ring marks
+ * each; the selected one is brighter). A tap that is not on a node calls `onTap` - the bench opens the base-colour palette from it.
  */
 @Composable
 fun SurroundLayer(
@@ -79,10 +80,9 @@ fun SurroundLayer(
     val selectedNow by rememberUpdatedState(selected)
 
     fun nearest(p: Offset): Int {
-        val s = current
         var best = -1
         var bestD = 28f * 1.5f
-        s.nodes.forEachIndexed { i, n ->
+        current.nodes.forEachIndexed { i, n ->
             val d = hypot(p.x - n.x * size.width, p.y - n.y * size.height)
             if (d < bestD) { bestD = d; best = i }
         }
@@ -122,9 +122,9 @@ fun SurroundLayer(
                 if (!editingNow) return@drawWithContent
                 spec.nodes.forEachIndexed { i, n ->
                     val c = Offset(n.x * size.width, n.y * size.height)
-                    val hot = i == selectedNow
-                    drawCircle(Color.Black.copy(alpha = 0.5f), 9f, c, style = Stroke(4f))
-                    drawCircle(if (hot) Color.White else Color(0xFFBBBBBB), 9f, c, style = Stroke(2f))
+                    drawCircle(RiveWorkbenchColors.nodeRingShadow, 9f, c, style = Stroke(4f))
+                    val ring = if (i == selectedNow) RiveWorkbenchColors.nodeRingSelected else RiveWorkbenchColors.nodeRing
+                    drawCircle(ring, 9f, c, style = Stroke(2f))
                     drawCircle(Color(n.argb).copy(alpha = 1f), 4f, c)
                 }
             },

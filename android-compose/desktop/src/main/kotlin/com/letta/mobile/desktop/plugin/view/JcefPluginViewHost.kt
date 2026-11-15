@@ -2,7 +2,6 @@ package com.letta.mobile.desktop.plugin.view
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -103,7 +102,7 @@ private fun PreparingNotice(notice: String, session: PluginViewSession, modifier
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Surface(
             modifier = Modifier.padding(LettaDimens.Space.sm).testTag(PluginViewTestTags.notice(session.spec.elementId)),
-            shape = RoundedCornerShape(LettaDimens.Radius.sm),
+            shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.inverseSurface,
             contentColor = MaterialTheme.colorScheme.inverseOnSurface,
         ) {

@@ -10,7 +10,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.letta.mobile.ui.shell.header.HeaderControls
@@ -19,6 +18,7 @@ import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.ShellHeader
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSizing
 
 /**
  * A full-screen dialog on a compact window and a card dialog on a wider one, both titled by the
@@ -33,7 +33,7 @@ fun AdaptiveDialog(
     content: @Composable () -> Unit,
 ) {
     BoxWithConstraints {
-        val isCompact = maxWidth < 600.dp
+        val isCompact = maxWidth < LettaSizing.compactWidthBreakpoint
 
         if (isCompact) {
             Dialog(
@@ -59,7 +59,7 @@ fun AdaptiveDialog(
             Dialog(onDismissRequest = onDismiss) {
                 Card(
                     modifier = modifier
-                        .widthIn(max = 900.dp)
+                        .widthIn(max = LettaSizing.readableDialogMaxWidth)
                         .fillMaxWidth()
                         .padding(LettaDimens.Orb.lg),
                 ) {

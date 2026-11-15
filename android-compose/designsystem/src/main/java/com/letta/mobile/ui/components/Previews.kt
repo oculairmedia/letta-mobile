@@ -66,40 +66,6 @@ private fun MessageBubblePreview() = PreviewMessageBubbleContent()
 
 @PreviewLightDark
 @Composable
-internal fun PreviewThinkingSectionContent() {
-    LettaTheme(dynamicColor = false) {
-        Surface {
-            ThinkingSection(
-                thinkingText = "Let me analyze this step by step:\n1. First consideration\n2. Second point\n3. **Conclusion**: this approach works best.",
-            )
-        }
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun ThinkingSectionPreview() = PreviewThinkingSectionContent()
-
-@PreviewLightDark
-@Composable
-internal fun PreviewEmptyStateContent() {
-    LettaTheme(dynamicColor = false) {
-        Surface {
-            EmptyState(
-                icon = LettaIcons.ChatOutline,
-                message = "Start a conversation",
-                modifier = Modifier.height(200.dp),
-            )
-        }
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun EmptyStatePreview() = PreviewEmptyStateContent()
-
-@PreviewLightDark
-@Composable
 internal fun PreviewMessageActionButtonsContent() {
     LettaTheme(dynamicColor = false) {
         Surface {
@@ -149,22 +115,6 @@ private fun LatencyTextPreview() = PreviewLatencyTextContent()
 
 @PreviewLightDark
 @Composable
-internal fun PreviewErrorDialogContent() {
-    LettaTheme(dynamicColor = false) {
-        ErrorDialog(
-            message = "Failed to connect to server. Please check your connection and try again.",
-            onDismiss = {},
-            onRetry = {},
-        )
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun ErrorDialogPreview() = PreviewErrorDialogContent()
-
-@PreviewLightDark
-@Composable
 internal fun PreviewAccordionsContent() {
     LettaTheme(dynamicColor = false) {
         Surface {
@@ -194,85 +144,3 @@ internal fun PreviewAccordionsContent() {
 @PreviewLightDark
 @Composable
 private fun AccordionsPreview() = PreviewAccordionsContent()
-
-@PreviewLightDark
-@Composable
-internal fun PreviewMessageSenderContent() {
-    LettaTheme(dynamicColor = false) {
-        Surface {
-            Column(modifier = Modifier.padding(16.dp)) {
-                MessageSender(isUser = false, agentName = "Letta Agent")
-                Spacer(modifier = Modifier.height(8.dp))
-                MessageSender(isUser = true)
-            }
-        }
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun MessageSenderPreview() = PreviewMessageSenderContent()
-
-@PreviewLightDark
-@Composable
-internal fun PreviewTelemetryGridContent() {
-    LettaTheme(dynamicColor = false) {
-        Surface {
-            TelemetryGrid(
-                promptTokens = 12_348,
-                completionTokens = 684,
-                durationMs = 3_420,
-                costUsd = 0.0045,
-                modifier = Modifier.padding(16.dp),
-            )
-        }
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun TelemetryGridPreview() = PreviewTelemetryGridContent()
-
-@PreviewLightDark
-@Composable
-internal fun PreviewDateSeparatorContent() {
-    LettaTheme(dynamicColor = false) {
-        Surface {
-            Column(modifier = Modifier.padding(16.dp)) {
-                DateSeparator(date = java.time.LocalDate.now())
-                DateSeparator(date = java.time.LocalDate.now().minusDays(1))
-                DateSeparator(date = java.time.LocalDate.of(2023, 1, 1))
-            }
-        }
-    }
-}
-
-@PreviewLightDark
-@Composable
-internal fun PreviewLiveStatusTextContent() {
-    LettaTheme(dynamicColor = false) {
-        Surface {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                LiveStatusText(text = "Running tool execution...", active = true)
-                LiveStatusText(text = "Completed tool execution", active = false)
-            }
-        }
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun LiveStatusTextPreview() = PreviewLiveStatusTextContent()
-
-
-@PreviewLightDark
-@Composable
-private fun DateSeparatorPreview() = PreviewDateSeparatorContent()
-
-@PreviewLightDark
-@Composable
-private fun StatusTimelinePreview() = PreviewStatusTimelineContent()
-

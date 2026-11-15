@@ -28,6 +28,7 @@ import kotlin.math.PI
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.random.Random
+import com.letta.mobile.ui.theme.VoiceOverlayTokens
 
 /**
  * letta-mobile-bcdv: shader palette is hardcoded inside GLSL (yellow /
@@ -237,14 +238,7 @@ private fun AudioAnimationFallback(
         label = "audioFallbackPhase",
     )
 
-    val gradient = Brush.verticalGradient(
-        colors = listOf(
-            Color(0xFFFDDF85), // yellow
-            Color(0xFFA0D0AF), // green
-            Color(0xFFE25F57), // red
-            Color(0xFF85B1F8), // blue
-        ),
-    )
+    val gradient = Brush.verticalGradient(colors = VoiceOverlayTokens.wavePalette)
 
     Canvas(modifier = modifier.fillMaxSize()) {
         drawRect(color = bgColor)
