@@ -68,7 +68,11 @@ internal class AdminChatSessionPort(
         sendQueue = viewModel.sendQueue,
         composerHost = hostInputs(scope, fileMentions),
         backgroundProcesses = viewModel.approvalRelay?.let { relay -> com.letta.mobile.ui.chat.session.backgroundProcessHost(
-            scope, relay.deviceStatusFrames,
+            scope, kotlinx.coroutines.flow.combine(relay.deviceStatuses, viewModel.uiState) { statuses, _ ->
+                statuses[com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(
+                    viewModel.agentId.value, viewModel.conversationId?.value.orEmpty(),
+                )]
+            },
             viewModel.uiState.map { viewModel.conversationId?.value?.let {
                 com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(viewModel.agentId.value, it)
             } }, relay::stopBackgroundProcess,

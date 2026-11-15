@@ -1,9 +1,10 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.serialization.json.jsonObject
 import kotlinx.coroutines.flow.MutableSharedFlow
 import java.lang.reflect.Proxy
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
@@ -20,13 +21,35 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class BackgroundProcessRelayTest {
     @Test
+    fun viewerWithoutConversationAccessReceivesNoProcessData() = runTest(UnconfinedTestDispatcher()) {
+        val channel = ScriptedAppServerTransport { emptyList() }
+        val client = DefaultAppServerClient(channel, parentScope = backgroundScope)
+        val registry = ConnectionRegistry()
+        IrohNodeEndpoint(scope = backgroundScope, authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+            connectionRegistry = registry).attachToolsetStatuses(client)
+        val denied = object : ViewerHandle by Viewer("denied") {
+            override fun adminContext() = null
+        }
+        val deniedFrames = mutableListOf<String>()
+        val capture = object : ViewerHandle by denied {
+            override suspend fun writeFrame(frame: String): Boolean { deniedFrames += frame; return true }
+        }
+        registry.register("c", registry.claim(capture))
+        channel.push("""{"type":"update_device_status","event_seq":1,"emitted_at":"now","idempotency_key":"status",
+            "runtime":{"agent_id":"a","conversation_id":"c"},
+            "device_status":{"background_processes":[{"id":"p"}]}}""")
+        runCurrent()
+        assertTrue(deniedFrames.isEmpty(), "a viewer without authorization must receive no process data")
+    }
+
+    @Test
     fun snapshotsReachOnlyConversationViewersAndReplayToLateViewers() = runTest(UnconfinedTestDispatcher()) {
         val channel = ScriptedAppServerTransport { emptyList() }
         val client = DefaultAppServerClient(channel, parentScope = backgroundScope)
         val registry = ConnectionRegistry()
         val endpoint = IrohNodeEndpoint(scope = backgroundScope, authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
             connectionRegistry = registry)
-        endpoint.attachBackgroundProcesses(client)
+        endpoint.attachToolsetStatuses(client)
         val phone = Viewer("phone")
         val desktop = Viewer("desktop")
         val elsewhere = Viewer("other")
@@ -53,9 +76,9 @@ class BackgroundProcessRelayTest {
         assertEquals(2, phone.frames.size)
         runCurrent()
         assertEquals(2, desktop.frames.size)
-        val frame = AppServerProtocol.decodeFrame(desktop.frames.last()).frame as AppServerInboundFrame.UpdateDeviceStatus
+        val frame = AppServerProtocol.json.parseToJsonElement(desktop.frames.last()).jsonObject.getValue("device_status").jsonObject
         runCurrent()
-        assertEquals("[]", frame.deviceStatus["background_processes"].toString())
+        assertEquals("[]", frame["background_processes"].toString())
     }
 
     @Test
@@ -63,12 +86,15 @@ class BackgroundProcessRelayTest {
         val frames = MutableSharedFlow<AppServerReceivedFrame>()
         val client = Proxy.newProxyInstance(AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java)) {
                 _, method, _ ->
-            check(method.name == "getEvents")
-            frames
+            when (method.name) {
+                "getEvents" -> frames
+                "isConnected" -> MutableStateFlow(true)
+                else -> error("Unexpected call: ${method.name}")
+            }
         } as AppServerClient
         val registry = ConnectionRegistry()
         IrohNodeEndpoint(scope = backgroundScope, authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
-            connectionRegistry = registry).attachBackgroundProcesses(client)
+            connectionRegistry = registry).attachToolsetStatuses(client)
         fun status(conversation: String, generation: Long) = AppServerProtocol.decodeFrame(
             """{"type":"update_device_status","event_seq":1,"emitted_at":"now","idempotency_key":"status",
                 "runtime":{"agent_id":"a","conversation_id":"$conversation"},
@@ -89,6 +115,10 @@ class BackgroundProcessRelayTest {
     }
 
     private class Viewer(override val connectionId: String) : ViewerHandle {
+        override fun adminContext() = AdminRpcRequestContext(
+            authenticated = true, authorizedAgentIds = setOf("a"), authorizedConversationIds = setOf("c"),
+            grantedCapabilities = setOf(IrohPeerCapabilities.CHAT_READ),
+        )
         val frames = mutableListOf<String>()
         override suspend fun writeFrame(frame: String): Boolean { frames += frame; return true }
     }

@@ -20,9 +20,7 @@ import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
-import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
-import kotlinx.coroutines.flow.MutableSharedFlow
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import com.letta.mobile.ui.chat.session.TimelineLocalState
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -689,10 +687,10 @@ class DesktopChatSessionPortTest {
 
     @Test
     fun processShelfUsesTheSharedHostProjectionAndStopAdmission() = runTest {
-        val frames = MutableSharedFlow<AppServerReceivedFrame>()
+        val statuses = com.letta.mobile.data.transport.api.ToolsetStatusStore()
         val stopped = mutableListOf<Pair<AppServerRuntimeScope, String>>()
         val gateway = object : FakeDesktopChatGateway() {
-            override val deviceStatusFrames = frames
+            override val deviceStatuses = statuses.deviceStatuses
             override val stopBackgroundProcess: suspend (AppServerRuntimeScope, String) -> Unit = { runtime, processId ->
                 stopped += runtime to processId
             }
@@ -703,7 +701,7 @@ class DesktopChatSessionPortTest {
                 "runtime":{"agent_id":"agent-0","conversation_id":"conv-1"},
                 "device_status":{"background_processes":$processes}}""",
         )
-        frames.emit(status("""[{"id":"p"}]"""))
+        statuses.observe(status("""[{"id":"p"}]"""))
         runCurrent()
         assertEquals(listOf("p"), port.composer.value.backgroundProcesses.map { it.id })
         port.actions.stopBackgroundProcess(ProcessId("p"))
@@ -711,7 +709,7 @@ class DesktopChatSessionPortTest {
         runCurrent()
         assertEquals(listOf(AppServerRuntimeScope("agent-0", "conv-1") to "p"), stopped)
         assertEquals(1, port.composer.value.backgroundProcesses.size)
-        frames.emit(status("[]"))
+        statuses.observe(status("[]"))
         runCurrent()
         assertTrue(port.composer.value.backgroundProcesses.isEmpty())
         controller.close()

@@ -21,6 +21,8 @@ class MonitorStopContractTest {
     private class Client : AppServerClient {
         val calls = mutableListOf<AppServerCommand.MonitorStop>()
         var success = true
+        var active = true
+        private val owner = AppServerRuntimeScope("agent-1", "conv-1")
         override val events: Flow<AppServerReceivedFrame> = emptyFlow()
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) = error("unused")
         override suspend fun input(command: AppServerCommand.Input) = error("unused")
@@ -30,7 +32,18 @@ class MonitorStopContractTest {
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = error("unused")
         override suspend fun monitorStop(command: AppServerCommand.MonitorStop): AppServerInboundFrame.MonitorStopResponse {
             calls += command
-            return AppServerInboundFrame.MonitorStopResponse(command.requestId, success, if (success) null else "cannot stop")
+            require(command.requestId.isNotEmpty())
+            val runtime = requireNotNull(command.runtime)
+            require(runtime.agentId.isNotEmpty() && runtime.conversationId.isNotEmpty())
+            require(command.processId.isNotEmpty())
+            val error = when {
+                !active -> "Runtime is no longer active"
+                command.processId != "process-1" -> "Monitor not found"
+                command.runtime != owner -> "Monitor does not belong to this conversation"
+                !success -> "Monitor could not be stopped"
+                else -> null
+            }
+            return AppServerInboundFrame.MonitorStopResponse(command.requestId, error == null, error)
         }
     }
 
@@ -66,7 +79,19 @@ class MonitorStopContractTest {
     fun failureIsAnError() = runTest {
         val client = Client().apply { success = false }
         val result = call(client)
-        assertTrue(result.contains("\"success\":false") && result.contains("cannot stop"), result)
+        assertTrue(result.contains("\"success\":false") && result.contains("Monitor could not be stopped"), result)
+    }
+
+    @Test
+    fun realHostPreconditionsRemainVisibleThroughTheRegisteredRoute() = runTest {
+        val client = Client()
+        val params = fixture.getValue("params").jsonObject
+        assertTrue(call(client, JsonObject(params + ("process_id" to kotlinx.serialization.json.JsonPrimitive("unknown"))))
+            .contains("Monitor not found"))
+        assertTrue(call(client, JsonObject(params + ("conversation_id" to kotlinx.serialization.json.JsonPrimitive("other"))))
+            .contains("Monitor does not belong to this conversation"))
+        client.active = false
+        assertTrue(call(client).contains("Runtime is no longer active"))
     }
 
     @Test

@@ -4,10 +4,11 @@ package com.letta.mobile.ui.chat.session
 
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.transport.appserver.AppServerBackgroundProcess
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
-import com.letta.mobile.data.transport.appserver.snapshot
+import com.letta.mobile.data.transport.appserver.toDeviceStatusSnapshot
+import com.letta.mobile.data.transport.api.deviceStatusPayload
+import kotlinx.coroutines.flow.map
 import kotlin.uuid.Uuid
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -30,7 +31,7 @@ import kotlinx.coroutines.launch
  */
 fun backgroundProcessHost(
     scope: CoroutineScope,
-    frames: Flow<AppServerReceivedFrame>,
+    frames: Flow<AppServerReceivedFrame?>,
     runtimes: Flow<AppServerRuntimeScope?>,
     stop: suspend (AppServerRuntimeScope, String) -> Unit,
 ): StateFlow<ChatComposerHostInputs> {
@@ -58,7 +59,7 @@ fun backgroundProcessHost(
             if (target == null) return@collectLatest
             coroutineScope {
                 val (gateway, runtime) = target
-                backgroundProcessHost(this, gateway.deviceStatusFrames, flowOf(runtime)) { selected, id ->
+                backgroundProcessHost(this, gateway.deviceStatuses.map { it[runtime] }, flowOf(runtime)) { selected, id ->
                     if (current() == target) gateway.stopBackgroundProcess(selected, id)
                 }.collect { host.value = it }
             }
@@ -73,14 +74,14 @@ fun backgroundProcessHost(
     gateway: ChatGateway,
     target: TimelineChatTarget,
 ): StateFlow<ChatComposerHostInputs> = backgroundProcessHost(
-    scope, gateway.deviceStatusFrames,
+    scope, gateway.deviceStatuses.map { it[AppServerRuntimeScope(target.agentId, target.conversationId)] },
     flowOf(AppServerRuntimeScope(target.agentId, target.conversationId)),
     gateway.stopBackgroundProcess,
 )
 
 private suspend fun followBackgroundProcesses(
     host: MutableStateFlow<ChatComposerHostInputs>,
-    frames: Flow<AppServerReceivedFrame>,
+    frames: Flow<AppServerReceivedFrame?>,
     runtime: AppServerRuntimeScope,
     stop: suspend (AppServerRuntimeScope, String) -> Unit,
 ) = coroutineScope {
@@ -104,7 +105,16 @@ private suspend fun followBackgroundProcesses(
     }
     try {
         frames.collect { received ->
-            val status = received.deviceStatusFor(runtime) ?: return@collect
+            if (received == null) {
+                synchronized(lock) {
+                    pending.clear()
+                    processes = emptyList()
+                    generation = null
+                    host.value = ChatComposerHostInputs()
+                }
+                return@collect
+            }
+            val status = received.frame.deviceStatusPayload()?.takeIf { it.first == runtime } ?: return@collect
             synchronized(lock) {
                 val incoming = received.connectionGeneration
                 if (isOlderConnectionSnapshot(incoming, generation)) return@synchronized
@@ -112,7 +122,7 @@ private suspend fun followBackgroundProcesses(
                     pending.clear()
                     generation = incoming
                 }
-                processes = status.snapshot.backgroundProcesses
+                processes = status.second.toDeviceStatusSnapshot().backgroundProcesses
                 pending.keys.retainAll(processes.map { it.id }.toSet())
                 host.value = host.value.copy(
                     backgroundProcesses = processes,
@@ -154,6 +164,3 @@ private fun claimBackgroundProcess(
 
 private fun isOlderConnectionSnapshot(incoming: Long?, current: Long?): Boolean =
     current != null && (incoming == null || incoming < current)
-
-private fun AppServerReceivedFrame.deviceStatusFor(runtime: AppServerRuntimeScope): AppServerInboundFrame.UpdateDeviceStatus? =
-    (frame as? AppServerInboundFrame.UpdateDeviceStatus)?.takeIf { it.runtime == runtime }

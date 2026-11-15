@@ -23,6 +23,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.put
 
 class ToolsetDeviceStatusRelayTest {
@@ -37,19 +38,24 @@ class ToolsetDeviceStatusRelayTest {
                 else -> error("Unexpected call: ${method.name}")
             }
         } as AppServerClient
-        val registry = ConnectionRegistry()
-        bindToolsetDeviceStatuses(backgroundScope, client, registry)
+        val registry = ConnectionRegistry().also { bindToolsetDeviceStatuses(backgroundScope, client, it) }
         val delivered = mutableListOf<String>()
-        val allowed = viewer("allowed", delivered)
+        var allowedContext = AdminRpcRequestContext(true, grantedCapabilities = setOf(IrohPeerCapabilities.CHAT_READ))
+        val allowed = object : ViewerHandle by viewer("allowed", delivered) {
+            override fun adminContext() = allowedContext
+        }
         registry.register("conv-1", registry.claim(allowed))
         val forbidden = mutableListOf<String>()
         registry.register("conv-1", registry.claim(viewer("wrong-agent", forbidden, agent = "other")))
         registry.register("conv-1", registry.claim(viewer("wrong-conversation", forbidden, conversation = "other")))
         registry.register("other", registry.claim(viewer("other-view", forbidden)))
+        registry.register("conv-1", registry.claim(viewer("no-read", forbidden, capabilities = emptySet())))
         val status = AppServerInboundFrame.UpdateDeviceStatus(
             runtime = AppServerRuntimeScope("agent-1", "conv-1"), eventSeq = 7,
             emittedAt = "2026-11-15T00:00:00Z", idempotencyKey = "status-7",
-            deviceStatus = buildJsonObject { put("current_toolset_preference", "auto") },
+            deviceStatus = Json.parseToJsonElement(
+                """{"current_toolset_preference":"auto","background_processes":[{"process_id":"process-1","kind":"monitor"}]}""",
+            ).jsonObject,
         )
         frames.emit(AppServerReceivedFrame(AppServerChannel.Stream, status, JsonObject(emptyMap())))
         runCurrent()
@@ -57,6 +63,8 @@ class ToolsetDeviceStatusRelayTest {
         assertTrue(forbidden.isEmpty())
         val wire = Json.parseToJsonElement(delivered.single()).jsonObject
         assertEquals(JsonPrimitive("toolset_status"), wire["type"])
+        assertEquals(JsonPrimitive("process-1"), wire.getValue("device_status").jsonObject
+            .getValue("background_processes").jsonArray.single().jsonObject["process_id"])
         assertTrue("event_seq" !in wire, "native and relayed turns have separate sequence spaces")
         val store = ToolsetStatusStore()
         store.observe(AppServerProtocol.decodeFrame(delivered.single(), AppServerChannel.Stream))
@@ -65,6 +73,13 @@ class ToolsetDeviceStatusRelayTest {
         registry.register("conv-1", registry.claim(viewer("late-view", replayed)))
         runCurrent()
         assertEquals(delivered, replayed)
+        revokedContexts.forEach { revoked ->
+            allowedContext = revoked
+            frames.emit(AppServerReceivedFrame(AppServerChannel.Stream, status, JsonObject(emptyMap())))
+            runCurrent()
+            assertEquals(1, delivered.size, "authorization is checked again for every process frame")
+            assertTrue(forbidden.isEmpty())
+        }
         connected.value = false
         runCurrent()
         frames.emit(AppServerReceivedFrame(AppServerChannel.Stream, status, JsonObject(emptyMap())))
@@ -85,8 +100,7 @@ class ToolsetDeviceStatusRelayTest {
                 else -> error("Unexpected call: ${method.name}")
             }
         } as AppServerClient
-        val registry = ConnectionRegistry()
-        bindToolsetDeviceStatuses(backgroundScope, client, registry)
+        val registry = ConnectionRegistry().also { bindToolsetDeviceStatuses(backgroundScope, client, it) }
         val neverReads = object : ViewerHandle by viewer("never-reads", mutableListOf()) {
             override suspend fun writeFrame(frame: String): Boolean = kotlinx.coroutines.awaitCancellation()
         }
@@ -127,13 +141,27 @@ class ToolsetDeviceStatusRelayTest {
         assertTrue(slowFrames.last().contains("choice-99"))
     }
 
-    private fun viewer(id: String, frames: MutableList<String>, agent: String = "agent-1", conversation: String = "conv-1") =
+    private val revokedContexts = listOf(
+            AdminRpcRequestContext(true, authorizedAgentIds = setOf("other"),
+                grantedCapabilities = setOf(IrohPeerCapabilities.CHAT_READ)),
+            AdminRpcRequestContext(true, authorizedConversationIds = setOf("other"),
+                grantedCapabilities = setOf(IrohPeerCapabilities.CHAT_READ)),
+            AdminRpcRequestContext(true, grantedCapabilities = emptySet()),
+        )
+
+    private fun viewer(
+        id: String,
+        frames: MutableList<String>,
+        agent: String = "agent-1",
+        conversation: String = "conv-1",
+        capabilities: Set<String> = setOf(IrohPeerCapabilities.CHAT_READ),
+    ) =
         object : ViewerHandle {
             override val connectionId = id
             override suspend fun writeFrame(frame: String): Boolean { frames += frame; return true }
             override fun adminContext() = AdminRpcRequestContext(
                 authenticated = true, authorizedAgentIds = setOf(agent), authorizedConversationIds = setOf(conversation),
-                grantedCapabilities = setOf(IrohPeerCapabilities.CHAT_READ),
+                grantedCapabilities = capabilities,
             )
         }
 }

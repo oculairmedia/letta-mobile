@@ -9,6 +9,7 @@ import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.JsonArray
 
 /**
@@ -20,8 +21,9 @@ interface IChannelTransport {
     /** Present only when this captured transport can observe and abort exact turns authoritatively. */
     val activeTurnEvents: RuntimeTurnEventSource? get() = null
     /** Runtime snapshots from the current connection; empty on transports without native status. */
-    val deviceStatusFrames: kotlinx.coroutines.flow.Flow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>
-        get() = kotlinx.coroutines.flow.emptyFlow()
+    val deviceStatuses: StateFlow<Map<com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
+        com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>>
+        get() = MutableStateFlow(emptyMap())
     /** Host toolset choices and confirmed preferences for this connection, scoped by runtime. */
     val toolsetStates: StateFlow<Map<com.letta.mobile.data.toolsets.ToolsetRuntime, com.letta.mobile.data.toolsets.ToolsetState>>
         get() = com.letta.mobile.data.toolsets.EmptyToolsets

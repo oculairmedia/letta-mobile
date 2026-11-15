@@ -74,11 +74,15 @@ class IrohChannelTransportDisconnectGenerationTest {
         try {
             harness.connect(Observer.OLD)
             harness.emitStatus(Observer.OLD, "old")
-            val old = withTimeout(5.seconds) { harness.transport.deviceStatusFrames.first { it.processId() == "old" } }
+            val old = withTimeout(5.seconds) {
+                harness.transport.deviceStatuses.first { statuses ->
+                    statuses.values.any { frame -> frame.processId() == "old" }
+                }.values.single()
+            }
             harness.disconnectAndAssertPublicState()
             harness.connect(Observer.NEW)
             val next = clientScope.async(start = CoroutineStart.UNDISPATCHED) {
-                harness.transport.deviceStatusFrames.first()
+                harness.transport.deviceStatuses.first { it.isNotEmpty() }.values.single()
             }
             assertFalse(next.isCompleted, "a new connection cannot replay its predecessor's status")
             harness.emitStatus(Observer.OLD, "stale")

@@ -5,6 +5,9 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.toolsets.ToolsetRuntime
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
+import com.letta.mobile.ui.chat.session.TimelineChatTarget
+import com.letta.mobile.ui.chat.session.backgroundProcessHost
 import com.letta.mobile.data.transport.api.AppServerClientChannel
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -61,9 +64,13 @@ class ToolsetChannelTest {
         events.emit(status())
         runCurrent()
         assertEquals("auto", channel.toolsetStates.value[ToolsetRuntime("agent-1", "conv-1")]?.preference)
+        val shelf = backgroundProcessHost(backgroundScope, IrohAdminRpcChatGateway(channel), target)
+        runCurrent()
+        assertEquals(listOf("process-1"), shelf.value.backgroundProcesses.map { it.id }, "late shelf gets cached process data")
         connected.value = false
         runCurrent()
         assertTrue(channel.toolsetStates.value.isEmpty())
+        assertTrue(shelf.value.backgroundProcesses.isEmpty(), "disconnect clears an already visible shelf")
         assertEquals(0, events.subscriptionCount.value, "the old session must release its eager collector")
         events.emit(status())
         runCurrent()
@@ -84,18 +91,25 @@ class ToolsetChannelTest {
             events.emit(status())
             runCurrent()
             assertEquals("auto", transport.toolsetStates.value[ToolsetRuntime("agent-1", "conv-1")]?.preference)
+            val shelf = backgroundProcessHost(backgroundScope, IrohAdminRpcChatGateway(transport), target)
+            runCurrent()
+            assertEquals(listOf("process-1"), shelf.value.backgroundProcesses.map { it.id })
             transport.disconnect()
             runCurrent()
             assertTrue(transport.toolsetStates.value.isEmpty())
+            assertTrue(shelf.value.backgroundProcesses.isEmpty())
         } finally {
             transport.close()
         }
     }
 
+    private val target = TimelineChatTarget("agent-1", "Ada", "conv-1")
+
     private fun status(): AppServerReceivedFrame {
         val wire = Json.parseToJsonElement("""{"type":"toolset_status",
             "runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},
-            "device_status":{"current_toolset_preference":"auto","available_toolsets":[{"id":"auto"},{"id":"codex"}]}}""").jsonObject
+            "device_status":{"background_processes":[{"process_id":"process-1","kind":"monitor"}],
+            "current_toolset_preference":"auto","available_toolsets":[{"id":"auto"},{"id":"codex"}]}}""").jsonObject
         return AppServerProtocol.decodeFrame(wire.toString(), AppServerChannel.Stream)
     }
 }

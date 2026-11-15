@@ -40,7 +40,7 @@ class ChatApprovalRelay @Inject constructor(
     /** letta-mobile-bzvro.14: answers made while the link is down, replayed after the reconnect. */
     val outbox: ApprovalOutboxCoordinator,
 ) {
-    val deviceStatusFrames get() = transport.deviceStatusFrames
+    val deviceStatuses get() = transport.deviceStatuses
 
     suspend fun stopBackgroundProcess(runtime: AppServerRuntimeScope, processId: String) =
         transport.stopBackgroundProcess(runtime, ProcessId(processId))

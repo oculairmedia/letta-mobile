@@ -187,7 +187,7 @@ class IrohAdminRpcChatGateway(
     override val pendingApprovalDetails: kotlinx.coroutines.flow.StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>>
         get() = approvalControls?.relay?.pending ?: noPendingApprovals
 
-    override val deviceStatusFrames get() = transport.deviceStatusFrames
+    override val deviceStatuses get() = transport.deviceStatuses
 
     override val stopBackgroundProcess:
         suspend (com.letta.mobile.data.transport.appserver.AppServerRuntimeScope, String) -> Unit =

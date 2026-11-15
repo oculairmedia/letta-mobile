@@ -41,7 +41,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
-import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.feature.chat.coordination.ChatApprovalRelay
@@ -69,9 +68,9 @@ class AdminChatSessionPortTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         var viewModel: AdminChatViewModel? = null
         try {
-            val frames = MutableSharedFlow<AppServerReceivedFrame>()
+            val statuses = com.letta.mobile.data.transport.api.ToolsetStatusStore()
             val relay = mockk<ChatApprovalRelay>(relaxed = true)
-            every { relay.deviceStatusFrames } returns frames
+            every { relay.deviceStatuses } returns statuses.deviceStatuses
             every { relay.pendingDetails } returns MutableStateFlow(emptyMap())
             every { relay.outbox.queuedRequestIds } returns MutableStateFlow(emptySet())
             every { relay.outbox.notices } returns MutableSharedFlow()
@@ -90,14 +89,14 @@ class AdminChatSessionPortTest {
                     "runtime":{"agent_id":"agent-process","conversation_id":"conversation-process"},
                     "device_status":{"background_processes":[${running.joinToString(",") { """{"id":"${it.value}"}""" }}]}}""",
             )
-            frames.emit(status(listOf(ProcessId("p"))))
+            statuses.observe(status(listOf(ProcessId("p"))))
             assertEquals(listOf("p"), port.composer.first { it.backgroundProcesses.isNotEmpty() }.backgroundProcesses.map { it.id })
             port.actions.stopBackgroundProcess(ProcessId("p"))
             port.actions.stopBackgroundProcess(ProcessId("p"))
             stopped.await()
             coVerify(exactly = 1) { relay.stopBackgroundProcess(AppServerRuntimeScope("agent-process", "conversation-process"), "p") }
             assertEquals(1, port.composer.value.backgroundProcesses.size)
-            frames.emit(status(emptyList()))
+            statuses.observe(status(emptyList()))
             assertTrue(port.composer.first { it.backgroundProcesses.isEmpty() }.backgroundProcesses.isEmpty())
         } finally {
             viewModel?.viewModelScope?.cancel()

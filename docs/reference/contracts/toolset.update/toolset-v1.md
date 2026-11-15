@@ -14,7 +14,9 @@ Producer and shared client fixtures: `toolset-v1.json`. Real-handler conformance
 `WireContractsTest`; forwarding and parameter failures run in `ToolsetHandlersTest`.
 This route ships as a matched set: wrapper + clients.
 
-The wrapper also forwards device status to authorized viewers as a `toolset_status` notification:
+The wrapper forwards the complete device status to authorized viewers as a `toolset_status` notification.
+The toolset picker and background-process shelf read the same connection-owned cache; `background_processes`
+is preserved unchanged, replayed on viewer attach and cleared with the connection. The envelope is unchanged:
 `{"type":"toolset_status","runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},"device_status":{...}}`.
 `device_status` is the host snapshot, including `available_toolsets` and
 `current_toolset_preference`. It replays the latest snapshot when a viewer joins, and drops the

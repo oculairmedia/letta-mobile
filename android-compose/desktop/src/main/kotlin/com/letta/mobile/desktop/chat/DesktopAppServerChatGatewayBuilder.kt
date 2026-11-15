@@ -23,6 +23,7 @@ import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.transport.appserver.AppServerReadinessExpectation
+import com.letta.mobile.data.transport.api.AppServerClientChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
@@ -220,7 +221,7 @@ class DesktopAppServerChatGatewayBuilder(
                     leases.forEach { it.close() }
                     clientScope.cancel()
                 },
-            )
+            ).apply { deviceStatuses = AppServerClientChannel(opened.client, clientScope).deviceStatuses }
         } catch (error: Throwable) {
             router.detach()
             leases.forEach { it.close() }

@@ -4,7 +4,6 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 
 import com.letta.mobile.util.attr
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.extras.relay.AppToolRelayHost
@@ -191,28 +190,6 @@ class IrohNodeEndpoint(
     fun attachPermissionModePublisher(publisher: PermissionModePublisher) {
         publisher.attach { conversationId, frame ->
             connectionRegistry.viewersFor(conversationId).count { it.writeFrame(frame) }
-        }
-    }
-
-    /** Replays and tails host-confirmed process snapshots to this conversation's authorized viewers. */
-    fun attachBackgroundProcesses(client: AppServerClient) {
-        val snapshots = java.util.concurrent.ConcurrentHashMap<String, AppServerInboundFrame.UpdateDeviceStatus>()
-        connectionRegistry.addViewerJoinedListener { conversationId, viewer ->
-            snapshots[conversationId]?.let { viewer.writeDeviceStatus(it) }
-        }
-        scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
-            var generation: Long? = null
-            client.events.collect { received ->
-                val incoming = received.connectionGeneration
-                if (isOlderBackgroundStatus(incoming, generation)) return@collect
-                if (incoming != generation) {
-                    snapshots.clear()
-                    generation = incoming
-                }
-                val status = received.frame as? AppServerInboundFrame.UpdateDeviceStatus ?: return@collect
-                snapshots[status.runtime.conversationId] = status
-                connectionRegistry.viewersFor(status.runtime.conversationId).forEach { it.writeDeviceStatus(status) }
-            }
         }
     }
 
@@ -582,6 +559,3 @@ interface IrohNodeProtocolHandler {
     fun authorize(remoteEndpointId: String): Boolean
     suspend fun accept(connection: Connection, remoteEndpointId: String)
 }
-
-private fun isOlderBackgroundStatus(incoming: Long?, current: Long?): Boolean =
-    current != null && (incoming == null || incoming < current)

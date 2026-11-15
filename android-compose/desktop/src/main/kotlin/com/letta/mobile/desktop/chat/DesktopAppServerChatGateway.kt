@@ -201,8 +201,9 @@ class DesktopAppServerChatGateway internal constructor(
 
     private val activeRunIdByConversation = ConcurrentHashMap<ConversationId, DesktopRunId>()
 
-    /** letta-mobile-ckmub.17.2: the shared engine-side mode change the web's chat page binds too. */
-    override val deviceStatusFrames get() = client.events
+    /** The session's shared device-status cache, bound before this gateway is published. */
+    override var deviceStatuses: StateFlow<Map<AppServerRuntimeScope, AppServerReceivedFrame>> = MutableStateFlow(emptyMap())
+        internal set
 
     override val stopBackgroundProcess: suspend (AppServerRuntimeScope, String) -> Unit =
         { runtime, id -> client.stopBackgroundProcess(runtime, ProcessId(id)) }

@@ -222,6 +222,7 @@ class WireContractsTest {
     ) { _, method, args ->
         check(method.name == "monitorStop") { "Unexpected native call: ${method.name}" }
         val command = args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.MonitorStop
+        assertTrue(command.requestId.isNotBlank())
         assertEquals("process-1", command.processId)
         assertEquals(com.letta.mobile.data.transport.appserver.AppServerRuntimeScope("agent-1", "conv-1"), command.runtime)
         com.letta.mobile.data.transport.appserver.AppServerInboundFrame.MonitorStopResponse(

@@ -4,7 +4,6 @@ import com.letta.mobile.data.model.AgentId
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.util.Telemetry
@@ -108,9 +107,6 @@ internal class IrohViewerHandle(
      * without throwing.
      */
     override suspend fun writeFrame(frame: String): Boolean = writeSerialized { frame }
-
-    override suspend fun writeDeviceStatus(status: AppServerInboundFrame.UpdateDeviceStatus): Boolean =
-        writeProtocolFrame("update_device_status", status.runtime, buildJsonObject { put("device_status", status.deviceStatus) })
 
     /**
      * The ONE serialized write step for this connection's stream.

@@ -54,8 +54,9 @@ interface ChatConversationStore {
 /** A backend the chat runs over: its timeline and its conversation records. */
 interface ChatGateway : TimelineTransport, ChatConversationStore {
     /** Host-confirmed runtime status, consumed by the shared process shelf projection. */
-    val deviceStatusFrames: kotlinx.coroutines.flow.Flow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>
-        get() = kotlinx.coroutines.flow.emptyFlow()
+    val deviceStatuses: kotlinx.coroutines.flow.StateFlow<Map<com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
+        com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>>
+        get() = kotlinx.coroutines.flow.MutableStateFlow(emptyMap())
 
     /** Ask the owning runtime to stop a process; throws when the host refuses. */
     val stopBackgroundProcess: suspend (com.letta.mobile.data.transport.appserver.AppServerRuntimeScope, String) -> Unit

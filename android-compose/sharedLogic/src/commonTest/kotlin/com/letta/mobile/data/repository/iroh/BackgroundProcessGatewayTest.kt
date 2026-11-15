@@ -11,6 +11,7 @@ import com.letta.mobile.data.transport.appserver.requestId
 import com.letta.mobile.data.transport.appserver.stopBackgroundProcess
 import com.letta.mobile.ui.chat.session.backgroundProcessHost
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -31,10 +32,10 @@ class BackgroundProcessGatewayTest {
         val client = DefaultAppServerClient(socket, parentScope = backgroundScope)
         val gateway = IrohAdminRpcChatGateway(AppServerClientChannel(client, backgroundScope))
         val runtime = AppServerRuntimeScope("agent-1", "conv-1")
-        val host = backgroundProcessHost(backgroundScope, gateway.deviceStatusFrames,
+        val host = backgroundProcessHost(backgroundScope, gateway.deviceStatuses.map { it[runtime] },
             MutableStateFlow(runtime), gateway.stopBackgroundProcess)
         runCurrent()
-        socket.push("""{"type":"update_device_status","event_seq":1,"emitted_at":"2026-11-15T00:00:00Z","idempotency_key":"status",
+        socket.push("""{"type":"toolset_status",
             "runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},
             "device_status":{"background_processes":[{"id":"p"}]}}""")
         runCurrent()
