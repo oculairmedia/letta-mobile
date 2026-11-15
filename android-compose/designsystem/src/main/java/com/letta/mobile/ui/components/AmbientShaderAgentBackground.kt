@@ -325,7 +325,7 @@ private fun DrawScope.drawAmbientFallback(
             colorStops = arrayOf(
                 0.00f to tint.copy(alpha = tint.alpha * (0.18f + 0.01f * streamEnergy) * envelope),
                 0.52f to tint.copy(alpha = tint.alpha * 0.08f * envelope),
-                1.00f to tint.copy(alpha = 0f),
+                1.00f to tint.copy(alpha = com.letta.mobile.ui.theme.GLOW_EDGE_ALPHA),
             ),
             center = center,
             radius = radius,

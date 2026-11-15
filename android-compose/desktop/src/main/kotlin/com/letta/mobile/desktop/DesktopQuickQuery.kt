@@ -9,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
@@ -21,6 +20,7 @@ import dev.nucleusframework.core.runtime.Platform
 import java.awt.event.WindowEvent
 import java.awt.event.WindowFocusListener
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.letta.mobile.ui.theme.tokens.desktop.DesktopWindowTokens
 
 /** Actions the quick-query window routes back into the main app. */
 @Immutable
@@ -135,8 +135,8 @@ internal fun DesktopQuickQueryWindow(coordinator: DesktopQuickQueryCoordinator) 
     val visible by coordinator.visible.collectAsState()
     if (!visible) return
     val state = rememberWindowState(
-        width = 680.dp,
-        height = 440.dp,
+        width = DesktopWindowTokens.quickQueryWidth,
+        height = DesktopWindowTokens.quickQueryHeight,
         position = WindowPosition(Alignment.Center),
     )
     Window(
