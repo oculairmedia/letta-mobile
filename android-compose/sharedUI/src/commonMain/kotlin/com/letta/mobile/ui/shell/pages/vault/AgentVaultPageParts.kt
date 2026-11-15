@@ -11,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +35,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 @Composable
 internal fun SecretRow(key: String, page: AgentVaultPageScope) {
     val revealed = key in page.state.revealed
+    // On touch each action reserves its 48dp target in the layout, so neighbouring targets never overlap.
+    val actionModifier = if (page.options.touch) Modifier.minimumInteractiveComponentSize() else Modifier
     LettaPanel(modifier = Modifier.fillMaxWidth().testTag(AgentVaultPageTags.row(key)), border = false) {
         Row(
             modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
@@ -57,17 +60,17 @@ internal fun SecretRow(key: String, page: AgentVaultPageScope) {
                     if (revealed) "Hide $key" else "Reveal $key",
                 ),
                 onClick = { page.actions.toggleReveal(SecretKey(key)) },
-                modifier = Modifier.testTag(AgentVaultPageTags.reveal(key)),
+                modifier = actionModifier.testTag(AgentVaultPageTags.reveal(key)),
             )
             LettaIconButton(
                 icon = LettaButtonIcon(LettaIcons.Edit, "Replace $key"),
                 onClick = { page.actions.startEditing(SecretKey(key)) },
-                modifier = Modifier.testTag(AgentVaultPageTags.edit(key)),
+                modifier = actionModifier.testTag(AgentVaultPageTags.edit(key)),
             )
             LettaIconButton(
                 icon = LettaButtonIcon(LettaIcons.Delete, "Delete $key", glyph = LettaIconStyle(tint = MaterialTheme.colorScheme.error)),
                 onClick = { page.actions.requestDelete(SecretKey(key)) },
-                modifier = Modifier.testTag(AgentVaultPageTags.delete(key)),
+                modifier = actionModifier.testTag(AgentVaultPageTags.delete(key)),
             )
         }
     }

@@ -20,6 +20,8 @@ import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.isPopup
@@ -290,7 +292,8 @@ class HomePageTest {
         onNodeWithTag(HomePageTags.stat("Agents")).performScrollTo().performClick()
         assertEquals(listOf("shortcut:TOOLS"), navigation.events, "only figures whose page the host offers link")
 
-        onNodeWithTag(HomePageTags.STATS_EXPAND).performClick()
+        onNodeWithTag(HomePageTags.STATS_EXPAND).assertIsOff().performClick()
+        onNodeWithTag(HomePageTags.STATS_EXPAND).assertIsOn()
         onNodeWithTag(HomePageTags.STATS_TREND).assertExists()
 
         onNodeWithTag(HomePageTags.PINNED_GRID).assertDoesNotExist()

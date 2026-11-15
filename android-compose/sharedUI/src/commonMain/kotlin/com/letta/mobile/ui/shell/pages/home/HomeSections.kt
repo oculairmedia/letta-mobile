@@ -1,5 +1,8 @@
 package com.letta.mobile.ui.shell.pages.home
 
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -218,7 +221,8 @@ private fun HomeStatsStrip(page: HomePageScope) {
                 text = TREND_LABEL,
                 active = expanded,
                 onClick = { expanded = !expanded },
-                modifier = Modifier.testTag(HomePageTags.STATS_EXPAND),
+                // The chip says it is selected; a checkbox also says whether it is checked.
+                modifier = Modifier.semantics { toggleableState = ToggleableState(expanded) }.testTag(HomePageTags.STATS_EXPAND),
                 role = Role.Checkbox,
             )
             StatsMenu(page)

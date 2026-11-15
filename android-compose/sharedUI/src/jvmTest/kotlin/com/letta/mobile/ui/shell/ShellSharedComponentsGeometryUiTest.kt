@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.shell
 
+import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -48,7 +49,7 @@ class ShellSharedComponentsGeometryUiTest {
     @Test
     fun theChannelsHeaderKeepsItsControlsInsideTheWindowAtEveryWidth() {
         WIDTHS.forEach { width ->
-            runComposeUiTest {
+            runDesktopComposeUiTest(width = width.value.toInt(), height = PAGE_HEIGHT.value.toInt()) {
                 showChannels(width)
                 val window = Rect(0f, 0f, width.value, PAGE_HEIGHT.value)
                 val title = boundsOf(LETTA_PAGE_TITLE_TAG)
@@ -74,7 +75,7 @@ class ShellSharedComponentsGeometryUiTest {
     @Test
     fun thePhoneScheduleViewBarFitsEverySegmentAtTouchHeight() {
         WIDTHS.forEach { width ->
-            runComposeUiTest {
+            runDesktopComposeUiTest(width = width.value.toInt(), height = PAGE_HEIGHT.value.toInt()) {
                 setContent {
                     MaterialTheme {
                         Box(Modifier.width(width)) { SchedulesViewBar(SchedulesView.entries.first()) {} }
@@ -86,7 +87,9 @@ class ShellSharedComponentsGeometryUiTest {
                 SchedulesView.entries.forEach { view ->
                     val segment = boundsOf(SchedulesPageTags.tab(view))
                     assertInside(bar, segment, "${view.name} at $width")
-                    assertTrue(segment.height >= LettaDimens.Control.minTouchTarget.value - 1f, "${view.name} touch height at $width")
+                    val touch = onNodeWithTag(SchedulesPageTags.tab(view), useUnmergedTree = true).fetchSemanticsNode().touchBoundsInRoot
+                    val touchHeight = touch.height / density.density
+                    assertTrue(touchHeight >= LettaDimens.Control.minTouchTarget.value - 1f, "${view.name} touch height at $width")
                     assertTrue(segment.left >= previousRight - 1f, "${view.name} after the previous segment at $width")
                     previousRight = segment.right
                 }
