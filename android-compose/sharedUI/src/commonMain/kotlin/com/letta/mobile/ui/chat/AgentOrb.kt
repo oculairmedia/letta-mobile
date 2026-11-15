@@ -9,7 +9,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -80,7 +79,7 @@ fun AgentOrb(
                 .clip(shape)
                 .background(agentOrbBrush(index))
                 .then(
-                    if (onClick != null) Modifier.lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = onClick) else Modifier,
+                    onClick?.let { Modifier.lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = it) } ?: Modifier,
                 ),
             contentAlignment = Alignment.Center,
         ) {

@@ -3,9 +3,7 @@ package com.letta.mobile.ui.canvas
 import com.letta.mobile.ui.host.LettaMenu
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
 import com.letta.mobile.ui.components.foundation.LettaDivider
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset

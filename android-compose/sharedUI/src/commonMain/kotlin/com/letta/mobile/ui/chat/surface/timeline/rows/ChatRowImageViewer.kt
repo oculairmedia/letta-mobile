@@ -111,7 +111,12 @@ internal fun ChatImageViewerContent(
                     if (touch) {
                         Modifier
                     } else {
-                        Modifier.lettaClickable(role = Role.Button, onClickLabel = closeLabel, target = LettaClickTarget.Inline, onClick = onDismiss)
+                        Modifier.lettaClickable(
+                            role = Role.Button,
+                            onClickLabel = closeLabel,
+                            target = LettaClickTarget.Inline,
+                            onClick = onDismiss,
+                        )
                     },
                 )
                 .onPreviewKeyEvent { event -> handleViewerKey(event, ViewerKeyTarget(pagerState, scope, onDismiss)) }

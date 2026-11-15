@@ -375,7 +375,7 @@ private fun CollapsedOwnSeat(content: CollapsedDockContent, size: Dp) {
                 val open = content.openAgent
                 AgentSphere(
                     size = collapsedFallbackSize(size),
-                    modifier = if (open != null) Modifier.lettaClickable(role = Role.Button, target = RoundInlineTarget, onClick = open) else Modifier,
+                    modifier = open?.let { Modifier.lettaClickable(role = Role.Button, target = RoundInlineTarget, onClick = it) } ?: Modifier,
                 )
             }
             MascotSeatVacancy.SEATED_ELSEWHERE -> CollapsedStandIn(content, size)
