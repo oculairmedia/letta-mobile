@@ -4,7 +4,7 @@ description: Use when a change touches how the shared timeline keys rows or hand
 license: Method from pstack create-formal-verification-skill (MIT, Lauren Tan, https://github.com/cursor/plugins)
 metadata:
   bead: letta-mobile-o1hju
-  sync-commit: 624012ec297e65003062991f5a07a2a5945f316c
+  sync-commit: 124ddf0384f8b6464bb628081537e83162a0f105
 ---
 
 # Verifying timeline row identity
@@ -50,7 +50,7 @@ Covered code at the sync commit. Paths are under
 To see what changed since the model was last confirmed:
 
 ```sh
-git diff --stat 624012ec297e65003062991f5a07a2a5945f316c -- \
+git diff --stat 124ddf0384f8b6464bb628081537e83162a0f105 -- \
   android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/timeline/TimelinePageProjection.kt \
   android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/MessageGrouping.kt \
   android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/TimelineRowAssembly.kt \
@@ -118,8 +118,10 @@ fixes are kept to show what each guard removes. `Recut` (per record) is an expec
 | s2-settled-a/b/c | pass | pass | pass (vacuous*) | pass | a pass, b/c FAIL |
 | s2-live-a/b | FAIL | FAIL | FAIL | FAIL | FAIL |
 | d1-settled-a/b/c | pass | pass | pass (vacuous*) | pass | a pass, b/c FAIL |
-| d1-live-a | pass | FAIL | FAIL | FAIL | FAIL |
+| d1-live-a/b | pass | FAIL (partial page) | FAIL | FAIL | FAIL |
 | ownkeys-settled-a/b/c | pass | pass | pass (vacuous*) | pass | a pass, b/c FAIL |
+| ownkeys-live-a | pass | pass | FAIL (adoption re-keys a drawn row) | FAIL | FAIL |
+| ownkeys-live-b | pass | FAIL | FAIL | FAIL | FAIL |
 | s3-settled-a | pass | pass | pass | pass | pass |
 | s3-settled-b/c | pass | pass | pass | pass | FAIL (re-cut splits a row) |
 | s3-live-a | pass | pass | pass | pass | FAIL (re-cut splits a row) |
@@ -174,8 +176,8 @@ every record; they add no behaviour, and every action is `<Name>Step /\ ObserveN
 - A seven-row ledger, PageSize 3 (Room's Around: 1 older row, the anchor, then newer rows), up to 6
   durable writes (MaxRev 7), one live turn per run of the model. These constants are the only
   bounds: every s3 run finishes without a state CONSTRAINT. Distinct states: s3-settled 189 to
-  4,283; s3-live-a 534,904 (about 1 minute per property); s3-live-b S3LIVEB_STATES (about
-  S3LIVEB_TIME per property with WORKERS=4).
+  4,283; s3-live-a 534,904 (about 1 minute per property); s3-live-b 3,769,282 (about 5 minutes
+  per property with WORKERS=4 on an idle host, 13 under a concurrent build).
 - Record identity is the ledger index. serverId, otid and stream aliases collapse into it.
   Durable rows carry their run id (as the S1 fixture stores them); App Server rows that carry
   none get `turn-<prompt>` from `withPromptOwnedRunIds`, which the model does not reproduce.
