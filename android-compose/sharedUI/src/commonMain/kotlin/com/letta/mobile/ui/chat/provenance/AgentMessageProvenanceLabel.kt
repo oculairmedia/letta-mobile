@@ -28,9 +28,8 @@ import com.letta.mobile.data.messaging.AgentMessageProvenance
 import com.letta.mobile.data.messaging.agentMessageDisplayLabel
 import com.letta.mobile.data.messaging.displayLabel
 import com.letta.mobile.ui.components.LettaDisclosureHeader
-import com.letta.mobile.ui.theme.ChatChipShape
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.chatMonoLabel
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /**
  * Shared (Android + Desktop + Web) VISUAL render for
@@ -102,7 +101,7 @@ fun AgentMessageProvenanceMetadata(provenance: AgentMessageProvenance, tint: Col
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = LettaDimens.Space.sm),
-        shape = ChatChipShape,
+        shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(LettaDimens.Stroke.hairline, tint.copy(alpha = LettaDimens.Alpha.hairline)),
     ) {
@@ -227,7 +226,7 @@ private fun MetadataRow(label: String, value: String) {
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.chatMonoLabel,
+            style = LettaTextStyles.monoLabel,
             color = MaterialTheme.colorScheme.onSurface,
         )
     }

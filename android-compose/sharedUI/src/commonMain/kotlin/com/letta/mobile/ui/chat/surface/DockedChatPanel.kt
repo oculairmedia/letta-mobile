@@ -100,7 +100,6 @@ import com.letta.mobile.ui.components.resizePointerIcon
 import com.letta.mobile.ui.mascot.LocalMascotTransport
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAvailable
-import com.letta.mobile.ui.theme.ChatChipShape
 import com.letta.mobile.ui.theme.ChatMascotDimens
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
@@ -772,7 +771,7 @@ private fun PanelHeader(state: ChatDockState, badged: Boolean, recents: BubbleRe
                 Modifier
                     .align(Alignment.Center)
                     .size(ChatSurfaceDimens.dockGripWidth, ChatSurfaceDimens.dockGripHeight)
-                    .background(MaterialTheme.colorScheme.outlineVariant, ChatChipShape),
+                    .background(MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small),
             )
         }
         if (recents != null) RecentsToggle(recents.state, Modifier.align(Alignment.CenterStart).padding(start = LettaDimens.Space.sm))

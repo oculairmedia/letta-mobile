@@ -35,8 +35,6 @@ import com.letta.mobile.sharedui.resources.composer_preview_attachment
 import com.letta.mobile.sharedui.resources.composer_remove_attachment
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.chat.surface.rememberDecodedImage
-import com.letta.mobile.ui.theme.ChatCardShape
-import com.letta.mobile.ui.theme.ChatChipShape
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -76,7 +74,7 @@ private fun AttachmentThumbnail(
         Surface(
             onClick = onPreview,
             modifier = Modifier.size(ChatComposerDimens.attachmentThumbnail),
-            shape = ChatChipShape,
+            shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.surfaceVariant,
         ) {
             AttachmentImage(bitmap = bitmap, contentScale = ContentScale.Crop)
@@ -124,7 +122,7 @@ private fun AttachmentPreviewDialog(image: MessageContentPart.Image, onDismiss: 
         ) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                shape = ChatCardShape,
+                shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
                 AttachmentImage(bitmap = bitmap, contentScale = ContentScale.Fit)

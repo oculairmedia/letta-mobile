@@ -41,8 +41,6 @@ import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.theme.ChatCardShape
-import com.letta.mobile.ui.theme.ChatChipShape
 import com.letta.mobile.ui.theme.LettaCheckGlyph
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.chatRowName
@@ -100,7 +98,7 @@ private fun ComposerCommandSuggestions(
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .testTag(ComposerTestTags.COMMAND_SUGGESTIONS),
-        shape = ChatCardShape,
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
@@ -205,14 +203,14 @@ private fun TouchCommandChip(
     Box {
         Surface(
             modifier = Modifier
-                .clip(ChatChipShape)
+                .clip(MaterialTheme.shapes.small)
                 .combinedClickable(
                     role = Role.Button,
                     onClick = { onChoose(command) },
                     onLongClick = if (command.removable) ({ menuOpen = true }) else null,
                 )
                 .testTag(ComposerTestTags.COMMAND_ROW + command.id),
-            shape = ChatChipShape,
+            shape = MaterialTheme.shapes.small,
             color = if (command.removable) scheme.secondaryContainer else scheme.surface,
             contentColor = if (command.removable) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
             border = BorderStroke(LettaDimens.Stroke.hairline, scheme.outlineVariant),

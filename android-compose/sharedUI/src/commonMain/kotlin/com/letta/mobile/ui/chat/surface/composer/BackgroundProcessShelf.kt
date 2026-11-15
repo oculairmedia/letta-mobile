@@ -30,11 +30,9 @@ import com.letta.mobile.data.transport.appserver.AppServerBackgroundProcess
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
-import com.letta.mobile.ui.theme.ChatCardShape
-import com.letta.mobile.ui.theme.ChatChipShape
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.chatLabelEmphasis
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /**
  * Shelf above the composer listing active background processes
@@ -55,14 +53,14 @@ fun BackgroundProcessShelf(
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .testTag("background_process_shelf"),
-        shape = ChatCardShape,
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(modifier = Modifier.padding(LettaDimens.Space.sm)) {
             Text(
                 text = "Background processes (${processes.size})",
-                style = MaterialTheme.typography.chatLabelEmphasis,
+                style = LettaTextStyles.labelSmallSemibold,
                 color = MaterialTheme.customColors.runningColor,
                 modifier = Modifier.padding(bottom = LettaDimens.Space.xs),
             )
@@ -100,7 +98,7 @@ private fun BackgroundProcessItem(
 ) {
     Surface(
         modifier = modifier.testTag("process_item_${process.id}"),
-        shape = ChatChipShape,
+        shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
@@ -112,7 +110,7 @@ private fun BackgroundProcessItem(
             val label = process.type?.uppercase() ?: "PROCESS"
             Text(
                 text = label,
-                style = MaterialTheme.typography.chatLabelEmphasis,
+                style = LettaTextStyles.labelSmallSemibold,
                 color = MaterialTheme.colorScheme.primary,
             )
             val desc = process.description ?: process.id

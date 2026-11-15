@@ -32,8 +32,7 @@ import com.letta.mobile.ui.components.list.RosterRowState
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaDoneGlyph
 import com.letta.mobile.ui.theme.LettaFailedGlyph
-import com.letta.mobile.ui.theme.chatCardTitle
-import com.letta.mobile.ui.theme.chatMonoBody
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 @Composable
 internal fun RunningCard(
@@ -119,7 +118,7 @@ private fun TitleBlock(item: SubagentRosterItem, modifier: Modifier = Modifier) 
         ) {
             Text(
                 text = item.title,
-                style = MaterialTheme.typography.chatCardTitle,
+                style = LettaTextStyles.titleSemibold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
@@ -141,7 +140,7 @@ private fun TitleBlock(item: SubagentRosterItem, modifier: Modifier = Modifier) 
 private fun ActivityLine(text: String) {
     Text(
         text = "› $text",
-        style = MaterialTheme.typography.chatMonoBody,
+        style = LettaTextStyles.mono,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,

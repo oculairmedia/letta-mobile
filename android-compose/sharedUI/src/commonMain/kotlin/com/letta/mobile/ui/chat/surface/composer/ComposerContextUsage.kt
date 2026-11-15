@@ -39,14 +39,13 @@ import com.letta.mobile.sharedui.resources.composer_context_total
 import com.letta.mobile.sharedui.resources.composer_context_total_share
 import com.letta.mobile.sharedui.resources.composer_context_unknown_total
 import com.letta.mobile.sharedui.resources.composer_context_unknown_value
-import com.letta.mobile.ui.theme.ChatChipShape
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.context.ContextUsageBar
 import com.letta.mobile.ui.context.ContextUsageRows
 import com.letta.mobile.ui.context.animatedContextUsage
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.chatPanelTitle
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -88,7 +87,7 @@ private fun ContextIndicator(text: String, onClick: () -> Unit) {
     val tint = MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         modifier = Modifier
-            .clip(ChatChipShape)
+            .clip(MaterialTheme.shapes.small)
             .clickable(onClickLabel = stringResource(Res.string.composer_context_show_breakdown), role = Role.Button, onClick = onClick)
             .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.hair)
             .testTag(ComposerTestTags.CONTEXT_CHIP),
@@ -154,7 +153,7 @@ private fun ContextUsageHeader(usage: ContextWindowUsage?) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = stringResource(Res.string.composer_context_title),
-            style = MaterialTheme.typography.chatPanelTitle,
+            style = LettaTextStyles.labelSemibold,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )

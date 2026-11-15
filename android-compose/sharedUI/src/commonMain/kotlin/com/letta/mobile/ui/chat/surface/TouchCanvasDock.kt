@@ -98,7 +98,6 @@ import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.theme.ChatHeadDimens
-import com.letta.mobile.ui.theme.ChatPanelShape
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -674,7 +673,7 @@ internal fun TouchInputTray(content: @Composable ColumnScope.() -> Unit) {
                 .fillMaxWidth()
                 .heightIn(max = maxHeight * INPUT_TRAY_MAX_HEIGHT_FRACTION)
                 .testTag(TOUCH_INPUT_TRAY_TAG),
-            shape = ChatPanelShape,
+            shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainer,
             contentColor = MaterialTheme.colorScheme.onSurface,
             shadowElevation = ChatSurfaceDimens.dockedReplyElevation,

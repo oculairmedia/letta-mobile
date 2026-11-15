@@ -7,23 +7,14 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 
 /*
- * The chat surface's shapes (composer, docked panel, canvas bubble, subagent sheets), by role, on the
- * LettaDimens.Radius scale: a chip and a panel never share a radius, so the panel does not read as an
- * oversized chip. Shapes whose corner animates take the animated value and keep the geometry here.
+ * The chat surface's shapes that the corner scale cannot name: the ones whose corner animates (they
+ * take the animated value and keep the geometry here) and the head-anchored card. Static chips,
+ * cards and panels use MaterialTheme.shapes small / medium / large.
  */
-
-/** Composer chips, attachment thumbnails, command chips, the dock's grip, a command card. */
-internal val ChatChipShape: Shape = RoundedCornerShape(LettaDimens.Radius.sm)
-
-/** Popovers, suggestion lists, the background process shelf, a preview frame. */
-internal val ChatCardShape: Shape = RoundedCornerShape(LettaDimens.Radius.md)
-
-/** The composer's prompt card, the touch input tray, the docked panel at rest. */
-internal val ChatPanelShape: Shape = RoundedCornerShape(LettaDimens.Radius.lg)
 
 /**
  * The docked panel part-way through a morph into the full page: [roundness] 1 is the panel at rest
- * ([ChatPanelShape]), 0 is the page's square corners.
+ * (`MaterialTheme.shapes.large`), 0 is the page's square corners.
  */
 internal fun chatPanelMorphShape(roundness: Float): Shape = RoundedCornerShape(LettaDimens.Radius.lg * roundness)
 
@@ -38,7 +29,7 @@ internal fun agentOrbShape(corner: Dp): Shape = RoundedCornerShape(corner)
 
 /**
  * A card spoken from the canvas head (the popup, the bubble's card): rounded all round at the
- * [ChatPanelShape] radius but for the corner nearest the head, which stays tight. [below] puts the
+ * large radius but for the corner nearest the head, which stays tight. [below] puts the
  * card under the head, so the tight corner is on its top edge; [headOnRight] puts it on the right.
  */
 internal fun headAnchoredShape(headOnRight: Boolean, below: Boolean): Shape {

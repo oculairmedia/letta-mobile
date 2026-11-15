@@ -30,8 +30,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import com.letta.mobile.ui.theme.ChatCardShape
-import com.letta.mobile.ui.theme.ChatChipShape
 import com.letta.mobile.ui.components.LettaMenuIndicator
 import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.theme.ChatComposerDimens
@@ -60,7 +58,7 @@ internal fun ComposerActionChip(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier,
-        shape = ChatChipShape,
+        shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
@@ -120,7 +118,7 @@ internal fun ComposerPopover(
     ) {
         Surface(
             modifier = Modifier.width(width).testTag(testTag),
-            shape = ChatCardShape,
+            shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
             shadowElevation = LettaDimens.Space.sm,

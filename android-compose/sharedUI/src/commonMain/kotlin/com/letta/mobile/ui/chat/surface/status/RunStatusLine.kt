@@ -49,10 +49,9 @@ import com.letta.mobile.sharedui.resources.run_status_sending
 import com.letta.mobile.sharedui.resources.run_status_tool
 import com.letta.mobile.sharedui.resources.run_status_waiting
 import com.letta.mobile.sharedui.resources.run_status_working
-import com.letta.mobile.ui.theme.ChatChipShape
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaSpinner
-import com.letta.mobile.ui.theme.chatMonoBody
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -236,7 +235,7 @@ private fun NoticeText(notice: LiveNotice) {
 private fun CommandCard(command: CommandActivity, onDismiss: () -> Unit) {
     val failed = command.state == CommandState.Failed
     Surface(
-        shape = ChatChipShape,
+        shape = MaterialTheme.shapes.small,
         color = if (failed) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
         contentColor = if (failed) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.fillMaxWidth().testTag(RunStatusTestTags.COMMAND),
@@ -267,7 +266,7 @@ private fun CommandOutput(output: String, command: CommandActivity) {
     SelectionContainer {
         Text(
             text = output,
-            style = if (command.preformatted) MaterialTheme.typography.chatMonoBody else MaterialTheme.typography.bodySmall,
+            style = if (command.preformatted) LettaTextStyles.mono else MaterialTheme.typography.bodySmall,
             maxLines = OUTPUT_MAX_LINES,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
