@@ -8,6 +8,7 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtLambdaArgument
 import org.jetbrains.kotlin.psi.KtValueArgument
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
+import org.jetbrains.kotlin.psi.psiUtil.parents
 
 /*
  * Rules that ban hand-built copies of shared UI elements.
@@ -83,7 +84,9 @@ internal class RawShapeLiteral(config: Config = Config.empty) : MobileRule(
  *
  * A named argument whose value is plain data (a parameter or a lowercase property
  * chain such as `fontWeight = weight`) is forwarding, not choosing, and passes:
- * the choice is made, and checked, where the value comes from.
+ * the choice is made, and checked, where the value comes from. That is why any
+ * `FontWeight.X` / `FontFamily.X` reference is also reported where it appears
+ * (for example `val weight = FontWeight.Bold`), once per choice.
  */
 internal class TypographyOverride(config: Config = Config.empty) : MobileRule(
     config,
@@ -112,6 +115,23 @@ internal class TypographyOverride(config: Config = Config.empty) : MobileRule(
             }
     }
 
+    override fun visitDotQualifiedExpression(expression: KtDotQualifiedExpression) {
+        super.visitDotQualifiedExpression(expression)
+        if (!FONT_CONSTANT.matches(expression.compactText())) return
+        if (!expression.containingKtFile.isStyledUiSource() || expression.isInsideReportedChoice()) return
+        report(
+            expression,
+            "`${expression.compactText()}` picks a font at the call site. Use a named text style token " +
+                "(add one to the type tokens if none fits).",
+        )
+    }
+
+    /** Already reported through its metric argument or typography copy. */
+    private fun KtDotQualifiedExpression.isInsideReportedChoice(): Boolean = parents.any { parent ->
+        (parent is KtValueArgument && parent.name() in TEXT_METRICS) ||
+            (parent is KtCallExpression && parent.isTypographyCopy())
+    }
+
     private fun KtCallExpression.receiverText(): String? =
         (parent as? KtDotQualifiedExpression)?.takeIf { it.selectorExpression == this }?.receiverExpression?.text
 
@@ -124,6 +144,9 @@ internal class TypographyOverride(config: Config = Config.empty) : MobileRule(
     }
 
     private companion object {
+        /** `FontWeight.Bold`, `FontFamily.Monospace`: a font choice wherever it is written. */
+        val FONT_CONSTANT = Regex("""(FontWeight|FontFamily)\.[A-Z]\w*""")
+
         val TEXT_METRICS = setOf("fontSize", "fontWeight", "fontFamily", "letterSpacing", "lineHeight")
 
         /** `MaterialTheme.typography.x`, `typography.x`, or a `...Type.x` token. */

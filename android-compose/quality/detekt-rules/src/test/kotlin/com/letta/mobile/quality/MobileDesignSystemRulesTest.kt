@@ -60,6 +60,7 @@ class MobileDesignSystemRulesTest {
             fun c() = Text("x", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold))
             fun d() = Text("x", style = LettaType.bodyMono.copy(color = tint))
             fun e() = Text("x", letterSpacing = LETTER_SPACING, lineHeight = LettaTokens.line)
+            fun f() { val weight = FontWeight.Bold; Text("x", fontWeight = weight) }
         """.trimIndent()
         val good = """
             fun a(weight: FontWeight) = Text("x", fontWeight = weight, style = MaterialTheme.typography.bodySmall)
@@ -67,9 +68,9 @@ class MobileDesignSystemRulesTest {
             fun c() = Text("x", style = LettaType.bodyMono, color = tint)
             fun d() = palette.copy(fileType = fileType.ext)
         """.trimIndent()
-        assertEquals(7, TypographyOverride().lintAt(root, FEATURE, bad).size)
+        assertEquals(8, TypographyOverride().lintAt(root, FEATURE, bad).size)
         assertEquals(0, TypographyOverride().lintAt(root, FEATURE, good).size)
-        assertEquals(7, TypographyOverride().lintAt(root, COMPONENT, bad).size)
+        assertEquals(8, TypographyOverride().lintAt(root, COMPONENT, bad).size)
         assertEquals(0, TypographyOverride().lintAt(root, THEME, bad).size)
     }
 
