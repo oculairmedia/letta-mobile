@@ -79,7 +79,9 @@ fun AgentOrb(
                 .clip(shape)
                 .background(agentOrbBrush(index))
                 .then(
-                    onClick?.let { Modifier.lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = it) } ?: Modifier,
+                    onClick?.let {
+                        Modifier.lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = it)
+                    } ?: Modifier,
                 ),
             contentAlignment = Alignment.Center,
         ) {
