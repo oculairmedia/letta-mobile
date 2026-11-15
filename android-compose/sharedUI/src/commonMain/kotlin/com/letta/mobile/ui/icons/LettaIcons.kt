@@ -27,6 +27,7 @@ import com.composables.icons.lucide.Database
 import com.composables.icons.lucide.Ellipsis
 import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.FileText
+import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Flashlight
 import com.composables.icons.lucide.FlashlightOff
 import com.composables.icons.lucide.GitFork
@@ -167,6 +168,9 @@ object LettaIcons {
     val Apps: ImageVector get() = Lucide.Grid2x2
     val ViewModule: ImageVector get() = Lucide.Grid2x2
     val FileOpen: ImageVector get() = Lucide.FileText
+
+    /** An image or photo: an attachment, a drop target for pictures. */
+    val Image: ImageVector get() = Lucide.Image
     val Inventory: ImageVector get() = Lucide.Package
     val Archive: ImageVector get() = Lucide.Archive
     val ForkRight: ImageVector get() = Lucide.GitFork

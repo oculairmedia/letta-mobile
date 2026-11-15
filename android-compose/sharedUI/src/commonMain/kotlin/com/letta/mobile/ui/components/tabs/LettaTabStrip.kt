@@ -15,11 +15,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,13 +36,19 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -168,6 +171,7 @@ private fun LettaTabItem(
     val hovered by interactionSource.collectIsHoveredAsState()
     val togglePin = { if (tab.isTransient) actions.onPin(tab.key) else actions.onUnpin(tab.key) }
     val pinLabel = if (tab.isTransient) "Pin" else "Unpin"
+    val tabShape = MaterialTheme.shapes.small.copy(bottomStart = CornerSize(0.dp), bottomEnd = CornerSize(0.dp))
     Surface(
         modifier = modifier
             .fillMaxHeight()
@@ -175,10 +179,10 @@ private fun LettaTabItem(
             .tabClick(tab, actions, interactionSource, state.pinEnabled)
             .widthIn(min = TabMinWidth, max = TabMaxWidth)
             .padding(top = LettaDimens.Space.xs)
-            .then(if (state.dragging) Modifier.shadow(LettaDimens.Space.xs, TabShape) else Modifier)
+            .then(if (state.dragging) Modifier.shadow(LettaDimens.Space.xs, tabShape) else Modifier)
             .semantics { selected = state.active }
             .testTag(LettaTabStripTags.tab(tab.key)),
-        shape = TabShape,
+        shape = tabShape,
         color = when {
             state.active -> MaterialTheme.colorScheme.background
             hovered -> MaterialTheme.colorScheme.surfaceContainer
@@ -190,11 +194,11 @@ private fun LettaTabItem(
             LettaTabLabel(tab, state.active, state.pinEnabled, Modifier.align(Alignment.Center))
             if (hovered || state.active) {
                 if (state.pinEnabled) {
-                    IconButton(onClick = togglePin, modifier = Modifier.align(Alignment.CenterEnd)
-                        .padding(end = LettaDimens.Control.iconButtonSm).size(LettaDimens.Control.iconButtonSm)) {
-                        Icon(Icons.Outlined.PushPin, contentDescription = "$pinLabel ${tab.title} tab",
-                            modifier = Modifier.size(LettaDimens.Control.iconSm))
-                    }
+                    LettaIconButton(
+                        tabGlyphButton(LettaIcons.Pin, "$pinLabel ${tab.title} tab"),
+                        onClick = togglePin,
+                        modifier = Modifier.align(Alignment.CenterEnd).padding(end = LettaDimens.Control.iconButtonSm),
+                    )
                 }
                 TabCloseButton(tab.title, onClose = { actions.onClose(tab.key) }, modifier = Modifier.align(Alignment.CenterEnd))
             }
@@ -234,9 +238,8 @@ private fun LettaTabLabel(tab: LettaTab, active: Boolean, pinEnabled: Boolean, m
     ) {
         Text(
             text = tab.title,
-            style = MaterialTheme.typography.labelMedium,
+            style = if (active) LettaTextAccents.labelMediumSemibold else MaterialTheme.typography.labelMedium,
             fontStyle = if (tab.isTransient) FontStyle.Italic else FontStyle.Normal,
-            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
             color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -258,16 +261,13 @@ private fun LettaTabLabel(tab: LettaTab, active: Boolean, pinEnabled: Boolean, m
 @Composable
 private fun TabCloseButton(title: String, onClose: () -> Unit, modifier: Modifier = Modifier) {
     // The small hit target around a glyph inside another control, not a button in its own right.
-    IconButton(onClick = onClose, modifier = modifier.size(LettaDimens.Control.iconButtonSm)) {
-        Icon(
-            imageVector = Icons.Outlined.Close,
-            contentDescription = "Close $title tab",
-            modifier = Modifier.size(LettaDimens.Control.iconSm),
-            tint = MaterialTheme.colorScheme.onSurface,
-        )
-    }
+    val glyph = LettaIconStyle(LettaDimens.Control.iconSm, MaterialTheme.colorScheme.onSurface)
+    LettaIconButton(tabGlyphButton(LettaIcons.Close, "Close $title tab").copy(glyph = glyph), onClick = onClose, modifier = modifier)
 }
 
-private val TabShape = RoundedCornerShape(topStart = LettaDimens.Space.sm, topEnd = LettaDimens.Space.sm)
+/** A glyph button inside a tab: the small hit target around a small glyph, not a button in its own right. */
+private fun tabGlyphButton(icon: ImageVector, description: String): LettaButtonIcon =
+    LettaButtonIcon(icon, description, size = LettaDimens.Control.iconButtonSm, glyph = LettaIconStyle(LettaDimens.Control.iconSm))
+
 private val TabMinWidth = LettaDimens.Orb.hero + LettaDimens.Space.sm
 private val TabMaxWidth = LettaDimens.Pane.navWidth

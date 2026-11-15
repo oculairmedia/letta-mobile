@@ -43,6 +43,7 @@ import com.letta.mobile.ui.shell.pages.memfs.MemfsFileDiffView
 import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.util.time.TimeLabels
+import androidx.compose.ui.semantics.Role
 
 object DreamingTags {
     const val PANEL = "dreaming_panel"
@@ -217,7 +218,7 @@ private fun DreamHistory(history: DreamHistoryState, onOpen: (DreamRun) -> Unit)
 @Composable
 private fun DreamRow(run: DreamRun, onOpen: (DreamRun) -> Unit) {
     Column(
-        Modifier.fillMaxWidth().heightIn(min = LettaDimens.Control.iconButtonLg).clickable { onOpen(run) }
+        Modifier.fillMaxWidth().heightIn(min = LettaDimens.Control.iconButtonLg).clickable(role = Role.Button) { onOpen(run) }
             .padding(vertical = LettaDimens.Space.sm).testTag(DreamingTags.run(run.sha)),
     ) {
         Text(run.summary, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)

@@ -8,7 +8,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import com.letta.mobile.data.repository.modelcontrol.ConnectableProvider
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementState
 import com.letta.mobile.ui.host.LettaAlertPane
@@ -19,6 +18,7 @@ import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 
 /**
  * How to connect a subscription account. The App Server accepts finished
@@ -72,8 +72,7 @@ private fun CommandLine(text: String) {
         SelectionContainer {
             Text(
                 text = text,
-                style = MaterialTheme.typography.bodyMedium,
-                fontFamily = FontFamily.Monospace,
+                style = LettaTextStyles.monoBody,
                 modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
             )
         }

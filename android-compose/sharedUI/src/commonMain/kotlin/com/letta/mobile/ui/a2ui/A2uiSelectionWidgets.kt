@@ -3,7 +3,6 @@ package com.letta.mobile.ui.a2ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
 import androidx.compose.material3.CircularProgressIndicator
@@ -45,12 +43,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.A2uiBindingResolver
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import kotlinx.serialization.json.JsonPrimitive
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.components.foundation.lettaPanelBorder
+import androidx.compose.ui.semantics.Role
 
 
 @Composable
@@ -231,9 +230,9 @@ internal fun A2uiAccordion(
             val expandedState = rememberA2uiLocalBooleanState("expanded_${item.key}", item.defaultOpen)
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(component.cornerRadius()),
+                shape = component.cornerShape(),
                 tonalElevation = component.elevation(),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                border = lettaPanelBorder(),
             ) {
                 Column(
                     modifier = Modifier
@@ -243,7 +242,7 @@ internal fun A2uiAccordion(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { expandedState.value = !expandedState.value }
+                            .clickable(role = Role.Button) { expandedState.value = !expandedState.value }
                             .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,

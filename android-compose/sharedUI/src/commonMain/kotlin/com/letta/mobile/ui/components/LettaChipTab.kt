@@ -17,8 +17,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 
 /**
  * The one filter / segment / toggle chip (the sidebar's Active / Archived / All, a page's view
@@ -48,8 +48,7 @@ fun LettaChipTab(
         leading?.invoke()
         Text(
             text = text,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+            style = if (active) LettaTextAccents.labelMediumSemibold else MaterialTheme.typography.labelMedium,
             color = if (active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
         )

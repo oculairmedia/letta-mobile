@@ -4559,6 +4559,7 @@ public final class com/letta/mobile/ui/icons/LettaIcons {
 	public final fun getFlashlightOff ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getForkRight ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getHelp ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getImage ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getInfo ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getInventory ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getKey ()Landroidx/compose/ui/graphics/vector/ImageVector;
@@ -7179,8 +7180,6 @@ public final class com/letta/mobile/ui/settings/BackendSettingsTags {
 public final class com/letta/mobile/ui/settings/ComposableSingletons$SettingsLayoutKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/settings/ComposableSingletons$SettingsLayoutKt;
 	public fun <init> ()V
-	public final fun getLambda$-1470436117$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-22429270$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$284562564$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
@@ -12214,6 +12213,31 @@ public final class com/letta/mobile/ui/theme/tokens/LettaStrokeTokens {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaStrokeTokens;
 	public final fun getHairline-D9Ej5fM ()F
+}
+
+public final class com/letta/mobile/ui/theme/tokens/LettaSurfaceSizes {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaSurfaceSizes;
+	public static final field dropScrimAlpha F
+	public final fun getBannerMaxWidth-D9Ej5fM ()F
+	public final fun getMascotGazeMinReach-D9Ej5fM ()F
+	public final fun getMascotPickerTile-D9Ej5fM ()F
+	public final fun getRosterSwipeThreshold-D9Ej5fM ()F
+	public final fun getSelectionActionMinWidth-D9Ej5fM ()F
+	public final fun getSidePaneMaxWidth-D9Ej5fM ()F
+	public final fun getSidePaneMinWidth-D9Ej5fM ()F
+	public final fun getSidePaneWidth-D9Ej5fM ()F
+	public final fun getSnackbarMaxWidth-D9Ej5fM ()F
+}
+
+public final class com/letta/mobile/ui/theme/tokens/LettaTextAccents {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaTextAccents;
+	public final fun getBodySemibold (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
+	public final fun getBodySmallSemibold (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
+	public final fun getCodeDisplay (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
+	public final fun getLabelMediumSemibold (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
+	public final fun getTitleLargeSemibold (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/TextStyle;
 }
 
 public final class com/letta/mobile/ui/theme/tokens/LettaTextStyles {

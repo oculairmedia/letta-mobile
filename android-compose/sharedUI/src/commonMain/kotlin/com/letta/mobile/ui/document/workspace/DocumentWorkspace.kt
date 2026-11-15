@@ -23,7 +23,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.workspace.DocumentPresentation
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceController
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceProblem
@@ -63,9 +62,9 @@ fun DocumentWorkspace(controller: DocumentWorkspaceController, modifier: Modifie
         header = { WorkspaceHeader(controller, state) },
     ) { padding ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
-            if (maxWidth >= 840.dp) {
+            if (maxWidth >= DocumentWorkspaceDimens.wideBreakpoint) {
                 Row(Modifier.fillMaxSize().testTag("document-workspace-wide")) {
-                    Column(Modifier.width(280.dp).padding(LettaDimens.Space.sm)) {
+                    Column(Modifier.width(DocumentWorkspaceDimens.selectorWidth).padding(LettaDimens.Space.sm)) {
                         PresentationSelector(controller, state)
                     }
                     WorkspaceContent(controller, state, operationScope, Modifier.weight(1f).fillMaxSize())

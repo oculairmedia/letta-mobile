@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.context.ContextWindowSegment
 import com.letta.mobile.data.context.ContextWindowSegmentKind
@@ -30,6 +28,7 @@ import com.letta.mobile.ui.theme.AgentContextDimens
 import com.letta.mobile.ui.theme.ChatComposerColors
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 
 /*
  * letta-mobile-3io8k: the context bar, its legend rows and the section colours, shared by the
@@ -69,7 +68,7 @@ private fun ContextUsageStripes(usage: ContextWindowUsage) {
         modifier = Modifier
             .fillMaxWidth()
             .height(LettaDimens.Space.sm)
-            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
+            .clip(MaterialTheme.shapes.small)
             .background(MaterialTheme.colorScheme.surfaceContainerLowest),
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Stroke.hairline),
     ) {
@@ -110,7 +109,7 @@ private fun ContextUsageRow(segment: ContextWindowSegment) {
         Box(
             modifier = Modifier
                 .size(LettaDimens.Control.iconSm)
-                .clip(RoundedCornerShape(LettaDimens.Radius.sm))
+                .clip(MaterialTheme.shapes.small)
                 .background(contextSegmentColor(segment.kind)),
         )
         Text(
@@ -128,8 +127,7 @@ private fun ContextUsageRow(segment: ContextWindowSegment) {
         )
         Text(
             text = formatContextShare(segment.fraction),
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
+            style = LettaTextAccents.labelMediumSemibold,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.width(ChatComposerDimens.contextShareColumn),
         )

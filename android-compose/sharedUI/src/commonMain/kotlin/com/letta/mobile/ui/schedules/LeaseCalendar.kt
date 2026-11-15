@@ -17,6 +17,7 @@ import com.letta.mobile.ui.components.row.LettaListRow
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.datetime.TimeZone
+import androidx.compose.ui.semantics.Role
 
 internal val LeaseState.badgeLabel: String get() = when (this) {
     LeaseState.ACTIVE -> "Active"
@@ -53,7 +54,7 @@ internal fun LeaseCalendarBlock(lease: Lease, onClick: () -> Unit, modifier: Mod
     }
     Column(
         modifier.testTag("lease-${lease.state.badgeLabel.lowercase()}-${lease.id}")
-            .background(color, MaterialTheme.shapes.small).clickable(onClick = onClick).padding(LettaDimens.Space.xs),
+            .background(color, MaterialTheme.shapes.small).clickable(role = Role.Button, onClick = onClick).padding(LettaDimens.Space.xs),
     ) {
         Text(
             lease.label,

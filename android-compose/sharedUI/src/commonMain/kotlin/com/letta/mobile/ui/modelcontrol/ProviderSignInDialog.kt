@@ -25,7 +25,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.data.repository.modelcontrol.ConnectableProvider
 import com.letta.mobile.data.repository.modelcontrol.ProviderSignInController
@@ -38,6 +37,7 @@ import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 
 /** Callbacks of [ProviderSignInDialog]; [bind] wires them to the shared sign-in controller. */
 data class ProviderSignInActions(
@@ -149,8 +149,7 @@ private fun DeviceCodeBody(state: ProviderSignInState.AwaitingApproval, platform
         SelectionContainer {
             Text(
                 text = state.userCode,
-                style = MaterialTheme.typography.headlineSmall,
-                fontFamily = FontFamily.Monospace,
+                style = LettaTextAccents.codeDisplay,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.md).testTag(ProviderSignInTags.USER_CODE),
             )

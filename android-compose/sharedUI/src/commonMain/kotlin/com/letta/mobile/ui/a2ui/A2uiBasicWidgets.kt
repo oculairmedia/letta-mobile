@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.a2ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -27,13 +25,11 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
@@ -63,7 +60,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
@@ -71,8 +67,11 @@ import com.letta.mobile.data.a2ui.A2uiBindingResolver
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.timeline.timelineLogger
-import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.icons.lettaIconByName
 import com.letta.mobile.ui.theme.LettaSpinner
+import com.letta.mobile.ui.components.foundation.LettaIcon
+import com.letta.mobile.ui.components.foundation.LettaIconStyle
+import com.letta.mobile.ui.components.foundation.LettaPanel
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -208,7 +207,7 @@ internal fun A2uiBooleanInput(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(enabled = !surfaceSubmitting) { update(!checked) },
+            .clickable(enabled = !surfaceSubmitting, role = kind.role) { update(!checked) },
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -239,6 +238,12 @@ internal fun A2uiBooleanInput(
         }
     }
 }
+
+private val A2uiBooleanInputKind.role: Role
+    get() = when (this) {
+        A2uiBooleanInputKind.Checkbox -> Role.Checkbox
+        A2uiBooleanInputKind.Switch -> Role.Switch
+    }
 
 @Composable
 internal fun A2uiRadio(
@@ -284,7 +289,7 @@ internal fun A2uiRadio(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = !surfaceSubmitting) { update(option.key) },
+                    .clickable(enabled = !surfaceSubmitting, role = Role.RadioButton) { update(option.key) },
                 horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -404,7 +409,10 @@ internal fun A2uiChoicePicker(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag(A2uiTestTags.CHOICE_PICKER_LIST_OPTION)
-                        .clickable(enabled = !surfaceSubmitting) { update(option.key) },
+                        .clickable(
+                            enabled = !surfaceSubmitting,
+                            role = if (multiSelect) Role.Checkbox else Role.RadioButton,
+                        ) { update(option.key) },
                     horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -480,7 +488,7 @@ internal fun A2uiDateTimeInput(
             modifier = Modifier
                 .matchParentSize()
                 .zIndex(1f)
-                .clickable {
+                .clickable(onClickLabel = label, role = Role.Button) {
                     A2uiHaptics.contextClick(haptic)
                     if (enableDate) {
                         showDatePicker = true
@@ -594,80 +602,13 @@ internal fun A2uiImage(
         ),
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = component.height() ?: 96.dp)
+            .heightIn(min = component.height() ?: A2uiDimens.imageMinHeight)
             .then(component.aspectRatioModifier()),
         placeholder = placeholder,
         error = error,
         contentScale = component.contentScale(),
     )
 }
-
-private val A2uiLettaIconsByName = mapOf(
-    "ArrowBack" to LettaIcons.ArrowBack,
-    "Close" to LettaIcons.Close,
-    "Menu" to LettaIcons.Menu,
-    "ChevronRight" to LettaIcons.ChevronRight,
-    "ChevronDown" to LettaIcons.ChevronDown,
-    "ChevronUp" to LettaIcons.ChevronUp,
-    "ExpandMore" to LettaIcons.ExpandMore,
-    "ExpandLess" to LettaIcons.ExpandLess,
-    "ArrowDropDown" to LettaIcons.ArrowDropDown,
-    "ArrowDropUp" to LettaIcons.ArrowDropUp,
-    "KeyboardArrowDown" to LettaIcons.KeyboardArrowDown,
-    "ListIcon" to LettaIcons.ListIcon,
-    "Add" to LettaIcons.Add,
-    "Edit" to LettaIcons.Edit,
-    "Delete" to LettaIcons.Delete,
-    "Save" to LettaIcons.Save,
-    "Search" to LettaIcons.Search,
-    "Clear" to LettaIcons.Clear,
-    "Refresh" to LettaIcons.Refresh,
-    "Send" to LettaIcons.Send,
-    "Copy" to LettaIcons.Copy,
-    "Share" to LettaIcons.Share,
-    "MoreVert" to LettaIcons.MoreVert,
-    "Play" to LettaIcons.Play,
-    "ManageSearch" to LettaIcons.ManageSearch,
-    "Check" to LettaIcons.Check,
-    "CheckCircle" to LettaIcons.CheckCircle,
-    "Error" to LettaIcons.Error,
-    "Info" to LettaIcons.Info,
-    "Help" to LettaIcons.Help,
-    "Circle" to LettaIcons.Circle,
-    "Agent" to LettaIcons.Agent,
-    "Tool" to LettaIcons.Tool,
-    "Chat" to LettaIcons.Chat,
-    "ChatOutline" to LettaIcons.ChatOutline,
-    "Settings" to LettaIcons.Settings,
-    "Key" to LettaIcons.Key,
-    "People" to LettaIcons.People,
-    "Cloud" to LettaIcons.Cloud,
-    "Storage" to LettaIcons.Storage,
-    "Code" to LettaIcons.Code,
-    "Schema" to LettaIcons.Schema,
-    "Dashboard" to LettaIcons.Dashboard,
-    "Apps" to LettaIcons.Apps,
-    "ViewModule" to LettaIcons.ViewModule,
-    "FileOpen" to LettaIcons.FileOpen,
-    "Inventory" to LettaIcons.Inventory,
-    "Archive" to LettaIcons.Archive,
-    "ForkRight" to LettaIcons.ForkRight,
-    "Database" to LettaIcons.Database,
-    "Favorite" to LettaIcons.Favorite,
-    "FavoriteBorder" to LettaIcons.FavoriteBorder,
-    "Star" to LettaIcons.Star,
-    "Sparkles" to LettaIcons.Sparkles,
-    "AutoAwesome" to LettaIcons.AutoAwesome,
-    "Lightbulb" to LettaIcons.Lightbulb,
-    "Psychology" to LettaIcons.Psychology,
-    "AccountCircle" to LettaIcons.AccountCircle,
-    "AccessTime" to LettaIcons.AccessTime,
-    "Link" to LettaIcons.Link,
-    "LinkOff" to LettaIcons.LinkOff,
-    "ExternalLink" to LettaIcons.ExternalLink,
-    "Pin" to LettaIcons.Pin,
-    "PinOff" to LettaIcons.PinOff,
-).mapKeys { (name, _) -> name.a2uiIconKey() }
 
 @Composable
 internal fun A2uiIcon(
@@ -679,7 +620,7 @@ internal fun A2uiIcon(
     val name = resolveBindingText(component.raw["name"] ?: component.raw["icon"], surface, renderScope)
         ?.takeIf { it.isNotBlank() }
     val size = component.iconSize()
-    val imageVector = name?.let(::lookupA2uiIcon)
+    val imageVector = name?.let(::lettaIconByName)
 
     if (name == null || imageVector == null) {
         LaunchedEffect(component.id, name) {
@@ -699,13 +640,11 @@ internal fun A2uiIcon(
         surface,
         renderScope,
     ) ?: name
-    Icon(
+    LettaIcon(
         imageVector = imageVector,
         contentDescription = contentDescription,
-        modifier = modifier
-            .size(size)
-            .testTag(A2uiTestTags.ICON),
-        tint = component.iconTint(),
+        modifier = modifier.testTag(A2uiTestTags.ICON),
+        style = LettaIconStyle(size = size, tint = component.iconTint()),
     )
 }
 
@@ -717,8 +656,8 @@ private fun A2uiSkeletonIcon(
     Box(
         modifier = modifier
             .size(size)
-            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
-            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f)),
+            .clip(MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.surfaceVariant),
     )
 }
 
@@ -758,11 +697,6 @@ private fun A2uiComponent.iconTint(): Color =
         "outlineVariant" -> MaterialTheme.colorScheme.outlineVariant
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-
-private fun lookupA2uiIcon(name: String) = A2uiLettaIconsByName[name.a2uiIconKey()]
-
-private fun String.a2uiIconKey(): String =
-    filter { it.isLetterOrDigit() }.lowercase()
 
 @Composable
 internal fun A2uiDivider(
@@ -1029,14 +963,7 @@ internal fun A2uiMedia(
     val title = resolveBindingText(component.raw["title"] ?: component.raw["label"], surface, renderScope)
         ?: if (kind == A2uiMediaKind.Video) "Video" else "Audio"
 
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag(kind.testTag),
-        shape = RoundedCornerShape(LettaDimens.Radius.md),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
+    LettaPanel(modifier = modifier.fillMaxWidth().testTag(kind.testTag)) {
         Column(
             modifier = Modifier.padding(LettaDimens.Space.md),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -1046,7 +973,7 @@ internal fun A2uiMedia(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(16f / 9f)
-                        .clip(RoundedCornerShape(LettaDimens.Radius.sm))
+                        .clip(MaterialTheme.shapes.small)
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -1111,7 +1038,7 @@ internal fun A2uiCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(component.cornerRadius()),
+        shape = component.cornerShape(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
@@ -1211,7 +1138,7 @@ internal fun A2uiButton(
         if (label == null) {
             A2uiSkeletonLine(
                 modifier = Modifier
-                    .widthIn(min = 72.dp)
+                    .widthIn(min = A2uiDimens.keyColumnWidth)
                     .testTag(A2uiTestTags.MISSING_TEXT),
                 height = LettaDimens.Space.md,
             )

@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -30,10 +29,13 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import kotlin.math.roundToInt
+import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
+import com.letta.mobile.ui.theme.tokens.LettaShapes
+import com.letta.mobile.ui.theme.tokens.LettaControlTokens
+import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
 
 /**
  * How large text-selection handles are drawn, as a multiple of the platform's. A phone's are
@@ -197,11 +199,11 @@ fun TouchTextToolbarHost(toolbar: TouchTextToolbar, quoteSink: QuoteSink? = null
     val position = remember(shown.rect, gap) { AboveSelection(shown.rect, gap) }
     Popup(popupPositionProvider = position) {
         Surface(
-            shape = RoundedCornerShape(TOOLBAR_CORNER),
+            // Fully rounded: the bar is one touch target tall, as the platform's own text toolbar is.
+            shape = LettaShapes.pill,
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 3.dp,
-            shadowElevation = 6.dp,
+            shadowElevation = LettaSpaceTokens.sm,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 actions.forEachIndexed { index, (label, action) ->
@@ -213,7 +215,11 @@ fun TouchTextToolbarHost(toolbar: TouchTextToolbar, quoteSink: QuoteSink? = null
                         },
                         modifier = Modifier.heightIn(min = BUTTON_HEIGHT).widthIn(min = BUTTON_MIN_WIDTH),
                     ) {
-                        Text(label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(horizontal = 4.dp))
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(horizontal = LettaSpaceTokens.xs),
+                        )
                     }
                 }
             }
@@ -238,7 +244,6 @@ private class AboveSelection(private val selection: Rect, private val gap: Int) 
     }
 }
 
-private val BUTTON_HEIGHT = 48.dp
-private val BUTTON_MIN_WIDTH = 64.dp
-private val TOOLBAR_CORNER = 24.dp
-private val TOOLBAR_GAP = 12.dp
+private val BUTTON_HEIGHT = LettaControlTokens.minTouchTarget
+private val BUTTON_MIN_WIDTH = LettaSurfaceSizes.selectionActionMinWidth
+private val TOOLBAR_GAP = LettaSpaceTokens.md

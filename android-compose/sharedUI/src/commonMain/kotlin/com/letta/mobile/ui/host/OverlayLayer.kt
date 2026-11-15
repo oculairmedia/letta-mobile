@@ -39,13 +39,13 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.text.ProvidePlatformClipboard
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.coroutines.delay
+import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 
 /** The window's overlay queue; a platform's window root provides it once ([OverlayHostRoot]). */
 val LocalOverlayHost = staticCompositionLocalOf<OverlayHost?> { null }
@@ -171,7 +171,7 @@ private fun OverlaySnackbarCard(host: OverlayHost, entry: OverlayEntry) {
     Snackbar(
         // Slots may require the full width; do not pass that minimum to each snackbar action.
         modifier = Modifier.wrapContentWidth().padding(LettaDimens.Space.md)
-            .widthIn(max = SnackbarMaxWidth).testTag(OverlayTags.SNACKBAR),
+            .widthIn(max = LettaSurfaceSizes.snackbarMaxWidth).testTag(OverlayTags.SNACKBAR),
         action = overlay.action?.let { action ->
             { TextButton(onClick = { host.performAction(entry.id) }, Modifier.testTag(OverlayTags.ACTION)) { Text(action.label) } }
         },
@@ -211,7 +211,7 @@ private fun OverlayBannerCard(host: OverlayHost, entry: OverlayEntry) {
             contentColor = if (error) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
             shape = MaterialTheme.shapes.medium,
             shadowElevation = LettaDimens.Space.xs,
-            modifier = Modifier.widthIn(max = BannerMaxWidth).fillMaxWidth().testTag(OverlayTags.BANNER),
+            modifier = Modifier.widthIn(max = LettaSurfaceSizes.bannerMaxWidth).fillMaxWidth().testTag(OverlayTags.BANNER),
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
@@ -241,8 +241,6 @@ private fun overlayTransition(reduced: Boolean): ContentTransform = if (reduced)
     (fadeIn(tween(LettaMotionTokens.ENTER_MILLIS)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(LettaMotionTokens.ENTER_MILLIS))
 }
 
-private val SnackbarMaxWidth = 600.dp
-private val BannerMaxWidth = 720.dp
 
 /** Test tags the overlay views carry. */
 object OverlayTags {

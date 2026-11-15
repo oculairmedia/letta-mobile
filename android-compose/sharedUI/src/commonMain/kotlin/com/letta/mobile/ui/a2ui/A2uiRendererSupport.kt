@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
@@ -45,6 +46,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
+import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -58,8 +60,8 @@ internal fun A2uiSkeletonCard(modifier: Modifier = Modifier) {
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             A2uiSkeletonLine(widthFraction = 0.65f)
             A2uiSkeletonLine(widthFraction = 1f)
@@ -72,14 +74,14 @@ internal fun A2uiSkeletonCard(modifier: Modifier = Modifier) {
 internal fun A2uiSkeletonLine(
     modifier: Modifier = Modifier,
     widthFraction: Float = 0.7f,
-    height: Dp = 14.dp,
+    height: Dp = A2uiDimens.skeletonLineHeight,
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth(widthFraction)
             .height(height)
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f))
+            .clip(MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
     )
 }
 
@@ -88,8 +90,8 @@ internal fun A2uiSkeletonImage(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(120.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .height(A2uiDimens.skeletonImageHeight)
+            .clip(MaterialTheme.shapes.small)
             .background(MaterialTheme.colorScheme.surfaceVariant),
     )
 }
@@ -363,12 +365,12 @@ internal fun A2uiComponent.localOpenUrl(surface: A2uiSurfaceState, renderScope: 
 internal fun A2uiComponent.spacing(): Dp =
     raw.dpValue("spacing") ?: when (raw.stringValue("spacing")) {
         "none" -> 0.dp
-        "xs" -> 4.dp
-        "sm" -> 8.dp
-        "md" -> 12.dp
-        "lg" -> 16.dp
-        "xl" -> 24.dp
-        else -> 8.dp
+        "xs" -> LettaDimens.Space.xs
+        "sm" -> LettaDimens.Space.sm
+        "md" -> LettaDimens.Space.md
+        "lg" -> LettaDimens.Space.lg
+        "xl" -> LettaDimens.Space.xl
+        else -> LettaDimens.Space.sm
     }
 
 internal fun A2uiComponent.horizontalArrangement(): Arrangement.Horizontal =
@@ -395,8 +397,15 @@ internal fun A2uiComponent.weightRowChildren(): Boolean =
         "spaceEvenly",
     ))
 
-internal fun A2uiComponent.cornerRadius(): Dp =
-    raw.dpValue("cornerRadius", "corner_radius") ?: 12.dp
+/**
+ * The container shape: the payload's own `cornerRadius` (data, drawn as given) on the theme's medium
+ * shape, or the medium shape itself when the payload names none.
+ */
+@Composable
+internal fun A2uiComponent.cornerShape(): Shape {
+    val base = MaterialTheme.shapes.medium
+    return raw.dpValue("cornerRadius", "corner_radius")?.let { base.copy(all = CornerSize(it)) } ?: base
+}
 
 internal fun A2uiComponent.elevation(): Dp =
     raw.dpValue("elevation") ?: 1.dp
@@ -668,7 +677,7 @@ internal fun ToolApprovalRisk.style(): ToolApprovalRiskStyle =
         )
         ToolApprovalRisk.Destructive -> ToolApprovalRiskStyle(
             borderColor = MaterialTheme.colorScheme.error,
-            borderWidth = 2.dp,
+            borderWidth = A2uiDimens.destructiveBorder,
             pillContainer = MaterialTheme.colorScheme.error,
             pillContent = MaterialTheme.colorScheme.onError,
         )

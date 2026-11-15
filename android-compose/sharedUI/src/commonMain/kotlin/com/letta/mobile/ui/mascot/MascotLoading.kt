@@ -22,7 +22,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -75,10 +74,11 @@ private fun LoadingOrbit(diameter: Dp) {
         label = "mascotLoadingOrbit",
     )
     val primary = MaterialTheme.colorScheme.primary
+    val track = MaterialTheme.colorScheme.primaryContainer
     Canvas(Modifier.size(diameter)) {
         val strokeWidth = LettaDimens.Space.hair.toPx()
         val radius = (size.minDimension - strokeWidth) / 2f
-        drawCircle(color = primary.copy(alpha = 0.18f), radius = radius, style = Stroke(width = strokeWidth))
+        drawCircle(color = track, radius = radius, style = Stroke(width = strokeWidth))
         rotate(angle) {
             drawCircle(
                 brush = Brush.sweepGradient(0.0f to Color.Transparent, 0.35f to Color.Transparent, 1.0f to primary),
