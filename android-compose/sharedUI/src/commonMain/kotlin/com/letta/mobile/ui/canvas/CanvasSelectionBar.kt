@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.canvas
 
-import com.composables.icons.lucide.EllipsisVertical
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -25,23 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import com.composables.icons.lucide.BringToFront
-import com.composables.icons.lucide.Circle
-import com.composables.icons.lucide.Copy
-import com.composables.icons.lucide.Square
-import com.composables.icons.lucide.Triangle
 import kotlin.math.roundToInt
-import com.composables.icons.lucide.AArrowDown
-import com.composables.icons.lucide.AArrowUp
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Type
-import com.composables.icons.lucide.AlignRight
-import com.composables.icons.lucide.AlignLeft
-import com.composables.icons.lucide.AlignCenter
-import com.composables.icons.lucide.Maximize2
-import com.composables.icons.lucide.SendToBack
-import com.composables.icons.lucide.TextCursorInput
-import com.composables.icons.lucide.Trash2
 import com.letta.mobile.data.canvas.CanvasTextStyle
 import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
@@ -52,6 +35,7 @@ import com.letta.mobile.ui.components.foundation.LettaSwatch
 import com.letta.mobile.ui.components.foundation.LettaVerticalDivider
 import com.letta.mobile.ui.host.LettaMenu
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.icons.LettaIcons
 
 /**
  * The contextual bar that floats on the selection, the way Miro shows what applies to it: one master control ([CanvasPropertyControl]) for every colour and property of the
@@ -133,9 +117,9 @@ fun CanvasSelectionBar(
 @Composable
 private fun NoteSelectionButtons(note: NoteBarActions, onDuplicate: (() -> Unit)?) {
     Divider()
-    BarButton(Lucide.Maximize2, "Open note large", onClick = note.onOpen)
-    onDuplicate?.let { BarButton(Lucide.Copy, "Duplicate note", onClick = it) }
-    BarButton(Lucide.Trash2, "Delete note", onClick = note.onDelete)
+    BarButton(LettaIcons.Maximize2, "Open note large", onClick = note.onOpen)
+    onDuplicate?.let { BarButton(LettaIcons.Copy, "Duplicate note", onClick = it) }
+    BarButton(LettaIcons.Delete, "Delete note", onClick = note.onDelete)
 }
 
 /** The desktop's bar for selected shapes: kind, text, stacking, and duplicate or delete. */
@@ -144,7 +128,7 @@ private fun ShapeSelectionButtons(actions: SelectionActions) {
     actions.reshape?.let { ShapeTypeButton(it) }
     actions.onEditText?.let {
         Divider()
-        BarButton(Lucide.TextCursorInput, "Edit text", onClick = it)
+        BarButton(LettaIcons.TextCursorInput, "Edit text", onClick = it)
     }
     // A shape's text, right on the bar the way Miro puts it: colour, a step smaller or larger, and
     // alignment. The panel's Text tab has the rest (font, exact sizes).
@@ -153,21 +137,21 @@ private fun ShapeSelectionButtons(actions: SelectionActions) {
     // the one property you reach for over and over, and a step up or down is all that needs.
     if (actions.properties.showFontSize && actions.shapeText == null) TextStepButtons(actions)
     Divider()
-    BarButton(Lucide.BringToFront, "Bring to front", onClick = actions.onBringToFront)
-    BarButton(Lucide.SendToBack, "Send to back", onClick = actions.onSendToBack)
+    BarButton(LettaIcons.BringToFront, "Bring to front", onClick = actions.onBringToFront)
+    BarButton(LettaIcons.SendToBack, "Send to back", onClick = actions.onSendToBack)
     Divider()
-    actions.onDuplicate?.let { BarButton(Lucide.Copy, "Duplicate selection", onClick = it) }
-    BarButton(Lucide.Trash2, "Delete selection", onClick = actions.onDelete)
+    actions.onDuplicate?.let { BarButton(LettaIcons.Copy, "Duplicate selection", onClick = it) }
+    BarButton(LettaIcons.Delete, "Delete selection", onClick = actions.onDelete)
 }
 
 @Composable
 private fun TextStepButtons(actions: SelectionActions) {
     val size = actions.properties.fontSize
     Divider()
-    BarButton(Lucide.AArrowDown, "Smaller text") {
+    BarButton(LettaIcons.AArrowDown, "Smaller text") {
         actions.dispatchProperty(CanvasPropertyIntent.SetFontSize(steppedFontSize(size, up = false)))
     }
-    BarButton(Lucide.AArrowUp, "Larger text") {
+    BarButton(LettaIcons.AArrowUp, "Larger text") {
         actions.dispatchProperty(CanvasPropertyIntent.SetFontSize(steppedFontSize(size, up = true)))
     }
 }
@@ -193,12 +177,12 @@ private fun PhoneSelectionButtons(actions: SelectionActions) {
     if (text != null || actions.properties.showFontSize) {
         val size = text?.fontSize ?: actions.properties.fontSize
         val setSize: (Float) -> Unit = text?.onFontSize ?: { actions.dispatchProperty(CanvasPropertyIntent.SetFontSize(it)) }
-        BarButton(Lucide.AArrowDown, "Smaller text") { setSize(steppedFontSize(size, up = false)) }
-        BarButton(Lucide.AArrowUp, "Larger text") { setSize(steppedFontSize(size, up = true)) }
+        BarButton(LettaIcons.AArrowDown, "Smaller text") { setSize(steppedFontSize(size, up = false)) }
+        BarButton(LettaIcons.AArrowUp, "Larger text") { setSize(steppedFontSize(size, up = true)) }
     }
     var open by remember { mutableStateOf(false) }
     Box {
-        BarButton(Lucide.EllipsisVertical, "More shape actions") { open = true }
+        BarButton(LettaIcons.EllipsisVertical, "More shape actions") { open = true }
         LettaMenu(expanded = open, onDismiss = { open = false }) {
             fun item(icon: ImageVector, label: String, onClick: () -> Unit) = @Composable {
                 DropdownMenuItem(
@@ -210,23 +194,23 @@ private fun PhoneSelectionButtons(actions: SelectionActions) {
                     },
                 )
             }
-            actions.onEditText?.let { item(Lucide.TextCursorInput, "Edit text", it)() }
+            actions.onEditText?.let { item(LettaIcons.TextCursorInput, "Edit text", it)() }
             if (text != null) {
                 DropdownMenuItem(
                     text = { TextColourSwatches(text) },
                     onClick = {},
                 )
                 val (icon, next) = when (text.alignment) {
-                    io.ak1.drawbox.domain.model.TextAlignment.LEFT -> Lucide.AlignLeft to io.ak1.drawbox.domain.model.TextAlignment.CENTER
-                    io.ak1.drawbox.domain.model.TextAlignment.CENTER -> Lucide.AlignCenter to io.ak1.drawbox.domain.model.TextAlignment.RIGHT
-                    io.ak1.drawbox.domain.model.TextAlignment.RIGHT -> Lucide.AlignRight to io.ak1.drawbox.domain.model.TextAlignment.LEFT
+                    io.ak1.drawbox.domain.model.TextAlignment.LEFT -> LettaIcons.AlignLeft to io.ak1.drawbox.domain.model.TextAlignment.CENTER
+                    io.ak1.drawbox.domain.model.TextAlignment.CENTER -> LettaIcons.AlignCenter to io.ak1.drawbox.domain.model.TextAlignment.RIGHT
+                    io.ak1.drawbox.domain.model.TextAlignment.RIGHT -> LettaIcons.AlignRight to io.ak1.drawbox.domain.model.TextAlignment.LEFT
                 }
                 item(icon, "Text alignment") { text.onAlignment(next) }()
             }
-            item(Lucide.BringToFront, "Bring to front", actions.onBringToFront)()
-            item(Lucide.SendToBack, "Send to back", actions.onSendToBack)()
-            actions.onDuplicate?.let { item(Lucide.Copy, "Duplicate", it)() }
-            item(Lucide.Trash2, "Delete", actions.onDelete)()
+            item(LettaIcons.BringToFront, "Bring to front", actions.onBringToFront)()
+            item(LettaIcons.SendToBack, "Send to back", actions.onSendToBack)()
+            actions.onDuplicate?.let { item(LettaIcons.Copy, "Duplicate", it)() }
+            item(LettaIcons.Delete, "Delete", actions.onDelete)()
         }
     }
 }
@@ -295,16 +279,16 @@ private fun ShapeTextButtons(text: ShapeTextActions) {
         current = text.color,
         palette = StrokePalette,
         label = "Text color",
-        glyph = Lucide.Type,
+        glyph = LettaIcons.Type,
         onPick = text.onColor,
         modifier = Modifier.size(BAR_BUTTON),
     )
-    BarButton(Lucide.AArrowDown, "Smaller text") { text.onFontSize(steppedFontSize(text.fontSize, up = false)) }
-    BarButton(Lucide.AArrowUp, "Larger text") { text.onFontSize(steppedFontSize(text.fontSize, up = true)) }
+    BarButton(LettaIcons.AArrowDown, "Smaller text") { text.onFontSize(steppedFontSize(text.fontSize, up = false)) }
+    BarButton(LettaIcons.AArrowUp, "Larger text") { text.onFontSize(steppedFontSize(text.fontSize, up = true)) }
     val (icon, next) = when (text.alignment) {
-        io.ak1.drawbox.domain.model.TextAlignment.LEFT -> Lucide.AlignLeft to io.ak1.drawbox.domain.model.TextAlignment.CENTER
-        io.ak1.drawbox.domain.model.TextAlignment.CENTER -> Lucide.AlignCenter to io.ak1.drawbox.domain.model.TextAlignment.RIGHT
-        io.ak1.drawbox.domain.model.TextAlignment.RIGHT -> Lucide.AlignRight to io.ak1.drawbox.domain.model.TextAlignment.LEFT
+        io.ak1.drawbox.domain.model.TextAlignment.LEFT -> LettaIcons.AlignLeft to io.ak1.drawbox.domain.model.TextAlignment.CENTER
+        io.ak1.drawbox.domain.model.TextAlignment.CENTER -> LettaIcons.AlignCenter to io.ak1.drawbox.domain.model.TextAlignment.RIGHT
+        io.ak1.drawbox.domain.model.TextAlignment.RIGHT -> LettaIcons.AlignRight to io.ak1.drawbox.domain.model.TextAlignment.LEFT
     }
     BarButton(icon, "Text alignment") { text.onAlignment(next) }
 }
@@ -331,9 +315,9 @@ private fun ShapeTypeButton(reshape: ShapeReshapeActions) {
 }
 
 private fun shapeIcon(type: ShapeType): ImageVector = when (type) {
-    ShapeType.CIRCLE -> Lucide.Circle
-    ShapeType.TRIANGLE -> Lucide.Triangle
-    else -> Lucide.Square
+    ShapeType.CIRCLE -> LettaIcons.Circle
+    ShapeType.TRIANGLE -> LettaIcons.Triangle
+    else -> LettaIcons.Square
 }
 
 private fun shapeLabel(type: ShapeType): String = when (type) {

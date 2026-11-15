@@ -14,9 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.InputChipDefaults
@@ -41,6 +38,7 @@ import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.stringResource
+import com.letta.mobile.ui.icons.LettaIcons
 
 /**
  *  (G31): the agents the draft mentions, one input chip each, above the
@@ -87,10 +85,10 @@ private fun AgentMentionChip(mention: AgentMentionRef, onRemove: () -> Unit) {
         onClick = onRemove,
         label = { Text(mention.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         avatar = {
-            Icon(Icons.Outlined.SmartToy, contentDescription = null, modifier = Modifier.size(InputChipDefaults.AvatarSize))
+            Icon(LettaIcons.Agent, contentDescription = null, modifier = Modifier.size(InputChipDefaults.AvatarSize))
         },
         trailingIcon = {
-            Icon(Icons.Outlined.Close, contentDescription = removeLabel, modifier = Modifier.size(InputChipDefaults.IconSize))
+            Icon(LettaIcons.Close, contentDescription = removeLabel, modifier = Modifier.size(InputChipDefaults.IconSize))
         },
         modifier = Modifier.testTag(ComposerAgentMentionTags.CHIP + mention.agentId),
     )

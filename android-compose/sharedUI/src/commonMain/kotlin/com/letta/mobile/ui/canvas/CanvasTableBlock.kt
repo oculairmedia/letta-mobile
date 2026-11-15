@@ -26,10 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import com.composables.icons.lucide.Columns2
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Minus
-import com.composables.icons.lucide.Rows2
 import io.github.linreal.cascade.editor.core.Block
 import io.github.linreal.cascade.editor.core.BlockContent
 import io.github.linreal.cascade.editor.core.CustomBlockType
@@ -43,6 +39,7 @@ import io.github.linreal.cascade.editor.registry.BlockRenderScope
 import io.github.linreal.cascade.editor.registry.ScopedBlockRenderer
 import com.letta.mobile.data.canvas.compose.CanvasCascadeBlocks
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.icons.LettaIcons
 
 /**
  * A table block for notes, as a Cascade custom block: its cells live in the block's custom
@@ -128,10 +125,10 @@ internal object TableBlockRenderer : ScopedBlockRenderer<TableBlockType> {
             }
             if (!scope.readOnly && scope.canEditBlockStructure) {
                 Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair), verticalAlignment = Alignment.CenterVertically) {
-                    SmallAction(Lucide.Rows2, "Add table row") { write(rows + listOf(List(rows.firstOrNull()?.size ?: 1) { "" })) }
-                    SmallAction(Lucide.Columns2, "Add table column") { write(rows.map { it + "" }) }
-                    if (rows.size > 1) SmallAction(Lucide.Minus, "Remove table row") { write(rows.dropLast(1)) }
-                    if ((rows.firstOrNull()?.size ?: 0) > 1) SmallAction(Lucide.Minus, "Remove table column") { write(rows.map { it.dropLast(1) }) }
+                    SmallAction(LettaIcons.Rows2, "Add table row") { write(rows + listOf(List(rows.firstOrNull()?.size ?: 1) { "" })) }
+                    SmallAction(LettaIcons.Columns2, "Add table column") { write(rows.map { it + "" }) }
+                    if (rows.size > 1) SmallAction(LettaIcons.Remove, "Remove table row") { write(rows.dropLast(1)) }
+                    if ((rows.firstOrNull()?.size ?: 0) > 1) SmallAction(LettaIcons.Remove, "Remove table column") { write(rows.map { it.dropLast(1) }) }
                 }
             }
         }

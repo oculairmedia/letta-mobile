@@ -20,4 +20,7 @@ object LettaComponentDimens {
 
     /** The glyph above an empty state's words (LettaEmptyState). */
     val emptyStateIcon: Dp = 40.dp
+
+    /** The shadow an elevated notice casts over the page (the overlay host's banner, LettaInlineNotice). */
+    val floatingNoticeElevation: Dp = 4.dp
 }

@@ -14,7 +14,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,9 +23,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -46,6 +43,10 @@ import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.coroutines.delay
 import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
+import com.letta.mobile.ui.components.foundation.LettaInlineNotice
+import com.letta.mobile.ui.components.foundation.LettaNotice
+import com.letta.mobile.ui.components.foundation.LettaNoticeAction
+import com.letta.mobile.ui.theme.tokens.LettaPanelTone
 
 /** The window's overlay queue; a platform's window root provides it once ([OverlayHostRoot]). */
 val LocalOverlayHost = staticCompositionLocalOf<OverlayHost?> { null }
@@ -206,32 +207,27 @@ private fun OverlayBannerCard(host: OverlayHost, entry: OverlayEntry) {
     val visible = remember(entry.id) { MutableTransitionState(reduced).apply { targetState = true } }
     val enter = if (reduced) EnterTransition.None else fadeIn(tween(LettaMotionTokens.ENTER_MILLIS)) + slideInVertically { -it / 2 }
     AnimatedVisibility(visibleState = visible, enter = enter, exit = ExitTransition.None) {
-        Surface(
-            color = if (error) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = if (error) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
-            shape = MaterialTheme.shapes.medium,
-            shadowElevation = LettaDimens.Space.xs,
-            modifier = Modifier.widthIn(max = LettaSurfaceSizes.bannerMaxWidth).fillMaxWidth().testTag(OverlayTags.BANNER),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-            ) {
-                Text(overlay.message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                overlay.action?.let { action ->
-                    TextButton(onClick = { host.performAction(entry.id) }, Modifier.testTag(OverlayTags.ACTION)) { Text(action.label) }
-                }
-                if (overlay.dismissible) DismissButton { host.dismiss(entry.id) }
-            }
+        val action = overlay.action?.let { LettaNoticeAction(it.label, onClick = { host.performAction(entry.id) }, tag = OverlayTags.ACTION) }
+        val dismiss = if (overlay.dismissible) {
+            LettaNoticeAction(DISMISS_LABEL, onClick = { host.dismiss(entry.id) }, tag = OverlayTags.DISMISS, icon = LettaIcons.Close)
+        } else {
+            null
         }
+        LettaInlineNotice(
+            notice = LettaNotice(overlay.message, tone = if (error) LettaPanelTone.Error else LettaPanelTone.Info, elevated = true),
+            modifier = Modifier.widthIn(max = LettaSurfaceSizes.bannerMaxWidth).testTag(OverlayTags.BANNER),
+            action = action,
+            dismiss = dismiss,
+        )
     }
 }
+
+private const val DISMISS_LABEL = "Dismiss"
 
 @Composable
 private fun DismissButton(onClick: () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.testTag(OverlayTags.DISMISS)) {
-        Icon(LettaIcons.Close, contentDescription = "Dismiss")
+        Icon(LettaIcons.Close, contentDescription = DISMISS_LABEL)
     }
 }
 

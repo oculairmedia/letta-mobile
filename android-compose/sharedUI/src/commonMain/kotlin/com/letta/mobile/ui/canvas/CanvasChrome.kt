@@ -27,19 +27,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import com.composables.icons.lucide.Download
-import com.composables.icons.lucide.EllipsisVertical
-import com.composables.icons.lucide.FileJson
-import com.composables.icons.lucide.History
-import com.composables.icons.lucide.Import
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Maximize
-import com.composables.icons.lucide.Redo2
-import com.composables.icons.lucide.Share2
-import com.composables.icons.lucide.Trash2
-import com.composables.icons.lucide.Undo2
-import com.composables.icons.lucide.ZoomIn
-import com.composables.icons.lucide.ZoomOut
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
 import com.letta.mobile.data.canvas.CanvasSyncHealth
 import com.letta.mobile.sharedui.resources.Res
@@ -158,15 +145,15 @@ internal fun CanvasOverflowMenu(overflow: CanvasOverflow, expanded: Boolean, onD
         overflow.host.forEach { entry -> MenuEntry(entry.icon, entry.label) { onDismiss(); entry.onClick() } }
         if (overflow.sync != null || overflow.host.isNotEmpty()) LettaDivider()
         overflow.onShare?.let { share ->
-            MenuEntry(Lucide.Share2, stringResource(Res.string.canvas_menu_share)) { onDismiss(); share() }
+            MenuEntry(LettaIcons.Share, stringResource(Res.string.canvas_menu_share)) { onDismiss(); share() }
         }
         if (overflow.compact) {
             val zoom = overflow.zoom
-            MenuEntry(Lucide.ZoomIn, "Zoom in (${zoom.scalePercent}%)", onClick = zoom.onZoomIn)
-            MenuEntry(Lucide.ZoomOut, "Zoom out", onClick = zoom.onZoomOut)
-            MenuEntry(Lucide.Maximize, "Fit to content") { onDismiss(); zoom.onReset() }
+            MenuEntry(LettaIcons.ZoomIn, "Zoom in (${zoom.scalePercent}%)", onClick = zoom.onZoomIn)
+            MenuEntry(LettaIcons.ZoomOut, "Zoom out", onClick = zoom.onZoomOut)
+            MenuEntry(LettaIcons.Maximize, "Fit to content") { onDismiss(); zoom.onReset() }
             overflow.onHistory?.let { history ->
-                MenuEntry(Lucide.History, "History (${overflow.checkpointCount ?: 0})") { onDismiss(); history() }
+                MenuEntry(LettaIcons.History, "History (${overflow.checkpointCount ?: 0})") { onDismiss(); history() }
             }
         }
         BoardMenuEntries(overflow.menu, overflow.background, onDismiss)
@@ -195,20 +182,20 @@ internal fun CanvasActionsPill(
     val compact = undo != null
     ChromePill(modifier = modifier) {
         if (undo != null) {
-            PillIconButton(Lucide.Undo2, "Undo", enabled = undo.canUndo, onClick = undo.onUndo)
-            PillIconButton(Lucide.Redo2, "Redo", enabled = undo.canRedo, onClick = undo.onRedo)
+            PillIconButton(LettaIcons.Undo2, "Undo", enabled = undo.canUndo, onClick = undo.onUndo)
+            PillIconButton(LettaIcons.Redo2, "Redo", enabled = undo.canRedo, onClick = undo.onRedo)
         } else {
             ZoomControls(zoom)
         }
         PillDivider()
         if (onHistory != null && !compact) {
-            PillIconButton(Lucide.History, "History (${checkpointCount ?: 0})", onClick = onHistory)
+            PillIconButton(LettaIcons.History, "History (${checkpointCount ?: 0})", onClick = onHistory)
         }
         if (onShare != null) {
-            PillIconButton(Lucide.Share2, "Share to chat", onClick = onShare)
+            PillIconButton(LettaIcons.Share, "Share to chat", onClick = onShare)
         }
         Box {
-            PillIconButton(Lucide.EllipsisVertical, "More", onClick = { menuOpen = true })
+            PillIconButton(LettaIcons.EllipsisVertical, "More", onClick = { menuOpen = true })
             CanvasOverflowMenu(
                 overflow = CanvasOverflow(zoom, checkpointCount, onHistory, menu, background, compact),
                 expanded = menuOpen,
@@ -220,7 +207,7 @@ internal fun CanvasActionsPill(
 
 @Composable
 private fun ZoomControls(zoom: CanvasZoom) {
-    PillIconButton(Lucide.ZoomOut, "Zoom out", onClick = zoom.onZoomOut)
+    PillIconButton(LettaIcons.ZoomOut, "Zoom out", onClick = zoom.onZoomOut)
         Text(
             text = "${zoom.scalePercent}%",
             style = MaterialTheme.typography.labelMedium,
@@ -230,18 +217,18 @@ private fun ZoomControls(zoom: CanvasZoom) {
                 .pointerInput(zoom.onActualSize) { detectTapGestures(onDoubleTap = { zoom.onActualSize() }) },
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-    PillIconButton(Lucide.ZoomIn, "Zoom in", onClick = zoom.onZoomIn)
-    PillIconButton(Lucide.Maximize, "Fit to content", onClick = zoom.onReset)
+    PillIconButton(LettaIcons.ZoomIn, "Zoom in", onClick = zoom.onZoomIn)
+    PillIconButton(LettaIcons.Maximize, "Fit to content", onClick = zoom.onReset)
 }
 
 /** The overflow's board commands and background settings, shared by both layouts. */
 @Composable
 private fun BoardMenuEntries(menu: CanvasMenuActions, background: CanvasBackgroundActions, close: () -> Unit) {
-    MenuEntry(Lucide.Import, "Import Build Cycle") { close(); menu.onImportBuildCycle() }
-    MenuEntry(Lucide.Import, "Import Daily Loop") { close(); menu.onImportDailyLoop() }
-    MenuEntry(Lucide.FileJson, "Export JSON") { close(); menu.onExportJson() }
-    MenuEntry(Lucide.Download, "Export SVG") { close(); menu.onExportSvg() }
-    MenuEntry(Lucide.Trash2, "Clear") { close(); menu.onClear() }
+    MenuEntry(LettaIcons.Import, "Import Build Cycle") { close(); menu.onImportBuildCycle() }
+    MenuEntry(LettaIcons.Import, "Import Daily Loop") { close(); menu.onImportDailyLoop() }
+    MenuEntry(LettaIcons.FileJson, "Export JSON") { close(); menu.onExportJson() }
+    MenuEntry(LettaIcons.Download, "Export SVG") { close(); menu.onExportSvg() }
+    MenuEntry(LettaIcons.Delete, "Clear") { close(); menu.onClear() }
     Text(
         text = "Background",
         style = MaterialTheme.typography.labelSmall,

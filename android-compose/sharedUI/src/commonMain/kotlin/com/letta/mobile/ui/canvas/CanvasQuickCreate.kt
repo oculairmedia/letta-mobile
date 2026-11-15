@@ -21,11 +21,6 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import com.composables.icons.lucide.ArrowDown
-import com.composables.icons.lucide.ArrowLeft
-import com.composables.icons.lucide.ArrowRight
-import com.composables.icons.lucide.ArrowUp
-import com.composables.icons.lucide.Lucide
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Intent
@@ -36,13 +31,14 @@ import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlin.math.roundToInt
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import com.letta.mobile.ui.icons.LettaIcons
 
 /** Which side of an element a quick-create target sits on, and which way the new one goes. */
 enum class QuickCreateDirection(val dx: Float, val dy: Float, val label: String, internal val icon: ImageVector) {
-    UP(0f, -1f, "above", Lucide.ArrowUp),
-    RIGHT(1f, 0f, "to the right", Lucide.ArrowRight),
-    DOWN(0f, 1f, "below", Lucide.ArrowDown),
-    LEFT(-1f, 0f, "to the left", Lucide.ArrowLeft),
+    UP(0f, -1f, "above", LettaIcons.ArrowUp),
+    RIGHT(1f, 0f, "to the right", LettaIcons.ArrowForward),
+    DOWN(0f, 1f, "below", LettaIcons.ArrowDown),
+    LEFT(-1f, 0f, "to the left", LettaIcons.ArrowBack),
 }
 
 /** An arrow being pulled out of a quick-create target, in board px: from the target to the pointer. */

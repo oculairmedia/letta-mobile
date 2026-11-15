@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -49,16 +48,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.ALargeSmall
-import com.composables.icons.lucide.Copy
-import com.composables.icons.lucide.EllipsisVertical
-import com.composables.icons.lucide.ListTodo
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Palette
-import com.composables.icons.lucide.Redo2
-import com.composables.icons.lucide.SquarePlus
-import com.composables.icons.lucide.Trash2
-import com.composables.icons.lucide.Undo2
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasTextStyle
@@ -76,6 +65,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.ui.draw.clip
 
 /** What the opened note offers beyond its own text: the board's undo, copying and removing it. */
 class NoteEditorActions(
@@ -210,7 +200,9 @@ private fun NoteTitleField(session: CanvasSession, document: CanvasSceneDocument
     }
     val style = NoteTitleTextStyle.merge(TextStyle(color = onCard))
     Box(modifier = Modifier.fillMaxWidth().padding(horizontal = if (compact) LettaDimens.Space.lg else LettaDimens.Space.xl + LettaDimens.Space.xs)) {
-        if (title.isEmpty()) Text("Title", style = style, color = onCard.copy(alpha = LettaDimens.Alpha.disabled))
+        if (title.isEmpty()) {
+            Text("Title", style = style, color = onCard.copy(alpha = NOTE_TITLE_PLACEHOLDER_ALPHA))
+        }
         BasicTextField(
             value = title,
             onValueChange = { title = it.replace('\n', ' ') },
@@ -247,14 +239,14 @@ private fun NoteFootBar(note: OpenNote, toolbar: NoteToolbar?, actions: NoteEdit
                 return@Row
             }
             NoteAddMenu(toolbar, onCard)
-            NoteIcon(NoteButton(Lucide.Palette, "Colours", selected = foot == NoteFoot.COLOURS), onCard) {
+            NoteIcon(NoteButton(LettaIcons.Palette, "Colours", selected = foot == NoteFoot.COLOURS), onCard) {
                 foot = if (foot == NoteFoot.COLOURS) NoteFoot.ICONS else NoteFoot.COLOURS
             }
-            NoteIcon(NoteButton(Lucide.ALargeSmall, "Text formatting", enabled = toolbar != null), onCard) { foot = NoteFoot.FORMAT }
+            NoteIcon(NoteButton(LettaIcons.ALargeSmall, "Text formatting", enabled = toolbar != null), onCard) { foot = NoteFoot.FORMAT }
             Spacer(modifier = Modifier.weight(1f))
             if (actions != null) {
-                NoteIcon(NoteButton(Lucide.Undo2, "Undo", enabled = actions.canUndo), onCard, onClick = actions.onUndo)
-                NoteIcon(NoteButton(Lucide.Redo2, "Redo", enabled = actions.canRedo), onCard, onClick = actions.onRedo)
+                NoteIcon(NoteButton(LettaIcons.Undo2, "Undo", enabled = actions.canUndo), onCard, onClick = actions.onUndo)
+                NoteIcon(NoteButton(LettaIcons.Redo2, "Redo", enabled = actions.canRedo), onCard, onClick = actions.onRedo)
                 NoteMoreMenu(actions, onCard)
             }
         }
@@ -267,10 +259,10 @@ private fun NoteAddMenu(toolbar: NoteToolbar?, onCard: Color) {
     var open by remember { mutableStateOf(false) }
     val todo = BlockButtons.firstOrNull { it.label == "To-do" }
     Box {
-        NoteIcon(NoteButton(Lucide.SquarePlus, "Add to note", enabled = toolbar != null && todo != null), onCard) { open = true }
+        NoteIcon(NoteButton(LettaIcons.SquarePlus, "Add to note", enabled = toolbar != null && todo != null), onCard) { open = true }
         LettaMenu(expanded = open, onDismiss = { open = false }) {
             if (toolbar != null && todo != null) {
-                MenuRow(Lucide.ListTodo, "Checkboxes") {
+                MenuRow(LettaIcons.ListTodo, "Checkboxes") {
                     open = false
                     toolbar.apply(todo)
                 }
@@ -283,15 +275,15 @@ private fun NoteAddMenu(toolbar: NoteToolbar?, onCard: Color) {
 private fun NoteMoreMenu(actions: NoteEditorActions, onCard: Color) {
     var open by remember { mutableStateOf(false) }
     Box {
-        NoteIcon(NoteButton(Lucide.EllipsisVertical, "More"), onCard) { open = true }
+        NoteIcon(NoteButton(LettaIcons.EllipsisVertical, "More"), onCard) { open = true }
         LettaMenu(expanded = open, onDismiss = { open = false }) {
             actions.onDuplicate?.let { duplicate ->
-                MenuRow(Lucide.Copy, "Make a copy") {
+                MenuRow(LettaIcons.Copy, "Make a copy") {
                     open = false
                     duplicate()
                 }
             }
-            MenuRow(Lucide.Trash2, "Delete") {
+            MenuRow(LettaIcons.Delete, "Delete") {
                 open = false
                 actions.onDelete()
             }
@@ -360,14 +352,18 @@ private data class NoteButton(
 
 @Composable
 private fun NoteIcon(button: NoteButton, tint: Color, onClick: () -> Unit) {
-    // The note's own colour is not a theme role, so the glyph is drawn in its contrast ink, dimmed to
-    // the shared disabled floor when off, and the open panel's button is ringed in that ink.
-    val shown = if (button.enabled) tint else tint.copy(alpha = LettaDimens.Alpha.disabled)
+    // The note's own colour is not a theme role, so the glyph is drawn in its contrast ink, faded when
+    // off, and the open panel's button sits on a faint fill of that ink.
+    val shown = if (button.enabled) tint else tint.copy(alpha = NOTE_GLYPH_DISABLED_ALPHA)
     LettaIconButton(
         icon = LettaButtonIcon(button.icon, button.label, size = NOTE_EDITOR_BUTTON, glyph = LettaIconStyle(tint = shown)),
         onClick = onClick,
         enabled = button.enabled,
-        modifier = if (button.selected) Modifier.border(LettaDimens.Stroke.hairline, tint, CircleShape) else Modifier,
+        modifier = if (button.selected) {
+            Modifier.clip(CircleShape).background(tint.copy(alpha = NOTE_BUTTON_SELECTED_FILL_ALPHA))
+        } else {
+            Modifier
+        },
     )
 }
 private const val TITLE_SAVE_DELAY_MS = 400L

@@ -73,7 +73,7 @@ fun LettaControlRow(
 }
 
 /**
- * A row's label over its one-line helper, as [LettaControlRow] draws them; for a row that lays out
+ * A row's label over its helper, as [LettaControlRow] draws them; for a row that lays out
  * its own trailing part but should read the same.
  */
 @Composable
@@ -90,7 +90,7 @@ fun LettaRowWords(label: LettaRowLabel, modifier: Modifier = Modifier) {
                 it,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = label.supportingMaxLines,
                 overflow = TextOverflow.Ellipsis,
             )
         }
