@@ -42,7 +42,7 @@ internal class VoiceSetupHandlers(
             val key = candidate.apiKey ?: originOf(candidate.baseUrl)?.let { store.keyFor(it) }
             upstreamCall { upstream.models(VoiceUpstreamTarget(candidate.baseUrl, key)) }
         }
-        return voiceJson.encodeToJsonElement(HostVoiceTestResult.serializer(), HostVoiceTestResult(models.size, clock()))
+        return voiceWire(HostVoiceTestResult.serializer(), HostVoiceTestResult(models.size, clock()))
     }
 
     /**
@@ -63,7 +63,7 @@ internal class VoiceSetupHandlers(
             voicesSource = if (listed != null) HostVoiceListSource.UPSTREAM else HostVoiceListSource.CONFIGURED,
             checkedAtMs = clock(),
         )
-        return voiceJson.encodeToJsonElement(HostVoiceModels.serializer(), catalog)
+        return voiceWire(HostVoiceModels.serializer(), catalog)
     }
 
     /** Runs a check of the stored setup and records what it found against that revision. */
@@ -79,7 +79,7 @@ internal class VoiceSetupHandlers(
         return outcome.getOrThrow()
     }
 
-    private fun HostVoiceSetupStatus.toWire(): JsonElement = voiceJson.encodeToJsonElement(HostVoiceSetupStatus.serializer(), this)
+    private fun HostVoiceSetupStatus.toWire(): JsonElement = voiceWire(HostVoiceSetupStatus.serializer(), this)
 }
 
 /** Runs an upstream call, turning its failure into the route's refusal with the same code. */

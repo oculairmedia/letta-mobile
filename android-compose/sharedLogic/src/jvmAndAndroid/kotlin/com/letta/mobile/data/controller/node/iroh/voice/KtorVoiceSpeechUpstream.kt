@@ -198,19 +198,22 @@ internal class KtorVoiceSpeechUpstream(
     private suspend fun <T> guarded(totalMs: Long, block: suspend () -> T): T {
         try {
             return withTimeout(totalMs) { block() }
+        } catch (timedOut: TimeoutCancellationException) {
+            throw VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (expectedFailure: Exception) {
             throw classify(expectedFailure)
         }
     }
 
     /**
-     * A timeout of any kind is `voice.upstream_timeout`; anything else that is not already a
-     * [VoiceUpstreamFailure] or a cancellation means the server could not be reached.
+     * A client timeout is `voice.upstream_timeout`; anything else that is not already a
+     * [VoiceUpstreamFailure] means the server could not be reached.
      */
     private fun classify(error: Exception): Exception {
         return when (error) {
-            is TimeoutCancellationException -> VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
-            is VoiceUpstreamFailure, is CancellationException -> error
+            is VoiceUpstreamFailure -> error
             is HttpRequestTimeoutException, is ConnectTimeoutException, is SocketTimeoutException ->
                 VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
             else -> VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_UNREACHABLE)
@@ -231,7 +234,7 @@ internal class KtorVoiceSpeechUpstream(
     }
 
     private fun parse(body: String): JsonElement? {
-        return runCatching { lenientJson.parseToJsonElement(body) }.getOrNull()
+        return runCatching { Json.parseToJsonElement(body) }.getOrNull()
     }
 
     /**
@@ -265,7 +268,6 @@ internal class KtorVoiceSpeechUpstream(
         const val WAV = "wav"
         const val WAV_MIME = "audio/wav"
         const val CHUNK_BYTES = 8 * 1024
-        val lenientJson = Json { ignoreUnknownKeys = true }
         val failureByStatus = mapOf(
             401 to HostVoiceErrorCode.UPSTREAM_UNAUTHORIZED,
             403 to HostVoiceErrorCode.UPSTREAM_UNAUTHORIZED,

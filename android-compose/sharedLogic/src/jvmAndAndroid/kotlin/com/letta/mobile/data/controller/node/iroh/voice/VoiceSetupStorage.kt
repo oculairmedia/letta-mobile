@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh.voice
 
 import com.letta.mobile.data.controller.node.iroh.AtomicJsonFile
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStores
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.voice.SpeechEndpointUrl
 import com.letta.mobile.data.voice.consent.EndpointOrigin
 import com.letta.mobile.data.voice.host.HostVoiceGrants
@@ -11,7 +12,6 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 /** The stored speech setup, without its key: the server, the names used on it, the grants and the last check. */
 @Serializable
@@ -143,7 +143,4 @@ internal class FileVoiceKeyStore(private val path: Path) : VoiceKeyStore {
     )
 }
 
-private val storeJson = Json {
-    ignoreUnknownKeys = true
-    explicitNulls = false
-}
+private val storeJson = LettaJson.persisted

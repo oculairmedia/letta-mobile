@@ -20,11 +20,11 @@ internal fun interface VoiceSlot {
  * a request over a limit is refused with `voice.busy`.
  */
 internal class VoiceInFlight(maxUpstreamSpeech: Int = DEFAULT_MAX_UPSTREAM_SPEECH) {
-    private val held = ConcurrentHashMap.newKeySet<Pair<Any, VoiceRequestKind>>()
+    private val held = ConcurrentHashMap.newKeySet<Pair<String, VoiceRequestKind>>()
     private val upstreamSpeech = Semaphore(maxUpstreamSpeech)
 
     /** A slot for a [kind] request on [connection], or null when one is in flight or the host is at its limit. */
-    fun tryAcquire(connection: Any, kind: VoiceRequestKind): VoiceSlot? {
+    fun tryAcquire(connection: String, kind: VoiceRequestKind): VoiceSlot? {
         val key = connection to kind
         if (!held.add(key)) return null
         if (kind == VoiceRequestKind.SPEECH && !upstreamSpeech.tryAcquire()) {

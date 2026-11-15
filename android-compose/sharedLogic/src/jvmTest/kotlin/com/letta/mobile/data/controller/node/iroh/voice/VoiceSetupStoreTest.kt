@@ -29,7 +29,7 @@ class VoiceSetupStoreTest {
     fun theKeyIsWrittenOnlyToItsOwnFileAndNeverReadBack(): Unit = runBlocking {
         val status = store.write(command(PRIMARY, HostVoiceKeyChange.Replace(SecretWriteValue(KEY)), both))
         assertTrue(status.hasApiKey)
-        assertFalse(KEY in voiceJson.encodeToString(HostVoiceSetupStatus.serializer(), status))
+        assertFalse(KEY in voiceWire(HostVoiceSetupStatus.serializer(), status).toString())
         assertFalse(KEY in Files.readString(dir.resolve("voice-setup.json")))
         assertEquals(KEY, keys.read("https://speech.example.invalid:443"))
         assertFalse(KEY in store.snapshot().toString())

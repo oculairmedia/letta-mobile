@@ -71,6 +71,9 @@ internal class AdminRpcStreamWriteFailed : CancellationException("admin_rpc stre
  * one instance per connection into the coroutine context of every call it dispatches.
  */
 internal class AdminRpcConnection : AbstractCoroutineContextElement(Key) {
+    /** An id unique to this connection, for keying per-connection state. */
+    val id: String = java.util.UUID.randomUUID().toString()
+
     /** The context key. */
     companion object Key : CoroutineContext.Key<AdminRpcConnection>
 }
@@ -155,7 +158,7 @@ internal class AdminRpcStreamedExchange(
 
     /** Whether [frame] is this request's `admin_rpc_cancel`; anything else on the cancel channel is ignored. */
     private fun isCancelFor(frame: String, requestId: String): Boolean {
-        val obj = runCatching { json.parseToJsonElement(frame).jsonObject }.getOrNull() ?: return false
+        val obj = runCatching { Json.parseToJsonElement(frame).jsonObject }.getOrNull() ?: return false
         val type = obj["type"]?.jsonPrimitive?.contentOrNull
         return type == CANCEL_FRAME_TYPE && obj["request_id"]?.jsonPrimitive?.contentOrNull == requestId
     }
@@ -191,7 +194,7 @@ internal class AdminRpcStreamedExchange(
                     put("seq", seq)
                     event.forEach { (key, value) -> put(key, value) }
                 }
-                write(json.encodeToString(JsonObject.serializer(), frame))
+                write(frame.toString())
                 seq++
             }
         }
@@ -209,7 +212,7 @@ internal class AdminRpcStreamedExchange(
                         is AdminRpcStreamOutcome.Failure -> put("error", outcome.error)
                     }
                 }
-                runCatching { write(json.encodeToString(JsonObject.serializer(), response)) }
+                runCatching { write(response.toString()) }
                     .onFailure { report("final_write_failed", fields(request)) }
             }
         }
@@ -231,6 +234,5 @@ internal class AdminRpcStreamedExchange(
         const val STREAM_FRAME_TYPE = "admin_rpc_stream"
         const val CANCEL_FRAME_TYPE = "admin_rpc_cancel"
         private const val NANOS_PER_MILLI = 1_000_000L
-        private val json = Json { ignoreUnknownKeys = true }
     }
 }

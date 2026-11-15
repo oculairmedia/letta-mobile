@@ -44,7 +44,7 @@ internal class VoiceRequestHandlers(
         requireGrant(snapshot.setup.grants.audioForTranscription)
         val call = VoiceTranscriptionCall(clip.wav, model, clip.language ?: snapshot.setup.language, verbose = true)
         val result = holding(connectionKey(context), VoiceRequestKind.TRANSCRIPTION) { transcript(snapshot, call) }
-        return voiceJson.encodeToJsonElement(HostTranscriptionResult.serializer(), result)
+        return voiceWire(HostTranscriptionResult.serializer(), result)
     }
 
     /** Asks for `verbose_json` unless this setup's server already refused it, then falls back to `json`. */
@@ -109,7 +109,7 @@ internal class VoiceRequestHandlers(
     }
 
     /** Runs [work] holding the [kind] slot of [connection], refused with `voice.busy` when it is taken. */
-    private suspend fun <T> holding(connection: Any, kind: VoiceRequestKind, work: suspend () -> T): T {
+    private suspend fun <T> holding(connection: String, kind: VoiceRequestKind, work: suspend () -> T): T {
         val slot = inFlight.tryAcquire(connection, kind) ?: throw VoiceRefusal(HostVoiceErrorCode.BUSY)
         try {
             return work()
@@ -119,8 +119,11 @@ internal class VoiceRequestHandlers(
     }
 
     /** The serving connection, so the per-connection limit holds across request streams. */
-    private suspend fun connectionKey(context: AdminRpcRequestContext?): Any =
-        currentCoroutineContext()[AdminRpcConnection] ?: context?.authenticatedEndpointId ?: Any()
+    private suspend fun connectionKey(context: AdminRpcRequestContext?): String {
+        val connection = currentCoroutineContext()[AdminRpcConnection]?.id?.let { "connection:$it" }
+        val endpoint = context?.authenticatedEndpointId?.let { "endpoint:$it" }
+        return connection ?: endpoint ?: "call:${java.util.UUID.randomUUID()}"
+    }
 
     /** Decodes the server's WAVE stream and writes its format once, then each run of samples at once. */
     private class SpeechFrames(private val call: AdminRpcStreamedCall) {
@@ -174,7 +177,7 @@ internal class VoiceRequestHandlers(
         }
 
         fun summary(): JsonElement =
-            voiceJson.encodeToJsonElement(HostSpeechSummary.serializer(), HostSpeechSummary(audioFrames, sampleFrames))
+            voiceWire(HostSpeechSummary.serializer(), HostSpeechSummary(audioFrames, sampleFrames))
 
         private fun littleEndian(samples: ShortArray): ByteArray {
             val bytes = ByteArray(samples.size * BYTES_PER_SAMPLE)

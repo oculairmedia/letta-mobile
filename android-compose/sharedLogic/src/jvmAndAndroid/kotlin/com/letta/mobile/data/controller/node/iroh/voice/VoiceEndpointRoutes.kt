@@ -11,7 +11,10 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
 import java.nio.file.Path
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.json.Json
+import com.letta.mobile.data.serialization.LettaJson
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -106,9 +109,15 @@ internal object VoiceTelemetry {
     }
 }
 
-/** Voice wire JSON: defaults written (the contract's `has_api_key: false`, `segments: []`), nulls omitted. */
-internal val voiceJson = Json {
-    encodeDefaults = true
-    explicitNulls = false
-    ignoreUnknownKeys = true
+/**
+ * [value] as voice wire JSON: every default written (the contract's `has_api_key: false`,
+ * `segments: []`) and every null omitted, as the contract's writers do.
+ */
+internal fun <T> voiceWire(serializer: KSerializer<T>, value: T): JsonElement =
+    LettaJson.persisted.encodeToJsonElement(serializer, value).withoutNulls()
+
+private fun JsonElement.withoutNulls(): JsonElement = when (this) {
+    is JsonObject -> JsonObject(filterValues { it !is JsonNull }.mapValues { it.value.withoutNulls() })
+    is JsonArray -> JsonArray(map { it.withoutNulls() })
+    else -> this
 }

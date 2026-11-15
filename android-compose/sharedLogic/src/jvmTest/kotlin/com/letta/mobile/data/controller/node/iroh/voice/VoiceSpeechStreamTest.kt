@@ -112,9 +112,9 @@ class VoiceSpeechStreamTest {
     @Test
     fun theHostAllowsFourUpstreamSyntheses() {
         val limits = VoiceInFlight()
-        val held = (1..4).map { checkNotNull(limits.tryAcquire(Any(), VoiceRequestKind.SPEECH)) }
-        assertEquals(null, limits.tryAcquire(Any(), VoiceRequestKind.SPEECH))
-        val connection = Any()
+        val held = (1..4).map { checkNotNull(limits.tryAcquire(java.util.UUID.randomUUID().toString(), VoiceRequestKind.SPEECH)) }
+        assertEquals(null, limits.tryAcquire(java.util.UUID.randomUUID().toString(), VoiceRequestKind.SPEECH))
+        val connection = "connection-a"
         held.first().release()
         val slot = checkNotNull(limits.tryAcquire(connection, VoiceRequestKind.SPEECH))
         assertEquals(null, limits.tryAcquire(connection, VoiceRequestKind.SPEECH), "one per connection")
