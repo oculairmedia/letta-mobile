@@ -33,7 +33,9 @@ fun conversationModelPicker(
         { scope ->
             val focus = models.focus.value
             control.toolsets(scope, focus.conversationId?.let { conversation ->
-                com.letta.mobile.data.toolsets.ToolsetRuntime(focus.agentId?.value.orEmpty(), conversation.value)
+                focus.agentId?.let { agent ->
+                    com.letta.mobile.data.toolsets.ToolsetRuntime(agent.value, conversation.value)
+                }
             })
         }
     },

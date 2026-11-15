@@ -63,6 +63,7 @@ class ToolsetDeviceStatusRelayTest {
         assertEquals("auto", store.states.value[ToolsetRuntime("agent-1", "conv-1")]?.preference)
         val replayed = mutableListOf<String>()
         registry.register("conv-1", registry.claim(viewer("late-view", replayed)))
+        runCurrent()
         assertEquals(delivered, replayed)
         connected.value = false
         runCurrent()
@@ -71,6 +72,59 @@ class ToolsetDeviceStatusRelayTest {
         val afterDisconnect = mutableListOf<String>()
         registry.register("conv-1", registry.claim(viewer("after-disconnect", afterDisconnect)))
         assertTrue(afterDisconnect.isEmpty())
+    }
+
+    @Test
+    fun stalledViewerDoesNotBlockOtherViewersOrDisconnectClearing() = runTest {
+        val frames = MutableSharedFlow<AppServerReceivedFrame>()
+        val connected = MutableStateFlow(true)
+        val client = Proxy.newProxyInstance(AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java)) { _, method, _ ->
+            when (method.name) {
+                "getEvents" -> frames
+                "isConnected" -> connected
+                else -> error("Unexpected call: ${method.name}")
+            }
+        } as AppServerClient
+        val registry = ConnectionRegistry()
+        bindToolsetDeviceStatuses(backgroundScope, client, registry)
+        val neverReads = object : ViewerHandle by viewer("never-reads", mutableListOf()) {
+            override suspend fun writeFrame(frame: String): Boolean = kotlinx.coroutines.awaitCancellation()
+        }
+        registry.register("conv-1", registry.claim(neverReads))
+        val stalled = viewer("stalled", mutableListOf())
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val slowFrames = mutableListOf<String>()
+        val slow = object : ViewerHandle by stalled {
+            override suspend fun writeFrame(frame: String): Boolean {
+                release.await()
+                slowFrames += frame
+                return true
+            }
+        }
+        registry.register("conv-1", registry.claim(slow))
+        val delivered = mutableListOf<String>()
+        registry.register("conv-1", registry.claim(viewer("fast", delivered)))
+        repeat(100) { index ->
+            val status = AppServerInboundFrame.UpdateDeviceStatus(
+                runtime = AppServerRuntimeScope("agent-1", "conv-1"), eventSeq = index.toLong(),
+                emittedAt = "2026-11-15T00:00:00Z", idempotencyKey = "status-$index",
+                deviceStatus = buildJsonObject { put("current_toolset_preference", "choice-$index") },
+            )
+            frames.emit(AppServerReceivedFrame(AppServerChannel.Stream, status, JsonObject(emptyMap())))
+            runCurrent()
+        }
+        assertEquals(100, delivered.size)
+        connected.value = false
+        runCurrent()
+        val replayed = mutableListOf<String>()
+        registry.register("conv-1", registry.claim(viewer("after-disconnect", replayed)))
+        runCurrent()
+        assertTrue(replayed.isEmpty())
+        release.complete(Unit)
+        runCurrent()
+        assertEquals(2, slowFrames.size, "pending statuses coalesce to the newest runtime snapshot")
+        assertTrue(slowFrames.first().contains("choice-0"))
+        assertTrue(slowFrames.last().contains("choice-99"))
     }
 
     private fun viewer(id: String, frames: MutableList<String>, agent: String = "agent-1", conversation: String = "conv-1") =

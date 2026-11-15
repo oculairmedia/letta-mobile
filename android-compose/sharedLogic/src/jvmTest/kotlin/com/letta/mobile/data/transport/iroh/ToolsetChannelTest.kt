@@ -2,6 +2,8 @@
 
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.toolsets.ToolsetRuntime
 import com.letta.mobile.data.transport.api.AppServerClientChannel
 import com.letta.mobile.data.transport.appserver.AppServerChannel
@@ -20,6 +22,30 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 
 class ToolsetChannelTest {
+    @Test
+    fun browserChannelRoutesNonCronAdminRpcToSessionClient() = runTest {
+        val calls = mutableListOf<AppServerCommand.AdminRpc>()
+        val response = AppServerInboundFrame.AdminRpcResponse(
+            requestId = "response", success = true,
+        )
+        val client = Proxy.newProxyInstance(
+            AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java),
+        ) { _, method, args ->
+            when (method.name) {
+                "getEvents" -> MutableSharedFlow<AppServerReceivedFrame>()
+                "isConnected" -> MutableStateFlow(true)
+                "adminRpc" -> {
+                    calls += args[0] as AppServerCommand.AdminRpc
+                    response
+                }
+                else -> error("Unexpected call: ${method.name}")
+            }
+        } as AppServerClient
+        val channel = AppServerClientChannel(client, backgroundScope)
+        assertEquals(response, channel.adminRpc("model.list", "/v1/models", null))
+        assertEquals("model.list", calls.single().method)
+    }
+
     @Test
     fun browserChannelIngestsHostNotificationsBeforeThePickerOpens() = runTest {
         val events = MutableSharedFlow<AppServerReceivedFrame>()

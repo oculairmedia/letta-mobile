@@ -1,6 +1,5 @@
 package com.letta.mobile.data.controller.node.iroh
 
-import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
@@ -22,15 +21,20 @@ import kotlinx.serialization.json.put
  * Relays host device status to current and later viewers of the exact runtime. The wrapper's
  * notification envelope keeps the native event sequence out of the relayed turn's sequence.
  */
-internal fun bindToolsetDeviceStatuses(scope: CoroutineScope, client: AppServerClient, viewers: ConnectionRegistry): Job {
-    val lock = Mutex()
-    var generation: Long? = null
-    var linked = false
-    val latest = mutableMapOf<AppServerRuntimeScope, JsonObject>()
-    viewers.addViewerJoinedListener { conversationId, viewer ->
-        lock.withLock { replayToolsetStatus(latest, ConversationId(conversationId), viewer) }
-    }
-    return scope.launch(start = CoroutineStart.UNDISPATCHED) {
+internal fun bindToolsetDeviceStatuses(scope: CoroutineScope, client: AppServerClient, viewers: ConnectionRegistry): Job =
+    scope.launch(start = CoroutineStart.UNDISPATCHED) {
+        val lock = Mutex()
+        val writes = ObserverWriteQueue(this)
+        var generation: Long? = null
+        var linked = false
+        val latest = mutableMapOf<AppServerRuntimeScope, JsonObject>()
+        viewers.addViewerJoinedListener { conversationId, viewer ->
+            lock.withLock {
+                latest.filterKeys { it.conversationId == conversationId }.forEach { (runtime, frame) ->
+                    writes.enqueueLatest(viewer, runtime) { publishToolsetStatus(viewer, runtime, frame) }
+                }
+            }
+        }
         val monitoring = launch(start = CoroutineStart.UNDISPATCHED) {
             client.isConnected.collect { connected ->
                 lock.withLock {
@@ -56,7 +60,10 @@ internal fun bindToolsetDeviceStatuses(scope: CoroutineScope, client: AppServerC
                         generation = incoming
                     }
                     latest[status.runtime] = frame
-                    viewers.viewersFor(status.runtime.conversationId).forEach { publishToolsetStatus(it, status.runtime, frame) }
+                    val recipients = viewers.viewersFor(status.runtime.conversationId)
+                    recipients.forEach { viewer ->
+                        writes.enqueueLatest(viewer, status.runtime) { publishToolsetStatus(viewer, status.runtime, frame) }
+                    }
                 }
             }
         } finally {
@@ -69,17 +76,6 @@ internal fun bindToolsetDeviceStatuses(scope: CoroutineScope, client: AppServerC
             }
         }
     }
-}
-
-private suspend fun replayToolsetStatus(
-    latest: Map<AppServerRuntimeScope, JsonObject>,
-    conversationId: ConversationId,
-    viewer: ViewerHandle,
-) {
-    latest.filterKeys { it.conversationId == conversationId.value }.forEach { (runtime, frame) ->
-        publishToolsetStatus(viewer, runtime, frame)
-    }
-}
 
 private suspend fun publishToolsetStatus(viewer: ViewerHandle, runtime: AppServerRuntimeScope, frame: JsonObject) {
     val context = viewer.adminContext() ?: return
