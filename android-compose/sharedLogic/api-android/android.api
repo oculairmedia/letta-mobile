@@ -46048,11 +46048,11 @@ public final class com/letta/mobile/data/repository/modelcontrol/ModelPickerBind
 	public final fun rememberedEffort (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerEntry;)Ljava/lang/String;
 	public final fun selectEffort (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerEntry;Ljava/lang/String;)V
 	public final fun selectModel (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerEntry;)V
+	public final fun withToolsets (Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerBinding;
 }
 
 public final class com/letta/mobile/data/repository/modelcontrol/ModelPickerBindingKt {
-	public static final fun chatModelPicker (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerBinding;
-	public static synthetic fun chatModelPicker$default (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerBinding;
+	public static final fun chatModelPicker (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerBinding;
 }
 
 public final class com/letta/mobile/data/repository/modelcontrol/ModelPickerCatalog {
