@@ -2,8 +2,14 @@ package com.letta.mobile.feature.chat.voice
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.data.voice.local.LocalRecognition
+import com.letta.mobile.data.voice.local.LocalRecognitionEvent
+import com.letta.mobile.data.voice.local.LocalRecognitionRequest
+import com.letta.mobile.data.voice.local.LocalRecognizerSession
+import com.letta.mobile.data.voice.local.LocalSpeechRecognizer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -13,20 +19,20 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.math.max
 import kotlin.time.Duration.Companion.milliseconds
 
-private const val AUDIO_METER_MIN_DB = -2.0f
-private const val AUDIO_METER_MAX_DB = 100.0f
+private const val AMPLITUDE_MAX = 65535f
 private val STOP_GRACE = 500.milliseconds
 
+/** Dictation keeps the platform recogniser it always used rather than insisting on the on-device one. */
+private val DICTATION = LocalRecognitionRequest(preferOnDevice = false)
+
 /**
- * @param recognizing      true while [android.speech.SpeechRecognizer] is actively listening.
+ * @param recognizing      true while the recogniser is actively listening.
  * @param recognizedText   Latest (partial or final) transcription. Empty
  *                         outside a recognition session.
- * @param amplitude        Latest 0..65535 RMS amplitude reading.
- *                         AudioAnimation normalizes this internally
- *                         (letta-mobile-57t5).
+ * @param amplitude        Latest 0..65535 input level. AudioAnimation
+ *                         normalizes this internally.
  */
 internal data class VoiceInputUiState(
     val recognizing: Boolean = false,
@@ -36,17 +42,17 @@ internal data class VoiceInputUiState(
 
 /**
  * Hold-to-dictate state machine, shared by the dictation button and the recognizer overlay through
- * the chat screen's ViewModelStoreOwner.
+ * the chat screen's ViewModelStoreOwner, over the shared [LocalSpeechRecognizer] port.
  *
- * letta-mobile-7a1vl (leak): this view model holds nothing from the screen. Final transcripts go
- * out on [dictations], which the dictation button collects only while it is composed, and every
- * session gets its own recognizer and listener, destroyed and detached as soon as the session
- * ends (result, error, cancel, or [onCleared]). A binder stub the framework keeps alive can then
- * only pin a detached listener shell.
+ * This view model holds nothing from the screen: final transcripts go out on [dictations], which
+ * the dictation button collects only while it is composed, and every session opens its own
+ * recogniser and closes it as soon as the session ends (result, error, cancel, or [onCleared]);
+ * the binding detaches its framework listener when the recognition's collection ends, so a binder
+ * stub the framework keeps alive can only pin an empty shell.
  */
 @HiltViewModel
 internal class VoiceInputViewModel @Inject constructor(
-    private val recognizerFactory: VoiceRecognizerFactory,
+    private val recognizer: LocalSpeechRecognizer,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(VoiceInputUiState())
     val uiState = _uiState.asStateFlow()
@@ -65,12 +71,10 @@ internal class VoiceInputViewModel @Inject constructor(
     fun startSpeechRecognition() {
         endSession()
         generation++
-        val events = Session.Events(this)
-        val recognizer = recognizerFactory.create(events)
-        val started = Session(events, recognizer)
+        val opened = recognizer.open(DICTATION)
+        val started = Session(opened, opened.recognize())
         session = started
-        events.session = started
-        recognizer.start()
+        started.job = viewModelScope.launch { started.recognition.events.collect { on(started, it) } }
         _uiState.update { it.copy(recognizing = true, recognizedText = "", amplitude = 0) }
     }
 
@@ -80,7 +84,7 @@ internal class VoiceInputViewModel @Inject constructor(
             delay(STOP_GRACE)
             // A newer press started its own session in the meantime: leave it alone.
             if (stopping != generation) return@launch
-            session?.recognizer?.stop()
+            session?.recognition?.finish()
             _uiState.update { it.copy(recognizing = false, amplitude = 0) }
         }
     }
@@ -94,73 +98,32 @@ internal class VoiceInputViewModel @Inject constructor(
         endSession()
     }
 
-    private fun onRms(from: Session, rmsdB: Float) {
+    private fun on(from: Session, event: LocalRecognitionEvent) {
         if (from !== session) return
-        _uiState.update { it.copy(amplitude = convertRmsDbToAmplitude(rmsdB)) }
+        when (event) {
+            is LocalRecognitionEvent.Level -> _uiState.update { it.copy(amplitude = (event.level.value * AMPLITUDE_MAX).toInt()) }
+            is LocalRecognitionEvent.Partial -> _uiState.update { it.copy(recognizedText = event.text.value) }
+            is LocalRecognitionEvent.Final -> onFinalText(event.text.value)
+            // The recognizer is dead; release it now. The UI flips back when the hold ends, as before.
+            is LocalRecognitionEvent.Failed -> endSession()
+            else -> Unit
+        }
     }
 
-    private fun onPartialText(from: Session, text: String) {
-        if (from !== session) return
-        _uiState.update { it.copy(recognizedText = text) }
-    }
-
-    private fun onFinalText(from: Session, text: String) {
-        if (from !== session) return
+    private fun onFinalText(text: String) {
         endSession()
         _uiState.update { it.copy(recognizedText = text, recognizing = false, amplitude = 0) }
         if (text.isNotBlank()) _dictations.tryEmit(text)
     }
 
-    private fun onError(from: Session) {
-        if (from !== session) return
-        // The recognizer is dead; release it now. The UI flips back when the hold ends, as before.
-        endSession()
-    }
-
     private fun endSession() {
         val ending = session ?: return
         session = null
-        ending.events.detach()
-        ending.recognizer?.release()
-        ending.recognizer = null
+        ending.job?.cancel()
+        ending.opened.close()
     }
 
-    private fun convertRmsDbToAmplitude(rmsdB: Float): Int {
-        val clampedRmsdB = max(rmsdB, AUDIO_METER_MIN_DB).coerceAtMost(AUDIO_METER_MAX_DB)
-        return ((clampedRmsdB - AUDIO_METER_MIN_DB) * 65535f / (AUDIO_METER_MAX_DB - AUDIO_METER_MIN_DB)).toInt()
-    }
-
-    private class Session(val events: Events, var recognizer: VoiceRecognizerSession?) {
-        /** Forwards to the view model until [detach]; a late callback after that goes nowhere. */
-        class Events(owner: VoiceInputViewModel) : VoiceRecognitionEvents {
-            @Volatile
-            private var owner: VoiceInputViewModel? = owner
-            var session: Session? = null
-
-            fun detach() {
-                owner = null
-                session = null
-            }
-
-            override fun onRms(rmsdB: Float) {
-                val s = session ?: return
-                owner?.onRms(s, rmsdB)
-            }
-
-            override fun onPartialText(text: String) {
-                val s = session ?: return
-                owner?.onPartialText(s, text)
-            }
-
-            override fun onFinalText(text: String) {
-                val s = session ?: return
-                owner?.onFinalText(s, text)
-            }
-
-            override fun onError(error: Int) {
-                val s = session ?: return
-                owner?.onError(s)
-            }
-        }
+    private class Session(val opened: LocalRecognizerSession, val recognition: LocalRecognition) {
+        var job: Job? = null
     }
 }

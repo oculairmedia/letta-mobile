@@ -2406,6 +2406,8 @@ public final class com/letta/mobile/ui/chat/voice/VoiceModeKt {
 public final class com/letta/mobile/ui/chat/voice/VoiceModeTags {
 	public static final field $stable I
 	public static final field BUTTON Ljava/lang/String;
+	public static final field HANDOVER Ljava/lang/String;
+	public static final field HANDOVER_CLOSE Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/voice/VoiceModeTags;
 	public static final field STRIP Ljava/lang/String;
 	public static final field STRIP_ACTION Ljava/lang/String;
@@ -2414,10 +2416,11 @@ public final class com/letta/mobile/ui/chat/voice/VoiceModeTags {
 
 public final class com/letta/mobile/ui/chat/voice/VoiceSetupAccess {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLkotlin/jvm/functions/Function2;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCheck ()Lkotlin/jvm/functions/Function2;
 	public final fun getEchoCancelled ()Z
+	public final fun getLocalListening ()Lcom/letta/mobile/data/voice/local/LocalSpeechAvailability;
 	public final fun getStore ()Lcom/letta/mobile/data/voice/session/VoiceSetupStore;
 }
 
@@ -7558,6 +7561,7 @@ public final class com/letta/mobile/ui/settings/VoiceSettingsKeys {
 	public static final field INSTANCE Lcom/letta/mobile/ui/settings/VoiceSettingsKeys;
 	public static final field INTERRUPT Ljava/lang/String;
 	public static final field KEY Ljava/lang/String;
+	public static final field LISTENING Ljava/lang/String;
 	public static final field PANE Ljava/lang/String;
 	public static final field SAVE Ljava/lang/String;
 	public static final field SECTION Ljava/lang/String;

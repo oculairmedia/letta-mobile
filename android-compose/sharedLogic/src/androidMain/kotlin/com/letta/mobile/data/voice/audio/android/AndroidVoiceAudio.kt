@@ -4,6 +4,8 @@ import android.content.Context
 import com.letta.mobile.data.voice.audio.AudioFrameFormat
 import com.letta.mobile.data.voice.audio.AudioFrameSource
 import com.letta.mobile.data.voice.audio.AudioPlayer
+import com.letta.mobile.data.voice.local.LocalSpeechRecognizer
+import com.letta.mobile.data.voice.local.android.AndroidLocalSpeechRecognizer
 import com.letta.mobile.data.voice.session.VoiceAudio
 import kotlinx.coroutines.flow.Flow
 
@@ -11,10 +13,12 @@ import kotlinx.coroutines.flow.Flow
  * Voice mode's audio on Android ([AndroidAudio]): `AudioRecord` on the communication path, so echo
  * cancellation lets the person talk over the reply (the microphone reports `echoCancelled` when the
  * device offers the canceller), and `AudioTrack` with assistant usage. Capture
- * fails with PERMISSION_REQUIRED until `RECORD_AUDIO` is granted.
+ * fails with PERMISSION_REQUIRED until `RECORD_AUDIO` is granted. The device's own recogniser is
+ * [AndroidLocalSpeechRecognizer].
  */
 class AndroidVoiceAudio(context: Context) : VoiceAudio {
     private val audio = AndroidAudio(context.applicationContext)
+    private val recognizer = AndroidLocalSpeechRecognizer(context)
 
     override fun microphone(format: AudioFrameFormat): AudioFrameSource =
         audio.frameSource(format, AndroidCaptureOptions(mode = AndroidCaptureMode.COMMUNICATION))
@@ -22,4 +26,6 @@ class AndroidVoiceAudio(context: Context) : VoiceAudio {
     override fun deviceChanges(): Flow<Unit> = audio.deviceChanges()
 
     override fun speaker(): AudioPlayer = audio.player()
+
+    override fun localRecognizer(): LocalSpeechRecognizer = recognizer
 }

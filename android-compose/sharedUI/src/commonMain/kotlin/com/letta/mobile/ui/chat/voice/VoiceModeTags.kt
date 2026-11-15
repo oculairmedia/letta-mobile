@@ -13,4 +13,10 @@ object VoiceModeTags {
 
     /** The notice's dismiss, which turns voice mode off. */
     const val STRIP_CLOSE: String = "voice-mode-strip-close"
+
+    /** The notice that listening moved from the device's recogniser to the speech server. */
+    const val HANDOVER: String = "voice-mode-handover"
+
+    /** That notice's close, which keeps voice mode on. */
+    const val HANDOVER_CLOSE: String = "voice-mode-handover-close"
 }
