@@ -50,7 +50,7 @@ class DisclosureControlsGeometryUiTest {
         var flips = 0
         show(width) {
             Column {
-                Box(Modifier.testTag(PLAIN)) { Text(LABEL) }
+                Box(Modifier.testTag(PLAIN)) { Text(LABEL, maxLines = 1) }
                 Box(Modifier.testTag(HEADER)) {
                     LettaDisclosureHeader(expanded = false, onToggle = { flips++ }) { Text(LABEL, Modifier.weight(1f), maxLines = 1) }
                 }
