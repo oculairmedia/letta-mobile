@@ -1,5 +1,10 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
+import com.letta.mobile.ui.chat.surface.timeline.rows.TimelineStatusGlyph
+import com.letta.mobile.ui.components.line.StatusTone
+import com.letta.mobile.ui.theme.ChatRowCardShape
+import com.letta.mobile.ui.theme.ChatRowInsetShape
+import com.letta.mobile.ui.theme.ChatRowType
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -14,9 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -30,7 +33,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_error_title
@@ -90,7 +92,7 @@ private fun SkeletonBubble(isUser: Boolean, index: Int) {
         Column(
             modifier = Modifier
                 .widthIn(max = maxWidth)
-                .clip(RoundedCornerShape(LettaDimens.Radius.md))
+                .clip(ChatRowCardShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .alpha(pulse)
                 .padding(LettaDimens.Space.md),
@@ -107,7 +109,7 @@ private fun SkeletonLine(fraction: Float) {
         modifier = Modifier
             .fillMaxWidth(fraction)
             .height(LettaDimens.Space.md)
-            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
+            .clip(ChatRowInsetShape)
             .background(MaterialTheme.colorScheme.outline.copy(alpha = ChatTimelineDimens.Alpha.skeletonLine)),
     )
 }
@@ -124,16 +126,10 @@ internal fun TimelineStatusPanel(message: String, onRetry: () -> Unit, modifier:
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
-            Icon(
-                imageVector = LettaIcons.Error,
-                contentDescription = null,
-                modifier = Modifier.size(ChatTimelineDimens.statusIcon),
-                tint = MaterialTheme.colorScheme.error,
-            )
+            TimelineStatusGlyph(StatusTone.Failed, size = ChatTimelineDimens.statusIcon)
             Text(
                 text = stringResource(Res.string.timeline_error_title),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
+                style = ChatRowType.panelHeadline,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
             )
@@ -235,8 +231,7 @@ private fun WelcomeHeadline(agentName: String, hasConversation: Boolean) {
     }
     Text(
         text = title,
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.SemiBold,
+        style = ChatRowType.panelHeadline,
         color = MaterialTheme.colorScheme.onSurface,
         textAlign = TextAlign.Center,
     )

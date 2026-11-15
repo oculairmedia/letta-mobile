@@ -136,6 +136,11 @@ Reusable menus, list parts, chips, errors, refresh and pane primitives. Supply m
 # Package com.letta.mobile.ui.components.row
 
 The one list row every roster, recents and history list uses. [LettaListRow] owns the row's interaction source, hover, focus and press states, the rounded background ladder, the pointer cursor, muting and the tooltip entry point, so callers describe a row with [LettaListRowSpec] and never re-implement any of it. The tooltip is injected by the host, so this package depends on no host, shell or chat package.
+
+# Package com.letta.mobile.ui.components.line
+
+The plain values the shared line components in `ui.components` draw from: a status glyph's tone, the rail a line sits on (a run's header, a run's work step, or inside an open step), a line's label, tags and disclosure, and a pager's steps. Describe a summary, notice, step or divider line with these and draw it with the shared components; never hand-build the row, glyph, chevron or toggle. The package imports nothing of the UI, so any row package can name its values without joining an import cycle.
+
 # Package com.letta.mobile.ui.components.foundation
 
 The shared building blocks every page uses instead of hand-building its own: LettaIcon and LettaIconButton, LettaSearchField and LettaInlineSearchField, LettaToggleRow and LettaControlRow, LettaPanel and LettaInlineNotice, LettaStatusDot and LettaStatusLabel, LettaColorSwatch, LettaEmptyState, LettaNavChevron, LettaDivider and LettaVerticalDivider, and Modifier.lettaClickable. The package imports only Compose, `ui.icons` and `ui.theme.tokens`, never `ui.theme` or a page, so any page or component package can import it without closing a package cycle; keep it that way. Callers own their state and callbacks; these own size, shape, colour, semantics and touch target.
