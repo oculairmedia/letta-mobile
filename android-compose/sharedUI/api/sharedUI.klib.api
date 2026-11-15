@@ -10116,6 +10116,8 @@ final object com.letta.mobile.ui.pairing/PairingStrings { // com.letta.mobile.ui
         final fun <get-JOIN_TITLE>(): kotlin/String // com.letta.mobile.ui.pairing/PairingStrings.JOIN_TITLE.<get-JOIN_TITLE>|<get-JOIN_TITLE>(){}[0]
     final const val LINK_COPIED // com.letta.mobile.ui.pairing/PairingStrings.LINK_COPIED|{}LINK_COPIED[0]
         final fun <get-LINK_COPIED>(): kotlin/String // com.letta.mobile.ui.pairing/PairingStrings.LINK_COPIED.<get-LINK_COPIED>|<get-LINK_COPIED>(){}[0]
+    final const val LINK_ONLY_NO_QR // com.letta.mobile.ui.pairing/PairingStrings.LINK_ONLY_NO_QR|{}LINK_ONLY_NO_QR[0]
+        final fun <get-LINK_ONLY_NO_QR>(): kotlin/String // com.letta.mobile.ui.pairing/PairingStrings.LINK_ONLY_NO_QR.<get-LINK_ONLY_NO_QR>|<get-LINK_ONLY_NO_QR>(){}[0]
     final const val LINK_SECRET_NOTE // com.letta.mobile.ui.pairing/PairingStrings.LINK_SECRET_NOTE|{}LINK_SECRET_NOTE[0]
         final fun <get-LINK_SECRET_NOTE>(): kotlin/String // com.letta.mobile.ui.pairing/PairingStrings.LINK_SECRET_NOTE.<get-LINK_SECRET_NOTE>|<get-LINK_SECRET_NOTE>(){}[0]
     final const val NEW_CODE // com.letta.mobile.ui.pairing/PairingStrings.NEW_CODE|{}NEW_CODE[0]
