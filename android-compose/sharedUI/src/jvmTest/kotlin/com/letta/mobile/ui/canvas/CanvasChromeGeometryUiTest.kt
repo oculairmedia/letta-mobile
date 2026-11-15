@@ -20,7 +20,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.min
+import androidx.compose.ui.unit.width
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
 import com.letta.mobile.data.canvas.CanvasStorageFault
 import com.letta.mobile.ui.theme.LettaDimens
