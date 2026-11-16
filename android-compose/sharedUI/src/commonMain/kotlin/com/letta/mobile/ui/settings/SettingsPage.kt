@@ -19,8 +19,9 @@ import com.letta.mobile.data.shell.ShellSettingsSection
 import com.letta.mobile.ui.pairing.InstallAndPairBindings
 import com.letta.mobile.ui.shell.header.HeaderControls
 import com.letta.mobile.ui.shell.header.HeaderNav
-import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.ShellHeader
+import com.letta.mobile.ui.shell.header.pageBarTitle
+import com.letta.mobile.ui.host.LocalHostTitlesPage
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 
 /** What the Settings page shows: the saved backend, its connection (null hides it) and the anchor to open on. */
@@ -129,11 +130,16 @@ fun SettingsPage(
     LettaPageScaffold(
         modifier = modifier.testTag(SettingsPageTags.PAGE),
         containerColor = MaterialTheme.colorScheme.background,
-        header = {
-            ShellHeader(
-                title = HeaderTitle.Text("Settings"),
-                controls = HeaderControls(nav = onBack?.let { HeaderNav.Back(it) } ?: HeaderNav.None),
-            )
+        // Under a window header that already names the page, a bar with no Back would be empty.
+        header = if (onBack == null && LocalHostTitlesPage.current) {
+            null
+        } else {
+            {
+                ShellHeader(
+                    title = pageBarTitle("Settings"),
+                    controls = HeaderControls(nav = onBack?.let { HeaderNav.Back(it) } ?: HeaderNav.None),
+                )
+            }
         },
     ) { insets ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(insets)) {

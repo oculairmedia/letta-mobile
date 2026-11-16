@@ -36,6 +36,7 @@ import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 import com.letta.mobile.ui.components.LettaRefreshable
+import com.letta.mobile.ui.components.lettaPageGutter
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -123,7 +124,8 @@ data class HomePageNavigation(
 )
 
 /**
- * Host presentation choices: [showTitle] false when the host already titles the screen;
+ * Host presentation choices: [showTitle] false when the host already titles the screen (the shell
+ * binding clears it under a window header that names the page);
  * [showSearch] false when the host's own app bar carries the search; [touch] grows the controls to
  * touch-target size; [orbIndexByAgentId] colours the agent orbs; [headerActions] are the host's own
  * header controls (such as a backend chip); [document] replaces the page with a mod's
@@ -135,6 +137,12 @@ data class HomePageOptions(
     val showSearch: Boolean = true,
     val touch: Boolean = false,
     val composerPlaceholder: String = "Message your agent",
+    /**
+     * The prompt bar: the shared chat composer, drawn with [composerPlaceholder] and handing its
+     * draft to [HomePageNavigation.onSubmitPrompt]. The shell's Home binding supplies it; null
+     * leaves Home without one.
+     */
+    val promptBar: (@Composable (placeholder: String, onSubmit: (String) -> Unit, modifier: Modifier) -> Unit)? = null,
     val orbIndexByAgentId: Map<String, Int> = emptyMap(),
     val headerActions: (@Composable RowScope.() -> Unit)? = null,
     val document: UiGeneratedComponent? = null,
@@ -152,7 +160,8 @@ internal class HomePageScope(
 ) {
     val actions: HomePageActions = callbacks.actions
     val navigation: HomePageNavigation = callbacks.navigation
-    val horizontalPadding = if (wide) LettaDimens.Space.xxl else LettaDimens.Space.lg
+    /** The shared page gutter, so the rows line up under [HomeHeader]'s title. */
+    val horizontalPadding = lettaPageGutter(wide)
 
     /** A phone host that titles and searches in its own app bar still shows the error banner here. */
     val hasCompactHeader: Boolean
@@ -161,9 +170,9 @@ internal class HomePageScope(
     private val drawsHeaderControls: Boolean
         get() = options.showTitle || options.showSearch
 
-    /** The lane holds the composer; a compact page docks it below the list. */
+    /** The lane holds the composer and the host gave one; a compact page docks it below the list. */
     val hasComposer: Boolean
-        get() = HomeViews.COMPOSER in lane
+        get() = HomeViews.COMPOSER in lane && options.promptBar != null
 
     fun orbIndex(agentId: String?): Int = agentId?.let { options.orbIndexByAgentId[it] } ?: 0
 
@@ -181,7 +190,11 @@ private fun HomeRefreshable(page: HomePageScope, modifier: Modifier, content: @C
 
 @Composable
 private fun WideHomeLayout(page: HomePageScope) {
-    HomeRefreshable(page, Modifier.fillMaxSize()) { WideHomeList(page) }
+    // The page header stays put above the list, as on every other page, and insets itself.
+    Column(Modifier.fillMaxSize()) {
+        HomeHeader(page)
+        HomeRefreshable(page, Modifier.weight(1f).fillMaxWidth()) { WideHomeList(page) }
+    }
 }
 
 @Composable
@@ -189,9 +202,8 @@ private fun WideHomeList(page: HomePageScope) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-        contentPadding = PaddingValues(horizontal = page.horizontalPadding, vertical = LettaDimens.Space.xl),
+        contentPadding = PaddingValues(start = page.horizontalPadding, end = page.horizontalPadding, top = LettaDimens.Space.sm, bottom = LettaDimens.Space.xl),
     ) {
-        item { HomeHeader(page) }
         if (page.state.search.isActive) homeSearchResults(page) else homeSections(page)
     }
 }
@@ -199,18 +211,17 @@ private fun WideHomeList(page: HomePageScope) {
 @Composable
 private fun CompactHomeLayout(page: HomePageScope) {
     Column(Modifier.fillMaxSize()) {
+        if (page.hasCompactHeader) HomeHeader(page)
         HomeRefreshable(page, Modifier.weight(1f).fillMaxWidth()) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-                contentPadding = PaddingValues(horizontal = page.horizontalPadding, vertical = LettaDimens.Space.lg),
+                contentPadding = PaddingValues(start = page.horizontalPadding, end = page.horizontalPadding, top = LettaDimens.Space.sm, bottom = LettaDimens.Space.lg),
             ) {
-                if (page.hasCompactHeader) item { HomeHeader(page) }
                 if (page.state.search.isActive) homeSearchResults(page) else homeSections(page)
             }
         }
-        if (!page.state.search.isActive && page.hasComposer) {
-            HomeComposer(page, Modifier.padding(horizontal = page.horizontalPadding, vertical = LettaDimens.Space.sm))
-        }
+        // The chat composer runs edge to edge at the bottom, as on the compact chat page.
+        if (!page.state.search.isActive && page.hasComposer) HomePromptBar(page)
     }
 }

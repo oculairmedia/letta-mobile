@@ -48,6 +48,8 @@ import com.letta.mobile.sharedui.resources.composer_send
 import com.letta.mobile.sharedui.resources.composer_stop
 import com.letta.mobile.sharedui.resources.composer_stopping
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.context.ModelPickerHost
@@ -219,14 +221,16 @@ internal fun ComposerVoiceButton(model: ComposerModel) {
 }
 
 /**
- * Send, or Stop while a run streams with nothing to queue. A pending stop reads "stopping"
- * and a second press is the owner's local force-clear. Lifted from desktop's ComposerSendButton
- * and Android's stop morph.
+ * Send, or Stop while a run streams with nothing to queue: the one send button of every composer
+ * (the pointer card, the Touch bar, Home's prompt bar). A pending stop reads "stopping" and a second
+ * press is the owner's local force-clear. A send plays the launch cue and a stop a plain confirm on
+ * hosts with haptics. The Touch bar centres it in its larger touch target.
  */
 @Composable
 internal fun ComposerActionButton(model: ComposerModel, modifier: Modifier = Modifier) {
     val stops = model.decisions.action == ComposerAction.Stop
     val enabled = stops || model.decisions.sendEnabled
+    val haptics = LocalHaptics.current
     val colors = actionButtonColors(stops = stops, enabled = enabled)
     val scale by animateFloatAsState(
         targetValue = if (enabled) 1f else DisabledActionScale,
@@ -234,7 +238,10 @@ internal fun ComposerActionButton(model: ComposerModel, modifier: Modifier = Mod
         label = "composerActionScale",
     )
     Surface(
-        onClick = model::runAction,
+        onClick = {
+            haptics.play(if (stops) LettaHapticCue.Confirm else LettaHapticCue.SendLaunch)
+            model.runAction()
+        },
         enabled = enabled,
         modifier = modifier
             .size(LettaDimens.Control.actionButton)

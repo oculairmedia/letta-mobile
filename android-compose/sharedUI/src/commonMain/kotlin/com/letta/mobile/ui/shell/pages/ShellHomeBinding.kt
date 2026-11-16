@@ -24,6 +24,7 @@ import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellHomePrompt
 import com.letta.mobile.data.shell.ShellHomeShortcuts
 import com.letta.mobile.data.shell.ShellSkillsSection
+import com.letta.mobile.ui.host.LocalHostTitlesPage
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.pages.home.HomeConnectionPanel
@@ -130,9 +131,15 @@ internal fun shellHomeBinding(
     } else {
         val state by controller.state.collectAsState()
         val callbacks = HomePageCallbacks(actions = controller, navigation = homeNavigation(graph, host))
-        shellHomePage(state, callbacks, host.home.options).Content(destination, modifier)
+        // A window header that already names the page (the compact desktop title bar) leaves Home untitled.
+        val options = host.home.options.withPromptBar().let { if (LocalHostTitlesPage.current) it.copy(showTitle = false) else it }
+        shellHomePage(state, callbacks, options).Content(destination, modifier)
     }
 }
+
+/** Home's prompt bar is the chat page's own composer ([HomePromptComposer]), unless the host set one. */
+private fun HomePageOptions.withPromptBar(): HomePageOptions =
+    if (promptBar != null) this else copy(promptBar = { placeholder, onSubmit, modifier -> HomePromptComposer(placeholder, onSubmit, modifier) })
 
 private fun homeNavigation(graph: SessionRepositoryGraph, host: ShellPageHost): HomePageNavigation {
     val router = host.navigator
