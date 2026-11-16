@@ -3,8 +3,6 @@ package com.letta.mobile.ui.components.beam
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
-import com.letta.mobile.util.Telemetry
-import com.letta.mobile.util.attr
 import org.jetbrains.skia.Paint as SkiaPaint
 import org.jetbrains.skia.Rect as SkiaRect
 import org.jetbrains.skia.RuntimeEffect
@@ -14,29 +12,30 @@ import org.jetbrains.skia.RuntimeShaderBuilder
  * Desktop and web (both Skiko): the shared beam source compiled as SkSL. The effect is compiled
  * once per process and shared; each beam owns a builder (its uniforms) and a paint, released with it.
  */
-internal actual fun createBorderBeamShader(): BorderBeamRenderer? =
-    BorderBeamEffect.effect?.let { SkiaBorderBeam(RuntimeShaderBuilder(it)) }
+internal actual fun createBorderBeamShader(areaPx: Float): BorderBeamRenderer? =
+    if (areaPx > MAX_SHADER_AREA_PX) BorderBeamFallback()
+    else BorderBeamEffect.effect?.let { SkiaBorderBeam(RuntimeShaderBuilder(it)) }
 
 /** The compiled effect, or null when the SkSL does not compile here (logged once). */
 private object BorderBeamEffect {
     val effect: RuntimeEffect? by lazy {
-        runCatching { RuntimeEffect.makeForShader(BORDER_BEAM_SHADER) }
-            .onFailure { failure ->
-                Telemetry.event(
-                    BORDER_BEAM_TELEMETRY_TAG,
-                    "shader.compileFailed",
-                    "error" attr (failure.message ?: failure::class.simpleName.orEmpty()),
-                    level = Telemetry.Level.WARN,
-                )
-            }.getOrNull()
+        compileBeamShader { RuntimeEffect.makeForShader(BORDER_BEAM_SHADER) }
     }
 }
 
 private class SkiaBorderBeam(private val builder: RuntimeShaderBuilder) : BorderBeamRenderer {
     private val paint = SkiaPaint()
     private var released = false
+    private val pathRenderer = BorderBeamFallback()
 
     override fun DrawScope.drawBeam(frame: BeamFrame) {
+        // RuntimeEffect is also evaluated on software canvases. Its 24 Gaussian samples per
+        // pixel are appropriate for small controls, but card-sized passes stall raster rendering.
+        // Bound that cost in production, using the same perimeter renderer as older phones.
+        if (size.width * size.height > MAX_SHADER_AREA_PX) {
+            with(pathRenderer) { drawBeam(frame) }
+            return
+        }
         val uniforms = BeamUniforms(this, frame)
         builder.uniform("size", uniforms.width, uniforms.height)
         builder.uniform("density", uniforms.density)
@@ -70,3 +69,6 @@ private class SkiaBorderBeam(private val builder: RuntimeShaderBuilder) : Border
         builder.close()
     }
 }
+
+/** Above a small control's area, raster cost must scale with its perimeter instead of its fill. */
+private const val MAX_SHADER_AREA_PX = 64 * 64

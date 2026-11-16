@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
@@ -15,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.transport.appserver.AppServerBackgroundProcess
@@ -28,13 +30,16 @@ import com.letta.mobile.ui.icons.LettaIcons
 
 /**
  * Shelf above the composer listing active background processes
- * reported by the App Server's `device_status.background_processes`.
+ * reported by the App Server's `device_status.background_processes`. A chip's close button stops
+ * its process (after a confirm); tapping an agent task's chip opens that subagent through [onOpen]
+ * (the page's subagent view) where the host has one, and otherwise asks to stop it too.
  */
 @Composable
 fun BackgroundProcessShelf(
     processes: List<AppServerBackgroundProcess>,
     onStop: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onOpen: ((AppServerBackgroundProcess) -> Unit)? = null,
 ) {
     if (processes.isEmpty()) return
 
@@ -42,15 +47,21 @@ fun BackgroundProcessShelf(
 
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        modifier = modifier
+        // The row keeps the column's width and start edge, but [modifier] measures the chips' own
+        // extent: the lane lets its scroll-to-latest button sit beside a short row rather than above it.
+        modifier = Modifier
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
+            .wrapContentWidth(Alignment.Start)
+            .then(modifier)
             .testTag("background_process_shelf"),
     ) {
         items(processes, key = { it.id }) { process ->
+            val open = onOpen?.takeIf { process.type == AGENT_TASK }
             BackgroundProcessItem(
                 process = process,
                 onRequestStop = { confirmingProcessId = process.id },
+                onClick = open?.let { { it(process) } },
             )
         }
     }
@@ -72,17 +83,18 @@ private fun BackgroundProcessItem(
     process: AppServerBackgroundProcess,
     onRequestStop: () -> Unit,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
     val kindLabel = when (process.type) {
         "monitor" -> "Monitor"
-        "agent_task" -> "Agent task"
+        AGENT_TASK -> "Agent task"
         "bash" -> "Bash"
         "workflow" -> "Workflow"
         else -> "Process"
     }
     LettaChip(
         text = process.description ?: process.id,
-        onClick = onRequestStop,
+        onClick = onClick ?: onRequestStop,
         modifier = modifier.testTag("process_item_${process.id}"),
         slots = LettaChipSlots(
             leading = {
@@ -111,6 +123,9 @@ private fun BackgroundProcessItem(
         ),
     )
 }
+
+/** The process type of a dispatched subagent's run. */
+private const val AGENT_TASK = "agent_task"
 
 @Composable
 private fun StopProcessConfirmDialog(

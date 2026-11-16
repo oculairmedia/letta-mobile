@@ -31,8 +31,8 @@ import com.letta.mobile.ui.components.list.RosterListTag
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.header.HeaderControls
 import com.letta.mobile.ui.shell.header.HeaderNav
-import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.ShellHeader
+import com.letta.mobile.ui.shell.header.pageBarTitle
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.launch
@@ -96,7 +96,7 @@ fun PluginsPage(
     LettaPageScaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
-        header = { ShellHeader(title = HeaderTitle.Text(TITLE), controls = HeaderControls(nav = HeaderNav.Back(onBack))) },
+        header = { ShellHeader(title = pageBarTitle(TITLE), controls = HeaderControls(nav = HeaderNav.Back(onBack))) },
     ) { insets -> PluginsPageBody(state, actions, options.onPickPackage, Modifier.padding(insets)) }
 }
 

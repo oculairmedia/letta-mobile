@@ -1,27 +1,19 @@
 package com.letta.mobile.ui.chat.surface.composer
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -37,18 +29,13 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonColors
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -58,11 +45,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import com.composables.icons.lucide.AudioLines
 import com.composables.icons.lucide.Lucide
@@ -70,9 +57,6 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_actions_open
 import com.letta.mobile.sharedui.resources.composer_attach_image
 import com.letta.mobile.sharedui.resources.composer_open_canvas
-import com.letta.mobile.sharedui.resources.composer_send
-import com.letta.mobile.sharedui.resources.composer_stop
-import com.letta.mobile.sharedui.resources.composer_stopping
 import com.letta.mobile.sharedui.resources.voice_mode_sheet_row
 import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.haptics.LettaHapticCue
@@ -87,7 +71,6 @@ import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.TouchComposerDimens
 import com.letta.mobile.ui.theme.chatBottomBarShape
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /*
@@ -236,7 +219,8 @@ private fun TouchBarSurface(model: ComposerModel, content: @Composable androidx.
     Surface(
         // Voice mode's outline follows the bar's shape: the bar runs flush to the screen's sides and
         // bottom, so what shows is a glowing top edge and its rounded corners.
-        modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.hasFocus }.voiceOutline(shape).testTag(ComposerTestTags.TOUCH_BAR),
+        modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.hasFocus }
+            .composerOutline(shape, model.uiState).testTag(ComposerTestTags.TOUCH_BAR),
         shape = shape,
         color = look.color,
         contentColor = scheme.onSurface,
@@ -384,7 +368,9 @@ private fun touchSlotDictates(model: ComposerModel): Boolean {
  * (the keyboard's own action key sends), but Stop and the mic stay.
  *
  * It is the Touch bar's one trailing slot: the voice-mode button (when [voiceMode]) comes first, then
- * the mic or Send / Stop, one item gap apart. Another trailing action goes here too, not elsewhere in
+ * the mic or Send / Stop (the shared [ComposerActionButton], centred in the bar's touch target), one
+ * item gap apart. Where there is no mic, Send takes no room until there is a draft, so the voice-mode
+ * button rests at the end and slides left as Send arrives. Another trailing action goes here too, not elsewhere in
  * the bar's row. The pointer card's counterpart is its ComposerTrailingActions.
  */
 @Composable
@@ -393,9 +379,10 @@ private fun TouchTrailingSlot(model: ComposerModel, voiceMode: Boolean) {
     val keyboard = keyboardOpen()
     val visible = dictates || model.streaming || !keyboard
     val shown = rememberRetainedTrailingContent(visible, if (dictates) TouchTrailingContent.Voice else TouchTrailingContent.Action)
+    // The gap before the slot rides inside it, so it comes and goes with the mic or Send.
+    val gap = if (voiceMode) TouchComposerDimens.itemSpacing else 0.dp
     Row(
         modifier = Modifier.testTag(ComposerTestTags.TRAILING_ACTIONS),
-        horizontalArrangement = Arrangement.spacedBy(TouchComposerDimens.itemSpacing),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (voiceMode) ComposerVoiceModeButton(size = TouchComposerDimens.actionTarget, iconSize = TouchComposerDimens.actionIcon)
@@ -407,12 +394,17 @@ private fun TouchTrailingSlot(model: ComposerModel, voiceMode: Boolean) {
         ) {
             when (shown) {
                 TouchTrailingContent.Voice -> Box(
-                    Modifier.size(TouchComposerDimens.actionTarget).testTag(ComposerTestTags.TOUCH_VOICE),
+                    Modifier.padding(start = gap).size(TouchComposerDimens.actionTarget).testTag(ComposerTestTags.TOUCH_VOICE),
                     contentAlignment = Alignment.Center,
                 ) {
                     ComposerVoiceButton(model)
                 }
-                TouchTrailingContent.Action -> TouchActionButton(model)
+                TouchTrailingContent.Action -> ComposerActionButton(
+                    model,
+                    Modifier.testTag(ComposerTestTags.SEND_SLOT),
+                    seat = TouchComposerDimens.actionTarget,
+                    leadingGap = gap,
+                )
             }
         }
     }
@@ -461,104 +453,3 @@ private fun touchSlotExit(): ExitTransition {
 }
 
 private const val EXIT_SCALE = 0.76f
-
-/** Send, or the red Stop (smaller, beating while the run is live; "stopping" once asked). */
-@Composable
-private fun TouchActionButton(model: ComposerModel) {
-    val stops = model.decisions.action == ComposerAction.Stop
-    val haptics = LocalHaptics.current
-    val size by animateFloatAsState(
-        if (stops) TouchComposerDimens.stopScale else 1f,
-        chipSpec(),
-        label = "touchActionScale",
-    )
-    val pulse = rememberStopPulse(stopPulses(model))
-    FilledIconButton(
-        onClick = {
-            // A send launches the flight; stopping the run reads as a plain confirm.
-            haptics.play(if (stops) LettaHapticCue.Confirm else LettaHapticCue.SendLaunch)
-            model.runAction()
-        },
-        enabled = stops || model.decisions.sendEnabled,
-        modifier = Modifier
-            .size(TouchComposerDimens.actionTarget)
-            .graphicsLayer {
-                val scale = size * pulse.value
-                scaleX = scale
-                scaleY = scale
-            }
-            .testTag(if (stops) ComposerTestTags.STOP else ComposerTestTags.SEND),
-        colors = touchActionColors(stops),
-    ) {
-        TouchActionIcon(stops = stops, contentDescription = stringResource(touchActionLabel(model.decisions)))
-    }
-}
-
-/**
- * Send and Stop morph into each other (legacy LettaInputBar
- * ComposerActionIcon): the leaving glyph fades and shrinks to 0.76 while the arriving one fades
- * and grows from it, on the expressive fast springs. A plain swap under reduced motion.
- */
-@Composable
-private fun TouchActionIcon(stops: Boolean, contentDescription: String) {
-    val iconModifier = Modifier.size(TouchComposerDimens.actionIcon)
-    if (LocalReducedMotion.current) {
-        Icon(touchActionIcon(stops), contentDescription = contentDescription, modifier = iconModifier)
-        return
-    }
-    val enter = fadeIn(ChatExpressiveMotion.fastEffects()) + scaleIn(ChatExpressiveMotion.fastSpatial(), initialScale = EXIT_SCALE)
-    val exit = fadeOut(ChatExpressiveMotion.fastEffects()) + scaleOut(ChatExpressiveMotion.fastSpatial(), targetScale = EXIT_SCALE)
-    AnimatedContent(
-        targetState = stops,
-        transitionSpec = { enter togetherWith exit },
-        label = "touchActionIconMorph",
-    ) { stopping ->
-        Icon(touchActionIcon(stopping), contentDescription = contentDescription, modifier = iconModifier)
-    }
-}
-
-private fun touchActionIcon(stops: Boolean): ImageVector = if (stops) LettaIcons.Close else LettaIcons.Send
-
-/** Stop beats while the run is live and not yet asked to stop; never under reduced motion. */
-@Composable
-private fun stopPulses(model: ComposerModel): Boolean {
-    if (LocalReducedMotion.current) return false
-    return model.decisions.action == ComposerAction.Stop && !model.decisions.stopping
-}
-
-/** Send in the primary colour; Stop in the error container. */
-@Composable
-private fun touchActionColors(stops: Boolean): IconButtonColors {
-    val scheme = MaterialTheme.colorScheme
-    return IconButtonDefaults.filledIconButtonColors(
-        containerColor = if (stops) scheme.errorContainer else scheme.primary,
-        contentColor = if (stops) scheme.onErrorContainer else scheme.onPrimary,
-        disabledContainerColor = scheme.surfaceContainerHigh,
-        disabledContentColor = scheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled),
-    )
-}
-
-/** "Stopping" once asked, "Stop" during a run, otherwise "Send". */
-private fun touchActionLabel(decisions: ComposerDecisions): StringResource {
-    return when {
-        decisions.stopping -> Res.string.composer_stopping
-        decisions.action == ComposerAction.Stop -> Res.string.composer_stop
-        else -> Res.string.composer_send
-    }
-}
-
-/** A gentle 1.0 -> 1.04 heartbeat while [active]; still otherwise. */
-@Composable
-private fun rememberStopPulse(active: Boolean): State<Float> {
-    if (!active) return remember { mutableFloatStateOf(1f) }
-    val transition = rememberInfiniteTransition(label = "touchStopPulse")
-    return transition.animateFloat(
-        initialValue = 1f,
-        targetValue = TouchComposerDimens.stopPulseScale,
-        animationSpec = infiniteRepeatable(
-            animation = tween(TouchComposerDimens.stopPulseMillis, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "touchStopPulseScale",
-    )
-}

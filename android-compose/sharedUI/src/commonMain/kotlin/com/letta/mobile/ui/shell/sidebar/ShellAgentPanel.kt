@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.shell.sidebar
 
+import com.letta.mobile.ui.host.LocalHostTitlesPage
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -196,10 +197,13 @@ fun ShellNavRow(model: ShellNavRowModel, onClick: () -> Unit, modifier: Modifier
 /**
  * The title slot, then the agent's menu. The slot is the focused agent (mascot + name, tap to edit),
  * or "Home" while the fleet page is open; the agent menu has nothing to act on then, so it hides.
+ * Under a window header that already names the page ([LocalHostTitlesPage]) the "Home" header is
+ * left out, so the page name shows once.
  */
 @Composable
 private fun ShellPanelHeader(frame: ShellPanelFrame) {
     val state = frame.state
+    if (state.home && LocalHostTitlesPage.current) return
     val agentCard = frame.agentCard
     Column(Modifier.fillMaxWidth().padding(start = LettaDimens.Space.hair, bottom = LettaDimens.Space.lg)) {
         Box(Modifier.fillMaxWidth()) {

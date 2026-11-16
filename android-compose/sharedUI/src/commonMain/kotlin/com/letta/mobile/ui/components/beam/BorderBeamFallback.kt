@@ -22,7 +22,7 @@ import kotlin.math.max
  * follows the shader's geometry and palette but approximates its per-pixel glow.
  *
  * One instance per beam: the outline path and its measure are rebuilt only when the size or corner
- * radius changes, and the segment path is reused, so a frame allocates only its stroke styles.
+ * radius changes. The segment path and stroke styles are reused across frames.
  * Ported from border-beam-android by ismnoiet (MIT, see sharedUI/THIRD_PARTY_LICENSES).
  */
 internal class BorderBeamFallback : BorderBeamRenderer {
@@ -32,12 +32,19 @@ internal class BorderBeamFallback : BorderBeamRenderer {
     private val track = Path()
     private val measure = PathMeasure()
     private val segment = Path()
+    private var strokeDensity = Float.NaN
+    private var strokeStyle: LettaBeamStyle? = null
+    private var cachedStrokes: BeamStrokes? = null
+    private var cachedPalette: BeamPalette? = null
+    private val segmentColors = Array(SEGMENTS) { Color.Transparent }
+    private val segmentWeights = FloatArray(SEGMENTS)
 
     override fun DrawScope.drawBeam(frame: BeamFrame) {
         if (size.width <= 0f || size.height <= 0f) return
         ensureOutline(frame.cornersPx)
+        ensurePalette(frame.palette)
         val strength = frame.alpha.coerceIn(0f, 1f)
-        val strokes = BeamStrokes(this, frame.style)
+        val strokes = strokesFor(frame.style)
         clipPath(clip) {
             if (frame.style == LettaBeamStyle.Sweep) {
                 drawSweep(frame, strength, strokes)
@@ -47,11 +54,36 @@ internal class BorderBeamFallback : BorderBeamRenderer {
         }
     }
 
+    /** Palette blending and the comet's bell are independent of phase and fade. */
+    private fun ensurePalette(palette: BeamPalette) {
+        if (cachedPalette === palette) return
+        cachedPalette = palette
+        for (k in 0 until SEGMENTS) {
+            val t = (k + CENTRE) / SEGMENTS
+            val color = sampleBeamPalette(palette.colors, t)
+            segmentColors[k] = color
+            segmentWeights[k] = beamBell(t, BELL_POWER) * color.alpha
+        }
+    }
+
+    /** Density and style, rather than the moving phase, determine the strokes. */
+    private fun DrawScope.strokesFor(style: LettaBeamStyle): BeamStrokes {
+        if (strokeDensity != density || strokeStyle != style) {
+            cachedStrokes = BeamStrokes(this, style)
+            strokeDensity = density
+            strokeStyle = style
+        }
+        return checkNotNull(cachedStrokes)
+    }
+
     private fun DrawScope.ensureOutline(corners: FloatArray) {
         if (size == cachedSize && corners.contentEquals(cachedCorners)) return
         cachedSize = size
         corners.copyInto(cachedCorners)
-        val (tr, br, bl, tl) = corners
+        val tr = corners[0]
+        val br = corners[1]
+        val bl = corners[2]
+        val tl = corners[3]
         clip.rewind()
         clip.addRoundRect(
             RoundRect(
@@ -79,9 +111,8 @@ internal class BorderBeamFallback : BorderBeamRenderer {
         val arc = frame.style.arc
         val sign = frame.direction.sign
         for (k in 0 until SEGMENTS) {
-            val t = (k + CENTRE) / SEGMENTS
-            val color = sampleBeamPalette(frame.palette.colors, t)
-            val weight = beamBell(t, BELL_POWER) * color.alpha * strength
+            val color = segmentColors[k]
+            val weight = segmentWeights[k] * strength
             if (weight <= MIN_WEIGHT) continue
             val position = ((1f - arc) + k * arc / SEGMENTS + sign * frame.phase).mod(1f)
             val start = position * length
@@ -115,9 +146,8 @@ internal class BorderBeamFallback : BorderBeamRenderer {
         val length = width * SWEEP_LENGTH
         val start = (width - length) * sweepPosition(frame.phase)
         for (k in 0 until SEGMENTS) {
-            val t = (k + CENTRE) / SEGMENTS
-            val color = sampleBeamPalette(frame.palette.colors, t)
-            val weight = beamBell(t, BELL_POWER) * color.alpha * strength
+            val color = segmentColors[k]
+            val weight = segmentWeights[k] * strength
             if (weight <= MIN_WEIGHT) continue
             val from = Offset(start + length * k / SEGMENTS, y)
             val to = Offset(start + length * (k + OVERLAP) / SEGMENTS, y)
@@ -129,7 +159,7 @@ internal class BorderBeamFallback : BorderBeamRenderer {
     }
 
     private companion object {
-        const val SEGMENTS = 36
+        const val SEGMENTS = 24
         const val CENTRE = 0.5f
         const val OVERLAP = 1.2f
         const val BELL_POWER = 1.2f
@@ -166,7 +196,11 @@ internal class BorderBeamFallback : BorderBeamRenderer {
  * by [inset] to stay concentric with the edge.
  */
 internal fun Path.addBeamTrack(bounds: Rect, corners: FloatArray, inset: Float) {
-    val (tr, br, bl, tl) = corners.map { max(it - inset, 0f) }
+    val inner = corners.map { max(it - inset, 0f) }
+    val tr = inner[0]
+    val br = inner[1]
+    val bl = inner[2]
+    val tl = inner[3]
     moveTo(bounds.right, bounds.center.y)
     lineTo(bounds.right, bounds.bottom - br)
     cornerArc(Offset(bounds.right - br, bounds.bottom - br), br, startDegrees = 0f)

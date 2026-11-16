@@ -44,8 +44,7 @@ internal interface BorderBeamRenderer {
 /**
  * The beam shader compiled for this platform: AGSL on Android 13 and later, Skia SkSL on desktop
  * and web. Null where runtime shaders do not exist or the source does not compile (logged); the
- * common [BorderBeamFallback] draws then.
+ * common [BorderBeamFallback] draws then. [areaPx] lets raster platforms select the perimeter
+ * renderer before compiling an expensive card-sized shader; zero requests the shader directly.
  */
-internal expect fun createBorderBeamShader(): BorderBeamRenderer?
-
-internal const val BORDER_BEAM_TELEMETRY_TAG = "BorderBeam"
+internal expect fun createBorderBeamShader(areaPx: Float = 0f): BorderBeamRenderer?

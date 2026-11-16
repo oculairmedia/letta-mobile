@@ -155,7 +155,8 @@ class ChatSurfaceInsetsTest {
         onNodeWithText(REPLY, substring = true, useUnmergedTree = true).assertVisibleInside(panel, "assistant reply")
         onNodeWithTag(barTag).assertVisibleInside(panel, "composer")
         onNodeWithTag(ComposerTestTags.DOCKED_INPUT).assertVisibleInside(panel, "composer input")
-        onNodeWithTag(ComposerTestTags.SEND).assertVisibleInside(panel, "send button")
+        // No Send: the draft is empty, and Send only shows once there is something to send.
+        onNodeWithTag(ComposerTestTags.SEND_SLOT).assertDoesNotExist()
     }
 
     private fun SemanticsNodeInteraction.assertVisibleInside(panel: DpRect, label: String) {

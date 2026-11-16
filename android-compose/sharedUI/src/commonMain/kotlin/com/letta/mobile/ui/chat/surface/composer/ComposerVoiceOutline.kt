@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.chat.surface.composer
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
@@ -26,7 +27,12 @@ import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.ui.ambient.AmbientVoice
+import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.voice.LocalVoiceMode
+import com.letta.mobile.ui.components.beam.LettaBeamDefaults
+import com.letta.mobile.ui.components.beam.LettaBeamSpec
+import com.letta.mobile.ui.components.beam.lettaBorderBeam
+import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -39,43 +45,58 @@ internal var SemanticsPropertyReceiver.voiceOutlineRole by VoiceOutlineRoleKey
 internal val VoiceOutlineAnimatedKey = SemanticsPropertyKey<Boolean>("VoiceOutlineAnimated")
 internal var SemanticsPropertyReceiver.voiceOutlineAnimated by VoiceOutlineAnimatedKey
 
+/** Semantic outline mode exposed for accessibility and tests. */
+internal val ComposerOutlineModeKey = SemanticsPropertyKey<ComposerOutlineMode>("ComposerOutlineMode")
+internal var SemanticsPropertyReceiver.composerOutlineMode by ComposerOutlineModeKey
+
 /**
- * Voice mode's glowing outline around a prompt surface drawn in [shape]: a soft glow and a brighter
- * thin edge along the surface's own border, in the colour of whoever is active ([voiceGlowRole]: the
- * person's amber while listening and hearing, the agent's thinking colour while it thinks and speaks,
- * the error colour after a failure, nothing otherwise). Its brightness follows the same level the
- * page's ambient glow follows (resting while nobody speaks), so the two move together; the colour
- * cross-fades over the glow's glide.
- *
- * It only draws, behind the surface (the surface's own fill hides the inner half of each stroke), so
- * no layout bounds change and nothing it covers loses a click; the glow bleeds a few dp past the
- * surface. It animates on the frame clock only while it follows a voice; under reduced motion it is a
- * still edge at a fixed brightness. Without voice mode on the page it is nothing.
+ * Draws the conversation's current outline on its prompt surface. Listening and errors use
+ * the voice glow, thinking uses a thin still edge, and working uses the animated beam.
+ * Colours glide between states and reduced motion holds the outline still.
  */
 @Composable
-internal fun Modifier.voiceOutline(shape: Shape): Modifier {
-    val handle = LocalVoiceMode.current ?: return this
-    val state by handle.state.collectAsState()
-    val role = voiceGlowRole(state)
+internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modifier {
+    val handle = LocalVoiceMode.current
+    val state = handle?.state?.collectAsState()?.value
+    val role = state?.let(::voiceGlowRole) ?: VoiceGlowRole.Idle
+    val presence = LocalMascotRegistry.current.presence[uiState.agentId]
+    val mode = composerOutlineMode(state, uiState.runPhase, companionWorking(uiState, presence))
     val reducedMotion = LocalReducedMotion.current
+    val targetColor = when (mode) {
+        ComposerOutlineMode.Listening, ComposerOutlineMode.Error -> outlineColor(role)
+        ComposerOutlineMode.Thinking -> voiceAgentColor().copy(alpha = LettaDimens.Alpha.composerThinking)
+        ComposerOutlineMode.Idle, ComposerOutlineMode.Working -> Color.Transparent
+    }
     val color = animateColorAsState(
-        targetValue = outlineColor(role),
+        targetValue = targetColor,
         animationSpec = if (reducedMotion) snap() else tween(ChatMotionTokens.AmbientGlow.GLIDE_MILLIS),
-        label = "voiceOutlineColor",
+        label = "composerOutlineColor",
     )
-    val level = handle.glowLevel(state).takeUnless { reducedMotion }
+    val level = state?.let { handle?.glowLevel(it) }.takeIf { mode == ComposerOutlineMode.Listening && !reducedMotion }
     val brightness = rememberOutlineBrightness(level)
+    val colors = LettaBeamDefaults.colors()
+    val beam = remember(colors, shape) { LettaBeamSpec(colors, shape) }
+    val softness = animateFloatAsState(
+        targetValue = if (mode == ComposerOutlineMode.Thinking) 0f else 1f,
+        animationSpec = if (reducedMotion) snap() else tween(ChatMotionTokens.AmbientGlow.GLIDE_MILLIS),
+        label = "composerOutlineSoftness",
+    )
     return this
         .semantics {
+            composerOutlineMode = mode
             voiceOutlineRole = role
             voiceOutlineAnimated = level != null
         }
+        .lettaBorderBeam(beam, active = mode == ComposerOutlineMode.Working)
         .drawWithCache {
             val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithCache)) }
             val strokes = OutlineStrokes(this)
-            onDrawBehind { drawOutline(path, strokes, color.value, brightness.floatValue) }
+            onDrawBehind {
+                drawOutline(path, strokes, color.value, OutlineLight(brightness.floatValue, softness.value))
+            }
         }
 }
+
 
 /** The outline's colour for [role]: the person's, the agent's, the error colour, or none. */
 @Composable
@@ -119,12 +140,14 @@ private class OutlineStrokes(density: Density) {
     val edge = Stroke(width = with(density) { LettaDimens.Space.xs.toPx() })
 }
 
-/** Draws [path]'s glow, halo and edge in [tint] at [lit] brightness; nothing for a transparent tint. */
-private fun DrawScope.drawOutline(path: Path, strokes: OutlineStrokes, tint: Color, lit: Float) {
+private data class OutlineLight(val lit: Float, val softness: Float)
+
+/** Draws [path]'s glow, halo and edge in [tint] with [light] brightness; nothing for a transparent tint. */
+private fun DrawScope.drawOutline(path: Path, strokes: OutlineStrokes, tint: Color, light: OutlineLight) {
     if (tint.alpha <= HIDDEN_ALPHA) return
-    drawPath(path, tint.copy(alpha = tint.alpha * GLOW_ALPHA * lit), style = strokes.glow)
-    drawPath(path, tint.copy(alpha = tint.alpha * HALO_ALPHA * lit), style = strokes.halo)
-    drawPath(path, tint.copy(alpha = tint.alpha * (EDGE_FLOOR + (1f - EDGE_FLOOR) * lit)), style = strokes.edge)
+    drawPath(path, tint.copy(alpha = tint.alpha * GLOW_ALPHA * light.lit * light.softness), style = strokes.glow)
+    drawPath(path, tint.copy(alpha = tint.alpha * HALO_ALPHA * light.lit * light.softness), style = strokes.halo)
+    drawPath(path, tint.copy(alpha = tint.alpha * (1f - light.softness * (1f - EDGE_FLOOR) * (1f - light.lit))), style = strokes.edge)
 }
 
 /** The fixed brightness of a still outline: reduced motion, the thinking state, a failure. */

@@ -244,6 +244,9 @@ object LettaDimens {
      * sites currently violate this; `LowContentAlpha` catches them.
      */
     object Alpha {
+        /** Opacity of the quiet thinking edge on the composer. */
+        const val composerThinking: Float = 0.35f
+
         const val disabled: Float = LettaRowDimens.disabledAlpha
 
         /** Dividers and hairlines against a surface. */
