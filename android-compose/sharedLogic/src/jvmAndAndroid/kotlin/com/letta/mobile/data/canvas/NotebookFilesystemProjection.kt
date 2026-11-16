@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.files.readUtf8
+import com.letta.mobile.data.files.writeUtf8
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
@@ -200,14 +202,14 @@ internal class NotebookFilesystemProjection(private val root: Path) {
     private fun safeRead(path: Path): String? {
         if (!Files.exists(path, NOFOLLOW_LINKS)) return null
         require(Files.isRegularFile(path, NOFOLLOW_LINKS)) { "Not a regular projection file: $path" }
-        return Files.readString(path, UTF_8)
+        return readUtf8(path)
     }
 
     private fun atomicWrite(path: Path, value: String) {
         safeRead(path) // Reject symlinks and non-regular destinations before replacement.
         val temp = Files.createTempFile(path.parent, ".notebook-", ".tmp")
         try {
-            Files.writeString(temp, value, UTF_8)
+            writeUtf8(temp, value)
             Files.move(temp, path, ATOMIC_MOVE, REPLACE_EXISTING)
         } finally {
             Files.deleteIfExists(temp)

@@ -71,6 +71,10 @@ Serializable wire models for pinned bd serve mutation operations and their reque
 
 Session capabilities and explicit route availability. Bound sources and absent routes let repositories report unsupported operations without silently choosing another backend. Keep unsupported routes explicit rather than silently falling back; session factories describe available operations through [SessionCapabilities](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.backend/-session-capabilities/index.html) and [SessionRouteMatrix](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.backend/-session-route-matrix/index.html).
 
+# Package com.letta.mobile.data.files
+
+UTF-8 file access shared by JVM and Android storage implementations.
+
 # Package com.letta.mobile.data.canvas
 
 Canvas scene/operation models, validation, projection, undo/history, synchronization and host tool integration. Notebook, filesystem and relay storage bindings are platform-scoped implementations alongside the portable contracts. Keep platform drawing and filesystem access behind adapters; implement [CanvasDocumentStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas/-canvas-document-store/index.html), [CanvasSyncTransport](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas/-canvas-sync-transport/index.html) and [CanvasPreviewRenderer](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas/-canvas-preview-renderer/index.html) for their respective effects.

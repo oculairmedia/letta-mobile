@@ -6,11 +6,108 @@ import com.letta.mobile.data.model.MessageId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class A2aReservationTest {
     private val message = IrohAgentMessage("sender", "recipient", "body", "stable", 1)
+
+    // Execute the same behavioural assertions against the pre-clock constructor on revert.
+    private fun timedRouter(clock: () -> Long): IrohAgentMessageRouter {
+        val constructor = IrohAgentMessageRouter::class.java.constructors.firstOrNull { it.parameterCount == 7 && !it.isSynthetic }
+        return if (constructor == null) IrohAgentMessageRouter("self")
+        else constructor.newInstance("self", emptySet<String>(), 64, 4096, 1024, clock, 3_600_000L) as IrohAgentMessageRouter
+    }
+
+    @Test
+    fun durableRollingWindowRestoresExactAdmissionTimes() = runTest {
+        val dir = java.nio.file.Files.createTempDirectory("a2a-window").toFile()
+        try {
+            val file = java.io.File(dir, "receipts.json")
+            var now = 10_000L
+            fun receiver() = IrohAgentMessageReceiver(timedRouter { now }, { emptyList() },
+                { _, _ -> DeliveryOutcome(false, "application_input_accepted") }, { msg, peer -> msg.fromAgentId == peer }, file)
+            repeat(64) { index ->
+                assertEquals("application_input_accepted", receiver().respond(message.copy(msgId = "message-$index"), "sender").reason)
+            }
+            assertEquals("per_sender_cap_exceeded", receiver().respond(message.copy(msgId = "next"), "sender").reason)
+            now += 3_600_001L
+            assertEquals("application_input_accepted", receiver().respond(message.copy(msgId = "next"), "sender").reason)
+            val json = Json.parseToJsonElement(file.readText())
+            val journal = json as JsonObject
+            assertEquals(JsonPrimitive(3), journal["version"])
+            val times = journal["senderAcceptedAt"] as JsonObject
+            assertEquals(JsonArray(listOf(JsonPrimitive(now))), times["sender"])
+            assertEquals("duplicate_msg_id", receiver().respond(message.copy(msgId = "message-0"), "sender").reason)
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test
+    fun rollingWindowSurvivesSnapshotRestore() {
+        var now = 10_000L
+        val router = timedRouter { now }
+        assertEquals(IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver, router.route("sender", "first", emptyList()))
+        now += 1_800_000L
+        repeat(63) { index ->
+            assertEquals(IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver, router.route("sender", "message-$index", emptyList()))
+        }
+        val restored = timedRouter { now }.apply { restore(router.snapshot()) }
+        assertEquals(IrohAgentMessageRouter.RoutingDecision.Dropped("per_sender_cap_exceeded"),
+            restored.route("sender", "next", emptyList()))
+        now += 1_800_001L
+        assertEquals(IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver, restored.route("sender", "next", emptyList()))
+        assertEquals(IrohAgentMessageRouter.RoutingDecision.Dropped("per_sender_cap_exceeded"),
+            restored.route("sender", "overflow", emptyList()))
+        val encoded = com.letta.mobile.data.serialization.LettaJson.persisted.encodeToString(
+            IrohAgentMessageRouter.Snapshot.serializer(), restored.snapshot())
+        kotlin.test.assertTrue(encoded.contains(now.toString()), encoded)
+        assertEquals(3, restored.snapshot().version)
+    }
+
+    @Test
+    fun retentionPrunesOldReservationsButKeepsEveryYoungerState() {
+        var now = 1_000L
+        val router = timedRouter { now }
+        for (state in IrohAgentMessageRouter.ReservationState.entries) {
+            router.route("sender", state.name, emptyList())
+            router.settle(AgentId("sender"), MessageId(state.name), state)
+        }
+        now += 14L * 24 * 60 * 60 * 1_000 - 1
+        router.route("other", "young", emptyList())
+        val restored = timedRouter { now }.apply { restore(router.snapshot()) }
+        assertEquals(4, restored.snapshot().reservations["sender"]?.size)
+        now += 2
+        restored.route("other", "trigger", emptyList())
+        assertEquals(null, restored.snapshot().reservations["sender"])
+        assertEquals(setOf("young", "trigger"), restored.snapshot().reservations["other"]?.keys)
+    }
+
+    @Test
+    fun versionTwoMigrationDiscardsLifetimeTotalsAndPreservesEveryState() = runTest {
+        val dir = java.nio.file.Files.createTempDirectory("a2a-migration").toFile()
+        try {
+            val file = java.io.File(dir, "receipts.json")
+            file.writeText("""{"version":2,"reservations":{"sender":{
+                "reserved":"RESERVED","accepted":"ACCEPTED","ambiguous":"AMBIGUOUS","persisted":"PERSISTED"
+                }},"senderAttempts":{"sender":64}}""")
+            val receiver = IrohAgentMessageReceiver(timedRouter { 123_456L }, { emptyList() },
+                { _, _ -> DeliveryOutcome(false, "application_input_accepted") }, { msg, peer -> msg.fromAgentId == peer }, file)
+            assertEquals("application_input_accepted", receiver.respond(message.copy(msgId = "next"), "sender").reason)
+            for (id in listOf("reserved", "accepted", "ambiguous", "persisted")) {
+                val expected = if (id == "persisted") "duplicate_persisted" else "duplicate_msg_id"
+                assertEquals(expected, receiver.respond(message.copy(msgId = id), "sender").reason)
+            }
+            val journal = Json.parseToJsonElement(file.readText()) as JsonObject
+            assertEquals(JsonPrimitive(3), journal["version"])
+            val times = (journal["reservationTimes"] as JsonObject)["sender"] as JsonObject
+            assertEquals(setOf("reserved", "accepted", "ambiguous", "persisted", "next"), times.keys)
+            assertEquals(setOf(JsonPrimitive(123_456L)), times.values.toSet())
+        } finally { dir.deleteRecursively() }
+    }
 
     @Test
     fun duplicateOutcomesMatchReservationStateAndSenderClassification() = runTest {
@@ -260,7 +357,8 @@ class A2aReservationTest {
             receiver().respond(message, "peer")
             assertEquals("reservation_capacity_exceeded", receiver().respond(message.copy(msgId = "other"), "peer").reason)
             assertEquals("duplicate_msg_id", receiver().respond(message, "peer").reason)
-            for (corruption in listOf("broken", "{}", "{\"version\":99,\"reservations\":{},\"senderAttempts\":{}}")) {
+            for (corruption in listOf("broken", "{}", """{"version":2,"reservations":{}}""",
+                """{"version":3,"reservations":{},"senderAttempts":{}}""", "{\"version\":99,\"reservations\":{},\"senderAttempts\":{}}")) {
                 file.writeText(corruption)
                 assertEquals("reservation_journal_failure", receiver().respond(message, "peer").reason)
             }

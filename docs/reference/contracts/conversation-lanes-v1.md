@@ -140,15 +140,19 @@ The PERSISTED state and its acknowledgement survive journal recovery.
 
 Reservations and every settlement use the canonical authenticated sender plus `msgId`, so a
 second sender may reuse a message ID without changing the first sender's reservation. Journal
-version 2 encodes reservations as sender -> message ID -> state. Version 1 has senderless keys;
+version 3 encodes reservations as sender -> message ID -> state, with admission timestamps
+and rolling sender-window timestamps. Version 2 migration keeps every reservation, stamps it
+with migration time, and discards the lifetime attempt totals. Version 1 has senderless keys;
 it is rejected without rewriting or dispatch, even when empty, and requires external
 reconciliation before migration. Sender-attempt counters cannot identify the owner of an old entry.
 
-The journal retains at most 4096 sender/message identities, 1024 sender counters, 512 characters per
-identity and 4 MiB of encoded data. The existing own/sibling guard and 64-attempt per-sender cap
-remain; attempts, including definite failures, consume that cap and its count survives restart.
+The journal retains at most 4096 sender/message identities, 1024 senders, 512 characters per
+identity and 4 MiB of encoded data. The existing own/sibling guard remains. Each sender may
+receive at most 64 routing admissions in a rolling hour; duplicates and lane-policy drops do not
+consume this window. Admissions, including later definite application failures, survive restart.
 Admission fails closed at any bound, on malformed state, or on write failure. Accepted/ambiguous
-identities are never evicted or expired to make room. An OS lock serializes transactions between
+identities younger than 14 days are never evicted to make room. Routing prunes all reservation
+states older than 14 days under the same lock; a pruned identity may be delivered again. An OS lock serializes transactions between
 wrapper processes; replacement requires atomic rename after file fsync and directory fsync.
 Directory sync is skipped on Windows, whose JVM cannot open directory channels, and an
 `UnsupportedOperationException` is best-effort on other platforms. Real I/O failures on platforms

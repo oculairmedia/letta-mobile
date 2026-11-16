@@ -237,6 +237,29 @@ final enum class com.letta.mobile.ui.chat/AgentActivity : kotlin/Enum<com.letta.
     final fun values(): kotlin/Array<com.letta.mobile.ui.chat/AgentActivity> // com.letta.mobile.ui.chat/AgentActivity.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.ui.components.beam/LettaBeamDirection : kotlin/Enum<com.letta.mobile.ui.components.beam/LettaBeamDirection> { // com.letta.mobile.ui.components.beam/LettaBeamDirection|null[0]
+    enum entry Clockwise // com.letta.mobile.ui.components.beam/LettaBeamDirection.Clockwise|null[0]
+    enum entry CounterClockwise // com.letta.mobile.ui.components.beam/LettaBeamDirection.CounterClockwise|null[0]
+
+    final val entries // com.letta.mobile.ui.components.beam/LettaBeamDirection.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.ui.components.beam/LettaBeamDirection> // com.letta.mobile.ui.components.beam/LettaBeamDirection.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.ui.components.beam/LettaBeamDirection // com.letta.mobile.ui.components.beam/LettaBeamDirection.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.ui.components.beam/LettaBeamDirection> // com.letta.mobile.ui.components.beam/LettaBeamDirection.values|values#static(){}[0]
+}
+
+final enum class com.letta.mobile.ui.components.beam/LettaBeamStyle : kotlin/Enum<com.letta.mobile.ui.components.beam/LettaBeamStyle> { // com.letta.mobile.ui.components.beam/LettaBeamStyle|null[0]
+    enum entry Orbit // com.letta.mobile.ui.components.beam/LettaBeamStyle.Orbit|null[0]
+    enum entry OrbitCompact // com.letta.mobile.ui.components.beam/LettaBeamStyle.OrbitCompact|null[0]
+    enum entry Sweep // com.letta.mobile.ui.components.beam/LettaBeamStyle.Sweep|null[0]
+
+    final val entries // com.letta.mobile.ui.components.beam/LettaBeamStyle.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.ui.components.beam/LettaBeamStyle> // com.letta.mobile.ui.components.beam/LettaBeamStyle.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.ui.components.beam/LettaBeamStyle // com.letta.mobile.ui.components.beam/LettaBeamStyle.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.ui.components.beam/LettaBeamStyle> // com.letta.mobile.ui.components.beam/LettaBeamStyle.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.ui.components.disclosure/ChevronEmphasis : kotlin/Enum<com.letta.mobile.ui.components.disclosure/ChevronEmphasis> { // com.letta.mobile.ui.components.disclosure/ChevronEmphasis|null[0]
     enum entry Emphasized // com.letta.mobile.ui.components.disclosure/ChevronEmphasis.Emphasized|null[0]
     enum entry Neutral // com.letta.mobile.ui.components.disclosure/ChevronEmphasis.Neutral|null[0]
@@ -776,6 +799,18 @@ final enum class com.letta.mobile.ui.shell.sidebar/ShellCanvasPickPlan : kotlin/
 
     final fun valueOf(kotlin/String): com.letta.mobile.ui.shell.sidebar/ShellCanvasPickPlan // com.letta.mobile.ui.shell.sidebar/ShellCanvasPickPlan.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<com.letta.mobile.ui.shell.sidebar/ShellCanvasPickPlan> // com.letta.mobile.ui.shell.sidebar/ShellCanvasPickPlan.values|values#static(){}[0]
+}
+
+final enum class com.letta.mobile.ui.theme.tokens/LettaBeamTone : kotlin/Enum<com.letta.mobile.ui.theme.tokens/LettaBeamTone> { // com.letta.mobile.ui.theme.tokens/LettaBeamTone|null[0]
+    enum entry Attention // com.letta.mobile.ui.theme.tokens/LettaBeamTone.Attention|null[0]
+    enum entry Spectrum // com.letta.mobile.ui.theme.tokens/LettaBeamTone.Spectrum|null[0]
+    enum entry Working // com.letta.mobile.ui.theme.tokens/LettaBeamTone.Working|null[0]
+
+    final val entries // com.letta.mobile.ui.theme.tokens/LettaBeamTone.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.ui.theme.tokens/LettaBeamTone> // com.letta.mobile.ui.theme.tokens/LettaBeamTone.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.ui.theme.tokens/LettaBeamTone // com.letta.mobile.ui.theme.tokens/LettaBeamTone.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.ui.theme.tokens/LettaBeamTone> // com.letta.mobile.ui.theme.tokens/LettaBeamTone.values|values#static(){}[0]
 }
 
 final enum class com.letta.mobile.ui.theme.tokens/LettaPanelTone : kotlin/Enum<com.letta.mobile.ui.theme.tokens/LettaPanelTone> { // com.letta.mobile.ui.theme.tokens/LettaPanelTone|null[0]
@@ -3206,6 +3241,28 @@ final class com.letta.mobile.ui.chat/QueuedSendActions { // com.letta.mobile.ui.
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.chat/QueuedSendActions.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.ui.chat/QueuedSendActions.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.ui.chat/QueuedSendActions.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.ui.components.beam/LettaBeamSpec { // com.letta.mobile.ui.components.beam/LettaBeamSpec|null[0]
+    constructor <init>(kotlin.collections/List<androidx.compose.ui.graphics/Color>, androidx.compose.ui.graphics/Shape, com.letta.mobile.ui.components.beam/LettaBeamStyle = ..., com.letta.mobile.ui.components.beam/LettaBeamDirection = ...) // com.letta.mobile.ui.components.beam/LettaBeamSpec.<init>|<init>(kotlin.collections.List<androidx.compose.ui.graphics.Color>;androidx.compose.ui.graphics.Shape;com.letta.mobile.ui.components.beam.LettaBeamStyle;com.letta.mobile.ui.components.beam.LettaBeamDirection){}[0]
+
+    final val colors // com.letta.mobile.ui.components.beam/LettaBeamSpec.colors|{}colors[0]
+        final fun <get-colors>(): kotlin.collections/List<androidx.compose.ui.graphics/Color> // com.letta.mobile.ui.components.beam/LettaBeamSpec.colors.<get-colors>|<get-colors>(){}[0]
+    final val direction // com.letta.mobile.ui.components.beam/LettaBeamSpec.direction|{}direction[0]
+        final fun <get-direction>(): com.letta.mobile.ui.components.beam/LettaBeamDirection // com.letta.mobile.ui.components.beam/LettaBeamSpec.direction.<get-direction>|<get-direction>(){}[0]
+    final val shape // com.letta.mobile.ui.components.beam/LettaBeamSpec.shape|{}shape[0]
+        final fun <get-shape>(): androidx.compose.ui.graphics/Shape // com.letta.mobile.ui.components.beam/LettaBeamSpec.shape.<get-shape>|<get-shape>(){}[0]
+    final val style // com.letta.mobile.ui.components.beam/LettaBeamSpec.style|{}style[0]
+        final fun <get-style>(): com.letta.mobile.ui.components.beam/LettaBeamStyle // com.letta.mobile.ui.components.beam/LettaBeamSpec.style.<get-style>|<get-style>(){}[0]
+
+    final fun component1(): kotlin.collections/List<androidx.compose.ui.graphics/Color> // com.letta.mobile.ui.components.beam/LettaBeamSpec.component1|component1(){}[0]
+    final fun component2(): androidx.compose.ui.graphics/Shape // com.letta.mobile.ui.components.beam/LettaBeamSpec.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.ui.components.beam/LettaBeamStyle // com.letta.mobile.ui.components.beam/LettaBeamSpec.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.ui.components.beam/LettaBeamDirection // com.letta.mobile.ui.components.beam/LettaBeamSpec.component4|component4(){}[0]
+    final fun copy(kotlin.collections/List<androidx.compose.ui.graphics/Color> = ..., androidx.compose.ui.graphics/Shape = ..., com.letta.mobile.ui.components.beam/LettaBeamStyle = ..., com.letta.mobile.ui.components.beam/LettaBeamDirection = ...): com.letta.mobile.ui.components.beam/LettaBeamSpec // com.letta.mobile.ui.components.beam/LettaBeamSpec.copy|copy(kotlin.collections.List<androidx.compose.ui.graphics.Color>;androidx.compose.ui.graphics.Shape;com.letta.mobile.ui.components.beam.LettaBeamStyle;com.letta.mobile.ui.components.beam.LettaBeamDirection){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.components.beam/LettaBeamSpec.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.ui.components.beam/LettaBeamSpec.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.ui.components.beam/LettaBeamSpec.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.ui.components.disclosure/LettaMenuIndicatorStyle { // com.letta.mobile.ui.components.disclosure/LettaMenuIndicatorStyle|null[0]
@@ -9226,6 +9283,11 @@ final object com.letta.mobile.ui.chat.voice/VoiceModeTags { // com.letta.mobile.
         final fun <get-STRIP_CLOSE>(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceModeTags.STRIP_CLOSE.<get-STRIP_CLOSE>|<get-STRIP_CLOSE>(){}[0]
 }
 
+final object com.letta.mobile.ui.components.beam/LettaBeamDefaults { // com.letta.mobile.ui.components.beam/LettaBeamDefaults|null[0]
+    final fun colors(com.letta.mobile.ui.theme.tokens/LettaBeamTone?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int): kotlin.collections/List<androidx.compose.ui.graphics/Color> // com.letta.mobile.ui.components.beam/LettaBeamDefaults.colors|colors(com.letta.mobile.ui.theme.tokens.LettaBeamTone?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
+    final fun single(androidx.compose.ui.graphics/Color): kotlin.collections/List<androidx.compose.ui.graphics/Color> // com.letta.mobile.ui.components.beam/LettaBeamDefaults.single|single(androidx.compose.ui.graphics.Color){}[0]
+}
+
 final object com.letta.mobile.ui.components.disclosure/DisclosureChevronDefaults { // com.letta.mobile.ui.components.disclosure/DisclosureChevronDefaults|null[0]
     final const val AnimationDurationMillis // com.letta.mobile.ui.components.disclosure/DisclosureChevronDefaults.AnimationDurationMillis|{}AnimationDurationMillis[0]
         final fun <get-AnimationDurationMillis>(): kotlin/Int // com.letta.mobile.ui.components.disclosure/DisclosureChevronDefaults.AnimationDurationMillis.<get-AnimationDurationMillis>|<get-AnimationDurationMillis>(){}[0]
@@ -11661,7 +11723,38 @@ final object com.letta.mobile.ui.theme.tokens/LettaAlphaTokens { // com.letta.mo
         final fun <get-muted>(): kotlin/Float // com.letta.mobile.ui.theme.tokens/LettaAlphaTokens.muted.<get-muted>|<get-muted>(){}[0]
 }
 
+final object com.letta.mobile.ui.theme.tokens/LettaBeamMotion { // com.letta.mobile.ui.theme.tokens/LettaBeamMotion|null[0]
+    final const val FADE_MILLIS // com.letta.mobile.ui.theme.tokens/LettaBeamMotion.FADE_MILLIS|{}FADE_MILLIS[0]
+        final fun <get-FADE_MILLIS>(): kotlin/Int // com.letta.mobile.ui.theme.tokens/LettaBeamMotion.FADE_MILLIS.<get-FADE_MILLIS>|<get-FADE_MILLIS>(){}[0]
+    final const val LAP_MILLIS // com.letta.mobile.ui.theme.tokens/LettaBeamMotion.LAP_MILLIS|{}LAP_MILLIS[0]
+        final fun <get-LAP_MILLIS>(): kotlin/Int // com.letta.mobile.ui.theme.tokens/LettaBeamMotion.LAP_MILLIS.<get-LAP_MILLIS>|<get-LAP_MILLIS>(){}[0]
+    final const val STILL_PHASE // com.letta.mobile.ui.theme.tokens/LettaBeamMotion.STILL_PHASE|{}STILL_PHASE[0]
+        final fun <get-STILL_PHASE>(): kotlin/Float // com.letta.mobile.ui.theme.tokens/LettaBeamMotion.STILL_PHASE.<get-STILL_PHASE>|<get-STILL_PHASE>(){}[0]
+    final const val SWEEP_MILLIS // com.letta.mobile.ui.theme.tokens/LettaBeamMotion.SWEEP_MILLIS|{}SWEEP_MILLIS[0]
+        final fun <get-SWEEP_MILLIS>(): kotlin/Int // com.letta.mobile.ui.theme.tokens/LettaBeamMotion.SWEEP_MILLIS.<get-SWEEP_MILLIS>|<get-SWEEP_MILLIS>(){}[0]
+}
+
+final object com.letta.mobile.ui.theme.tokens/LettaBeamPalette { // com.letta.mobile.ui.theme.tokens/LettaBeamPalette|null[0]
+    final const val TAIL_ALPHA // com.letta.mobile.ui.theme.tokens/LettaBeamPalette.TAIL_ALPHA|{}TAIL_ALPHA[0]
+        final fun <get-TAIL_ALPHA>(): kotlin/Float // com.letta.mobile.ui.theme.tokens/LettaBeamPalette.TAIL_ALPHA.<get-TAIL_ALPHA>|<get-TAIL_ALPHA>(){}[0]
+
+    final val spectrum // com.letta.mobile.ui.theme.tokens/LettaBeamPalette.spectrum|{}spectrum[0]
+        final fun <get-spectrum>(): kotlin.collections/List<androidx.compose.ui.graphics/Color> // com.letta.mobile.ui.theme.tokens/LettaBeamPalette.spectrum.<get-spectrum>|<get-spectrum>(){}[0]
+}
+
 final object com.letta.mobile.ui.theme.tokens/LettaComponentDimens { // com.letta.mobile.ui.theme.tokens/LettaComponentDimens|null[0]
+    final val beamCoreStroke // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.beamCoreStroke|{}beamCoreStroke[0]
+        final fun <get-beamCoreStroke>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.beamCoreStroke.<get-beamCoreStroke>|<get-beamCoreStroke>(){}[0]
+    final val beamGlowCompact // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.beamGlowCompact|{}beamGlowCompact[0]
+        final fun <get-beamGlowCompact>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.beamGlowCompact.<get-beamGlowCompact>|<get-beamGlowCompact>(){}[0]
+    final val beamGlowOrbit // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.beamGlowOrbit|{}beamGlowOrbit[0]
+        final fun <get-beamGlowOrbit>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.beamGlowOrbit.<get-beamGlowOrbit>|<get-beamGlowOrbit>(){}[0]
+    final val beamGlowSweep // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.beamGlowSweep|{}beamGlowSweep[0]
+        final fun <get-beamGlowSweep>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.beamGlowSweep.<get-beamGlowSweep>|<get-beamGlowSweep>(){}[0]
+    final val beamHaloStroke // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.beamHaloStroke|{}beamHaloStroke[0]
+        final fun <get-beamHaloStroke>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.beamHaloStroke.<get-beamHaloStroke>|<get-beamHaloStroke>(){}[0]
+    final val beamMinGlowStroke // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.beamMinGlowStroke|{}beamMinGlowStroke[0]
+        final fun <get-beamMinGlowStroke>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.beamMinGlowStroke.<get-beamMinGlowStroke>|<get-beamMinGlowStroke>(){}[0]
     final val emptyStateIcon // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.emptyStateIcon|{}emptyStateIcon[0]
         final fun <get-emptyStateIcon>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.emptyStateIcon.<get-emptyStateIcon>|<get-emptyStateIcon>(){}[0]
     final val floatingNoticeElevation // com.letta.mobile.ui.theme.tokens/LettaComponentDimens.floatingNoticeElevation|{}floatingNoticeElevation[0]
@@ -12736,6 +12829,8 @@ final val com.letta.mobile.ui.chat/ChatColumnMaxWidth // com.letta.mobile.ui.cha
     final fun <get-ChatColumnMaxWidth>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.chat/ChatColumnMaxWidth.<get-ChatColumnMaxWidth>|<get-ChatColumnMaxWidth>(){}[0]
 final val com.letta.mobile.ui.chat/com_letta_mobile_ui_chat_AgentIdentity$stableprop // com.letta.mobile.ui.chat/com_letta_mobile_ui_chat_AgentIdentity$stableprop|#static{}com_letta_mobile_ui_chat_AgentIdentity$stableprop[0]
 final val com.letta.mobile.ui.chat/com_letta_mobile_ui_chat_QueuedSendActions$stableprop // com.letta.mobile.ui.chat/com_letta_mobile_ui_chat_QueuedSendActions$stableprop|#static{}com_letta_mobile_ui_chat_QueuedSendActions$stableprop[0]
+final val com.letta.mobile.ui.components.beam/com_letta_mobile_ui_components_beam_LettaBeamDefaults$stableprop // com.letta.mobile.ui.components.beam/com_letta_mobile_ui_components_beam_LettaBeamDefaults$stableprop|#static{}com_letta_mobile_ui_components_beam_LettaBeamDefaults$stableprop[0]
+final val com.letta.mobile.ui.components.beam/com_letta_mobile_ui_components_beam_LettaBeamSpec$stableprop // com.letta.mobile.ui.components.beam/com_letta_mobile_ui_components_beam_LettaBeamSpec$stableprop|#static{}com_letta_mobile_ui_components_beam_LettaBeamSpec$stableprop[0]
 final val com.letta.mobile.ui.components.disclosure/com_letta_mobile_ui_components_disclosure_DisclosureChevronDefaults$stableprop // com.letta.mobile.ui.components.disclosure/com_letta_mobile_ui_components_disclosure_DisclosureChevronDefaults$stableprop|#static{}com_letta_mobile_ui_components_disclosure_DisclosureChevronDefaults$stableprop[0]
 final val com.letta.mobile.ui.components.disclosure/com_letta_mobile_ui_components_disclosure_LettaMenuIndicatorStyle$stableprop // com.letta.mobile.ui.components.disclosure/com_letta_mobile_ui_components_disclosure_LettaMenuIndicatorStyle$stableprop|#static{}com_letta_mobile_ui_components_disclosure_LettaMenuIndicatorStyle$stableprop[0]
 final val com.letta.mobile.ui.components.foundation/LocalLettaTextInputModifier // com.letta.mobile.ui.components.foundation/LocalLettaTextInputModifier|{}LocalLettaTextInputModifier[0]
@@ -13314,6 +13409,8 @@ final val com.letta.mobile.ui.theme.tokens/LocalLettaReducedMotion // com.letta.
     final fun <get-LocalLettaReducedMotion>(): androidx.compose.runtime/ProvidableCompositionLocal<kotlin/Boolean> // com.letta.mobile.ui.theme.tokens/LocalLettaReducedMotion.<get-LocalLettaReducedMotion>|<get-LocalLettaReducedMotion>(){}[0]
 final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_CustomColors$stableprop // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_CustomColors$stableprop|#static{}com_letta_mobile_ui_theme_tokens_CustomColors$stableprop[0]
 final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaAlphaTokens$stableprop // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaAlphaTokens$stableprop|#static{}com_letta_mobile_ui_theme_tokens_LettaAlphaTokens$stableprop[0]
+final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaBeamMotion$stableprop // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaBeamMotion$stableprop|#static{}com_letta_mobile_ui_theme_tokens_LettaBeamMotion$stableprop[0]
+final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaBeamPalette$stableprop // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaBeamPalette$stableprop|#static{}com_letta_mobile_ui_theme_tokens_LettaBeamPalette$stableprop[0]
 final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaComponentDimens$stableprop // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaComponentDimens$stableprop|#static{}com_letta_mobile_ui_theme_tokens_LettaComponentDimens$stableprop[0]
 final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaControlTokens$stableprop // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaControlTokens$stableprop|#static{}com_letta_mobile_ui_theme_tokens_LettaControlTokens$stableprop[0]
 final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaRowDimens$stableprop // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaRowDimens$stableprop|#static{}com_letta_mobile_ui_theme_tokens_LettaRowDimens$stableprop[0]
@@ -13384,6 +13481,7 @@ final fun (androidx.compose.ui.graphics/Color).com.letta.mobile.ui.canvas/toHex(
 final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.a11y/accessibilityTraversal(kotlin/Float): androidx.compose.ui/Modifier // com.letta.mobile.ui.a11y/accessibilityTraversal|accessibilityTraversal@androidx.compose.ui.Modifier(kotlin.Float){}[0]
 final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.a11y/politeLiveRegion(): androidx.compose.ui/Modifier // com.letta.mobile.ui.a11y/politeLiveRegion|politeLiveRegion@androidx.compose.ui.Modifier(){}[0]
 final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.chat.branch/onSecondaryClick(kotlin/Function0<kotlin/Unit>?): androidx.compose.ui/Modifier // com.letta.mobile.ui.chat.branch/onSecondaryClick|onSecondaryClick@androidx.compose.ui.Modifier(kotlin.Function0<kotlin.Unit>?){}[0]
+final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.components.beam/lettaBorderBeam(com.letta.mobile.ui.components.beam/LettaBeamSpec, kotlin/Boolean = ...): androidx.compose.ui/Modifier // com.letta.mobile.ui.components.beam/lettaBorderBeam|lettaBorderBeam@androidx.compose.ui.Modifier(com.letta.mobile.ui.components.beam.LettaBeamSpec;kotlin.Boolean){}[0]
 final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.components.foundation/lettaClickable(androidx.compose.ui.semantics/Role, kotlin/String? = ..., androidx.compose.ui.graphics/Shape, kotlin/Function0<kotlin/Unit>?): androidx.compose.ui/Modifier // com.letta.mobile.ui.components.foundation/lettaClickable|lettaClickable@androidx.compose.ui.Modifier(androidx.compose.ui.semantics.Role;kotlin.String?;androidx.compose.ui.graphics.Shape;kotlin.Function0<kotlin.Unit>?){}[0]
 final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.components.foundation/lettaClickable(androidx.compose.ui.semantics/Role, kotlin/String? = ..., com.letta.mobile.ui.components.foundation/LettaClickTarget = ..., kotlin/Function0<kotlin/Unit>?): androidx.compose.ui/Modifier // com.letta.mobile.ui.components.foundation/lettaClickable|lettaClickable@androidx.compose.ui.Modifier(androidx.compose.ui.semantics.Role;kotlin.String?;com.letta.mobile.ui.components.foundation.LettaClickTarget;kotlin.Function0<kotlin.Unit>?){}[0]
 final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.components.picker/pickerRowSemantics(com.letta.mobile.ui.components.picker/PickerRowState): androidx.compose.ui/Modifier // com.letta.mobile.ui.components.picker/pickerRowSemantics|pickerRowSemantics@androidx.compose.ui.Modifier(com.letta.mobile.ui.components.picker.PickerRowState){}[0]
@@ -13722,6 +13820,8 @@ final fun com.letta.mobile.ui.chat/com_letta_mobile_ui_chat_QueuedSendActions$st
 final fun com.letta.mobile.ui.chat/queuedOnServerLabel(com.letta.mobile.data.chat.send/ServerQueueBlocker): kotlin/String // com.letta.mobile.ui.chat/queuedOnServerLabel|queuedOnServerLabel(com.letta.mobile.data.chat.send.ServerQueueBlocker){}[0]
 final fun com.letta.mobile.ui.chat/queuedSendLabel(kotlin/Int): kotlin/String // com.letta.mobile.ui.chat/queuedSendLabel|queuedSendLabel(kotlin.Int){}[0]
 final fun com.letta.mobile.ui.chat/queuedSendsHeader(com.letta.mobile.data.chat.send/ConversationSendQueue): kotlin/String // com.letta.mobile.ui.chat/queuedSendsHeader|queuedSendsHeader(com.letta.mobile.data.chat.send.ConversationSendQueue){}[0]
+final fun com.letta.mobile.ui.components.beam/com_letta_mobile_ui_components_beam_LettaBeamDefaults$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components.beam/com_letta_mobile_ui_components_beam_LettaBeamDefaults$stableprop_getter|com_letta_mobile_ui_components_beam_LettaBeamDefaults$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.components.beam/com_letta_mobile_ui_components_beam_LettaBeamSpec$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components.beam/com_letta_mobile_ui_components_beam_LettaBeamSpec$stableprop_getter|com_letta_mobile_ui_components_beam_LettaBeamSpec$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.components.disclosure/DisclosureChevron(kotlin/Boolean, androidx.compose.ui/Modifier?, kotlin/Boolean, com.letta.mobile.ui.components.disclosure/ChevronEmphasis?, com.letta.mobile.ui.components.disclosure/ChevronIndication?, kotlin/Boolean, kotlin/String?, kotlin/Boolean, androidx.compose.ui.graphics/Color, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components.disclosure/DisclosureChevron|DisclosureChevron(kotlin.Boolean;androidx.compose.ui.Modifier?;kotlin.Boolean;com.letta.mobile.ui.components.disclosure.ChevronEmphasis?;com.letta.mobile.ui.components.disclosure.ChevronIndication?;kotlin.Boolean;kotlin.String?;kotlin.Boolean;androidx.compose.ui.graphics.Color;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components.disclosure/LettaDisclosureHeader(kotlin/Boolean, kotlin/Function0<kotlin/Unit>, androidx.compose.ui/Modifier?, kotlin/String?, kotlin/Function3<androidx.compose.foundation.layout/RowScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components.disclosure/LettaDisclosureHeader|LettaDisclosureHeader(kotlin.Boolean;kotlin.Function0<kotlin.Unit>;androidx.compose.ui.Modifier?;kotlin.String?;kotlin.Function3<androidx.compose.foundation.layout.RowScope,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components.disclosure/LettaFoldButton(kotlin/Function0<kotlin/Unit>, kotlin/String, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components.disclosure/LettaFoldButton|LettaFoldButton(kotlin.Function0<kotlin.Unit>;kotlin.String;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
@@ -14545,6 +14645,8 @@ final fun com.letta.mobile.ui.theme.graph/com_letta_mobile_ui_theme_graph_GraphD
 final fun com.letta.mobile.ui.theme.pill/com_letta_mobile_ui_theme_pill_LettaPillColors$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.pill/com_letta_mobile_ui_theme_pill_LettaPillColors$stableprop_getter|com_letta_mobile_ui_theme_pill_LettaPillColors$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_CustomColors$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_CustomColors$stableprop_getter|com_letta_mobile_ui_theme_tokens_CustomColors$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaAlphaTokens$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaAlphaTokens$stableprop_getter|com_letta_mobile_ui_theme_tokens_LettaAlphaTokens$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaBeamMotion$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaBeamMotion$stableprop_getter|com_letta_mobile_ui_theme_tokens_LettaBeamMotion$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaBeamPalette$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaBeamPalette$stableprop_getter|com_letta_mobile_ui_theme_tokens_LettaBeamPalette$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaComponentDimens$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaComponentDimens$stableprop_getter|com_letta_mobile_ui_theme_tokens_LettaComponentDimens$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaControlTokens$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaControlTokens$stableprop_getter|com_letta_mobile_ui_theme_tokens_LettaControlTokens$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaRowDimens$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaRowDimens$stableprop_getter|com_letta_mobile_ui_theme_tokens_LettaRowDimens$stableprop_getter(){}[0]

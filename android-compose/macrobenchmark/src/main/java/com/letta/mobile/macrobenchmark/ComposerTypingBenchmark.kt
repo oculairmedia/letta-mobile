@@ -29,15 +29,8 @@ import org.junit.runner.RunWith
  * CSV/JSON output lands under
  *   android-compose/macrobenchmark/build/outputs/connected_android_test_additional_output/.
  *
- * The benchmark is intentionally tolerant about UI structure: it finds
- * the first focusable `EditText` reachable from the launch surface
- * rather than depending on a specific compose test tag. If no editable
- * field is reachable it logs a structural mismatch and bails out of the
- * measure block — the same soft-skip pattern used by
- * [ScrollJankBenchmark].
- *
- * Baseline is tracked as `composer.typing.jank.pct` in
- * `perf/baselines.json` (see letta-mobile-o7ob.4.1).
+ * Requires a seeded conversation selected by instrumentation arguments.
+ * Fails when its composer or turn state is unavailable.
  */
 @RunWith(AndroidJUnit4::class)
 class ComposerTypingBenchmark {
@@ -51,6 +44,34 @@ class ComposerTypingBenchmark {
     @Test
     fun typeComposerCompilationPartial() = type(CompilationMode.Partial())
 
+    @Test
+    fun settleTurnCompilationNone() {
+        var responseMarker = ""
+        benchmarkRule.measureRepeated(
+            packageName = TARGET_PACKAGE,
+            metrics = listOf(FrameTimingMetric()),
+            iterations = DEFAULT_ITERATIONS,
+            startupMode = StartupMode.WARM,
+            compilationMode = CompilationMode.None(),
+            setupBlock = {
+                val field = launchSeededConversation()
+                responseMarker = "benchmark_${System.nanoTime()}"
+                field.text = "Reply with exactly this word: $responseMarker"
+                checkNotNull(device.wait(Until.findObject(By.desc("Send message")), FIELD_WAIT_MS)) {
+                    "Send action was not found"
+                }
+            },
+        ) {
+            checkNotNull(device.findObject(By.desc("Send message"))).click()
+            check(device.wait(Until.hasObject(By.desc("Stop")), TURN_WAIT_MS)) { "Turn never became active" }
+            check(device.wait(Until.gone(By.desc("Stop")), TURN_WAIT_MS)) { "Turn did not settle" }
+            check(device.wait(Until.hasObject(By.text(responseMarker)), FIELD_WAIT_MS)) {
+                "Expected assistant response was not found"
+            }
+            device.waitForIdle(IDLE_AFTER_BURST_MS)
+        }
+    }
+
     private fun type(compilationMode: CompilationMode) {
         benchmarkRule.measureRepeated(
             packageName = TARGET_PACKAGE,
@@ -59,31 +80,17 @@ class ComposerTypingBenchmark {
             startupMode = StartupMode.WARM,
             compilationMode = compilationMode,
             setupBlock = {
-                startActivityAndWait()
-                // Wait for first decor frame so splash → first composition
-                // jank doesn't leak into the typing measurement.
-                device.wait(
-                    Until.hasObject(By.pkg(TARGET_PACKAGE).depth(0)),
-                    STARTUP_WAIT_MS,
-                )
+                launchSeededConversation()
             },
         ) {
             // Compose TextField surfaces to a11y / uiautomator as an
             // `android.widget.EditText` that reports `focusable=true` and
             // `clazz=android.widget.EditText`. Match by class to avoid
             // coupling to placeholder text (which varies with i18n).
-            val field: UiObject2? = device.wait(
+            val field: UiObject2 = checkNotNull(device.wait(
                 Until.findObject(By.clazz("android.widget.EditText")),
                 FIELD_WAIT_MS,
-            )
-            if (field == null) {
-                // Launch surface on this device doesn't expose an editable
-                // field (e.g. onboarding / login). Frame-timing on an
-                // empty block is harmless; just emit a single idle frame
-                // tick so the iteration still has a measurable span.
-                device.waitForIdle(IDLE_AFTER_BURST_MS)
-                return@measureRepeated
-            }
+            )) { "Seeded conversation composer was not found" }
 
             // Focus the field so keystrokes land in the composer. A tap
             // rather than `field.click()` avoids accidentally triggering
@@ -107,14 +114,18 @@ class ComposerTypingBenchmark {
             field.text = ""
             device.waitForIdle(IDLE_BETWEEN_BURSTS_MS)
             for (i in 1..INCREMENTAL_CHARS) {
-                field.text = TYPING_BURST.take(i)
+                checkNotNull(device.wait(Until.findObject(By.clazz("android.widget.EditText")), FIELD_WAIT_MS)) {
+                    "Seeded conversation composer was not found"
+                }.text = TYPING_BURST.take(i)
             }
             device.waitForIdle(IDLE_AFTER_BURST_MS)
 
             // Reset composer state so the next iteration starts from an
             // empty field. This keeps iteration N+1 independent of
             // iteration N's tail state.
-            field.text = ""
+            checkNotNull(device.wait(Until.findObject(By.clazz("android.widget.EditText")), FIELD_WAIT_MS)) {
+                "Seeded conversation composer was not found"
+            }.text = ""
             device.waitForIdle(IDLE_AFTER_BURST_MS)
         }
     }
@@ -123,7 +134,7 @@ class ComposerTypingBenchmark {
         // Match the suffixed package from :app's `benchmark` buildType.
         const val TARGET_PACKAGE = "ca.oculair.meridian.benchmark"
         const val DEFAULT_ITERATIONS = 5
-        const val STARTUP_WAIT_MS = 10_000L
+        const val TURN_WAIT_MS = 120_000L
         const val FIELD_WAIT_MS = 5_000L
         const val FOCUS_WAIT_MS = 250L
         const val IDLE_BETWEEN_BURSTS_MS = 150L

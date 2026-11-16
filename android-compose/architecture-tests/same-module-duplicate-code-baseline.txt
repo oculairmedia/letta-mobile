@@ -21,7 +21,6 @@ android-compose/drawbox/src/commonMain/kotlin/io/ak1/drawbox/domain/model/Serial
 android-compose/drawbox/src/jvmMain/kotlin/io/ak1/drawbox/ImageDecoder.jvm.kt|android-compose/drawbox/src/wasmJsMain/kotlin/io/ak1/drawbox/ImageDecoder.web.kt 34
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldDrawer.kt|android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldDrawer.kt 18
 android-compose/iroh-wrapper-cli/src/main/kotlin/com/letta/mobile/cli/commands/A2aWiring.kt|android-compose/iroh-wrapper-cli/src/main/kotlin/com/letta/mobile/cli/commands/A2aWiring.kt 13
-android-compose/macrobenchmark/src/main/java/com/letta/mobile/macrobenchmark/ComposerTypingBenchmark.kt|android-compose/macrobenchmark/src/main/java/com/letta/mobile/macrobenchmark/ScrollJankBenchmark.kt 22
 android-compose/sharedLogic/src/androidMain/kotlin/com/letta/mobile/data/a2ui/A2uiBindingFormatters.android.kt|android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/a2ui/A2uiBindingFormatters.jvm.kt 35
 android-compose/sharedLogic/src/androidMain/kotlin/com/letta/mobile/data/timeline/TimelinePlatform.android.kt|android-compose/sharedLogic/src/hostNativeMain/kotlin/com/letta/mobile/data/timeline/TimelinePlatform.hostNative.kt 11
 android-compose/sharedLogic/src/androidMain/kotlin/com/letta/mobile/data/timeline/TimelinePlatform.android.kt|android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/timeline/TimelinePlatform.jvm.kt 29

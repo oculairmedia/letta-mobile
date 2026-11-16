@@ -269,3 +269,63 @@ workflow are unaffected and can continue using `\` line continuations.
 
 This bit us once during the initial perf-gate bring-up (2026-04-21); the
 fix was commit `021e832`.
+
+## Seeded physical-device frame investigation
+
+The frame benchmarks are separate from the startup gate. On the Pixel 2 XL,
+charge to at least 50%, record battery temperature and level, and use only its
+explicit adb serial (`711KPAE0914240`). Use the same seeded agent and
+conversation, compilation mode, benchmark sources and iteration count for both
+builds; alternate installations to control drift. A populated timeline and a
+working turn are required: an empty surface is not a measurement.
+
+Build `playBenchmark` with `-Pkotzilla=false`, install it alongside the normal
+app, then configure its `ca.oculair.meridian.benchmark` package with the
+benchmark-only automation launch extra. For the mini, obtain the Iroh ticket
+from `/opt/letta-test-server/current-iroh-ticket` on `graphiti`; construct a
+base64 JSON payload with `serverUrl` set to `iroh://<ticket>`, a nonempty
+`accessToken`, `configId` set to `automation-auth`, and `mode` set to
+`SELF_HOSTED`. Launch `com.letta.mobile.MainActivity` with the extra
+`com.letta.mobile.extra.AUTOMATION_CONFIG_PAYLOAD_BASE64`. Use only a
+dedicated test host and test credentials: AndroidX logs the launch intent,
+including its encoded payload, to device logcat. Do not commit tickets or
+tokens or share unredacted device logs. Confirm the conversation opens and
+contains messages before recording results.
+
+If the ID launch route lands on Home, the benchmark falls back to selecting a
+recent conversation by visible title and zero-based index. Supply
+`conversationTitle`, `conversationIndex` and a distinctive visible
+`conversationMarker` from that timeline. The marker is checked after navigation;
+verify the chosen conversation and its content manually before measuring.
+
+Pass the encoded payload as `configPayload`, along with `agentId` and
+`conversationId`, as Android instrumentation arguments to
+`ScrollJankBenchmark` and `ComposerTypingBenchmark`. The latter includes a
+settlement scenario that sends a real message and waits for a turn to become
+finish, and verifies a unique assistant response, so use a dedicated test
+conversation. The tests fail if the
+expected controls or turn state are absent. Preserve the raw benchmark JSON and
+traces for each run; report the number of frames and describe any unavailable
+metrics. The seeded-host dependency is tracked by `letta-mobile-4ccv` and
+these scenarios remain non-gating until CI has a reproducible host.
+
+For example, from `android-compose` (set the two IDs to a seeded conversation):
+
+```bash
+export ANDROID_HOME=/opt/android-sdk ANDROID_SDK_ROOT=/opt/android-sdk
+export ANDROID_SERIAL=711KPAE0914240
+/usr/local/bin/gradle-slot ./gradlew :macrobenchmark:connectedBenchmarkAndroidTest \
+  -Pkotzilla=false \
+  -Pandroid.testInstrumentationRunnerArguments.configPayload="$CONFIG_PAYLOAD" \
+  -Pandroid.testInstrumentationRunnerArguments.agentId="$AGENT_ID" \
+  -Pandroid.testInstrumentationRunnerArguments.conversationId="$CONVERSATION_ID" \
+  -Pandroid.testInstrumentationRunnerArguments.conversationTitle="$CONVERSATION_TITLE" \
+  -Pandroid.testInstrumentationRunnerArguments.conversationIndex="$CONVERSATION_INDEX" \
+  -Pandroid.testInstrumentationRunnerArguments.conversationMarker="$CONVERSATION_MARKER" \
+  -Pandroid.testInstrumentationRunnerArguments.class='com.letta.mobile.macrobenchmark.ScrollJankBenchmark#scrollChatListCompilationNone,com.letta.mobile.macrobenchmark.ComposerTypingBenchmark#typeComposerCompilationNone,com.letta.mobile.macrobenchmark.ComposerTypingBenchmark#settleTurnCompilationNone'
+```
+
+Android 11 does not provide AndroidX's `frameOverrunMs` (it requires API 31),
+so an overrun-based jank percentage is unavailable on the Pixel 2 XL. Report
+`frameDurationCpuMs` separately and do not substitute a CPU-time threshold as
+if it were the overrun metric.
