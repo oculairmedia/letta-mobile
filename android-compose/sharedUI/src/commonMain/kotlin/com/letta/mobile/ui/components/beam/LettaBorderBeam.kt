@@ -6,7 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.runtime.withFrameNanos
+import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
@@ -245,7 +245,7 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
     private suspend fun runFrames() {
         var last = 0L
         while (coroutineScope.isActive) {
-            withFrameNanos { now ->
+            withInfiniteAnimationFrameNanos { now ->
                 if (last != 0L) phase = advanceBeamPhase(phase, now - last, spec.style.periodMillis)
                 last = now
             }

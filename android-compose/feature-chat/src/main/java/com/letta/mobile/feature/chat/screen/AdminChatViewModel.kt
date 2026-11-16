@@ -159,10 +159,8 @@ internal class AdminChatViewModel @Inject constructor(
 ) : ViewModel() {
     /** Initialize before startup because cached runtime events can arrive during construction. */
     private val runPhases = com.letta.mobile.data.presence.ConversationRunPhasePublisher(runRegistry)
-
     /** letta-mobile-bzvro.40: the Iroh host's parked approvals and the mode chip (inert without a relay). */
     private val approvalBinding = com.letta.mobile.feature.chat.coordination.ChatApprovalBinding(approvalRelay, routeArgs.agentId)
-
     /** This screen's runtime phase under its captured conversation key. */
     val liveStatus: StateFlow<com.letta.mobile.data.runtime.RuntimeLiveStatus> = createLiveStatusFlow()
 

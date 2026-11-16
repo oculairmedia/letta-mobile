@@ -30,8 +30,8 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.components.beam.LettaBeamDefaults
 import com.letta.mobile.ui.components.beam.LettaBeamSpec
 import com.letta.mobile.ui.components.beam.lettaBorderBeam
-import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.chat.voice.LocalVoiceMode
+import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -44,22 +44,15 @@ internal var SemanticsPropertyReceiver.voiceOutlineRole by VoiceOutlineRoleKey
 internal val VoiceOutlineAnimatedKey = SemanticsPropertyKey<Boolean>("VoiceOutlineAnimated")
 internal var SemanticsPropertyReceiver.voiceOutlineAnimated by VoiceOutlineAnimatedKey
 
-/**
- * Voice mode's glowing outline around a prompt surface drawn in [shape]: a soft glow and a brighter
- * thin edge along the surface's own border, in the colour of whoever is active ([voiceGlowRole]: the
- * person's amber while listening and hearing, the agent's thinking colour while it thinks and speaks,
- * the error colour after a failure, nothing otherwise). Its brightness follows the same level the
- * page's ambient glow follows (resting while nobody speaks), so the two move together; the colour
- * cross-fades over the glow's glide.
- *
- * It only draws, behind the surface (the surface's own fill hides the inner half of each stroke), so
- * no layout bounds change and nothing it covers loses a click; the glow bleeds a few dp past the
- * surface. It animates on the frame clock only while it follows a voice; under reduced motion it is a
- * still edge at a fixed brightness. Without voice mode on the page it is nothing.
- */
+/** Semantic outline mode exposed for accessibility and tests. */
 internal val ComposerOutlineModeKey = SemanticsPropertyKey<ComposerOutlineMode>("ComposerOutlineMode")
 internal var SemanticsPropertyReceiver.composerOutlineMode by ComposerOutlineModeKey
 
+/**
+ * Draws the conversation's current outline on its prompt surface. Listening and errors use
+ * the voice glow, thinking uses a thin still edge, and working uses the animated beam.
+ * Colours glide between states and reduced motion holds the outline still.
+ */
 @Composable
 internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modifier {
     val handle = LocalVoiceMode.current
@@ -70,13 +63,13 @@ internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modif
     val reducedMotion = LocalReducedMotion.current
     val targetColor = when (mode) {
         ComposerOutlineMode.Listening, ComposerOutlineMode.Error -> outlineColor(role)
-        ComposerOutlineMode.Thinking -> voiceAgentColor().copy(alpha = THINKING_ALPHA)
+        ComposerOutlineMode.Thinking -> voiceAgentColor().copy(alpha = LettaDimens.Alpha.composerThinking)
         ComposerOutlineMode.Idle, ComposerOutlineMode.Working -> Color.Transparent
     }
     val color = animateColorAsState(
         targetValue = targetColor,
         animationSpec = if (reducedMotion) snap() else tween(ChatMotionTokens.AmbientGlow.GLIDE_MILLIS),
-        label = "voiceOutlineColor",
+        label = "composerOutlineColor",
     )
     val level = state?.let { handle?.glowLevel(it) }.takeIf { mode == ComposerOutlineMode.Listening && !reducedMotion }
     val brightness = rememberOutlineBrightness(level)
@@ -101,7 +94,6 @@ internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modif
         }
 }
 
-private const val THINKING_ALPHA = 0.35f
 
 /** The outline's colour for [role]: the person's, the agent's, the error colour, or none. */
 @Composable

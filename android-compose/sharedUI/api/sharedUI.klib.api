@@ -12369,6 +12369,8 @@ final object com.letta.mobile.ui.theme/ChatTimelineDimens { // com.letta.mobile.
 
 final object com.letta.mobile.ui.theme/LettaDimens { // com.letta.mobile.ui.theme/LettaDimens|null[0]
     final object Alpha { // com.letta.mobile.ui.theme/LettaDimens.Alpha|null[0]
+        final const val composerThinking // com.letta.mobile.ui.theme/LettaDimens.Alpha.composerThinking|{}composerThinking[0]
+            final fun <get-composerThinking>(): kotlin/Float // com.letta.mobile.ui.theme/LettaDimens.Alpha.composerThinking.<get-composerThinking>|<get-composerThinking>(){}[0]
         final const val disabled // com.letta.mobile.ui.theme/LettaDimens.Alpha.disabled|{}disabled[0]
             final fun <get-disabled>(): kotlin/Float // com.letta.mobile.ui.theme/LettaDimens.Alpha.disabled.<get-disabled>|<get-disabled>(){}[0]
         final const val hairline // com.letta.mobile.ui.theme/LettaDimens.Alpha.hairline|{}hairline[0]

@@ -8,7 +8,9 @@ import kotlin.test.assertEquals
 class ComposerOutlineModeTest {
     @Test
     fun conversationPhasesAndVoicePrecedence() {
-        assertEquals(ComposerOutlineMode.Idle, composerOutlineMode(null, RunPhase.IDLE, false))
+        listOf(RunPhase.IDLE, RunPhase.AWAITING_INPUT, RunPhase.FAILED, RunPhase.DONE).forEach {
+            assertEquals(ComposerOutlineMode.Idle, composerOutlineMode(null, it, true))
+        }
         assertEquals(ComposerOutlineMode.Thinking, composerOutlineMode(null, RunPhase.QUEUED, false))
         assertEquals(ComposerOutlineMode.Thinking, composerOutlineMode(null, RunPhase.REASONING, false))
         listOf(RunPhase.WORKING, RunPhase.DELEGATING, RunPhase.RESPONDING, RunPhase.INTERRUPTING).forEach {
@@ -17,5 +19,6 @@ class ComposerOutlineModeTest {
         assertEquals(ComposerOutlineMode.Listening, composerOutlineMode(VoiceModeState.Listening, RunPhase.WORKING, true))
         assertEquals(ComposerOutlineMode.Working, composerOutlineMode(VoiceModeState.WaitingForReply, RunPhase.REASONING, false))
         assertEquals(ComposerOutlineMode.Working, composerOutlineMode(null, null, true))
+        assertEquals(ComposerOutlineMode.Idle, composerOutlineMode(null, null, false))
     }
 }

@@ -236,7 +236,8 @@ private fun TouchBarSurface(model: ComposerModel, content: @Composable androidx.
     Surface(
         // Voice mode's outline follows the bar's shape: the bar runs flush to the screen's sides and
         // bottom, so what shows is a glowing top edge and its rounded corners.
-        modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.hasFocus }.composerOutline(shape, model.uiState).testTag(ComposerTestTags.TOUCH_BAR),
+        modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.hasFocus }
+            .composerOutline(shape, model.uiState).testTag(ComposerTestTags.TOUCH_BAR),
         shape = shape,
         color = look.color,
         contentColor = scheme.onSurface,

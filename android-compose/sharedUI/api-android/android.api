@@ -11980,6 +11980,7 @@ public final class com/letta/mobile/ui/theme/LettaDimens {
 public final class com/letta/mobile/ui/theme/LettaDimens$Alpha {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaDimens$Alpha;
+	public static final field composerThinking F
 	public static final field disabled F
 	public static final field hairline F
 	public static final field muted F
