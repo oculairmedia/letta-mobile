@@ -51,7 +51,10 @@ internal class BorderBeamFallback : BorderBeamRenderer {
         if (size == cachedSize && corners.contentEquals(cachedCorners)) return
         cachedSize = size
         corners.copyInto(cachedCorners)
-        val (tr, br, bl, tl) = corners
+        val tr = corners[0]
+        val br = corners[1]
+        val bl = corners[2]
+        val tl = corners[3]
         clip.rewind()
         clip.addRoundRect(
             RoundRect(
@@ -166,7 +169,11 @@ internal class BorderBeamFallback : BorderBeamRenderer {
  * by [inset] to stay concentric with the edge.
  */
 internal fun Path.addBeamTrack(bounds: Rect, corners: FloatArray, inset: Float) {
-    val (tr, br, bl, tl) = corners.map { max(it - inset, 0f) }
+    val inner = corners.map { max(it - inset, 0f) }
+    val tr = inner[0]
+    val br = inner[1]
+    val bl = inner[2]
+    val tl = inner[3]
     moveTo(bounds.right, bounds.center.y)
     lineTo(bounds.right, bounds.bottom - br)
     cornerArc(Offset(bounds.right - br, bounds.bottom - br), br, startDegrees = 0f)
