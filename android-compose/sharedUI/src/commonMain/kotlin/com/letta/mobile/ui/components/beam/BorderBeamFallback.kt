@@ -26,7 +26,7 @@ import kotlin.math.max
  *
  * One instance per beam: the outline path and its measure are rebuilt only when the size or corner
  * radius changes. The track path and stroke styles are reused across frames. Palette stops are cached;
- * each orbit frame submits exactly three strokes of the cached track. A sweep gradient maps
+ * each orbit frame extracts at most two paths and submits exactly three comet strokes. A sweep gradient maps
  * palette stops to cached perimeter angles, so colour and brightness follow corners too.
  * Ported from border-beam-android by ismnoiet (MIT, see sharedUI/THIRD_PARTY_LICENSES).
  */
@@ -35,6 +35,7 @@ internal class BorderBeamFallback : BorderBeamRenderer {
     private val cachedCorners = FloatArray(CORNERS) { Float.NaN }
     private val clip = Path()
     private val track = Path()
+    private val segment = Path()
     private val measure = PathMeasure()
     private val perimeterAngles = FloatArray(ANGLE_SAMPLES + 1)
     private var strokeDensity = Float.NaN
@@ -125,6 +126,12 @@ internal class BorderBeamFallback : BorderBeamRenderer {
     private fun DrawScope.drawOrbit(frame: BeamFrame, strength: Float, strokes: BeamStrokes) {
         if (measure.length <= 0f) return
         val start = ((1f - frame.style.arc) + frame.direction.sign * frame.phase).mod(1f)
+        val length = measure.length
+        val from = start * length
+        val to = from + frame.style.arc * length
+        segment.rewind()
+        measure.getSegment(from, minOf(to, length), segment, true)
+        if (to > length) measure.getSegment(0f, to - length, segment, true)
         val stops = gradientColors.mapIndexed { index, color ->
             perimeterAngle(start + frame.style.arc * index / (PALETTE_STOPS - 1)) to color
         }.sortedBy { it.first }
@@ -137,9 +144,9 @@ internal class BorderBeamFallback : BorderBeamRenderer {
             *(listOf(0f to seam) + stops + (1f to seam)).toTypedArray(),
             center = center,
         )
-        drawPath(track, brush, alpha = GLOW_ALPHA * strength, style = strokes.glow)
-        drawPath(track, brush, alpha = HALO_ALPHA * strength, style = strokes.halo)
-        drawPath(track, brush, alpha = strength, style = strokes.core)
+        drawPath(segment, brush, alpha = GLOW_ALPHA * strength, style = strokes.glow)
+        drawPath(segment, brush, alpha = HALO_ALPHA * strength, style = strokes.halo)
+        drawPath(segment, brush, alpha = strength, style = strokes.core)
     }
 
     /** A continuous gradient sweeping back and forth along the bottom edge. */

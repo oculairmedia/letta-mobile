@@ -4,6 +4,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -21,8 +23,13 @@ class BorderBeamPerformanceTest {
         val bitmap = ImageBitmap(WIDTH, HEIGHT)
         val delegate = Canvas(bitmap)
         var commands = 0
+        val drawnPath = PathMeasure()
         val canvas = Proxy.newProxyInstance(Canvas::class.java.classLoader, arrayOf(Canvas::class.java)) { _, method, args ->
             if (method.name.startsWith("draw")) commands++
+            if (method.name == "drawPath") {
+                drawnPath.setPath(checkNotNull(args)[0] as Path, false)
+                assertTrue(drawnPath.length <= WIDTH + HEIGHT, "a stroke covers only the comet, not the full perimeter")
+            }
             method.invoke(delegate, *(args ?: emptyArray()))
         } as Canvas
         val scope = CanvasDrawScope()
