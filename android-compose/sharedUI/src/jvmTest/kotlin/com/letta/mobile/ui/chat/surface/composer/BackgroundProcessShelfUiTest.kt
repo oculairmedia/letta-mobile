@@ -23,7 +23,10 @@ import kotlin.test.assertEquals
 class BackgroundProcessShelfUiTest {
     @Test
     fun confirmedStopKeepsTheRowUntilTheHostRemovesIt() = runComposeUiTest {
-        val snapshots = mutableStateOf(listOf(AppServerBackgroundProcess("p", description = "worker")))
+        val snapshots = mutableStateOf(listOf(
+            AppServerBackgroundProcess("p", type = "monitor", description = "worker"),
+            AppServerBackgroundProcess("q", type = "agent_task", description = "reflection"),
+        ))
         val stops = mutableListOf<String>()
         val actions = object : ChatActions by RecordingChatActions() {
             override fun stopBackgroundProcess(processId: ProcessId) { stops += processId.value }
@@ -36,7 +39,9 @@ class BackgroundProcessShelfUiTest {
                 ))
             }
         }
+        onNodeWithText("Background processes", substring = true).assertDoesNotExist()
         onNodeWithTag("process_item_p").assertExists()
+        onNodeWithTag("process_item_q").assertExists()
         onNodeWithContentDescription("Stop process p").performClick()
         runOnIdle { assertEquals(emptyList(), stops) }
         onNodeWithText("Stop background process?").assertExists()
