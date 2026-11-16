@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
@@ -51,7 +52,10 @@ import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiGeneratedComponent
+import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import com.letta.mobile.ui.components.LettaRefreshTags
+import com.letta.mobile.ui.host.LocalHostTitlesPage
+import com.letta.mobile.ui.shell.pages.HomePromptComposer
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.ProvideLettaHost
 import com.letta.mobile.ui.mascot.AgentAvatarTestTag
@@ -129,7 +133,11 @@ class HomePageTest {
             MaterialTheme {
                 ProvideLettaHost(host) {
                     Box(Modifier.width(width).height(PAGE_HEIGHT)) {
-                        HomePage(state = state, callbacks = HomePageCallbacks(actions, navigation.navigation), options = options)
+                        HomePage(
+                            state = state,
+                            callbacks = HomePageCallbacks(actions, navigation.navigation),
+                            options = options.withSharedPromptBar(),
+                        )
                     }
                 }
             }
@@ -203,6 +211,22 @@ class HomePageTest {
         onNodeWithText("Scout · Booked the train").assertExists()
     }
 
+    /** A window header that already names the page (the compact desktop title bar) leaves Home untitled. */
+    @Test
+    fun aHeaderThatNamesThePageDropsTheHomeTitle() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalHostTitlesPage provides true) {
+                    Box(Modifier.width(COMPACT).height(PAGE_HEIGHT)) {
+                        HomePage(state = baseState(), callbacks = HomePageCallbacks(actions, navigation.navigation))
+                    }
+                }
+            }
+        }
+        onNodeWithText("Home").assertDoesNotExist()
+        onNodeWithTag(HomePageTags.SEARCH).assertExists()
+    }
+
     @Test
     fun rowsAndTilesNavigate() = runComposeUiTest {
         show(baseState())
@@ -216,9 +240,10 @@ class HomePageTest {
     @Test
     fun theComposerSendsTrimmedText() = runComposeUiTest {
         show(baseState())
-        onNodeWithTag(HomePageTags.COMPOSER).performTextInput("  plan my week  ")
-        onNodeWithTag(HomePageTags.SEND).performClick()
+        onNodeWithTag(ComposerTestTags.INPUT).performTextInput("  plan my week  ")
+        onNodeWithTag(ComposerTestTags.SEND).performClick()
         assertEquals(listOf("prompt:plan my week"), navigation.events)
+        onNodeWithTag(ComposerTestTags.SEND).assertDoesNotExist()
     }
 
     @Test
@@ -491,3 +516,7 @@ class HomePageTest {
         val STRIP_MAX_HEIGHT = 72.dp
     }
 }
+
+/** Home as the shell's binding draws it: its prompt bar is the shared chat composer. */
+internal fun HomePageOptions.withSharedPromptBar(): HomePageOptions =
+    copy(promptBar = { placeholder, onSubmit, modifier -> HomePromptComposer(placeholder, onSubmit, modifier) })

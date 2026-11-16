@@ -139,6 +139,9 @@ class VoiceModeComposerUiTest {
         permissionMode = ChatPermissionModeUiState(selected = AppServerPermissionMode.Unrestricted),
     )
 
+    /** What the composer holds; a test that empties or fills the draft sets it. */
+    private var composer by mutableStateOf(drafted)
+
     @Composable
     private fun rememberVoice(configured: Boolean): VoiceModeHandle {
         val scope = rememberCoroutineScope()
@@ -178,7 +181,7 @@ class VoiceModeComposerUiTest {
                 LocalVoiceSetupPane provides { _ -> Text("voice setup pane") },
             ) {
                 Box(Modifier.width(width).height(PageHeight), contentAlignment = Alignment.BottomCenter) {
-                    ChatComposerPanel(ComposerInputs(composer = drafted, actions = RecordingChatActions(), mode = mode))
+                    ChatComposerPanel(ComposerInputs(composer = composer, actions = RecordingChatActions(), mode = mode))
                 }
                 VoiceSetupPaneHost(handle.takeIf { withVoice() })
             }
@@ -208,14 +211,14 @@ class VoiceModeComposerUiTest {
         var voice by mutableStateOf(false)
         showComposer(width, layout.style, layout.mode, VoiceOptions(shown = { voice }))
         onNodeWithTag(VoiceModeTags.BUTTON).assertDoesNotExist()
-        val sendBefore = bounds(ComposerTestTags.SEND)
+        val sendBefore = bounds(ComposerTestTags.SEND_SLOT)
         val fieldBefore = bounds(layout.field)
 
         voice = true
         waitForIdle()
         val where = "at $width ($layout)"
         val button = bounds(VoiceModeTags.BUTTON)
-        val send = bounds(ComposerTestTags.SEND)
+        val send = bounds(ComposerTestTags.SEND_SLOT)
         val field = bounds(layout.field)
         val slot = bounds(ComposerTestTags.TRAILING_ACTIONS)
         assertEquals(sendBefore, send, "Send keeps its bounds $where")
@@ -232,6 +235,46 @@ class VoiceModeComposerUiTest {
         assertEquals(fieldBefore.left, field.left, "the field keeps its start $where")
         assertTrue(field.width >= minimumField, "the field keeps ${field.width} >= $minimumField $where")
     }
+
+    /**
+     * With no draft in [layout] at [width] the voice-mode button rests at the end of the trailing slot
+     * where Send would be; a draft brings Send in at the end and pushes the button left by Send and its
+     * gap; emptying the draft brings the button back. The field's start never moves.
+     */
+    private fun slidesAsideForSend(width: Dp, layout: Layout) = runComposeUiTest {
+        composer = drafted.copy(text = "", canSend = false)
+        showComposer(width, layout.style, layout.mode)
+        waitForIdle()
+        val where = "at $width ($layout)"
+        val restingButton = bounds(VoiceModeTags.BUTTON)
+        val slot = bounds(ComposerTestTags.TRAILING_ACTIONS)
+        val fieldStart = bounds(layout.field).left
+        onNodeWithTag(ComposerTestTags.SEND).assertDoesNotExist()
+        assertEquals(slot.right, restingButton.right, "the button rests at the slot's end $where")
+
+        composer = drafted
+        waitForIdle()
+        val send = bounds(ComposerTestTags.SEND_SLOT)
+        val button = bounds(VoiceModeTags.BUTTON)
+        assertEquals(bounds(ComposerTestTags.TRAILING_ACTIONS).right, send.right, "Send arrives at the slot's end $where")
+        assertTrue(button.right <= send.left, "the button moved left of Send $where")
+        // The button gave up exactly the room Send (and its gap) now takes at the end.
+        assertEquals(send.right - button.right, restingButton.left - button.left, "the button moved by Send's seat and gap $where")
+        assertEquals(fieldStart, bounds(layout.field).left, "the field keeps its start $where")
+
+        composer = drafted.copy(text = "", canSend = false)
+        waitForIdle()
+        assertEquals(restingButton, bounds(VoiceModeTags.BUTTON), "the button returns to the end $where")
+    }
+
+    @Test
+    fun theCardButtonSlidesAsideForSend() = slidesAsideForSend(1200.dp, Layout.Card)
+
+    @Test
+    fun theDockedBarButtonSlidesAsideForSend() = slidesAsideForSend(760.dp, Layout.Docked)
+
+    @Test
+    fun theTouchBarButtonSlidesAsideForSend() = slidesAsideForSend(700.dp, Layout.Touch)
 
     @Test
     fun theCardSeatsItBeforeSendAt360() = sitsBeforeSend(360.dp, Layout.Card, minimumField = 150.dp)
@@ -281,11 +324,11 @@ class VoiceModeComposerUiTest {
         var voice by mutableStateOf(false)
         var handle: VoiceModeHandle? = null
         showComposer(360.dp, LettaInput.Touch, ChatSurfaceMode.Docked, VoiceOptions(shown = { voice }, onHandle = { handle = it }))
-        val sendBefore = bounds(ComposerTestTags.SEND)
+        val sendBefore = bounds(ComposerTestTags.SEND_SLOT)
         voice = true
         waitForIdle()
         onNodeWithTag(VoiceModeTags.BUTTON).assertDoesNotExist()
-        assertEquals(sendBefore, bounds(ComposerTestTags.SEND), "Send keeps its bounds")
+        assertEquals(sendBefore, bounds(ComposerTestTags.SEND_SLOT), "Send keeps its bounds")
         onNodeWithTag(ComposerTestTags.TOUCH_PLUS).performClick()
         waitForIdle()
         onNodeWithText("Voice conversation").assertExists().performClick()

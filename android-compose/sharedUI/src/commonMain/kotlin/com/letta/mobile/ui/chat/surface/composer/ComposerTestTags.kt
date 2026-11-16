@@ -4,6 +4,9 @@ package com.letta.mobile.ui.chat.surface.composer
 internal object ComposerTestTags {
     const val INPUT = "composer-input"
     const val SEND = "composer-send"
+
+    /** Send and Stop's seat: always laid out, also while Send hides on an empty draft. */
+    const val SEND_SLOT = "composer-send-slot"
     const val STOP = "composer-stop"
     /** The trailing action slot (the voice-mode button, then Send or Stop) of every composer layout. */
     const val TRAILING_ACTIONS = "composer-trailing-actions"

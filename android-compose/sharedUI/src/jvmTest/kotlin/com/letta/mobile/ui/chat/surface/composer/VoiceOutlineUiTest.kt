@@ -26,6 +26,7 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -176,7 +177,11 @@ class VoiceOutlineUiTest {
         }
     }
 
-    private fun ComposeUiTest.bounds(tag: String): DpRect = onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+    /** [tag]'s bounds, or [Absent] while it is not shown (Send with no draft): absent then must stay absent. */
+    private fun ComposeUiTest.bounds(tag: String): DpRect {
+        if (onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) return Absent
+        return onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+    }
 
     private fun <T> ComposeUiTest.semantic(tag: String, key: SemanticsPropertyKey<T>): T =
         onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().config[key]
@@ -186,7 +191,7 @@ class VoiceOutlineUiTest {
     /** The composer's fixed parts for [style]: the bar or card, Send, the voice button, the field, and the card's under line. */
     private fun fixedTags(style: LettaInput): List<String> = buildList {
         add(barTag(style))
-        add(ComposerTestTags.SEND)
+        add(ComposerTestTags.SEND_SLOT)
         add(VoiceModeTags.BUTTON)
         add(ComposerTestTags.INPUT)
         if (style == LettaInput.Pointer) add(ComposerTestTags.PERMISSION_MODE_LINE)
@@ -371,6 +376,7 @@ class VoiceOutlineUiTest {
 
     private companion object {
         val PageHeight = 900.dp
+        val Absent = DpRect(0.dp, 0.dp, 0.dp, 0.dp)
         val LastRowHeight = 40.dp
         val GlowSize = 200.dp
         val AMBER: Int = 0xFFE0A458.toInt()

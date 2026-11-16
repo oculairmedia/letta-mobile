@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
@@ -37,7 +38,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.collections.immutable.ImmutableList
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
-import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaInlineTarget
 import com.letta.mobile.ui.components.foundation.lettaClickable
 
 /**
@@ -89,7 +90,7 @@ internal fun ChatImageAttachmentsGrid(
                     .lettaClickable(
                         role = Role.Image,
                         onClickLabel = openLabel,
-                        target = LettaClickTarget.Inline,
+                        target = lettaInlineTarget(attachmentShape()),
                         onClick = { tap.open(index) },
                     ),
             )
@@ -124,7 +125,7 @@ internal fun ChatPromptImageGrid(
                     .lettaClickable(
                         role = Role.Image,
                         onClickLabel = openLabel,
-                        target = LettaClickTarget.Inline,
+                        target = lettaInlineTarget(attachmentShape()),
                         onClick = { tap.open(index) },
                     ),
             )
@@ -157,7 +158,7 @@ internal fun ChatImageThumbnailStrip(
                     .lettaClickable(
                         role = Role.Image,
                         onClickLabel = openLabel,
-                        target = LettaClickTarget.Inline,
+                        target = lettaInlineTarget(attachmentShape()),
                         onClick = { tap.open(index) },
                     ),
             )
@@ -172,6 +173,10 @@ internal fun ChatImageThumbnailStrip(
         }
     }
 }
+
+/** An attachment cell's shape (Touch: the legacy inset cell; pointer: the outlined card), its press clipped to it too. */
+@Composable
+private fun attachmentShape(): Shape = if (touchStyle()) ChatRowInsetShape else MaterialTheme.shapes.medium
 
 @Composable
 internal fun ChatAttachmentImage(
@@ -192,7 +197,7 @@ internal fun ChatAttachmentImage(
     Surface(
         modifier = modifier.then(size),
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = if (touch) ChatRowInsetShape else MaterialTheme.shapes.medium,
+        shape = attachmentShape(),
         border = if (touch) null else BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
         if (bitmap != null) {

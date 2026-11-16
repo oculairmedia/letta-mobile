@@ -70,7 +70,7 @@ import com.letta.mobile.ui.components.foundation.LettaTonalPill
 import com.letta.mobile.ui.theme.pill.LettaPillColors
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
-import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaRowTarget
 import com.letta.mobile.ui.components.foundation.lettaClickable
 
 // letta-mobile-bglj6.1: Android's SubagentNotificationCard
@@ -321,7 +321,7 @@ private fun NotificationActionRow(actions: NotificationActions) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
             .defaultMinSize(minHeight = LettaDimens.Space.xxl)
-            .lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = onOpen)
+            .lettaClickable(role = Role.Button, target = lettaRowTarget(), onClick = onOpen)
             .padding(vertical = LettaDimens.Space.sm),
     )
 }

@@ -106,11 +106,6 @@ object TouchComposerDimens {
     /** The "+" shrinks a touch while pressed. */
     const val pressedScale: Float = 0.96f
 
-    /** Stop draws smaller than Send and beats gently while the run is live. */
-    const val stopScale: Float = 0.7f
-    const val stopPulseScale: Float = 1.04f
-    const val stopPulseMillis: Int = 800
-
     /** The page's companion above the bar while the agent works (legacy ChatComposerCompanion). */
     val companion: Dp = 64.dp
 

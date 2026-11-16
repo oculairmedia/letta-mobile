@@ -3,6 +3,7 @@ package com.letta.mobile.ui.shell
 import android.view.View
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -129,7 +130,13 @@ class ShellHeaderPageLayoutTest {
                 home = shellHomePage(
                     state = HomePageState(),
                     callbacks = HomePageCallbacks(NoopHome, NoopNavigation),
-                    options = HomePageOptions(showTitle = false, showSearch = false, touch = true),
+                    // The shell binding's prompt bar is the shared chat composer; a sized stand-in is enough to lay out.
+                    options = HomePageOptions(
+                        showTitle = false,
+                        showSearch = false,
+                        touch = true,
+                        promptBar = { _, _, modifier -> Box(modifier.height(PROMPT_BAR_HEIGHT)) },
+                    ),
                 ),
             ),
             modifier = modifier,
@@ -198,6 +205,7 @@ class ShellHeaderPageLayoutTest {
         val HEADER = PageTag(ShellHeaderTags.HEADER)
         val HOME_PAGE = PageTag(HomePageTags.PAGE)
         val HOME_COMPOSER = PageTag(HomePageTags.COMPOSER)
+        val PROMPT_BAR_HEIGHT = 72.dp
 
         val NoopNavigation = HomePageNavigation(
             onSubmitPrompt = {},

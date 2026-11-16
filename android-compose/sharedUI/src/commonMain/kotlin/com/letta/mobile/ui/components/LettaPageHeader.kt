@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import com.letta.mobile.ui.host.LocalHostTitlesPage
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
@@ -41,10 +42,11 @@ import com.letta.mobile.ui.components.foundation.LettaMenuItem
  * 4. [caption]: one muted line (the zone times read in, where a secret is stored);
  * 5. [content]: what only this page has (a search field, an error banner, a stats strip).
  *
- * A host that titles the screen itself passes a null [title]; the rest keeps its place.
+ * A host that titles the screen itself passes a null [title]; the rest keeps its place. Under a
+ * window header that already names the page ([LocalHostTitlesPage]) the title drops the same way.
  *
  * [primaryAction] is the page's one labelled action ("New schedule"), drawn as a filled button
- * after a plus unless the item names another icon. [refresh] is the page's [LettaRefreshAction],
+ * after a plus unless the item names another icon, tagged with the item's tag when it has one. [refresh] is the page's [LettaRefreshAction],
  * which draws on pointer hosts only: touch pulls the page's [LettaRefreshable] instead.
  */
 @Composable
@@ -59,18 +61,19 @@ fun LettaPageHeader(
     controls: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
+    val shownTitle = title.takeUnless { LocalHostTitlesPage.current }
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val wide = maxWidth >= LettaDimens.Pane.wideBreakpoint
         val rowContext = context.takeIf { wide }
         // The row leaves the layout when it would be empty (a titled host on touch with nothing to press).
-        val showsTitleRow = title != null || primaryAction != null || rowContext != null || actions != null ||
+        val showsTitleRow = shownTitle != null || primaryAction != null || rowContext != null || actions != null ||
             (refresh != null && isPointerHost())
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = lettaPageGutter(wide), vertical = LettaDimens.Space.sm),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             if (showsTitleRow) {
-                PageTitleRow(title, primaryAction, rowContext) {
+                PageTitleRow(shownTitle, primaryAction, rowContext) {
                     actions?.invoke(this)
                     refresh?.invoke()
                 }
@@ -133,7 +136,8 @@ private fun PageTitleRow(
 
 @Composable
 private fun PagePrimaryButton(action: LettaMenuItem) {
-    Button(onClick = action.onClick, enabled = action.enabled, modifier = Modifier.testTag(LETTA_PAGE_PRIMARY_ACTION_TAG)) {
+    val tag = action.tag.ifEmpty { LETTA_PAGE_PRIMARY_ACTION_TAG }
+    Button(onClick = action.onClick, enabled = action.enabled, modifier = Modifier.testTag(tag)) {
         Icon(action.icon ?: LettaIcons.Add, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
         Spacer(Modifier.size(LettaDimens.Space.xs))
         Text(action.label, maxLines = 1)

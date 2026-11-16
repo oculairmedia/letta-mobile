@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.subagents.SubagentDispatchTarget
+import com.letta.mobile.data.subagents.SubagentView
 import com.letta.mobile.data.subagents.SubagentViewLabel
 import com.letta.mobile.data.subagents.subagentViewForDispatch
 import com.letta.mobile.data.subagents.subagentViewOf
@@ -35,16 +36,25 @@ fun SubagentDualViewHolder.conversationOpener(entries: () -> List<SubagentEntry>
 }
 
 /**
- * The page's [ChatSurfaceHost.openSubagent] with a dual view: a tapped dispatch (or its report)
- * opens its subagent beside the parent once [entries] name the child's conversation
- * ([subagentViewForDispatch]). A subagent whose conversation is not known yet opens nothing.
+ * The page's [ChatSurfaceHost.openSubagent] with a dual view: a tapped dispatch (or its report, or
+ * an agent task's chip above the composer) opens its subagent beside the parent once [entries] name
+ * the child's conversation ([subagentViewForDispatch]), found by its tool call or task id, else by
+ * the newest run with the same description. A subagent whose conversation is not known yet opens nothing.
  */
 fun ChatSurfaceHost.withSubagentDualView(holder: SubagentDualViewHolder, entries: () -> List<SubagentEntry>): ChatSurfaceHost =
     copy(
         openSubagent = { call, agent, description ->
             if (call.isNotBlank()) {
+                val known = entries()
                 val target = SubagentDispatchTarget(ToolCallId(call), agent?.takeIf { it.isNotBlank() }?.let(::AgentId), description)
-                entries().subagentViewForDispatch(target)?.let(holder::open)
+                (known.subagentViewForDispatch(target) ?: known.viewByDescription(description))?.let(holder::open)
             }
         },
     )
+
+/** The newest run described as [description], for a caller that knows the run only by its words. */
+private fun List<SubagentEntry>.viewByDescription(description: String): SubagentView? {
+    if (description.isBlank()) return null
+    val entry = lastOrNull { it.description == description } ?: return null
+    return subagentViewForDispatch(SubagentDispatchTarget(ToolCallId(entry.toolCallId), null, description))
+}
