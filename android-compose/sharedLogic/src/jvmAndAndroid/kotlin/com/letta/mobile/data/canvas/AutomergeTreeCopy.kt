@@ -18,28 +18,28 @@ internal class AutomergeTreeCopy(private val source: Read, private val tx: Trans
         when (value) {
             is AmValue.Map -> copyMap(value.id, tx.set(to, key, ObjectType.MAP))
             is AmValue.List -> copyList(value.id, tx.set(to, key, ObjectType.LIST))
-            is AmValue.Text -> tx.spliceText(tx.set(to, key, ObjectType.TEXT), 0, 0, source.text(value.id).orElseThrow())
+            is AmValue.Text -> tx.spliceText(tx.set(to, key, ObjectType.TEXT), 0, 0, source.text(value.id).get())
             else -> tx.set(to, key, scalar(value))
         }
     }
 
     /** Copy [source]'s map entry [key] of [from] into map [to] under the same key. */
-    fun copyEntry(from: ObjectId, to: ObjectId, key: String) = copyValue(source.get(from, key).orElseThrow(), to, key)
+    fun copyEntry(from: ObjectId, to: ObjectId, key: String) = copyValue(source.get(from, key).get(), to, key)
 
     /** Copy a whole object tree. */
     fun copyMap(from: ObjectId, to: ObjectId) {
-        for (key in source.keys(from).orElseThrow()) copyEntry(from, to, key)
+        for (key in source.keys(from).get()) copyEntry(from, to, key)
     }
 
     private fun copyList(from: ObjectId, to: ObjectId) {
-        source.listItems(from).orElseThrow().forEachIndexed { index, value -> insertValue(value, to, index.toLong()) }
+        source.listItems(from).get().forEachIndexed { index, value -> insertValue(value, to, index.toLong()) }
     }
 
     private fun insertValue(value: AmValue, to: ObjectId, at: Long) {
         when (value) {
             is AmValue.Map -> copyMap(value.id, tx.insert(to, at, ObjectType.MAP))
             is AmValue.List -> copyList(value.id, tx.insert(to, at, ObjectType.LIST))
-            is AmValue.Text -> tx.spliceText(tx.insert(to, at, ObjectType.TEXT), 0, 0, source.text(value.id).orElseThrow())
+            is AmValue.Text -> tx.spliceText(tx.insert(to, at, ObjectType.TEXT), 0, 0, source.text(value.id).get())
             else -> tx.insert(to, at, scalar(value))
         }
     }

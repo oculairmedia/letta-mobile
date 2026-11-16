@@ -5,7 +5,8 @@ import com.letta.mobile.data.model.CanvasId
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
-import java.nio.charset.StandardCharsets.UTF_8
+import com.letta.mobile.data.files.readUtf8
+import com.letta.mobile.data.files.writeUtf8
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
@@ -191,7 +192,7 @@ internal class NotebookHistoryArchive(
 
         /** One journaled move: finished if the index names the new document or it is whole, else undone. */
         private fun resolve(journal: Path) {
-            val successor = Files.readString(journal, UTF_8).trim()
+            val successor = readUtf8(journal).trim()
             val indexed = index.read()
             when {
                 !successor.isNotebookKey() -> Files.delete(journal)
@@ -304,7 +305,7 @@ internal class NotebookHistoryArchive(
             val journal = archiveDirectory.resolve("$stamp$SUCCESSOR_SUFFIX")
             val journalTemp = Files.createTempFile(archiveDirectory, ".successor-", ".tmp")
             try {
-                Files.writeString(journalTemp, newKey, UTF_8)
+                writeUtf8(journalTemp, newKey)
                 Files.move(journalTemp, journal, ATOMIC_MOVE)
             } finally {
                 Files.deleteIfExists(journalTemp)
@@ -338,7 +339,7 @@ internal class NotebookHistoryArchive(
     private fun copyArchiveEntries(old: Read, tx: Transaction, oldKey: String) {
         val previous = (old.get(ObjectId.ROOT, HISTORY_ARCHIVE).orElse(null) as? AmValue.List)?.id ?: return
         val list = tx.set(ObjectId.ROOT, HISTORY_ARCHIVE, ObjectType.LIST)
-        old.listItems(previous).orElseThrow().forEachIndexed { at, value ->
+        old.listItems(previous).get().forEachIndexed { at, value ->
             val raw = (value as? AmValue.Str)?.value ?: return@forEachIndexed
             val entry = runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull()
             val named = if (entry == null || "document" in entry) raw else JsonObject(entry + ("document" to JsonPrimitive(oldKey))).toString()
