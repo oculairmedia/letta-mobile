@@ -26,6 +26,11 @@ import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.ui.ambient.AmbientVoice
+import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.components.beam.LettaBeamDefaults
+import com.letta.mobile.ui.components.beam.LettaBeamSpec
+import com.letta.mobile.ui.components.beam.lettaBorderBeam
+import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -52,30 +57,51 @@ internal var SemanticsPropertyReceiver.voiceOutlineAnimated by VoiceOutlineAnima
  * surface. It animates on the frame clock only while it follows a voice; under reduced motion it is a
  * still edge at a fixed brightness. Without voice mode on the page it is nothing.
  */
+internal val ComposerOutlineModeKey = SemanticsPropertyKey<ComposerOutlineMode>("ComposerOutlineMode")
+internal var SemanticsPropertyReceiver.composerOutlineMode by ComposerOutlineModeKey
+
 @Composable
-internal fun Modifier.voiceOutline(shape: Shape): Modifier {
-    val handle = LocalVoiceMode.current ?: return this
-    val state by handle.state.collectAsState()
-    val role = voiceGlowRole(state)
+internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modifier {
+    val handle = LocalVoiceMode.current
+    val state = handle?.state?.collectAsState()?.value
+    val role = state?.let(::voiceGlowRole) ?: VoiceGlowRole.Idle
+    val presence = LocalMascotRegistry.current.presence[uiState.agentId]
+    val mode = composerOutlineMode(state, uiState.runPhase, companionWorking(uiState, presence))
     val reducedMotion = LocalReducedMotion.current
+    val targetColor = when (mode) {
+        ComposerOutlineMode.Listening, ComposerOutlineMode.Error -> outlineColor(role)
+        ComposerOutlineMode.Thinking -> voiceAgentColor().copy(alpha = THINKING_ALPHA)
+        ComposerOutlineMode.Idle, ComposerOutlineMode.Working -> Color.Transparent
+    }
     val color = animateColorAsState(
-        targetValue = outlineColor(role),
+        targetValue = targetColor,
         animationSpec = if (reducedMotion) snap() else tween(ChatMotionTokens.AmbientGlow.GLIDE_MILLIS),
         label = "voiceOutlineColor",
     )
-    val level = handle.glowLevel(state).takeUnless { reducedMotion }
+    val level = state?.let { handle?.glowLevel(it) }.takeIf { mode == ComposerOutlineMode.Listening && !reducedMotion }
     val brightness = rememberOutlineBrightness(level)
+    val beam = LettaBeamSpec(LettaBeamDefaults.colors(), shape)
     return this
         .semantics {
+            composerOutlineMode = mode
             voiceOutlineRole = role
             voiceOutlineAnimated = level != null
         }
+        .lettaBorderBeam(beam, active = mode == ComposerOutlineMode.Working)
         .drawWithCache {
             val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithCache)) }
             val strokes = OutlineStrokes(this)
-            onDrawBehind { drawOutline(path, strokes, color.value, brightness.floatValue) }
+            onDrawBehind {
+                if (mode == ComposerOutlineMode.Thinking) {
+                    drawPath(path, color.value, style = strokes.edge)
+                } else if (mode != ComposerOutlineMode.Working) {
+                    drawOutline(path, strokes, color.value, brightness.floatValue)
+                }
+            }
         }
 }
+
+private const val THINKING_ALPHA = 0.35f
 
 /** The outline's colour for [role]: the person's, the agent's, the error colour, or none. */
 @Composable
