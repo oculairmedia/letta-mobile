@@ -46,10 +46,10 @@ class ToolsetDeviceStatusRelayTest {
         }
         registry.register("conv-1", registry.claim(allowed))
         val forbidden = mutableListOf<String>()
-        registry.register("conv-1", registry.claim(viewer("wrong-agent", forbidden, agent = "other")))
-        registry.register("conv-1", registry.claim(viewer("wrong-conversation", forbidden, conversation = "other")))
+        registry.register("conv-1", registry.claim(viewer("wrong-agent", forbidden, context = viewerContext(agent = "other"))))
+        registry.register("conv-1", registry.claim(viewer("wrong-conversation", forbidden, viewerContext(conversation = "other"))))
         registry.register("other", registry.claim(viewer("other-view", forbidden)))
-        registry.register("conv-1", registry.claim(viewer("no-read", forbidden, capabilities = emptySet())))
+        registry.register("conv-1", registry.claim(viewer("no-read", forbidden, context = viewerContext(capabilities = emptySet()))))
         val status = AppServerInboundFrame.UpdateDeviceStatus(
             runtime = AppServerRuntimeScope("agent-1", "conv-1"), eventSeq = 7,
             emittedAt = "2026-11-15T00:00:00Z", idempotencyKey = "status-7",
@@ -152,16 +152,20 @@ class ToolsetDeviceStatusRelayTest {
     private fun viewer(
         id: String,
         frames: MutableList<String>,
-        agent: String = "agent-1",
-        conversation: String = "conv-1",
-        capabilities: Set<String> = setOf(IrohPeerCapabilities.CHAT_READ),
+        context: AdminRpcRequestContext = viewerContext(),
     ) =
         object : ViewerHandle {
             override val connectionId = id
             override suspend fun writeFrame(frame: String): Boolean { frames += frame; return true }
-            override fun adminContext() = AdminRpcRequestContext(
-                authenticated = true, authorizedAgentIds = setOf(agent), authorizedConversationIds = setOf(conversation),
-                grantedCapabilities = capabilities,
-            )
+            override fun adminContext() = context
         }
+
+    private fun viewerContext(
+        agent: String = "agent-1",
+        conversation: String = "conv-1",
+        capabilities: Set<String> = setOf(IrohPeerCapabilities.CHAT_READ),
+    ) = AdminRpcRequestContext(
+        authenticated = true, authorizedAgentIds = setOf(agent), authorizedConversationIds = setOf(conversation),
+        grantedCapabilities = capabilities,
+    )
 }

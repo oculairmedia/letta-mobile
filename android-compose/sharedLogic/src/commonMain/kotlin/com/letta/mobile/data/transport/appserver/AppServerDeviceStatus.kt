@@ -236,3 +236,19 @@ suspend fun AppServerClient.stopBackgroundProcess(runtime: AppServerRuntimeScope
     ))
     check(response.success) { response.error ?: "Could not stop background process" }
 }
+
+internal fun AppServerInboundFrame.deviceStatusPayload(): Pair<AppServerRuntimeScope, JsonObject>? = when (this) {
+    is AppServerInboundFrame.UpdateDeviceStatus -> runtime to deviceStatus
+    is AppServerInboundFrame.Unknown -> notification(raw)
+    else -> null
+}
+
+private fun notification(raw: JsonObject): Pair<AppServerRuntimeScope, JsonObject>? {
+    if (raw["type"] != JsonPrimitive("toolset_status")) return null
+    val runtime = raw["runtime"] as? JsonObject ?: return null
+    val status = raw["device_status"] as? JsonObject ?: return null
+    val scope = runCatching {
+        AppServerProtocol.json.decodeFromJsonElement(AppServerRuntimeScope.serializer(), runtime)
+    }.getOrNull()
+    return scope?.let { it to status }
+}

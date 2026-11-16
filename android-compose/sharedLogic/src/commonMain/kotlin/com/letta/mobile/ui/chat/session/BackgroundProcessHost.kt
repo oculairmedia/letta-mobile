@@ -7,7 +7,7 @@ import com.letta.mobile.data.transport.appserver.AppServerBackgroundProcess
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.toDeviceStatusSnapshot
-import com.letta.mobile.data.transport.api.deviceStatusPayload
+import com.letta.mobile.data.transport.appserver.deviceStatusPayload
 import kotlinx.coroutines.flow.map
 import kotlin.uuid.Uuid
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -90,28 +90,33 @@ private suspend fun followBackgroundProcesses(
     var active = true
     var generation: Long? = null
     var processes = emptyList<AppServerBackgroundProcess>()
-    val stopProcess: (String) -> Unit = stopProcess@{ id ->
-        val request = synchronized(lock) { claimBackgroundProcess(id, active, processes, pending) } ?: return@stopProcess
+    fun clearSnapshot() {
+        pending.clear()
+        processes = emptyList()
+        generation = null
+        host.value = ChatComposerHostInputs()
+    }
+    fun completeStop(id: String, request: Uuid, error: String?) {
+        synchronized(lock) {
+            if (pending[id] != request) return@synchronized
+            if (error != null) pending.remove(id)
+            host.value = host.value.copy(backgroundProcessError = error)
+        }
+    }
+    fun stopProcess(callbackGeneration: Long?): (String) -> Unit = stopProcess@{ id ->
+        val request = synchronized(lock) {
+            claimBackgroundProcess(id, active && callbackGeneration == generation, processes, pending)
+        } ?: return@stopProcess
         launch {
             stopBackgroundProcessRequest({ stop(runtime, id) }) { error ->
-                synchronized(lock) {
-                    if (pending[id] == request) {
-                        if (error != null) pending.remove(id)
-                        host.value = host.value.copy(backgroundProcessError = error)
-                    }
-                }
+                completeStop(id, request, error)
             }
         }
     }
     try {
         frames.collect { received ->
             if (received == null) {
-                synchronized(lock) {
-                    pending.clear()
-                    processes = emptyList()
-                    generation = null
-                    host.value = ChatComposerHostInputs()
-                }
+                synchronized(lock) { clearSnapshot() }
                 return@collect
             }
             val status = received.frame.deviceStatusPayload()?.takeIf { it.first == runtime } ?: return@collect
@@ -126,7 +131,7 @@ private suspend fun followBackgroundProcesses(
                 pending.keys.retainAll(processes.map { it.id }.toSet())
                 host.value = host.value.copy(
                     backgroundProcesses = processes,
-                    stopBackgroundProcess = stopProcess,
+                    stopBackgroundProcess = stopProcess(incoming),
                     clearBackgroundProcessError = {
                         synchronized(lock) { if (active) host.value = host.value.copy(backgroundProcessError = null) }
                     },

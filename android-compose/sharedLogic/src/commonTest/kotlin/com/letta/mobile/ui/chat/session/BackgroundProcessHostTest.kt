@@ -127,6 +127,24 @@ class BackgroundProcessHostTest {
     }
 
     @Test
+    fun callbackFromPreviousConnectionCannotStopReusedProcessId() = runTest(UnconfinedTestDispatcher()) {
+        val frames = MutableSharedFlow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>()
+        var calls = 0
+        val host = backgroundProcessHost(backgroundScope, frames, MutableStateFlow(runtime)) { _, _ -> calls++ }
+        frames.emit(snapshot("""[{"id":"p"}]""").copy(connectionGeneration = 1))
+        runCurrent()
+        val oldStop = checkNotNull(host.value.stopBackgroundProcess)
+        frames.emit(snapshot("""[{"id":"p"}]""").copy(connectionGeneration = 2))
+        runCurrent()
+        oldStop("p")
+        runCurrent()
+        assertEquals(0, calls, "a callback from generation 1 must not stop a generation 2 process")
+        checkNotNull(host.value.stopBackgroundProcess)("p")
+        runCurrent()
+        assertEquals(1, calls)
+    }
+
+    @Test
     fun concurrentClicksSendOneStop() = runTest {
         val frames = MutableSharedFlow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>()
         val calls = atomic(0)

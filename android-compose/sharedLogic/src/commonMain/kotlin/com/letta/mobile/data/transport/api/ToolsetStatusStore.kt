@@ -3,13 +3,10 @@ package com.letta.mobile.data.transport.api
 import com.letta.mobile.data.toolsets.ToolsetOption
 import com.letta.mobile.data.toolsets.ToolsetRuntime
 import com.letta.mobile.data.toolsets.ToolsetState
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
-import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.data.transport.appserver.deviceStatusPayload
 import com.letta.mobile.data.transport.appserver.toDeviceStatusSnapshot
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,20 +65,4 @@ class ToolsetStatusStore {
         epoch++
         hosts.value = emptyMap()
     }
-}
-
-internal fun AppServerInboundFrame.deviceStatusPayload(): Pair<AppServerRuntimeScope, JsonObject>? = when (this) {
-    is AppServerInboundFrame.UpdateDeviceStatus -> runtime to deviceStatus
-    is AppServerInboundFrame.Unknown -> notification(raw)
-    else -> null
-}
-
-private fun notification(raw: JsonObject): Pair<AppServerRuntimeScope, JsonObject>? {
-    if (raw["type"] != JsonPrimitive("toolset_status")) return null
-    val runtime = raw["runtime"] as? JsonObject ?: return null
-    val status = raw["device_status"] as? JsonObject ?: return null
-    val scope = runCatching {
-        AppServerProtocol.json.decodeFromJsonElement(AppServerRuntimeScope.serializer(), runtime)
-    }.getOrNull()
-    return scope?.let { it to status }
 }

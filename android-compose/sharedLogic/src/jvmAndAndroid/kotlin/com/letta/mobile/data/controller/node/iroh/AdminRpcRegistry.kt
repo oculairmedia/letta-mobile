@@ -111,8 +111,9 @@ object AdminRpcRegistry {
             notifications.agentChanges, notifications.conversationChanges, notifications.turnIdentity,
         )
 
-        registerCatalogRoutes(router, services, native, tiers, localBackendStore)
-        registerSessionRoutes(router, services, pairing, native, notifications, localBackendStore)
+        registerCatalogRoutes(router, services, native, tiers)
+        registerSessionRoutes(router, services, pairing, notifications)
+        registerRuntimeRoutes(router, native, tiers)
         registerHostRoutes(router, services)
 
         router.requireNonEmpty()
@@ -137,7 +138,6 @@ object AdminRpcRegistry {
         services: AdminRpcHostServices,
         native: AdminRpcNativeSources,
         tiers: NativeReadTiers,
-        localBackendStore: LocalBackendAdminStore?,
     ) {
         HealthAdminHandlers.register(router, services.controller)
         AgentAdminHandlers.register(router, services.controller, tiers)
@@ -145,12 +145,12 @@ object AdminRpcRegistry {
         ConversationAdminHandlers.register(router, tiers, controller = services.controller)
         ProjectAdminHandlers.register(router, services.vibesyncBaseUrl?.trimEnd('/'))
         registerBeads(router, services)
-        RunAdminHandlers.register(router, localBackendStore)
+        RunAdminHandlers.register(router, tiers.localBackendStore)
         ArchiveAdminHandlers.register(router)
         IdentityAdminHandlers.register(router)
         ModelAdminHandlers.register(router, tiers, modelExposureStore(native.modelExposureFile))
         ScheduleAdminHandlers.register(router, native.nativeClient)
-        ToolAdminHandlers.register(router, localBackendStore, native.nativeClient)
+        ToolAdminHandlers.register(router, tiers.localBackendStore, native.nativeClient)
         McpAdminHandlers.register(router)
         // letta-mobile-by4vm.84: goals have no App Server owner; slash commands come from device status.
         GoalAdminHandlers.register(router)
@@ -164,19 +164,21 @@ object AdminRpcRegistry {
         )
     }
 
-    /** Approvals, pairing, run records, monitors, schedules and workspace routes, in registration order. */
+    /** Approvals, permission modes and pairing use the existing host contexts. */
     private fun registerSessionRoutes(
         router: AdminRpcRouter,
         services: AdminRpcHostServices,
         pairing: AdminRpcPairing,
-        native: AdminRpcNativeSources,
         notifications: AdminRpcNotifications,
-        localBackendStore: LocalBackendAdminStore?,
     ) {
         ApprovalAdminHandlers.register(router, services.controller)
         // letta-mobile-bzvro.40: the conversation's permission mode for Iroh clients.
         PermissionModeAdminHandlers.register(router, services.controller, notifications.permissionModes)
         PairingAdminHandlers.register(router, pairing.pairingService, pairing.pairingQr)
+    }
+
+    /** Native runtime controls and records share the existing read tiers. */
+    private fun registerRuntimeRoutes(router: AdminRpcRouter, native: AdminRpcNativeSources, tiers: NativeReadTiers) {
         val wrapperRecords = native.wrapperRecords
             ?: com.letta.mobile.data.controller.node.iroh.records.FileWrapperRecordStore()
         registerRunRecordHandlers(router, wrapperRecords)
@@ -186,7 +188,7 @@ object AdminRpcRegistry {
         // letta-mobile-bzvro.37: MemFS / secrets / workspace files for Iroh clients.
         WorkspaceAdminHandlers.register(router, native.nativeClient)
         // letta-mobile-57cta: manual compaction for Iroh clients (execute_command / conversation_compact).
-        ConversationCompactHandlers.register(router, native.nativeClient, localBackendStore)
+        ConversationCompactHandlers.register(router, tiers.nativeClient, tiers.localBackendStore)
         // letta-mobile-joigh: the context limit for Iroh clients (execute_command context-limit).
         ConversationContextLimitHandlers.register(router, native.nativeClient)
         // letta-mobile-by4vm.51: /recompile for Iroh clients (conversation_recompile).
