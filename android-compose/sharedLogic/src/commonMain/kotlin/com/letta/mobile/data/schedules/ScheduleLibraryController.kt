@@ -417,19 +417,21 @@ class ScheduleLibraryController(
      * a fleet delete without one does nothing). With an agent selected, a different [owner] does nothing.
      */
     fun deleteSchedule(scheduledMessageId: String, owner: AgentId? = null) {
-        val selected = stateFlow.value.selectedAgentId
-        if (stateFlow.value.fleet) {
-            owner?.let { deleteFleetSchedule(it, ScheduleIdentity(scheduledMessageId)) }
-            return
+        val identity = ScheduleIdentity(scheduledMessageId)
+        when {
+            stateFlow.value.fleet -> owner?.let { deleteFleetSchedule(it, identity) }
+            owner == null || owner.value == stateFlow.value.selectedAgentId -> deleteSelectedSchedule(identity)
         }
-        if (owner != null && owner.value != selected) return
+    }
+
+    private fun deleteSelectedSchedule(identity: ScheduleIdentity) {
         val revision = ScheduleRevision(targetRevision.value)
         mutationJob?.cancel()
         mutationJob = scope.launch {
             val current = stateFlow.value
             val agentId = current.selectedAgentId ?: return@launch
             try {
-                val schedules = operations.deleteAndReload(current, AgentId(agentId), ScheduleIdentity(scheduledMessageId))
+                val schedules = operations.deleteAndReload(current, AgentId(agentId), identity)
                 val crons = operations.loadControlCrons(AgentId(agentId))
                 if (targetRevision.value != revision.value) return@launch
                 stateFlow.value = current.withSchedules(schedules).copy(
