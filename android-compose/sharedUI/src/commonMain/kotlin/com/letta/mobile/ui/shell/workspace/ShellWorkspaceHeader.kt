@@ -128,10 +128,16 @@ fun ShellWorkspaceHeader(state: ShellWorkspaceHeaderState, modifier: Modifier = 
 }
 
 /**
- * The header shows the page's own name as plain text: the compact window's minimal header with a
- * title (the desktop's page label) and no agent pill in its place. A null title is the app's name.
+ * The header shows the page's own name as plain text, so the page should not title itself again: a
+ * host title (the desktop's page label) with nothing in its place. Compact, that is the minimal
+ * header without an agent pill; wide, the bar without tabs or an identity block ([headerTitle]).
+ * A null title is the app's name, which names no page (Android, the browser).
  */
-internal fun ShellWorkspaceHeaderState.namesPage(): Boolean = minimal != null && minimal.identity == null && title != null
+internal fun ShellWorkspaceHeaderState.namesPage(): Boolean {
+    if (title == null) return false
+    val shown = minimal
+    return if (shown != null) shown.identity == null else tabs.tabs.isEmpty() && identity == null
+}
 
 /**
  * The height a bar gives this header: the phone app bar's for the minimal header (room for the agent

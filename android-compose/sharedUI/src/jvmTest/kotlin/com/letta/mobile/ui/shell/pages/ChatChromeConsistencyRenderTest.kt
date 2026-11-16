@@ -46,8 +46,8 @@ import kotlin.time.Duration.Companion.minutes
 /**
  * Home and the chat composer side by side at the review widths (360, 700, 760, 1200 dp) in Dark and
  * Light, rendered to build/chat-chrome-render/ for review: below the wide breakpoint (the compact
- * window, where the title bar names the page) Home is untitled and both draw the same Touch bar
- * and Send; at 1200 dp both draw the pointer card. Each frame asserts the shared Send is there.
+ * window) both draw the same Touch bar and Send; at 1200 dp both draw the pointer card. Home is untitled throughout, as under the desktop
+ * title bar that names the page. Each frame asserts the shared Send is there.
  */
 class ChatChromeConsistencyRenderTest {
     @Test
@@ -62,7 +62,7 @@ class ChatChromeConsistencyRenderTest {
 
     @Composable
     private fun HomeFrame(width: Int) {
-        CompositionLocalProvider(LocalHostTitlesPage provides compact(width)) {
+        CompositionLocalProvider(LocalHostTitlesPage provides true) {
             HomePage(state = state(), callbacks = InertHomeCallbacks, options = HomePageOptions(composerPlaceholder = "Message Letta…").withSharedPromptBar())
         }
     }
