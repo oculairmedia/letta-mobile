@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.coordination
 import com.letta.mobile.testutil.FakeTimelineExternalTransportWriter
 import com.letta.mobile.feature.chat.screen.ChatPagingBinding
 import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
@@ -86,8 +87,8 @@ class SelectedGenerationRetirementTest {
         try {
             owner.requireCurrent()
             fail("Retired send owner accepted a callback")
-        } catch (failure: IllegalStateException) {
-            assertTrue(failure.message.orEmpty().contains("retired"))
+        } catch (_: CancellationException) {
+            assertTrue(owner.scope.coroutineContext[kotlinx.coroutines.Job]?.isCancelled == true)
         }
 
         val secondWriter = FakeTimelineExternalTransportWriter()

@@ -66,6 +66,51 @@ class WsChatSendCoordinatorTest {
     }
 
     @Test
+    fun `retiring owner during suspended send cancels without failure or dispatch`() = runTest {
+        val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val failures = mutableListOf<Throwable>()
+        val handler = kotlinx.coroutines.CoroutineExceptionHandler { _, failure -> failures += failure }
+        val parent = CoroutineScope(backgroundScope.coroutineContext + handler)
+        val owner = SelectedChatSendOwner(mockk(), mockk(), mockk(), parent) {}
+        val timeline = io.mockk.spyk(FakeTimelineExternalTransportWriter())
+        coEvery { timeline.clearExternalTransportActive(any(), any()) } coAnswers {
+            try {
+                entered.complete(Unit)
+                kotlinx.coroutines.awaitCancellation()
+            } catch (_: CancellationException) {
+                // Stale-presence cleanup can finish normally while cancellation unwinds.
+            }
+        }
+        val bridge = mockk<WsChatBridge>(relaxed = true)
+        val ui = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        val coordinator = WsChatSendCoordinator(
+            scope = owner.scope,
+            agentId = "agent-1",
+            activeConfig = { owner.requireCurrent(); settingsRepository()() },
+            wsChatBridge = bridge,
+            timelineRepository = timeline,
+            conversationRepository = mockk(),
+            uiState = ui,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-owned" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+            prepareConversation = owner::ready,
+            backendDescriptor = { owner.requireCurrent(); null },
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", "agent-1", "conv-owned", "run-1"))
+        val send = coordinator.send("hello")
+        runCurrent()
+        entered.await()
+        owner.retire()
+        assertTrue("No failure may escape retirement: $failures", failures.isEmpty())
+        assertTrue("The send must end cancelled", send.isCancelled)
+        assertNull("Cancellation must not become a send error", ui.value.error)
+        verify(exactly = 0) { bridge.send(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
     fun `send dispatches through ws bridge and appends optimistic local with android otid`() = runTest {
         val settingsRepository = settingsRepository()
         val wsChatBridge = mockBridge(sendAccepted = true)
