@@ -15,6 +15,15 @@ class IrohAgentMessageRouterTest {
         )
 
     @Test
+    fun lanePolicyDropsDoNotConsumeSenderWindow() {
+        val router = IrohAgentMessageRouter("target", maxPerSender = 1)
+        assertEquals("home_lane_forbidden", assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
+            router.route("sender", "refused", emptyList(), IrohAgentMessageRouter.InboundAddress(lane = "home")),
+        ).reason)
+        assertIs<IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver>(router.route("sender", "accepted", emptyList()))
+    }
+
+    @Test
     fun duplicateReasonReflectsEachReservationStateAndSurvivesSnapshotRestore() {
         for (state in IrohAgentMessageRouter.ReservationState.entries) {
             val router = IrohAgentMessageRouter("target")
