@@ -11,7 +11,9 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import java.lang.reflect.Proxy
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.TimeSource
 
@@ -44,6 +46,27 @@ class BorderBeamPerformanceTest {
                 }
                 assertTrue(commands <= 3, "$style phase ${frame.phase}: $commands strokes exceeds 3")
             }
+        }
+    }
+
+    @Test
+    fun orbitReusesStopArraysAcrossFrames() {
+        val renderer = BorderBeamFallback()
+        val scope = CanvasDrawScope()
+        val canvas = Canvas(ImageBitmap(WIDTH, HEIGHT))
+        val frame = BeamFrame(LettaBeamStyle.Orbit, LettaBeamDirection.Clockwise, BeamPalette(listOf(Color.White)))
+        fun draw() = scope.draw(Density(3.5f), LayoutDirection.Ltr, canvas, Size(WIDTH.toFloat(), HEIGHT.toFloat())) {
+            with(renderer) { drawBeam(frame) }
+        }
+        draw()
+        val arrays = renderer.javaClass.declaredFields.filter { it.type.isArray }.onEach { it.isAccessible = true }
+        val colorArrays = arrays.filter { it.type.componentType == Color::class.java }
+        assertEquals(1, colorArrays.size, "orbit must retain one reusable color stop array")
+        val stops = colorArrays.single().get(renderer)
+        repeat(60) {
+            frame.phase = it / 60f
+            draw()
+            assertSame(stops, colorArrays.single().get(renderer), "stop storage must survive phase changes")
         }
     }
 

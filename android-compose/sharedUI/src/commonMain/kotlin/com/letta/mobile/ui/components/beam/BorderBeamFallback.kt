@@ -9,7 +9,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.Shader
+import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.SweepGradientShader
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -43,6 +46,10 @@ internal class BorderBeamFallback : BorderBeamRenderer {
     private var cachedStrokes: BeamStrokes? = null
     private var cachedPalette: BeamPalette? = null
     private var gradientColors: List<Color> = emptyList()
+    private val orbitStops = FloatArray(PALETTE_STOPS + 2)
+    private val orbitColors = Array(PALETTE_STOPS + 2) { Color.Transparent }
+    private val orbitStopList = orbitStops.asList()
+    private val orbitColorList = orbitColors.asList()
 
     override fun DrawScope.drawBeam(frame: BeamFrame) {
         if (size.width <= 0f || size.height <= 0f) return
@@ -122,7 +129,6 @@ internal class BorderBeamFallback : BorderBeamRenderer {
     }
 
     /** A transparent sweep outside the comet; its coloured stops follow the perimeter distance. */
-    @Suppress("SpreadOperator") // Compose requires varargs for nonuniform stops; bounded to 27 entries.
     private fun DrawScope.drawOrbit(frame: BeamFrame, strength: Float, strokes: BeamStrokes) {
         if (measure.length <= 0f) return
         val start = ((1f - frame.style.arc) + frame.direction.sign * frame.phase).mod(1f)
@@ -132,18 +138,32 @@ internal class BorderBeamFallback : BorderBeamRenderer {
         segment.rewind()
         measure.getSegment(from, minOf(to, length), segment, true)
         if (to > length) measure.getSegment(0f, to - length, segment, true)
-        val stops = gradientColors.mapIndexed { index, color ->
-            perimeterAngle(start + frame.style.arc * index / (PALETTE_STOPS - 1)) to color
-        }.sortedBy { it.first }
         val seam = if (start + frame.style.arc > 1f) {
             sampleBeamPalette(gradientColors, (1f - start) / frame.style.arc)
         } else {
             Color.Transparent
         }
-        val brush = Brush.sweepGradient(
-            *(listOf(0f to seam) + stops + (1f to seam)).toTypedArray(),
-            center = center,
-        )
+        orbitStops[0] = 0f
+        orbitColors[0] = seam
+        for (index in gradientColors.indices) {
+            val angle = perimeterAngle(start + frame.style.arc * index / (PALETTE_STOPS - 1))
+            var insertion = index + 1
+            while (insertion > 1 && orbitStops[insertion - 1] > angle) {
+                orbitStops[insertion] = orbitStops[insertion - 1]
+                orbitColors[insertion] = orbitColors[insertion - 1]
+                insertion--
+            }
+            orbitStops[insertion] = angle
+            orbitColors[insertion] = gradientColors[index]
+        }
+        orbitStops[PALETTE_STOPS + 1] = 1f
+        orbitColors[PALETTE_STOPS + 1] = seam
+        // ShaderBrush caches its shader by size, so a new brush is needed as stops move each frame.
+        val brush = object : ShaderBrush() {
+            override fun createShader(size: Size): Shader = SweepGradientShader(
+                Offset(size.width / 2f, size.height / 2f), orbitColorList, orbitStopList,
+            )
+        }
         drawPath(segment, brush, alpha = GLOW_ALPHA * strength, style = strokes.glow)
         drawPath(segment, brush, alpha = HALO_ALPHA * strength, style = strokes.halo)
         drawPath(segment, brush, alpha = strength, style = strokes.core)
