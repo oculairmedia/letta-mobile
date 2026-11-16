@@ -2542,6 +2542,54 @@ public final class com/letta/mobile/ui/components/ResizePointerIcon_androidKt {
 	public static final fun resizePointerIcon (Lcom/letta/mobile/ui/components/ResizeDirection;)Landroidx/compose/ui/input/pointer/PointerIcon;
 }
 
+public final class com/letta/mobile/ui/components/beam/LettaBeamDefaults {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/components/beam/LettaBeamDefaults;
+	public final fun colors (Lcom/letta/mobile/ui/theme/tokens/LettaBeamTone;Landroidx/compose/runtime/Composer;II)Ljava/util/List;
+	public final fun single-8_81llA (J)Ljava/util/List;
+}
+
+public final class com/letta/mobile/ui/components/beam/LettaBeamDirection : java/lang/Enum {
+	public static final field Clockwise Lcom/letta/mobile/ui/components/beam/LettaBeamDirection;
+	public static final field CounterClockwise Lcom/letta/mobile/ui/components/beam/LettaBeamDirection;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/components/beam/LettaBeamDirection;
+	public static fun values ()[Lcom/letta/mobile/ui/components/beam/LettaBeamDirection;
+}
+
+public final class com/letta/mobile/ui/components/beam/LettaBeamSpec {
+	public static final field $stable I
+	public fun <init> (Ljava/util/List;Landroidx/compose/ui/graphics/Shape;Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;Lcom/letta/mobile/ui/components/beam/LettaBeamDirection;)V
+	public synthetic fun <init> (Ljava/util/List;Landroidx/compose/ui/graphics/Shape;Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;Lcom/letta/mobile/ui/components/beam/LettaBeamDirection;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Landroidx/compose/ui/graphics/Shape;
+	public final fun component3 ()Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;
+	public final fun component4 ()Lcom/letta/mobile/ui/components/beam/LettaBeamDirection;
+	public final fun copy (Ljava/util/List;Landroidx/compose/ui/graphics/Shape;Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;Lcom/letta/mobile/ui/components/beam/LettaBeamDirection;)Lcom/letta/mobile/ui/components/beam/LettaBeamSpec;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/beam/LettaBeamSpec;Ljava/util/List;Landroidx/compose/ui/graphics/Shape;Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;Lcom/letta/mobile/ui/components/beam/LettaBeamDirection;ILjava/lang/Object;)Lcom/letta/mobile/ui/components/beam/LettaBeamSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColors ()Ljava/util/List;
+	public final fun getDirection ()Lcom/letta/mobile/ui/components/beam/LettaBeamDirection;
+	public final fun getShape ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getStyle ()Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/components/beam/LettaBeamStyle : java/lang/Enum {
+	public static final field Orbit Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;
+	public static final field OrbitCompact Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;
+	public static final field Sweep Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;
+	public static fun values ()[Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;
+}
+
+public final class com/letta/mobile/ui/components/beam/LettaBorderBeamKt {
+	public static final fun lettaBorderBeam (Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/beam/LettaBeamSpec;Z)Landroidx/compose/ui/Modifier;
+	public static synthetic fun lettaBorderBeam$default (Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/beam/LettaBeamSpec;ZILjava/lang/Object;)Landroidx/compose/ui/Modifier;
+}
+
 public final class com/letta/mobile/ui/components/disclosure/ChevronEmphasis : java/lang/Enum {
 	public static final field Emphasized Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;
 	public static final field Neutral Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;
@@ -12239,9 +12287,40 @@ public final class com/letta/mobile/ui/theme/tokens/LettaAlphaTokens {
 	public static final field muted F
 }
 
+public final class com/letta/mobile/ui/theme/tokens/LettaBeamMotion {
+	public static final field $stable I
+	public static final field FADE_MILLIS I
+	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaBeamMotion;
+	public static final field LAP_MILLIS I
+	public static final field STILL_PHASE F
+	public static final field SWEEP_MILLIS I
+}
+
+public final class com/letta/mobile/ui/theme/tokens/LettaBeamPalette {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaBeamPalette;
+	public static final field TAIL_ALPHA F
+	public final fun getSpectrum ()Ljava/util/List;
+}
+
+public final class com/letta/mobile/ui/theme/tokens/LettaBeamTone : java/lang/Enum {
+	public static final field Attention Lcom/letta/mobile/ui/theme/tokens/LettaBeamTone;
+	public static final field Spectrum Lcom/letta/mobile/ui/theme/tokens/LettaBeamTone;
+	public static final field Working Lcom/letta/mobile/ui/theme/tokens/LettaBeamTone;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/theme/tokens/LettaBeamTone;
+	public static fun values ()[Lcom/letta/mobile/ui/theme/tokens/LettaBeamTone;
+}
+
 public final class com/letta/mobile/ui/theme/tokens/LettaComponentDimens {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaComponentDimens;
+	public final fun getBeamCoreStroke-D9Ej5fM ()F
+	public final fun getBeamGlowCompact-D9Ej5fM ()F
+	public final fun getBeamGlowOrbit-D9Ej5fM ()F
+	public final fun getBeamGlowSweep-D9Ej5fM ()F
+	public final fun getBeamHaloStroke-D9Ej5fM ()F
+	public final fun getBeamMinGlowStroke-D9Ej5fM ()F
 	public final fun getEmptyStateIcon-D9Ej5fM ()F
 	public final fun getFloatingNoticeElevation-D9Ej5fM ()F
 	public final fun getStatusDot-D9Ej5fM ()F
