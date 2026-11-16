@@ -347,6 +347,10 @@ A Markdown text/title document kind over the shared document primitives. Persist
 
 Dreaming settings, history, notifications and controller state. App Server and admin-RPC adapters expose available reflection operations through one backend contract. Keep runtime ownership and platform presentation outside dreaming controls; supply operations through [DreamingRepository](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.dreaming/-dreaming-repository/index.html) and history through [DreamHistorySource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.dreaming/-dream-history-source/index.html).
 
+# Package com.letta.mobile.data.fleet
+
+Per-agent reads across the whole roster, a few agents at a time, for pages that show every agent's data when no agent is focused (Schedules, Memory) on hosts that serve that data only per agent. One agent's failed read leaves the others' values; only a read in which every agent failed is a failure. Callers key reads by agent id and merge the values in roster order.
+
 # Package com.letta.mobile.data.health
 
 Server health probing, state and repository contracts. Service availability is reported separately from whether a conversation currently has an active turn. Keep active-turn state distinct from reachability; provide probes through [AppServerReachability](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.health/-app-server-reachability/index.html) and consume updates through [ServerHealthListener](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.health/-server-health-listener/index.html).

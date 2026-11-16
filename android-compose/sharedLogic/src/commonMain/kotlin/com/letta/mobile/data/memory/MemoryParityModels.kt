@@ -30,14 +30,18 @@ data class MemoryParityState(
     val sections: List<MemoryParitySection> = emptyList(),
     val summary: MemoryParitySummary = MemoryParitySummary(),
     val graph: MemoryParityGraph = MemoryParityGraph(),
+    /** Every agent's memory blocks (no agent focused), grouped by label; [selectedAgentId] is null. */
+    val fleet: Boolean = false,
 ) {
     val isEmpty: Boolean
         get() = sections.all { it.items.isEmpty() }
 
     val scopeSubtitle: String
-        get() = selectedAgentName
-            ?.let { "Skills, memory, schedules, and channels for $it." }
-            ?: "Skills, memory, schedules, and channels for the active backend."
+        get() = when {
+            selectedAgentName != null -> "Skills, memory, schedules, and channels for $selectedAgentName."
+            fleet -> "Memory blocks across every agent on the active backend, grouped by label."
+            else -> "Skills, memory, schedules, and channels for the active backend."
+        }
 }
 
 @Serializable
@@ -319,6 +323,14 @@ sealed interface MemoryParityItem {
         val label: String? = null,
         /** How many characters the block's value holds, against its [limit]. */
         val length: Int = 0,
+        /** In the fleet view, the agents holding a block with this label, in roster order. */
+        val owners: List<MemoryParityAgentOption> = emptyList(),
+        /**
+         * In the fleet view, the one block every owner holds (a single owner, or an id the backend
+         * shares); null when owners hold different blocks under the label, which then cannot be
+         * edited from the fleet view.
+         */
+        val sharedBlockId: String? = null,
     ) : MemoryParityItem
 
     @Serializable
@@ -463,9 +475,7 @@ object MemoryParityMapper {
             emptyMessage = "No memory blocks attached.",
             status = loaded.toSectionStatus(),
             items = blocks.map { block ->
-                val preview = block.value.lineSequence().firstOrNull { it.isNotBlank() }
-                    ?.take(MAX_MEMORY_PREVIEW_CHARS)
-                    ?: ""
+                val preview = previewOf(block.value)
                 val subtitle = block.description?.takeIf { it.isNotBlank() }
                     ?: block.limit?.let { "Limit $it chars" }
                     ?: "Core memory"
@@ -519,7 +529,11 @@ object MemoryParityMapper {
             },
         )
 
-    private fun channelsSection(
+    /** A block value's first non-blank line, cut to a preview's length. */
+    internal fun previewOf(value: String): String =
+        value.lineSequence().firstOrNull { it.isNotBlank() }?.take(MAX_MEMORY_PREVIEW_CHARS) ?: ""
+
+    internal fun channelsSection(
         backendDescriptor: BackendDescriptor,
         channelTransportState: ChannelTransportState,
     ): MemoryParitySection {

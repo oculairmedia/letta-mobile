@@ -88,8 +88,8 @@ internal fun rememberSchedulesData(state: SchedulesPageState, clock: ScheduleClo
     val runHistory = state.library.runHistory.takeIf {
         state.focusedAgentId == null || state.focusedAgentId == state.library.selectedAgentId
     }.orEmpty()
-    val defs = remember(crons, state.library.schedules, state.focusedAgentId, clock.zone) {
-        SchedulesPageModel.defs(crons, state.library.schedules, state.focusedAgentId, clock)
+    val defs = remember(crons, state.library.schedules, state.scopeAgentId, clock.zone) {
+        SchedulesPageModel.defs(crons, state.library.schedules, state.scopeAgentId, clock)
     }
     val historyDefs = remember(defs, runHistory, state.library.selectedAgentId) {
         val knownIds = defs.map { it.id }.toSet()
@@ -308,7 +308,7 @@ private fun headerParams(ui: SchedulesPageUi, input: SchedulesPageInput, view: S
 
 private fun filterParams(ui: SchedulesPageUi, input: SchedulesPageInput) = SchedulesFilterParams(
     state = input.state,
-    onSelectAgent = input.actions.onSelectAgent,
+    onFilterAgent = input.actions.onFilterAgent,
     showPaused = ui.showPaused.takeIf { input.data.hasPaused },
     onTogglePaused = { ui.showPaused = !ui.showPaused },
 )
@@ -337,7 +337,7 @@ internal fun SchedulesPageDialogs(ui: SchedulesPageUi, state: SchedulesPageState
     ui.form?.let { initial ->
         ScheduleFormPane(
             clock = clock,
-            initial = initial,
+            setup = formSetup(state, initial),
             onDismiss = { ui.form = null },
             onSubmit = { draft ->
                 draft.toRequest(state.targetAgentId, clock.zone)?.let(actions.onCreate)
@@ -361,6 +361,15 @@ internal fun SchedulesPageDialogs(ui: SchedulesPageUi, state: SchedulesPageState
         )
     }
 }
+
+/** An unfocused page's form asks which agent the schedule is for, starting from the fleet's filter. */
+private fun formSetup(state: SchedulesPageState, initial: ScheduleFormDraft): ScheduleFormSetup =
+    if (state.showsFleet) {
+        val agents = state.library.agents.associate { it.id.value to it.name }
+        ScheduleFormSetup(initial.copy(agentId = initial.agentId ?: state.scopeAgentId), agents)
+    } else {
+        ScheduleFormSetup(initial)
+    }
 
 private const val RAIL_TITLE = "Schedule details"
 

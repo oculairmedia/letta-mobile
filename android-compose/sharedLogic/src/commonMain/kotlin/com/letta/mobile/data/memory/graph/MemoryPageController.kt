@@ -66,6 +66,13 @@ class MemoryPageController private constructor(
         source.selectAgent(agentId)
     }
 
+    /** Shows every agent's memory, grouped by label (no agent focused). */
+    fun selectFleet() {
+        ensureProjecting()
+        clearSelection()
+        source.selectFleet()
+    }
+
     override fun toggleKind(kind: MemoryGraphNodeKind) {
         disabledKinds.update { MemoryGraphViews.toggle(it, stateFlow.value.view.kindsPresent, kind) }
     }

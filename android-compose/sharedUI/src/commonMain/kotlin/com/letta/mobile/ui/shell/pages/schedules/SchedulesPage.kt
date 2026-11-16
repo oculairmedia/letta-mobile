@@ -64,11 +64,17 @@ data class SchedulesPageState(
     /** False hides "New schedule" (no backend route, or no agent to schedule for). */
     val canCreate: Boolean = false,
 ) {
-    /** The agent a new schedule is for: the focused one, else the library's selection. */
-    val targetAgentId: String? get() = focusedAgentId ?: library.selectedAgentId
+    /** The agent a new schedule is for: the focused one, else the library's selection or fleet filter. */
+    val targetAgentId: String? get() = focusedAgentId ?: library.scopeAgentId
 
-    /** The agent chips show only when the host has no focused agent and there is a choice. */
+    /** The agent whose schedules show: the focused one, else the fleet's filter; null shows every agent's. */
+    val scopeAgentId: String? get() = focusedAgentId ?: library.scopeAgentId
+
+    /** The agent chips (a filter over the fleet) show only when the host has no focused agent and there is a choice. */
     val showsAgentChips: Boolean get() = focusedAgentId == null && library.agents.size > 1
+
+    /** Every agent's schedules show together, so each row names its agent and "New schedule" asks for one. */
+    val showsFleet: Boolean get() = focusedAgentId == null && library.fleet
 }
 
 /**
@@ -81,7 +87,8 @@ data class SchedulesPageState(
 @Immutable
 data class SchedulesPageActions(
     val onRefresh: () -> Unit = {},
-    val onSelectAgent: (String) -> Unit = {},
+    /** Narrows an unfocused page to one agent's schedules; null shows every agent's. */
+    val onFilterAgent: (String?) -> Unit = {},
     val onCreate: (ScheduleCreateRequest) -> Unit = {},
     val onDeleteSchedule: (NativeScheduleRef) -> Unit = {},
     val onDeleteCron: (CronTaskId) -> Unit = {},
@@ -174,6 +181,12 @@ object SchedulesPageTags {
     internal const val RULES_SECTION = "rules"
 
     fun agent(agentId: String): String = "schedules_agent_$agentId"
+
+    /** The agent filter chip that shows every agent's schedules. */
+    const val ALL_AGENTS = "schedules_agent_all"
+
+    /** An agent choice in the New-schedule form of an unfocused page. */
+    fun formAgent(agentId: String): String = "schedules_form_agent_$agentId"
 
     fun cadence(label: String): String = "schedules_cadence_${label.lowercase().replace(' ', '_')}"
 }

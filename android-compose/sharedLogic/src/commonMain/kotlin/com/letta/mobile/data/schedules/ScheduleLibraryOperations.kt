@@ -63,7 +63,7 @@ internal class ScheduleLibraryOperations(
 
 internal fun ScheduleLibraryState.canControlCron(candidate: CronTask, resume: Boolean): Boolean {
     val task = crons.firstOrNull { it.id == candidate.id } ?: return false
-    val ownerMatches = task.agentId == null || task.agentId == selectedAgentId
+    val ownerMatches = task.agentId == null || task.agentId == selectedAgentId || (fleet && selectedAgentId == null)
     val controllable = task.status in setOf(null, "active", "paused")
     val stateMatches = (task.status == "paused") == resume
     return ownerMatches && controllable && stateMatches

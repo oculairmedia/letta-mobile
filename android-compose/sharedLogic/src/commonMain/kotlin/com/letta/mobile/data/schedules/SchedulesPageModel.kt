@@ -52,23 +52,29 @@ data class ScheduleCreateRequest(
     )
 }
 
-/** The create form's fields: a name, the prompt the agent receives and the cadence builder. */
+/**
+ * The create form's fields: a name, the prompt the agent receives and the cadence builder, plus
+ * the [agentId] chosen in the form when the page shows every agent's schedules (null: the host's).
+ */
 @Immutable
 data class ScheduleFormDraft(
     val name: String = "",
     val prompt: String = "",
     val cadence: CronBuilderState = CronBuilderState(),
+    /** The agent chosen in the form; null leaves it to the host. */
+    val agentId: String? = null,
 ) {
     /** The cron the cadence builds, or null while it is incomplete. */
     val expression: String? get() = CronBuilder.toExpression(cadence)
 
     val isComplete: Boolean get() = expression != null && name.isNotBlank() && prompt.isNotBlank()
 
-    /** The request this draft submits, trimmed; null while incomplete. */
+    /** The request this draft submits for its own agent, else [agentId], trimmed; null while incomplete. */
     fun toRequest(agentId: String?, zone: TimeZone): ScheduleCreateRequest? {
         val cron = expression ?: return null
         if (!isComplete) return null
-        return ScheduleCreateRequest(agentId = agentId, name = name.trim(), prompt = prompt.trim(), cron = cron, timezone = zone.id)
+        val target = this.agentId ?: agentId
+        return ScheduleCreateRequest(agentId = target, name = name.trim(), prompt = prompt.trim(), cron = cron, timezone = zone.id)
     }
 }
 
@@ -91,8 +97,8 @@ object SchedulesPageModel {
 
     /**
      * Every schedule the page shows: the cron tasks (scoped to [focusedAgentId] when set; a cron with
-     * no agent belongs to every agent), then the native schedule-admin schedules not already
-     * represented by id. Native schedules are already agent-scoped by the library controller.
+     * no agent belongs to every agent), then the native schedule-admin schedules (also scoped to
+     * [focusedAgentId] when set; a fleet read holds every agent's) not already represented by id.
      * One-shot crons resolve to a single instant against [now], so callers must not re-key on a ticking clock.
      */
     fun defs(
@@ -104,7 +110,8 @@ object SchedulesPageModel {
         val scoped = if (focusedAgentId == null) crons else crons.filter { it.agentId == null || it.agentId == focusedAgentId }
         val cronDefs = ScheduleProjection.toScheduleDefs(scoped, clock.zone, clock.now)
         val cronIds = cronDefs.mapTo(HashSet()) { it.id }
-        return cronDefs + ScheduleProjection.toScheduleDefsFromNative(native, clock.zone).filter { it.id !in cronIds }
+        val nativeScoped = if (focusedAgentId == null) native else native.filter { it.agentId == focusedAgentId }
+        return cronDefs + ScheduleProjection.toScheduleDefsFromNative(nativeScoped, clock.zone).filter { it.id !in cronIds }
     }
 
     /** "October 5 – 11, 2026", or across a month / year boundary "September 28 – October 4, 2026". */

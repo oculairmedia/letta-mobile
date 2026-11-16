@@ -13,7 +13,10 @@ import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
+import com.letta.mobile.data.model.visibleInLists
+import com.letta.mobile.data.fleet.AgentFleetReads
 import com.letta.mobile.util.Telemetry
+import kotlinx.serialization.Serializable
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -38,8 +41,12 @@ interface MemoryParitySource : AutoCloseable {
     fun start()
     fun reload()
     fun selectAgent(agentId: String)
+
+    /** Shows every agent's memory (no agent focused) instead of one agent's. */
+    fun selectFleet()
 }
 
+@Serializable
 @Immutable
 data class MemoryParityAgentOption(
     val id: String,
@@ -60,6 +67,7 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
     private var selectedAgentId: AgentId? = null
     private var selectedAgentDetail: Agent? = null
     private var selectedAgentGraphId: Long? = null
+    private var fleet = false
 
     override fun start() {
         if (stateFlow.value.memory.sections.isEmpty()) {
@@ -70,16 +78,73 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
     override fun reload() {
         val revision = loadRevision.incrementAndGet()
         val target = selectedAgentId
+        val fleetTarget = fleet && target == null
         loadJob?.cancel()
-        loadJob = scope.launch { load(target, revision) }
+        loadJob = scope.launch { if (fleetTarget) loadFleet(revision) else load(target, revision) }
     }
 
     override fun selectAgent(agentId: String) {
         val target = AgentId(agentId)
         if (selectedAgentId == target) return
         selectedAgentId = target
+        fleet = false
         stateFlow.update { it.copy(memory = MemoryParityState(), isLoading = true, errorMessage = null) }
         reload()
+    }
+
+    /**
+     * Every agent's core-memory blocks, read per agent a few at a time (one agent's failure leaves
+     * the others'), grouped by label. The host's global block list carries no owner, so it cannot say
+     * which agents use a block or route an edit, which goes through agent + label.
+     */
+    override fun selectFleet() {
+        if (fleet && selectedAgentId == null) return reload()
+        selectedAgentId = null
+        selectedAgentDetail = null
+        fleet = true
+        stateFlow.update { it.copy(memory = MemoryParityState(fleet = true), isLoading = true, errorMessage = null) }
+        reload()
+    }
+
+    private suspend fun loadFleet(revision: Long) {
+        ensureCurrent(revision)
+        stateFlow.update { it.copy(isLoading = true, errorMessage = null) }
+        val graph = sessionGraphProvider.current
+        val roster = sectionReader.read("roster", SessionRoute.AGENTS, graph.capabilities) {
+            graph.agentRepository.refreshAgentsIfStale(maxAgeMs = maxAgeMs)
+            graph.agentRepository.agents.value
+        }
+        ensureCurrent(revision)
+        val agents = roster.value.orEmpty().visibleInLists()
+        val blocks = readFleetBlocks(graph, agents, roster.loaded)
+        ensureCurrent(revision)
+        val memory = MemoryFleetMapper.build(MemoryFleetInput(
+            agents = agents,
+            blocks = blocks.value.orEmpty(),
+            backendDescriptor = graph.backendDescriptor,
+            channelTransportState = graph.channelTransport.state.value,
+            blocksLoaded = blocks.loaded,
+        ))
+        stateFlow.value = MemoryParityControllerState(
+            memory = memory,
+            agents = if (roster.loaded) agents.map { MemoryParityAgentOption(it.id.value, it.name) } else stateFlow.value.agents,
+            isLoading = false,
+            errorMessage = (roster.error ?: blocks.error)?.let(errorMessageMapper),
+        )
+    }
+
+    private suspend fun readFleetBlocks(
+        graph: Graph,
+        agents: List<Agent>,
+        rosterLoaded: Boolean,
+    ): MemoryParitySectionRead<List<Pair<AgentId, List<Block>>>> {
+        if (!rosterLoaded) return absent(false, emptyList())
+        val repository = graph.blockRepository ?: return MemoryParitySectionRead.Loaded(agents.map { it.id to it.coreBlocks })
+        return sectionReader.read("blocks", SessionRoute.BLOCKS, graph.capabilities) {
+            val read = AgentFleetReads.read(agents.map { it.id }) { agent -> repository.getBlocks(agent.value) }
+            read.firstFailure?.takeIf { read.allFailed }?.let { throw it }
+            read.values
+        }
     }
 
     override fun close() {

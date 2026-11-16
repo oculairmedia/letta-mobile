@@ -96,7 +96,7 @@ class ShellPageDepsParityTest {
     }
 
     @Test
-    fun schedulesPickerDispatchesTheWorkspaceFocus() = runComposeUiTest {
+    fun schedulesChipsFilterTheFleetWithoutMovingFocus() = runComposeUiTest {
         val binding = HostSessionBinding(
             platform = SessionPlatform.DESKTOP, config = iroh, appServerClients = HostAppServerClients { null },
         )
@@ -122,7 +122,7 @@ class ShellPageDepsParityTest {
             }
         } as IScheduleRepository
         val schedules = ScheduleLibraryController(agentRepository, scheduleRepository, scope)
-        schedules.start()
+        schedules.selectFleet()
         val controllers = ShellLibraryControllers(
             memory = ShellLibraryFactory.memory(provider, scope), schedules = schedules,
             channels = ShellLibraryFactory.channels(provider, scope), tools = ShellLibraryFactory.tools(graph, scope),
@@ -137,7 +137,8 @@ class ShellPageDepsParityTest {
             MaterialTheme { ProvideLettaHost(LettaHost.Pointer) { ShellPage(ShellDestination.Schedules(), deps) } }
         }
         onNodeWithTag(SchedulesPageTags.agent("a2")).performClick()
-        assertEquals(AgentId("a2"), workspace.currentFocus.agentId)
+        assertEquals("a2", schedules.state.value.agentFilter)
+        assertEquals(null, workspace.currentFocus.agentId)
         scope.cancel()
         graph.close()
     }
@@ -161,6 +162,7 @@ class ShellPageDepsParityTest {
             override fun selectAgent(agentId: String) {
                 state.value = state.value.copy(memory = state.value.memory.copy(selectedAgentId = agentId))
             }
+            override fun selectFleet() = Unit
             override fun close() = Unit
         }
         val memory = MemoryPageController(source, memoryBlocks(), scope, layoutDispatcher = Dispatchers.Unconfined)

@@ -11,6 +11,8 @@ import com.letta.mobile.data.schedules.leases.Lease
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.ICronRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
+import com.letta.mobile.data.fleet.AgentFleetRead
+import com.letta.mobile.data.fleet.AgentFleetReads
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -56,7 +58,17 @@ data class ScheduleLibraryState(
     val leases: List<Lease> = emptyList(),
     /** Cron controls waiting for host confirmation and the refreshed list. */
     val pendingCronIds: Set<String> = emptySet(),
+    /**
+     * True when no agent is focused and the library holds every agent's schedules (rows carry
+     * their own agent); [selectedAgentId] is null then.
+     */
+    val fleet: Boolean = false,
+    /** In [fleet] mode, the one agent whose schedules the page narrows to; null shows every agent's. */
+    val agentFilter: String? = null,
 ) {
+    /** The agent whose schedules show: the selected one, else the fleet's filter; null shows all. */
+    val scopeAgentId: String? get() = selectedAgentId ?: agentFilter.takeIf { fleet }
+
     /** Crons scoped to the selected agent (cron tasks may carry no agent id). */
     val cronsForSelectedAgent: List<CronTask>
         get() = selectedAgentId?.let { agentId ->
@@ -68,8 +80,10 @@ data class ScheduleLibraryState(
 
     val emptyMessage: String
         get() = when {
+            !scheduleAdminAvailable && !cronMode -> scheduleAdminMessage ?: SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE
+            fleet && agents.isEmpty() -> "No agents available."
+            fleet -> "No schedules across your agents."
             cronMode -> "No schedules for this agent."
-            !scheduleAdminAvailable -> scheduleAdminMessage ?: SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE
             selectedAgentId == null -> "No agents available."
             else -> "No schedules for this agent."
         }
@@ -171,6 +185,10 @@ class ScheduleLibraryController(
     fun loadData() {
         loadJob?.cancel()
         val revision = ScheduleRevision(targetRevision.value)
+        if (stateFlow.value.fleet) {
+            loadJob = scope.launch { loadFleet(revision) }
+            return
+        }
         loadJob = scope.launch {
             stateFlow.update { it.copy(isLoading = true, errorMessage = null) }
             val (agents, rosterError) = operations.loadAgentRoster { stateFlow.value.agents }
@@ -220,6 +238,68 @@ class ScheduleLibraryController(
         } else {
             onFailure()
         }
+    }
+
+    /**
+     * Shows every agent's schedules (no agent focused): each agent is read a few at a time, one
+     * agent's failure leaves the others listed, and rows keep their own agent for mutations.
+     */
+    fun selectFleet() {
+        loadJob?.cancel()
+        val current = stateFlow.value
+        if (!current.fleet || current.selectedAgentId != null) {
+            targetRevision.incrementAndGet()
+            cronMutationJob?.cancel()
+            stateFlow.value = ScheduleLibraryState(agents = current.agents, fleet = true)
+        }
+        loadData()
+    }
+
+    /** In fleet mode, narrows the rows to [agentId]'s; null shows every agent's again. */
+    fun filterAgent(agentId: String?) {
+        stateFlow.update { if (it.fleet) it.copy(agentFilter = agentId) else it }
+    }
+
+    private suspend fun loadFleet(revision: ScheduleRevision) {
+        stateFlow.update { it.copy(isLoading = true, errorMessage = null) }
+        val (agents, rosterError) = operations.loadAgentRoster { stateFlow.value.agents }
+        if (targetRevision.value != revision.value) return
+        val read = readFleet(agents.map { it.id }, native = !nativeScheduleRouteUnavailable)
+        if (targetRevision.value != revision.value) return
+        if (cronSource != null && read.nativeRouteUnserved()) nativeScheduleRouteUnavailable = true
+        val published = stateFlow.value.fleetTarget(agents).withFleetRead(read, errorMessageMapper)
+        stateFlow.value = published.copy(
+            errorMessage = published.errorMessage ?: rosterError?.let { errorMessageMapper(it, "Failed to load agents") },
+        )
+        loadFleetRunHistory(revision)
+    }
+
+    /** Every agent's native schedules (null where the route is not served) and cron tasks, a few agents at a time. */
+    private suspend fun readFleet(agents: List<AgentId>, native: Boolean): AgentFleetRead<AgentId, AgentScheduleRead> =
+        AgentFleetReads.read(agents) { agent ->
+            val schedules = if (native) nativeSchedulesOrNull(agent) else null
+            schedules to cronSource?.listCrons(agent)
+        }
+
+    private suspend fun nativeSchedulesOrNull(agent: AgentId): List<ScheduledMessage>? =
+        try {
+            operations.loadSchedulesForAgent(agent)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            if (scheduleAdminUnavailableMatcher(t)) null else throw t
+        }
+
+    /** Each agent's recorded runs for its own rows, merged; agents whose history fails keep none. */
+    private suspend fun loadFleetRunHistory(revision: ScheduleRevision) {
+        val source = recordSources?.runHistory ?: return
+        val state = stateFlow.value
+        val owned = state.schedules.map { it.agentId to it.id } + state.crons.mapNotNull { cron -> cron.agentId?.let { it to cron.id } }
+        val idsByAgent = owned.groupBy({ AgentId(it.first) }, { it.second })
+        val read = AgentFleetReads.read(idsByAgent.keys.toList()) { agent -> source(agent, idsByAgent.getValue(agent).distinct()) }
+        if (targetRevision.value != revision.value) return
+        val history = read.values.flatMap { it.second }.groupBy { it.scheduleId }
+        stateFlow.update { if (it.fleet) it.copy(runHistory = history) else it }
     }
 
     fun selectAgent(agentId: String) {
@@ -294,7 +374,50 @@ class ScheduleLibraryController(
      */
     fun createRecurringSchedule(request: ScheduleCreateRequest) {
         val agentId = request.agentId ?: stateFlow.value.selectedAgentId ?: return
-        createSchedule(agentId, request.toCreateParams())
+        if (stateFlow.value.fleet) createFleetSchedule(AgentId(agentId), request.toCreateParams())
+        else createSchedule(agentId, request.toCreateParams())
+    }
+
+    /** In fleet mode, creates the schedule for the agent the form chose, then reads the fleet again. */
+    private fun createFleetSchedule(agent: AgentId, params: ScheduleCreateParams) {
+        val revision = ScheduleRevision(targetRevision.value)
+        mutationJob?.cancel()
+        mutationJob = scope.launch {
+            try {
+                scheduleRepository.createSchedule(agent.value, params)
+                if (targetRevision.value == revision.value) loadFleet(revision)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                if (targetRevision.value != revision.value) return@launch
+                stateFlow.value = operations.mutationFailure(t, stateFlow.value, "Failed to create schedule")
+            }
+        }
+    }
+
+    /**
+     * Deletes a schedule that belongs to [agentId]: in fleet mode the row names its own agent; with
+     * an agent selected it must be that agent.
+     */
+    fun deleteAgentSchedule(agentId: String, scheduledMessageId: String) {
+        val current = stateFlow.value
+        if (!current.fleet) {
+            if (current.selectedAgentId == agentId) deleteSchedule(scheduledMessageId)
+            return
+        }
+        val revision = ScheduleRevision(targetRevision.value)
+        mutationJob?.cancel()
+        mutationJob = scope.launch {
+            try {
+                operations.deleteAndReload(current, AgentId(agentId), ScheduleIdentity(scheduledMessageId))
+                if (targetRevision.value == revision.value) loadFleet(revision)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                if (targetRevision.value != revision.value) return@launch
+                stateFlow.value = operations.mutationFailure(t, stateFlow.value, "Failed to delete schedule")
+            }
+        }
     }
 
     fun deleteSchedule(scheduledMessageId: String) {
@@ -334,7 +457,7 @@ class ScheduleLibraryController(
         val taskId = task.id
         if (cronRepository == null) return
         val current = stateFlow.value
-        val agent = current.selectedAgentId ?: return
+        val agent = current.selectedAgentId ?: task.agentId.takeIf { current.fleet } ?: return
         if (cronMutationJob?.isActive == true) return
         if (!current.canControlCron(task, resume)) return
         val revision = ScheduleRevision(targetRevision.value)
@@ -350,7 +473,10 @@ class ScheduleLibraryController(
             if (resume) repository.resumeSchedule(agent.value, task.id).getOrThrow()
             else repository.pauseSchedule(agent.value, task.id).getOrThrow()
             val crons = cronSource?.listCrons(agent).orEmpty()
-            if (targetRevision.value == revision.value) stateFlow.update { it.copy(crons = crons) }
+            if (targetRevision.value == revision.value) stateFlow.update {
+                if (it.fleet) it.copy(crons = it.crons.replacingAgentCrons(agent, crons, it.agents))
+                else it.copy(crons = crons)
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
@@ -482,6 +608,8 @@ private fun MutableStateFlow<ScheduleLibraryState>.selectAgentTarget(agent: Agen
     update { current ->
         if (current.selectedAgentId == agentId) current else current.copy(
             selectedAgentId = agentId,
+            fleet = false,
+            agentFilter = null,
             schedules = emptyList(),
             crons = emptyList(),
             pendingCronIds = emptySet(),

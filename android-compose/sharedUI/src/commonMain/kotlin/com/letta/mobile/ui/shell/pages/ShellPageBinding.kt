@@ -243,7 +243,11 @@ private fun selectPageAgent(workspace: ShellWorkspaceState, agent: AgentId): Boo
     ))
 }
 
-/** The shared Schedules page; a schedule can be made where the session serves them and an agent is chosen. */
+/**
+ * The shared Schedules page. With an agent focused it shows that agent's schedules; with none it
+ * shows every agent's, the agent chips narrowing it. A schedule can be made where the session serves
+ * them and there is an agent to make it for (the focused one, or one chosen in the form).
+ */
 private fun schedulesPage(
     graph: SessionRepositoryGraph,
     schedules: ScheduleLibraryController,
@@ -251,18 +255,20 @@ private fun schedulesPage(
 ) = ShellPageContent<ShellDestination.Schedules> { destination, modifier ->
     val library by schedules.state.collectAsState()
     val focused = host.navigator.state.currentFocus.agentId?.value
-    val agentChosen = focused != null
+    val agentAvailable = focused != null || (library.fleet && library.agents.isNotEmpty())
     val state = SchedulesPageState(
         library = library,
         focusedAgentId = focused,
-        canCreate = graph.capabilities.supports(SessionRoute.SCHEDULES) && agentChosen,
+        canCreate = graph.capabilities.supports(SessionRoute.SCHEDULES) && agentAvailable,
     )
     shellSchedulesPage(state, shellScheduleActions(schedules, host.navigator.state)).Content(destination, modifier)
 }
 
 /**
- * The Schedules page's actions over the shared library. A row or form can mutate only while its
- * agent still matches both the workspace focus and the library's current query target.
+ * The Schedules page's actions over the shared library. With an agent focused, a row or form can
+ * mutate only while its agent still matches both the workspace focus and the library's current
+ * query target. With none focused, the library holds every agent's schedules and each row mutates
+ * through its own agent.
  */
 internal fun shellScheduleActions(
     schedules: ScheduleLibraryController,
@@ -271,20 +277,32 @@ internal fun shellScheduleActions(
     onRefresh = {
         if (workspace.currentFocus.agentId?.value == schedules.state.value.selectedAgentId) schedules.loadData()
     },
-    onSelectAgent = { id -> selectPageAgent(workspace, AgentId(id)) },
+    onFilterAgent = { id -> if (fleetSchedules(schedules, workspace)) schedules.filterAgent(id) },
     onDeleteSchedule = { ref ->
-        if (scheduleAgent(schedules, workspace) == ref.agentId) schedules.deleteSchedule(ref.scheduleId)
+        if (fleetSchedules(schedules, workspace)) schedules.deleteAgentSchedule(ref.agentId, ref.scheduleId)
+        else if (scheduleAgent(schedules, workspace) == ref.agentId) schedules.deleteSchedule(ref.scheduleId)
     },
-    onDeleteCron = { id ->
-        scheduleAgent(schedules, workspace)?.let { schedules.deleteSchedule(id.value) }
-    },
+    onDeleteCron = { id -> deleteCron(schedules, workspace, id.value) },
     onTogglePause = { id, resume -> toggleFocusedCron(schedules, workspace, id, resume) },
     onCreate = { request -> createFocusedSchedule(schedules, workspace, request) },
 )
 
+/** No agent is focused and the library holds the fleet's schedules. */
+private fun fleetSchedules(schedules: ScheduleLibraryController, workspace: ShellWorkspaceState): Boolean =
+    workspace.currentFocus.agentId == null && schedules.state.value.fleet
+
 private fun scheduleAgent(schedules: ScheduleLibraryController, workspace: ShellWorkspaceState): String? {
     val agent = workspace.currentFocus.agentId?.value ?: return null
     return agent.takeIf { schedules.state.value.selectedAgentId == it }
+}
+
+private fun deleteCron(schedules: ScheduleLibraryController, workspace: ShellWorkspaceState, id: String) {
+    if (fleetSchedules(schedules, workspace)) {
+        val owner = schedules.state.value.crons.firstOrNull { it.id == id }?.agentId ?: return
+        schedules.deleteAgentSchedule(owner, id)
+    } else {
+        scheduleAgent(schedules, workspace)?.let { schedules.deleteSchedule(id) }
+    }
 }
 
 private fun toggleFocusedCron(
@@ -293,7 +311,7 @@ private fun toggleFocusedCron(
     id: String,
     resume: Boolean,
 ) {
-    scheduleAgent(schedules, workspace) ?: return
+    if (!fleetSchedules(schedules, workspace) && scheduleAgent(schedules, workspace) == null) return
     schedules.state.value.crons.firstOrNull { it.id == id }?.let { schedules.toggleCronPause(it, resume) }
 }
 
@@ -302,6 +320,10 @@ private fun createFocusedSchedule(
     workspace: ShellWorkspaceState,
     request: ScheduleCreateRequest,
 ) {
+    if (fleetSchedules(schedules, workspace)) {
+        if (request.agentId != null) schedules.createRecurringSchedule(request)
+        return
+    }
     val agent = scheduleAgent(schedules, workspace) ?: return
     if (request.agentId == null || request.agentId == agent) {
         schedules.createRecurringSchedule(request.copy(agentId = agent))

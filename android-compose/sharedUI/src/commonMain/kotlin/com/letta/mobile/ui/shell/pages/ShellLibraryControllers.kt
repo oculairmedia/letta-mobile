@@ -149,16 +149,21 @@ private fun <T : AutoCloseable> StartedWhileComposed(controller: T, start: (T) -
 }
 
 /**
- * The page on screen follows the focused [agent]: Memory and Schedules select it, and Skills loads
- * its installed set whenever the page opens or the agent changes.
+ * The page on screen follows the focused [agent]: Memory and Schedules select it, or with no agent
+ * focused show the whole fleet (so no earlier agent's state lingers), and Skills loads its installed
+ * set whenever the page opens or the agent changes.
  */
 @Composable
 fun ShellLibraryFocusEffects(controllers: ShellLibraryControllers, page: ShellPageKind, agent: AgentId?) {
     LaunchedEffect(controllers.memory, page, agent) {
-        if (page == ShellPageKind.Memory && agent != null) controllers.memory.selectAgent(agent.value)
+        if (page == ShellPageKind.Memory) {
+            if (agent != null) controllers.memory.selectAgent(agent.value) else controllers.memory.selectFleet()
+        }
     }
     LaunchedEffect(controllers.schedules, page, agent) {
-        if (page == ShellPageKind.Schedules && agent != null) controllers.schedules.selectAgent(agent.value)
+        if (page == ShellPageKind.Schedules) {
+            if (agent != null) controllers.schedules.selectAgent(agent.value) else controllers.schedules.selectFleet()
+        }
     }
     LaunchedEffect(controllers.skills, page, agent) {
         if (page == ShellPageKind.Skills) controllers.skills.reload(agent?.value)
