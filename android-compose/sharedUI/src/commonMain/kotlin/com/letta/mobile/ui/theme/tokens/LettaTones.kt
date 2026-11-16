@@ -38,3 +38,19 @@ enum class LettaStatusTone {
     /** Failed: `error`. */
     Error,
 }
+
+/**
+ * The colour set a border beam (lettaBorderBeam) runs in. Each tone maps to theme roles except
+ * [Spectrum], the one multicolour palette ([LettaBeamPalette.spectrum]).
+ */
+enum class LettaBeamTone {
+    /** Something is working (a run, a stream, a recording): `primary` into `tertiary`. */
+    Working,
+
+    /** Something wants attention now (approval, failure about to need a decision): `error`. */
+    Attention,
+
+    /** The multicolour beam for a featured or celebratory surface. */
+    Spectrum,
+}
+

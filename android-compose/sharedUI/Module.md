@@ -149,6 +149,10 @@ The shared building blocks every page uses instead of hand-building its own: Let
 
 The one disclosure: DisclosureChevron and everything built on it. LettaDisclosureHeader is a header line whose whole width toggles what it discloses (the same line the chat timeline draws its disclosures with), LettaFoldButton and LettaUnfoldButton fold a dock or card down and back, and LettaMenuIndicator is the still mark at the end of a chip or picker button that opens a menu or sheet. Every disclosure clicks the same way: a button with an action label and an open / closed state, by pointer, touch or keyboard, with the segment tick. The package imports only Compose, `ui.icons`, `ui.haptics`, `ui.theme.tokens`, `ui.components.line` and `ui.components.foundation`, so any page, the chat root and the canvas among them, can import it without closing a package cycle.
 
+# Package com.letta.mobile.ui.components.beam
+
+Modifier.lettaBorderBeam: an animated beam of light travelling around an element's border, the signal that something there is live (a run, a stream, a recording). A LettaBeamSpec sets its colours (LettaBeamDefaults.colors for a theme tone), the outline it follows, and its style (Orbit, OrbitCompact, Sweep) and direction. It draws with a runtime shader on Android 13+ (AGSL) and on desktop and web (Skia SkSL), from one shared source, and with Canvas strokes everywhere else. Each frame only redraws the element; the frame loop stops while the beam is off, off screen or under reduced motion, where the beam stays lit but still. Ported from border-beam-android (MIT, see THIRD_PARTY_LICENSES). The package imports only Compose, `ui.theme.tokens` and the telemetry utility, so any page can use it without closing a package cycle.
+
 # Package com.letta.mobile.ui.components.list
 
 Roster models, sections, row parts and drag/reorder affordances. Extend through roster models, row-content slots and action callbacks; ordering persistence and deletion policy belong to the owner of the list.

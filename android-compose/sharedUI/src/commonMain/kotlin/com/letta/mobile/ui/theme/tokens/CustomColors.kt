@@ -91,3 +91,24 @@ data class CustomColors(
 
 /** The [CustomColors] in scope; read it as `MaterialTheme.customColors`. Every Letta theme provides it. */
 val LocalLettaCustomColors = staticCompositionLocalOf { CustomColors() }
+
+/**
+ * Fixed beam palettes (lettaBorderBeam). The tone-mapped beams read the theme instead; this is the
+ * one multicolour set, the same in light and dark because it draws over the container's own edge.
+ * Ported from border-beam-android's `colorful` palette (MIT, see sharedUI/THIRD_PARTY_LICENSES).
+ * Ordered tail to head.
+ */
+object LettaBeamPalette {
+    /** Green, blue, violet, pink, amber: the multicolour beam ([LettaBeamTone.Spectrum]). */
+    val spectrum: List<Color> = listOf(
+        Color(red = 0.25f, green = 0.85f, blue = 0.45f),
+        Color(red = 0.20f, green = 0.60f, blue = 0.95f),
+        Color(red = 0.70f, green = 0.35f, blue = 0.95f),
+        Color(red = 1.00f, green = 0.35f, blue = 0.65f),
+        Color(red = 1.00f, green = 0.65f, blue = 0.25f),
+    )
+
+    /** How faint a single-colour beam's two ends are, so it fades in and out along its length. */
+    const val TAIL_ALPHA: Float = 0.3f
+}
+

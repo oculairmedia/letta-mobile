@@ -26,4 +26,22 @@ object LettaComponentDimens {
 
     /** The shadow an elevated notice casts over the page (the overlay host's banner, LettaInlineNotice). */
     val floatingNoticeElevation: Dp = 4.dp
+
+    /** How far a border beam's soft glow reaches inward from the edge (lettaBorderBeam, Orbit style). */
+    val beamGlowOrbit: Dp = 20.dp
+
+    /** The beam's glow reach on small controls (OrbitCompact): icon buttons, avatars, chips. */
+    val beamGlowCompact: Dp = 4.dp
+
+    /** The beam's glow reach when it sweeps along the bottom edge (Sweep): search and input bars. */
+    val beamGlowSweep: Dp = 10.dp
+
+    /** The beam's crisp core line, drawn where no shader runs (the Canvas fallback). */
+    val beamCoreStroke: Dp = 2.dp
+
+    /** The tight halo around the beam's core line in the Canvas fallback. */
+    val beamHaloStroke: Dp = 4.dp
+
+    /** The narrowest soft glow the Canvas fallback draws, so a compact beam still reads. */
+    val beamMinGlowStroke: Dp = 6.dp
 }
