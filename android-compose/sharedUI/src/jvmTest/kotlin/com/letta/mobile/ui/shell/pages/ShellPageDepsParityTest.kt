@@ -13,6 +13,9 @@ import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import com.letta.mobile.data.schedules.ScheduleLibraryController
+import com.letta.mobile.data.schedules.fleet.ScheduleFleetController
+import com.letta.mobile.data.schedules.fleet.ScheduleFleetPolicy
+import com.letta.mobile.data.schedules.fleet.ScheduleFleetSources
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.skills.SkillsApi
 import com.letta.mobile.data.skills.SkillsCatalogController
@@ -122,12 +125,14 @@ class ShellPageDepsParityTest {
             }
         } as IScheduleRepository
         val schedules = ScheduleLibraryController(agentRepository, scheduleRepository, scope)
-        schedules.selectFleet()
+        val fleet = ScheduleFleetController(ScheduleFleetSources(agentRepository, scheduleRepository), ScheduleFleetPolicy(), scope)
+        fleet.refresh()
         val controllers = ShellLibraryControllers(
             memory = ShellLibraryFactory.memory(provider, scope), schedules = schedules,
             channels = ShellLibraryFactory.channels(provider, scope), tools = ShellLibraryFactory.tools(graph, scope),
             skills = ShellLibraryFactory.skills(graph, scope), home = ShellLibraryFactory.home(provider, settings, scope),
             memfs = MemfsPageController(AppServerMemfsSource({ error("no session") }, emptyFlow(), { it }), scope),
+            scheduleFleet = fleet,
         )
         val workspace = ShellWorkspaceState()
         workspace.selectFocus(CurrentFocus(pageRoute = "schedules"))
@@ -137,7 +142,7 @@ class ShellPageDepsParityTest {
             MaterialTheme { ProvideLettaHost(LettaHost.Pointer) { ShellPage(ShellDestination.Schedules(), deps) } }
         }
         onNodeWithTag(SchedulesPageTags.agent("a2")).performClick()
-        assertEquals("a2", schedules.state.value.agentFilter)
+        assertEquals("a2", fleet.state.value.agentFilter)
         assertEquals(null, workspace.currentFocus.agentId)
         scope.cancel()
         graph.close()
@@ -176,6 +181,7 @@ class ShellPageDepsParityTest {
             memory = memory, schedules = ShellLibraryFactory.schedules(graph, scope),
             channels = ShellLibraryFactory.channels(provider, scope), tools = ShellLibraryFactory.tools(graph, scope),
             skills = ShellLibraryFactory.skills(graph, scope), home = ShellLibraryFactory.home(provider, settings, scope), memfs = memfs,
+            scheduleFleet = ShellLibraryFactory.scheduleFleet(graph, scope),
         )
         val workspace = ShellWorkspaceState().apply { selectFocus(CurrentFocus(pageRoute = "memory", agentId = AgentId("a1"))) }
         val deps = shellPageDeps(graph, controllers, host(settings, workspace, ShellPageFocus(AgentId("a1"), "Ada")))
@@ -276,6 +282,7 @@ class ShellPageDepsParityTest {
             channels = ShellLibraryFactory.channels(provider, scope), tools = ShellLibraryFactory.tools(graph, scope),
             skills = skills, home = ShellLibraryFactory.home(provider, settings, scope),
             memfs = MemfsPageController(AppServerMemfsSource({ error("no session") }, emptyFlow(), { it }), scope),
+            scheduleFleet = ShellLibraryFactory.scheduleFleet(graph, scope),
         )
         val workspace = ShellWorkspaceState().apply { selectFocus(CurrentFocus(pageRoute = "skills", agentId = AgentId("a2"))) }
         val deps = shellPageDeps(graph, controllers, host(settings, workspace, ShellPageFocus(AgentId("a2"), "Bo")))
@@ -321,6 +328,7 @@ class ShellPageDepsParityTest {
             skills = ShellLibraryFactory.skills(graph, scope),
             home = ShellLibraryFactory.home(provider, settings, scope),
             memfs = MemfsPageController(AppServerMemfsSource({ error("no session") }, emptyFlow(), { it }), scope),
+            scheduleFleet = ShellLibraryFactory.scheduleFleet(graph, scope),
         )
         val registered = shellPageDeps(graph, controllers, host(settings)).registered
         graph.close()

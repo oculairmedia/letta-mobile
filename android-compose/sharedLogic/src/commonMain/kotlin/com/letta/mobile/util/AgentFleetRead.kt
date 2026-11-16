@@ -1,6 +1,5 @@
-package com.letta.mobile.data.fleet
+package com.letta.mobile.util
 
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -25,9 +24,9 @@ data class AgentFleetRead<K, out T>(
 }
 
 /**
- * Reads something per agent across the roster, a few agents at a time, the way the conversation
- * fleet reads conversations: for pages (Schedules, Memory) whose host serves the data only per
- * agent and that show the whole fleet when no agent is focused.
+ * Reads something per agent across the roster, a few agents at a time, the way
+ * [AgentConversationFleet] reads conversations: for pages (Schedules, Memory) whose host serves
+ * the data only per agent and that show the whole fleet when no agent is focused.
  */
 object AgentFleetReads {
     /** Reads at once across the roster. */
@@ -41,20 +40,11 @@ object AgentFleetReads {
     ): AgentFleetRead<K, T> = coroutineScope {
         val permits = Semaphore(parallelism.coerceAtLeast(1))
         val results = agents.distinct().map { agent ->
-            async { agent to attempt { permits.withPermit { read(agent) } } }
+            async { agent to runCatchingCancellable { permits.withPermit { read(agent) } } }
         }.awaitAll()
         AgentFleetRead(
             values = results.filter { it.second.isSuccess }.map { (agent, result) -> agent to result.getOrThrow() },
             failures = results.mapNotNull { (agent, result) -> result.exceptionOrNull()?.let { agent to it } }.toMap(),
         )
     }
-
-    private suspend fun <T> attempt(block: suspend () -> T): Result<T> =
-        try {
-            Result.success(block())
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (t: Throwable) {
-            Result.failure(t)
-        }
 }

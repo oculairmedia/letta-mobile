@@ -347,10 +347,6 @@ A Markdown text/title document kind over the shared document primitives. Persist
 
 Dreaming settings, history, notifications and controller state. App Server and admin-RPC adapters expose available reflection operations through one backend contract. Keep runtime ownership and platform presentation outside dreaming controls; supply operations through [DreamingRepository](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.dreaming/-dreaming-repository/index.html) and history through [DreamHistorySource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.dreaming/-dream-history-source/index.html).
 
-# Package com.letta.mobile.data.fleet
-
-Per-agent reads across the whole roster, a few agents at a time, for pages that show every agent's data when no agent is focused (Schedules, Memory) on hosts that serve that data only per agent. One agent's failed read leaves the others' values; only a read in which every agent failed is a failure. Callers key reads by agent id and merge the values in roster order.
-
 # Package com.letta.mobile.data.health
 
 Server health probing, state and repository contracts. Service availability is reported separately from whether a conversation currently has an active turn. Keep active-turn state distinct from reachability; provide probes through [AppServerReachability](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.health/-app-server-reachability/index.html) and consume updates through [ServerHealthListener](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.health/-server-health-listener/index.html).
@@ -924,6 +920,10 @@ The host side of the voice-endpoint v1 contract: one speech server setup shared 
 # Package com.letta.mobile.data.controller.node.iroh.errors
 
 The one exception type whose message the admin RPC router returns to a remote client. Handlers raise it for deliberate, safe refusals built from the caller's own request; every other exception answers a fixed internal-error text so host paths and state never cross the wire. This leaf package imports nothing from the handlers or the router.
+
+# Package com.letta.mobile.data.schedules.fleet
+
+The Schedules page with no agent focused: every agent's native schedules and cron tasks, read a few agents at a time and merged in roster order. One agent's failed read leaves the others listed; only every read failing is an error. Rows keep their own agent, so deletes, pause/resume and run history go through it, and a new schedule is made for the agent the form names. The state is a `ScheduleLibraryState` with `fleet` set, so the page renders it like one agent's library.
 
 # Package com.letta.mobile.data.schedules.leases
 

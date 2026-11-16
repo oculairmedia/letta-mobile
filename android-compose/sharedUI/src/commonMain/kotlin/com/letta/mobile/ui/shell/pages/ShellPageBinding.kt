@@ -6,15 +6,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.memory.MemoryParityControllerState
 import com.letta.mobile.data.memory.graph.MemoryPageState
 import com.letta.mobile.data.memory.memfs.MemfsNavigation
 import com.letta.mobile.data.memory.memfs.MemfsPageActions
 import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
-import com.letta.mobile.data.schedules.ScheduleCreateRequest
-import com.letta.mobile.data.schedules.ScheduleLibraryController
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.shell.CurrentFocusChatMode
 import com.letta.mobile.data.shell.ShellWorkspaceState
@@ -37,13 +34,10 @@ import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceBinding
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceView
 import com.letta.mobile.ui.chat.surface.timeline.rows.LocalMemoryPreview
 import com.letta.mobile.ui.shell.pages.memory.rememberMemoryWorkspaceView
-import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageActions
-import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageState
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageActions
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageOptions
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageState
 import com.letta.mobile.ui.shell.shellChannelsPage
-import com.letta.mobile.ui.shell.shellSchedulesPage
 import com.letta.mobile.ui.shell.shellSkillsPage
 
 /** The agent the pages are about, as the host's shell focuses it. */
@@ -129,7 +123,7 @@ fun shellPageDeps(
         // A board is a panel of its conversation's chat page.
         canvas = chat?.let { page -> ShellPageContent { _, modifier -> page.Content(ShellDestination.Chat(), modifier) } },
         memory = memoryPage(controllers, host),
-        schedules = schedulesPage(graph, controllers.schedules, host),
+        schedules = schedulesPage(graph, controllers, host),
         channels = channelsPage(controllers, host.pages.slots),
         skills = skillsPage(controllers, host),
         settings = settings,
@@ -241,93 +235,6 @@ private fun selectPageAgent(workspace: ShellWorkspaceState, agent: AgentId): Boo
     return workspace.selectFocus(workspace.currentFocus.copy(
         agentId = agent, conversationId = null, chatMode = CurrentFocusChatMode.Resume,
     ))
-}
-
-/**
- * The shared Schedules page. With an agent focused it shows that agent's schedules; with none it
- * shows every agent's, the agent chips narrowing it. A schedule can be made where the session serves
- * them and there is an agent to make it for (the focused one, or one chosen in the form).
- */
-private fun schedulesPage(
-    graph: SessionRepositoryGraph,
-    schedules: ScheduleLibraryController,
-    host: ShellPageHost,
-) = ShellPageContent<ShellDestination.Schedules> { destination, modifier ->
-    val library by schedules.state.collectAsState()
-    val focused = host.navigator.state.currentFocus.agentId?.value
-    val agentAvailable = focused != null || (library.fleet && library.agents.isNotEmpty())
-    val state = SchedulesPageState(
-        library = library,
-        focusedAgentId = focused,
-        canCreate = graph.capabilities.supports(SessionRoute.SCHEDULES) && agentAvailable,
-    )
-    shellSchedulesPage(state, shellScheduleActions(schedules, host.navigator.state)).Content(destination, modifier)
-}
-
-/**
- * The Schedules page's actions over the shared library. With an agent focused, a row or form can
- * mutate only while its agent still matches both the workspace focus and the library's current
- * query target. With none focused, the library holds every agent's schedules and each row mutates
- * through its own agent.
- */
-internal fun shellScheduleActions(
-    schedules: ScheduleLibraryController,
-    workspace: ShellWorkspaceState,
-) = SchedulesPageActions(
-    onRefresh = {
-        if (workspace.currentFocus.agentId?.value == schedules.state.value.selectedAgentId) schedules.loadData()
-    },
-    onFilterAgent = { id -> if (fleetSchedules(schedules, workspace)) schedules.filterAgent(id?.let(::AgentId)) },
-    onDeleteSchedule = { ref ->
-        if (fleetSchedules(schedules, workspace)) schedules.deleteSchedule(ref.scheduleId, AgentId(ref.agentId))
-        else if (scheduleAgent(schedules, workspace) == ref.agentId) schedules.deleteSchedule(ref.scheduleId)
-    },
-    onDeleteCron = { id -> deleteCron(schedules, workspace, id.value) },
-    onTogglePause = { id, resume -> toggleFocusedCron(schedules, workspace, id, resume) },
-    onCreate = { request -> createFocusedSchedule(schedules, workspace, request) },
-)
-
-/** No agent is focused and the library holds the fleet's schedules. */
-private fun fleetSchedules(schedules: ScheduleLibraryController, workspace: ShellWorkspaceState): Boolean =
-    workspace.currentFocus.agentId == null && schedules.state.value.fleet
-
-private fun scheduleAgent(schedules: ScheduleLibraryController, workspace: ShellWorkspaceState): String? {
-    val agent = workspace.currentFocus.agentId?.value ?: return null
-    return agent.takeIf { schedules.state.value.selectedAgentId == it }
-}
-
-private fun deleteCron(schedules: ScheduleLibraryController, workspace: ShellWorkspaceState, id: String) {
-    if (fleetSchedules(schedules, workspace)) {
-        val owner = schedules.state.value.crons.firstOrNull { it.id == id }?.agentId ?: return
-        schedules.deleteSchedule(id, AgentId(owner))
-    } else {
-        scheduleAgent(schedules, workspace)?.let { schedules.deleteSchedule(id) }
-    }
-}
-
-private fun toggleFocusedCron(
-    schedules: ScheduleLibraryController,
-    workspace: ShellWorkspaceState,
-    id: String,
-    resume: Boolean,
-) {
-    if (!fleetSchedules(schedules, workspace) && scheduleAgent(schedules, workspace) == null) return
-    schedules.state.value.crons.firstOrNull { it.id == id }?.let { schedules.toggleCronPause(it, resume) }
-}
-
-private fun createFocusedSchedule(
-    schedules: ScheduleLibraryController,
-    workspace: ShellWorkspaceState,
-    request: ScheduleCreateRequest,
-) {
-    if (fleetSchedules(schedules, workspace)) {
-        if (request.agentId != null) schedules.createRecurringSchedule(request)
-        return
-    }
-    val agent = scheduleAgent(schedules, workspace) ?: return
-    if (request.agentId == null || request.agentId == agent) {
-        schedules.createRecurringSchedule(request.copy(agentId = agent))
-    }
 }
 
 private fun channelsPage(controllers: ShellLibraryControllers, slots: ChannelsPageSlots) =

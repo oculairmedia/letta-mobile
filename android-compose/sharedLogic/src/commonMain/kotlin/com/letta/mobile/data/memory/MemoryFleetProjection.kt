@@ -4,8 +4,12 @@ import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.model.visibleInLists
+import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.runtime.BackendDescriptor
+import com.letta.mobile.util.AgentFleetReads
 
 /** What the fleet memory view is built from: the roster and each agent's blocks, in roster order. */
 @Immutable
@@ -138,4 +142,23 @@ object MemoryFleetMapper {
     }
 
     private const val NAMED_OWNERS = 3
+}
+
+/**
+ * Every visible roster agent's core-memory blocks, read per agent a few at a time: one agent's
+ * failure leaves the others' blocks, and only every agent failing makes the section unavailable.
+ * Without a block repository the roster's embedded blocks stand in.
+ */
+internal suspend fun MemoryParitySectionReader.readFleetBlocks(
+    graph: SessionRepositoryGraph,
+    roster: MemoryParitySectionRead<List<Agent>>,
+): MemoryParitySectionRead<List<Pair<AgentId, List<Block>>>> {
+    val agents = roster.value?.visibleInLists()
+        ?: return MemoryParitySectionRead.Unavailable(IllegalStateException("roster dependency unavailable"))
+    val repository = graph.blockRepository ?: return MemoryParitySectionRead.Loaded(agents.map { it.id to it.coreBlocks })
+    return read("blocks", SessionRoute.BLOCKS, graph.capabilities) {
+        val fleet = AgentFleetReads.read(agents.map { it.id }) { agent -> repository.getBlocks(agent.value) }
+        fleet.firstFailure?.takeIf { fleet.allFailed }?.let { throw it }
+        fleet.values
+    }
 }

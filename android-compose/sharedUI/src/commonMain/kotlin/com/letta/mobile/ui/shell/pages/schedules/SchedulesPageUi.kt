@@ -362,6 +362,18 @@ internal fun SchedulesPageDialogs(ui: SchedulesPageUi, state: SchedulesPageState
     }
 }
 
+/**
+ * Where the form starts: the [initial] draft (a slot tapped on the calendar prefills its time) and,
+ * on a page showing every agent, the [agents] the schedule can be for, names by id in roster order
+ * (empty: the focused agent's).
+ */
+internal class ScheduleFormSetup(
+    val initial: ScheduleFormDraft = ScheduleFormDraft(),
+    val agents: Map<String, String> = emptyMap(),
+) {
+    fun canSubmit(draft: ScheduleFormDraft): Boolean = draft.isComplete && (agents.isEmpty() || draft.agentId != null)
+}
+
 /** An unfocused page's form asks which agent the schedule is for, starting from the fleet's filter. */
 private fun formSetup(state: SchedulesPageState, initial: ScheduleFormDraft): ScheduleFormSetup =
     if (state.showsFleet) {

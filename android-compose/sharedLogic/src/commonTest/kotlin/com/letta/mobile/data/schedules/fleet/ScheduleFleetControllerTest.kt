@@ -1,10 +1,15 @@
-package com.letta.mobile.data.schedules
+package com.letta.mobile.data.schedules.fleet
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentSummary
+import com.letta.mobile.data.schedules.CronScheduleSource
+import com.letta.mobile.data.schedules.CronTask
+import com.letta.mobile.data.schedules.ScheduleClock
+import com.letta.mobile.data.schedules.ScheduleCreateRequest
 import com.letta.mobile.data.schedules.ScheduleLibraryControllerTest.FakeAgentRepository
 import com.letta.mobile.data.schedules.ScheduleLibraryControllerTest.FakeScheduleRepository
 import com.letta.mobile.data.schedules.ScheduleLibraryControllerTest.RouteUnavailableException
+import com.letta.mobile.data.schedules.SchedulesPageModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -17,14 +22,13 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
-/** The library with no agent focused: every agent's schedules, read a few agents at a time. */
 @OptIn(ExperimentalCoroutinesApi::class)
-class ScheduleLibraryFleetTest {
+class ScheduleFleetControllerTest {
     @Test
-    fun withNoAgentFocusedEveryAgentsSchedulesListInRosterOrder() = runTest {
+    fun everyAgentsSchedulesListInRosterOrder() = runTest {
         val schedules = FakeScheduleRepository()
-        val controller = controller(scheduleRepository = schedules)
-        controller.selectFleet()
+        val controller = controller(schedules)
+        controller.refresh()
         advanceUntilIdle()
         val state = controller.state.value
         assertTrue(state.fleet)
@@ -32,34 +36,34 @@ class ScheduleLibraryFleetTest {
         assertEquals(listOf("s1", "s2"), state.schedules.map { it.id })
         assertEquals(listOf("a1", "a2"), schedules.refreshedAgents.sorted())
         assertNull(state.errorMessage)
+        assertFalse(state.isLoading)
     }
 
     @Test
-    fun oneAgentsFailureLeavesTheOtherAgentsListedInTheFleet() = runTest {
+    fun oneAgentsFailureLeavesTheOtherAgentsListed() = runTest {
         val schedules = FakeScheduleRepository().apply { failingAgents += "a2" }
-        val controller = controller(scheduleRepository = schedules)
-        controller.selectFleet()
+        val controller = controller(schedules)
+        controller.refresh()
         advanceUntilIdle()
         assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })
         assertEquals("Could not load schedules for 1 agent.", controller.state.value.errorMessage)
-        assertFalse(controller.state.value.isLoading)
     }
 
     @Test
-    fun everyAgentFailingIsTheFleetsOnlyTotalFailure() = runTest {
+    fun everyAgentFailingIsTheOnlyTotalFailure() = runTest {
         val schedules = FakeScheduleRepository().apply { failingAgents += listOf("a1", "a2") }
-        val controller = controller(scheduleRepository = schedules)
-        controller.selectFleet()
+        val controller = controller(schedules)
+        controller.refresh()
         advanceUntilIdle()
         assertTrue(controller.state.value.schedules.isEmpty())
         assertEquals("a1 down", controller.state.value.errorMessage)
     }
 
     @Test
-    fun anAgentFilterNarrowsTheFleetToThatAgentAndAllWidensIt() = runTest {
+    fun anAgentFilterNarrowsTheRowsToThatAgentAndAllWidensThem() = runTest {
         val clock = ScheduleClock(Instant.parse("2026-11-16T12:00:00Z"), TimeZone.UTC)
-        val controller = controller()
-        controller.selectFleet()
+        val controller = controller(FakeScheduleRepository())
+        controller.refresh()
         advanceUntilIdle()
         controller.filterAgent(AgentId("a2"))
         val narrowed = controller.state.value
@@ -72,70 +76,52 @@ class ScheduleLibraryFleetTest {
     }
 
     @Test
-    fun anAgentFilterOnlyAppliesToTheFleet() = runTest {
-        val controller = controller()
-        controller.selectAgent("a1")
-        advanceUntilIdle()
-        controller.filterAgent(AgentId("a2"))
-        assertNull(controller.state.value.agentFilter)
-        assertEquals("a1", controller.state.value.scopeAgentId)
-    }
-
-    @Test
-    fun focusMovingFromNoneToAnAgentAndBackSwapsFleetAndAgentState() = runTest {
-        val controller = controller()
-        controller.selectFleet()
+    fun aFilterSurvivesARefreshWhileItsAgentIsListed() = runTest {
+        val controller = controller(FakeScheduleRepository())
+        controller.refresh()
         advanceUntilIdle()
         controller.filterAgent(AgentId("a1"))
-
-        controller.selectAgent("a2")
-        assertFalse(controller.state.value.fleet)
-        assertNull(controller.state.value.agentFilter)
-        assertTrue(controller.state.value.schedules.isEmpty(), "the fleet's rows must not linger under an agent")
+        controller.refresh()
         advanceUntilIdle()
-        assertEquals(listOf("s2"), controller.state.value.schedules.map { it.id })
-
-        controller.selectFleet()
-        assertTrue(controller.state.value.fleet)
-        assertNull(controller.state.value.selectedAgentId)
-        assertTrue(controller.state.value.schedules.isEmpty(), "the agent's rows must not linger in the fleet")
-        advanceUntilIdle()
-        assertEquals(listOf("s1", "s2"), controller.state.value.schedules.map { it.id })
+        assertEquals("a1", controller.state.value.agentFilter)
     }
 
     @Test
-    fun aCronBackedFleetMergesEachAgentsCronsInRosterOrder() = runTest {
+    fun aCronBackedHostMergesEachAgentsCronsInRosterOrder() = runTest {
         val crons = CronScheduleSource { agent -> listOfNotNull(agent?.let { CronTask(id = "c-${it.value}", agentId = it.value) }) }
         val schedules = FakeScheduleRepository().apply { error = RouteUnavailableException() }
-        val controller = controller(scheduleRepository = schedules, cronSource = crons)
-        controller.selectFleet()
+        val controller = controller(schedules, crons)
+        controller.refresh()
         advanceUntilIdle()
         val state = controller.state.value
         assertTrue(state.cronMode)
         assertTrue(state.scheduleAdminAvailable)
         assertEquals(listOf("c-a1", "c-a2"), state.crons.map { it.id })
+
+        val probes = schedules.refreshScheduleCallCount
+        controller.refresh()
+        advanceUntilIdle()
+        assertEquals(probes, schedules.refreshScheduleCallCount, "the unserved native route is not asked again")
     }
 
     @Test
-    fun fleetMutationsGoThroughTheRowsOwnAgent() = runTest {
+    fun mutationsGoThroughTheRowsOwnAgent() = runTest {
         val schedules = FakeScheduleRepository()
-        val controller = controller(scheduleRepository = schedules)
-        controller.selectFleet()
+        val controller = controller(schedules)
+        controller.refresh()
         advanceUntilIdle()
 
-        controller.deleteSchedule("s2", AgentId("a2"))
+        controller.deleteNative(controller.state.value.schedules.single { it.id == "s2" })
         advanceUntilIdle()
         assertEquals(listOf("s2"), schedules.deletedScheduleIds)
         assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })
 
-        controller.createRecurringSchedule(ScheduleCreateRequest("a2", "Digest", "work", "0 18 * * *", "UTC"))
+        controller.createSchedule(ScheduleCreateRequest("a2", "Digest", "work", "0 18 * * *", "UTC"))
         advanceUntilIdle()
-        assertEquals(1, schedules.createdSchedules.size)
         assertEquals(listOf("s1", "created-1"), controller.state.value.schedules.map { it.id })
         assertEquals("a2", controller.state.value.schedules.last().agentId)
-        assertTrue(controller.state.value.fleet)
 
-        controller.createRecurringSchedule(ScheduleCreateRequest(null, "Digest", "work", "0 18 * * *", "UTC"))
+        controller.createSchedule(ScheduleCreateRequest(null, "Digest", "work", "0 18 * * *", "UTC"))
         advanceUntilIdle()
         assertEquals(1, schedules.createdSchedules.size, "a fleet create needs the agent the form chose")
     }
@@ -148,14 +134,10 @@ class ScheduleLibraryFleetTest {
         assertEquals(listOf("c-a1", "c-a2b", "c-a3"), replaced.map { it.id })
     }
 
-    private fun TestScope.controller(
-        scheduleRepository: FakeScheduleRepository = FakeScheduleRepository(),
-        cronSource: CronScheduleSource? = null,
-    ) = ScheduleLibraryController(
-        agentRepository = FakeAgentRepository(),
-        scheduleRepository = scheduleRepository,
-        scope = this,
-        scheduleAdminUnavailableMatcher = { it is RouteUnavailableException },
-        cronSource = cronSource,
-    )
+    private fun TestScope.controller(schedules: FakeScheduleRepository, crons: CronScheduleSource? = null) =
+        ScheduleFleetController(
+            ScheduleFleetSources(FakeAgentRepository(), schedules, crons),
+            ScheduleFleetPolicy(nativeUnavailable = { it is RouteUnavailableException }),
+            this,
+        )
 }

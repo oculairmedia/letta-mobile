@@ -8592,11 +8592,12 @@ public final class com/letta/mobile/ui/shell/pages/ShellHostPages {
 
 public final class com/letta/mobile/ui/shell/pages/ShellLibraryControllers {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/memory/graph/MemoryPageController;Lcom/letta/mobile/data/schedules/ScheduleLibraryController;Lcom/letta/mobile/data/channel/ChannelsPageController;Lcom/letta/mobile/data/tools/ToolLibraryController;Lcom/letta/mobile/data/skills/SkillsCatalogController;Lcom/letta/mobile/data/home/HomePageController;Lcom/letta/mobile/data/memory/memfs/MemfsPageController;)V
+	public fun <init> (Lcom/letta/mobile/data/memory/graph/MemoryPageController;Lcom/letta/mobile/data/schedules/ScheduleLibraryController;Lcom/letta/mobile/data/channel/ChannelsPageController;Lcom/letta/mobile/data/tools/ToolLibraryController;Lcom/letta/mobile/data/skills/SkillsCatalogController;Lcom/letta/mobile/data/home/HomePageController;Lcom/letta/mobile/data/memory/memfs/MemfsPageController;Lcom/letta/mobile/data/schedules/fleet/ScheduleFleetController;)V
 	public final fun getChannels ()Lcom/letta/mobile/data/channel/ChannelsPageController;
 	public final fun getHome ()Lcom/letta/mobile/data/home/HomePageController;
 	public final fun getMemfs ()Lcom/letta/mobile/data/memory/memfs/MemfsPageController;
 	public final fun getMemory ()Lcom/letta/mobile/data/memory/graph/MemoryPageController;
+	public final fun getScheduleFleet ()Lcom/letta/mobile/data/schedules/fleet/ScheduleFleetController;
 	public final fun getSchedules ()Lcom/letta/mobile/data/schedules/ScheduleLibraryController;
 	public final fun getSkills ()Lcom/letta/mobile/data/skills/SkillsCatalogController;
 	public final fun getTools ()Lcom/letta/mobile/data/tools/ToolLibraryController;
@@ -8613,6 +8614,7 @@ public final class com/letta/mobile/ui/shell/pages/ShellLibraryFactory {
 	public final fun channels (Lcom/letta/mobile/data/session/SessionRepositoryGraphProvider;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/channel/ChannelsPageController;
 	public final fun home (Lcom/letta/mobile/data/session/SessionRepositoryGraphProvider;Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/home/HomePageController;
 	public final fun memory (Lcom/letta/mobile/data/session/SessionRepositoryGraphProvider;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/memory/graph/MemoryPageController;
+	public final fun scheduleFleet (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/schedules/fleet/ScheduleFleetController;
 	public final fun schedules (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/schedules/ScheduleLibraryController;
 	public final fun skills (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/skills/SkillsCatalogController;
 	public final fun tools (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/tools/ToolLibraryController;

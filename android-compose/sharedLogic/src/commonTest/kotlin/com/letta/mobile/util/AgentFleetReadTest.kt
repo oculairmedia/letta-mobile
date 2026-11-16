@@ -1,4 +1,4 @@
-package com.letta.mobile.data.fleet
+package com.letta.mobile.util
 
 import com.letta.mobile.data.model.AgentId
 import kotlinx.coroutines.CancellationException

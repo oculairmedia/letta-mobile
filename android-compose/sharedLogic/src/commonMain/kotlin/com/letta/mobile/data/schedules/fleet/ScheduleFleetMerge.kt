@@ -1,9 +1,12 @@
-package com.letta.mobile.data.schedules
+package com.letta.mobile.data.schedules.fleet
 
-import com.letta.mobile.data.fleet.AgentFleetRead
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.ScheduledMessage
+import com.letta.mobile.data.schedules.CronTask
+import com.letta.mobile.data.schedules.ScheduleLibraryState
+import com.letta.mobile.data.schedules.adminUnavailable
+import com.letta.mobile.util.AgentFleetRead
 
 /**
  * One agent's schedules as a fleet read found them: its native schedules (null when its native
@@ -40,10 +43,6 @@ internal fun ScheduleLibraryState.withFleetRead(
 internal fun AgentFleetRead<AgentId, AgentScheduleRead>.nativeRouteUnserved(): Boolean =
     failures.isEmpty() && values.isNotEmpty() && values.none { it.second.first != null }
 
-/** [agent]'s freshly listed crons: in the fleet they replace only that agent's, otherwise every row. */
-internal fun ScheduleLibraryState.withAgentCrons(agent: AgentId, fresh: List<CronTask>): ScheduleLibraryState =
-    copy(crons = if (fleet) crons.replacingAgentCrons(agent, fresh, agents) else fresh)
-
 /** These crons with [agent]'s replaced by [fresh], in [roster] order. */
 internal fun List<CronTask>.replacingAgentCrons(
     agent: AgentId,
@@ -63,6 +62,7 @@ internal fun ScheduleLibraryState.fleetTarget(agents: List<AgentSummary>): Sched
         fleet = true,
         agentFilter = agentFilter?.takeIf { filter -> agents.isEmpty() || agents.any { it.id.value == filter } },
         runHistory = runHistory,
+        pendingCronIds = pendingCronIds,
     )
 
 private fun fleetPartialFailure(failed: Int): String? = when (failed) {

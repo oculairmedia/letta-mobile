@@ -14,7 +14,6 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
 import com.letta.mobile.data.model.visibleInLists
-import com.letta.mobile.data.fleet.AgentFleetReads
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.Serializable
 import kotlinx.atomicfu.atomic
@@ -117,7 +116,7 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
         }
         ensureCurrent()
         val agents = roster.value.orEmpty().visibleInLists()
-        val blocks = readFleetBlocks(graph, roster)
+        val blocks = sectionReader.readFleetBlocks(graph, roster)
         ensureCurrent()
         val memory = MemoryFleetMapper.build(MemoryFleetInput(
             agents = agents,
@@ -132,19 +131,6 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
             isLoading = false,
             errorMessage = (roster.error ?: blocks.error)?.let(errorMessageMapper),
         )
-    }
-
-    private suspend fun readFleetBlocks(
-        graph: Graph,
-        roster: MemoryParitySectionRead<List<Agent>>,
-    ): MemoryParitySectionRead<List<Pair<AgentId, List<Block>>>> {
-        val agents = roster.value?.visibleInLists() ?: return absent(false, emptyList())
-        val repository = graph.blockRepository ?: return MemoryParitySectionRead.Loaded(agents.map { it.id to it.coreBlocks })
-        return sectionReader.read("blocks", SessionRoute.BLOCKS, graph.capabilities) {
-            val read = AgentFleetReads.read(agents.map { it.id }) { agent -> repository.getBlocks(agent.value) }
-            read.firstFailure?.takeIf { read.allFailed }?.let { throw it }
-            read.values
-        }
     }
 
     override fun close() {

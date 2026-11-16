@@ -675,7 +675,7 @@ class ScheduleLibraryControllerTest {
             refreshScheduleCallCount++
             refreshedAgents += agentId
             error?.let { throw it }
-            if (agentId in failingAgents) throw IllegalStateException("$agentId down")
+            check(agentId !in failingAgents) { "$agentId down" }
         }
 
         override suspend fun getSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage =

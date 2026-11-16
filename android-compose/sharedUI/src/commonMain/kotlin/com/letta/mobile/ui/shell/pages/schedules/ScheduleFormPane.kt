@@ -46,18 +46,6 @@ import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import com.letta.mobile.ui.theme.customColors
 
 /**
- * Where the form starts: the [initial] draft (a slot tapped on the calendar prefills its time) and,
- * on a page showing every agent, the [agents] the schedule can be for, names by id in roster order
- * (empty: the focused agent's).
- */
-internal class ScheduleFormSetup(
-    val initial: ScheduleFormDraft = ScheduleFormDraft(),
-    val agents: Map<String, String> = emptyMap(),
-) {
-    fun canSubmit(draft: ScheduleFormDraft): Boolean = draft.isComplete && (agents.isEmpty() || draft.agentId != null)
-}
-
-/**
  * The "New schedule" form: the agent when the page shows every agent's, then name, prompt and the
  * cron builder with a live preview of the next runs, starting from [setup].
  * A [LettaPaneKind.Modal]: a sheet on a phone, a dialog on a pointer.

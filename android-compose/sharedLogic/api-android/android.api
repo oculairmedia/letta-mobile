@@ -23110,28 +23110,6 @@ public final class com/letta/mobile/data/dreaming/DreamingState {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/letta/mobile/data/fleet/AgentFleetRead {
-	public fun <init> (Ljava/util/List;Ljava/util/Map;)V
-	public final fun component1 ()Ljava/util/List;
-	public final fun component2 ()Ljava/util/Map;
-	public final fun copy (Ljava/util/List;Ljava/util/Map;)Lcom/letta/mobile/data/fleet/AgentFleetRead;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/fleet/AgentFleetRead;Ljava/util/List;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/fleet/AgentFleetRead;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAllFailed ()Z
-	public final fun getFailures ()Ljava/util/Map;
-	public final fun getFirstFailure ()Ljava/lang/Throwable;
-	public final fun getValues ()Ljava/util/List;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/data/fleet/AgentFleetReads {
-	public static final field DEFAULT_PARALLELISM I
-	public static final field INSTANCE Lcom/letta/mobile/data/fleet/AgentFleetReads;
-	public final fun read (Ljava/util/List;ILkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun read$default (Lcom/letta/mobile/data/fleet/AgentFleetReads;Ljava/util/List;ILkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-}
-
 public final class com/letta/mobile/data/flow/CapturedSessionFlow : kotlinx/coroutines/flow/StateFlow {
 	public fun <init> (Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;)V
 	public fun collect (Lkotlinx/coroutines/flow/FlowCollector;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -48809,13 +48787,10 @@ public final class com/letta/mobile/data/schedules/ScheduleLibraryController : j
 	public fun close ()V
 	public final fun createRecurringSchedule (Lcom/letta/mobile/data/schedules/ScheduleCreateRequest;)V
 	public final fun createSchedule (Ljava/lang/String;Lcom/letta/mobile/data/model/ScheduleCreateParams;)V
-	public final fun deleteSchedule-UMmLIKU (Ljava/lang/String;Ljava/lang/String;)V
-	public static synthetic fun deleteSchedule-UMmLIKU$default (Lcom/letta/mobile/data/schedules/ScheduleLibraryController;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
-	public final fun filterAgent-XmxTwY8 (Ljava/lang/String;)V
+	public final fun deleteSchedule (Ljava/lang/String;)V
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun loadData ()V
 	public final fun selectAgent (Ljava/lang/String;)V
-	public final fun selectFleet ()V
 	public final fun start ()V
 	public final fun toggleCronPause (Lcom/letta/mobile/data/schedules/CronTask;Z)V
 }
@@ -49090,6 +49065,36 @@ public final class com/letta/mobile/data/schedules/WeekRun {
 	public final fun getRun ()Lcom/letta/mobile/data/schedules/ScheduleRun;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/schedules/fleet/ScheduleFleetController : java/lang/AutoCloseable {
+	public fun <init> (Lcom/letta/mobile/data/schedules/fleet/ScheduleFleetSources;Lcom/letta/mobile/data/schedules/fleet/ScheduleFleetPolicy;Lkotlinx/coroutines/CoroutineScope;)V
+	public fun close ()V
+	public final fun createSchedule (Lcom/letta/mobile/data/schedules/ScheduleCreateRequest;)V
+	public final fun deleteCron (Lcom/letta/mobile/data/schedules/CronTask;)V
+	public final fun deleteNative (Lcom/letta/mobile/data/model/ScheduledMessage;)V
+	public final fun filterAgent-XmxTwY8 (Ljava/lang/String;)V
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun refresh ()V
+	public final fun toggleCronPause (Lcom/letta/mobile/data/schedules/CronTask;Z)V
+}
+
+public final class com/letta/mobile/data/schedules/fleet/ScheduleFleetPolicy {
+	public fun <init> ()V
+	public fun <init> (Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Z)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getErrorMessage ()Lkotlin/jvm/functions/Function2;
+	public final fun getNativeRoute ()Z
+	public final fun getNativeUnavailable ()Lkotlin/jvm/functions/Function1;
+}
+
+public final class com/letta/mobile/data/schedules/fleet/ScheduleFleetSources {
+	public fun <init> (Lcom/letta/mobile/data/repository/api/IAgentRepository;Lcom/letta/mobile/data/repository/api/IScheduleRepository;Lcom/letta/mobile/data/schedules/CronScheduleSource;Lkotlin/jvm/functions/Function3;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/repository/api/IAgentRepository;Lcom/letta/mobile/data/repository/api/IScheduleRepository;Lcom/letta/mobile/data/schedules/CronScheduleSource;Lkotlin/jvm/functions/Function3;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAgents ()Lcom/letta/mobile/data/repository/api/IAgentRepository;
+	public final fun getCrons ()Lcom/letta/mobile/data/schedules/CronScheduleSource;
+	public final fun getRunHistory ()Lkotlin/jvm/functions/Function3;
+	public final fun getSchedules ()Lcom/letta/mobile/data/repository/api/IScheduleRepository;
 }
 
 public final class com/letta/mobile/data/schedules/leases/Lease {
@@ -77779,6 +77784,28 @@ public final class com/letta/mobile/util/AgentConversationFleetPaging {
 
 public abstract interface class com/letta/mobile/util/AgentConversationReader {
 	public abstract fun read-a2BnSRI (Ljava/lang/String;Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/util/AgentFleetRead {
+	public fun <init> (Ljava/util/List;Ljava/util/Map;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/Map;
+	public final fun copy (Ljava/util/List;Ljava/util/Map;)Lcom/letta/mobile/util/AgentFleetRead;
+	public static synthetic fun copy$default (Lcom/letta/mobile/util/AgentFleetRead;Ljava/util/List;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/util/AgentFleetRead;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAllFailed ()Z
+	public final fun getFailures ()Ljava/util/Map;
+	public final fun getFirstFailure ()Ljava/lang/Throwable;
+	public final fun getValues ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/util/AgentFleetReads {
+	public static final field DEFAULT_PARALLELISM I
+	public static final field INSTANCE Lcom/letta/mobile/util/AgentFleetReads;
+	public final fun read (Ljava/util/List;ILkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun read$default (Lcom/letta/mobile/util/AgentFleetReads;Ljava/util/List;ILkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/util/BackendUrlTelemetryKt {
