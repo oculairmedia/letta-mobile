@@ -116,7 +116,7 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
         }
         ensureCurrent(revision)
         val agents = roster.value.orEmpty().visibleInLists()
-        val blocks = readFleetBlocks(graph, agents, roster.loaded)
+        val blocks = readFleetBlocks(graph, roster)
         ensureCurrent(revision)
         val memory = MemoryFleetMapper.build(MemoryFleetInput(
             agents = agents,
@@ -135,10 +135,9 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
 
     private suspend fun readFleetBlocks(
         graph: Graph,
-        agents: List<Agent>,
-        rosterLoaded: Boolean,
+        roster: MemoryParitySectionRead<List<Agent>>,
     ): MemoryParitySectionRead<List<Pair<AgentId, List<Block>>>> {
-        if (!rosterLoaded) return absent(false, emptyList())
+        val agents = roster.value?.visibleInLists() ?: return absent(false, emptyList())
         val repository = graph.blockRepository ?: return MemoryParitySectionRead.Loaded(agents.map { it.id to it.coreBlocks })
         return sectionReader.read("blocks", SessionRoute.BLOCKS, graph.capabilities) {
             val read = AgentFleetReads.read(agents.map { it.id }) { agent -> repository.getBlocks(agent.value) }

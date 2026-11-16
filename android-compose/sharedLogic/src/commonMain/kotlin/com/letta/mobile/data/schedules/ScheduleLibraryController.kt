@@ -473,10 +473,7 @@ class ScheduleLibraryController(
             if (resume) repository.resumeSchedule(agent.value, task.id).getOrThrow()
             else repository.pauseSchedule(agent.value, task.id).getOrThrow()
             val crons = cronSource?.listCrons(agent).orEmpty()
-            if (targetRevision.value == revision.value) stateFlow.update {
-                if (it.fleet) it.copy(crons = it.crons.replacingAgentCrons(agent, crons, it.agents))
-                else it.copy(crons = crons)
-            }
+            if (targetRevision.value == revision.value) stateFlow.update { it.withAgentCrons(agent, crons) }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {

@@ -23,7 +23,8 @@ internal fun ScheduleLibraryState.withFleetRead(
     val reads = read.values.map { it.second }
     val nativeServed = reads.any { it.first != null }
     val cronServed = reads.any { it.second != null }
-    if (reads.isNotEmpty() && !nativeServed && !cronServed) return adminUnavailable()
+    val anyServed = nativeServed || cronServed
+    if (reads.isNotEmpty() && !anyServed) return adminUnavailable()
     return copy(
         schedules = reads.flatMap { it.first.orEmpty() }.distinctBy { it.id },
         crons = reads.flatMap { it.second.orEmpty() }.distinctBy { it.id },
@@ -38,6 +39,10 @@ internal fun ScheduleLibraryState.withFleetRead(
 /** Every read answered and none on the native route: later fleet reads skip it. */
 internal fun AgentFleetRead<AgentId, AgentScheduleRead>.nativeRouteUnserved(): Boolean =
     failures.isEmpty() && values.isNotEmpty() && values.none { it.second.first != null }
+
+/** [agent]'s freshly listed crons: in the fleet they replace only that agent's, otherwise every row. */
+internal fun ScheduleLibraryState.withAgentCrons(agent: AgentId, fresh: List<CronTask>): ScheduleLibraryState =
+    copy(crons = if (fleet) crons.replacingAgentCrons(agent, fresh, agents) else fresh)
 
 /** These crons with [agent]'s replaced by [fresh], in [roster] order. */
 internal fun List<CronTask>.replacingAgentCrons(

@@ -156,16 +156,22 @@ private fun <T : AutoCloseable> StartedWhileComposed(controller: T, start: (T) -
 @Composable
 fun ShellLibraryFocusEffects(controllers: ShellLibraryControllers, page: ShellPageKind, agent: AgentId?) {
     LaunchedEffect(controllers.memory, page, agent) {
-        if (page == ShellPageKind.Memory) {
-            if (agent != null) controllers.memory.selectAgent(agent.value) else controllers.memory.selectFleet()
-        }
+        if (page == ShellPageKind.Memory) controllers.memory.follow(agent)
     }
     LaunchedEffect(controllers.schedules, page, agent) {
-        if (page == ShellPageKind.Schedules) {
-            if (agent != null) controllers.schedules.selectAgent(agent.value) else controllers.schedules.selectFleet()
-        }
+        if (page == ShellPageKind.Schedules) controllers.schedules.follow(agent)
     }
     LaunchedEffect(controllers.skills, page, agent) {
         if (page == ShellPageKind.Skills) controllers.skills.reload(agent?.value)
     }
+}
+
+/** Shows [agent]'s memory, or every agent's when none is focused. */
+private fun MemoryPageController.follow(agent: AgentId?) {
+    if (agent == null) selectFleet() else selectAgent(agent.value)
+}
+
+/** Shows [agent]'s schedules, or every agent's when none is focused. */
+private fun ScheduleLibraryController.follow(agent: AgentId?) {
+    if (agent == null) selectFleet() else selectAgent(agent.value)
 }
