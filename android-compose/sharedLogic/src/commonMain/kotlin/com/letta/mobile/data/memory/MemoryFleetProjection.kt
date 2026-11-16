@@ -74,7 +74,7 @@ object MemoryFleetMapper {
         val nodes = mutableListOf(backend)
         val edges = mutableListOf<MemoryGraphEdge>()
         input.agents.forEach { agent ->
-            val id = agentNodeId(agent.id.value)
+            val id = agentNodeId(agent.id)
             val subtitle = agent.description?.takeIf { it.isNotBlank() } ?: "Agent"
             nodes += MemoryGraphNode(id, agent.name, subtitle, MemoryGraphNodeKind.Agent, agent.id.value)
             edges += MemoryGraphEdge("$root->$id", root, id, "runs", MemoryGraphEdgeKind.Runs)
@@ -83,7 +83,7 @@ object MemoryFleetMapper {
             val id = "memory:${item.id}"
             nodes += MemoryGraphNode(id, item.title, item.subtitle, MemoryGraphNodeKind.Memory, item.id)
             item.owners.forEach { owner ->
-                val from = agentNodeId(owner.id)
+                val from = agentNodeId(AgentId(owner.id))
                 edges += MemoryGraphEdge("$from->$id", from, id, "remembers", MemoryGraphEdgeKind.Remembers)
             }
         }
@@ -99,7 +99,7 @@ object MemoryFleetMapper {
         )
     }
 
-    private fun agentNodeId(agentId: String) = "agent:$agentId"
+    private fun agentNodeId(agent: AgentId) = "agent:${agent.value}"
 
     private class LabelGroup(val key: String, val label: String?) {
         val entries = mutableListOf<Pair<AgentId, Block>>()

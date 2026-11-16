@@ -9732,6 +9732,7 @@ public final class com/letta/mobile/ui/shell/pages/schedules/SchedulesPageTags {
 	public static final field EMPTY Ljava/lang/String;
 	public static final field ERROR Ljava/lang/String;
 	public static final field FORM Ljava/lang/String;
+	public static final field FORM_AGENTS Ljava/lang/String;
 	public static final field FORM_NAME Ljava/lang/String;
 	public static final field FORM_PREVIEW Ljava/lang/String;
 	public static final field FORM_PROMPT Ljava/lang/String;
@@ -9749,7 +9750,6 @@ public final class com/letta/mobile/ui/shell/pages/schedules/SchedulesPageTags {
 	public static final field ZONE Ljava/lang/String;
 	public final fun agent (Ljava/lang/String;)Ljava/lang/String;
 	public final fun cadence (Ljava/lang/String;)Ljava/lang/String;
-	public final fun formAgent (Ljava/lang/String;)Ljava/lang/String;
 	public final fun rule (Ljava/lang/String;)Ljava/lang/String;
 	public final fun tab (Lcom/letta/mobile/data/schedules/SchedulesView;)Ljava/lang/String;
 	public final fun view (Lcom/letta/mobile/data/schedules/SchedulesView;)Ljava/lang/String;

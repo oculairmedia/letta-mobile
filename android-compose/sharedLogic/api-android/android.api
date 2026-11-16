@@ -48809,9 +48809,9 @@ public final class com/letta/mobile/data/schedules/ScheduleLibraryController : j
 	public fun close ()V
 	public final fun createRecurringSchedule (Lcom/letta/mobile/data/schedules/ScheduleCreateRequest;)V
 	public final fun createSchedule (Ljava/lang/String;Lcom/letta/mobile/data/model/ScheduleCreateParams;)V
-	public final fun deleteAgentSchedule (Ljava/lang/String;Ljava/lang/String;)V
-	public final fun deleteSchedule (Ljava/lang/String;)V
-	public final fun filterAgent (Ljava/lang/String;)V
+	public final fun deleteSchedule-UMmLIKU (Ljava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun deleteSchedule-UMmLIKU$default (Lcom/letta/mobile/data/schedules/ScheduleLibraryController;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun filterAgent-XmxTwY8 (Ljava/lang/String;)V
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun loadData ()V
 	public final fun selectAgent (Ljava/lang/String;)V

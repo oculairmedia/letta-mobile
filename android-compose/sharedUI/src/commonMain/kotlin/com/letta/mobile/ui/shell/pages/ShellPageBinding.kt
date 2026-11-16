@@ -277,9 +277,9 @@ internal fun shellScheduleActions(
     onRefresh = {
         if (workspace.currentFocus.agentId?.value == schedules.state.value.selectedAgentId) schedules.loadData()
     },
-    onFilterAgent = { id -> if (fleetSchedules(schedules, workspace)) schedules.filterAgent(id) },
+    onFilterAgent = { id -> if (fleetSchedules(schedules, workspace)) schedules.filterAgent(id?.let(::AgentId)) },
     onDeleteSchedule = { ref ->
-        if (fleetSchedules(schedules, workspace)) schedules.deleteAgentSchedule(ref.agentId, ref.scheduleId)
+        if (fleetSchedules(schedules, workspace)) schedules.deleteSchedule(ref.scheduleId, AgentId(ref.agentId))
         else if (scheduleAgent(schedules, workspace) == ref.agentId) schedules.deleteSchedule(ref.scheduleId)
     },
     onDeleteCron = { id -> deleteCron(schedules, workspace, id.value) },
@@ -299,7 +299,7 @@ private fun scheduleAgent(schedules: ScheduleLibraryController, workspace: Shell
 private fun deleteCron(schedules: ScheduleLibraryController, workspace: ShellWorkspaceState, id: String) {
     if (fleetSchedules(schedules, workspace)) {
         val owner = schedules.state.value.crons.firstOrNull { it.id == id }?.agentId ?: return
-        schedules.deleteAgentSchedule(owner, id)
+        schedules.deleteSchedule(id, AgentId(owner))
     } else {
         scheduleAgent(schedules, workspace)?.let { schedules.deleteSchedule(id) }
     }

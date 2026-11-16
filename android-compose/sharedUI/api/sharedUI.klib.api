@@ -11259,6 +11259,8 @@ final object com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags { // co
         final fun <get-ERROR>(): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.ERROR.<get-ERROR>|<get-ERROR>(){}[0]
     final const val FORM // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.FORM|{}FORM[0]
         final fun <get-FORM>(): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.FORM.<get-FORM>|<get-FORM>(){}[0]
+    final const val FORM_AGENTS // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.FORM_AGENTS|{}FORM_AGENTS[0]
+        final fun <get-FORM_AGENTS>(): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.FORM_AGENTS.<get-FORM_AGENTS>|<get-FORM_AGENTS>(){}[0]
     final const val FORM_NAME // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.FORM_NAME|{}FORM_NAME[0]
         final fun <get-FORM_NAME>(): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.FORM_NAME.<get-FORM_NAME>|<get-FORM_NAME>(){}[0]
     final const val FORM_PREVIEW // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.FORM_PREVIEW|{}FORM_PREVIEW[0]
@@ -11290,7 +11292,6 @@ final object com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags { // co
 
     final fun agent(kotlin/String): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.agent|agent(kotlin.String){}[0]
     final fun cadence(kotlin/String): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.cadence|cadence(kotlin.String){}[0]
-    final fun formAgent(kotlin/String): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.formAgent|formAgent(kotlin.String){}[0]
     final fun rule(kotlin/String): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.rule|rule(kotlin.String){}[0]
     final fun tab(com.letta.mobile.data.schedules/SchedulesView): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.tab|tab(com.letta.mobile.data.schedules.SchedulesView){}[0]
     final fun view(com.letta.mobile.data.schedules/SchedulesView): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.view|view(com.letta.mobile.data.schedules.SchedulesView){}[0]

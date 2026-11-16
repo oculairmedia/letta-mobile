@@ -190,8 +190,8 @@ object SchedulesPageTags {
     /** The agent filter chip that shows every agent's schedules. */
     const val ALL_AGENTS = "schedules_agent_all"
 
-    /** An agent choice in the New-schedule form of an unfocused page. */
-    fun formAgent(agentId: String): String = "schedules_form_agent_$agentId"
+    /** The agent choices in the New-schedule form of an unfocused page. */
+    const val FORM_AGENTS = "schedules_form_agents"
 
     fun cadence(label: String): String = "schedules_cadence_${label.lowercase().replace(' ', '_')}"
 }

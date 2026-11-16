@@ -123,13 +123,16 @@ internal fun ScheduleFormPane(
 /** The agents a schedule can be for, one chosen. */
 @Composable
 private fun AgentChoice(agents: Map<String, String>, selected: String?, onSelect: (String) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()).testTag(SchedulesPageTags.FORM_AGENTS),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    ) {
         agents.forEach { (id, name) ->
             LettaChipTab(
                 text = name,
                 active = id == selected,
                 onClick = { onSelect(id) },
-                modifier = Modifier.heightIn(min = LettaDimens.Control.iconButtonSm).testTag(SchedulesPageTags.formAgent(id)),
+                modifier = Modifier.heightIn(min = LettaDimens.Control.iconButtonSm),
             )
         }
     }

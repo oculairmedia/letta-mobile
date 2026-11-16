@@ -61,7 +61,7 @@ class ScheduleLibraryFleetTest {
         val controller = controller()
         controller.selectFleet()
         advanceUntilIdle()
-        controller.filterAgent("a2")
+        controller.filterAgent(AgentId("a2"))
         val narrowed = controller.state.value
         assertEquals("a2", narrowed.scopeAgentId)
         assertEquals(listOf("s2"), SchedulesPageModel.defs(narrowed.crons, narrowed.schedules, narrowed.scopeAgentId, clock).map { it.id })
@@ -76,7 +76,7 @@ class ScheduleLibraryFleetTest {
         val controller = controller()
         controller.selectAgent("a1")
         advanceUntilIdle()
-        controller.filterAgent("a2")
+        controller.filterAgent(AgentId("a2"))
         assertNull(controller.state.value.agentFilter)
         assertEquals("a1", controller.state.value.scopeAgentId)
     }
@@ -86,7 +86,7 @@ class ScheduleLibraryFleetTest {
         val controller = controller()
         controller.selectFleet()
         advanceUntilIdle()
-        controller.filterAgent("a1")
+        controller.filterAgent(AgentId("a1"))
 
         controller.selectAgent("a2")
         assertFalse(controller.state.value.fleet)
@@ -123,7 +123,7 @@ class ScheduleLibraryFleetTest {
         controller.selectFleet()
         advanceUntilIdle()
 
-        controller.deleteAgentSchedule("a2", "s2")
+        controller.deleteSchedule("s2", AgentId("a2"))
         advanceUntilIdle()
         assertEquals(listOf("s2"), schedules.deletedScheduleIds)
         assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })

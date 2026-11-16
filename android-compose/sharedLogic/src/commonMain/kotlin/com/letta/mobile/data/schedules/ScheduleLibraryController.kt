@@ -254,9 +254,9 @@ class ScheduleLibraryController(
         loadData()
     }
 
-    /** In fleet mode, narrows the rows to [agentId]'s; null shows every agent's again. */
-    fun filterAgent(agentId: String?) {
-        stateFlow.update { if (it.fleet) it.copy(agentFilter = agentId) else it }
+    /** In fleet mode, narrows the rows to [agent]'s; null shows every agent's again. */
+    fun filterAgent(agent: AgentId?) {
+        stateFlow.update { if (it.fleet) it.copy(agentFilter = agent?.value) else it }
     }
 
     private suspend fun loadFleet(revision: ScheduleRevision) {
@@ -394,21 +394,14 @@ class ScheduleLibraryController(
         }
     }
 
-    /**
-     * Deletes a schedule that belongs to [agentId]: in fleet mode the row names its own agent; with
-     * an agent selected it must be that agent.
-     */
-    fun deleteAgentSchedule(agentId: String, scheduledMessageId: String) {
+    /** In fleet mode, deletes [schedule] through its own agent [owner], then reads the fleet again. */
+    private fun deleteFleetSchedule(owner: AgentId, schedule: ScheduleIdentity) {
         val current = stateFlow.value
-        if (!current.fleet) {
-            if (current.selectedAgentId == agentId) deleteSchedule(scheduledMessageId)
-            return
-        }
         val revision = ScheduleRevision(targetRevision.value)
         mutationJob?.cancel()
         mutationJob = scope.launch {
             try {
-                operations.deleteAndReload(current, AgentId(agentId), ScheduleIdentity(scheduledMessageId))
+                operations.deleteAndReload(current, owner, schedule)
                 if (targetRevision.value == revision.value) loadFleet(revision)
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -419,7 +412,17 @@ class ScheduleLibraryController(
         }
     }
 
-    fun deleteSchedule(scheduledMessageId: String) {
+    /**
+     * Deletes a schedule of the selected agent, or in fleet mode of its [owner] (the row's own agent;
+     * a fleet delete without one does nothing). With an agent selected, a different [owner] does nothing.
+     */
+    fun deleteSchedule(scheduledMessageId: String, owner: AgentId? = null) {
+        val selected = stateFlow.value.selectedAgentId
+        if (stateFlow.value.fleet) {
+            owner?.let { deleteFleetSchedule(it, ScheduleIdentity(scheduledMessageId)) }
+            return
+        }
+        if (owner != null && owner.value != selected) return
         val revision = ScheduleRevision(targetRevision.value)
         mutationJob?.cancel()
         mutationJob = scope.launch {
