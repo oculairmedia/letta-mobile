@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
@@ -159,11 +160,12 @@ private fun DockedBarRow(model: ComposerModel, onAttachImage: () -> Unit, fieldH
 /**
  * The trailing action slot of the card and of the docked bar, in their top-end corner: the voice-mode
  * button where the page has voice mode, then Send (or Stop while a run streams), one round cluster
- * spaced like the bar's other controls. It is the one place a trailing action goes.
+ * spaced like the bar's other controls. With no draft Send takes no room and the voice button rests
+ * in the corner; Send pushes it left as it arrives. It is the one place a trailing action goes.
  *
  * Another trailing action goes in this row, before [ComposerActionButton], and its width into
- * [trailingActionsWidth], which the prompt field and the docked row reserve so nothing slides under
- * the slot. The Touch bar's counterpart is its TouchTrailingSlot.
+ * [trailingActionsWidth], which the prompt field and the docked row reserve for the cluster at its
+ * widest (with Send), so the field never reflows as Send comes and goes and nothing slides under it. The Touch bar's counterpart is its TouchTrailingSlot.
  */
 @Composable
 private fun ComposerTrailingActions(model: ComposerModel, modifier: Modifier = Modifier) {
@@ -171,11 +173,15 @@ private fun ComposerTrailingActions(model: ComposerModel, modifier: Modifier = M
         modifier = modifier
             .padding(top = LettaDimens.Space.sm, end = LettaDimens.Space.sm)
             .testTag(ComposerTestTags.TRAILING_ACTIONS),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ComposerVoiceModeButton(size = LettaDimens.Control.actionButton)
-        ComposerActionButton(model, Modifier.testTag(ComposerTestTags.SEND_SLOT))
+        // Send brings its own gap, so with no draft the voice button rests flush at the end.
+        ComposerActionButton(
+            model,
+            Modifier.testTag(ComposerTestTags.SEND_SLOT),
+            leadingGap = if (hasVoiceMode()) LettaDimens.Space.sm else 0.dp,
+        )
     }
 }
 

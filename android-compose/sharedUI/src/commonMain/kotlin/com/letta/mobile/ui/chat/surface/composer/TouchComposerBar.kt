@@ -49,6 +49,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import com.composables.icons.lucide.AudioLines
 import com.composables.icons.lucide.Lucide
@@ -366,7 +367,9 @@ private fun touchSlotDictates(model: ComposerModel): Boolean {
  * (the keyboard's own action key sends), but Stop and the mic stay.
  *
  * It is the Touch bar's one trailing slot: the voice-mode button (when [voiceMode]) comes first, then
- * the mic or Send / Stop, one item gap apart. Another trailing action goes here too, not elsewhere in
+ * the mic or Send / Stop (the shared [ComposerActionButton], centred in the bar's touch target), one
+ * item gap apart. Where there is no mic, Send takes no room until there is a draft, so the voice-mode
+ * button rests at the end and slides left as Send arrives. Another trailing action goes here too, not elsewhere in
  * the bar's row. The pointer card's counterpart is its ComposerTrailingActions.
  */
 @Composable
@@ -375,9 +378,10 @@ private fun TouchTrailingSlot(model: ComposerModel, voiceMode: Boolean) {
     val keyboard = keyboardOpen()
     val visible = dictates || model.streaming || !keyboard
     val shown = rememberRetainedTrailingContent(visible, if (dictates) TouchTrailingContent.Voice else TouchTrailingContent.Action)
+    // The gap before the slot rides inside it, so it comes and goes with the mic or Send.
+    val gap = if (voiceMode) TouchComposerDimens.itemSpacing else 0.dp
     Row(
         modifier = Modifier.testTag(ComposerTestTags.TRAILING_ACTIONS),
-        horizontalArrangement = Arrangement.spacedBy(TouchComposerDimens.itemSpacing),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (voiceMode) ComposerVoiceModeButton(size = TouchComposerDimens.actionTarget, iconSize = TouchComposerDimens.actionIcon)
@@ -389,12 +393,17 @@ private fun TouchTrailingSlot(model: ComposerModel, voiceMode: Boolean) {
         ) {
             when (shown) {
                 TouchTrailingContent.Voice -> Box(
-                    Modifier.size(TouchComposerDimens.actionTarget).testTag(ComposerTestTags.TOUCH_VOICE),
+                    Modifier.padding(start = gap).size(TouchComposerDimens.actionTarget).testTag(ComposerTestTags.TOUCH_VOICE),
                     contentAlignment = Alignment.Center,
                 ) {
                     ComposerVoiceButton(model)
                 }
-                TouchTrailingContent.Action -> TouchActionButton(model)
+                TouchTrailingContent.Action -> ComposerActionButton(
+                    model,
+                    Modifier.testTag(ComposerTestTags.SEND_SLOT),
+                    seat = TouchComposerDimens.actionTarget,
+                    leadingGap = gap,
+                )
             }
         }
     }
@@ -443,11 +452,3 @@ private fun touchSlotExit(): ExitTransition {
 }
 
 private const val EXIT_SCALE = 0.76f
-
-/** The shared Send / Stop ([ComposerActionButton]), centred in the bar's touch target. */
-@Composable
-private fun TouchActionButton(model: ComposerModel) {
-    Box(Modifier.size(TouchComposerDimens.actionTarget).testTag(ComposerTestTags.SEND_SLOT), contentAlignment = Alignment.Center) {
-        ComposerActionButton(model)
-    }
-}
