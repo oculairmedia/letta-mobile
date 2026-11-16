@@ -23,6 +23,7 @@ import com.letta.mobile.ui.chat.session.ChatModelHandle
 import com.letta.mobile.ui.chat.session.ChatRunId
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
+import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.composer.ChatComposerPanel
 import com.letta.mobile.ui.chat.surface.composer.ComposerInputs
 
@@ -38,8 +39,11 @@ internal fun HomePromptComposer(placeholder: String?, onSubmit: (String) -> Unit
     val submit by rememberUpdatedState(onSubmit)
     val actions = remember { promptBarActions(read = { draft }, write = { draft = it }, submit = { submit(it) }) }
     val composer = ChatComposerUiState(text = draft, canSend = draft.isNotBlank(), placeholder = placeholder)
-    ChatComposerPanel(ComposerInputs(composer = composer, actions = actions, capabilities = PromptBarCapabilities), modifier)
+    ChatComposerPanel(ComposerInputs(composer = composer, actions = actions, capabilities = PromptBarCapabilities, platform = PromptBarPlatform), modifier)
 }
+
+/** No keyboard hints: "@ to add files" and "/ for commands" are the chat page's, not the prompt bar's. */
+private val PromptBarPlatform = ChatSurfacePlatform(showKeyboardHints = false)
 
 /** Nothing but the draft: no images, model, history or approvals to offer. */
 private val PromptBarCapabilities = ChatSurfaceCapabilities(
