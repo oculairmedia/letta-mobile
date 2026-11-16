@@ -185,42 +185,41 @@ class ScheduleLibraryController(
     fun loadData() {
         loadJob?.cancel()
         val revision = ScheduleRevision(targetRevision.value)
-        if (stateFlow.value.fleet) {
-            loadJob = scope.launch { loadFleet(revision) }
-            return
-        }
-        loadJob = scope.launch {
-            stateFlow.update { it.copy(isLoading = true, errorMessage = null) }
-            val (agents, rosterError) = operations.loadAgentRoster { stateFlow.value.agents }
-            if (targetRevision.value != revision.value) return@launch
-            val target = stateFlow.value.targetForAgents(agents)
-            try {
-                if (nativeScheduleRouteUnavailable) {
-                    publishCronFallbackOrUnavailable(target, revision)
-                    return@launch
+        loadJob = scope.launch { if (stateFlow.value.fleet) loadFleet(revision) else loadTarget(revision) }
+    }
+
+    /** Loads the selected agent's schedules (none selected: the roster only). */
+    private suspend fun loadTarget(revision: ScheduleRevision) {
+        stateFlow.update { it.copy(isLoading = true, errorMessage = null) }
+        val (agents, rosterError) = operations.loadAgentRoster { stateFlow.value.agents }
+        if (targetRevision.value != revision.value) return
+        val target = stateFlow.value.targetForAgents(agents)
+        try {
+            if (nativeScheduleRouteUnavailable) {
+                publishCronFallbackOrUnavailable(target, revision)
+                return
+            }
+            val schedules = operations.loadTargetSchedules(target)
+            val crons = operations.loadControlCrons(target.selectedAgentId?.let(::AgentId))
+            if (targetRevision.value != revision.value) return
+            stateFlow.value = target.withSchedules(schedules).withControlCrons(crons).copy(
+                errorMessage = rosterError?.let { errorMessageMapper(it, "Failed to load agents") },
+            )
+            loadRunHistory()
+            loadLeases()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            if (targetRevision.value != revision.value) return
+            publishLoadFailure(t, target, revision) {
+                stateFlow.update { current ->
+                    current.copy(
+                        agents = target.agents,
+                        isLoading = false,
+                        errorMessage = errorMessageMapper(t, "Failed to load schedules"),
+                    )
                 }
-                val schedules = operations.loadTargetSchedules(target)
-                val crons = operations.loadControlCrons(target.selectedAgentId?.let(::AgentId))
-                if (targetRevision.value != revision.value) return@launch
-                stateFlow.value = target.withSchedules(schedules).withControlCrons(crons).copy(
-                    errorMessage = rosterError?.let { errorMessageMapper(it, "Failed to load agents") },
-                )
-                loadRunHistory()
                 loadLeases()
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (t: Throwable) {
-                if (targetRevision.value != revision.value) return@launch
-                publishLoadFailure(t, target, revision) {
-                    stateFlow.update { current ->
-                        current.copy(
-                            agents = target.agents,
-                            isLoading = false,
-                            errorMessage = errorMessageMapper(t, "Failed to load schedules"),
-                        )
-                    }
-                    loadLeases()
-                }
             }
         }
     }

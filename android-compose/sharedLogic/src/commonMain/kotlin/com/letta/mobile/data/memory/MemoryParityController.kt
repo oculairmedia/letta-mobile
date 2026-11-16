@@ -80,7 +80,7 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
         val target = selectedAgentId
         val fleetTarget = fleet && target == null
         loadJob?.cancel()
-        loadJob = scope.launch { if (fleetTarget) loadFleet(revision) else load(target, revision) }
+        loadJob = scope.launch { if (fleetTarget) loadFleet { ensureCurrent(revision) } else load(target, revision) }
     }
 
     override fun selectAgent(agentId: String) {
@@ -106,18 +106,19 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
         reload()
     }
 
-    private suspend fun loadFleet(revision: Long) {
-        ensureCurrent(revision)
+    /** [ensureCurrent] throws once a newer target replaced this load. */
+    private suspend fun loadFleet(ensureCurrent: () -> Unit) {
+        ensureCurrent()
         stateFlow.update { it.copy(isLoading = true, errorMessage = null) }
         val graph = sessionGraphProvider.current
         val roster = sectionReader.read("roster", SessionRoute.AGENTS, graph.capabilities) {
             graph.agentRepository.refreshAgentsIfStale(maxAgeMs = maxAgeMs)
             graph.agentRepository.agents.value
         }
-        ensureCurrent(revision)
+        ensureCurrent()
         val agents = roster.value.orEmpty().visibleInLists()
         val blocks = readFleetBlocks(graph, roster)
-        ensureCurrent(revision)
+        ensureCurrent()
         val memory = MemoryFleetMapper.build(MemoryFleetInput(
             agents = agents,
             blocks = blocks.value.orEmpty(),
