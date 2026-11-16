@@ -115,7 +115,7 @@ internal sealed interface ScheduleDeleteTarget {
  * agent wins over a native schedule with the same id, exactly as the merged list shows it.
  */
 internal fun SchedulesPageState.deleteTarget(id: String): ScheduleDeleteTarget? {
-    val cron = (crons + library.crons).firstOrNull { it.id == id && it.inScopeOf(focusedAgentId) }
+    val cron = (crons + library.crons).firstOrNull { it.id == id && inFocus(it) }
     if (cron != null) return ScheduleDeleteTarget.Cron(CronTaskId(cron.id))
     val native = library.schedules.firstOrNull { it.id == id } ?: return null
     return ScheduleDeleteTarget.Native(NativeScheduleRef(native.agentId, native.id))
@@ -124,11 +124,11 @@ internal fun SchedulesPageState.deleteTarget(id: String): ScheduleDeleteTarget? 
 /** Only live cron tasks have pause/resume operations; native schedule IDs use a different API. */
 internal fun SchedulesPageState.canTogglePause(id: CronTaskId): Boolean {
     if (id.value in library.pendingCronIds) return false
-    return (crons + library.crons).any { it.id == id.value && it.controllable && it.inScopeOf(focusedAgentId) }
+    return (crons + library.crons).any { it.id == id.value && it.controllable && inFocus(it) }
 }
 
-/** A cron with no agent belongs to every agent; no [agentId] means every agent is in scope. */
-private fun CronTask.inScopeOf(agentId: String?): Boolean = agentId == null || this.agentId in setOf(null, agentId)
+/** Whether [cron] belongs to the focused agent: with none focused every cron does, and a cron with no agent belongs to all. */
+private fun SchedulesPageState.inFocus(cron: CronTask): Boolean = focusedAgentId == null || cron.agentId in setOf(null, focusedAgentId)
 
 /** Only an active or paused cron (or one whose host reports no status) can be paused or resumed. */
 private val CronTask.controllable: Boolean get() = status in CONTROLLABLE_CRON_STATUSES
