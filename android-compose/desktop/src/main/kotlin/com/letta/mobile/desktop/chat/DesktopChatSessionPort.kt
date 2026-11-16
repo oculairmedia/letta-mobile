@@ -12,6 +12,7 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.session.ChatBranchView
@@ -67,7 +68,6 @@ internal class DesktopChatSessionPort(
         }) { state, _ -> state.projectWorkspace(owner, controller.isTargetCurrent()) },
             { controller.state.value.projectWorkspace(owner, controller.isTargetCurrent()) })
     } ?: controller.state
-
     /** Shared conversation extensions, including the window-retained active-turn owner. */
     private val options = TimelineChatSessionOptions(
         workingDirectory = controller.workingDirectory,
@@ -90,20 +90,19 @@ internal class DesktopChatSessionPort(
         activeTurnCoordinator = controller.activeTurnCoordinator(surface.value.selectedConversationId),
     )
     private val extensions = ChatSessionExtensions(options, scope)
-
-    init {
-        controller.models.bindCatalog(bindings.modelCatalog, follow = scope)
-    }
-
+    init { controller.models.bindCatalog(bindings.modelCatalog, follow = scope) }
     fun updateHostInputs(inputs: ChatComposerHostInputs) {
         hostInputs.value = inputs
     }
-
     override val uiState: StateFlow<ChatUiState> = DerivedStateFlow(
-        timelineInputs().runningFold(null as ChatUiState?) { previous, inputs -> desktopChatUiState(inputs, previous) }
-            .map { it ?: initialUiState() }, ::initialUiState,
+        combine(
+            timelineInputs().runningFold(null as ChatUiState?) { previous, inputs -> desktopChatUiState(inputs, previous) }
+                .map { it ?: initialUiState() },
+            controller.runs,
+        ) { state, runs ->
+            state.copy(runPhase = runs[(state.conversationState as? ConversationState.Ready)?.conversationId]?.phase)
+        }, ::initialUiState,
     )
-
     override val composer: StateFlow<ChatComposerUiState> = DerivedStateFlow(
         combine(surface, extensions.chrome) { surface, chrome ->
             surface.composerUiState(controller.attachmentLimits).let { if (controller.isSelectionCurrent()) it.withChrome(chrome) else it }
@@ -112,7 +111,6 @@ internal class DesktopChatSessionPort(
             if (controller.isSelectionCurrent()) it.withChrome(extensions.chrome.value) else it
         } },
     )
-
     override val liveStatus: StateFlow<RuntimeLiveStatus> get() = extensions.liveStatus
 
     /** letta-mobile-zxk2n.5: what the Chat options show and hide, for the page's appearance. */
@@ -145,6 +143,7 @@ internal class DesktopChatSessionPort(
     ).withExtensions(extensions.facts.value)
 
     private fun initialUiState(): ChatUiState = desktopChatUiState(currentTimelineInputs(), previous = null)
+        .copy(runPhase = controller.runs.value[surface.value.selectedConversationId]?.phase)
 
     private fun currentTimelineInputs() = DesktopChatTimelineInputs(
         surface = surface.value,

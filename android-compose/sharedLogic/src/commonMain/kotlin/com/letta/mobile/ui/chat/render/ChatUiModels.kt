@@ -256,6 +256,8 @@ data class ChatUiState(
     val isLoadingMessages: Boolean = true,
     val isLoadingOlderMessages: Boolean = false,
     val hasMoreOlderMessages: Boolean = false,
+    /** Phase for the visible conversation, or null when its run state is unavailable. */
+    val runPhase: com.letta.mobile.data.presence.RunPhase? = null,
     val isStreaming: Boolean = false,
     val isAgentTyping: Boolean = false,
     val pendingTools: ImmutableList<PendingToolCall> = persistentListOf(),

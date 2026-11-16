@@ -2546,6 +2546,13 @@ public final class com/letta/mobile/ui/components/ResizePointerIcon_jvmKt {
 	public static final fun resizePointerIcon (Lcom/letta/mobile/ui/components/ResizeDirection;)Landroidx/compose/ui/input/pointer/PointerIcon;
 }
 
+public final class com/letta/mobile/ui/components/beam/BeamShaderDiagnostics {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/components/beam/BeamShaderDiagnostics;
+	public final fun getReportFailure ()Lkotlin/jvm/functions/Function1;
+	public final fun setReportFailure (Lkotlin/jvm/functions/Function1;)V
+}
+
 public final class com/letta/mobile/ui/components/beam/LettaBeamDefaults {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/components/beam/LettaBeamDefaults;
@@ -2592,6 +2599,10 @@ public final class com/letta/mobile/ui/components/beam/LettaBeamStyle : java/lan
 public final class com/letta/mobile/ui/components/beam/LettaBorderBeamKt {
 	public static final fun lettaBorderBeam (Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/beam/LettaBeamSpec;Z)Landroidx/compose/ui/Modifier;
 	public static synthetic fun lettaBorderBeam$default (Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/beam/LettaBeamSpec;ZILjava/lang/Object;)Landroidx/compose/ui/Modifier;
+}
+
+public final class com/letta/mobile/ui/components/beam/telemetry/BeamShaderTelemetryKt {
+	public static final fun installBeamShaderTelemetry ()V
 }
 
 public final class com/letta/mobile/ui/components/disclosure/ChevronEmphasis : java/lang/Enum {
@@ -12111,6 +12122,7 @@ public final class com/letta/mobile/ui/theme/LettaDimens {
 public final class com/letta/mobile/ui/theme/LettaDimens$Alpha {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaDimens$Alpha;
+	public static final field composerThinking F
 	public static final field disabled F
 	public static final field hairline F
 	public static final field muted F
