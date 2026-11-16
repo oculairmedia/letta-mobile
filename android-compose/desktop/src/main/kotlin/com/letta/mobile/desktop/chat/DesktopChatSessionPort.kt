@@ -12,6 +12,7 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.session.ChatBranchView
@@ -89,9 +90,7 @@ internal class DesktopChatSessionPort(
         activeTurnCoordinator = controller.activeTurnCoordinator(surface.value.selectedConversationId),
     )
     private val extensions = ChatSessionExtensions(options, scope)
-    init {
-        controller.models.bindCatalog(bindings.modelCatalog, follow = scope)
-    }
+    init { controller.models.bindCatalog(bindings.modelCatalog, follow = scope) }
     fun updateHostInputs(inputs: ChatComposerHostInputs) {
         hostInputs.value = inputs
     }
@@ -101,8 +100,7 @@ internal class DesktopChatSessionPort(
                 .map { it ?: initialUiState() },
             controller.runs,
         ) { state, runs ->
-            val id = (state.conversationState as? com.letta.mobile.ui.chat.render.ConversationState.Ready)?.conversationId
-            state.copy(runPhase = runs[id]?.phase)
+            state.copy(runPhase = runs[(state.conversationState as? ConversationState.Ready)?.conversationId]?.phase)
         }, ::initialUiState,
     )
     override val composer: StateFlow<ChatComposerUiState> = DerivedStateFlow(
@@ -145,6 +143,7 @@ internal class DesktopChatSessionPort(
     ).withExtensions(extensions.facts.value)
 
     private fun initialUiState(): ChatUiState = desktopChatUiState(currentTimelineInputs(), previous = null)
+        .copy(runPhase = controller.runs.value[surface.value.selectedConversationId]?.phase)
 
     private fun currentTimelineInputs() = DesktopChatTimelineInputs(
         surface = surface.value,

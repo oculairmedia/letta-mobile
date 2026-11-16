@@ -12,7 +12,7 @@ import com.letta.mobile.util.attr
  * Android: the shared beam source compiled as AGSL. Runtime shaders arrived in Android 13; below that
  * this is null and the Canvas fallback draws.
  */
-internal actual fun createBorderBeamShader(): BorderBeamRenderer? =
+internal actual fun createBorderBeamShader(areaPx: Float): BorderBeamRenderer? =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) AgslBorderBeam.compile() else null
 
 /** One beam's AGSL shader; uniforms are per instance, so every beam owns one. */

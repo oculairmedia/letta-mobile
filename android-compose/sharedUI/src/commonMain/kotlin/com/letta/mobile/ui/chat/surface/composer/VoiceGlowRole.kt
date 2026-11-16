@@ -73,7 +73,10 @@ private const val LIGHT_EDGE_DEEPEN = 0.45f
 /** The single visual treatment selected for a composer border. */
 internal enum class ComposerOutlineMode { Idle, Listening, Working, Thinking, Error }
 
-/** Voice owns the outline while active; otherwise use this conversation's phase. */
+/**
+ * Voice owns the outline while active; otherwise use this conversation's phase.
+ * AWAITING_INPUT is parked on the user: its approval card supplies the attention signal.
+ */
 internal fun composerOutlineMode(
     voice: VoiceModeState?,
     phase: RunPhase?,

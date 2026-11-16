@@ -50,11 +50,15 @@ class DesktopChatControllerRunPhasesTest {
         controller.start()
         runCurrent()
 
+        controller.selectConversation("conv-1")
+        runCurrent()
         gateway.emit(RuntimeEventPayload.ToolCallObserved(ToolCallId("t1"), ToolName("grep")))
         runCurrent()
 
         val run = controller.runs.value.getValue("conv-1")
         assertEquals(RunPhase.WORKING, run.phase)
+        val port = DesktopChatSessionPort(controller, backgroundScope)
+        assertEquals(RunPhase.WORKING, port.uiState.value.runPhase, "the visible composer's synchronous state includes its run phase")
         assertEquals("grep", run.toolName)
         assertEquals(AgentActivityKind.WORKING, controller.runs.value.presenceByAgent().getValue("agent-0").activity)
 

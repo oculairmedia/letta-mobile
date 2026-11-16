@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.chat.surface.composer
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
@@ -27,10 +28,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.ui.ambient.AmbientVoice
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.components.beam.LettaBeamDefaults
 import com.letta.mobile.ui.components.beam.LettaBeamSpec
 import com.letta.mobile.ui.components.beam.lettaBorderBeam
-import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -73,7 +74,13 @@ internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modif
     )
     val level = state?.let { handle?.glowLevel(it) }.takeIf { mode == ComposerOutlineMode.Listening && !reducedMotion }
     val brightness = rememberOutlineBrightness(level)
-    val beam = LettaBeamSpec(LettaBeamDefaults.colors(), shape)
+    val colors = LettaBeamDefaults.colors()
+    val beam = remember(colors, shape) { LettaBeamSpec(colors, shape) }
+    val softness = animateFloatAsState(
+        targetValue = if (mode == ComposerOutlineMode.Thinking) 0f else 1f,
+        animationSpec = if (reducedMotion) snap() else tween(ChatMotionTokens.AmbientGlow.GLIDE_MILLIS),
+        label = "composerOutlineSoftness",
+    )
     return this
         .semantics {
             composerOutlineMode = mode
@@ -85,11 +92,7 @@ internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modif
             val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithCache)) }
             val strokes = OutlineStrokes(this)
             onDrawBehind {
-                if (mode == ComposerOutlineMode.Thinking) {
-                    drawPath(path, color.value, style = strokes.edge)
-                } else if (mode != ComposerOutlineMode.Working) {
-                    drawOutline(path, strokes, color.value, brightness.floatValue)
-                }
+                drawOutline(path, strokes, color.value, brightness.floatValue, softness.value)
             }
         }
 }
@@ -138,11 +141,11 @@ private class OutlineStrokes(density: Density) {
 }
 
 /** Draws [path]'s glow, halo and edge in [tint] at [lit] brightness; nothing for a transparent tint. */
-private fun DrawScope.drawOutline(path: Path, strokes: OutlineStrokes, tint: Color, lit: Float) {
+private fun DrawScope.drawOutline(path: Path, strokes: OutlineStrokes, tint: Color, lit: Float, softness: Float) {
     if (tint.alpha <= HIDDEN_ALPHA) return
-    drawPath(path, tint.copy(alpha = tint.alpha * GLOW_ALPHA * lit), style = strokes.glow)
-    drawPath(path, tint.copy(alpha = tint.alpha * HALO_ALPHA * lit), style = strokes.halo)
-    drawPath(path, tint.copy(alpha = tint.alpha * (EDGE_FLOOR + (1f - EDGE_FLOOR) * lit)), style = strokes.edge)
+    drawPath(path, tint.copy(alpha = tint.alpha * GLOW_ALPHA * lit * softness), style = strokes.glow)
+    drawPath(path, tint.copy(alpha = tint.alpha * HALO_ALPHA * lit * softness), style = strokes.halo)
+    drawPath(path, tint.copy(alpha = tint.alpha * (1f - softness * (1f - EDGE_FLOOR) * (1f - lit))), style = strokes.edge)
 }
 
 /** The fixed brightness of a still outline: reduced motion, the thinking state, a failure. */
