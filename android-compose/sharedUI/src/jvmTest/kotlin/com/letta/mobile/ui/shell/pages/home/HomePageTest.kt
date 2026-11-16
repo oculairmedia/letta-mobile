@@ -23,7 +23,6 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.isPopup
@@ -240,7 +239,7 @@ class HomePageTest {
         onNodeWithTag(ComposerTestTags.INPUT).performTextInput("  plan my week  ")
         onNodeWithTag(ComposerTestTags.SEND).performClick()
         assertEquals(listOf("prompt:plan my week"), navigation.events)
-        onNodeWithTag(ComposerTestTags.SEND).assertIsNotEnabled()
+        onNodeWithTag(ComposerTestTags.SEND).assertDoesNotExist()
     }
 
     @Test

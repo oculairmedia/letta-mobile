@@ -1,6 +1,21 @@
 package com.letta.mobile.ui.chat.surface
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.Constraints
+import com.letta.mobile.ui.chat.surface.timeline.ScrollToLatestButton
+import com.letta.mobile.ui.chat.surface.timeline.TouchScrollToLatestButton
+import com.letta.mobile.ui.theme.ChatTimelineDimens
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,6 +33,23 @@ import com.letta.mobile.ui.theme.LettaDimens
 // The frame projects slots rather than importing shell layout into the chat renderer (a package cycle).
 internal val LocalChatLane = compositionLocalOf<List<Pair<RuntimeViewId, String?>>> { ChatViews.Default.map { it to null } }
 internal val LocalChatModuleContent = compositionLocalOf<@Composable (Int, Modifier) -> Unit> { { _, _ -> } }
+
+/**
+ * The scroll-to-latest button's action while it should show (null while hidden), handed up by the
+ * timeline so [ChatLane] draws the button over the timeline and the composer alike.
+ */
+internal val LocalScrollToLatestAction = compositionLocalOf<MutableState<(() -> Unit)?>?> { null }
+
+/**
+ * Root bounds the lane places that button against: [LANE_TIMELINE] (the list's area, less what it
+ * reserves at the bottom), [LANE_CARD] (the composer's prompt) and [LANE_ABOVE_CARD] (what stands
+ * above the prompt and could sit under the button: the chips' own extent, or the whole band).
+ */
+internal val LocalChatLaneBounds = compositionLocalOf<SnapshotStateMap<String, Rect>?> { null }
+
+internal const val LANE_TIMELINE = "timeline"
+internal const val LANE_CARD = "card"
+internal const val LANE_ABOVE_CARD = "aboveCard"
 
 /** One content lane, reused by the full page and the dock's conversation area. */
 @Composable
@@ -54,8 +86,63 @@ internal fun ChatLane(
             }
         }
     }
-    // One composition position even when an optional view adds/removes the width observer.
-    content(measuredModifier)
+    val action = remember { mutableStateOf<(() -> Unit)?>(null) }
+    val bounds = remember { mutableStateMapOf<String, Rect>() }
+    CompositionLocalProvider(LocalScrollToLatestAction provides action, LocalChatLaneBounds provides bounds) {
+        Box(measuredModifier) {
+            // One composition position even when an optional view adds/removes the width observer.
+            content(Modifier.fillMaxWidth())
+            ScrollToLatestOverlay(action.value, bounds, Modifier.matchParentSize())
+        }
+    }
+}
+
+/**
+ * The scroll-to-latest button over the lane: the Touch FAB at the timeline's bottom end, the pointer
+ * squircle centred over it. It rests just above the composer's prompt; only when something above the
+ * prompt (a chip row, the queue, a notice) would sit under it does it rise to clear that, to just
+ * above the timeline's own bottom edge, where it always stood.
+ */
+@Composable
+private fun ScrollToLatestOverlay(action: (() -> Unit)?, bounds: SnapshotStateMap<String, Rect>, modifier: Modifier) {
+    var lastAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    if (action != null) lastAction = action
+    var origin by remember { mutableStateOf(Rect.Zero) }
+    val touch = touchStyle()
+    val insetPx = with(LocalDensity.current) { ChatTimelineDimens.scrollToLatestTouchInset.toPx() }
+    Layout(
+        content = {
+            val onClick = { lastAction?.invoke() ?: Unit }
+            if (touch) {
+                TouchScrollToLatestButton(visible = action != null, onClick = onClick)
+            } else if (action != null) {
+                ScrollToLatestButton(onClick = onClick)
+            }
+        },
+        modifier = modifier.onGloballyPositioned { origin = it.boundsInRoot() },
+    ) { measurables, constraints ->
+        val button = measurables.firstOrNull()?.measure(Constraints())
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            val timeline = bounds[LANE_TIMELINE] ?: return@layout
+            if (button == null) return@layout
+            val left = if (touch) timeline.right - insetPx - button.width else timeline.center.x - button.width / 2f
+            val bottom = scrollToLatestBottom(timeline, bounds, left..left + button.width, insetPx)
+            button.place((left - origin.left).toInt(), (bottom - button.height - origin.top).toInt())
+        }
+    }
+}
+
+/** Where the button's bottom rests (root px): above the prompt, unless something above it is in the button's way. */
+private fun scrollToLatestBottom(
+    timeline: Rect,
+    bounds: Map<String, Rect>,
+    span: ClosedFloatingPointRange<Float>,
+    insetPx: Float,
+): Float {
+    val rest = timeline.bottom - insetPx
+    val card = bounds[LANE_CARD]?.takeIf { it.top > timeline.bottom } ?: return rest
+    val blocked = bounds[LANE_ABOVE_CARD]?.let { it.left < span.endInclusive && it.right > span.start } == true
+    return if (blocked) rest else card.top - insetPx
 }
 
 /** Only extra slots observe width changes; input and transcript retain their composition and focus. */

@@ -47,7 +47,7 @@ import kotlin.time.Duration.Companion.minutes
  * Home and the chat composer side by side at the review widths (360, 700, 760, 1200 dp) in Dark and
  * Light, rendered to build/chat-chrome-render/ for review: below the wide breakpoint (the compact
  * window) both draw the same Touch bar and Send; at 1200 dp both draw the pointer card. Home is untitled throughout, as under the desktop
- * title bar that names the page. Each frame asserts the shared Send is there.
+ * title bar that names the page. The chat frame asserts the shared Send.
  */
 class ChatChromeConsistencyRenderTest {
     @Test
@@ -82,8 +82,8 @@ class ChatChromeConsistencyRenderTest {
                 }
             }
             waitForIdle()
-            onNodeWithTag(ComposerTestTags.SEND).assertExists()
-            if (name.startsWith("home")) onNodeWithTag(HomePageTags.COMPOSER).assertExists()
+            // Home's draft is empty, so its Send stays hidden; the chat frame has a draft.
+            if (name.startsWith("home")) onNodeWithTag(HomePageTags.COMPOSER).assertExists() else onNodeWithTag(ComposerTestTags.SEND).assertExists()
             val file = File("build/chat-chrome-render").apply { mkdirs() }.resolve(name)
             ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", file)
         }

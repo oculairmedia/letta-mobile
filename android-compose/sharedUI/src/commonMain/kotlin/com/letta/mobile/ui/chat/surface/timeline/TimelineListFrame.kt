@@ -31,6 +31,14 @@ import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.surface.touchStyle
+import com.letta.mobile.ui.chat.surface.LocalScrollToLatestAction
+import com.letta.mobile.ui.chat.surface.LocalChatLaneBounds
+import com.letta.mobile.ui.chat.surface.LANE_TIMELINE
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.DisposableEffect
 import com.letta.mobile.ui.chat.surface.sendflight.LocalSendFlight
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRenderItemRow
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowCallbacks
@@ -106,7 +114,8 @@ internal fun TimelineListFrame(
     )
     // The prompt's sticky copy stands in for its row, which hides meanwhile.
     val sticky = pinned
-    Box(modifier = modifier.fillMaxWidth()) {
+    val laneButton = rememberLaneScrollToLatest(overlays)
+    Box(modifier = modifier.fillMaxWidth().then(laneButton)) {
         CompositionLocalProvider(LocalTextSelectionColors provides selectionColors, LocalStickyPrompt provides sticky) {
             LazyColumn(
                 state = listState,
@@ -154,7 +163,9 @@ internal fun TimelineListFrame(
             PinnedPromptCopy(prompt, overlays.pinnedPrompt, bindings, Modifier.align(Alignment.TopCenter))
         }
         val showScrollToLatest = overlays.showScrollToLatest && !overlays.glide.isGliding
-        if (touchStyle()) {
+        // Inside a chat lane the lane draws the button, over the composer's band as well.
+        val drawsOwnButton = LocalScrollToLatestAction.current == null
+        if (drawsOwnButton && touchStyle()) {
             TouchScrollToLatestButton(
                 visible = showScrollToLatest,
                 onClick = overlays.onScrollToLatest,
@@ -165,7 +176,7 @@ internal fun TimelineListFrame(
                         bottom = ChatTimelineDimens.scrollToLatestTouchInset + overlays.bottomReserve,
                     ),
             )
-        } else if (showScrollToLatest) {
+        } else if (drawsOwnButton && showScrollToLatest) {
             ScrollToLatestButton(
                 onClick = overlays.onScrollToLatest,
                 modifier = Modifier
@@ -173,6 +184,32 @@ internal fun TimelineListFrame(
                     .padding(bottom = LettaDimens.Space.lg + overlays.bottomReserve),
             )
         }
+    }
+}
+
+/**
+ * Hands the scroll-to-latest button to the chat lane around this list, when there is one: its action
+ * while it should show, and the list's area (less the bottom reserve) to place it against. The
+ * returned modifier measures that area; outside a lane it does nothing and the frame draws the button.
+ */
+@Composable
+private fun rememberLaneScrollToLatest(overlays: TimelineFrameOverlays): Modifier {
+    val action = LocalScrollToLatestAction.current
+    val bounds = LocalChatLaneBounds.current
+    if (action == null || bounds == null) return Modifier
+    val show = overlays.showScrollToLatest && !overlays.glide.isGliding
+    val onScroll = overlays.onScrollToLatest
+    SideEffect { action.value = if (show) onScroll else null }
+    DisposableEffect(action, bounds) {
+        onDispose {
+            action.value = null
+            bounds.remove(LANE_TIMELINE)
+        }
+    }
+    val reservePx = with(LocalDensity.current) { overlays.bottomReserve.toPx() }
+    return Modifier.onGloballyPositioned { coordinates ->
+        val area = coordinates.boundsInRoot()
+        bounds[LANE_TIMELINE] = area.copy(bottom = area.bottom - reservePx)
     }
 }
 

@@ -1,6 +1,15 @@
 package com.letta.mobile.ui.chat.surface.composer
 
 import androidx.compose.animation.animateColorAsState
+import com.letta.mobile.ui.theme.LocalReducedMotion
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -222,13 +231,30 @@ internal fun ComposerVoiceButton(model: ComposerModel) {
 
 /**
  * Send, or Stop while a run streams with nothing to queue: the one send button of every composer
- * (the pointer card, the Touch bar, Home's prompt bar). A pending stop reads "stopping" and a second
- * press is the owner's local force-clear. A send plays the launch cue and a stop a plain confirm on
- * hosts with haptics. The Touch bar centres it in its larger touch target.
+ * (the pointer card, the Touch bar, Home's prompt bar). Send only shows once there is something to
+ * send (text or an image); it fades and grows in, and leaves the same way (a plain swap under reduced
+ * motion), while its slot keeps its width so the field never reflows on the first keystroke. Stop
+ * always shows while it applies. A pending stop reads "stopping" and a second press is the owner's
+ * local force-clear. A send plays the launch cue and a stop a plain confirm on hosts with haptics.
+ * The Touch bar centres it in its larger touch target.
  */
 @Composable
 internal fun ComposerActionButton(model: ComposerModel, modifier: Modifier = Modifier) {
     val stops = model.decisions.action == ComposerAction.Stop
+    Box(modifier.size(LettaDimens.Control.actionButton), contentAlignment = Alignment.Center) {
+        AnimatedVisibility(
+            visible = stops || model.composer.hasPayload,
+            enter = actionButtonEnter(),
+            exit = actionButtonExit(),
+            label = "composerActionShown",
+        ) {
+            ComposerActionSurface(model, stops)
+        }
+    }
+}
+
+@Composable
+private fun ComposerActionSurface(model: ComposerModel, stops: Boolean) {
     val enabled = stops || model.decisions.sendEnabled
     val haptics = LocalHaptics.current
     val colors = actionButtonColors(stops = stops, enabled = enabled)
@@ -243,7 +269,7 @@ internal fun ComposerActionButton(model: ComposerModel, modifier: Modifier = Mod
             model.runAction()
         },
         enabled = enabled,
-        modifier = modifier
+        modifier = Modifier
             .size(LettaDimens.Control.actionButton)
             .testTag(if (stops) ComposerTestTags.STOP else ComposerTestTags.SEND)
             .graphicsLayer {
@@ -263,6 +289,21 @@ internal fun ComposerActionButton(model: ComposerModel, modifier: Modifier = Mod
         }
     }
 }
+
+/** Send's arrival: a fade and a small grow on the chips' easing; a plain cut under reduced motion. */
+@Composable
+private fun actionButtonEnter(): EnterTransition {
+    if (LocalReducedMotion.current) return fadeIn(snap())
+    return fadeIn(tween(LettaMotionTokens.CHIP_MILLIS)) + scaleIn(tween(LettaMotionTokens.CHIP_MILLIS), initialScale = HiddenActionScale)
+}
+
+@Composable
+private fun actionButtonExit(): ExitTransition {
+    if (LocalReducedMotion.current) return fadeOut(snap())
+    return fadeOut(tween(LettaMotionTokens.CHIP_MILLIS)) + scaleOut(tween(LettaMotionTokens.CHIP_MILLIS), targetScale = HiddenActionScale)
+}
+
+private const val HiddenActionScale = 0.76f
 
 private const val DisabledActionScale = 0.9f
 

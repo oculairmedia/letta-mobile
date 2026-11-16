@@ -322,10 +322,11 @@ class ChatComposerPanelUiTest {
         assertEquals(0, onAllNodesWithTag(ComposerTestTags.HINT, useUnmergedTree = true).fetchSemanticsNodes().size)
     }
 
+    /** Send only appears once there is something to send; Stop is unaffected. */
     @Test
-    fun sendIsDisabledWithoutAPayload() = runComposeUiTest {
+    fun sendHidesWithoutAPayload() = runComposeUiTest {
         setPointerContent { Panel(ComposerInputs(composer = ready(text = ""), actions = RecordingChatActions())) }
-        onNodeWithTag(ComposerTestTags.SEND).assertIsNotEnabled()
+        onNodeWithTag(ComposerTestTags.SEND).assertDoesNotExist()
     }
 
     @Test
