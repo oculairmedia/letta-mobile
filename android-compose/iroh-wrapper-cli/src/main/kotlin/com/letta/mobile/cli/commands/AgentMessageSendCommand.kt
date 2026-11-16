@@ -64,6 +64,9 @@ class AgentMessageSendCommand : CliktCommand(name = "send") {
     private val conversationId by option("--conversation-id", help = "Target conversation id on the recipient (takes precedence over --lane).").default("")
     private val lane by option("--lane", help = "Destination lane (default: inbox).")
     private val correlation by option("--correlation", help = "Task correlation key=value; repeatable.").multiple()
+    private val inReplyTo by option("--in-reply-to", help = "Correlation id of the request being answered.")
+    private val replyCorrelationId by option("--reply-correlation-id", help = "Host-minted reply address.")
+    private val replyExpiresAt by option("--reply-expires-at", help = "Host reply expiry in epoch milliseconds.")
     private val correlationJson by option("--correlation-json", help = "Task correlation as a JSON string map.")
     private val identityDir by option("--identity-dir", help = "Per-agent Iroh identity dir.")
         .default(File(System.getProperty("user.home"), ".letta/iroh/identities").path)
@@ -83,6 +86,11 @@ class AgentMessageSendCommand : CliktCommand(name = "send") {
             conversationId = targetId,
             lane = if (targetId == null) lane else null,
             correlation = parseCorrelation(correlation, correlationJson),
+            correlationId = inReplyTo,
+            replyTo = replyCorrelationId?.let {
+                com.letta.mobile.data.lanes.reply.ReplyTo(it,
+                    replyExpiresAt?.toLongOrNull() ?: throw UsageError("reply-expires-at is required"))
+            },
         )
         val sendHook = sendOverride
         if (sendHook != null) {

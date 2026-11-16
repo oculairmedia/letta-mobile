@@ -971,3 +971,15 @@ Internal query-generation tokens for schedule controller work. A captured revisi
 
 Host-confirmed toolset choices and preference selection. ToolsetControl sends one request and waits
 for the runtime's device-status echo; hosts bind their shared channel state and admin RPC.
+
+# Package com.letta.mobile.data.lanes.reply
+
+Host-owned reply correlation and untrusted attachment policy. The shared store
+mints request identifiers from a supplied clock, verifies the expected replier,
+and holds replies until wrapper input acceptance. JVM/Android binds transactions
+to the host identity directory using an atomic JSON journal.
+
+# Package com.letta.mobile.data.lanes.reply.persistence
+
+JVM/Android filesystem binding for shared reply policy. Transactions use the
+existing process lock and atomic JSON replacement; identity lookup is read-only.

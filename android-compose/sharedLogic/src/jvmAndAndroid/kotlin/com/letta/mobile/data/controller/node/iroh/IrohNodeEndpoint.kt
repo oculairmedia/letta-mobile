@@ -55,6 +55,7 @@ class IrohNodeEndpoint(
     private val protocolHandlers: List<IrohNodeProtocolHandler> = emptyList(),
     /** The host's stream-to-stored identity join, shared by every connection. */
     private val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
+    private val replies: com.letta.mobile.data.lanes.reply.ReplyStore? = null,
     private val connectionRegistry: ConnectionRegistry = ConnectionRegistry(),
 ) {
     private val alpn = binding.alpn
@@ -480,6 +481,7 @@ class IrohNodeEndpoint(
             turnHost = turnHost,
             turnIdentity = turnIdentity,
         )
+        nodeConnection.replies = replies
         val relayLink = appToolRelay?.link(send = nodeConnection::writeAppToolFrame, ready = { nodeConnection.acceptsAppToolCalls })
         nodeConnection.appToolRelayLink = relayLink
         val peerConnections = appServerConnections.computeIfAbsent(remoteId) {

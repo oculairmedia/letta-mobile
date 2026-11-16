@@ -1,6 +1,9 @@
 package com.letta.mobile.data.controller.extras
 
 import com.letta.mobile.data.controller.capability.Capability
+import com.letta.mobile.data.lanes.reply.ReplyOrigin
+import com.letta.mobile.data.lanes.reply.ReplyStore
+import kotlinx.serialization.json.booleanOrNull
 import com.letta.mobile.data.controller.extras.messaging.IrohMessageOptions
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -78,6 +81,7 @@ class CustomIrohMessagingTool(
      * for the Meridian→Lester bug both stay hermetic.
      */
     private val runner: IrohCliRunner? = null,
+    private val replies: ReplyStore? = null,
 ) : ExternalTool {
 
     override val name: String = TOOL_NAME
@@ -114,6 +118,8 @@ class CustomIrohMessagingTool(
                 put("type", "string")
                 put("description", "Explicit recipient conversation; takes precedence over lane.")
             })
+            put("expect_reply", buildJsonObject { put("type", "boolean") })
+            put("in_reply_to", buildJsonObject { put("type", "string") })
             put("correlation", buildJsonObject {
                 put("type", "object")
                 put("description", "Task correlation as a string-to-string map.")
@@ -123,7 +129,36 @@ class CustomIrohMessagingTool(
         put("required", buildJsonArray { add("to"); add("body") })
     }
 
+    override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
+        if (input["expect_reply"]?.jsonPrimitive?.booleanOrNull != true) return invoke(input, caller.agentId)
+        if (!caller.isVerified || caller.conversationId.isNullOrBlank()) {
+            return ExternalToolResult.Error("expect_reply requires a host-verified conversation")
+        }
+        val validated = validateInputs(caller.agentId, input)
+        return when (validated) {
+            is Validated.Error -> ExternalToolResult.Error(validated.reason)
+            is Validated.Ok -> sendExpectingReply(validated, caller)
+        }
+    }
+
+    private suspend fun sendExpectingReply(validated: Validated.Ok, caller: ExternalToolCaller): ExternalToolResult {
+        val store = replies ?: return ExternalToolResult.Error("reply routing is not configured")
+        val address = store.request(ReplyOrigin(validated.fromAgentId, requireNotNull(caller.conversationId)),
+            validated.toAgentId)
+        val result = dispatchValidated(validated.fromAgentId, validated.toAgentId, validated.body,
+            validated.options.copy(replyTo = address))
+        return when (result) {
+            is ExternalToolResult.Error -> result
+            is ExternalToolResult.Success -> ExternalToolResult.Success(
+                JsonObject(kotlinx.serialization.json.Json.parseToJsonElement(result.content).let { it as JsonObject } +
+                    ("correlation_id" to JsonPrimitive(address.correlationId))).toString())
+        }
+    }
+
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult {
+        if (input["expect_reply"]?.jsonPrimitive?.booleanOrNull == true) {
+            return ExternalToolResult.Error("expect_reply requires a host-verified conversation")
+        }
         // Validation lives in a helper; the call site just dispatches on
         // the result. The helper extracts the CodeScene complex-method
         // guard-chain into a separate function and returns a sealed result
@@ -277,5 +312,6 @@ private fun parseMessageOptions(input: JsonObject): IrohMessageOptions {
             value.content
         }
     }
-    return IrohMessageOptions(conversationId, if (conversationId == null) lane else null, correlation, optionalString("msg_id"))
+    return IrohMessageOptions(conversationId, if (conversationId == null) lane else null, correlation,
+        optionalString("msg_id"), correlationId = optionalString("in_reply_to"))
 }

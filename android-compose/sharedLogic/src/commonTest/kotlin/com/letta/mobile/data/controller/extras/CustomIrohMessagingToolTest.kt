@@ -28,6 +28,18 @@ import kotlin.test.assertFalse
  */
 class CustomIrohMessagingToolTest {
     @Test
+    fun expectReplyRefusesUnverifiedCallerWithoutSending() = runTest {
+        val runner = CapturingRunner()
+        val result = toolWithRunner(runner).invoke(buildJsonObject {
+            put("to", "target")
+            put("body", "question")
+            put("expect_reply", true)
+        }, "sender")
+        assertIs<ExternalToolResult.Error>(result)
+        assertTrue(runner.calls.isEmpty())
+    }
+
+    @Test
     fun routesOptionalFieldsAndDropsLaneForExplicitConversation() = runTest {
         val captured = CapturingRunner()
         val tool = toolWithRunner(captured)

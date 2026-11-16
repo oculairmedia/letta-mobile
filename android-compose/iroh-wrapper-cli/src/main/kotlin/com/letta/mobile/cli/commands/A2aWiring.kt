@@ -154,6 +154,7 @@ fun buildA2aWiring(
         },
         authenticate = { message, peer -> authenticateSender(config, message, peer) },
         journalFile = config.receiptsFile,
+        replies = com.letta.mobile.data.lanes.reply.persistence.fileReplyStore(config.identityDir),
     )
     return A2aWiring(
         receiver = receiver,
@@ -469,8 +470,12 @@ internal suspend fun handleCreateAndDeliver(
 }
 
 private fun deliveredBody(message: IrohAgentMessage): String {
-    if (message.lane == null && message.correlation == null) return message.body
+    if (message.lane == null && message.correlation == null && message.replyTo == null) return message.body
     val metadata = buildJsonObject {
+        message.replyTo?.let { address -> put("reply_to", buildJsonObject {
+            put("correlation_id", address.correlationId)
+            put("expires_at", address.expiresAt)
+        }) }
         message.lane?.let { put("lane", it) }
         message.correlation?.let { values ->
             put("correlation", buildJsonObject { values.forEach { (key, value) -> put(key, value) } })

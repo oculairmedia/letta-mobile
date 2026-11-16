@@ -18382,8 +18382,8 @@ public final class com/letta/mobile/data/controller/extras/AgentDiscoveryTool : 
 public final class com/letta/mobile/data/controller/extras/CustomIrohMessagingTool : com/letta/mobile/data/controller/extras/ExternalTool {
 	public static final field Companion Lcom/letta/mobile/data/controller/extras/CustomIrohMessagingTool$Companion;
 	public static final field TOOL_NAME Ljava/lang/String;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/IrohCliRunner;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/IrohCliRunner;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/IrohCliRunner;Lcom/letta/mobile/data/lanes/reply/ReplyStore;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/IrohCliRunner;Lcom/letta/mobile/data/lanes/reply/ReplyStore;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun getCapability ()Lcom/letta/mobile/data/controller/capability/Capability;
 	public fun getDescription ()Ljava/lang/String;
 	public fun getInputSchema ()Lkotlinx/serialization/json/JsonObject;
@@ -18776,19 +18776,23 @@ public final class com/letta/mobile/data/controller/extras/identity/ToolCallScop
 
 public final class com/letta/mobile/data/controller/extras/messaging/IrohMessageOptions {
 	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/lanes/reply/ReplyTo;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/lanes/reply/ReplyTo;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/util/Map;
 	public final fun component4 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Lcom/letta/mobile/data/lanes/reply/ReplyTo;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/lanes/reply/ReplyTo;)Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/lanes/reply/ReplyTo;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getConversationId ()Ljava/lang/String;
 	public final fun getCorrelation ()Ljava/util/Map;
+	public final fun getCorrelationId ()Ljava/lang/String;
 	public final fun getLane ()Ljava/lang/String;
 	public final fun getMsgId ()Ljava/lang/String;
+	public final fun getReplyTo ()Lcom/letta/mobile/data/lanes/reply/ReplyTo;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -20153,8 +20157,8 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohNodeConnection
 
 public final class com/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint {
 	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint$Companion;
-	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohEndpointBinding;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/iroh/IrohCanvasRelay;Ljava/util/List;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohEndpointBinding;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/iroh/IrohCanvasRelay;Ljava/util/List;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohEndpointBinding;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/iroh/IrohCanvasRelay;Ljava/util/List;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lcom/letta/mobile/data/lanes/reply/ReplyStore;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohEndpointBinding;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/iroh/IrohCanvasRelay;Ljava/util/List;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lcom/letta/mobile/data/lanes/reply/ReplyStore;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun addr ()Lcomputer/iroh/EndpointAddr;
 	public final fun agentChangeTarget ()Lcom/letta/mobile/data/controller/node/iroh/AgentChangeTarget;
 	public final fun attachAppToolRelay (Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayHost;)V
@@ -23954,6 +23958,263 @@ public final class com/letta/mobile/data/lanes/LaneArrival {
 	public final fun getSourceMessageId ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/lanes/reply/HeldReply {
+	public static final field Companion Lcom/letta/mobile/data/lanes/reply/HeldReply$Companion;
+	public fun <init> (Lcom/letta/mobile/data/lanes/reply/PendingReply;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/lanes/reply/PendingReply;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/lanes/reply/PendingReply;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/data/lanes/reply/PendingReply;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/lanes/reply/HeldReply;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/lanes/reply/HeldReply;Lcom/letta/mobile/data/lanes/reply/PendingReply;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/lanes/reply/HeldReply;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBody ()Ljava/lang/String;
+	public final fun getInputToken ()Ljava/lang/String;
+	public final fun getMessageKey ()Ljava/lang/String;
+	public final fun getProcessEpoch ()Ljava/lang/String;
+	public final fun getRequest ()Lcom/letta/mobile/data/lanes/reply/PendingReply;
+	public final fun getSender ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/lanes/reply/HeldReply$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/lanes/reply/HeldReply$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/lanes/reply/HeldReply;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/lanes/reply/HeldReply;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/lanes/reply/HeldReply$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/lanes/reply/PendingReply {
+	public static final field Companion Lcom/letta/mobile/data/lanes/reply/PendingReply$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJ)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()J
+	public final fun component7 ()J
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJ)Lcom/letta/mobile/data/lanes/reply/PendingReply;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/lanes/reply/PendingReply;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJILjava/lang/Object;)Lcom/letta/mobile/data/lanes/reply/PendingReply;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCorrelationId ()Ljava/lang/String;
+	public final fun getCreatedAt ()J
+	public final fun getExpectedEndpoint ()Ljava/lang/String;
+	public final fun getExpectedReplier ()Ljava/lang/String;
+	public final fun getExpiresAt ()J
+	public final fun getOriginAgent ()Ljava/lang/String;
+	public final fun getOriginConversation ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/lanes/reply/PendingReply$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/lanes/reply/PendingReply$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/lanes/reply/PendingReply;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/lanes/reply/PendingReply;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/lanes/reply/PendingReply$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/lanes/reply/ReplyDeadLetter {
+	public static final field Companion Lcom/letta/mobile/data/lanes/reply/ReplyDeadLetter$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()J
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)Lcom/letta/mobile/data/lanes/reply/ReplyDeadLetter;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/lanes/reply/ReplyDeadLetter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JILjava/lang/Object;)Lcom/letta/mobile/data/lanes/reply/ReplyDeadLetter;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCorrelationId ()Ljava/lang/String;
+	public final fun getMessageKey ()Ljava/lang/String;
+	public final fun getReason ()Ljava/lang/String;
+	public final fun getRecordedAt ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/lanes/reply/ReplyDeadLetter$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/lanes/reply/ReplyDeadLetter$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/lanes/reply/ReplyDeadLetter;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/lanes/reply/ReplyDeadLetter;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/lanes/reply/ReplyDeadLetter$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/lanes/reply/ReplyMatch : java/lang/Enum {
+	public static final field HELD Lcom/letta/mobile/data/lanes/reply/ReplyMatch;
+	public static final field INBOX Lcom/letta/mobile/data/lanes/reply/ReplyMatch;
+	public static final field MISMATCH Lcom/letta/mobile/data/lanes/reply/ReplyMatch;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/lanes/reply/ReplyMatch;
+	public static fun values ()[Lcom/letta/mobile/data/lanes/reply/ReplyMatch;
+}
+
+public final class com/letta/mobile/data/lanes/reply/ReplyOrigin {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/lanes/reply/ReplyOrigin;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/lanes/reply/ReplyOrigin;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/lanes/reply/ReplyOrigin;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgent ()Ljava/lang/String;
+	public final fun getConversation ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/lanes/reply/ReplyReceipt {
+	public static final field Companion Lcom/letta/mobile/data/lanes/reply/ReplyReceipt$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()J
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)Lcom/letta/mobile/data/lanes/reply/ReplyReceipt;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/lanes/reply/ReplyReceipt;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JILjava/lang/Object;)Lcom/letta/mobile/data/lanes/reply/ReplyReceipt;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCorrelationId ()Ljava/lang/String;
+	public final fun getEndpoint ()Ljava/lang/String;
+	public final fun getMessageKey ()Ljava/lang/String;
+	public final fun getRecipient ()Ljava/lang/String;
+	public final fun getRetainedUntil ()J
+	public final fun getSender ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/lanes/reply/ReplyReceipt$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/lanes/reply/ReplyReceipt$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/lanes/reply/ReplyReceipt;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/lanes/reply/ReplyReceipt;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/lanes/reply/ReplyReceipt$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/lanes/reply/ReplySnapshot {
+	public static final field Companion Lcom/letta/mobile/data/lanes/reply/ReplySnapshot$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/Set;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Ljava/util/Set;
+	public final fun copy (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/Set;)Lcom/letta/mobile/data/lanes/reply/ReplySnapshot;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/lanes/reply/ReplySnapshot;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/lanes/reply/ReplySnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDeadLetters ()Ljava/util/List;
+	public final fun getExpired ()Ljava/util/Set;
+	public final fun getHeld ()Ljava/util/List;
+	public final fun getPending ()Ljava/util/List;
+	public final fun getReceived ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/lanes/reply/ReplySnapshot$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/lanes/reply/ReplySnapshot$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/lanes/reply/ReplySnapshot;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/lanes/reply/ReplySnapshot;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/lanes/reply/ReplySnapshot$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/lanes/reply/ReplyStore {
+	public static final field Companion Lcom/letta/mobile/data/lanes/reply/ReplyStore$Companion;
+	public static final field REPLY_TTL_MS J
+	public fun <init> (Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun consume (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun held (Lcom/letta/mobile/data/lanes/reply/ReplyOrigin;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun receive (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun receive$default (Lcom/letta/mobile/data/lanes/reply/ReplyStore;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun release (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun request (Lcom/letta/mobile/data/lanes/reply/ReplyOrigin;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/lanes/reply/ReplyStore$Companion {
+	public final fun prepend (Ljava/util/List;Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/lanes/reply/ReplyTo {
+	public static final field Companion Lcom/letta/mobile/data/lanes/reply/ReplyTo$Companion;
+	public fun <init> (Ljava/lang/String;J)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()J
+	public final fun copy (Ljava/lang/String;J)Lcom/letta/mobile/data/lanes/reply/ReplyTo;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/lanes/reply/ReplyTo;Ljava/lang/String;JILjava/lang/Object;)Lcom/letta/mobile/data/lanes/reply/ReplyTo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCorrelationId ()Ljava/lang/String;
+	public final fun getExpiresAt ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/lanes/reply/ReplyTo$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/lanes/reply/ReplyTo$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/lanes/reply/ReplyTo;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/lanes/reply/ReplyTo;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/lanes/reply/ReplyTo$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/lanes/reply/persistence/FileReplyStoreKt {
+	public static final fun fileReplyStore (Ljava/io/File;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/data/lanes/reply/ReplyStore;
+	public static synthetic fun fileReplyStore$default (Ljava/io/File;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/data/lanes/reply/ReplyStore;
 }
 
 public final class com/letta/mobile/data/lens/LensDestination : java/lang/Enum {
@@ -49487,15 +49748,17 @@ public final class com/letta/mobile/data/runtime/TurnInputAcknowledgement {
 	public static final field Companion Lcom/letta/mobile/data/runtime/TurnInputAcknowledgement$Companion;
 	public static final field QUEUED Ljava/lang/String;
 	public static final field STARTED Ljava/lang/String;
-	public fun <init> (ZLjava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (ZLjava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZLjava/lang/String;Ljava/lang/String;Z)V
+	public synthetic fun <init> (ZLjava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
-	public final fun copy (ZLjava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/runtime/TurnInputAcknowledgement;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/runtime/TurnInputAcknowledgement;ZLjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/runtime/TurnInputAcknowledgement;
+	public final fun component4 ()Z
+	public final fun copy (ZLjava/lang/String;Ljava/lang/String;Z)Lcom/letta/mobile/data/runtime/TurnInputAcknowledgement;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/runtime/TurnInputAcknowledgement;ZLjava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lcom/letta/mobile/data/runtime/TurnInputAcknowledgement;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAccepted ()Z
+	public final fun getConfirmed ()Z
 	public final fun getDisposition ()Ljava/lang/String;
 	public final fun getError ()Ljava/lang/String;
 	public fun hashCode ()I
@@ -71581,9 +71844,11 @@ public final class com/letta/mobile/data/transport/iroh/IrohAgentIdentityKt {
 
 public final class com/letta/mobile/data/transport/iroh/IrohAgentMessage {
 	public static final field Companion Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/util/Map;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Lcom/letta/mobile/data/lanes/reply/ReplyTo;Ljava/lang/Boolean;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Lcom/letta/mobile/data/lanes/reply/ReplyTo;Ljava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Lcom/letta/mobile/data/lanes/reply/ReplyTo;
+	public final fun component11 ()Ljava/lang/Boolean;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
@@ -71591,16 +71856,20 @@ public final class com/letta/mobile/data/transport/iroh/IrohAgentMessage {
 	public final fun component6 ()Ljava/lang/String;
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Ljava/util/Map;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/util/Map;)Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;
+	public final fun component9 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Lcom/letta/mobile/data/lanes/reply/ReplyTo;Ljava/lang/Boolean;)Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Lcom/letta/mobile/data/lanes/reply/ReplyTo;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;
 	public final fun encode ()Ljava/lang/String;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBody ()Ljava/lang/String;
 	public final fun getConversationId ()Ljava/lang/String;
 	public final fun getCorrelation ()Ljava/util/Map;
+	public final fun getCorrelationId ()Ljava/lang/String;
 	public final fun getFromAgentId ()Ljava/lang/String;
 	public final fun getLane ()Ljava/lang/String;
+	public final fun getMore ()Ljava/lang/Boolean;
 	public final fun getMsgId ()Ljava/lang/String;
+	public final fun getReplyTo ()Lcom/letta/mobile/data/lanes/reply/ReplyTo;
 	public final fun getToAgentId ()Ljava/lang/String;
 	public final fun getTs ()J
 	public fun hashCode ()I
@@ -71661,8 +71930,8 @@ public final class com/letta/mobile/data/transport/iroh/IrohAgentMessageAck$Comp
 }
 
 public final class com/letta/mobile/data/transport/iroh/IrohAgentMessageReceiver : com/letta/mobile/data/controller/node/iroh/IrohNodeProtocolHandler {
-	public fun <init> (Lcom/letta/mobile/data/messaging/IrohAgentMessageRouter;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Ljava/io/File;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/messaging/IrohAgentMessageRouter;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Ljava/io/File;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/messaging/IrohAgentMessageRouter;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Ljava/io/File;Lcom/letta/mobile/data/lanes/reply/ReplyStore;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/messaging/IrohAgentMessageRouter;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Ljava/io/File;Lcom/letta/mobile/data/lanes/reply/ReplyStore;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun accept (Lcomputer/iroh/Connection;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun authorize (Ljava/lang/String;)Z
 	public fun getAlpn ()[B

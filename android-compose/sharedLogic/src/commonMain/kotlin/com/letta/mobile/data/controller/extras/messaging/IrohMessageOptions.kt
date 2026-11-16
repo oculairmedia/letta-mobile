@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.extras.messaging
 
+import com.letta.mobile.data.lanes.reply.ReplyTo
+
 /** Optional recipient addressing and task correlation for an agent message. */
 data class IrohMessageOptions(
     /** Explicit target conversation; when set it wins and [lane] is ignored. */
@@ -10,4 +12,8 @@ data class IrohMessageOptions(
     val correlation: Map<String, String>? = null,
     /** Caller-supplied idempotency ID; reuse it unchanged when retrying the same message. */
     val msgId: String? = null,
+    /** Correlation copied from the request being answered. */
+    val correlationId: String? = null,
+    /** Host-minted request return address. */
+    val replyTo: ReplyTo? = null,
 )

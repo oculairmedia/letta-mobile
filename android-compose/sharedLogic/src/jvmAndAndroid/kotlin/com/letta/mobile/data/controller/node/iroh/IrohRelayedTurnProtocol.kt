@@ -94,6 +94,8 @@ internal class IrohRelayedTurnProtocol(
     private val writeControl: suspend (String) -> Unit,
     /** Runs once, right after an accepted ack (the observer user echo). */
     private val afterAccepted: suspend () -> Unit = {},
+    private val afterRefused: suspend () -> Unit = {},
+    private val afterConfirmed: suspend () -> Unit = {},
 ) {
     private val ackLock = Mutex()
     private var acknowledged = false
@@ -127,7 +129,10 @@ internal class IrohRelayedTurnProtocol(
             "hasRequestId" attr (requestId != null),
         )
         requestId?.let { id -> writeControlSafely(inputAcceptedFrame(id, runtime, ack)) }
-        if (ack.accepted) afterAccepted()
+        if (ack.accepted) {
+            if (ack.confirmed) afterConfirmed()
+            afterAccepted()
+        } else afterRefused()
     }
 
     /** Before the fanout forwards [draft]: settle the ack if the engine has not reported it yet. */
@@ -138,7 +143,7 @@ internal class IrohRelayedTurnProtocol(
         val end = turnEndOf(payload)
         // A turn that fails before the engine reported acceptance never ran for the client.
         if (end?.stopReason == STOP_ERROR) acknowledge(TurnInputAcknowledgement.rejected(end.error ?: STOP_ERROR))
-        acknowledge(TurnInputAcknowledgement.Started)
+        acknowledge(TurnInputAcknowledgement.Started.copy(confirmed = false))
     }
 
     /** After the fanout forwarded [draft]: loop status, queue snapshots and the terminal frames. */
@@ -441,13 +446,19 @@ internal fun relayedTurnProtocol(
     fanout: ConversationTurnFanout,
     echo: RelayedUserEcho?,
     writeControl: suspend (String) -> Unit,
+    consumeReplies: suspend () -> Unit = {},
+    releaseReplies: suspend () -> Unit = {},
 ) = IrohRelayedTurnProtocol(
     runtime = input.runtime,
     requestId = input.requestId,
     clientMessageId = echo?.clientMessageId,
     fanout = fanout,
     writeControl = writeControl,
-    afterAccepted = { echo?.let { runCatching { fanout.broadcastUserEcho(it.clientMessageId, it.text, it.contentParts) } } },
+    afterRefused = releaseReplies,
+    afterConfirmed = consumeReplies,
+    afterAccepted = {
+        echo?.let { runCatching { fanout.broadcastUserEcho(it.clientMessageId, it.text, it.contentParts) } }
+    },
 )
 
 /** The sender's prompt, echoed to observers once its input is accepted. */

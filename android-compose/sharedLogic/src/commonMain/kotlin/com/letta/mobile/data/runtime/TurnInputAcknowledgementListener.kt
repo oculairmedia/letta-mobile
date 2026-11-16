@@ -13,6 +13,8 @@ data class TurnInputAcknowledgement(
     val accepted: Boolean,
     val disposition: String?,
     val error: String? = null,
+    /** False for compatibility inference without an upstream acceptance. */
+    val confirmed: Boolean = true,
 ) {
     companion object {
         const val STARTED = "started"
@@ -45,7 +47,7 @@ internal fun InputAcceptance.toAcknowledgement(): TurnInputAcknowledgement = whe
     InputAcceptance.Queued -> TurnInputAcknowledgement.Queued
     is InputAcceptance.Failure -> TurnInputAcknowledgement.rejected(failureReason)
     // The input was sent; only the upstream ack is missing, and the turn runs as it did pre-ack.
-    is InputAcceptance.Unacknowledged -> TurnInputAcknowledgement.Started
+    is InputAcceptance.Unacknowledged -> TurnInputAcknowledgement.Started.copy(confirmed = false)
 }
 
 /** Reports [ack] to the collecting context's listener, if one is installed. */

@@ -52,6 +52,7 @@ class IrohAgentMessageReceiver(
     private val onDeliver: suspend (message: IrohAgentMessage, decision: IrohAgentMessageRouter.RoutingDecision) -> DeliveryOutcome,
     private val authenticate: (message: IrohAgentMessage, peer: String) -> Boolean,
     private val journalFile: File? = null,
+    private val replies: com.letta.mobile.data.lanes.reply.ReplyStore? = null,
 ) : IrohNodeProtocolHandler {
     override val alpn: ByteArray get() = IrohAgentMessage.ALPN
 
@@ -114,7 +115,21 @@ class IrohAgentMessageReceiver(
 
     /** The outcome for [message] from the dialing node [peer]: refused unless it is the claimed sender. */
     suspend fun respond(message: IrohAgentMessage, peer: String): DeliveryOutcome {
-        if (authenticate(message, peer)) return deliver(message)
+        if (authenticate(message, peer)) {
+            val id = message.correlationId
+            if (id != null && replies != null) {
+                val match = replies.receive(id,
+                    message.toAgentId,
+                    message.fromAgentId, peer,
+                    "$peer/${message.msgId}", message.body, message.more == true)
+                when (match) {
+                    com.letta.mobile.data.lanes.reply.ReplyMatch.HELD -> return DeliveryOutcome(true, "reply_held")
+                    com.letta.mobile.data.lanes.reply.ReplyMatch.MISMATCH -> return DeliveryOutcome(false, "correlation_mismatch")
+                    com.letta.mobile.data.lanes.reply.ReplyMatch.INBOX -> Unit
+                }
+            }
+            return deliver(message)
+        }
         Telemetry.event(
             "A2aHost",
             "a2a.sender_rejected",

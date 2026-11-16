@@ -210,6 +210,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Conversation lanes v1](reference/contracts/conversation-lanes-v1.md)
 - [Current focus v1: contract proposal](reference/contracts/current-focus-v1.md)
 - [Keystore v1: provider contract](reference/contracts/keystore-v1.md)
+- [Lane inbox v1: Implementation notes \(H4\)](reference/contracts/lane-inbox-v1-h4-notes.md)
 - [Lane inbox v1](reference/contracts/lane-inbox-v1.md)
 - [Object verbs v1: contract proposal](reference/contracts/object-verbs-v1.md)
 - [Project registry v1: host-owned project record, project file and read methods](reference/contracts/project-registry-v1.md)

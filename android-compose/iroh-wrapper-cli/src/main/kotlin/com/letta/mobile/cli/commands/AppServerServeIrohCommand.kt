@@ -472,6 +472,7 @@ class AppServerServeIrohCommand : CliktCommand(
         canvasRelay = canvasRelay,
         protocolHandlers = protocolHandlers,
         turnIdentity = turnIdentity,
+        replies = com.letta.mobile.data.lanes.reply.persistence.fileReplyStore(a2aConfig().identityDir),
     )
 
     /**
@@ -848,7 +849,7 @@ class AppServerServeIrohCommand : CliktCommand(
         return policy.apply(
             buildProductionExternalToolRegistryForTesting(
                 binary = meridianBinary,
-                identityDir = a2aIdentityDir,
+                identityDir = a2aConfig().identityDir.path,
                 addressStore = a2aAddressBook,
                 localBackendDir = localBackendDir,
                 hostTools = hostCanvasTools + com.letta.mobile.data.shell.layout.edit.ShellLayoutRelay.hostTools(appToolRelay),
@@ -1154,6 +1155,8 @@ internal fun buildProductionExternalToolRegistryForTesting(
         binary = binary,
         identityDir = identityDir,
         addressStore = addressStore,
+        replies = com.letta.mobile.data.lanes.reply.persistence.fileReplyStore(
+            identityDir?.let { java.io.File(it) } ?: java.io.File(System.getProperty("user.home"), ".letta/iroh/identities")),
     )
     val discovery = localBackendDir?.takeIf { it.isNotBlank() }?.let {
         AgentDiscoveryTool(LocalBackendAgentDiscoverySource(LocalBackendAdminStore(java.io.File(it))))

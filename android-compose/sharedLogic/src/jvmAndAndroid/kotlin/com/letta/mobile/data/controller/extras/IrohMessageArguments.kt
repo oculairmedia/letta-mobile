@@ -8,6 +8,11 @@ internal fun MutableList<String>.addMessageOptions(options: IrohMessageOptions) 
     options.conversationId?.let { add("--conversation-id"); add(it) }
     if (options.conversationId == null) options.lane?.let { add("--lane"); add(it) }
     options.correlation?.let { addCorrelation(it) }
+    options.correlationId?.let { add("--in-reply-to"); add(it) }
+    options.replyTo?.let {
+        add("--reply-correlation-id"); add(it.correlationId)
+        add("--reply-expires-at"); add(it.expiresAt.toString())
+    }
 }
 
 private fun MutableList<String>.addCorrelation(correlation: Map<String, String>) {

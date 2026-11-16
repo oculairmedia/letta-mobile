@@ -158,6 +158,16 @@ class AgentMessageSendCommandBodyResolutionTest {
 }
 
 class AgentMessageSendEnvelopeTest {
+    @Test
+    fun requestAndReplyCorrelationSurviveCliAndEnvelope() {
+        val request = send("--reply-correlation-id", "host-minted", "--reply-expires-at", "1234")
+        assertEquals("host-minted", request.replyTo?.correlationId)
+        assertEquals(1234L, request.replyTo?.expiresAt)
+        val reply = send("--in-reply-to", "host-minted")
+        assertEquals("host-minted", reply.correlationId)
+        assertEquals(null, reply.replyTo)
+    }
+
     private fun send(vararg extra: String): IrohAgentMessage {
         var wire = ""
         val command = AgentMessageSendCommand().apply { sendOverride = { wire = it.encode() } }

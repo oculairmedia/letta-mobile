@@ -1,5 +1,5 @@
 // Klib ABI Dump
-// Targets: [mingwX64.hostNative, wasmJs]
+// Targets: [wasmJs]
 // Rendering settings:
 // - Signature version: 2
 // - Show manifest properties: true
@@ -1540,6 +1540,18 @@ final enum class com.letta.mobile.data.home/FleetSortKey : kotlin/Enum<com.letta
 
     final fun valueOf(kotlin/String): com.letta.mobile.data.home/FleetSortKey // com.letta.mobile.data.home/FleetSortKey.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<com.letta.mobile.data.home/FleetSortKey> // com.letta.mobile.data.home/FleetSortKey.values|values#static(){}[0]
+}
+
+final enum class com.letta.mobile.data.lanes.reply/ReplyMatch : kotlin/Enum<com.letta.mobile.data.lanes.reply/ReplyMatch> { // com.letta.mobile.data.lanes.reply/ReplyMatch|null[0]
+    enum entry HELD // com.letta.mobile.data.lanes.reply/ReplyMatch.HELD|null[0]
+    enum entry INBOX // com.letta.mobile.data.lanes.reply/ReplyMatch.INBOX|null[0]
+    enum entry MISMATCH // com.letta.mobile.data.lanes.reply/ReplyMatch.MISMATCH|null[0]
+
+    final val entries // com.letta.mobile.data.lanes.reply/ReplyMatch.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.lanes.reply/ReplyMatch> // com.letta.mobile.data.lanes.reply/ReplyMatch.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.lanes.reply/ReplyMatch // com.letta.mobile.data.lanes.reply/ReplyMatch.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.lanes.reply/ReplyMatch> // com.letta.mobile.data.lanes.reply/ReplyMatch.values|values#static(){}[0]
 }
 
 final enum class com.letta.mobile.data.lanes/ConversationPurpose : kotlin/Enum<com.letta.mobile.data.lanes/ConversationPurpose> { // com.letta.mobile.data.lanes/ConversationPurpose|null[0]
@@ -39340,22 +39352,28 @@ final class com.letta.mobile.data.controller.extras.identity/ToolCallScope { // 
 }
 
 final class com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions { // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions|null[0]
-    constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/Map<kotlin/String, kotlin/String>? = ..., kotlin/String? = ...) // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.collections.Map<kotlin.String,kotlin.String>?;kotlin.String?){}[0]
+    constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/Map<kotlin/String, kotlin/String>? = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.lanes.reply/ReplyTo? = ...) // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.collections.Map<kotlin.String,kotlin.String>?;kotlin.String?;kotlin.String?;com.letta.mobile.data.lanes.reply.ReplyTo?){}[0]
 
     final val conversationId // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.conversationId|{}conversationId[0]
         final fun <get-conversationId>(): kotlin/String? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
     final val correlation // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.correlation|{}correlation[0]
         final fun <get-correlation>(): kotlin.collections/Map<kotlin/String, kotlin/String>? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.correlation.<get-correlation>|<get-correlation>(){}[0]
+    final val correlationId // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.correlationId|{}correlationId[0]
+        final fun <get-correlationId>(): kotlin/String? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.correlationId.<get-correlationId>|<get-correlationId>(){}[0]
     final val lane // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.lane|{}lane[0]
         final fun <get-lane>(): kotlin/String? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.lane.<get-lane>|<get-lane>(){}[0]
     final val msgId // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.msgId|{}msgId[0]
         final fun <get-msgId>(): kotlin/String? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.msgId.<get-msgId>|<get-msgId>(){}[0]
+    final val replyTo // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.replyTo|{}replyTo[0]
+        final fun <get-replyTo>(): com.letta.mobile.data.lanes.reply/ReplyTo? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.replyTo.<get-replyTo>|<get-replyTo>(){}[0]
 
     final fun component1(): kotlin/String? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.component1|component1(){}[0]
     final fun component2(): kotlin/String? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.component2|component2(){}[0]
     final fun component3(): kotlin.collections/Map<kotlin/String, kotlin/String>? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.component3|component3(){}[0]
     final fun component4(): kotlin/String? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.component4|component4(){}[0]
-    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/Map<kotlin/String, kotlin/String>? = ..., kotlin/String? = ...): com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.copy|copy(kotlin.String?;kotlin.String?;kotlin.collections.Map<kotlin.String,kotlin.String>?;kotlin.String?){}[0]
+    final fun component5(): kotlin/String? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.component5|component5(){}[0]
+    final fun component6(): com.letta.mobile.data.lanes.reply/ReplyTo? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.component6|component6(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/Map<kotlin/String, kotlin/String>? = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.lanes.reply/ReplyTo? = ...): com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.copy|copy(kotlin.String?;kotlin.String?;kotlin.collections.Map<kotlin.String,kotlin.String>?;kotlin.String?;kotlin.String?;com.letta.mobile.data.lanes.reply.ReplyTo?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.toString|toString(){}[0]
@@ -39485,7 +39503,7 @@ final class com.letta.mobile.data.controller.extras/AgentDiscoveryTool : com.let
 }
 
 final class com.letta.mobile.data.controller.extras/CustomIrohMessagingTool : com.letta.mobile.data.controller.extras/ExternalTool { // com.letta.mobile.data.controller.extras/CustomIrohMessagingTool|null[0]
-    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.controller.extras/IrohCliRunner? = ...) // com.letta.mobile.data.controller.extras/CustomIrohMessagingTool.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String?;com.letta.mobile.data.controller.extras.IrohCliRunner?){}[0]
+    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.controller.extras/IrohCliRunner? = ..., com.letta.mobile.data.lanes.reply/ReplyStore? = ...) // com.letta.mobile.data.controller.extras/CustomIrohMessagingTool.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String?;com.letta.mobile.data.controller.extras.IrohCliRunner?;com.letta.mobile.data.lanes.reply.ReplyStore?){}[0]
 
     final val capability // com.letta.mobile.data.controller.extras/CustomIrohMessagingTool.capability|{}capability[0]
         final fun <get-capability>(): com.letta.mobile.data.controller.capability/Capability // com.letta.mobile.data.controller.extras/CustomIrohMessagingTool.capability.<get-capability>|<get-capability>(){}[0]
@@ -39496,6 +39514,7 @@ final class com.letta.mobile.data.controller.extras/CustomIrohMessagingTool : co
     final val name // com.letta.mobile.data.controller.extras/CustomIrohMessagingTool.name|{}name[0]
         final fun <get-name>(): kotlin/String // com.letta.mobile.data.controller.extras/CustomIrohMessagingTool.name.<get-name>|<get-name>(){}[0]
 
+    final suspend fun invoke(kotlinx.serialization.json/JsonObject, com.letta.mobile.data.controller.extras/ExternalToolCaller): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.controller.extras/CustomIrohMessagingTool.invoke|invoke(kotlinx.serialization.json.JsonObject;com.letta.mobile.data.controller.extras.ExternalToolCaller){}[0]
     final suspend fun invoke(kotlinx.serialization.json/JsonObject, kotlin/String?): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.controller.extras/CustomIrohMessagingTool.invoke|invoke(kotlinx.serialization.json.JsonObject;kotlin.String?){}[0]
 
     final object Companion { // com.letta.mobile.data.controller.extras/CustomIrohMessagingTool.Companion|null[0]
@@ -41914,6 +41933,269 @@ final class com.letta.mobile.data.home/SettingsStoreHomePinStore : com.letta.mob
     final object Companion { // com.letta.mobile.data.home/SettingsStoreHomePinStore.Companion|null[0]
         final const val DEFAULT_STORAGE_KEY // com.letta.mobile.data.home/SettingsStoreHomePinStore.Companion.DEFAULT_STORAGE_KEY|{}DEFAULT_STORAGE_KEY[0]
             final fun <get-DEFAULT_STORAGE_KEY>(): kotlin/String // com.letta.mobile.data.home/SettingsStoreHomePinStore.Companion.DEFAULT_STORAGE_KEY.<get-DEFAULT_STORAGE_KEY>|<get-DEFAULT_STORAGE_KEY>(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.lanes.reply/HeldReply { // com.letta.mobile.data.lanes.reply/HeldReply|null[0]
+    constructor <init>(com.letta.mobile.data.lanes.reply/PendingReply, kotlin/String, kotlin/String, kotlin/String, kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.lanes.reply/HeldReply.<init>|<init>(com.letta.mobile.data.lanes.reply.PendingReply;kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?){}[0]
+
+    final val body // com.letta.mobile.data.lanes.reply/HeldReply.body|{}body[0]
+        final fun <get-body>(): kotlin/String // com.letta.mobile.data.lanes.reply/HeldReply.body.<get-body>|<get-body>(){}[0]
+    final val inputToken // com.letta.mobile.data.lanes.reply/HeldReply.inputToken|{}inputToken[0]
+        final fun <get-inputToken>(): kotlin/String? // com.letta.mobile.data.lanes.reply/HeldReply.inputToken.<get-inputToken>|<get-inputToken>(){}[0]
+    final val messageKey // com.letta.mobile.data.lanes.reply/HeldReply.messageKey|{}messageKey[0]
+        final fun <get-messageKey>(): kotlin/String // com.letta.mobile.data.lanes.reply/HeldReply.messageKey.<get-messageKey>|<get-messageKey>(){}[0]
+    final val processEpoch // com.letta.mobile.data.lanes.reply/HeldReply.processEpoch|{}processEpoch[0]
+        final fun <get-processEpoch>(): kotlin/String? // com.letta.mobile.data.lanes.reply/HeldReply.processEpoch.<get-processEpoch>|<get-processEpoch>(){}[0]
+    final val request // com.letta.mobile.data.lanes.reply/HeldReply.request|{}request[0]
+        final fun <get-request>(): com.letta.mobile.data.lanes.reply/PendingReply // com.letta.mobile.data.lanes.reply/HeldReply.request.<get-request>|<get-request>(){}[0]
+    final val sender // com.letta.mobile.data.lanes.reply/HeldReply.sender|{}sender[0]
+        final fun <get-sender>(): kotlin/String // com.letta.mobile.data.lanes.reply/HeldReply.sender.<get-sender>|<get-sender>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.lanes.reply/PendingReply // com.letta.mobile.data.lanes.reply/HeldReply.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.lanes.reply/HeldReply.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.lanes.reply/HeldReply.component3|component3(){}[0]
+    final fun component4(): kotlin/String // com.letta.mobile.data.lanes.reply/HeldReply.component4|component4(){}[0]
+    final fun component5(): kotlin/String? // com.letta.mobile.data.lanes.reply/HeldReply.component5|component5(){}[0]
+    final fun component6(): kotlin/String? // com.letta.mobile.data.lanes.reply/HeldReply.component6|component6(){}[0]
+    final fun copy(com.letta.mobile.data.lanes.reply/PendingReply = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.lanes.reply/HeldReply // com.letta.mobile.data.lanes.reply/HeldReply.copy|copy(com.letta.mobile.data.lanes.reply.PendingReply;kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.lanes.reply/HeldReply.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.lanes.reply/HeldReply.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.lanes.reply/HeldReply.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.lanes.reply/HeldReply> { // com.letta.mobile.data.lanes.reply/HeldReply.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.lanes.reply/HeldReply.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.lanes.reply/HeldReply.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.lanes.reply/HeldReply.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.lanes.reply/HeldReply // com.letta.mobile.data.lanes.reply/HeldReply.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.lanes.reply/HeldReply) // com.letta.mobile.data.lanes.reply/HeldReply.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.lanes.reply.HeldReply){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.lanes.reply/HeldReply.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.lanes.reply/HeldReply> // com.letta.mobile.data.lanes.reply/HeldReply.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.lanes.reply/PendingReply { // com.letta.mobile.data.lanes.reply/PendingReply|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Long, kotlin/Long) // com.letta.mobile.data.lanes.reply/PendingReply.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Long;kotlin.Long){}[0]
+
+    final val correlationId // com.letta.mobile.data.lanes.reply/PendingReply.correlationId|{}correlationId[0]
+        final fun <get-correlationId>(): kotlin/String // com.letta.mobile.data.lanes.reply/PendingReply.correlationId.<get-correlationId>|<get-correlationId>(){}[0]
+    final val createdAt // com.letta.mobile.data.lanes.reply/PendingReply.createdAt|{}createdAt[0]
+        final fun <get-createdAt>(): kotlin/Long // com.letta.mobile.data.lanes.reply/PendingReply.createdAt.<get-createdAt>|<get-createdAt>(){}[0]
+    final val expectedEndpoint // com.letta.mobile.data.lanes.reply/PendingReply.expectedEndpoint|{}expectedEndpoint[0]
+        final fun <get-expectedEndpoint>(): kotlin/String // com.letta.mobile.data.lanes.reply/PendingReply.expectedEndpoint.<get-expectedEndpoint>|<get-expectedEndpoint>(){}[0]
+    final val expectedReplier // com.letta.mobile.data.lanes.reply/PendingReply.expectedReplier|{}expectedReplier[0]
+        final fun <get-expectedReplier>(): kotlin/String // com.letta.mobile.data.lanes.reply/PendingReply.expectedReplier.<get-expectedReplier>|<get-expectedReplier>(){}[0]
+    final val expiresAt // com.letta.mobile.data.lanes.reply/PendingReply.expiresAt|{}expiresAt[0]
+        final fun <get-expiresAt>(): kotlin/Long // com.letta.mobile.data.lanes.reply/PendingReply.expiresAt.<get-expiresAt>|<get-expiresAt>(){}[0]
+    final val originAgent // com.letta.mobile.data.lanes.reply/PendingReply.originAgent|{}originAgent[0]
+        final fun <get-originAgent>(): kotlin/String // com.letta.mobile.data.lanes.reply/PendingReply.originAgent.<get-originAgent>|<get-originAgent>(){}[0]
+    final val originConversation // com.letta.mobile.data.lanes.reply/PendingReply.originConversation|{}originConversation[0]
+        final fun <get-originConversation>(): kotlin/String // com.letta.mobile.data.lanes.reply/PendingReply.originConversation.<get-originConversation>|<get-originConversation>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.lanes.reply/PendingReply.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.lanes.reply/PendingReply.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.lanes.reply/PendingReply.component3|component3(){}[0]
+    final fun component4(): kotlin/String // com.letta.mobile.data.lanes.reply/PendingReply.component4|component4(){}[0]
+    final fun component5(): kotlin/String // com.letta.mobile.data.lanes.reply/PendingReply.component5|component5(){}[0]
+    final fun component6(): kotlin/Long // com.letta.mobile.data.lanes.reply/PendingReply.component6|component6(){}[0]
+    final fun component7(): kotlin/Long // com.letta.mobile.data.lanes.reply/PendingReply.component7|component7(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Long = ..., kotlin/Long = ...): com.letta.mobile.data.lanes.reply/PendingReply // com.letta.mobile.data.lanes.reply/PendingReply.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Long;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.lanes.reply/PendingReply.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.lanes.reply/PendingReply.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.lanes.reply/PendingReply.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.lanes.reply/PendingReply> { // com.letta.mobile.data.lanes.reply/PendingReply.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.lanes.reply/PendingReply.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.lanes.reply/PendingReply.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.lanes.reply/PendingReply.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.lanes.reply/PendingReply // com.letta.mobile.data.lanes.reply/PendingReply.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.lanes.reply/PendingReply) // com.letta.mobile.data.lanes.reply/PendingReply.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.lanes.reply.PendingReply){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.lanes.reply/PendingReply.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.lanes.reply/PendingReply> // com.letta.mobile.data.lanes.reply/PendingReply.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.lanes.reply/ReplyDeadLetter { // com.letta.mobile.data.lanes.reply/ReplyDeadLetter|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/Long) // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.Long){}[0]
+
+    final val correlationId // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.correlationId|{}correlationId[0]
+        final fun <get-correlationId>(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.correlationId.<get-correlationId>|<get-correlationId>(){}[0]
+    final val messageKey // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.messageKey|{}messageKey[0]
+        final fun <get-messageKey>(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.messageKey.<get-messageKey>|<get-messageKey>(){}[0]
+    final val reason // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.reason|{}reason[0]
+        final fun <get-reason>(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.reason.<get-reason>|<get-reason>(){}[0]
+    final val recordedAt // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.recordedAt|{}recordedAt[0]
+        final fun <get-recordedAt>(): kotlin/Long // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.recordedAt.<get-recordedAt>|<get-recordedAt>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.component3|component3(){}[0]
+    final fun component4(): kotlin/Long // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Long = ...): com.letta.mobile.data.lanes.reply/ReplyDeadLetter // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.lanes.reply/ReplyDeadLetter> { // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.lanes.reply/ReplyDeadLetter // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.lanes.reply/ReplyDeadLetter) // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.lanes.reply.ReplyDeadLetter){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.lanes.reply/ReplyDeadLetter> // com.letta.mobile.data.lanes.reply/ReplyDeadLetter.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.lanes.reply/ReplyOrigin { // com.letta.mobile.data.lanes.reply/ReplyOrigin|null[0]
+    constructor <init>(kotlin/String, kotlin/String) // com.letta.mobile.data.lanes.reply/ReplyOrigin.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+    final val agent // com.letta.mobile.data.lanes.reply/ReplyOrigin.agent|{}agent[0]
+        final fun <get-agent>(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyOrigin.agent.<get-agent>|<get-agent>(){}[0]
+    final val conversation // com.letta.mobile.data.lanes.reply/ReplyOrigin.conversation|{}conversation[0]
+        final fun <get-conversation>(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyOrigin.conversation.<get-conversation>|<get-conversation>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyOrigin.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyOrigin.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ...): com.letta.mobile.data.lanes.reply/ReplyOrigin // com.letta.mobile.data.lanes.reply/ReplyOrigin.copy|copy(kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.lanes.reply/ReplyOrigin.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.lanes.reply/ReplyOrigin.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyOrigin.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.lanes.reply/ReplyReceipt { // com.letta.mobile.data.lanes.reply/ReplyReceipt|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Long) // com.letta.mobile.data.lanes.reply/ReplyReceipt.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Long){}[0]
+
+    final val correlationId // com.letta.mobile.data.lanes.reply/ReplyReceipt.correlationId|{}correlationId[0]
+        final fun <get-correlationId>(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyReceipt.correlationId.<get-correlationId>|<get-correlationId>(){}[0]
+    final val endpoint // com.letta.mobile.data.lanes.reply/ReplyReceipt.endpoint|{}endpoint[0]
+        final fun <get-endpoint>(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyReceipt.endpoint.<get-endpoint>|<get-endpoint>(){}[0]
+    final val messageKey // com.letta.mobile.data.lanes.reply/ReplyReceipt.messageKey|{}messageKey[0]
+        final fun <get-messageKey>(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyReceipt.messageKey.<get-messageKey>|<get-messageKey>(){}[0]
+    final val recipient // com.letta.mobile.data.lanes.reply/ReplyReceipt.recipient|{}recipient[0]
+        final fun <get-recipient>(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyReceipt.recipient.<get-recipient>|<get-recipient>(){}[0]
+    final val retainedUntil // com.letta.mobile.data.lanes.reply/ReplyReceipt.retainedUntil|{}retainedUntil[0]
+        final fun <get-retainedUntil>(): kotlin/Long // com.letta.mobile.data.lanes.reply/ReplyReceipt.retainedUntil.<get-retainedUntil>|<get-retainedUntil>(){}[0]
+    final val sender // com.letta.mobile.data.lanes.reply/ReplyReceipt.sender|{}sender[0]
+        final fun <get-sender>(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyReceipt.sender.<get-sender>|<get-sender>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyReceipt.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyReceipt.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyReceipt.component3|component3(){}[0]
+    final fun component4(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyReceipt.component4|component4(){}[0]
+    final fun component5(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyReceipt.component5|component5(){}[0]
+    final fun component6(): kotlin/Long // com.letta.mobile.data.lanes.reply/ReplyReceipt.component6|component6(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Long = ...): com.letta.mobile.data.lanes.reply/ReplyReceipt // com.letta.mobile.data.lanes.reply/ReplyReceipt.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.lanes.reply/ReplyReceipt.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.lanes.reply/ReplyReceipt.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyReceipt.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.lanes.reply/ReplyReceipt> { // com.letta.mobile.data.lanes.reply/ReplyReceipt.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.lanes.reply/ReplyReceipt.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.lanes.reply/ReplyReceipt.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.lanes.reply/ReplyReceipt.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.lanes.reply/ReplyReceipt // com.letta.mobile.data.lanes.reply/ReplyReceipt.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.lanes.reply/ReplyReceipt) // com.letta.mobile.data.lanes.reply/ReplyReceipt.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.lanes.reply.ReplyReceipt){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.lanes.reply/ReplyReceipt.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.lanes.reply/ReplyReceipt> // com.letta.mobile.data.lanes.reply/ReplyReceipt.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.lanes.reply/ReplySnapshot { // com.letta.mobile.data.lanes.reply/ReplySnapshot|null[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.data.lanes.reply/PendingReply> = ..., kotlin.collections/List<com.letta.mobile.data.lanes.reply/HeldReply> = ..., kotlin.collections/List<com.letta.mobile.data.lanes.reply/ReplyDeadLetter> = ..., kotlin.collections/List<com.letta.mobile.data.lanes.reply/ReplyReceipt> = ..., kotlin.collections/Set<kotlin/String> = ...) // com.letta.mobile.data.lanes.reply/ReplySnapshot.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.lanes.reply.PendingReply>;kotlin.collections.List<com.letta.mobile.data.lanes.reply.HeldReply>;kotlin.collections.List<com.letta.mobile.data.lanes.reply.ReplyDeadLetter>;kotlin.collections.List<com.letta.mobile.data.lanes.reply.ReplyReceipt>;kotlin.collections.Set<kotlin.String>){}[0]
+
+    final val deadLetters // com.letta.mobile.data.lanes.reply/ReplySnapshot.deadLetters|{}deadLetters[0]
+        final fun <get-deadLetters>(): kotlin.collections/List<com.letta.mobile.data.lanes.reply/ReplyDeadLetter> // com.letta.mobile.data.lanes.reply/ReplySnapshot.deadLetters.<get-deadLetters>|<get-deadLetters>(){}[0]
+    final val expired // com.letta.mobile.data.lanes.reply/ReplySnapshot.expired|{}expired[0]
+        final fun <get-expired>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.lanes.reply/ReplySnapshot.expired.<get-expired>|<get-expired>(){}[0]
+    final val held // com.letta.mobile.data.lanes.reply/ReplySnapshot.held|{}held[0]
+        final fun <get-held>(): kotlin.collections/List<com.letta.mobile.data.lanes.reply/HeldReply> // com.letta.mobile.data.lanes.reply/ReplySnapshot.held.<get-held>|<get-held>(){}[0]
+    final val pending // com.letta.mobile.data.lanes.reply/ReplySnapshot.pending|{}pending[0]
+        final fun <get-pending>(): kotlin.collections/List<com.letta.mobile.data.lanes.reply/PendingReply> // com.letta.mobile.data.lanes.reply/ReplySnapshot.pending.<get-pending>|<get-pending>(){}[0]
+    final val received // com.letta.mobile.data.lanes.reply/ReplySnapshot.received|{}received[0]
+        final fun <get-received>(): kotlin.collections/List<com.letta.mobile.data.lanes.reply/ReplyReceipt> // com.letta.mobile.data.lanes.reply/ReplySnapshot.received.<get-received>|<get-received>(){}[0]
+
+    final fun component1(): kotlin.collections/List<com.letta.mobile.data.lanes.reply/PendingReply> // com.letta.mobile.data.lanes.reply/ReplySnapshot.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<com.letta.mobile.data.lanes.reply/HeldReply> // com.letta.mobile.data.lanes.reply/ReplySnapshot.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<com.letta.mobile.data.lanes.reply/ReplyDeadLetter> // com.letta.mobile.data.lanes.reply/ReplySnapshot.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/List<com.letta.mobile.data.lanes.reply/ReplyReceipt> // com.letta.mobile.data.lanes.reply/ReplySnapshot.component4|component4(){}[0]
+    final fun component5(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.lanes.reply/ReplySnapshot.component5|component5(){}[0]
+    final fun copy(kotlin.collections/List<com.letta.mobile.data.lanes.reply/PendingReply> = ..., kotlin.collections/List<com.letta.mobile.data.lanes.reply/HeldReply> = ..., kotlin.collections/List<com.letta.mobile.data.lanes.reply/ReplyDeadLetter> = ..., kotlin.collections/List<com.letta.mobile.data.lanes.reply/ReplyReceipt> = ..., kotlin.collections/Set<kotlin/String> = ...): com.letta.mobile.data.lanes.reply/ReplySnapshot // com.letta.mobile.data.lanes.reply/ReplySnapshot.copy|copy(kotlin.collections.List<com.letta.mobile.data.lanes.reply.PendingReply>;kotlin.collections.List<com.letta.mobile.data.lanes.reply.HeldReply>;kotlin.collections.List<com.letta.mobile.data.lanes.reply.ReplyDeadLetter>;kotlin.collections.List<com.letta.mobile.data.lanes.reply.ReplyReceipt>;kotlin.collections.Set<kotlin.String>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.lanes.reply/ReplySnapshot.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.lanes.reply/ReplySnapshot.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplySnapshot.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.lanes.reply/ReplySnapshot> { // com.letta.mobile.data.lanes.reply/ReplySnapshot.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.lanes.reply/ReplySnapshot.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.lanes.reply/ReplySnapshot.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.lanes.reply/ReplySnapshot.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.lanes.reply/ReplySnapshot // com.letta.mobile.data.lanes.reply/ReplySnapshot.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.lanes.reply/ReplySnapshot) // com.letta.mobile.data.lanes.reply/ReplySnapshot.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.lanes.reply.ReplySnapshot){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.lanes.reply/ReplySnapshot.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.lanes.reply/ReplySnapshot.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.lanes.reply/ReplySnapshot> // com.letta.mobile.data.lanes.reply/ReplySnapshot.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.lanes.reply/ReplyStore { // com.letta.mobile.data.lanes.reply/ReplyStore|null[0]
+    constructor <init>(kotlin.coroutines/SuspendFunction1<kotlin/Function1<com.letta.mobile.data.lanes.reply/ReplySnapshot, com.letta.mobile.data.lanes.reply/ReplySnapshot>, com.letta.mobile.data.lanes.reply/ReplySnapshot>, kotlin/Function0<kotlin/Long>, kotlin/Function1<kotlin/String, kotlin/String?>, kotlin/String = ..., kotlin/Function1<kotlin/String, kotlin/String> = ...) // com.letta.mobile.data.lanes.reply/ReplyStore.<init>|<init>(kotlin.coroutines.SuspendFunction1<kotlin.Function1<com.letta.mobile.data.lanes.reply.ReplySnapshot,com.letta.mobile.data.lanes.reply.ReplySnapshot>,com.letta.mobile.data.lanes.reply.ReplySnapshot>;kotlin.Function0<kotlin.Long>;kotlin.Function1<kotlin.String,kotlin.String?>;kotlin.String;kotlin.Function1<kotlin.String,kotlin.String>){}[0]
+
+    final suspend fun consume(kotlin.collections/List<com.letta.mobile.data.lanes.reply/HeldReply>) // com.letta.mobile.data.lanes.reply/ReplyStore.consume|consume(kotlin.collections.List<com.letta.mobile.data.lanes.reply.HeldReply>){}[0]
+    final suspend fun held(com.letta.mobile.data.lanes.reply/ReplyOrigin, kotlin/String): kotlin.collections/List<com.letta.mobile.data.lanes.reply/HeldReply> // com.letta.mobile.data.lanes.reply/ReplyStore.held|held(com.letta.mobile.data.lanes.reply.ReplyOrigin;kotlin.String){}[0]
+    final suspend fun receive(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Boolean = ...): com.letta.mobile.data.lanes.reply/ReplyMatch // com.letta.mobile.data.lanes.reply/ReplyStore.receive|receive(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Boolean){}[0]
+    final suspend fun release(kotlin.collections/List<com.letta.mobile.data.lanes.reply/HeldReply>) // com.letta.mobile.data.lanes.reply/ReplyStore.release|release(kotlin.collections.List<com.letta.mobile.data.lanes.reply.HeldReply>){}[0]
+    final suspend fun request(com.letta.mobile.data.lanes.reply/ReplyOrigin, kotlin/String): com.letta.mobile.data.lanes.reply/ReplyTo // com.letta.mobile.data.lanes.reply/ReplyStore.request|request(com.letta.mobile.data.lanes.reply.ReplyOrigin;kotlin.String){}[0]
+
+    final object Companion { // com.letta.mobile.data.lanes.reply/ReplyStore.Companion|null[0]
+        final const val REPLY_TTL_MS // com.letta.mobile.data.lanes.reply/ReplyStore.Companion.REPLY_TTL_MS|{}REPLY_TTL_MS[0]
+            final fun <get-REPLY_TTL_MS>(): kotlin/Long // com.letta.mobile.data.lanes.reply/ReplyStore.Companion.REPLY_TTL_MS.<get-REPLY_TTL_MS>|<get-REPLY_TTL_MS>(){}[0]
+
+        final fun prepend(kotlin.collections/List<com.letta.mobile.data.lanes.reply/HeldReply>, kotlin/String): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyStore.Companion.prepend|prepend(kotlin.collections.List<com.letta.mobile.data.lanes.reply.HeldReply>;kotlin.String){}[0]
+    }
+}
+
+final class com.letta.mobile.data.lanes.reply/ReplyTo { // com.letta.mobile.data.lanes.reply/ReplyTo|null[0]
+    constructor <init>(kotlin/String, kotlin/Long) // com.letta.mobile.data.lanes.reply/ReplyTo.<init>|<init>(kotlin.String;kotlin.Long){}[0]
+
+    final val correlationId // com.letta.mobile.data.lanes.reply/ReplyTo.correlationId|{}correlationId[0]
+        final fun <get-correlationId>(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyTo.correlationId.<get-correlationId>|<get-correlationId>(){}[0]
+    final val expiresAt // com.letta.mobile.data.lanes.reply/ReplyTo.expiresAt|{}expiresAt[0]
+        final fun <get-expiresAt>(): kotlin/Long // com.letta.mobile.data.lanes.reply/ReplyTo.expiresAt.<get-expiresAt>|<get-expiresAt>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyTo.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // com.letta.mobile.data.lanes.reply/ReplyTo.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Long = ...): com.letta.mobile.data.lanes.reply/ReplyTo // com.letta.mobile.data.lanes.reply/ReplyTo.copy|copy(kotlin.String;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.lanes.reply/ReplyTo.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.lanes.reply/ReplyTo.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.lanes.reply/ReplyTo.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.lanes.reply/ReplyTo> { // com.letta.mobile.data.lanes.reply/ReplyTo.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.lanes.reply/ReplyTo.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.lanes.reply/ReplyTo.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.lanes.reply/ReplyTo.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.lanes.reply/ReplyTo // com.letta.mobile.data.lanes.reply/ReplyTo.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.lanes.reply/ReplyTo) // com.letta.mobile.data.lanes.reply/ReplyTo.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.lanes.reply.ReplyTo){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.lanes.reply/ReplyTo.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.lanes.reply/ReplyTo> // com.letta.mobile.data.lanes.reply/ReplyTo.Companion.serializer|serializer(){}[0]
     }
 }
 
@@ -60466,10 +60748,12 @@ final class com.letta.mobile.data.runtime/TurnIdentityLedger { // com.letta.mobi
 }
 
 final class com.letta.mobile.data.runtime/TurnInputAcknowledgement { // com.letta.mobile.data.runtime/TurnInputAcknowledgement|null[0]
-    constructor <init>(kotlin/Boolean, kotlin/String?, kotlin/String? = ...) // com.letta.mobile.data.runtime/TurnInputAcknowledgement.<init>|<init>(kotlin.Boolean;kotlin.String?;kotlin.String?){}[0]
+    constructor <init>(kotlin/Boolean, kotlin/String?, kotlin/String? = ..., kotlin/Boolean = ...) // com.letta.mobile.data.runtime/TurnInputAcknowledgement.<init>|<init>(kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.Boolean){}[0]
 
     final val accepted // com.letta.mobile.data.runtime/TurnInputAcknowledgement.accepted|{}accepted[0]
         final fun <get-accepted>(): kotlin/Boolean // com.letta.mobile.data.runtime/TurnInputAcknowledgement.accepted.<get-accepted>|<get-accepted>(){}[0]
+    final val confirmed // com.letta.mobile.data.runtime/TurnInputAcknowledgement.confirmed|{}confirmed[0]
+        final fun <get-confirmed>(): kotlin/Boolean // com.letta.mobile.data.runtime/TurnInputAcknowledgement.confirmed.<get-confirmed>|<get-confirmed>(){}[0]
     final val disposition // com.letta.mobile.data.runtime/TurnInputAcknowledgement.disposition|{}disposition[0]
         final fun <get-disposition>(): kotlin/String? // com.letta.mobile.data.runtime/TurnInputAcknowledgement.disposition.<get-disposition>|<get-disposition>(){}[0]
     final val error // com.letta.mobile.data.runtime/TurnInputAcknowledgement.error|{}error[0]
@@ -60478,7 +60762,8 @@ final class com.letta.mobile.data.runtime/TurnInputAcknowledgement { // com.lett
     final fun component1(): kotlin/Boolean // com.letta.mobile.data.runtime/TurnInputAcknowledgement.component1|component1(){}[0]
     final fun component2(): kotlin/String? // com.letta.mobile.data.runtime/TurnInputAcknowledgement.component2|component2(){}[0]
     final fun component3(): kotlin/String? // com.letta.mobile.data.runtime/TurnInputAcknowledgement.component3|component3(){}[0]
-    final fun copy(kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.runtime/TurnInputAcknowledgement // com.letta.mobile.data.runtime/TurnInputAcknowledgement.copy|copy(kotlin.Boolean;kotlin.String?;kotlin.String?){}[0]
+    final fun component4(): kotlin/Boolean // com.letta.mobile.data.runtime/TurnInputAcknowledgement.component4|component4(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ...): com.letta.mobile.data.runtime/TurnInputAcknowledgement // com.letta.mobile.data.runtime/TurnInputAcknowledgement.copy|copy(kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.Boolean){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.runtime/TurnInputAcknowledgement.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.runtime/TurnInputAcknowledgement.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.runtime/TurnInputAcknowledgement.toString|toString(){}[0]
@@ -82282,7 +82567,7 @@ final suspend fun com.letta.mobile.data.transport.appserver/awaitAppServerReadin
 final suspend fun com.letta.mobile.data.transport.appserver/openAppServerWebSocket(com.letta.mobile.data.transport.appserver/AppServerWebSocketDial, io.ktor.client/HttpClient, kotlinx.coroutines/CoroutineScope): com.letta.mobile.data.transport.appserver/AppServerWebSocketConnection // com.letta.mobile.data.transport.appserver/openAppServerWebSocket|openAppServerWebSocket(com.letta.mobile.data.transport.appserver.AppServerWebSocketDial;io.ktor.client.HttpClient;kotlinx.coroutines.CoroutineScope){}[0]
 final suspend inline fun <#A: kotlin/Any?> com.letta.mobile.util/runCatchingCancellable(kotlin.coroutines/SuspendFunction0<#A>): kotlin/Result<#A> // com.letta.mobile.util/runCatchingCancellable|runCatchingCancellable(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
 
-// Targets: [mingwX64.hostNative]
+// Targets: [wasmJs]
 final class com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta : kotlinx.atomicfu.locks/SynchronizedObject { // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta|null[0]
     constructor <init>() // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta.<init>|<init>(){}[0]
 

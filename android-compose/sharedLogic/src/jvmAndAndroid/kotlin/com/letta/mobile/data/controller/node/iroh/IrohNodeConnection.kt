@@ -102,6 +102,8 @@ class IrohNodeConnection(
     /** The host's stream-to-stored identity join; null leaves rows unjoined. */
     private val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
 ) {
+    internal var replies: com.letta.mobile.data.lanes.reply.ReplyStore? = null
+
     private val remoteEndpointId = authentication.remoteEndpointId
 
     // Per-connection, strictly-monotonic event_seq with a disjoint process-scoped
@@ -924,6 +926,15 @@ class IrohNodeConnection(
             }
             return
         }
+        val heldReplies = replies?.held(com.letta.mobile.data.lanes.reply.ReplyOrigin(input.runtime.agentId, input.runtime.conversationId),
+            clientMsgId ?: UUID.randomUUID().toString()).orEmpty()
+        val forwardedText = com.letta.mobile.data.lanes.reply.ReplyStore.prepend(heldReplies, text)
+        val forwardedParts = if (heldReplies.isEmpty()) contentParts else contentParts?.let {
+            JsonArray(listOf(kotlinx.serialization.json.buildJsonObject {
+                put("type", JsonPrimitive("text"))
+                put("text", JsonPrimitive(com.letta.mobile.data.lanes.reply.ReplyStore.prepend(heldReplies, "")))
+            }) + it)
+        }
         val command = TurnCommand(
             backendId = BackendId("iroh-node-server"),
             runtimeId = RuntimeId("iroh-node:${input.runtime.agentId}:${input.runtime.conversationId}"),
@@ -931,15 +942,17 @@ class IrohNodeConnection(
             conversationId = ConversationId(input.runtime.conversationId),
             input = TurnInput.UserMessage(
                 localMessageId = clientMsgId ?: "iroh-${UUID.randomUUID()}",
-                text = text,
-                contentPartsJson = contentParts?.toString(),
+                text = forwardedText,
+                contentPartsJson = forwardedParts?.toString(),
             ),
         )
         // Mid-turn redial fix: the INITIATOR-ONLY parking record for this turn.
         val tracker = clientMsgId?.let { TurnFrameTracker() }
         val fanout = createTurnFanout(input, streamSend, tracker, clientMsgId)
         val echo = clientMsgId?.let { RelayedUserEcho(it, text, contentParts) }
-        val turn = RelayedInputTurn(input, clientMsgId, fanout, relayedTurnProtocol(input, fanout, echo, ::writeControl), tracker)
+        val turn = RelayedInputTurn(input, clientMsgId, fanout, relayedTurnProtocol(input, fanout, echo, ::writeControl,
+            consumeReplies = { replies?.consume(heldReplies) },
+            releaseReplies = { replies?.release(heldReplies) }), tracker)
         // letta-mobile-qygvv.3: the collector runs on the node-owned host. If this
         // connection closes first, the turn is detached, not cancelled: the server
         // turn keeps its approvals, external tools and other viewers, and its tail
