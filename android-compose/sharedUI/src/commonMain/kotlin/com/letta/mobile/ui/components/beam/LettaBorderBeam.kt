@@ -2,13 +2,14 @@ package com.letta.mobile.ui.components.beam
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
@@ -26,6 +27,7 @@ import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.node.observeReads
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import com.letta.mobile.ui.theme.tokens.LettaBeamMotion
 import com.letta.mobile.ui.theme.tokens.LettaBeamPalette
 import com.letta.mobile.ui.theme.tokens.LettaBeamTone
@@ -149,6 +151,8 @@ internal val LettaBeamStyle.periodMillis: Int
 /** Below this the beam counts as faded out and is not drawn. */
 private const val VISIBLE_ALPHA = 0.001f
 
+private data class OutlineKey(val size: Size, val density: Float, val fontScale: Float, val direction: LayoutDirection)
+
 internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
     Modifier.Node(),
     DrawModifierNode,
@@ -161,6 +165,7 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
     private var spec = spec
     private var active = active
     private var frame = frameFor(spec)
+    private var outlineKey: OutlineKey? = null
 
     /** Starts anywhere on the lap, so beams side by side do not move in lockstep. */
     private var phase = Random.nextFloat()
@@ -192,6 +197,7 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
     }
 
     override fun onObservedReadsChanged() {
+        outlineKey = null
         readReducedMotion()
         syncLoop()
         invalidateDraw()
@@ -203,6 +209,7 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
         if (spec != this.spec) {
             this.spec = spec
             frame = frameFor(spec)
+            outlineKey = null
             invalidateDraw()
         }
         if (active != this.active) {
@@ -245,7 +252,7 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
     private suspend fun runFrames() {
         var last = 0L
         while (coroutineScope.isActive) {
-            withFrameNanos { now ->
+            withInfiniteAnimationFrameNanos { now ->
                 if (last != 0L) phase = advanceBeamPhase(phase, now - last, spec.style.periodMillis)
                 last = now
             }
@@ -259,16 +266,26 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
         if (alpha <= VISIBLE_ALPHA || size.minDimension <= 0f) return
         frame.phase = if (reducedMotion) LettaBeamMotion.STILL_PHASE else phase
         frame.alpha = alpha
-        cornersFor(spec.shape, this, frame.cornersPx)
-        val renderer = resolveShader() ?: fallback
+        refreshGeometry()
+        val renderer = resolveShader(size.width * size.height) ?: fallback
         with(renderer) { drawBeam(frame) }
     }
 
+    private fun ContentDrawScope.refreshGeometry() {
+        val key = OutlineKey(size, density, fontScale, layoutDirection)
+        if (outlineKey == key) return
+        observeReads {
+            reducedMotion = currentValueOf(LocalLettaReducedMotion)
+            cornersFor(spec.shape, this, frame.cornersPx)
+        }
+        outlineKey = key
+    }
+
     /** The platform shader, compiled on the first draw and kept until detach; null means use the fallback. */
-    private fun resolveShader(): BorderBeamRenderer? {
+    private fun resolveShader(areaPx: Float): BorderBeamRenderer? {
         if (!shaderResolved) {
             shaderResolved = true
-            shader = createBorderBeamShader()
+            shader = createBorderBeamShader(areaPx)
         }
         return shader
     }

@@ -1,5 +1,7 @@
 package com.letta.mobile
 
+import com.letta.mobile.ui.components.beam.telemetry.installBeamShaderTelemetry
+
 import android.app.Application
 import android.util.Log
 import coil3.ImageLoader
@@ -71,6 +73,7 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         com.letta.mobile.util.Telemetry.delegate = com.letta.mobile.util.AndroidTelemetryDelegate()
+        installBeamShaderTelemetry()
         // CrashReporter and global exception handler must run on main thread
         // before anything else so uncaught exceptions are captured from the start.
         crashReporter.install()

@@ -61,7 +61,7 @@ internal fun ComposerPromptCard(model: ComposerModel, onAttachImage: () -> Unit)
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .swipeUpToCanvas(enabled = swipeEnabled, onTrigger = { model.onIntent(ChatSurfaceIntent.OpenCanvas) })
-            .voiceOutline(MaterialTheme.shapes.large)
+            .composerOutline(MaterialTheme.shapes.large, model.uiState)
             .testTag(ComposerTestTags.CARD),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -123,7 +123,7 @@ private fun DockedBarRow(model: ComposerModel, onAttachImage: () -> Unit, fieldH
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .voiceOutline(MaterialTheme.shapes.large)
+            .composerOutline(MaterialTheme.shapes.large, model.uiState)
             .testTag(ComposerTestTags.DOCKED_BAR),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainer,

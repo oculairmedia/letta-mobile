@@ -5,14 +5,12 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import com.letta.mobile.util.Telemetry
-import com.letta.mobile.util.attr
 
 /**
  * Android: the shared beam source compiled as AGSL. Runtime shaders arrived in Android 13; below that
  * this is null and the Canvas fallback draws.
  */
-internal actual fun createBorderBeamShader(): BorderBeamRenderer? =
+internal actual fun createBorderBeamShader(areaPx: Float): BorderBeamRenderer? =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) AgslBorderBeam.compile() else null
 
 /** One beam's AGSL shader; uniforms are per instance, so every beam owns one. */
@@ -40,14 +38,6 @@ private class AgslBorderBeam(private val shader: RuntimeShader) : BorderBeamRend
     companion object {
         /** Null when the AGSL does not compile on this device: logged, so it cannot pass as the fallback. */
         fun compile(): AgslBorderBeam? =
-            runCatching { AgslBorderBeam(RuntimeShader(BORDER_BEAM_SHADER)) }
-                .onFailure { failure ->
-                    Telemetry.event(
-                        BORDER_BEAM_TELEMETRY_TAG,
-                        "shader.compileFailed",
-                        "error" attr (failure.message ?: failure::class.simpleName.orEmpty()),
-                        level = Telemetry.Level.WARN,
-                    )
-                }.getOrNull()
+            compileBeamShader { AgslBorderBeam(RuntimeShader(BORDER_BEAM_SHADER)) }
     }
 }
