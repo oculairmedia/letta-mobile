@@ -23,6 +23,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.a2ui.toA2uiSurfaceStateOrNull
@@ -208,20 +212,40 @@ private fun WideHomeList(page: HomePageScope) {
     }
 }
 
+/**
+ * The phone page: the header, then the list with the chat composer docked over its bottom edge. The
+ * list runs on under the bar, as the compact chat's timeline does, and pads its end by the bar's
+ * height, so its last row clears the bar and nothing is cut off at the bar's rounded corners.
+ */
 @Composable
 private fun CompactHomeLayout(page: HomePageScope) {
+    val docked = !page.state.search.isActive && page.hasComposer
+    var barHeight by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
     Column(Modifier.fillMaxSize()) {
         if (page.hasCompactHeader) HomeHeader(page)
-        HomeRefreshable(page, Modifier.weight(1f).fillMaxWidth()) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-                contentPadding = PaddingValues(start = page.horizontalPadding, end = page.horizontalPadding, top = LettaDimens.Space.sm, bottom = LettaDimens.Space.lg),
-            ) {
-                if (page.state.search.isActive) homeSearchResults(page) else homeSections(page)
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            HomeRefreshable(page, Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+                    contentPadding = PaddingValues(
+                        start = page.horizontalPadding,
+                        end = page.horizontalPadding,
+                        top = LettaDimens.Space.sm,
+                        bottom = LettaDimens.Space.lg + if (docked) barHeight else 0.dp,
+                    ),
+                ) {
+                    if (page.state.search.isActive) homeSearchResults(page) else homeSections(page)
+                }
+            }
+            // The chat composer runs edge to edge at the bottom, as on the compact chat page.
+            if (docked) {
+                HomePromptBar(
+                    page,
+                    Modifier.align(Alignment.BottomCenter).onSizeChanged { barHeight = with(density) { it.height.toDp() } },
+                )
             }
         }
-        // The chat composer runs edge to edge at the bottom, as on the compact chat page.
-        if (!page.state.search.isActive && page.hasComposer) HomePromptBar(page)
     }
 }
