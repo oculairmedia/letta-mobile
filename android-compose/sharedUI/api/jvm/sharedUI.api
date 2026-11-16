@@ -2121,7 +2121,7 @@ public final class com/letta/mobile/ui/chat/surface/ambient/ChatPanelAmbientGlow
 }
 
 public final class com/letta/mobile/ui/chat/surface/composer/BackgroundProcessShelfKt {
-	public static final fun BackgroundProcessShelf (Ljava/util/List;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun BackgroundProcessShelf (Ljava/util/List;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/chat/surface/composer/ComposableSingletons$CompanionSeatKt {

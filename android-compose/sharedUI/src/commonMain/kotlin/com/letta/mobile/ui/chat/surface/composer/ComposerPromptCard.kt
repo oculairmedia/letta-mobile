@@ -175,7 +175,7 @@ private fun ComposerTrailingActions(model: ComposerModel, modifier: Modifier = M
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ComposerVoiceModeButton(size = LettaDimens.Control.actionButton)
-        ComposerActionButton(model)
+        ComposerActionButton(model, Modifier.testTag(ComposerTestTags.SEND_SLOT))
     }
 }
 

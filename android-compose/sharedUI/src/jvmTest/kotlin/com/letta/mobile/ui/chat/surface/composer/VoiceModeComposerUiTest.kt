@@ -208,14 +208,14 @@ class VoiceModeComposerUiTest {
         var voice by mutableStateOf(false)
         showComposer(width, layout.style, layout.mode, VoiceOptions(shown = { voice }))
         onNodeWithTag(VoiceModeTags.BUTTON).assertDoesNotExist()
-        val sendBefore = bounds(ComposerTestTags.SEND)
+        val sendBefore = bounds(ComposerTestTags.SEND_SLOT)
         val fieldBefore = bounds(layout.field)
 
         voice = true
         waitForIdle()
         val where = "at $width ($layout)"
         val button = bounds(VoiceModeTags.BUTTON)
-        val send = bounds(ComposerTestTags.SEND)
+        val send = bounds(ComposerTestTags.SEND_SLOT)
         val field = bounds(layout.field)
         val slot = bounds(ComposerTestTags.TRAILING_ACTIONS)
         assertEquals(sendBefore, send, "Send keeps its bounds $where")
@@ -281,11 +281,11 @@ class VoiceModeComposerUiTest {
         var voice by mutableStateOf(false)
         var handle: VoiceModeHandle? = null
         showComposer(360.dp, LettaInput.Touch, ChatSurfaceMode.Docked, VoiceOptions(shown = { voice }, onHandle = { handle = it }))
-        val sendBefore = bounds(ComposerTestTags.SEND)
+        val sendBefore = bounds(ComposerTestTags.SEND_SLOT)
         voice = true
         waitForIdle()
         onNodeWithTag(VoiceModeTags.BUTTON).assertDoesNotExist()
-        assertEquals(sendBefore, bounds(ComposerTestTags.SEND), "Send keeps its bounds")
+        assertEquals(sendBefore, bounds(ComposerTestTags.SEND_SLOT), "Send keeps its bounds")
         onNodeWithTag(ComposerTestTags.TOUCH_PLUS).performClick()
         waitForIdle()
         onNodeWithText("Voice conversation").assertExists().performClick()

@@ -186,7 +186,7 @@ class VoiceOutlineUiTest {
     /** The composer's fixed parts for [style]: the bar or card, Send, the voice button, the field, and the card's under line. */
     private fun fixedTags(style: LettaInput): List<String> = buildList {
         add(barTag(style))
-        add(ComposerTestTags.SEND)
+        add(ComposerTestTags.SEND_SLOT)
         add(VoiceModeTags.BUTTON)
         add(ComposerTestTags.INPUT)
         if (style == LettaInput.Pointer) add(ComposerTestTags.PERMISSION_MODE_LINE)

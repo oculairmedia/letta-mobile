@@ -155,7 +155,7 @@ class ChatSurfaceInsetsTest {
         onNodeWithText(REPLY, substring = true, useUnmergedTree = true).assertVisibleInside(panel, "assistant reply")
         onNodeWithTag(barTag).assertVisibleInside(panel, "composer")
         onNodeWithTag(ComposerTestTags.DOCKED_INPUT).assertVisibleInside(panel, "composer input")
-        onNodeWithTag(ComposerTestTags.SEND).assertVisibleInside(panel, "send button")
+        onNodeWithTag(ComposerTestTags.SEND_SLOT).assertVisibleInside(panel, "send button")
     }
 
     private fun SemanticsNodeInteraction.assertVisibleInside(panel: DpRect, label: String) {

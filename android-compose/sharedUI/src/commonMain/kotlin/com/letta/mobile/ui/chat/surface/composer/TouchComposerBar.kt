@@ -447,7 +447,7 @@ private const val EXIT_SCALE = 0.76f
 /** The shared Send / Stop ([ComposerActionButton]), centred in the bar's touch target. */
 @Composable
 private fun TouchActionButton(model: ComposerModel) {
-    Box(Modifier.size(TouchComposerDimens.actionTarget), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(TouchComposerDimens.actionTarget).testTag(ComposerTestTags.SEND_SLOT), contentAlignment = Alignment.Center) {
         ComposerActionButton(model)
     }
 }

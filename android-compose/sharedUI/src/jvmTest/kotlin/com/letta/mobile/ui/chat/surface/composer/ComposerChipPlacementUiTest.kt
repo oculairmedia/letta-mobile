@@ -189,7 +189,7 @@ class ComposerChipPlacementUiTest {
         waitUntilExactlyOneExists(chipIn(ComposerTestTags.CONTEXT_CHIP, ComposerTestTags.CONTROLS))
         waitUntilExactlyOneExists(hasTestTag(ComposerTestTags.PERMISSION_MODE_LINE))
         val card = onNodeWithTag(ComposerTestTags.CARD).getUnclippedBoundsInRoot()
-        listOf(ComposerTestTags.SEND, ComposerTestTags.MODEL_CHIP, ComposerTestTags.CONTEXT_CHIP)
+        listOf(ComposerTestTags.SEND_SLOT, ComposerTestTags.MODEL_CHIP, ComposerTestTags.CONTEXT_CHIP)
             .forEach { tag ->
                 val bounds = onNodeWithTag(tag).getUnclippedBoundsInRoot()
                 assertTrue(bounds.left >= card.left && bounds.right <= card.right, "$tag $bounds overflows the card $card")
