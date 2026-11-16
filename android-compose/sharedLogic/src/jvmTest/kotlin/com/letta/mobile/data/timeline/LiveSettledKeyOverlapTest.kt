@@ -74,6 +74,33 @@ class LiveSettledKeyOverlapTest {
         }
     }
 
+    @Test fun settledAliasSurvivesLiveClearAndLaterDurableRevision() = runBlocking {
+        val recorder = TimelineFrameRecorder.open(OverlapTurn.scope)
+        try {
+            recorder.stream(OverlapTurn.live)
+            val live = recorder.lastFrame().rows.single { OverlapTurn.reply.id in it.messages }
+            val durable = OverlapTurn.durable.map { message ->
+                when (message) {
+                    is com.letta.mobile.data.model.AssistantMessage -> message.copy(id = "canonical-reply")
+                    is com.letta.mobile.data.model.ReasoningMessage -> message.copy(id = "canonical-thought")
+                    else -> message
+                }
+            }
+            recorder.settle(durable)
+            val settled = recorder.lastFrame().rows.single { "canonical-reply" in it.messages }
+            assertEquals(live.key, settled.key, "settlement must retain the first live row key")
+            recorder.reconcile(durable + com.letta.mobile.data.model.AssistantMessage(
+                id = "later-reply", contentRaw = kotlinx.serialization.json.JsonPrimitive("Later durable revision"),
+                date = "2026-09-25T16:00:00Z",
+            ))
+            val later = recorder.lastFrame().rows.single { "canonical-reply" in it.messages }
+            assertEquals(live.key, later.key, "publication clearance must not erase the presentation alias")
+            assertTrue(later.liveNames.containsAll(live.messages), "later generations lost the resident member aliases: ${later.liveNames}")
+        } finally {
+            recorder.close()
+        }
+    }
+
     private fun assertFrameClean(frame: OverlapFrame) {
         assertEquals(emptyMap(), frame.rows.duplicates, "guard dropped rows: $frame")
         val keys = frame.keys.filterNotNull()

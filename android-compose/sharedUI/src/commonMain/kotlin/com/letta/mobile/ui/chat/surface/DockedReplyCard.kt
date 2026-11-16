@@ -13,7 +13,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -141,7 +140,7 @@ private fun rememberMessageHistory(state: ChatUiState, appearance: ChatSurfaceAp
 /** The paged route: live rows (the turn in flight) over the newest settled rows. */
 @Composable
 private fun rememberPagedHistory(presentation: CanonicalTimelinePresentation): List<ChatRenderItem> {
-    val live by presentation.live.collectAsState()
+    val live by presentation.live.collectForChatSurface()
     val settled = presentation.settled.collectAsLazyPagingItems()
     // Docked is the default view: without this the live overlay would never drain while docked.
     ObserveResidentRows(presentation, settled)

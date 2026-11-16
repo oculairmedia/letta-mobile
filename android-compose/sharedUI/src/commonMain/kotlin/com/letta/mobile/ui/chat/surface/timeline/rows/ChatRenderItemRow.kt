@@ -66,6 +66,9 @@ private fun RowContent(item: ChatRenderItem, context: ChatRowContext, callbacks:
  */
 internal val LocalRowComposed = staticCompositionLocalOf<((key: String) -> Unit)?> { null }
 
+/** Test-only lifetime observation of the actual keyed run children; absent in every host. */
+internal val LocalRunStepLifetime = staticCompositionLocalOf<((String, Boolean) -> Unit)?> { null }
+
 /** The page's timeline text scale (pinch / settings) applied to the row's text only. */
 @Composable
 private fun WithRowFontScale(fontScale: Float, content: @Composable () -> Unit) {
