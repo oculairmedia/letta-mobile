@@ -1,7 +1,6 @@
 package com.letta.mobile.desktop
 
-import com.letta.mobile.util.Telemetry
-import com.letta.mobile.util.attr
+import com.letta.mobile.ui.components.beam.telemetry.installBeamShaderTelemetry
 import com.letta.mobile.data.canvas.bubble.CanvasBubbleLayout
 import com.letta.mobile.desktop.data.DesktopPreferences
 import com.letta.mobile.ui.chat.surface.CanvasBubbleLayoutHost
@@ -51,10 +50,7 @@ internal const val LETTA_WINDOWS_AUMID = "com.letta.desktop"
 internal const val LETTA_DESKTOP_APP_NAME = "Letta Desktop"
 fun main(args: Array<String>) {
     com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder()).use {
-        com.letta.mobile.ui.components.beam.BeamShaderDiagnostics.reportFailure = { failure ->
-            Telemetry.event("BorderBeam", "shader.compileFailed",
-                "error" attr (failure.message ?: failure::class.simpleName.orEmpty()), level = Telemetry.Level.WARN)
-        }
+        installBeamShaderTelemetry()
         LinuxAwtScale().run()
         DesktopCrashReporter.installGlobalHandler()
         // An Iroh host relays an agent's shell_layout calls here; they change the shell on screen.

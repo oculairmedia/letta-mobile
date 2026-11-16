@@ -2601,6 +2601,10 @@ public final class com/letta/mobile/ui/components/beam/LettaBorderBeamKt {
 	public static synthetic fun lettaBorderBeam$default (Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/beam/LettaBeamSpec;ZILjava/lang/Object;)Landroidx/compose/ui/Modifier;
 }
 
+public final class com/letta/mobile/ui/components/beam/telemetry/BeamShaderTelemetryKt {
+	public static final fun installBeamShaderTelemetry ()V
+}
+
 public final class com/letta/mobile/ui/components/disclosure/ChevronEmphasis : java/lang/Enum {
 	public static final field Emphasized Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;
 	public static final field Neutral Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;

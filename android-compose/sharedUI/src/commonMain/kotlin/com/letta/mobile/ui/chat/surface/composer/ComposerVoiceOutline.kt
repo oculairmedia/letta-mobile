@@ -92,7 +92,7 @@ internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modif
             val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithCache)) }
             val strokes = OutlineStrokes(this)
             onDrawBehind {
-                drawOutline(path, strokes, color.value, brightness.floatValue, softness.value)
+                drawOutline(path, strokes, color.value, OutlineLight(brightness.floatValue, softness.value))
             }
         }
 }
@@ -140,12 +140,14 @@ private class OutlineStrokes(density: Density) {
     val edge = Stroke(width = with(density) { LettaDimens.Space.xs.toPx() })
 }
 
-/** Draws [path]'s glow, halo and edge in [tint] at [lit] brightness; nothing for a transparent tint. */
-private fun DrawScope.drawOutline(path: Path, strokes: OutlineStrokes, tint: Color, lit: Float, softness: Float) {
+private data class OutlineLight(val lit: Float, val softness: Float)
+
+/** Draws [path]'s glow, halo and edge in [tint] with [light] brightness; nothing for a transparent tint. */
+private fun DrawScope.drawOutline(path: Path, strokes: OutlineStrokes, tint: Color, light: OutlineLight) {
     if (tint.alpha <= HIDDEN_ALPHA) return
-    drawPath(path, tint.copy(alpha = tint.alpha * GLOW_ALPHA * lit * softness), style = strokes.glow)
-    drawPath(path, tint.copy(alpha = tint.alpha * HALO_ALPHA * lit * softness), style = strokes.halo)
-    drawPath(path, tint.copy(alpha = tint.alpha * (1f - softness * (1f - EDGE_FLOOR) * (1f - lit))), style = strokes.edge)
+    drawPath(path, tint.copy(alpha = tint.alpha * GLOW_ALPHA * light.lit * light.softness), style = strokes.glow)
+    drawPath(path, tint.copy(alpha = tint.alpha * HALO_ALPHA * light.lit * light.softness), style = strokes.halo)
+    drawPath(path, tint.copy(alpha = tint.alpha * (1f - light.softness * (1f - EDGE_FLOOR) * (1f - light.lit))), style = strokes.edge)
 }
 
 /** The fixed brightness of a still outline: reduced motion, the thinking state, a failure. */

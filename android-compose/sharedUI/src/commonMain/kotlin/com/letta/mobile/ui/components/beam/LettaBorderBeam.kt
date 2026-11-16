@@ -151,6 +151,8 @@ internal val LettaBeamStyle.periodMillis: Int
 /** Below this the beam counts as faded out and is not drawn. */
 private const val VISIBLE_ALPHA = 0.001f
 
+private data class OutlineKey(val size: Size, val density: Float, val fontScale: Float, val direction: LayoutDirection)
+
 internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
     Modifier.Node(),
     DrawModifierNode,
@@ -163,10 +165,7 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
     private var spec = spec
     private var active = active
     private var frame = frameFor(spec)
-    private var outlineSize = Size.Unspecified
-    private var outlineDensity = Float.NaN
-    private var outlineFontScale = Float.NaN
-    private var outlineDirection: LayoutDirection? = null
+    private var outlineKey: OutlineKey? = null
 
     /** Starts anywhere on the lap, so beams side by side do not move in lockstep. */
     private var phase = Random.nextFloat()
@@ -198,7 +197,7 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
     }
 
     override fun onObservedReadsChanged() {
-        outlineSize = Size.Unspecified
+        outlineKey = null
         readReducedMotion()
         syncLoop()
         invalidateDraw()
@@ -210,7 +209,7 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
         if (spec != this.spec) {
             this.spec = spec
             frame = frameFor(spec)
-            outlineSize = Size.Unspecified
+            outlineKey = null
             invalidateDraw()
         }
         if (active != this.active) {
@@ -267,18 +266,19 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
         if (alpha <= VISIBLE_ALPHA || size.minDimension <= 0f) return
         frame.phase = if (reducedMotion) LettaBeamMotion.STILL_PHASE else phase
         frame.alpha = alpha
-        if (outlineSize != size || outlineDensity != density || outlineFontScale != fontScale || outlineDirection != layoutDirection) {
-            observeReads {
-                reducedMotion = currentValueOf(LocalLettaReducedMotion)
-                cornersFor(spec.shape, this, frame.cornersPx)
-            }
-            outlineSize = size
-            outlineDensity = density
-            outlineFontScale = fontScale
-            outlineDirection = layoutDirection
-        }
+        refreshGeometry()
         val renderer = resolveShader(size.width * size.height) ?: fallback
         with(renderer) { drawBeam(frame) }
+    }
+
+    private fun ContentDrawScope.refreshGeometry() {
+        val key = OutlineKey(size, density, fontScale, layoutDirection)
+        if (outlineKey == key) return
+        observeReads {
+            reducedMotion = currentValueOf(LocalLettaReducedMotion)
+            cornersFor(spec.shape, this, frame.cornersPx)
+        }
+        outlineKey = key
     }
 
     /** The platform shader, compiled on the first draw and kept until detach; null means use the fallback. */
