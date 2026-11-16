@@ -158,17 +158,22 @@ class ScheduleFleetController(
         }
     }
 
+    /** The pending mark clears however the change ends, cancellation included, so later controls work. */
     private suspend fun changePause(repository: ICronRepository, agent: AgentId, task: CronTask, resume: Boolean) {
-        val result = runCatchingCancellable {
-            if (resume) repository.resumeSchedule(agent.value, task.id).getOrThrow()
-            else repository.pauseSchedule(agent.value, task.id).getOrThrow()
-            sources.crons?.listCrons(agent).orEmpty()
-        }
-        stateFlow.update { current ->
-            result.fold(
-                onSuccess = { crons -> current.copy(crons = current.crons.replacingAgentCrons(agent, crons, current.agents)) },
-                onFailure = { current.copy(errorMessage = policy.errorMessage(it, "Failed to change schedule state")) },
-            ).copy(pendingCronIds = emptySet())
+        try {
+            val result = runCatchingCancellable {
+                if (resume) repository.resumeSchedule(agent.value, task.id).getOrThrow()
+                else repository.pauseSchedule(agent.value, task.id).getOrThrow()
+                sources.crons?.listCrons(agent).orEmpty()
+            }
+            stateFlow.update { current ->
+                result.fold(
+                    onSuccess = { crons -> current.copy(crons = current.crons.replacingAgentCrons(agent, crons, current.agents)) },
+                    onFailure = { current.copy(errorMessage = policy.errorMessage(it, "Failed to change schedule state")) },
+                )
+            }
+        } finally {
+            stateFlow.update { it.copy(pendingCronIds = emptySet()) }
         }
     }
 }
