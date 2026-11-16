@@ -82,7 +82,7 @@ internal object NotebookBoardStorage {
     // ---- reading ------------------------------------------------------------------------
 
     fun boardJson(read: Read): String {
-        val raw = (read.get(ObjectId.ROOT, BOARD).orElseThrow() as AmValue.Str).value
+        val raw = (read.get(ObjectId.ROOT, BOARD).get() as AmValue.Str).value
         val stored = StoredBoard(read)
         if (stored.isInline) return raw
         return assembled(stored, Json.parseToJsonElement(raw).jsonObject, stored::elements).toString()
@@ -95,7 +95,7 @@ internal object NotebookBoardStorage {
      * write cost the size of the board.
      */
     fun envelope(read: Read): JsonObject {
-        val root = Json.parseToJsonElement((read.get(ObjectId.ROOT, BOARD).orElseThrow() as AmValue.Str).value).jsonObject
+        val root = Json.parseToJsonElement((read.get(ObjectId.ROOT, BOARD).get() as AmValue.Str).value).jsonObject
         val stored = StoredBoard(read)
         return if (stored.isInline) root else assembled(stored, root, stored::elementStubs)
     }
@@ -153,7 +153,7 @@ internal object NotebookBoardStorage {
          * a peer whose board string lost the merge) follow, by id, as elements do.
          */
         private fun readEntries(map: ObjectId, stubs: JsonElement?): JsonArray {
-            val entries = read.keys(map).orElseThrow().toSet()
+            val entries = read.keys(map).get().toSet()
             val stubIds = (stubs as? JsonArray).orEmpty().mapNotNull(::idOf)
             val ordered = stubIds.filter { it in entries }.distinct() + (entries - stubIds.toSet()).sorted()
             return JsonArray(readMaps(map, ordered).values.toList())
@@ -168,14 +168,14 @@ internal object NotebookBoardStorage {
 
     /** A map of JSON strings as a JSON object. */
     private fun readStringMap(read: Read, map: ObjectId): JsonObject =
-        JsonObject(read.keys(map).orElseThrow().associateWith { field ->
-            Json.parseToJsonElement((read.get(map, field).orElseThrow() as AmValue.Str).value)
+        JsonObject(read.keys(map).get().associateWith { field ->
+            Json.parseToJsonElement((read.get(map, field).get() as AmValue.Str).value)
         })
 
     fun deletedElements(read: Read): List<CanvasDeletedElement> {
         val snapshots = (read.get(ObjectId.ROOT, DELETED).orElse(null) as? AmValue.Map) ?: return emptyList()
         val liveIds = liveIdsOf(read)
-        return read.keys(snapshots.id).orElseThrow().mapNotNull { key ->
+        return read.keys(snapshots.id).get().mapNotNull { key ->
             if (key in liveIds) null else (read.get(snapshots.id, key).orElse(null) as? AmValue.Str)?.value?.let {
                 CanvasDeletedElement(key, it)
             }
@@ -188,7 +188,7 @@ internal object NotebookBoardStorage {
     fun writeBoard(tx: Transaction, board: JsonObject) {
         val elements = elementsMap(tx)
         val incoming = addressableElements(board)
-        for (key in tx.keys(elements).orElseThrow()) {
+        for (key in tx.keys(elements).get()) {
             if (key !in incoming) tx.delete(elements, key)
         }
         incoming.forEach { (key, value) -> putElement(tx, key, value) }
@@ -312,7 +312,7 @@ internal object NotebookBoardStorage {
 
     /** [parent] holds one map per key of [values], written by [write]; other keys are dropped. */
     private fun <T> writeMaps(tx: Transaction, parent: ObjectId, values: Map<String, T>, write: (ObjectId, T) -> Unit) {
-        tx.keys(parent).orElseThrow().filter { it !in values }.forEach { tx.delete(parent, it) }
+        tx.keys(parent).get().filter { it !in values }.forEach { tx.delete(parent, it) }
         values.forEach { (key, value) -> write(mapAt(tx, parent, key) ?: tx.set(parent, key, ObjectType.MAP), value) }
     }
 
@@ -332,7 +332,7 @@ internal object NotebookBoardStorage {
 
     /** [map] holds [value]'s fields as JSON strings, writing only those that changed. */
     private fun putStrings(tx: Transaction, map: ObjectId, value: JsonObject) {
-        tx.keys(map).orElseThrow().filter { it !in value }.forEach { tx.delete(map, it) }
+        tx.keys(map).get().filter { it !in value }.forEach { tx.delete(map, it) }
         value.forEach { (field, fieldValue) -> setStringIfChanged(tx, map, field, fieldValue.toString()) }
     }
 
@@ -358,7 +358,7 @@ internal object NotebookBoardStorage {
 
     private fun readDigests(read: Read, key: String): Map<String, String> {
         val map = mapAt(read, ObjectId.ROOT, key) ?: return emptyMap()
-        return read.keys(map).orElseThrow().associateWith { (read.get(map, it).orElseThrow() as AmValue.Str).value }
+        return read.keys(map).get().associateWith { (read.get(map, it).get() as AmValue.Str).value }
     }
 
     fun writeSceneBase(tx: Transaction, base: SceneBase) {
@@ -371,7 +371,7 @@ internal object NotebookBoardStorage {
 
     private fun writeDigests(tx: Transaction, key: String, digests: Map<String, String>) {
         val map = mapAt(tx, ObjectId.ROOT, key) ?: tx.set(ObjectId.ROOT, key, ObjectType.MAP)
-        tx.keys(map).orElseThrow().filter { it !in digests }.forEach { tx.delete(map, it) }
+        tx.keys(map).get().filter { it !in digests }.forEach { tx.delete(map, it) }
         digests.forEach { (entry, value) -> setStringIfChanged(tx, map, entry, value) }
     }
 
@@ -392,7 +392,7 @@ internal object NotebookBoardStorage {
     fun copyCurrentState(source: Read, tx: Transaction, skip: Set<String>, restoreListBytes: Long): Int {
         val copy = AutomergeTreeCopy(source, tx)
         val handled = setOf(ELEMENTS, TOMBSTONES, DELETED, BASE_BLANK, BASE_ELEMENTS, BASE_FIELDS)
-        source.keys(ObjectId.ROOT).orElseThrow().filter { it !in skip && it !in handled }
+        source.keys(ObjectId.ROOT).get().filter { it !in skip && it !in handled }
             .forEach { copy.copyEntry(ObjectId.ROOT, ObjectId.ROOT, it) }
         val hidden = keysOf(source, mapAt(source, ObjectId.ROOT, TOMBSTONES)).toSet()
         // Created even when empty, as a new notebook has them: two peers creating one concurrently
@@ -401,7 +401,7 @@ internal object NotebookBoardStorage {
         tx.set(ObjectId.ROOT, TOMBSTONES, ObjectType.MAP)
         val restore = tx.set(ObjectId.ROOT, DELETED, ObjectType.MAP)
         mapAt(source, ObjectId.ROOT, ELEMENTS)?.let { from ->
-            source.keys(from).orElseThrow().filter { it !in hidden }.forEach { copy.copyEntry(from, elements, it) }
+            source.keys(from).get().filter { it !in hidden }.forEach { copy.copyEntry(from, elements, it) }
         }
         val restorable = restorableSnapshots(source)
         val kept = keptWithin(restorable, restoreListBytes)
@@ -414,7 +414,7 @@ internal object NotebookBoardStorage {
     private fun restorableSnapshots(source: Read): List<Pair<String, String>> {
         val map = mapAt(source, ObjectId.ROOT, DELETED) ?: return emptyList()
         val live = liveIdsOf(source)
-        return source.keys(map).orElseThrow()
+        return source.keys(map).get()
             .filter { it !in live }
             .mapNotNull { key -> (source.get(map, key).orElse(null) as? AmValue.Str)?.value?.let { key to it } }
             .sortedWith(compareBy({ it.second.length }, { it.first }))
@@ -434,7 +434,7 @@ internal object NotebookBoardStorage {
         fun string(read: Read, key: String) = (read.get(ObjectId.ROOT, key).orElse(null) as? AmValue.Str)?.value
         fun text(read: Read) = (read.get(ObjectId.ROOT, "markdown").orElse(null) as? AmValue.Text)?.let { read.text(it.id).orElse(null) }
         fun items(read: Read) = (read.get(ObjectId.ROOT, "items").orElse(null) as? AmValue.Map)?.let { map ->
-            read.keys(map.id).orElseThrow().associateWith { (read.get(map.id, it).orElse(null) as? AmValue.Str)?.value }
+            read.keys(map.id).get().associateWith { (read.get(map.id, it).orElse(null) as? AmValue.Str)?.value }
         }
         return Json.parseToJsonElement(boardJson(a)) == Json.parseToJsonElement(boardJson(b)) &&
             readSceneBase(a) == readSceneBase(b) &&
@@ -474,7 +474,7 @@ internal object NotebookBoardStorage {
     private fun mapAt(read: Read, parent: ObjectId, key: String): ObjectId? =
         (read.get(parent, key).orElse(null) as? AmValue.Map)?.id
 
-    private fun keysOf(read: Read, map: ObjectId?): List<String> = map?.let { read.keys(it).orElseThrow().toList() }.orEmpty()
+    private fun keysOf(read: Read, map: ObjectId?): List<String> = map?.let { read.keys(it).get().toList() }.orEmpty()
 
     private fun deleteIfPresent(tx: Transaction, map: ObjectId, key: String) {
         if (tx.get(map, key).isPresent) tx.delete(map, key)

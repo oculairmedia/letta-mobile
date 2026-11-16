@@ -5,7 +5,7 @@ import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import computer.iroh.Connection
 import computer.iroh.Endpoint
-import java.nio.charset.StandardCharsets.UTF_8
+import com.letta.mobile.data.files.readUtf8
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
@@ -23,7 +23,7 @@ object NotebookPeerProvisioning {
     fun read(file: Path): Set<String>? {
         if (!Files.exists(file, NOFOLLOW_LINKS)) return null
         require(Files.isRegularFile(file, NOFOLLOW_LINKS)) { "Not a regular notebook peer file: $file" }
-        val ids = Json.decodeFromString<Peers>(Files.readString(file, UTF_8)).peerIds
+        val ids = Json.decodeFromString<Peers>(readUtf8(file)).peerIds
         require(ids.isNotEmpty() && ids.size == ids.toSet().size && ids.all { it.matches(Regex("[0-9a-f]{64}")) }) {
             "Notebook peers must be distinct lowercase Iroh endpoint IDs"
         }

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
-import java.nio.charset.StandardCharsets.UTF_8
+import com.letta.mobile.data.files.readUtf8
+import com.letta.mobile.data.files.writeUtf8
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
@@ -79,7 +80,7 @@ internal class NotebookDocumentIndex(directory: Path) {
     private fun <T> readFile(file: Path, serializer: KSerializer<T>, valid: (T) -> Boolean): T? {
         if (!Files.exists(file, NOFOLLOW_LINKS)) return null
         require(Files.isRegularFile(file, NOFOLLOW_LINKS)) { "Not a regular notebook index: $file" }
-        return Json.decodeFromString(serializer, Files.readString(file, UTF_8)).also {
+        return Json.decodeFromString(serializer, readUtf8(file)).also {
             require(valid(it)) { "Invalid notebook index: $file" }
         }
     }
@@ -87,7 +88,7 @@ internal class NotebookDocumentIndex(directory: Path) {
     private fun <T> write(file: Path, serializer: KSerializer<T>, value: T) {
         val temp = Files.createTempFile(file.parent, ".notebook-index-", ".tmp")
         try {
-            Files.writeString(temp, Json.encodeToString(serializer, value), UTF_8)
+            writeUtf8(temp, Json.encodeToString(serializer, value))
             Files.move(temp, file, ATOMIC_MOVE, REPLACE_EXISTING)
         } finally {
             Files.deleteIfExists(temp)
