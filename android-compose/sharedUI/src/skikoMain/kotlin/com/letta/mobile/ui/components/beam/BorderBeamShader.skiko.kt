@@ -3,8 +3,6 @@ package com.letta.mobile.ui.components.beam
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
-import com.letta.mobile.util.Telemetry
-import com.letta.mobile.util.attr
 import org.jetbrains.skia.Paint as SkiaPaint
 import org.jetbrains.skia.Rect as SkiaRect
 import org.jetbrains.skia.RuntimeEffect
@@ -21,15 +19,7 @@ internal actual fun createBorderBeamShader(areaPx: Float): BorderBeamRenderer? =
 /** The compiled effect, or null when the SkSL does not compile here (logged once). */
 private object BorderBeamEffect {
     val effect: RuntimeEffect? by lazy {
-        runCatching { RuntimeEffect.makeForShader(BORDER_BEAM_SHADER) }
-            .onFailure { failure ->
-                Telemetry.event(
-                    BORDER_BEAM_TELEMETRY_TAG,
-                    "shader.compileFailed",
-                    "error" attr (failure.message ?: failure::class.simpleName.orEmpty()),
-                    level = Telemetry.Level.WARN,
-                )
-            }.getOrNull()
+        compileBeamShader { RuntimeEffect.makeForShader(BORDER_BEAM_SHADER) }
     }
 }
 

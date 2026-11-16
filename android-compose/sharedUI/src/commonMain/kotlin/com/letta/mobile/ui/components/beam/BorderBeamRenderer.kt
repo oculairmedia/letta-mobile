@@ -48,5 +48,3 @@ internal interface BorderBeamRenderer {
  * renderer before compiling an expensive card-sized shader; zero requests the shader directly.
  */
 internal expect fun createBorderBeamShader(areaPx: Float = 0f): BorderBeamRenderer?
-
-internal const val BORDER_BEAM_TELEMETRY_TAG = "BorderBeam"

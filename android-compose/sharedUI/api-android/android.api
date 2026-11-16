@@ -2542,6 +2542,13 @@ public final class com/letta/mobile/ui/components/ResizePointerIcon_androidKt {
 	public static final fun resizePointerIcon (Lcom/letta/mobile/ui/components/ResizeDirection;)Landroidx/compose/ui/input/pointer/PointerIcon;
 }
 
+public final class com/letta/mobile/ui/components/beam/BeamShaderDiagnostics {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/components/beam/BeamShaderDiagnostics;
+	public final fun getReportFailure ()Lkotlin/jvm/functions/Function1;
+	public final fun setReportFailure (Lkotlin/jvm/functions/Function1;)V
+}
+
 public final class com/letta/mobile/ui/components/beam/LettaBeamDefaults {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/components/beam/LettaBeamDefaults;
