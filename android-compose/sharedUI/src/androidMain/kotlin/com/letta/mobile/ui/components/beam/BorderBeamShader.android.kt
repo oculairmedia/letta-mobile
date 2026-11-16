@@ -24,7 +24,8 @@ private class AgslBorderBeam(private val shader: RuntimeShader) : BorderBeamRend
         val uniforms = BeamUniforms(this, frame)
         shader.setFloatUniform("size", uniforms.width, uniforms.height)
         shader.setFloatUniform("density", uniforms.density)
-        shader.setFloatUniform("cornerRadius", uniforms.cornerRadius)
+        val radii = uniforms.radii
+        shader.setFloatUniform("radii", radii[0], radii[1], radii[2], radii[3])
         shader.setFloatUniform("phase", uniforms.phase)
         shader.setFloatUniform("direction", uniforms.direction)
         shader.setFloatUniform("mode", uniforms.mode)

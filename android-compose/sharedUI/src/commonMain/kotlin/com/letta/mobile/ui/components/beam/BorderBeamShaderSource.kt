@@ -6,16 +6,16 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
  * The beam as one shader pass (crisp edge, tight halo and soft inner glow) over a rounded rectangle.
  * The same source compiles as AGSL on Android and as SkSL on desktop and web; it returns a
  * premultiplied colour, which both expect from this source. All lengths are in dp so the beam looks
- * the same at every density.
+ * the same at every density. Each corner has its own circular radius.
  *
  * Ported from border-beam-android by ismnoiet (MIT, see sharedUI/THIRD_PARTY_LICENSES), itself a port
- * of the iOS Metal shader. Changes: the fade and intensity are one `intensity` uniform, and the sweep
- * always runs along the bottom edge.
+ * of the iOS Metal shader. Changes: per-corner radii, the fade and intensity are one `intensity`
+ * uniform, and the sweep always runs along the bottom edge.
  */
 internal const val BORDER_BEAM_SHADER = """
 uniform float2 size;          // draw area in dp
 uniform float density;        // px per dp
-uniform float cornerRadius;   // dp, already clamped to half the shorter side
+uniform float4 radii;         // dp corner radii (top-right, bottom-right, bottom-left, top-left), each clamped to half the shorter side
 uniform float phase;          // 0...1, loops
 uniform float direction;      // +1 clockwise (left to right along the top), -1 counter-clockwise
 uniform float mode;           // 0 = orbit the border, 1 = sweep along the bottom edge
@@ -27,50 +27,67 @@ uniform float4 colors[8];     // palette, tail to head
 
 const float PI = 3.14159265;
 
+// Corner radii are (top-right, bottom-right, bottom-left, top-left) in dp; y grows downward.
+// The radius of the corner in p's quadrant.
+float cornerFor(float2 p, float4 r) {
+    return p.x >= 0.0 ? (p.y >= 0.0 ? r.y : r.x) : (p.y >= 0.0 ? r.z : r.w);
+}
+
 // Signed distance to a rounded box centred at the origin (negative inside).
-float sdRoundedBox(float2 p, float2 hs, float r) {
-    float2 q = abs(p) - (hs - r);
-    return length(max(q, float2(0.0))) + min(max(q.x, q.y), 0.0) - r;
+float sdRoundedBox(float2 p, float2 hs, float4 r) {
+    float rc = cornerFor(p, r);
+    float2 q = abs(p) - (hs - rc);
+    return length(max(q, float2(0.0))) + min(max(q.x, q.y), 0.0) - rc;
+}
+
+// The border's length: four straight edges shortened by their corners, plus four quarter arcs.
+float perimeterLength(float2 hs, float4 r) {
+    float sum = r.x + r.y + r.z + r.w;
+    return max(4.0 * (hs.x + hs.y) - 2.0 * sum + 0.5 * PI * sum, 0.001);
 }
 
 // Position along the border, clockwise from the right edge's midpoint, as 0...1. Distance ALONG
 // the edge (not the angle around the centre) keeps the beam's ends perpendicular to the border.
-float perimeterParam(float2 p, float2 hs, float r) {
-    float2 ih = max(hs - r, float2(0.0));
-    float q = PI * r * 0.5;
-    float L = 4.0 * ih.x + 4.0 * ih.y + 4.0 * q;
-    float baseBL = ih.y + q + 2.0 * ih.x;
-    float baseL = baseBL + q;
-    float baseTL = baseL + 2.0 * ih.y;
-    float baseTR = baseTL + q + 2.0 * ih.x;
+// The border runs: right edge (lower half), bottom-right arc, bottom edge, bottom-left arc, left
+// edge, top-left arc, top edge, top-right arc, right edge (upper half).
+float perimeterParam(float2 p, float2 hs, float4 r) {
+    float L = perimeterLength(hs, r);
+    float baseBR = hs.y - r.y;
+    float baseB = baseBR + 0.5 * PI * r.y;
+    float baseBL = baseB + 2.0 * hs.x - r.y - r.z;
+    float baseL = baseBL + 0.5 * PI * r.z;
+    float baseTL = baseL + 2.0 * hs.y - r.z - r.w;
+    float baseT = baseTL + 0.5 * PI * r.w;
+    float baseTR = baseT + 2.0 * hs.x - r.w - r.x;
+    float rc = cornerFor(p, r);
     float2 ap = abs(p);
     float s = 0.0;
-    if (ap.x > ih.x && ap.y > ih.y) {
-        float2 v = ap - ih;
+    if (ap.x > hs.x - rc && ap.y > hs.y - rc) {
+        float2 v = ap - (hs - rc);
         float ang = atan(v.y, v.x);
         if (p.x >= 0.0 && p.y >= 0.0) {
-            s = ih.y + r * ang;
+            s = baseBR + rc * ang;
         } else if (p.x < 0.0 && p.y >= 0.0) {
-            s = baseBL + r * (PI * 0.5 - ang);
+            s = baseBL + rc * (PI * 0.5 - ang);
         } else if (p.x < 0.0) {
-            s = baseTL + r * ang;
+            s = baseTL + rc * ang;
         } else {
-            s = baseTR + r * (PI * 0.5 - ang);
+            s = baseTR + rc * (PI * 0.5 - ang);
         }
     } else if ((hs.x - ap.x) < (hs.y - ap.y)) {
         if (p.x >= 0.0) {
             s = p.y >= 0.0 ? p.y : L + p.y;
         } else {
-            s = baseL + (ih.y - p.y);
+            s = baseL + (hs.y - r.z - p.y);
         }
     } else {
         if (p.y >= 0.0) {
-            s = ih.y + q + (ih.x - p.x);
+            s = baseB + (hs.x - r.y - p.x);
         } else {
-            s = baseTL + q + (p.x + ih.x);
+            s = baseT + (p.x + hs.x - r.w);
         }
     }
-    return fract(s / max(L, 0.001));
+    return fract(s / L);
 }
 
 // Linear blend across the palette at t in 0...1, with constant array indices only.
@@ -90,44 +107,40 @@ float4 samplePalette(float t) {
 }
 
 // The point on the border at distance s (dp), clockwise from the right edge's midpoint.
-float2 boundaryPoint(float s, float2 hs, float r) {
-    float2 ih = max(hs - r, float2(0.0));
-    float q = PI * r * 0.5;
-    float L = 4.0 * ih.x + 4.0 * ih.y + 4.0 * q;
-    s = s - L * floor(s / max(L, 0.001));
-    float l = ih.y;
+float2 boundaryPoint(float s, float2 hs, float4 r) {
+    float L = perimeterLength(hs, r);
+    s = s - L * floor(s / L);
+    float l = hs.y - r.y;
     if (s < l) { return float2(hs.x, s); }
     s -= l;
-    l = q;
-    if (s < l) { float a = s / r; return float2(ih.x, ih.y) + r * float2(cos(a), sin(a)); }
+    l = 0.5 * PI * r.y;
+    if (s < l) { float a = s / r.y; return float2(hs.x - r.y, hs.y - r.y) + r.y * float2(cos(a), sin(a)); }
     s -= l;
-    l = 2.0 * ih.x;
-    if (s < l) { return float2(ih.x - s, hs.y); }
+    l = 2.0 * hs.x - r.y - r.z;
+    if (s < l) { return float2(hs.x - r.y - s, hs.y); }
     s -= l;
-    l = q;
-    if (s < l) { float a = PI * 0.5 + s / r; return float2(-ih.x, ih.y) + r * float2(cos(a), sin(a)); }
+    l = 0.5 * PI * r.z;
+    if (s < l) { float a = PI * 0.5 + s / r.z; return float2(-hs.x + r.z, hs.y - r.z) + r.z * float2(cos(a), sin(a)); }
     s -= l;
-    l = 2.0 * ih.y;
-    if (s < l) { return float2(-hs.x, ih.y - s); }
+    l = 2.0 * hs.y - r.z - r.w;
+    if (s < l) { return float2(-hs.x, hs.y - r.z - s); }
     s -= l;
-    l = q;
-    if (s < l) { float a = PI + s / r; return float2(-ih.x, -ih.y) + r * float2(cos(a), sin(a)); }
+    l = 0.5 * PI * r.w;
+    if (s < l) { float a = PI + s / r.w; return float2(-hs.x + r.w, -hs.y + r.w) + r.w * float2(cos(a), sin(a)); }
     s -= l;
-    l = 2.0 * ih.x;
-    if (s < l) { return float2(-ih.x + s, -hs.y); }
+    l = 2.0 * hs.x - r.w - r.x;
+    if (s < l) { return float2(-hs.x + r.w + s, -hs.y); }
     s -= l;
-    l = q;
-    if (s < l) { float a = PI * 1.5 + s / r; return float2(ih.x, -ih.y) + r * float2(cos(a), sin(a)); }
+    l = 0.5 * PI * r.x;
+    if (s < l) { float a = PI * 1.5 + s / r.x; return float2(hs.x - r.x, -hs.y + r.x) + r.x * float2(cos(a), sin(a)); }
     s -= l;
-    return float2(hs.x, -ih.y + s);
+    return float2(hs.x, -hs.y + r.x + s);
 }
 
 // The orbiting beam's soft glow: a chain of Gaussian blobs along its path on the border, so corners
 // come out round on any shape. Premultiplied rgb + weight, peaking near 1 on the border.
-float4 orbitGlowBlobs(float2 p, float dist, float2 hs, float r, float sigmaBase) {
-    float2 ih = max(hs - r, float2(0.0));
-    float q = PI * r * 0.5;
-    float L = 4.0 * ih.x + 4.0 * ih.y + 4.0 * q;
+float4 orbitGlowBlobs(float2 p, float dist, float2 hs, float4 r, float sigmaBase) {
+    float L = perimeterLength(hs, r);
     float delta = arc * L / 24.0;
     float sigma = max(sigmaBase, 0.8 * delta);
     if (dist > 3.0 * sigma) { return float4(0.0); }
@@ -153,7 +166,7 @@ float4 orbitGlowBlobs(float2 p, float dist, float2 hs, float r, float sigmaBase)
 half4 main(float2 fragCoord) {
     float2 position = fragCoord / density;
     float2 hs = size * 0.5;
-    float r = min(cornerRadius, min(hs.x, hs.y));
+    float4 r = min(radii, float4(min(hs.x, hs.y)));
     float2 p = position - hs;
     float dist = -sdRoundedBox(p, hs, r);
     if (dist < 0.0) { return half4(0.0); }
@@ -203,7 +216,7 @@ internal class BeamUniforms(scope: DrawScope, frame: BeamFrame) {
     val density: Float = scope.density
     val width: Float = scope.size.width / density
     val height: Float = scope.size.height / density
-    val cornerRadius: Float = frame.cornerRadiusPx / density
+    val radii: FloatArray = FloatArray(CORNERS) { frame.cornersPx[it] / density }
     val phase: Float = frame.phase
     val direction: Float = frame.direction.sign
     val mode: Float = if (frame.style == LettaBeamStyle.Sweep) 1f else 0f

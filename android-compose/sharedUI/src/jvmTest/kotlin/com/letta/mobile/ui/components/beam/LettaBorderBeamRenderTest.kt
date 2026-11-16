@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
@@ -110,13 +111,25 @@ class LettaBorderBeamRenderTest {
         val bitmap = ImageBitmap(BOX_W, BOX_H)
         val frame = BeamFrame(LettaBeamStyle.Orbit, LettaBeamDirection.Clockwise, BeamPalette(LettaBeamPalette.spectrum))
         frame.phase = 0.4f
-        frame.cornerRadiusPx = 16f
+        frame.cornersPx.fill(16f)
         CanvasDrawScope().draw(Density(1f), LayoutDirection.Ltr, Canvas(bitmap), Size(BOX_W.toFloat(), BOX_H.toFloat())) {
             with(BorderBeamFallback()) { drawBeam(frame) }
         }
         val pixels = bitmap.toPixelMap()
         assertTrue(pixels.edgeIsLit(), "the fallback strokes the border")
         assertTrue(pixels[BOX_W / 2, BOX_H / 2].alpha == 0f, "and leaves the middle clear")
+    }
+
+    @Test
+    fun theFallbackPutsTheBeamWhereTheShaderDoes() {
+        val shader = assertNotNull(createBorderBeamShader())
+        listOf(0.1f, 0.35f, 0.6f, 0.85f).forEach { phase ->
+            val fromShader = litCentroid(renderFrame(shader, phase))
+            val fromFallback = litCentroid(renderFrame(BorderBeamFallback(), phase))
+            val apart = (fromShader - fromFallback).getDistance()
+            assertTrue(apart < WIDE_W * 0.15f, "at phase $phase the shader lights $fromShader, the fallback $fromFallback")
+        }
+        shader.release()
     }
 
     @Test
@@ -153,6 +166,34 @@ class LettaBorderBeamRenderTest {
         return differ
     }
 
+    private fun renderFrame(renderer: BorderBeamRenderer, phase: Float): PixelMap {
+        val bitmap = ImageBitmap(WIDE_W, BOX_H)
+        val frame = BeamFrame(LettaBeamStyle.Orbit, LettaBeamDirection.Clockwise, BeamPalette(LettaBeamDefaults.single(Color.White)))
+        frame.phase = phase
+        frame.cornersPx.fill(12f)
+        CanvasDrawScope().draw(Density(1f), LayoutDirection.Ltr, Canvas(bitmap), Size(WIDE_W.toFloat(), BOX_H.toFloat())) {
+            with(renderer) { drawBeam(frame) }
+        }
+        return bitmap.toPixelMap()
+    }
+
+    /** The alpha-weighted centre of everything drawn. */
+    private fun litCentroid(pixels: PixelMap): Offset {
+        var x = 0f
+        var y = 0f
+        var total = 0f
+        for (py in 0 until pixels.height) {
+            for (px in 0 until pixels.width) {
+                val a = pixels[px, py].alpha
+                x += px * a
+                y += py * a
+                total += a
+            }
+        }
+        assertTrue(total > 0f, "something is drawn")
+        return Offset(x / total, y / total)
+    }
+
     @Composable
     private fun BeamBox(active: Boolean, reducedMotion: Boolean) {
         CompositionLocalProvider(LocalLettaReducedMotion provides reducedMotion) {
@@ -179,6 +220,7 @@ class LettaBorderBeamRenderTest {
         val REFERENCE_WIDTHS = listOf(360, 700, 760, 1200)
         const val BOX_W = 200
         const val BOX_H = 100
+        const val WIDE_W = 300
         const val GALLERY_H = 640
         const val FADE_PAST_MS = 1_000L
         const val MOVE_MS = 400L

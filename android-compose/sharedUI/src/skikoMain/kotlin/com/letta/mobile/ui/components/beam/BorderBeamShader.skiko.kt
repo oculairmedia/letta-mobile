@@ -40,7 +40,8 @@ private class SkiaBorderBeam(private val builder: RuntimeShaderBuilder) : Border
         val uniforms = BeamUniforms(this, frame)
         builder.uniform("size", uniforms.width, uniforms.height)
         builder.uniform("density", uniforms.density)
-        builder.uniform("cornerRadius", uniforms.cornerRadius)
+        val radii = uniforms.radii
+        builder.uniform("radii", radii[0], radii[1], radii[2], radii[3])
         builder.uniform("phase", uniforms.phase)
         builder.uniform("direction", uniforms.direction)
         builder.uniform("mode", uniforms.mode)

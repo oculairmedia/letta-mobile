@@ -2,6 +2,7 @@ package com.letta.mobile.ui.components.beam
 
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -26,7 +27,7 @@ import kotlin.math.max
  */
 internal class BorderBeamFallback : BorderBeamRenderer {
     private var cachedSize = Size.Unspecified
-    private var cachedRadius = Float.NaN
+    private val cachedCorners = FloatArray(CORNERS) { Float.NaN }
     private val clip = Path()
     private val track = Path()
     private val measure = PathMeasure()
@@ -34,7 +35,7 @@ internal class BorderBeamFallback : BorderBeamRenderer {
 
     override fun DrawScope.drawBeam(frame: BeamFrame) {
         if (size.width <= 0f || size.height <= 0f) return
-        ensureOutline(frame.cornerRadiusPx)
+        ensureOutline(frame.cornersPx)
         val strength = frame.alpha.coerceIn(0f, 1f)
         val strokes = BeamStrokes(this, frame.style)
         clipPath(clip) {
@@ -46,18 +47,28 @@ internal class BorderBeamFallback : BorderBeamRenderer {
         }
     }
 
-    private fun DrawScope.ensureOutline(radius: Float) {
-        if (size == cachedSize && radius == cachedRadius) return
+    private fun DrawScope.ensureOutline(corners: FloatArray) {
+        if (size == cachedSize && corners.contentEquals(cachedCorners)) return
         cachedSize = size
-        cachedRadius = radius
+        corners.copyInto(cachedCorners)
+        val (tr, br, bl, tl) = corners
         clip.rewind()
-        clip.addRoundRect(RoundRect(0f, 0f, size.width, size.height, CornerRadius(radius)))
+        clip.addRoundRect(
+            RoundRect(
+                left = 0f,
+                top = 0f,
+                right = size.width,
+                bottom = size.height,
+                topLeftCornerRadius = CornerRadius(tl),
+                topRightCornerRadius = CornerRadius(tr),
+                bottomRightCornerRadius = CornerRadius(br),
+                bottomLeftCornerRadius = CornerRadius(bl),
+            ),
+        )
         // The comet runs one hairline inside the edge, so its core is not half clipped away.
         val inset = INSET_DP * density
         track.rewind()
-        track.addRoundRect(
-            RoundRect(inset, inset, size.width - inset, size.height - inset, CornerRadius(max(radius - inset, 0f))),
-        )
+        track.addBeamTrack(Rect(inset, inset, size.width - inset, size.height - inset), corners, inset)
         measure.setPath(track, false)
     }
 
@@ -145,3 +156,34 @@ internal class BorderBeamFallback : BorderBeamRenderer {
         }
     }
 }
+
+/**
+ * The border the comet travels, walked the way the shader measures it: clockwise on screen from the
+ * right edge's midpoint, through the bottom-right, bottom-left, top-left and top-right corners. So
+ * phase 0 sits at the same point in both renderers, and distance along the path grows in the
+ * clockwise direction on every platform (Compose's own rounded-rectangle paths wind the other way
+ * and start elsewhere). [corners] are the outer radii in [BeamFrame.cornersPx] order; each shrinks
+ * by [inset] to stay concentric with the edge.
+ */
+internal fun Path.addBeamTrack(bounds: Rect, corners: FloatArray, inset: Float) {
+    val (tr, br, bl, tl) = corners.map { max(it - inset, 0f) }
+    moveTo(bounds.right, bounds.center.y)
+    lineTo(bounds.right, bounds.bottom - br)
+    cornerArc(Offset(bounds.right - br, bounds.bottom - br), br, startDegrees = 0f)
+    lineTo(bounds.left + bl, bounds.bottom)
+    cornerArc(Offset(bounds.left + bl, bounds.bottom - bl), bl, startDegrees = 90f)
+    lineTo(bounds.left, bounds.top + tl)
+    cornerArc(Offset(bounds.left + tl, bounds.top + tl), tl, startDegrees = 180f)
+    lineTo(bounds.right - tr, bounds.top)
+    cornerArc(Offset(bounds.right - tr, bounds.top + tr), tr, startDegrees = 270f)
+    close()
+}
+
+/** A clockwise quarter circle of [radius] around [centre] from [startDegrees]; nothing for a square corner. */
+private fun Path.cornerArc(centre: Offset, radius: Float, startDegrees: Float) {
+    if (radius <= 0f) return
+    arcTo(Rect(centre, radius), startDegrees, QUARTER_TURN, forceMoveTo = false)
+}
+
+private const val QUARTER_TURN = 90f
+

@@ -8,11 +8,12 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
@@ -63,7 +64,8 @@ enum class LettaBeamDirection(internal val sign: Float) {
  * @param colors the beam's colours from tail to head, usually [LettaBeamDefaults.colors]; up to eight
  *   are blended (a longer list is thinned evenly) and each colour's alpha fades its stretch of the beam
  * @param shape the outline the beam follows: pass the same shape the container is clipped or filled
- *   with. Rounded corners are followed exactly; any other outline is treated as a plain rectangle.
+ *   with. Rounded corners are followed exactly, each with its own radius (an elliptical corner
+ *   follows its smaller radius); any other outline is treated as a plain rectangle.
  * @param style how the beam moves
  * @param direction which way an orbiting beam travels
  */
@@ -174,8 +176,12 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
 
     override fun onAttach() {
         readReducedMotion()
+        // A fade cut short by a detach resumes toward the current target instead of staying half lit.
+        if (fade.value != fadeTarget()) animateFade()
         syncLoop()
     }
+
+    private fun fadeTarget(): Float = if (active) 1f else 0f
 
     override fun onDetach() {
         loop = null
@@ -207,7 +213,7 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
 
     private fun animateFade() {
         if (!isAttached) return
-        val target = if (active) 1f else 0f
+        val target = fadeTarget()
         fadeJob?.cancel()
         syncLoop()
         fadeJob = coroutineScope.launch {
@@ -253,7 +259,7 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
         if (alpha <= VISIBLE_ALPHA || size.minDimension <= 0f) return
         frame.phase = if (reducedMotion) LettaBeamMotion.STILL_PHASE else phase
         frame.alpha = alpha
-        frame.cornerRadiusPx = cornerRadiusFor(spec.shape, size, this)
+        cornersFor(spec.shape, this, frame.cornersPx)
         val renderer = resolveShader() ?: fallback
         with(renderer) { drawBeam(frame) }
     }
@@ -271,16 +277,25 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
 }
 
 /**
- * The corner radius the beam follows for [shape] at [size], in px and clamped to half the shorter
- * side: the smallest corner of a rounded outline, 0 for a rectangle or any other outline.
+ * Writes the corner radii the beam follows for [shape] at the scope's size into [out], in px, in
+ * [BeamFrame.cornersPx] order and each clamped to half the shorter side: a rounded outline's own
+ * corners (the smaller radius of an elliptical one), all 0 for a rectangle or any other outline.
+ * The outline is built for the scope's layout direction, so a right-to-left shape mirrors.
  */
-internal fun cornerRadiusFor(shape: Shape, size: Size, scope: ContentDrawScope): Float {
+internal fun cornersFor(shape: Shape, scope: DrawScope, out: FloatArray) {
+    val size = scope.size
+    val limit = min(size.width, size.height) / 2f
     val outline = shape.createOutline(size, scope.layoutDirection, scope)
-    val radius = when (outline) {
-        is Outline.Rounded -> with(outline.roundRect) {
-            minOf(topLeftCornerRadius.x, topRightCornerRadius.x, bottomLeftCornerRadius.x, bottomRightCornerRadius.x)
-        }
-        else -> 0f
+    if (outline !is Outline.Rounded) {
+        out.fill(0f)
+        return
     }
-    return radius.coerceIn(0f, min(size.width, size.height) / 2f)
+    with(outline.roundRect) {
+        out[0] = topRightCornerRadius.circular(limit)
+        out[1] = bottomRightCornerRadius.circular(limit)
+        out[2] = bottomLeftCornerRadius.circular(limit)
+        out[3] = topLeftCornerRadius.circular(limit)
+    }
 }
+
+private fun CornerRadius.circular(limit: Float): Float = min(x, y).coerceIn(0f, limit)
