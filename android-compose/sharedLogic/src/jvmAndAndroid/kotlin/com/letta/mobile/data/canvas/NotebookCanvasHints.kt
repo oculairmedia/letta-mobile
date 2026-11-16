@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
-import java.nio.charset.StandardCharsets.UTF_8
+import com.letta.mobile.data.files.readUtf8
+import com.letta.mobile.data.files.writeUtf8
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
@@ -26,7 +27,7 @@ private val HINTS = MapSerializer(String.serializer(), String.serializer())
 internal fun Path.readCanvasHints(): Map<String, String> = runCatching {
     val file = resolve(CANVAS_HINTS_FILE)
     if (!Files.isRegularFile(file, NOFOLLOW_LINKS)) return emptyMap()
-    Json.decodeFromString(HINTS, Files.readString(file, UTF_8)).filterValues { it.isNotebookKey() }
+    Json.decodeFromString(HINTS, readUtf8(file)).filterValues { it.isNotebookKey() }
 }.getOrDefault(emptyMap())
 
 /** Replace the hints file with [hints]; false when the write failed (a missed save only costs a scan). */
@@ -34,7 +35,7 @@ internal fun Path.writeCanvasHints(hints: Map<String, String>): Boolean =
     runCatching {
         val temp = Files.createTempFile(this, ".notebook-canvases-", ".tmp")
         try {
-            Files.writeString(temp, Json.encodeToString(HINTS, hints), UTF_8)
+            writeUtf8(temp, Json.encodeToString(HINTS, hints))
             Files.move(temp, resolve(CANVAS_HINTS_FILE), ATOMIC_MOVE, REPLACE_EXISTING)
         } finally {
             Files.deleteIfExists(temp)

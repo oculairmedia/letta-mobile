@@ -211,9 +211,9 @@ class NotebookLocalStore(
         val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
         return handle.writing(id) { document ->
             document.startTransaction().use { tx ->
-                val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
-                val previous = tx.text(textId).orElseThrow()
-                val currentTitle = (tx.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value
+                val textId = (tx.get(ObjectId.ROOT, "markdown").get() as AmValue.Text).id
+                val previous = tx.text(textId).get()
+                val currentTitle = (tx.get(ObjectId.ROOT, "title").get() as AmValue.Str).value
                 val currentBoard = boardFrom(tx)
                 if (previous != expected.markdown) return@writing false
                 if (currentTitle != expected.title) return@writing false
@@ -622,15 +622,15 @@ class NotebookLocalStore(
 
     /** Keep the requested logical identity while reading the current storage generation. */
     fun read(id: DocumentId): NotebookDocument? = resolveStorageId(id)?.let(::open)?.withDocument { document ->
-        val title = (document.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value
-        val textId = (document.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
+        val title = (document.get(ObjectId.ROOT, "title").get() as AmValue.Str).value
+        val textId = (document.get(ObjectId.ROOT, "markdown").get() as AmValue.Text).id
         val board = boardFrom(document)
-        val itemsId = (document.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
-        val items = document.keys(itemsId).orElseThrow().map { key ->
-            val value = (document.get(itemsId, key).orElseThrow() as AmValue.Str).value
+        val itemsId = (document.get(ObjectId.ROOT, "items").get() as AmValue.Map).id
+        val items = document.keys(itemsId).get().map { key ->
+            val value = (document.get(itemsId, key).get() as AmValue.Str).value
             NotebookItem.serializer().decodeStored(value).also { require(it.id == key) }
         }
-        NotebookDocument(NotebookDocumentId(id.stableKey()), title, document.text(textId).orElseThrow(), board, items)
+        NotebookDocument(NotebookDocumentId(id.stableKey()), title, document.text(textId).get(), board, items)
     }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
 
     /**
@@ -678,7 +678,7 @@ class NotebookLocalStore(
     fun insertMarkdown(id: DocumentId, index: Int, text: String) {
         require(index >= 0)
         mutate(id) { tx ->
-            val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
+            val textId = (tx.get(ObjectId.ROOT, "markdown").get() as AmValue.Text).id
             tx.spliceText(textId, index.toLong(), 0, text)
         }
     }
@@ -694,8 +694,8 @@ class NotebookLocalStore(
         val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
         return handle.writing(id) { document ->
             document.startTransaction().use { tx ->
-                val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
-                val previous = tx.text(textId).orElseThrow()
+                val textId = (tx.get(ObjectId.ROOT, "markdown").get() as AmValue.Text).id
+                val previous = tx.text(textId).get()
                 if (previous != expected) return@writing false
                 if (previous == replacement) return@writing true
                 tx.spliceMarkdown(textId, previous, replacement)
@@ -731,7 +731,7 @@ class NotebookLocalStore(
     fun putItem(id: DocumentId, item: NotebookItem) {
         require(item.id.isNotBlank())
         mutate(id) { tx ->
-            val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
+            val itemsId = (tx.get(ObjectId.ROOT, "items").get() as AmValue.Map).id
             val stored = (tx.get(itemsId, item.id).orElse(null) as? AmValue.Str)?.value
             tx.set(itemsId, item.id, NotebookItem.serializer().encodeKeepingUnknown(item, stored))
         }
@@ -741,7 +741,7 @@ class NotebookLocalStore(
     fun removeItem(id: DocumentId, key: String) {
         require(key.isNotBlank())
         mutate(id) { tx ->
-            val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
+            val itemsId = (tx.get(ObjectId.ROOT, "items").get() as AmValue.Map).id
             tx.delete(itemsId, key)
         }
     }
