@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.surface.composer
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
@@ -213,7 +215,7 @@ private fun ComposerAboveCard(model: ComposerModel) {
     if (model.composer.backgroundProcesses.isNotEmpty()) {
         BackgroundProcessShelf(
             processes = model.composer.backgroundProcesses,
-            onStop = actions::stopBackgroundProcess,
+            onStop = { actions.stopBackgroundProcess(ProcessId(it)) },
         )
     }
     ComposerSuggestions(model.composer, model.decisions.autocomplete, actions)

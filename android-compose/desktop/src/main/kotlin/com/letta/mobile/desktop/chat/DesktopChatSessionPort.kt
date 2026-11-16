@@ -44,7 +44,6 @@ import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
-/** What the shell hands the port beyond the controller itself. */
 internal data class DesktopChatSessionBindings(
     /** The shell's A2UI dispatch (resolves the conversation id, then sends over the channel transport). */
     val onA2uiAction: (A2uiAction) -> Unit = {},
@@ -80,6 +79,9 @@ internal class DesktopChatSessionPort(
         models = controller.models,
         sendQueue = controller.sendQueue,
         composerHost = hostInputs,
+        backgroundProcesses = com.letta.mobile.ui.chat.session.backgroundProcessHost(scope,
+            surface.map { controller.activeGateway.backgroundProcessTarget(it.selectedConversation) },
+            { controller.activeGateway.backgroundProcessTarget(surface.value.selectedConversation) }),
         onA2uiAction = bindings.onA2uiAction,
         branching = controller.conversationManagement.branches,
         recompile = controller.conversationManagement.recompile,
@@ -93,7 +95,6 @@ internal class DesktopChatSessionPort(
         controller.models.bindCatalog(bindings.modelCatalog, follow = scope)
     }
 
-    /** Feeds the composer chrome the shell computes (commands, mentionables, context usage). */
     fun updateHostInputs(inputs: ChatComposerHostInputs) {
         hostInputs.value = inputs
     }
@@ -130,11 +131,7 @@ internal class DesktopChatSessionPort(
         onSetFontScale = bindings.onSetFontScale,
     )
 
-    /**
-     * Follows the controller: approval support follows the active gateway and paged history the
-     * canonical (paged) route, both of which change after construction; the extension points
-     * (working directory, model switch, branching) follow their own sources.
-     */
+    /** Follows the controller and the shared extension sources across selection changes. */
     override val capabilities: StateFlow<ChatSurfaceCapabilities> = combine(
         controller.approvals.canSubmitApprovals,
         controller.canonicalPresentation,
@@ -219,7 +216,10 @@ internal class DesktopChatActions(
 
     override fun reportComposerError(message: String) = controller.showComposerError(message)
 
-    override fun clearComposerError() = controller.clearComposerError()
+    override fun clearComposerError() {
+        backgroundProcessErrorClear?.invoke()
+        controller.clearComposerError()
+    }
 
     override fun stopRun() {
         if (controller.isSelectionCurrent()) controller.state.value.selectedConversationId?.let(controller::stopActiveRun)

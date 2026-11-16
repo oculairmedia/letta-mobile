@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.session
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.UiMessage
@@ -25,13 +27,17 @@ class ChatExtensionActionState(
  * extension point bound is a no-op its capabilities hide.
  */
 abstract class ChatExtensionActions(
-    options: TimelineChatSessionOptions,
+    private val options: TimelineChatSessionOptions,
     private val state: ChatExtensionActionState,
 ) : ChatActions,
     ChatHostCommandActions by HostCommandExtensions(options),
     ChatBranchActions by BranchExtensions(options.branching, state.branchView),
     ChatSendQueueActions by SendQueueExtensions(options.sendQueue),
     ChatConversationSettingsActions by SettingsExtensions(options) {
+    /** The process source owns clearing its error; absent when the host has reported none. */
+    protected val backgroundProcessErrorClear: (() -> Unit)?
+        get() = options.backgroundProcesses?.value?.clearBackgroundProcessError
+
     override fun rerun(message: UiMessage) = Unit
 
     override fun dismissA2uiSurface(surfaceId: A2uiSurfaceId) = Unit
@@ -64,6 +70,9 @@ abstract class ChatExtensionActions(
 
 /** Composer commands, `/recompile` and A2UI actions, answered by the host's inputs. */
 private class HostCommandExtensions(private val options: TimelineChatSessionOptions) : ChatHostCommandActions {
+    override fun stopBackgroundProcess(processId: ProcessId) =
+        options.backgroundProcesses?.value?.stopBackgroundProcess?.invoke(processId.value) ?: Unit
+
     override fun runComposerCommand(command: ChatComposerCommand) = hostCommand(command)?.run?.invoke() ?: Unit
 
     override fun uninstallComposerCommand(command: ChatComposerCommand) = hostCommand(command)?.uninstall?.invoke() ?: Unit

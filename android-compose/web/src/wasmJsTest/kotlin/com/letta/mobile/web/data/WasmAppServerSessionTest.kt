@@ -384,7 +384,7 @@ class WasmAppServerSessionTest {
         var requestSequence = 0
         val client = DefaultAppServerClient(transport, parentScope = this)
         val admin = AppServerLocalAdminGateway(client) { operation -> "test-$operation-${++requestSequence}" }
-        return SessionChatGateway(admin, EmptyTimelineTransport, AppServerClientChannel(client, this))
+        return SessionChatGateway(admin, EmptyTimelineTransport, AppServerClientChannel(client, this), client)
     }
 
     private class ConversationListTransport(

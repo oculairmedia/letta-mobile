@@ -24,6 +24,7 @@ import com.letta.mobile.ui.chat.session.TimelineChatSessionPort
 import com.letta.mobile.ui.chat.session.TimelineChatTarget
 import com.letta.mobile.ui.chat.session.TimelineChipSources
 import com.letta.mobile.ui.chat.session.TimelineSyncLoopSession
+import com.letta.mobile.ui.chat.session.backgroundProcessHost
 import com.letta.mobile.ui.chat.session.withChips
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,6 +69,7 @@ class WebChatSessionPort(
         controls = binding.controls,
         approvals = hostApprovalState(binding, scope),
         composerHost = hostInputs,
+        backgroundProcesses = binding.hostApprovals?.let { backgroundProcessHost(scope, it, binding.target) },
     ).withChips(scope, binding.target, binding.chips).withConversations(binding.conversations)
     private val port = SlashCommandSessionPort(TimelineChatSessionPort(
         session = TimelineSyncLoopSession(loop),
@@ -76,10 +78,7 @@ class WebChatSessionPort(
         options = options,
     ), scope, binding.slashCommands)
 
-    /**
-     * The conversation's model list and picks (the model chip's), which
-     * size the context meter's and card's window and take the card's model pick; null without chips.
-     */
+    /** The conversation's shared model source for its chip and context meter; null without chips. */
     val models: ConversationModels? = options.models as? ConversationModels
 
     /** The composer's context meter, the shell's reading for this conversation. */

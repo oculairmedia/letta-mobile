@@ -1,5 +1,7 @@
 package com.letta.mobile.feature.chat.screen.shared
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import com.letta.mobile.data.model.LlmModel
@@ -26,14 +28,22 @@ import com.letta.mobile.ui.chat.session.TimelineChatSessionOptions
 import com.letta.mobile.ui.chat.session.TimelineLocalState
 import com.letta.mobile.ui.chat.session.withExtensions
 import com.letta.mobile.ui.chat.session.ChatModelHandle
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import com.letta.mobile.feature.chat.coordination.ChatApprovalRelay
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -52,6 +62,47 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AdminChatSessionPortTest {
+
+    @Test
+    fun `process shelf and Stop use the common host projection`() = runTest(UnconfinedTestDispatcher()) {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        var viewModel: AdminChatViewModel? = null
+        try {
+            val statuses = com.letta.mobile.data.transport.api.ToolsetStatusStore()
+            val relay = mockk<ChatApprovalRelay>(relaxed = true)
+            every { relay.deviceStatuses } returns statuses.deviceStatuses
+            every { relay.pendingDetails } returns MutableStateFlow(emptyMap())
+            every { relay.outbox.queuedRequestIds } returns MutableStateFlow(emptySet())
+            every { relay.outbox.notices } returns MutableSharedFlow()
+            every { relay.permissionMode(any()) } returns flowOf(null)
+            val stopped = CompletableDeferred<Unit>()
+            coEvery { relay.stopBackgroundProcess(any(), any()) } coAnswers { stopped.complete(Unit); Unit }
+            val agent = TestData.agent("agent-process", "Process")
+            val vm = openedChatViewModel(canonicalPagingHost(), agent, "conversation-process",
+                FixtureSession("process", approvalRelay = relay))
+            viewModel = vm
+            val port = AdminChatSessionPort(vm, backgroundScope)
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.composer.collect {} }
+            // The host's device status listing these running processes, as it arrives on the wire.
+            fun status(running: List<ProcessId>) = AppServerProtocol.decodeFrame(
+                """{"type":"update_device_status","event_seq":1,"emitted_at":"now","idempotency_key":"status",
+                    "runtime":{"agent_id":"agent-process","conversation_id":"conversation-process"},
+                    "device_status":{"background_processes":[${running.joinToString(",") { """{"id":"${it.value}"}""" }}]}}""",
+            )
+            statuses.observe(status(listOf(ProcessId("p"))))
+            assertEquals(listOf("p"), port.composer.first { it.backgroundProcesses.isNotEmpty() }.backgroundProcesses.map { it.id })
+            port.actions.stopBackgroundProcess(ProcessId("p"))
+            port.actions.stopBackgroundProcess(ProcessId("p"))
+            stopped.await()
+            coVerify(exactly = 1) { relay.stopBackgroundProcess(AppServerRuntimeScope("agent-process", "conversation-process"), "p") }
+            assertEquals(1, port.composer.value.backgroundProcesses.size)
+            statuses.observe(status(emptyList()))
+            assertTrue(port.composer.first { it.backgroundProcesses.isEmpty() }.backgroundProcesses.isEmpty())
+        } finally {
+            viewModel?.viewModelScope?.cancel()
+            Dispatchers.resetMain()
+        }
+    }
 
     @Test
     fun `fork, edit and rerun come and go together with the page's ability to branch`() {
@@ -267,8 +318,9 @@ class AdminChatSessionPortTest {
             assertEquals(null, placeholder?.usage)
             assertTrue("the chip shows its placeholder rather than hiding", placeholder != null)
 
-            readings.record(usage("agent-context", "conversation-context", 28_864))
-            readings.record(usage("agent-context", "conversation-context", 29_193))
+            val runtime = AppServerRuntimeScope("agent-context", "conversation-context")
+            readings.record(usage(runtime, 28_864))
+            readings.record(usage(runtime, 29_193))
 
             val usage = port.composer.value.contextUsage?.usage
             assertEquals(29_193, usage?.usedTokens)
@@ -329,8 +381,8 @@ class AdminChatSessionPortTest {
         }
     }
 
-    private fun usage(agentId: String, conversationId: String, contextTokens: Long) =
-        ServerFrame.UsageStatistics(agentId = agentId, conversationId = conversationId, contextTokens = contextTokens)
+    private fun usage(runtime: AppServerRuntimeScope, contextTokens: Long) =
+        ServerFrame.UsageStatistics(agentId = runtime.agentId, conversationId = runtime.conversationId, contextTokens = contextTokens)
 
     @Test
     fun `open canvas from the full-screen page goes to canvas navigation`() {

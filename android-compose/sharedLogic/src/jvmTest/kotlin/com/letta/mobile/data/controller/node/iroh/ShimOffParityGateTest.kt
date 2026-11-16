@@ -217,6 +217,9 @@ class ShimOffParityGateTest {
             put("prompt", "hi")
         }
 
+        override suspend fun monitorStop(command: AppServerCommand.MonitorStop) =
+            AppServerInboundFrame.MonitorStopResponse(command.requestId, true)
+
         override suspend fun cronList(command: AppServerCommand.CronList) =
             AppServerInboundFrame.CronListResponse(command.requestId, true, buildJsonArray { add(cronTask()) })
 
@@ -381,6 +384,11 @@ class ShimOffParityGateTest {
     private val firstCatalogToolId: String =
         NativeAdminCatalogs.toolCatalog().first().jsonObject.getValue("id").jsonPrimitive.content
 
+    private fun kotlinx.serialization.json.JsonObjectBuilder.scheduleParams() {
+            put("messages", Json.parseToJsonElement("""[{"role":"user","content":"hi"}]"""))
+            put("schedule", Json.parseToJsonElement("""{"type":"recurring","cron_expression":"0 0 * * *"}"""))
+    }
+
     private fun params(method: String) = buildJsonObject {
         put("agent_id", "agent-1")
         put("command_id", "doctor")
@@ -388,6 +396,7 @@ class ShimOffParityGateTest {
         put("message_id", "m-1")
         put("identifier", "p-1")
         put("task_id", "t-1")
+        put("process_id", "process-1")
         put("tool_call_id", "tc-1")
         put("name", "demo")
         put("cron", "0 0 * * *")
@@ -419,10 +428,7 @@ class ShimOffParityGateTest {
         put("tokens", 200_000)
         // letta-mobile-bzvro.40: permission_mode.set (conversation.compact reads `mode` as its own field).
         if (method == "permission_mode.set") put("mode", "standard")
-        if (method == "schedule.create") {
-            put("messages", Json.parseToJsonElement("""[{"role":"user","content":"hi"}]"""))
-            put("schedule", Json.parseToJsonElement("""{"type":"recurring","cron_expression":"0 0 * * *"}"""))
-        }
+        if (method == "schedule.create") scheduleParams()
         // letta-mobile-bzvro.37 workspace relay rows.
         put("path", "system/persona.md")
         put("file_path", "system/persona.md")

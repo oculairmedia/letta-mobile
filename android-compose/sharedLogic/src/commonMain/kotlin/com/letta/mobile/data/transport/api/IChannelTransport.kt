@@ -1,5 +1,7 @@
 package com.letta.mobile.data.transport.api
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.ChannelTransportDefaults
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -7,6 +9,7 @@ import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.JsonArray
 
 /**
@@ -17,6 +20,10 @@ import kotlinx.serialization.json.JsonArray
 interface IChannelTransport {
     /** Present only when this captured transport can observe and abort exact turns authoritatively. */
     val activeTurnEvents: RuntimeTurnEventSource? get() = null
+    /** Runtime snapshots from the current connection; empty on transports without native status. */
+    val deviceStatuses: StateFlow<Map<com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
+        com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>>
+        get() = MutableStateFlow(emptyMap())
     /** Host toolset choices and confirmed preferences for this connection, scoped by runtime. */
     val toolsetStates: StateFlow<Map<com.letta.mobile.data.toolsets.ToolsetRuntime, com.letta.mobile.data.toolsets.ToolsetState>>
         get() = com.letta.mobile.data.toolsets.EmptyToolsets
@@ -178,3 +185,17 @@ data class RedialWhileTurnActive(
     val runId: String,
     val connectionGeneration: Long = 0L,
 )
+
+/** Stop one host-owned process. The next host snapshot, rather than this acknowledgement, removes its row. */
+suspend fun IChannelTransport.stopBackgroundProcess(
+    runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
+    processId: ProcessId,
+) {
+    val body = kotlinx.serialization.json.buildJsonObject {
+        put("agent_id", kotlinx.serialization.json.JsonPrimitive(runtime.agentId))
+        put("conversation_id", kotlinx.serialization.json.JsonPrimitive(runtime.conversationId))
+        put("process_id", kotlinx.serialization.json.JsonPrimitive(processId.value))
+    }
+    val response = adminRpc("monitor.stop", "", body.toString())
+    check(response.success) { response.error ?: "Could not stop background process" }
+}

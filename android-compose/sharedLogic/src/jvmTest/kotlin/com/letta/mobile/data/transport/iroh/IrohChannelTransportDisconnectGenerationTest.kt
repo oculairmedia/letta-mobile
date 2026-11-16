@@ -15,6 +15,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
+import com.letta.mobile.data.transport.appserver.snapshot
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonPrimitive
@@ -65,6 +67,38 @@ class IrohChannelTransportDisconnectGenerationTest {
             harness.close()
         }
     }
+
+    @Test
+    fun backgroundStatusCacheRetiresWithItsConnection(): Unit = runBlocking {
+        val harness = TransportHarness()
+        try {
+            harness.connect(Observer.OLD)
+            harness.emitStatus(Observer.OLD, "old")
+            val old = withTimeout(5.seconds) {
+                harness.transport.deviceStatuses.first { statuses ->
+                    statuses.values.any { frame -> frame.processId() == "old" }
+                }.values.single()
+            }
+            harness.disconnectAndAssertPublicState()
+            harness.connect(Observer.NEW)
+            val next = clientScope.async(start = CoroutineStart.UNDISPATCHED) {
+                harness.transport.deviceStatuses.first { it.isNotEmpty() }.values.single()
+            }
+            assertFalse(next.isCompleted, "a new connection cannot replay its predecessor's status")
+            harness.emitStatus(Observer.OLD, "stale")
+            delay(STALE_FRAME_SETTLE_TIME)
+            assertFalse(next.isCompleted)
+            harness.emitStatus(Observer.NEW, "new")
+            val current = withTimeout(5.seconds) { next.await() }
+            assertEquals("new", current.processId())
+            assertTrue(checkNotNull(current.connectionGeneration) > checkNotNull(old.connectionGeneration))
+        } finally {
+            harness.close()
+        }
+    }
+
+    private fun AppServerReceivedFrame.processId(): String? =
+        (frame as? AppServerInboundFrame.UpdateDeviceStatus)?.snapshot?.backgroundProcesses?.singleOrNull()?.id
 
     private inner class TransportHarness {
         private val observerStreams = List(2) {
@@ -123,6 +157,14 @@ class IrohChannelTransportDisconnectGenerationTest {
         suspend fun close() {
             collector.cancelAndJoin()
             transport.disconnect()
+        }
+
+        suspend fun emitStatus(observer: Observer, id: String) {
+            observerStreams[observer.index].emit(AppServerProtocol.decodeFrame(
+                """{"type":"update_device_status","event_seq":1,"emitted_at":"now","idempotency_key":"$id",
+                    "runtime":{"agent_id":"$AGENT","conversation_id":"$CONVERSATION"},
+                    "device_status":{"background_processes":[{"id":"$id"}]}}""",
+            ))
         }
 
         private suspend fun dial(dialConfig: IrohConnectConfig): IrohConnectionHandle {

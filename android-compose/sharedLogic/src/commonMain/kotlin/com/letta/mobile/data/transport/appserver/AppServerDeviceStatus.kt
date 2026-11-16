@@ -1,5 +1,7 @@
 package com.letta.mobile.data.transport.appserver
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -225,3 +227,28 @@ private fun JsonObject.firstArray(vararg keys: String): JsonArray? =
 
 private fun JsonObject.stringListOrEmpty(vararg keys: String): List<String> =
     firstArray(*keys)?.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.contentOrNull } ?: emptyList()
+
+/** Native binding for the shared process shelf; only a host snapshot changes the visible rows. */
+@OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+suspend fun AppServerClient.stopBackgroundProcess(runtime: AppServerRuntimeScope, processId: ProcessId) {
+    val response = monitorStop(AppServerCommand.MonitorStop(
+        requestId = kotlin.uuid.Uuid.random().toString(), processId = processId.value, runtime = runtime,
+    ))
+    check(response.success) { response.error ?: "Could not stop background process" }
+}
+
+internal fun AppServerInboundFrame.deviceStatusPayload(): Pair<AppServerRuntimeScope, JsonObject>? = when (this) {
+    is AppServerInboundFrame.UpdateDeviceStatus -> runtime to deviceStatus
+    is AppServerInboundFrame.Unknown -> notification(raw)
+    else -> null
+}
+
+private fun notification(raw: JsonObject): Pair<AppServerRuntimeScope, JsonObject>? {
+    if (raw["type"] != JsonPrimitive("toolset_status")) return null
+    val runtime = raw["runtime"] as? JsonObject ?: return null
+    val status = raw["device_status"] as? JsonObject ?: return null
+    val scope = runCatching {
+        AppServerProtocol.json.decodeFromJsonElement(AppServerRuntimeScope.serializer(), runtime)
+    }.getOrNull()
+    return scope?.let { it to status }
+}

@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.process.ProcessId
+
 import com.letta.mobile.ui.shell.workspace.escapeCollapsesToCanvas
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -18,6 +20,7 @@ import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import com.letta.mobile.ui.chat.session.TimelineLocalState
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -679,6 +682,36 @@ class DesktopChatSessionPortTest {
         runCurrent()
         assertEquals(emptyList(), gateway.requested)
 
+        controller.close()
+    }
+
+    @Test
+    fun processShelfUsesTheSharedHostProjectionAndStopAdmission() = runTest {
+        val statuses = com.letta.mobile.data.transport.api.ToolsetStatusStore()
+        val stopped = mutableListOf<Pair<AppServerRuntimeScope, String>>()
+        val gateway = object : FakeDesktopChatGateway() {
+            override val deviceStatuses = statuses.deviceStatuses
+            override val stopBackgroundProcess: suspend (AppServerRuntimeScope, String) -> Unit = { runtime, processId ->
+                stopped += runtime to processId
+            }
+        }
+        val (controller, port) = startedPort(gateway)
+        fun status(processes: String) = AppServerProtocol.decodeFrame(
+            """{"type":"update_device_status","event_seq":1,"emitted_at":"now","idempotency_key":"status",
+                "runtime":{"agent_id":"agent-0","conversation_id":"conv-1"},
+                "device_status":{"background_processes":$processes}}""",
+        )
+        statuses.observe(status("""[{"id":"p"}]"""))
+        runCurrent()
+        assertEquals(listOf("p"), port.composer.value.backgroundProcesses.map { it.id })
+        port.actions.stopBackgroundProcess(ProcessId("p"))
+        port.actions.stopBackgroundProcess(ProcessId("p"))
+        runCurrent()
+        assertEquals(listOf(AppServerRuntimeScope("agent-0", "conv-1") to "p"), stopped)
+        assertEquals(1, port.composer.value.backgroundProcesses.size)
+        statuses.observe(status("[]"))
+        runCurrent()
+        assertTrue(port.composer.value.backgroundProcesses.isEmpty())
         controller.close()
     }
 

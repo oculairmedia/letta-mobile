@@ -2882,6 +2882,7 @@
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "deny_fail_closed"
     },
+    {"method":"monitor.stop","handler":"BackgroundProcessAdminHandler.kt","current_backend":"native App Server v2 (no shim path ever existed over Iroh)","owner":"app_server_v2","public_contract":"monitor_stop","native_contract":["monitor_stop","monitor_stop_response"],"authorization_class":"runtime_write","data_store":"controller_memory","fallback":"none","migration_slice":"none","notes":"Scoped process stop forwards to the owning App Server runtime; snapshots confirm removal.","production_first_route":"app_server_v2","post_shim_owner":"app_server_v2","post_shim_fallback":"none"},
     {
       "method": "voice.setup.get",
       "handler": "VoiceSetupHandlers.kt",

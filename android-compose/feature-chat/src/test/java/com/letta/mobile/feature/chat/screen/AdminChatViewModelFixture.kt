@@ -51,6 +51,7 @@ internal data class FixtureSession(
     val routeArgs: ChatRouteArgs? = null,
     val settings: ISettingsRepository = stubSettingsRepository(),
     val currentConversationTracker: com.letta.mobile.data.channel.CurrentConversationTracker = mockk(relaxed = true),
+    val approvalRelay: com.letta.mobile.feature.chat.coordination.ChatApprovalRelay? = null,
 )
 
 internal fun openedChatViewModel(
@@ -87,6 +88,7 @@ internal fun openedChatViewModel(
     },
     pagingHost = pagingHost,
     runRegistry = session.runRegistry,
+    approvalRelay = session.approvalRelay,
 ).also { model -> session.focus?.let { focus -> model.bindWorkspace(focus) {} } }
 
 /** Cached, so the ViewModel resolves the agent without suspending during construction. */

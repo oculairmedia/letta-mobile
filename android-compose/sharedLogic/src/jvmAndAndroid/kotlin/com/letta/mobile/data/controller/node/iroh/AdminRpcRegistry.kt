@@ -78,6 +78,7 @@ object AdminRpcRegistry {
         "health.check",
         "run.record", "lease.upsert", "lease.list",
         "approval.submit",
+        "monitor.stop",
         "project.list",
         "project.get",
         "project.beadsRemoteStatus",
@@ -110,46 +111,9 @@ object AdminRpcRegistry {
             notifications.agentChanges, notifications.conversationChanges, notifications.turnIdentity,
         )
 
-        HealthAdminHandlers.register(router, services.controller)
-        AgentAdminHandlers.register(router, services.controller, tiers)
-        SubagentAdminHandlers.register(router, services.subagentRegistrySource)
-        ConversationAdminHandlers.register(router, tiers, controller = services.controller)
-        ProjectAdminHandlers.register(router, services.vibesyncBaseUrl?.trimEnd('/'))
-        registerBeads(router, services)
-        RunAdminHandlers.register(router, localBackendStore)
-        ArchiveAdminHandlers.register(router)
-        IdentityAdminHandlers.register(router)
-        ModelAdminHandlers.register(router, tiers, modelExposureStore(native.modelExposureFile))
-        ScheduleAdminHandlers.register(router, native.nativeClient)
-        ToolAdminHandlers.register(router, localBackendStore, native.nativeClient)
-        McpAdminHandlers.register(router)
-        // letta-mobile-by4vm.84: goals have no App Server owner; slash commands come from device status.
-        GoalAdminHandlers.register(router)
-        val slashCatalog = native.slashCommands ?: native.nativeClient?.let { NativeSlashCommandCatalog() }
-        SlashCommandAdminHandlers.register(router, slashCatalog, native.nativeClient)
-        SkillAdminHandlers.register(
-            router,
-            nativeClient = native.nativeClient,
-            controller = services.controller,
-            skillsListing = native.skillsListing,
-        )
-        ApprovalAdminHandlers.register(router, services.controller)
-        // letta-mobile-bzvro.40: the conversation's permission mode for Iroh clients.
-        PermissionModeAdminHandlers.register(router, services.controller, notifications.permissionModes)
-        PairingAdminHandlers.register(router, pairing.pairingService, pairing.pairingQr)
-        val wrapperRecords = native.wrapperRecords
-            ?: com.letta.mobile.data.controller.node.iroh.records.FileWrapperRecordStore()
-        registerRunRecordHandlers(router, wrapperRecords)
-        CronAdminHandlers.register(router, native.nativeClient, wrapperRecords)
-        ReflectionAdminHandlers.register(router, native.nativeClient)
-        // letta-mobile-bzvro.37: MemFS / secrets / workspace files for Iroh clients.
-        WorkspaceAdminHandlers.register(router, native.nativeClient)
-        // letta-mobile-57cta: manual compaction for Iroh clients (execute_command / conversation_compact).
-        ConversationCompactHandlers.register(router, native.nativeClient, localBackendStore)
-        // letta-mobile-joigh: the context limit for Iroh clients (execute_command context-limit).
-        ConversationContextLimitHandlers.register(router, native.nativeClient)
-        // letta-mobile-by4vm.51: /recompile for Iroh clients (conversation_recompile).
-        ConversationRecompileHandlers.register(router, native.nativeClient)
+        registerCatalogRoutes(router, services, native, tiers)
+        registerSessionRoutes(router, services, pairing, notifications)
+        registerRuntimeRoutes(router, native, tiers)
         registerHostRoutes(router, services)
 
         router.requireNonEmpty()
@@ -167,6 +131,69 @@ object AdminRpcRegistry {
     }
 
     val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos", "subagent.dismiss")
+
+    /** Agents, conversations, projects, models, tools and skills: the catalog routes, in registration order. */
+    private fun registerCatalogRoutes(
+        router: AdminRpcRouter,
+        services: AdminRpcHostServices,
+        native: AdminRpcNativeSources,
+        tiers: NativeReadTiers,
+    ) {
+        HealthAdminHandlers.register(router, services.controller)
+        AgentAdminHandlers.register(router, services.controller, tiers)
+        SubagentAdminHandlers.register(router, services.subagentRegistrySource)
+        ConversationAdminHandlers.register(router, tiers, controller = services.controller)
+        ProjectAdminHandlers.register(router, services.vibesyncBaseUrl?.trimEnd('/'))
+        registerBeads(router, services)
+        RunAdminHandlers.register(router, tiers.localBackendStore)
+        ArchiveAdminHandlers.register(router)
+        IdentityAdminHandlers.register(router)
+        ModelAdminHandlers.register(router, tiers, modelExposureStore(native.modelExposureFile))
+        ScheduleAdminHandlers.register(router, native.nativeClient)
+        ToolAdminHandlers.register(router, tiers.localBackendStore, native.nativeClient)
+        McpAdminHandlers.register(router)
+        // letta-mobile-by4vm.84: goals have no App Server owner; slash commands come from device status.
+        GoalAdminHandlers.register(router)
+        val slashCatalog = native.slashCommands ?: native.nativeClient?.let { NativeSlashCommandCatalog() }
+        SlashCommandAdminHandlers.register(router, slashCatalog, native.nativeClient)
+        SkillAdminHandlers.register(
+            router,
+            nativeClient = native.nativeClient,
+            controller = services.controller,
+            skillsListing = native.skillsListing,
+        )
+    }
+
+    /** Approvals, permission modes and pairing use the existing host contexts. */
+    private fun registerSessionRoutes(
+        router: AdminRpcRouter,
+        services: AdminRpcHostServices,
+        pairing: AdminRpcPairing,
+        notifications: AdminRpcNotifications,
+    ) {
+        ApprovalAdminHandlers.register(router, services.controller)
+        // letta-mobile-bzvro.40: the conversation's permission mode for Iroh clients.
+        PermissionModeAdminHandlers.register(router, services.controller, notifications.permissionModes)
+        PairingAdminHandlers.register(router, pairing.pairingService, pairing.pairingQr)
+    }
+
+    /** Native runtime controls and records share the existing read tiers. */
+    private fun registerRuntimeRoutes(router: AdminRpcRouter, native: AdminRpcNativeSources, tiers: NativeReadTiers) {
+        val wrapperRecords = native.wrapperRecords
+            ?: com.letta.mobile.data.controller.node.iroh.records.FileWrapperRecordStore()
+        registerRunRecordHandlers(router, wrapperRecords)
+        registerMonitorStop(router, native.nativeClient)
+        CronAdminHandlers.register(router, native.nativeClient, wrapperRecords)
+        ReflectionAdminHandlers.register(router, native.nativeClient)
+        // letta-mobile-bzvro.37: MemFS / secrets / workspace files for Iroh clients.
+        WorkspaceAdminHandlers.register(router, native.nativeClient)
+        // letta-mobile-57cta: manual compaction for Iroh clients (execute_command / conversation_compact).
+        ConversationCompactHandlers.register(router, tiers.nativeClient, tiers.localBackendStore)
+        // letta-mobile-joigh: the context limit for Iroh clients (execute_command context-limit).
+        ConversationContextLimitHandlers.register(router, native.nativeClient)
+        // letta-mobile-by4vm.51: /recompile for Iroh clients (conversation_recompile).
+        ConversationRecompileHandlers.register(router, native.nativeClient)
+    }
 
     /** Host-supplied route families: the plugin host, the canvas mount routes and the secret request routes. */
     private fun registerHostRoutes(router: AdminRpcRouter, services: AdminRpcHostServices) {

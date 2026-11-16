@@ -91,6 +91,8 @@ data class TimelineChatSessionOptions(
     val sendQueue: ChatSendQueueSource? = null,
     /** The composer's commands, mentionables, context usage and placeholder. */
     val composerHost: StateFlow<ChatComposerHostInputs>? = null,
+    /** Host snapshots and stop control for the existing process shelf. */
+    val backgroundProcesses: StateFlow<ChatComposerHostInputs>? = null,
     /** Where an A2UI surface's actions go; null drops them. */
     val onA2uiAction: ((A2uiAction) -> Unit)? = null,
     /** Fork, edit and resend, and rerun; null: capabilities off. */

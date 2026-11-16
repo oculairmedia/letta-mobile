@@ -66,7 +66,10 @@ internal class AdminChatActions(
 
     override fun reportComposerError(message: String) = viewModel.reportComposerError(message)
 
-    override fun clearComposerError() = viewModel.clearComposerError()
+    override fun clearComposerError() {
+        backgroundProcessErrorClear?.invoke()
+        viewModel.clearComposerError()
+    }
 
     // Run
     override fun stopRun() = viewModel.interruptRun()

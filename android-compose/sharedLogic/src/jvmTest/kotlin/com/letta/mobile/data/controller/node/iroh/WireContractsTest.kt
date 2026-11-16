@@ -62,7 +62,7 @@ class WireContractsTest {
                 // New fixture families must supply a real host-state adapter, never be skipped.
                 val known = setOf(
                     "controller_state", "conversations", "hidden_agent_ids", "visibility_index",
-                    "reflection_settings", "toolset_response", "cron_control", "execute_command_response", "voice",
+                    "reflection_settings", "monitor_success", "toolset_response", "cron_control", "execute_command_response", "voice",
                 )
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
@@ -217,6 +217,19 @@ class WireContractsTest {
         }
     } as AppServerClient
 
+    private fun monitorNative(host: JsonObject): AppServerClient = Proxy.newProxyInstance(
+        AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java),
+    ) { _, method, args ->
+        check(method.name == "monitorStop") { "Unexpected native call: ${method.name}" }
+        val command = args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.MonitorStop
+        assertTrue(command.requestId.isNotBlank())
+        assertEquals("process-1", command.processId)
+        assertEquals(com.letta.mobile.data.transport.appserver.AppServerRuntimeScope("agent-1", "conv-1"), command.runtime)
+        com.letta.mobile.data.transport.appserver.AppServerInboundFrame.MonitorStopResponse(
+            command.requestId, host.getValue("monitor_success").jsonPrimitive.boolean,
+        )
+    } as AppServerClient
+
     private fun toolsetNative(host: JsonObject): AppServerClient = Proxy.newProxyInstance(
         AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java),
     ) { _, method, args ->
@@ -269,6 +282,7 @@ class WireContractsTest {
     } as AppServerClient
 
     private fun fixtureNative(host: JsonObject?): AppServerClient = when {
+        host?.containsKey("monitor_success") == true -> monitorNative(host)
         host?.containsKey("toolset_response") == true -> toolsetNative(host)
         host?.containsKey("cron_control") == true -> cronControlNative(host)
         host?.containsKey("execute_command_response") == true -> commandNative(host)

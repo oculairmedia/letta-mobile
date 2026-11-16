@@ -35,6 +35,8 @@ fun ChatComposerUiState.withChrome(chrome: ChatComposerChrome): ChatComposerUiSt
     commands = chrome.host.commands.map(ChatHostCommand::command).toImmutableList(),
     mentionables = chrome.host.mentionables.toImmutableList(),
     contextUsage = chrome.host.contextUsage,
+    backgroundProcesses = chrome.host.backgroundProcesses.toImmutableList(),
+    error = chrome.host.backgroundProcessError ?: error,
 )
 
 /** What a host's extension points turn on. */
@@ -65,7 +67,11 @@ class ChatSessionExtensions(
 ) {
     private val workingDirectory = options.workingDirectory?.current ?: MutableStateFlow(null)
     private val model = options.models?.model ?: MutableStateFlow(null)
-    private val host = options.composerHost ?: MutableStateFlow(ChatComposerHostInputs())
+    private val hostInputs = options.composerHost ?: MutableStateFlow(ChatComposerHostInputs())
+    private val processInputs = options.backgroundProcesses ?: MutableStateFlow(ChatComposerHostInputs())
+    private val host = DerivedStateFlow(
+        combine(hostInputs, processInputs) { inputs, processes -> inputs.withBackgroundProcesses(processes) },
+    ) { hostInputs.value.withBackgroundProcesses(processInputs.value) }
     private val branching = options.branching?.support ?: MutableStateFlow(ChatBranchSupport())
 
     /** A send during a run goes to the host's queue rather than waiting for the run to end. */
@@ -104,3 +110,10 @@ class ChatSessionExtensions(
         const val STOP_TIMEOUT_MS = 5_000L
     }
 }
+
+private fun ChatComposerHostInputs.withBackgroundProcesses(processes: ChatComposerHostInputs) = copy(
+    backgroundProcesses = processes.backgroundProcesses,
+    backgroundProcessError = processes.backgroundProcessError,
+    stopBackgroundProcess = processes.stopBackgroundProcess,
+    clearBackgroundProcessError = processes.clearBackgroundProcessError,
+)

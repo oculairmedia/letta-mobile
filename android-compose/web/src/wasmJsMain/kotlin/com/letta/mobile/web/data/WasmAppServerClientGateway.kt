@@ -156,7 +156,10 @@ class WasmAppServerClientGateway(
             } else {
                 val admin = session.appServerAdmin
                 session.bindConversations(
-                    SessionChatGateway(admin, timelineTransport(session) { admin.getConversation(it).agentId }, graph.channelTransport),
+                    SessionChatGateway(
+                        admin, timelineTransport(session) { admin.getConversation(it).agentId },
+                        graph.channelTransport, session.client,
+                    ),
                 )
             }
             bounded(REQUEST_TIMEOUT_MS, "Agent list timed out") { graph.agentRepository.refreshAgents() }

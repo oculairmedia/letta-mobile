@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.extras.relay.AppToolRelayHost
 import com.letta.mobile.data.controller.extras.relay.AppToolRelayLink

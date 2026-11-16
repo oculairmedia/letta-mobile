@@ -43,6 +43,7 @@ class AppServerClientChannel(
     /** What the host advertised when this session authenticated (its `auth_response` capabilities). */
     override val hostCapabilities: Set<String> = emptySet(),
 ) : CronRpcChannel(appServerCronRpc(client)) {
+    override val deviceStatuses get() = toolsets.deviceStatuses
     private val toolsets = ToolsetStatusStore()
     override val toolsetStates = toolsets.states
 

@@ -24,6 +24,7 @@ internal class IrohConnectionSession(
     private val resubscribe: suspend (IrohViewedConversation) -> Unit,
 ) {
     private val generation = atomic(0L)
+    val deviceStatuses get() = toolsets.deviceStatuses
     private val toolsets = com.letta.mobile.data.transport.api.ToolsetStatusStore()
 
     /** Host-confirmed toolsets from this session's observer stream. */
@@ -69,13 +70,16 @@ internal class IrohConnectionSession(
         }
     }
 
-    private fun nextGeneration() = IrohSessionGeneration(generation.incrementAndGet())
+    private fun nextGeneration(): IrohSessionGeneration {
+        val next = generation.incrementAndGet()
+        toolsets.clear(next)
+        return IrohSessionGeneration(next)
+    }
 
     private fun stopSessionWork(reason: SessionStopReason): Job? {
         readyCapabilities = emptySet()
         readyTicket = null
         nextGeneration()
-        toolsets.clear(currentGeneration())
         resubscribeJob?.cancel()
         resubscribeJob = null
         return stopObserverIngest(reason)
@@ -109,9 +113,9 @@ internal class IrohConnectionSession(
             runCatching {
                 streamFrames.collect { received ->
                     if (!isCurrent(readyGeneration)) return@collect
-                    val stamped = received.copy(connectionGeneration = received.connectionGeneration ?: readyGeneration.value)
-                    toolsets.observe(stamped, currentGeneration())
-                    ingestObserverFrame(stamped)
+                    val scoped = received.copy(connectionGeneration = readyGeneration.value)
+                    toolsets.observe(scoped, currentGeneration())
+                    ingestObserverFrame(scoped)
                 }
             }.onFailure { error ->
                 if (error is CancellationException) throw error
