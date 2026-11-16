@@ -125,8 +125,10 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
             channelTransportState = graph.channelTransport.state.value,
             blocksLoaded = blocks.loaded,
         ))
+        // An unchanged fleet keeps the graph already published, so a reload never re-lays it out.
+        val previous = stateFlow.value.memory
         stateFlow.value = MemoryParityControllerState(
-            memory = memory,
+            memory = previous.takeIf { it == memory } ?: memory,
             agents = if (roster.loaded) agents.map { MemoryParityAgentOption(it.id.value, it.name) } else stateFlow.value.agents,
             isLoading = false,
             errorMessage = (roster.error ?: blocks.error)?.let(errorMessageMapper),

@@ -21,6 +21,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -53,6 +54,46 @@ class MemoryFleetTest {
         val items = blockItems(memory)
         assertEquals(2, items.size)
         assertEquals(listOf(listOf("Bo"), listOf("Ada")), items.map { item -> item.owners.map { it.name } })
+    }
+
+    @Test
+    fun theSameFleetBuildsTheSameGraphWhateverOrderTheHostAnswersIn() {
+        val blocks = listOf(
+            ada.id to listOf(block("p1", "persona"), block("h1", "human")),
+            bo.id to listOf(block("p2", "persona")),
+        )
+        val first = build(*blocks.toTypedArray())
+        val again = build(*blocks.toTypedArray())
+        val shuffled = MemoryFleetMapper.build(
+            MemoryFleetInput(listOf(cy, bo, ada), blocks.reversed(), backend, ChannelTransportState.Idle),
+        )
+        assertEquals(first, again)
+        assertEquals(first.graph, shuffled.graph)
+    }
+
+    @Test
+    fun anotherAgentsBlocksOnlyAddNodesAndEdges() {
+        val before = build(ada.id to listOf(block("p1", "persona")), bo.id to listOf(block("p2", "persona")))
+        val after = build(
+            ada.id to listOf(block("p1", "persona")),
+            bo.id to listOf(block("p2", "persona")),
+            cy.id to listOf(block("p3", "persona"), block("n3", "notes")),
+        )
+        val beforeIds = before.graph.nodes.map { it.id }
+        assertTrue(after.graph.nodes.map { it.id }.containsAll(beforeIds))
+        assertTrue(after.graph.edges.map { it.id }.containsAll(before.graph.edges.map { it.id }))
+        assertEquals(beforeIds, after.graph.nodes.map { it.id }.filter { it in beforeIds }, "kept nodes keep their order")
+    }
+
+    @Test
+    fun reloadingAnUnchangedFleetKeepsThePublishedGraph() = runTest {
+        val controller = MemoryParityController(provider(FleetBlocks()), this, sectionReader = MemoryParitySectionReader { _, _ -> })
+        controller.selectFleet()
+        advanceUntilIdle()
+        val published = controller.state.value.memory
+        controller.selectFleet()
+        advanceUntilIdle()
+        assertSame(published, controller.state.value.memory)
     }
 
     @Test

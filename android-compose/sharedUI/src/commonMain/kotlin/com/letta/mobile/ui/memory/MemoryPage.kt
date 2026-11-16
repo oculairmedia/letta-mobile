@@ -104,7 +104,11 @@ private class MemoryGraphRuntime(val looks: Map<String, MemoryNodeLook>, val liv
 private fun rememberMemoryGraphRuntime(layout: MemoryPageLayout, compact: Boolean): MemoryGraphRuntime {
     val state = layout.state
     val looks = remember(state.view, state.parity.memory) { MemoryNodeLooks.build(state.view, state.parity.memory) }
-    val live = rememberMemoryGraphLiveLayout(state.view, state.layout, looks, motion = !layout.reducedMotion)
+    // The fleet graph (every agent, hundreds of label groups, hubs shared by many agents) is drawn
+    // where the controller's deterministic layout puts it: live relaxation of a graph that dense keeps
+    // nodes drifting long after it opens. Dragging still moves a node.
+    val motion = !layout.reducedMotion && !state.parity.memory.fleet
+    val live = rememberMemoryGraphLiveLayout(state.view, state.layout, looks, motion)
     return remember(looks, live, compact) { MemoryGraphRuntime(looks, live, compact) }
 }
 

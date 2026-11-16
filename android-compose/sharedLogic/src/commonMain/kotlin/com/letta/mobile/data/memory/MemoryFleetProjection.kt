@@ -11,10 +11,10 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.util.AgentFleetReads
 
-/** What the fleet memory view is built from: the roster and each agent's blocks, in roster order. */
+/** What the fleet memory view is built from: the roster and each agent's blocks, in any order. */
 @Immutable
 data class MemoryFleetInput(
-    /** The roster's visible agents, in roster order. */
+    /** The roster's visible agents. */
     val agents: List<Agent>,
     /** Each agent's core-memory blocks, for the agents whose blocks were read. */
     val blocks: List<Pair<AgentId, List<Block>>>,
@@ -35,7 +35,9 @@ data class MemoryFleetInput(
  */
 object MemoryFleetMapper {
     /** The fleet memory overview: label groups, the backend-rooted graph and the channel. */
-    fun build(input: MemoryFleetInput): MemoryParityState {
+    fun build(input: MemoryFleetInput): MemoryParityState = buildOrdered(input.stablyOrdered())
+
+    private fun buildOrdered(input: MemoryFleetInput): MemoryParityState {
         val names = input.agents.associate { it.id.value to it.name }
         val groups = groups(input.blocks)
         val memory = MemoryParitySection(
@@ -56,6 +58,17 @@ object MemoryFleetMapper {
             graph = graph(input, memory, channels),
             fleet = true,
         )
+    }
+
+    /**
+     * Agents by name (then id), and their blocks in that order, so the graph's nodes and edges come
+     * out the same however the host orders its roster or its replies: an unchanged fleet keeps its
+     * topology, and so its layout, across reloads.
+     */
+    private fun MemoryFleetInput.stablyOrdered(): MemoryFleetInput {
+        val ordered = agents.distinctBy { it.id }.sortedWith(compareBy({ it.name.lowercase() }, { it.id.value }))
+        val rank = ordered.withIndex().associate { (index, agent) -> agent.id to index }
+        return copy(agents = ordered, blocks = blocks.sortedBy { rank[it.first] ?: Int.MAX_VALUE })
     }
 
     /** Label groups sorted by label; a block with no label is a group of its own. */
