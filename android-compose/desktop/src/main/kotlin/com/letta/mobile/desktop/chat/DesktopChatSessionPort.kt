@@ -100,8 +100,14 @@ internal class DesktopChatSessionPort(
     }
 
     override val uiState: StateFlow<ChatUiState> = DerivedStateFlow(
-        timelineInputs().runningFold(null as ChatUiState?) { previous, inputs -> desktopChatUiState(inputs, previous) }
-            .map { it ?: initialUiState() }, ::initialUiState,
+        combine(
+            timelineInputs().runningFold(null as ChatUiState?) { previous, inputs -> desktopChatUiState(inputs, previous) }
+                .map { it ?: initialUiState() },
+            controller.runs,
+        ) { state, runs ->
+            val id = (state.conversationState as? com.letta.mobile.ui.chat.render.ConversationState.Ready)?.conversationId
+            state.copy(runPhase = runs[id]?.phase)
+        }, ::initialUiState,
     )
 
     override val composer: StateFlow<ChatComposerUiState> = DerivedStateFlow(

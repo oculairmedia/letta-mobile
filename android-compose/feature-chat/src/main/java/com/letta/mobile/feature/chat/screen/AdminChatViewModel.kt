@@ -272,7 +272,9 @@ internal class AdminChatViewModel @Inject constructor(
                 isCancelling = status == com.letta.mobile.data.chat.runtime.NowActiveStatus.Stopping,
             )
         }
-        return projected.withHostApprovals(approvals)
+        val runs by runRegistry.runs.collectAsState()
+        val visibleId = (state.conversationState as? ConversationState.Ready)?.conversationId
+        return projected.copy(runPhase = runs[visibleId]?.phase).withHostApprovals(approvals)
     }
 
     private val composerController: ChatComposerController = ChatComposerController(limits = attachmentLimits)
