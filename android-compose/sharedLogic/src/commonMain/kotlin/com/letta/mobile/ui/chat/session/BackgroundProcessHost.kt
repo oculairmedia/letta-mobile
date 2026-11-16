@@ -96,20 +96,13 @@ private suspend fun followBackgroundProcesses(
         generation = null
         host.value = ChatComposerHostInputs()
     }
-    fun completeStop(id: String, request: Uuid, error: String?) {
-        synchronized(lock) {
-            if (pending[id] != request) return@synchronized
-            if (error != null) pending.remove(id)
-            host.value = host.value.copy(backgroundProcessError = error)
-        }
-    }
     fun stopProcess(callbackGeneration: Long?): (String) -> Unit = stopProcess@{ id ->
         val request = synchronized(lock) {
             claimBackgroundProcess(id, active && callbackGeneration == generation, processes, pending)
         } ?: return@stopProcess
         launch {
             stopBackgroundProcessRequest({ stop(runtime, id) }) { error ->
-                completeStop(id, request, error)
+                synchronized(lock) { host.completeBackgroundStop(pending, id, request, error) }
             }
         }
     }
@@ -144,6 +137,17 @@ private suspend fun followBackgroundProcesses(
             pending.clear()
         }
     }
+}
+
+private fun MutableStateFlow<ChatComposerHostInputs>.completeBackgroundStop(
+    pending: MutableMap<String, Uuid>,
+    id: String,
+    request: Uuid,
+    error: String?,
+) {
+    if (pending[id] != request) return
+    if (error != null) pending.remove(id)
+    value = value.copy(backgroundProcessError = error)
 }
 
 private suspend fun stopBackgroundProcessRequest(stop: suspend () -> Unit, complete: (String?) -> Unit) {
