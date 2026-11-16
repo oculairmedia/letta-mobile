@@ -86,10 +86,10 @@ class ScheduleFleetController(
         mutate("Failed to delete schedule") { sources.schedules.deleteSchedule(schedule.agentId, schedule.id) }
     }
 
-    /** Deletes a cron through its own agent; a cron with no agent, or a host without cron control, does nothing. */
+    /** Deletes a cron through its own agent; a host without cron control does nothing. */
     fun deleteCron(task: CronTask) {
         val repository = sources.crons?.repository ?: return
-        val agent = task.agentId ?: return
+        val agent = task.agentId ?: return stateFlow.update { it.copy(errorMessage = NO_CRON_OWNER) }
         mutate("Failed to delete schedule") { repository.deleteSchedule(agent, task.id).getOrThrow() }
     }
 
@@ -122,9 +122,11 @@ class ScheduleFleetController(
         loadRunHistory()
     }
 
+    /** One agent's rows; a failed cron read loses the agent only when it has no native schedules to show. */
     private suspend fun readAgent(agent: AgentId): AgentScheduleRead {
         val native = if (nativeUnserved) null else nativeOrNull(agent)
-        return native to sources.crons?.listCrons(agent)
+        val crons = runCatchingCancellable { sources.crons?.listCrons(agent) }
+        return if (native == null) null to crons.getOrThrow() else native to crons.getOrNull()
     }
 
     /** The agent's native schedules, or null when the host does not serve the route. */
@@ -170,3 +172,5 @@ class ScheduleFleetController(
         }
     }
 }
+
+private const val NO_CRON_OWNER = "This schedule has no agent to delete it through; focus an agent to manage it."

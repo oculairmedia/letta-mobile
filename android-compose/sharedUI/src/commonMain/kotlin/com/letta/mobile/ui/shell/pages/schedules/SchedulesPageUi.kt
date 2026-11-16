@@ -85,7 +85,7 @@ internal fun rememberSchedulesData(state: SchedulesPageState, clock: ScheduleClo
     val crons = remember(state.crons, state.library.crons) { (state.crons + state.library.crons).distinctBy { it.id } }
     // `now` is intentionally not a key: one-shot crons resolve to a single instant when projected,
     // and re-resolving every tick would jump a just-fired one-shot a year ahead.
-    val runHistory = state.library.runHistory.takeIf {
+    val runHistory = state.scopedRunHistory().takeIf {
         state.focusedAgentId == null || state.focusedAgentId == state.library.selectedAgentId
     }.orEmpty()
     val defs = remember(crons, state.library.schedules, state.scopeAgentId, clock.zone) {

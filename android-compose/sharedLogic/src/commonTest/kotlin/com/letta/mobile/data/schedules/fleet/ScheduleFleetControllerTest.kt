@@ -105,6 +105,16 @@ class ScheduleFleetControllerTest {
     }
 
     @Test
+    fun aFailedCronReadKeepsTheAgentsNativeSchedules() = runTest {
+        val crons = CronScheduleSource { _ -> error("crons down") }
+        val controller = controller(FakeScheduleRepository(), crons)
+        controller.refresh()
+        advanceUntilIdle()
+        assertEquals(listOf("s1", "s2"), controller.state.value.schedules.map { it.id })
+        assertNull(controller.state.value.errorMessage)
+    }
+
+    @Test
     fun mutationsGoThroughTheRowsOwnAgent() = runTest {
         val schedules = FakeScheduleRepository()
         val controller = controller(schedules)

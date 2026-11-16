@@ -47,6 +47,15 @@ class MemoryFleetTest {
     }
 
     @Test
+    fun anUnlabelledBlockNeverJoinsALabelThatLooksLikeItsId() {
+        val unlabelled = Block(id = BlockId("b1"), label = null, value = "v")
+        val memory = build(ada.id to listOf(unlabelled), bo.id to listOf(block("other", "id:b1")))
+        val items = blockItems(memory)
+        assertEquals(2, items.size)
+        assertEquals(listOf(listOf("Bo"), listOf("Ada")), items.map { item -> item.owners.map { it.name } })
+    }
+
+    @Test
     fun theGraphIsRootedAtTheBackendWithAgentsAsChildren() {
         val memory = build(ada.id to listOf(block("p1", "persona")), bo.id to listOf(block("p2", "persona")))
         val graph = memory.graph

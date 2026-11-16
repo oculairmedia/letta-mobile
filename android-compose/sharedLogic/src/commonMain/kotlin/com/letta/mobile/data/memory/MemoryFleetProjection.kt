@@ -64,7 +64,7 @@ object MemoryFleetMapper {
         blocks.forEach { (agent, agentBlocks) ->
             agentBlocks.forEach { block ->
                 val label = block.label?.takeIf { it.isNotBlank() }
-                val key = label ?: "id:${block.id.value}"
+                val key = label?.let { "label:$it" } ?: "id:${block.id.value}"
                 byKey.getOrPut(key) { LabelGroup(key, label) }.entries += agent to block
             }
         }

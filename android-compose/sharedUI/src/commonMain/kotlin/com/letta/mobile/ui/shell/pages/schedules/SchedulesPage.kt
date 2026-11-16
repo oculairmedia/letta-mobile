@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.schedules.CronTask
+import com.letta.mobile.data.schedules.RunRecord
 import com.letta.mobile.data.schedules.ScheduleClock
 import com.letta.mobile.data.schedules.ScheduleCreateRequest
 import com.letta.mobile.data.schedules.ScheduleLibraryState
@@ -124,11 +125,27 @@ internal fun SchedulesPageState.deleteTarget(id: String): ScheduleDeleteTarget? 
 /** Only live cron tasks have pause/resume operations; native schedule IDs use a different API. */
 internal fun SchedulesPageState.canTogglePause(id: CronTaskId): Boolean {
     if (id.value in library.pendingCronIds) return false
-    return (crons + library.crons).any { it.id == id.value && it.controllable && inFocus(it) }
+    return (crons + library.crons).any { it.id == id.value && it.controllable && inFocus(it) && hasWriter(it) }
 }
 
-/** Whether [cron] belongs to the focused agent: with none focused every cron does, and a cron with no agent belongs to all. */
-private fun SchedulesPageState.inFocus(cron: CronTask): Boolean = focusedAgentId == null || cron.agentId in setOf(null, focusedAgentId)
+/**
+ * Whether [cron] is in the rows on screen: with no agent in scope every cron is, and a cron with no
+ * agent belongs to all.
+ */
+private fun SchedulesPageState.inFocus(cron: CronTask): Boolean = scopeAgentId == null || cron.agentId in setOf(null, scopeAgentId)
+
+/** The fleet view controls a cron through its own agent, so a cron with none has no writer there. */
+private fun SchedulesPageState.hasWriter(cron: CronTask): Boolean = !showsFleet || cron.agentId != null
+
+/**
+ * The run history the page shows: in the fleet view narrowed to one agent, only that agent's
+ * schedules' runs (a cron with no agent belongs to all).
+ */
+internal fun SchedulesPageState.scopedRunHistory(): Map<String, List<RunRecord>> {
+    val scope = scopeAgentId?.takeIf { showsFleet } ?: return library.runHistory
+    val owners = library.schedules.associate { it.id to it.agentId } + (crons + library.crons).associate { it.id to it.agentId }
+    return library.runHistory.filterKeys { id -> owners[id] in setOf(null, scope) }
+}
 
 /** Only an active or paused cron (or one whose host reports no status) can be paused or resumed. */
 private val CronTask.controllable: Boolean get() = status in CONTROLLABLE_CRON_STATUSES
