@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
+import com.letta.mobile.data.presence.RunPhase
 import com.letta.mobile.data.voice.session.VoiceModeState
 import com.letta.mobile.ui.chat.voice.VoiceModeHandle
 import com.letta.mobile.ui.theme.customColors
@@ -68,3 +69,30 @@ internal fun voiceYouEdgeColor(): Color {
 
 private const val LIGHT_SURFACE_LUMINANCE = 0.5f
 private const val LIGHT_EDGE_DEEPEN = 0.45f
+
+/** The single visual treatment selected for a composer border. */
+internal enum class ComposerOutlineMode { Idle, Listening, Working, Thinking, Error }
+
+/** Voice owns the outline while active; otherwise use this conversation's phase. */
+internal fun composerOutlineMode(
+    voice: VoiceModeState?,
+    phase: RunPhase?,
+    fallbackWorking: Boolean,
+): ComposerOutlineMode = when (voice?.let(::voiceGlowRole)) {
+    VoiceGlowRole.Error -> ComposerOutlineMode.Error
+    VoiceGlowRole.You -> ComposerOutlineMode.Listening
+    VoiceGlowRole.Agent -> ComposerOutlineMode.Working
+    VoiceGlowRole.Idle, null -> when (phase) {
+        RunPhase.QUEUED,
+        RunPhase.REASONING -> ComposerOutlineMode.Thinking
+        RunPhase.WORKING,
+        RunPhase.DELEGATING,
+        RunPhase.RESPONDING,
+        RunPhase.INTERRUPTING -> ComposerOutlineMode.Working
+        RunPhase.IDLE,
+        RunPhase.AWAITING_INPUT,
+        RunPhase.FAILED,
+        RunPhase.DONE -> ComposerOutlineMode.Idle
+        null -> if (fallbackWorking) ComposerOutlineMode.Working else ComposerOutlineMode.Idle
+    }
+}
