@@ -139,7 +139,11 @@ internal fun shellHomeBinding(
 
 /** Home's prompt bar is the chat page's own composer ([HomePromptComposer]), unless the host set one. */
 private fun HomePageOptions.withPromptBar(): HomePageOptions =
-    if (promptBar != null) this else copy(promptBar = { placeholder, onSubmit, modifier -> HomePromptComposer(placeholder, onSubmit, modifier) })
+    if (promptBar != null) {
+        this
+    } else {
+        copy(promptBar = { placeholder, onSubmit, modifier -> HomePromptComposer(placeholder, onSubmit, modifier) })
+    }
 
 private fun homeNavigation(graph: SessionRepositoryGraph, host: ShellPageHost): HomePageNavigation {
     val router = host.navigator

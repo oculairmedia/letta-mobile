@@ -110,27 +110,36 @@ private fun ScrollToLatestOverlay(action: (() -> Unit)?, bounds: SnapshotStateMa
     var origin by remember { mutableStateOf(Rect.Zero) }
     val touch = touchStyle()
     val insetPx = with(LocalDensity.current) { ChatTimelineDimens.scrollToLatestTouchInset.toPx() }
+    val onClick: () -> Unit = { lastAction?.invoke() }
     Layout(
-        content = {
-            val onClick = { lastAction?.invoke() ?: Unit }
-            if (touch) {
-                TouchScrollToLatestButton(visible = action != null, onClick = onClick)
-            } else if (action != null) {
-                ScrollToLatestButton(onClick = onClick)
-            }
-        },
+        content = { LaneScrollToLatestButton(touch, shown = action != null, onClick) },
         modifier = modifier.onGloballyPositioned { origin = it.boundsInRoot() },
     ) { measurables, constraints ->
         val button = measurables.firstOrNull()?.measure(Constraints())
+        val timeline = bounds[LANE_TIMELINE]
         layout(constraints.maxWidth, constraints.maxHeight) {
-            val timeline = bounds[LANE_TIMELINE] ?: return@layout
-            if (button == null) return@layout
-            val left = if (touch) timeline.right - insetPx - button.width else timeline.center.x - button.width / 2f
-            val bottom = scrollToLatestBottom(timeline, bounds, left..left + button.width, insetPx)
-            button.place((left - origin.left).toInt(), (bottom - button.height - origin.top).toInt())
+            if (button != null && timeline != null) {
+                val left = scrollToLatestLeft(timeline, button.width, touch, insetPx)
+                val bottom = scrollToLatestBottom(timeline, bounds, left..left + button.width, insetPx)
+                button.place((left - origin.left).toInt(), (bottom - button.height - origin.top).toInt())
+            }
         }
     }
 }
+
+/** The lane's button: the round Touch one (which animates its own coming and going), or the pointer pill while shown. */
+@Composable
+private fun LaneScrollToLatestButton(touch: Boolean, shown: Boolean, onClick: () -> Unit) {
+    if (touch) {
+        TouchScrollToLatestButton(visible = shown, onClick = onClick)
+    } else if (shown) {
+        ScrollToLatestButton(onClick = onClick)
+    }
+}
+
+/** Where the button's left edge sits (root px): inset from the timeline's end on Touch, centred on pointer. */
+private fun scrollToLatestLeft(timeline: Rect, width: Int, touch: Boolean, insetPx: Float): Float =
+    if (touch) timeline.right - insetPx - width else timeline.center.x - width / 2f
 
 /** Where the button's bottom rests (root px): above the prompt, unless something above it is in the button's way. */
 private fun scrollToLatestBottom(

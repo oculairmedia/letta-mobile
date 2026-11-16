@@ -136,7 +136,8 @@ private fun PageTitleRow(
 
 @Composable
 private fun PagePrimaryButton(action: LettaMenuItem) {
-    Button(onClick = action.onClick, enabled = action.enabled, modifier = Modifier.testTag(action.tag.ifEmpty { LETTA_PAGE_PRIMARY_ACTION_TAG })) {
+    val tag = action.tag.ifEmpty { LETTA_PAGE_PRIMARY_ACTION_TAG }
+    Button(onClick = action.onClick, enabled = action.enabled, modifier = Modifier.testTag(tag)) {
         Icon(action.icon ?: LettaIcons.Add, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
         Spacer(Modifier.size(LettaDimens.Space.xs))
         Text(action.label, maxLines = 1)

@@ -39,7 +39,8 @@ internal fun HomePromptComposer(placeholder: String?, onSubmit: (String) -> Unit
     val submit by rememberUpdatedState(onSubmit)
     val actions = remember { promptBarActions(read = { draft }, write = { draft = it }, submit = { submit(it) }) }
     val composer = ChatComposerUiState(text = draft, canSend = draft.isNotBlank(), placeholder = placeholder)
-    ChatComposerPanel(ComposerInputs(composer = composer, actions = actions, capabilities = PromptBarCapabilities, platform = PromptBarPlatform), modifier)
+    val inputs = ComposerInputs(composer = composer, actions = actions, capabilities = PromptBarCapabilities, platform = PromptBarPlatform)
+    ChatComposerPanel(inputs, modifier)
 }
 
 /** No keyboard hints: "@ to add files" and "/ for commands" are the chat page's, not the prompt bar's. */

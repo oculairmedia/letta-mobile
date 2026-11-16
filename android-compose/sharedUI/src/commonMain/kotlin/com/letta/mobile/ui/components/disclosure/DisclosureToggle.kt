@@ -26,7 +26,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
-import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaRowTarget
 import com.letta.mobile.ui.components.foundation.lettaClickable
 import com.letta.mobile.ui.components.line.LineDisclosure
 import com.letta.mobile.ui.haptics.LettaHapticCue
@@ -40,8 +40,8 @@ import androidx.compose.foundation.layout.heightIn
  * it will do ("Expand", "Show full report") and whose state says whether it is open, by pointer,
  * touch or keyboard. Enter or Space flips it, Escape closes it, and the arrow keys move to the line
  * above or below. Every flip plays the segment tick. [stateDescription] overrides the spoken state
- * when the line says something more specific ("Working"). It is [lettaClickable] on an inline target,
- * so a line keeps the height its rail gives it.
+ * when the line says something more specific ("Working"). It is [lettaClickable] on [lettaRowTarget],
+ * so a line keeps the height its rail gives it and its hover and press are rounded like every row's.
  */
 @Composable
 internal fun Modifier.disclosureToggle(disclosure: LineDisclosure, stateDescription: String? = null): Modifier {
@@ -55,7 +55,7 @@ internal fun Modifier.disclosureToggle(disclosure: LineDisclosure, stateDescript
         disclosure.onToggle()
     }
     return onPreviewKeyEvent { event -> event.type == KeyEventType.KeyDown && disclosureKey(event.key, disclosure.expanded, flip, focus) }
-        .lettaClickable(role = Role.Button, onClickLabel = action, target = LettaClickTarget.Inline, onClick = flip)
+        .lettaClickable(role = Role.Button, onClickLabel = action, target = lettaRowTarget(), onClick = flip)
         .semantics { this.stateDescription = spoken }
 }
 

@@ -54,22 +54,24 @@ class ChatChromeConsistencyRenderTest {
     fun homeAndChatShareTheComposerAtEveryReviewWidth() {
         for (dark in listOf(true, false)) {
             for (width in WIDTHS) {
-                render("home-$width-${theme(dark)}.png", width, HOME_HEIGHT, dark) { HomeFrame(width) }
+                render("home-$width-${theme(dark)}.png", width, HOME_HEIGHT, dark) { HomeFrame() }
                 render("chat-$width-${theme(dark)}.png", width, COMPOSER_HEIGHT, dark) { ComposerFrame() }
             }
         }
     }
 
     @Composable
-    private fun HomeFrame(width: Int) {
+    private fun HomeFrame() {
+        val options = HomePageOptions(composerPlaceholder = "Message Letta…").withSharedPromptBar()
         CompositionLocalProvider(LocalHostTitlesPage provides true) {
-            HomePage(state = state(), callbacks = InertHomeCallbacks, options = HomePageOptions(composerPlaceholder = "Message Letta…").withSharedPromptBar())
+            HomePage(state = state(), callbacks = InertHomeCallbacks, options = options)
         }
     }
 
     @Composable
     private fun ComposerFrame() {
-        ChatComposerPanel(ComposerInputs(composer = ChatComposerUiState(text = "Plan the trip", canSend = true), actions = RecordingChatActions()))
+        val composer = ChatComposerUiState(text = "Plan the trip", canSend = true)
+        ChatComposerPanel(ComposerInputs(composer = composer, actions = RecordingChatActions()))
     }
 
     private fun render(name: String, width: Int, height: Int, dark: Boolean, content: @Composable () -> Unit) =
@@ -83,7 +85,8 @@ class ChatChromeConsistencyRenderTest {
             }
             waitForIdle()
             // Home's draft is empty, so its Send stays hidden; the chat frame has a draft.
-            if (name.startsWith("home")) onNodeWithTag(HomePageTags.COMPOSER).assertExists() else onNodeWithTag(ComposerTestTags.SEND).assertExists()
+            val shown = if (name.startsWith("home")) HomePageTags.COMPOSER else ComposerTestTags.SEND
+            onNodeWithTag(shown).assertExists()
             val file = File("build/chat-chrome-render").apply { mkdirs() }.resolve(name)
             ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", file)
         }
@@ -95,9 +98,18 @@ class ChatChromeConsistencyRenderTest {
     private fun state(): HomePageState {
         val now = Clock.System.now()
         val agents = listOf("Scout", "Planner", "Archivist").mapIndexed { index, name ->
-            FleetAgentStat(agentId = "a-$index", name = name, model = "openai/gpt-5", conversationCount = 6 - index, lastActivity = now, running = false, activityByDay = List(14) { 0 })
+            FleetAgentStat(
+                agentId = "a-$index",
+                name = name,
+                model = "openai/gpt-5",
+                conversationCount = 6 - index,
+                lastActivity = now,
+                running = false,
+                activityByDay = List(14) { 0 },
+            )
         }
-        val recent = listOf("Trip planning" to 7.minutes, "Garden layout" to 30.minutes, "Reading list" to 3.hours).mapIndexed { index, (title, age) ->
+        val titles = listOf("Trip planning" to 7.minutes, "Garden layout" to 30.minutes, "Reading list" to 3.hours)
+        val recent = titles.mapIndexed { index, (title, age) ->
             val agent = agents[index]
             FleetRecentConversation("c-$index", agent.agentId, agent.name, title, "", now - age, (now - age).toString())
         }

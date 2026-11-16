@@ -4,6 +4,7 @@ import com.letta.mobile.avatar.core.gaze.AttentionKey
 import com.letta.mobile.avatar.core.gaze.AttentionKind
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -162,28 +163,33 @@ internal fun TimelineListFrame(
         overlays.pinnedPrompt.item?.let { prompt ->
             PinnedPromptCopy(prompt, overlays.pinnedPrompt, bindings, Modifier.align(Alignment.TopCenter))
         }
-        val showScrollToLatest = overlays.showScrollToLatest && !overlays.glide.isGliding
         // Inside a chat lane the lane draws the button, over the composer's band as well.
-        val drawsOwnButton = LocalScrollToLatestAction.current == null
-        if (drawsOwnButton && touchStyle()) {
-            TouchScrollToLatestButton(
-                visible = showScrollToLatest,
-                onClick = overlays.onScrollToLatest,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(
-                        end = ChatTimelineDimens.scrollToLatestTouchInset,
-                        bottom = ChatTimelineDimens.scrollToLatestTouchInset + overlays.bottomReserve,
-                    ),
-            )
-        } else if (drawsOwnButton && showScrollToLatest) {
-            ScrollToLatestButton(
-                onClick = overlays.onScrollToLatest,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = LettaDimens.Space.lg + overlays.bottomReserve),
-            )
-        }
+        if (LocalScrollToLatestAction.current == null) OwnScrollToLatestButton(overlays)
+    }
+}
+
+/** The list's own scroll-to-latest button, outside a chat lane: round at the end on Touch, centred on pointer. */
+@Composable
+private fun BoxScope.OwnScrollToLatestButton(overlays: TimelineFrameOverlays) {
+    val show = overlays.showScrollToLatest && !overlays.glide.isGliding
+    if (touchStyle()) {
+        TouchScrollToLatestButton(
+            visible = show,
+            onClick = overlays.onScrollToLatest,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(
+                    end = ChatTimelineDimens.scrollToLatestTouchInset,
+                    bottom = ChatTimelineDimens.scrollToLatestTouchInset + overlays.bottomReserve,
+                ),
+        )
+    } else if (show) {
+        ScrollToLatestButton(
+            onClick = overlays.onScrollToLatest,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = LettaDimens.Space.lg + overlays.bottomReserve),
+        )
     }
 }
 

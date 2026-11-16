@@ -133,7 +133,11 @@ class HomePageTest {
             MaterialTheme {
                 ProvideLettaHost(host) {
                     Box(Modifier.width(width).height(PAGE_HEIGHT)) {
-                        HomePage(state = state, callbacks = HomePageCallbacks(actions, navigation.navigation), options = options.withSharedPromptBar())
+                        HomePage(
+                            state = state,
+                            callbacks = HomePageCallbacks(actions, navigation.navigation),
+                            options = options.withSharedPromptBar(),
+                        )
                     }
                 }
             }

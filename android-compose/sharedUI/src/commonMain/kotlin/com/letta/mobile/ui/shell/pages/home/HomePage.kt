@@ -206,7 +206,12 @@ private fun WideHomeList(page: HomePageScope) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-        contentPadding = PaddingValues(start = page.horizontalPadding, end = page.horizontalPadding, top = LettaDimens.Space.sm, bottom = LettaDimens.Space.xl),
+        contentPadding = PaddingValues(
+            start = page.horizontalPadding,
+            end = page.horizontalPadding,
+            top = LettaDimens.Space.sm,
+            bottom = LettaDimens.Space.xl,
+        ),
     ) {
         if (page.state.search.isActive) homeSearchResults(page) else homeSections(page)
     }

@@ -42,7 +42,7 @@ import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
-import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import com.letta.mobile.ui.components.foundation.lettaRowTarget
 import com.letta.mobile.ui.components.foundation.lettaClickable
 
 // letta-mobile-a7ir6: a Monitor watch recedes to one chip (its newest event, the event count and
@@ -132,7 +132,7 @@ private fun MonitorDetails(raw: String, lines: List<String>, notification: UiSub
         text = stringResource(if (showRaw) Res.string.rows_monitor_hide_raw else Res.string.rows_monitor_show_raw),
         style = MaterialTheme.typography.labelSmall,
         modifier = Modifier
-            .lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = { showRaw = !showRaw })
+            .lettaClickable(role = Role.Button, target = lettaRowTarget(), onClick = { showRaw = !showRaw })
             .padding(LettaDimens.Space.xs),
     )
     notification.taskId?.let {

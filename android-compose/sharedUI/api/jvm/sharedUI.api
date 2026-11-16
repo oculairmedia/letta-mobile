@@ -2724,6 +2724,11 @@ public final class com/letta/mobile/ui/components/foundation/LettaClickTarget$Co
 	public final fun getStandalone ()Lcom/letta/mobile/ui/components/foundation/LettaClickTarget;
 }
 
+public final class com/letta/mobile/ui/components/foundation/LettaClickTargetKt {
+	public static final fun lettaInlineTarget (Landroidx/compose/ui/graphics/Shape;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/components/foundation/LettaClickTarget;
+	public static final fun lettaRowTarget (Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/components/foundation/LettaClickTarget;
+}
+
 public final class com/letta/mobile/ui/components/foundation/LettaClickableKt {
 	public static final fun lettaClickable-glApdhM (Landroidx/compose/ui/Modifier;ILjava/lang/String;Landroidx/compose/ui/graphics/Shape;Lkotlin/jvm/functions/Function0;)Landroidx/compose/ui/Modifier;
 	public static final fun lettaClickable-glApdhM (Landroidx/compose/ui/Modifier;ILjava/lang/String;Lcom/letta/mobile/ui/components/foundation/LettaClickTarget;Lkotlin/jvm/functions/Function0;)Landroidx/compose/ui/Modifier;
