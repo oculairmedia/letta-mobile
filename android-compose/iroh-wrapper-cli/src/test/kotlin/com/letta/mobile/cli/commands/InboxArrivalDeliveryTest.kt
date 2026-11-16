@@ -105,7 +105,7 @@ class InboxArrivalDeliveryTest {
             }
             assertEquals(1, capable.frames.size, "a committed inbox arrival must reach the opted-in home observer")
             val journal = Json.parseToJsonElement(File(root, "a2a-receipts.json").readText()).jsonObject
-            assertEquals(2, journal["version"]!!.jsonPrimitive.int)
+            assertEquals(3, journal["version"]!!.jsonPrimitive.int)
             assertEquals("PERSISTED", journal["reservations"]!!.jsonObject["sender"]!!.jsonObject["stable-wake"]!!.jsonPrimitive.content)
 
             val decoded = Json.decodeFromString(ServerFrameSerializer, capable.frames.single())
