@@ -6748,7 +6748,7 @@ final class com.letta.mobile.ui.shell.pages.schedules/NativeScheduleRef { // com
 }
 
 final class com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions { // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions|null[0]
-    constructor <init>(kotlin/Function0<kotlin/Unit> = ..., kotlin/Function1<kotlin/String, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.data.schedules/ScheduleCreateRequest, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.ui.shell.pages.schedules/NativeScheduleRef, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.ui.shell.pages.schedules/CronTaskId, kotlin/Unit> = ..., kotlin/Function2<kotlin/String, kotlin/Boolean, kotlin/Unit>? = ...) // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.<init>|<init>(kotlin.Function0<kotlin.Unit>;kotlin.Function1<kotlin.String,kotlin.Unit>;kotlin.Function1<com.letta.mobile.data.schedules.ScheduleCreateRequest,kotlin.Unit>;kotlin.Function1<com.letta.mobile.ui.shell.pages.schedules.NativeScheduleRef,kotlin.Unit>;kotlin.Function1<com.letta.mobile.ui.shell.pages.schedules.CronTaskId,kotlin.Unit>;kotlin.Function2<kotlin.String,kotlin.Boolean,kotlin.Unit>?){}[0]
+    constructor <init>(kotlin/Function0<kotlin/Unit> = ..., kotlin/Function1<kotlin/String?, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.data.schedules/ScheduleCreateRequest, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.ui.shell.pages.schedules/NativeScheduleRef, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.ui.shell.pages.schedules/CronTaskId, kotlin/Unit> = ..., kotlin/Function2<kotlin/String, kotlin/Boolean, kotlin/Unit>? = ...) // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.<init>|<init>(kotlin.Function0<kotlin.Unit>;kotlin.Function1<kotlin.String?,kotlin.Unit>;kotlin.Function1<com.letta.mobile.data.schedules.ScheduleCreateRequest,kotlin.Unit>;kotlin.Function1<com.letta.mobile.ui.shell.pages.schedules.NativeScheduleRef,kotlin.Unit>;kotlin.Function1<com.letta.mobile.ui.shell.pages.schedules.CronTaskId,kotlin.Unit>;kotlin.Function2<kotlin.String,kotlin.Boolean,kotlin.Unit>?){}[0]
 
     final val onCreate // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.onCreate|{}onCreate[0]
         final fun <get-onCreate>(): kotlin/Function1<com.letta.mobile.data.schedules/ScheduleCreateRequest, kotlin/Unit> // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.onCreate.<get-onCreate>|<get-onCreate>(){}[0]
@@ -6756,20 +6756,20 @@ final class com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions { // 
         final fun <get-onDeleteCron>(): kotlin/Function1<com.letta.mobile.ui.shell.pages.schedules/CronTaskId, kotlin/Unit> // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.onDeleteCron.<get-onDeleteCron>|<get-onDeleteCron>(){}[0]
     final val onDeleteSchedule // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.onDeleteSchedule|{}onDeleteSchedule[0]
         final fun <get-onDeleteSchedule>(): kotlin/Function1<com.letta.mobile.ui.shell.pages.schedules/NativeScheduleRef, kotlin/Unit> // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.onDeleteSchedule.<get-onDeleteSchedule>|<get-onDeleteSchedule>(){}[0]
+    final val onFilterAgent // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.onFilterAgent|{}onFilterAgent[0]
+        final fun <get-onFilterAgent>(): kotlin/Function1<kotlin/String?, kotlin/Unit> // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.onFilterAgent.<get-onFilterAgent>|<get-onFilterAgent>(){}[0]
     final val onRefresh // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.onRefresh|{}onRefresh[0]
         final fun <get-onRefresh>(): kotlin/Function0<kotlin/Unit> // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.onRefresh.<get-onRefresh>|<get-onRefresh>(){}[0]
-    final val onSelectAgent // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.onSelectAgent|{}onSelectAgent[0]
-        final fun <get-onSelectAgent>(): kotlin/Function1<kotlin/String, kotlin/Unit> // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.onSelectAgent.<get-onSelectAgent>|<get-onSelectAgent>(){}[0]
     final val onTogglePause // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.onTogglePause|{}onTogglePause[0]
         final fun <get-onTogglePause>(): kotlin/Function2<kotlin/String, kotlin/Boolean, kotlin/Unit>? // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.onTogglePause.<get-onTogglePause>|<get-onTogglePause>(){}[0]
 
     final fun component1(): kotlin/Function0<kotlin/Unit> // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.component1|component1(){}[0]
-    final fun component2(): kotlin/Function1<kotlin/String, kotlin/Unit> // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.component2|component2(){}[0]
+    final fun component2(): kotlin/Function1<kotlin/String?, kotlin/Unit> // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.component2|component2(){}[0]
     final fun component3(): kotlin/Function1<com.letta.mobile.data.schedules/ScheduleCreateRequest, kotlin/Unit> // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.component3|component3(){}[0]
     final fun component4(): kotlin/Function1<com.letta.mobile.ui.shell.pages.schedules/NativeScheduleRef, kotlin/Unit> // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.component4|component4(){}[0]
     final fun component5(): kotlin/Function1<com.letta.mobile.ui.shell.pages.schedules/CronTaskId, kotlin/Unit> // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.component5|component5(){}[0]
     final fun component6(): kotlin/Function2<kotlin/String, kotlin/Boolean, kotlin/Unit>? // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.component6|component6(){}[0]
-    final fun copy(kotlin/Function0<kotlin/Unit> = ..., kotlin/Function1<kotlin/String, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.data.schedules/ScheduleCreateRequest, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.ui.shell.pages.schedules/NativeScheduleRef, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.ui.shell.pages.schedules/CronTaskId, kotlin/Unit> = ..., kotlin/Function2<kotlin/String, kotlin/Boolean, kotlin/Unit>? = ...): com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.copy|copy(kotlin.Function0<kotlin.Unit>;kotlin.Function1<kotlin.String,kotlin.Unit>;kotlin.Function1<com.letta.mobile.data.schedules.ScheduleCreateRequest,kotlin.Unit>;kotlin.Function1<com.letta.mobile.ui.shell.pages.schedules.NativeScheduleRef,kotlin.Unit>;kotlin.Function1<com.letta.mobile.ui.shell.pages.schedules.CronTaskId,kotlin.Unit>;kotlin.Function2<kotlin.String,kotlin.Boolean,kotlin.Unit>?){}[0]
+    final fun copy(kotlin/Function0<kotlin/Unit> = ..., kotlin/Function1<kotlin/String?, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.data.schedules/ScheduleCreateRequest, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.ui.shell.pages.schedules/NativeScheduleRef, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.ui.shell.pages.schedules/CronTaskId, kotlin/Unit> = ..., kotlin/Function2<kotlin/String, kotlin/Boolean, kotlin/Unit>? = ...): com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.copy|copy(kotlin.Function0<kotlin.Unit>;kotlin.Function1<kotlin.String?,kotlin.Unit>;kotlin.Function1<com.letta.mobile.data.schedules.ScheduleCreateRequest,kotlin.Unit>;kotlin.Function1<com.letta.mobile.ui.shell.pages.schedules.NativeScheduleRef,kotlin.Unit>;kotlin.Function1<com.letta.mobile.ui.shell.pages.schedules.CronTaskId,kotlin.Unit>;kotlin.Function2<kotlin.String,kotlin.Boolean,kotlin.Unit>?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageActions.toString|toString(){}[0]
@@ -6808,8 +6808,12 @@ final class com.letta.mobile.ui.shell.pages.schedules/SchedulesPageState { // co
         final fun <get-focusedAgentId>(): kotlin/String? // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageState.focusedAgentId.<get-focusedAgentId>|<get-focusedAgentId>(){}[0]
     final val library // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageState.library|{}library[0]
         final fun <get-library>(): com.letta.mobile.data.schedules/ScheduleLibraryState // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageState.library.<get-library>|<get-library>(){}[0]
+    final val scopeAgentId // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageState.scopeAgentId|{}scopeAgentId[0]
+        final fun <get-scopeAgentId>(): kotlin/String? // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageState.scopeAgentId.<get-scopeAgentId>|<get-scopeAgentId>(){}[0]
     final val showsAgentChips // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageState.showsAgentChips|{}showsAgentChips[0]
         final fun <get-showsAgentChips>(): kotlin/Boolean // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageState.showsAgentChips.<get-showsAgentChips>|<get-showsAgentChips>(){}[0]
+    final val showsFleet // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageState.showsFleet|{}showsFleet[0]
+        final fun <get-showsFleet>(): kotlin/Boolean // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageState.showsFleet.<get-showsFleet>|<get-showsFleet>(){}[0]
     final val targetAgentId // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageState.targetAgentId|{}targetAgentId[0]
         final fun <get-targetAgentId>(): kotlin/String? // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageState.targetAgentId.<get-targetAgentId>|<get-targetAgentId>(){}[0]
 
@@ -11245,6 +11249,8 @@ final object com.letta.mobile.ui.shell.pages.runs/RunsPageTags { // com.letta.mo
 }
 
 final object com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags { // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags|null[0]
+    final const val ALL_AGENTS // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.ALL_AGENTS|{}ALL_AGENTS[0]
+        final fun <get-ALL_AGENTS>(): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.ALL_AGENTS.<get-ALL_AGENTS>|<get-ALL_AGENTS>(){}[0]
     final const val DETAIL_SHEET // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.DETAIL_SHEET|{}DETAIL_SHEET[0]
         final fun <get-DETAIL_SHEET>(): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.DETAIL_SHEET.<get-DETAIL_SHEET>|<get-DETAIL_SHEET>(){}[0]
     final const val EMPTY // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.EMPTY|{}EMPTY[0]
@@ -11284,6 +11290,7 @@ final object com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags { // co
 
     final fun agent(kotlin/String): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.agent|agent(kotlin.String){}[0]
     final fun cadence(kotlin/String): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.cadence|cadence(kotlin.String){}[0]
+    final fun formAgent(kotlin/String): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.formAgent|formAgent(kotlin.String){}[0]
     final fun rule(kotlin/String): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.rule|rule(kotlin.String){}[0]
     final fun tab(com.letta.mobile.data.schedules/SchedulesView): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.tab|tab(com.letta.mobile.data.schedules.SchedulesView){}[0]
     final fun view(com.letta.mobile.data.schedules/SchedulesView): kotlin/String // com.letta.mobile.ui.shell.pages.schedules/SchedulesPageTags.view|view(com.letta.mobile.data.schedules.SchedulesView){}[0]

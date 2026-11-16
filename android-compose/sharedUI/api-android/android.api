@@ -9484,14 +9484,14 @@ public final class com/letta/mobile/ui/shell/pages/runs/RunsPageTags {
 public final class com/letta/mobile/ui/shell/pages/schedules/ComposableSingletons$ScheduleFormPaneKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/schedules/ComposableSingletons$ScheduleFormPaneKt;
 	public fun <init> ()V
-	public final fun getLambda$-1111039225$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-532217994$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1139151756$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-1108773294$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-1687594525$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-237951695$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-436650218$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1221662537$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$1273364922$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$139905082$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1666363867$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1798217837$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$338603605$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$562596456$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/shell/pages/schedules/CronTaskId {
@@ -9539,8 +9539,8 @@ public final class com/letta/mobile/ui/shell/pages/schedules/SchedulesPageAction
 	public final fun getOnCreate ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnDeleteCron ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnDeleteSchedule ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnFilterAgent ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnRefresh ()Lkotlin/jvm/functions/Function0;
-	public final fun getOnSelectAgent ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnTogglePause ()Lkotlin/jvm/functions/Function2;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -9586,7 +9586,9 @@ public final class com/letta/mobile/ui/shell/pages/schedules/SchedulesPageState 
 	public final fun getCrons ()Ljava/util/List;
 	public final fun getFocusedAgentId ()Ljava/lang/String;
 	public final fun getLibrary ()Lcom/letta/mobile/data/schedules/ScheduleLibraryState;
+	public final fun getScopeAgentId ()Ljava/lang/String;
 	public final fun getShowsAgentChips ()Z
+	public final fun getShowsFleet ()Z
 	public final fun getTargetAgentId ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -9594,6 +9596,7 @@ public final class com/letta/mobile/ui/shell/pages/schedules/SchedulesPageState 
 
 public final class com/letta/mobile/ui/shell/pages/schedules/SchedulesPageTags {
 	public static final field $stable I
+	public static final field ALL_AGENTS Ljava/lang/String;
 	public static final field DETAIL_SHEET Ljava/lang/String;
 	public static final field EMPTY Ljava/lang/String;
 	public static final field ERROR Ljava/lang/String;
@@ -9615,6 +9618,7 @@ public final class com/letta/mobile/ui/shell/pages/schedules/SchedulesPageTags {
 	public static final field ZONE Ljava/lang/String;
 	public final fun agent (Ljava/lang/String;)Ljava/lang/String;
 	public final fun cadence (Ljava/lang/String;)Ljava/lang/String;
+	public final fun formAgent (Ljava/lang/String;)Ljava/lang/String;
 	public final fun rule (Ljava/lang/String;)Ljava/lang/String;
 	public final fun tab (Lcom/letta/mobile/data/schedules/SchedulesView;)Ljava/lang/String;
 	public final fun view (Lcom/letta/mobile/data/schedules/SchedulesView;)Ljava/lang/String;

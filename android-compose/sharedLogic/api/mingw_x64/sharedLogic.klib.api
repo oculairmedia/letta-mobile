@@ -6040,6 +6040,7 @@ abstract interface com.letta.mobile.data.memory/MemoryParitySource : kotlin/Auto
 
     abstract fun reload() // com.letta.mobile.data.memory/MemoryParitySource.reload|reload(){}[0]
     abstract fun selectAgent(kotlin/String) // com.letta.mobile.data.memory/MemoryParitySource.selectAgent|selectAgent(kotlin.String){}[0]
+    abstract fun selectFleet() // com.letta.mobile.data.memory/MemoryParitySource.selectFleet|selectFleet(){}[0]
     abstract fun start() // com.letta.mobile.data.memory/MemoryParitySource.start|start(){}[0]
 }
 
@@ -12097,7 +12098,7 @@ sealed interface com.letta.mobile.data.memory/MemoryParityItem { // com.letta.mo
     }
 
     final class MemoryBlock : com.letta.mobile.data.memory/MemoryParityItem { // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock|null[0]
-        constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin.collections/List<kotlin/String>, kotlin.collections/List<com.letta.mobile.data.memory/MemoryTextLink>, kotlin/String, kotlin/Int?, kotlin/Boolean, kotlin/String? = ..., kotlin/Int = ...) // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.collections.List<com.letta.mobile.data.memory.MemoryTextLink>;kotlin.String;kotlin.Int?;kotlin.Boolean;kotlin.String?;kotlin.Int){}[0]
+        constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin.collections/List<kotlin/String>, kotlin.collections/List<com.letta.mobile.data.memory/MemoryTextLink>, kotlin/String, kotlin/Int?, kotlin/Boolean, kotlin/String? = ..., kotlin/Int = ..., kotlin.collections/List<com.letta.mobile.data.memory/MemoryParityAgentOption> = ..., kotlin/String? = ...) // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.collections.List<com.letta.mobile.data.memory.MemoryTextLink>;kotlin.String;kotlin.Int?;kotlin.Boolean;kotlin.String?;kotlin.Int;kotlin.collections.List<com.letta.mobile.data.memory.MemoryParityAgentOption>;kotlin.String?){}[0]
 
         final val detailText // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.detailText|{}detailText[0]
             final fun <get-detailText>(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.detailText.<get-detailText>|<get-detailText>(){}[0]
@@ -12113,10 +12114,14 @@ sealed interface com.letta.mobile.data.memory/MemoryParityItem { // com.letta.mo
             final fun <get-links>(): kotlin.collections/List<com.letta.mobile.data.memory/MemoryTextLink> // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.links.<get-links>|<get-links>(){}[0]
         final val metadataLabels // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.metadataLabels|{}metadataLabels[0]
             final fun <get-metadataLabels>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.metadataLabels.<get-metadataLabels>|<get-metadataLabels>(){}[0]
+        final val owners // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.owners|{}owners[0]
+            final fun <get-owners>(): kotlin.collections/List<com.letta.mobile.data.memory/MemoryParityAgentOption> // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.owners.<get-owners>|<get-owners>(){}[0]
         final val preview // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.preview|{}preview[0]
             final fun <get-preview>(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.preview.<get-preview>|<get-preview>(){}[0]
         final val readOnly // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.readOnly|{}readOnly[0]
             final fun <get-readOnly>(): kotlin/Boolean // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.readOnly.<get-readOnly>|<get-readOnly>(){}[0]
+        final val sharedBlockId // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.sharedBlockId|{}sharedBlockId[0]
+            final fun <get-sharedBlockId>(): kotlin/String? // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.sharedBlockId.<get-sharedBlockId>|<get-sharedBlockId>(){}[0]
         final val subtitle // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.subtitle|{}subtitle[0]
             final fun <get-subtitle>(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.subtitle.<get-subtitle>|<get-subtitle>(){}[0]
         final val title // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.title|{}title[0]
@@ -12125,6 +12130,8 @@ sealed interface com.letta.mobile.data.memory/MemoryParityItem { // com.letta.mo
         final fun component1(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component1|component1(){}[0]
         final fun component10(): kotlin/String? // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component10|component10(){}[0]
         final fun component11(): kotlin/Int // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component11|component11(){}[0]
+        final fun component12(): kotlin.collections/List<com.letta.mobile.data.memory/MemoryParityAgentOption> // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component12|component12(){}[0]
+        final fun component13(): kotlin/String? // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component13|component13(){}[0]
         final fun component2(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component2|component2(){}[0]
         final fun component3(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component3|component3(){}[0]
         final fun component4(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component4|component4(){}[0]
@@ -12133,7 +12140,7 @@ sealed interface com.letta.mobile.data.memory/MemoryParityItem { // com.letta.mo
         final fun component7(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component7|component7(){}[0]
         final fun component8(): kotlin/Int? // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component8|component8(){}[0]
         final fun component9(): kotlin/Boolean // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component9|component9(){}[0]
-        final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<com.letta.mobile.data.memory/MemoryTextLink> = ..., kotlin/String = ..., kotlin/Int? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Int = ...): com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.collections.List<com.letta.mobile.data.memory.MemoryTextLink>;kotlin.String;kotlin.Int?;kotlin.Boolean;kotlin.String?;kotlin.Int){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<com.letta.mobile.data.memory/MemoryTextLink> = ..., kotlin/String = ..., kotlin/Int? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Int = ..., kotlin.collections/List<com.letta.mobile.data.memory/MemoryParityAgentOption> = ..., kotlin/String? = ...): com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.collections.List<com.letta.mobile.data.memory.MemoryTextLink>;kotlin.String;kotlin.Int?;kotlin.Boolean;kotlin.String?;kotlin.Int;kotlin.collections.List<com.letta.mobile.data.memory.MemoryParityAgentOption>;kotlin.String?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.toString|toString(){}[0]
@@ -27035,6 +27042,7 @@ final class <#A: com.letta.mobile.data.session/SessionRepositoryGraph> com.letta
     final fun close() // com.letta.mobile.data.memory/MemoryParityController.close|close(){}[0]
     final fun reload() // com.letta.mobile.data.memory/MemoryParityController.reload|reload(){}[0]
     final fun selectAgent(kotlin/String) // com.letta.mobile.data.memory/MemoryParityController.selectAgent|selectAgent(kotlin.String){}[0]
+    final fun selectFleet() // com.letta.mobile.data.memory/MemoryParityController.selectFleet|selectFleet(){}[0]
     final fun start() // com.letta.mobile.data.memory/MemoryParityController.start|start(){}[0]
 }
 
@@ -27233,6 +27241,26 @@ final class <#A: kotlin/Any?, #B: kotlin/Any?> com.letta.mobile.data.model.provi
 
 final class <#A: kotlin/Any?, #B: kotlin/Any?> com.letta.mobile.data.model.provider.rpc/ProviderRpcCodec { // com.letta.mobile.data.model.provider.rpc/ProviderRpcCodec|null[0]
     constructor <init>(kotlinx.serialization/KSerializer<#A>, kotlinx.serialization/KSerializer<#B>, kotlin/Function1<#A, kotlin/Boolean>, kotlin/Function1<#B, kotlin/Int>) // com.letta.mobile.data.model.provider.rpc/ProviderRpcCodec.<init>|<init>(kotlinx.serialization.KSerializer<1:0>;kotlinx.serialization.KSerializer<1:1>;kotlin.Function1<1:0,kotlin.Boolean>;kotlin.Function1<1:1,kotlin.Int>){}[0]
+}
+
+final class <#A: kotlin/Any?, #B: out kotlin/Any?> com.letta.mobile.data.fleet/AgentFleetRead { // com.letta.mobile.data.fleet/AgentFleetRead|null[0]
+    constructor <init>(kotlin.collections/List<kotlin/Pair<#A, #B>>, kotlin.collections/Map<#A, kotlin/Throwable>) // com.letta.mobile.data.fleet/AgentFleetRead.<init>|<init>(kotlin.collections.List<kotlin.Pair<1:0,1:1>>;kotlin.collections.Map<1:0,kotlin.Throwable>){}[0]
+
+    final val allFailed // com.letta.mobile.data.fleet/AgentFleetRead.allFailed|{}allFailed[0]
+        final fun <get-allFailed>(): kotlin/Boolean // com.letta.mobile.data.fleet/AgentFleetRead.allFailed.<get-allFailed>|<get-allFailed>(){}[0]
+    final val failures // com.letta.mobile.data.fleet/AgentFleetRead.failures|{}failures[0]
+        final fun <get-failures>(): kotlin.collections/Map<#A, kotlin/Throwable> // com.letta.mobile.data.fleet/AgentFleetRead.failures.<get-failures>|<get-failures>(){}[0]
+    final val firstFailure // com.letta.mobile.data.fleet/AgentFleetRead.firstFailure|{}firstFailure[0]
+        final fun <get-firstFailure>(): kotlin/Throwable? // com.letta.mobile.data.fleet/AgentFleetRead.firstFailure.<get-firstFailure>|<get-firstFailure>(){}[0]
+    final val values // com.letta.mobile.data.fleet/AgentFleetRead.values|{}values[0]
+        final fun <get-values>(): kotlin.collections/List<kotlin/Pair<#A, #B>> // com.letta.mobile.data.fleet/AgentFleetRead.values.<get-values>|<get-values>(){}[0]
+
+    final fun component1(): kotlin.collections/List<kotlin/Pair<#A, #B>> // com.letta.mobile.data.fleet/AgentFleetRead.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/Map<#A, kotlin/Throwable> // com.letta.mobile.data.fleet/AgentFleetRead.component2|component2(){}[0]
+    final fun copy(kotlin.collections/List<kotlin/Pair<#A, #B>> = ..., kotlin.collections/Map<#A, kotlin/Throwable> = ...): com.letta.mobile.data.fleet/AgentFleetRead<#A, #B> // com.letta.mobile.data.fleet/AgentFleetRead.copy|copy(kotlin.collections.List<kotlin.Pair<1:0,1:1>>;kotlin.collections.Map<1:0,kotlin.Throwable>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.fleet/AgentFleetRead.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.fleet/AgentFleetRead.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.fleet/AgentFleetRead.toString|toString(){}[0]
 }
 
 final class <#A: kotlin/Any?> com.letta.mobile.data.flow/DerivedStateFlow : kotlinx.coroutines.flow/StateFlow<#A> { // com.letta.mobile.data.flow/DerivedStateFlow|null[0]
@@ -42446,6 +42474,7 @@ final class com.letta.mobile.data.memory.graph/MemoryPageController : com.letta.
     final fun retryContent() // com.letta.mobile.data.memory.graph/MemoryPageController.retryContent|retryContent(){}[0]
     final fun saveEdit() // com.letta.mobile.data.memory.graph/MemoryPageController.saveEdit|saveEdit(){}[0]
     final fun selectAgent(kotlin/String) // com.letta.mobile.data.memory.graph/MemoryPageController.selectAgent|selectAgent(kotlin.String){}[0]
+    final fun selectFleet() // com.letta.mobile.data.memory.graph/MemoryPageController.selectFleet|selectFleet(){}[0]
     final fun selectNode(kotlin/String) // com.letta.mobile.data.memory.graph/MemoryPageController.selectNode|selectNode(kotlin.String){}[0]
     final fun start() // com.letta.mobile.data.memory.graph/MemoryPageController.start|start(){}[0]
     final fun submitCreate() // com.letta.mobile.data.memory.graph/MemoryPageController.submitCreate|submitCreate(){}[0]
@@ -42881,6 +42910,31 @@ final class com.letta.mobile.data.memory.memfs/MemfsUpdate { // com.letta.mobile
     }
 }
 
+final class com.letta.mobile.data.memory/MemoryFleetInput { // com.letta.mobile.data.memory/MemoryFleetInput|null[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.data.model/Agent>, kotlin.collections/List<kotlin/Pair<com.letta.mobile.data.model/AgentId, kotlin.collections/List<com.letta.mobile.data.model/Block>>>, com.letta.mobile.runtime/BackendDescriptor, com.letta.mobile.data.transport/ChannelTransportState, kotlin/Boolean = ...) // com.letta.mobile.data.memory/MemoryFleetInput.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.model.Agent>;kotlin.collections.List<kotlin.Pair<com.letta.mobile.data.model.AgentId,kotlin.collections.List<com.letta.mobile.data.model.Block>>>;com.letta.mobile.runtime.BackendDescriptor;com.letta.mobile.data.transport.ChannelTransportState;kotlin.Boolean){}[0]
+
+    final val agents // com.letta.mobile.data.memory/MemoryFleetInput.agents|{}agents[0]
+        final fun <get-agents>(): kotlin.collections/List<com.letta.mobile.data.model/Agent> // com.letta.mobile.data.memory/MemoryFleetInput.agents.<get-agents>|<get-agents>(){}[0]
+    final val backendDescriptor // com.letta.mobile.data.memory/MemoryFleetInput.backendDescriptor|{}backendDescriptor[0]
+        final fun <get-backendDescriptor>(): com.letta.mobile.runtime/BackendDescriptor // com.letta.mobile.data.memory/MemoryFleetInput.backendDescriptor.<get-backendDescriptor>|<get-backendDescriptor>(){}[0]
+    final val blocks // com.letta.mobile.data.memory/MemoryFleetInput.blocks|{}blocks[0]
+        final fun <get-blocks>(): kotlin.collections/List<kotlin/Pair<com.letta.mobile.data.model/AgentId, kotlin.collections/List<com.letta.mobile.data.model/Block>>> // com.letta.mobile.data.memory/MemoryFleetInput.blocks.<get-blocks>|<get-blocks>(){}[0]
+    final val blocksLoaded // com.letta.mobile.data.memory/MemoryFleetInput.blocksLoaded|{}blocksLoaded[0]
+        final fun <get-blocksLoaded>(): kotlin/Boolean // com.letta.mobile.data.memory/MemoryFleetInput.blocksLoaded.<get-blocksLoaded>|<get-blocksLoaded>(){}[0]
+    final val channelTransportState // com.letta.mobile.data.memory/MemoryFleetInput.channelTransportState|{}channelTransportState[0]
+        final fun <get-channelTransportState>(): com.letta.mobile.data.transport/ChannelTransportState // com.letta.mobile.data.memory/MemoryFleetInput.channelTransportState.<get-channelTransportState>|<get-channelTransportState>(){}[0]
+
+    final fun component1(): kotlin.collections/List<com.letta.mobile.data.model/Agent> // com.letta.mobile.data.memory/MemoryFleetInput.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<kotlin/Pair<com.letta.mobile.data.model/AgentId, kotlin.collections/List<com.letta.mobile.data.model/Block>>> // com.letta.mobile.data.memory/MemoryFleetInput.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.runtime/BackendDescriptor // com.letta.mobile.data.memory/MemoryFleetInput.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.data.transport/ChannelTransportState // com.letta.mobile.data.memory/MemoryFleetInput.component4|component4(){}[0]
+    final fun component5(): kotlin/Boolean // com.letta.mobile.data.memory/MemoryFleetInput.component5|component5(){}[0]
+    final fun copy(kotlin.collections/List<com.letta.mobile.data.model/Agent> = ..., kotlin.collections/List<kotlin/Pair<com.letta.mobile.data.model/AgentId, kotlin.collections/List<com.letta.mobile.data.model/Block>>> = ..., com.letta.mobile.runtime/BackendDescriptor = ..., com.letta.mobile.data.transport/ChannelTransportState = ..., kotlin/Boolean = ...): com.letta.mobile.data.memory/MemoryFleetInput // com.letta.mobile.data.memory/MemoryFleetInput.copy|copy(kotlin.collections.List<com.letta.mobile.data.model.Agent>;kotlin.collections.List<kotlin.Pair<com.letta.mobile.data.model.AgentId,kotlin.collections.List<com.letta.mobile.data.model.Block>>>;com.letta.mobile.runtime.BackendDescriptor;com.letta.mobile.data.transport.ChannelTransportState;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.memory/MemoryFleetInput.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.memory/MemoryFleetInput.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.memory/MemoryFleetInput.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.memory/MemoryGraphEdge { // com.letta.mobile.data.memory/MemoryGraphEdge|null[0]
     constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, com.letta.mobile.data.memory/MemoryGraphEdgeKind) // com.letta.mobile.data.memory/MemoryGraphEdge.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;com.letta.mobile.data.memory.MemoryGraphEdgeKind){}[0]
 
@@ -42978,6 +43032,19 @@ final class com.letta.mobile.data.memory/MemoryParityAgentOption { // com.letta.
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.memory/MemoryParityAgentOption.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.memory/MemoryParityAgentOption.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.memory/MemoryParityAgentOption.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.memory/MemoryParityAgentOption> { // com.letta.mobile.data.memory/MemoryParityAgentOption.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.memory/MemoryParityAgentOption.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.memory/MemoryParityAgentOption.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.memory/MemoryParityAgentOption.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.memory/MemoryParityAgentOption // com.letta.mobile.data.memory/MemoryParityAgentOption.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.memory/MemoryParityAgentOption) // com.letta.mobile.data.memory/MemoryParityAgentOption.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.memory.MemoryParityAgentOption){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.memory/MemoryParityAgentOption.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.memory/MemoryParityAgentOption> // com.letta.mobile.data.memory/MemoryParityAgentOption.Companion.serializer|serializer(){}[0]
+    }
 }
 
 final class com.letta.mobile.data.memory/MemoryParityAvailability { // com.letta.mobile.data.memory/MemoryParityAvailability|null[0]
@@ -43125,8 +43192,10 @@ final class com.letta.mobile.data.memory/MemoryParitySectionReader { // com.lett
 }
 
 final class com.letta.mobile.data.memory/MemoryParityState { // com.letta.mobile.data.memory/MemoryParityState|null[0]
-    constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.memory/MemoryParitySection> = ..., com.letta.mobile.data.memory/MemoryParitySummary = ..., com.letta.mobile.data.memory/MemoryParityGraph = ...) // com.letta.mobile.data.memory/MemoryParityState.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.memory.MemoryParitySection>;com.letta.mobile.data.memory.MemoryParitySummary;com.letta.mobile.data.memory.MemoryParityGraph){}[0]
+    constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.memory/MemoryParitySection> = ..., com.letta.mobile.data.memory/MemoryParitySummary = ..., com.letta.mobile.data.memory/MemoryParityGraph = ..., kotlin/Boolean = ...) // com.letta.mobile.data.memory/MemoryParityState.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.memory.MemoryParitySection>;com.letta.mobile.data.memory.MemoryParitySummary;com.letta.mobile.data.memory.MemoryParityGraph;kotlin.Boolean){}[0]
 
+    final val fleet // com.letta.mobile.data.memory/MemoryParityState.fleet|{}fleet[0]
+        final fun <get-fleet>(): kotlin/Boolean // com.letta.mobile.data.memory/MemoryParityState.fleet.<get-fleet>|<get-fleet>(){}[0]
     final val graph // com.letta.mobile.data.memory/MemoryParityState.graph|{}graph[0]
         final fun <get-graph>(): com.letta.mobile.data.memory/MemoryParityGraph // com.letta.mobile.data.memory/MemoryParityState.graph.<get-graph>|<get-graph>(){}[0]
     final val isEmpty // com.letta.mobile.data.memory/MemoryParityState.isEmpty|{}isEmpty[0]
@@ -43147,7 +43216,8 @@ final class com.letta.mobile.data.memory/MemoryParityState { // com.letta.mobile
     final fun component3(): kotlin.collections/List<com.letta.mobile.data.memory/MemoryParitySection> // com.letta.mobile.data.memory/MemoryParityState.component3|component3(){}[0]
     final fun component4(): com.letta.mobile.data.memory/MemoryParitySummary // com.letta.mobile.data.memory/MemoryParityState.component4|component4(){}[0]
     final fun component5(): com.letta.mobile.data.memory/MemoryParityGraph // com.letta.mobile.data.memory/MemoryParityState.component5|component5(){}[0]
-    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.memory/MemoryParitySection> = ..., com.letta.mobile.data.memory/MemoryParitySummary = ..., com.letta.mobile.data.memory/MemoryParityGraph = ...): com.letta.mobile.data.memory/MemoryParityState // com.letta.mobile.data.memory/MemoryParityState.copy|copy(kotlin.String?;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.memory.MemoryParitySection>;com.letta.mobile.data.memory.MemoryParitySummary;com.letta.mobile.data.memory.MemoryParityGraph){}[0]
+    final fun component6(): kotlin/Boolean // com.letta.mobile.data.memory/MemoryParityState.component6|component6(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.memory/MemoryParitySection> = ..., com.letta.mobile.data.memory/MemoryParitySummary = ..., com.letta.mobile.data.memory/MemoryParityGraph = ..., kotlin/Boolean = ...): com.letta.mobile.data.memory/MemoryParityState // com.letta.mobile.data.memory/MemoryParityState.copy|copy(kotlin.String?;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.memory.MemoryParitySection>;com.letta.mobile.data.memory.MemoryParitySummary;com.letta.mobile.data.memory.MemoryParityGraph;kotlin.Boolean){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.memory/MemoryParityState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.memory/MemoryParityState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.memory/MemoryParityState.toString|toString(){}[0]
@@ -61108,8 +61178,10 @@ final class com.letta.mobile.data.schedules/ScheduleDef { // com.letta.mobile.da
 }
 
 final class com.letta.mobile.data.schedules/ScheduleFormDraft { // com.letta.mobile.data.schedules/ScheduleFormDraft|null[0]
-    constructor <init>(kotlin/String = ..., kotlin/String = ..., com.letta.mobile.data.schedules/CronBuilderState = ...) // com.letta.mobile.data.schedules/ScheduleFormDraft.<init>|<init>(kotlin.String;kotlin.String;com.letta.mobile.data.schedules.CronBuilderState){}[0]
+    constructor <init>(kotlin/String = ..., kotlin/String = ..., com.letta.mobile.data.schedules/CronBuilderState = ..., kotlin/String? = ...) // com.letta.mobile.data.schedules/ScheduleFormDraft.<init>|<init>(kotlin.String;kotlin.String;com.letta.mobile.data.schedules.CronBuilderState;kotlin.String?){}[0]
 
+    final val agentId // com.letta.mobile.data.schedules/ScheduleFormDraft.agentId|{}agentId[0]
+        final fun <get-agentId>(): kotlin/String? // com.letta.mobile.data.schedules/ScheduleFormDraft.agentId.<get-agentId>|<get-agentId>(){}[0]
     final val cadence // com.letta.mobile.data.schedules/ScheduleFormDraft.cadence|{}cadence[0]
         final fun <get-cadence>(): com.letta.mobile.data.schedules/CronBuilderState // com.letta.mobile.data.schedules/ScheduleFormDraft.cadence.<get-cadence>|<get-cadence>(){}[0]
     final val expression // com.letta.mobile.data.schedules/ScheduleFormDraft.expression|{}expression[0]
@@ -61124,7 +61196,8 @@ final class com.letta.mobile.data.schedules/ScheduleFormDraft { // com.letta.mob
     final fun component1(): kotlin/String // com.letta.mobile.data.schedules/ScheduleFormDraft.component1|component1(){}[0]
     final fun component2(): kotlin/String // com.letta.mobile.data.schedules/ScheduleFormDraft.component2|component2(){}[0]
     final fun component3(): com.letta.mobile.data.schedules/CronBuilderState // com.letta.mobile.data.schedules/ScheduleFormDraft.component3|component3(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., com.letta.mobile.data.schedules/CronBuilderState = ...): com.letta.mobile.data.schedules/ScheduleFormDraft // com.letta.mobile.data.schedules/ScheduleFormDraft.copy|copy(kotlin.String;kotlin.String;com.letta.mobile.data.schedules.CronBuilderState){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.data.schedules/ScheduleFormDraft.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., com.letta.mobile.data.schedules/CronBuilderState = ..., kotlin/String? = ...): com.letta.mobile.data.schedules/ScheduleFormDraft // com.letta.mobile.data.schedules/ScheduleFormDraft.copy|copy(kotlin.String;kotlin.String;com.letta.mobile.data.schedules.CronBuilderState;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.schedules/ScheduleFormDraft.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.schedules/ScheduleFormDraft.hashCode|hashCode(){}[0]
     final fun toRequest(kotlin/String?, kotlinx.datetime/TimeZone): com.letta.mobile.data.schedules/ScheduleCreateRequest? // com.letta.mobile.data.schedules/ScheduleFormDraft.toRequest|toRequest(kotlin.String?;kotlinx.datetime.TimeZone){}[0]
@@ -61140,9 +61213,12 @@ final class com.letta.mobile.data.schedules/ScheduleLibraryController : kotlin/A
     final fun close() // com.letta.mobile.data.schedules/ScheduleLibraryController.close|close(){}[0]
     final fun createRecurringSchedule(com.letta.mobile.data.schedules/ScheduleCreateRequest) // com.letta.mobile.data.schedules/ScheduleLibraryController.createRecurringSchedule|createRecurringSchedule(com.letta.mobile.data.schedules.ScheduleCreateRequest){}[0]
     final fun createSchedule(kotlin/String, com.letta.mobile.data.model/ScheduleCreateParams) // com.letta.mobile.data.schedules/ScheduleLibraryController.createSchedule|createSchedule(kotlin.String;com.letta.mobile.data.model.ScheduleCreateParams){}[0]
+    final fun deleteAgentSchedule(kotlin/String, kotlin/String) // com.letta.mobile.data.schedules/ScheduleLibraryController.deleteAgentSchedule|deleteAgentSchedule(kotlin.String;kotlin.String){}[0]
     final fun deleteSchedule(kotlin/String) // com.letta.mobile.data.schedules/ScheduleLibraryController.deleteSchedule|deleteSchedule(kotlin.String){}[0]
+    final fun filterAgent(kotlin/String?) // com.letta.mobile.data.schedules/ScheduleLibraryController.filterAgent|filterAgent(kotlin.String?){}[0]
     final fun loadData() // com.letta.mobile.data.schedules/ScheduleLibraryController.loadData|loadData(){}[0]
     final fun selectAgent(kotlin/String) // com.letta.mobile.data.schedules/ScheduleLibraryController.selectAgent|selectAgent(kotlin.String){}[0]
+    final fun selectFleet() // com.letta.mobile.data.schedules/ScheduleLibraryController.selectFleet|selectFleet(){}[0]
     final fun start() // com.letta.mobile.data.schedules/ScheduleLibraryController.start|start(){}[0]
     final fun toggleCronPause(com.letta.mobile.data.schedules/CronTask, kotlin/Boolean) // com.letta.mobile.data.schedules/ScheduleLibraryController.toggleCronPause|toggleCronPause(com.letta.mobile.data.schedules.CronTask;kotlin.Boolean){}[0]
 }
@@ -61167,8 +61243,10 @@ final class com.letta.mobile.data.schedules/ScheduleLibraryItem { // com.letta.m
 }
 
 final class com.letta.mobile.data.schedules/ScheduleLibraryState { // com.letta.mobile.data.schedules/ScheduleLibraryState|null[0]
-    constructor <init>(kotlin.collections/List<com.letta.mobile.data.model/AgentSummary> = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.model/ScheduledMessage> = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.schedules/CronTask> = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.schedules/RunRecord>> = ..., kotlin.collections/List<com.letta.mobile.data.schedules.leases/Lease> = ..., kotlin.collections/Set<kotlin/String> = ...) // com.letta.mobile.data.schedules/ScheduleLibraryState.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.model.AgentSummary>;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.model.ScheduledMessage>;kotlin.Boolean;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.schedules.CronTask>;kotlin.Boolean;kotlin.collections.Map<kotlin.String,kotlin.collections.List<com.letta.mobile.data.schedules.RunRecord>>;kotlin.collections.List<com.letta.mobile.data.schedules.leases.Lease>;kotlin.collections.Set<kotlin.String>){}[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.data.model/AgentSummary> = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.model/ScheduledMessage> = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.schedules/CronTask> = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.schedules/RunRecord>> = ..., kotlin.collections/List<com.letta.mobile.data.schedules.leases/Lease> = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin/Boolean = ..., kotlin/String? = ...) // com.letta.mobile.data.schedules/ScheduleLibraryState.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.model.AgentSummary>;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.model.ScheduledMessage>;kotlin.Boolean;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.schedules.CronTask>;kotlin.Boolean;kotlin.collections.Map<kotlin.String,kotlin.collections.List<com.letta.mobile.data.schedules.RunRecord>>;kotlin.collections.List<com.letta.mobile.data.schedules.leases.Lease>;kotlin.collections.Set<kotlin.String>;kotlin.Boolean;kotlin.String?){}[0]
 
+    final val agentFilter // com.letta.mobile.data.schedules/ScheduleLibraryState.agentFilter|{}agentFilter[0]
+        final fun <get-agentFilter>(): kotlin/String? // com.letta.mobile.data.schedules/ScheduleLibraryState.agentFilter.<get-agentFilter>|<get-agentFilter>(){}[0]
     final val agents // com.letta.mobile.data.schedules/ScheduleLibraryState.agents|{}agents[0]
         final fun <get-agents>(): kotlin.collections/List<com.letta.mobile.data.model/AgentSummary> // com.letta.mobile.data.schedules/ScheduleLibraryState.agents.<get-agents>|<get-agents>(){}[0]
     final val cronMode // com.letta.mobile.data.schedules/ScheduleLibraryState.cronMode|{}cronMode[0]
@@ -61183,6 +61261,8 @@ final class com.letta.mobile.data.schedules/ScheduleLibraryState { // com.letta.
         final fun <get-emptyMessage>(): kotlin/String // com.letta.mobile.data.schedules/ScheduleLibraryState.emptyMessage.<get-emptyMessage>|<get-emptyMessage>(){}[0]
     final val errorMessage // com.letta.mobile.data.schedules/ScheduleLibraryState.errorMessage|{}errorMessage[0]
         final fun <get-errorMessage>(): kotlin/String? // com.letta.mobile.data.schedules/ScheduleLibraryState.errorMessage.<get-errorMessage>|<get-errorMessage>(){}[0]
+    final val fleet // com.letta.mobile.data.schedules/ScheduleLibraryState.fleet|{}fleet[0]
+        final fun <get-fleet>(): kotlin/Boolean // com.letta.mobile.data.schedules/ScheduleLibraryState.fleet.<get-fleet>|<get-fleet>(){}[0]
     final val isLoading // com.letta.mobile.data.schedules/ScheduleLibraryState.isLoading|{}isLoading[0]
         final fun <get-isLoading>(): kotlin/Boolean // com.letta.mobile.data.schedules/ScheduleLibraryState.isLoading.<get-isLoading>|<get-isLoading>(){}[0]
     final val leases // com.letta.mobile.data.schedules/ScheduleLibraryState.leases|{}leases[0]
@@ -61197,6 +61277,8 @@ final class com.letta.mobile.data.schedules/ScheduleLibraryState { // com.letta.
         final fun <get-scheduleAdminMessage>(): kotlin/String? // com.letta.mobile.data.schedules/ScheduleLibraryState.scheduleAdminMessage.<get-scheduleAdminMessage>|<get-scheduleAdminMessage>(){}[0]
     final val schedules // com.letta.mobile.data.schedules/ScheduleLibraryState.schedules|{}schedules[0]
         final fun <get-schedules>(): kotlin.collections/List<com.letta.mobile.data.model/ScheduledMessage> // com.letta.mobile.data.schedules/ScheduleLibraryState.schedules.<get-schedules>|<get-schedules>(){}[0]
+    final val scopeAgentId // com.letta.mobile.data.schedules/ScheduleLibraryState.scopeAgentId|{}scopeAgentId[0]
+        final fun <get-scopeAgentId>(): kotlin/String? // com.letta.mobile.data.schedules/ScheduleLibraryState.scopeAgentId.<get-scopeAgentId>|<get-scopeAgentId>(){}[0]
     final val selectedAgentId // com.letta.mobile.data.schedules/ScheduleLibraryState.selectedAgentId|{}selectedAgentId[0]
         final fun <get-selectedAgentId>(): kotlin/String? // com.letta.mobile.data.schedules/ScheduleLibraryState.selectedAgentId.<get-selectedAgentId>|<get-selectedAgentId>(){}[0]
 
@@ -61204,6 +61286,8 @@ final class com.letta.mobile.data.schedules/ScheduleLibraryState { // com.letta.
     final fun component10(): kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.schedules/RunRecord>> // com.letta.mobile.data.schedules/ScheduleLibraryState.component10|component10(){}[0]
     final fun component11(): kotlin.collections/List<com.letta.mobile.data.schedules.leases/Lease> // com.letta.mobile.data.schedules/ScheduleLibraryState.component11|component11(){}[0]
     final fun component12(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.schedules/ScheduleLibraryState.component12|component12(){}[0]
+    final fun component13(): kotlin/Boolean // com.letta.mobile.data.schedules/ScheduleLibraryState.component13|component13(){}[0]
+    final fun component14(): kotlin/String? // com.letta.mobile.data.schedules/ScheduleLibraryState.component14|component14(){}[0]
     final fun component2(): kotlin/String? // com.letta.mobile.data.schedules/ScheduleLibraryState.component2|component2(){}[0]
     final fun component3(): kotlin.collections/List<com.letta.mobile.data.model/ScheduledMessage> // com.letta.mobile.data.schedules/ScheduleLibraryState.component3|component3(){}[0]
     final fun component4(): kotlin/Boolean // com.letta.mobile.data.schedules/ScheduleLibraryState.component4|component4(){}[0]
@@ -61212,7 +61296,7 @@ final class com.letta.mobile.data.schedules/ScheduleLibraryState { // com.letta.
     final fun component7(): kotlin/String? // com.letta.mobile.data.schedules/ScheduleLibraryState.component7|component7(){}[0]
     final fun component8(): kotlin.collections/List<com.letta.mobile.data.schedules/CronTask> // com.letta.mobile.data.schedules/ScheduleLibraryState.component8|component8(){}[0]
     final fun component9(): kotlin/Boolean // com.letta.mobile.data.schedules/ScheduleLibraryState.component9|component9(){}[0]
-    final fun copy(kotlin.collections/List<com.letta.mobile.data.model/AgentSummary> = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.model/ScheduledMessage> = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.schedules/CronTask> = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.schedules/RunRecord>> = ..., kotlin.collections/List<com.letta.mobile.data.schedules.leases/Lease> = ..., kotlin.collections/Set<kotlin/String> = ...): com.letta.mobile.data.schedules/ScheduleLibraryState // com.letta.mobile.data.schedules/ScheduleLibraryState.copy|copy(kotlin.collections.List<com.letta.mobile.data.model.AgentSummary>;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.model.ScheduledMessage>;kotlin.Boolean;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.schedules.CronTask>;kotlin.Boolean;kotlin.collections.Map<kotlin.String,kotlin.collections.List<com.letta.mobile.data.schedules.RunRecord>>;kotlin.collections.List<com.letta.mobile.data.schedules.leases.Lease>;kotlin.collections.Set<kotlin.String>){}[0]
+    final fun copy(kotlin.collections/List<com.letta.mobile.data.model/AgentSummary> = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.model/ScheduledMessage> = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.schedules/CronTask> = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.schedules/RunRecord>> = ..., kotlin.collections/List<com.letta.mobile.data.schedules.leases/Lease> = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin/Boolean = ..., kotlin/String? = ...): com.letta.mobile.data.schedules/ScheduleLibraryState // com.letta.mobile.data.schedules/ScheduleLibraryState.copy|copy(kotlin.collections.List<com.letta.mobile.data.model.AgentSummary>;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.model.ScheduledMessage>;kotlin.Boolean;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.schedules.CronTask>;kotlin.Boolean;kotlin.collections.Map<kotlin.String,kotlin.collections.List<com.letta.mobile.data.schedules.RunRecord>>;kotlin.collections.List<com.letta.mobile.data.schedules.leases.Lease>;kotlin.collections.Set<kotlin.String>;kotlin.Boolean;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.schedules/ScheduleLibraryState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.schedules/ScheduleLibraryState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.schedules/ScheduleLibraryState.toString|toString(){}[0]
@@ -79114,6 +79198,13 @@ final object com.letta.mobile.data.dreaming/DreamingRpc { // com.letta.mobile.da
     final fun commandArgs(kotlin/String?): kotlin/String? // com.letta.mobile.data.dreaming/DreamingRpc.commandArgs|commandArgs(kotlin.String?){}[0]
 }
 
+final object com.letta.mobile.data.fleet/AgentFleetReads { // com.letta.mobile.data.fleet/AgentFleetReads|null[0]
+    final const val DEFAULT_PARALLELISM // com.letta.mobile.data.fleet/AgentFleetReads.DEFAULT_PARALLELISM|{}DEFAULT_PARALLELISM[0]
+        final fun <get-DEFAULT_PARALLELISM>(): kotlin/Int // com.letta.mobile.data.fleet/AgentFleetReads.DEFAULT_PARALLELISM.<get-DEFAULT_PARALLELISM>|<get-DEFAULT_PARALLELISM>(){}[0]
+
+    final suspend fun <#A1: kotlin/Any?, #B1: kotlin/Any?> read(kotlin.collections/List<#A1>, kotlin/Int = ..., kotlin.coroutines/SuspendFunction1<#A1, #B1>): com.letta.mobile.data.fleet/AgentFleetRead<#A1, #B1> // com.letta.mobile.data.fleet/AgentFleetReads.read|read(kotlin.collections.List<0:0>;kotlin.Int;kotlin.coroutines.SuspendFunction1<0:0,0:1>){0§<kotlin.Any?>;1§<kotlin.Any?>}[0]
+}
+
 final object com.letta.mobile.data.home/HomePageReducer { // com.letta.mobile.data.home/HomePageReducer|null[0]
     final fun withCatalog(com.letta.mobile.data.home/HomePageState, com.letta.mobile.data.home/HomeSearchCatalog): com.letta.mobile.data.home/HomePageState // com.letta.mobile.data.home/HomePageReducer.withCatalog|withCatalog(com.letta.mobile.data.home.HomePageState;com.letta.mobile.data.home.HomeSearchCatalog){}[0]
     final fun withFavorite(com.letta.mobile.data.home/HomePageState, com.letta.mobile.data.home/HomeAgentRef?): com.letta.mobile.data.home/HomePageState // com.letta.mobile.data.home/HomePageReducer.withFavorite|withFavorite(com.letta.mobile.data.home.HomePageState;com.letta.mobile.data.home.HomeAgentRef?){}[0]
@@ -79230,6 +79321,10 @@ final object com.letta.mobile.data.memory.memfs/MemfsPageReducer { // com.letta.
 
 final object com.letta.mobile.data.memory/MemoryCategories { // com.letta.mobile.data.memory/MemoryCategories|null[0]
     final fun categorize(kotlin/String?): com.letta.mobile.data.memory/MemoryCategory // com.letta.mobile.data.memory/MemoryCategories.categorize|categorize(kotlin.String?){}[0]
+}
+
+final object com.letta.mobile.data.memory/MemoryFleetMapper { // com.letta.mobile.data.memory/MemoryFleetMapper|null[0]
+    final fun build(com.letta.mobile.data.memory/MemoryFleetInput): com.letta.mobile.data.memory/MemoryParityState // com.letta.mobile.data.memory/MemoryFleetMapper.build|build(com.letta.mobile.data.memory.MemoryFleetInput){}[0]
 }
 
 final object com.letta.mobile.data.memory/MemoryParityMapper { // com.letta.mobile.data.memory/MemoryParityMapper|null[0]
