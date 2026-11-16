@@ -67,6 +67,29 @@ import kotlinx.coroutines.flow.emptyFlow
 /** Pixel and composition oracles for the prompt's shared treatment; no fake transport is involved. */
 class ComposerOutlineRenderTest {
     @Test
+    fun movingOutlineDoesNotRecordItsParentAgain() = runDesktopComposeUiTest(width = WIDTH, height = HEIGHT) {
+        mainClock.autoAdvance = false
+        var parentDraws = 0
+        setContent {
+            SharedMaterialTheme {
+                Box(Modifier.fillMaxSize().drawWithContent {
+                    parentDraws++
+                    drawContent()
+                }) {
+                    Box(Modifier.fillMaxSize().composerOutline(SHAPE, ChatUiState(runPhase = RunPhase.WORKING)))
+                }
+            }
+        }
+        waitForIdle()
+        onRoot().captureToImage()
+        val before = parentDraws
+        mainClock.advanceTimeBy(MOVEMENT_MS)
+        waitForIdle()
+        onRoot().captureToImage()
+        assertEquals(before, parentDraws, "a moving composer must not record the surrounding page again")
+    }
+
+    @Test
     fun voiceModesKeepTheirRoleAndReportTheSelectedTreatment() = runDesktopComposeUiTest(width = WIDTH, height = HEIGHT) {
         val voice = MutableStateFlow<VoiceModeState>(VoiceModeState.Off)
         setContent {
