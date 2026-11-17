@@ -1,5 +1,6 @@
 package com.letta.mobile.data.model
 
+import com.letta.mobile.data.attachment.ImageUnavailableReason
 import androidx.compose.runtime.Immutable
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
@@ -234,11 +235,19 @@ private fun extractContentPartResponse(raw: JsonElement?): String? {
  * biomarker (≤2 branches in the dispatch site) does not regress when a
  * fourth shape lands.
  */
-private fun parseLettaImagePart(obj: JsonObject): MessageContentPart.Image? =
-    parseFlatLettaImagePart(obj) ?: parseWrappedLettaImagePart(obj) ?: MessageContentPart.Image(
-        base64 = obj.fieldContent("data").orEmpty(),
-        mediaType = obj.fieldContent("mimeType") ?: obj.fieldContent("media_type") ?: "image/unknown",
-    )
+private fun parseLettaImagePart(obj: JsonObject): MessageContentPart.Image =
+    ImageUnavailableReason.fromWire(obj.fieldContent("unavailable_reason"))?.let { reason ->
+        MessageContentPart.Image("", "image/unknown", unavailableReason = reason)
+    } ?: parseFlatLettaImagePart(obj) ?: parseWrappedLettaImagePart(obj)
+        ?: MessageContentPart.Image(
+            base64 = obj.fieldContent("data").orEmpty(),
+            mediaType = obj.fieldContent("mimeType") ?: obj.fieldContent("media_type") ?: "image/unknown",
+            unavailableReason = when {
+                !obj.fieldContent("data").isNullOrBlank() -> null
+                obj["source"] != null || obj["image_ref"] != null -> ImageUnavailableReason.UnsupportedSource
+                else -> ImageUnavailableReason.Missing
+            },
+        )
 
 /**
  * Flat image shape: `{ "type":"image", "data":"…", "mimeType":"…" }`.
@@ -278,22 +287,26 @@ private fun parseWrappedLettaImagePart(obj: JsonObject): MessageContentPart.Imag
 private fun parseBase64ImageSource(source: JsonObject): MessageContentPart.Image? {
     val mediaType = source.fieldContent("media_type")
     val data = source.fieldContent("data")
-    if (mediaType.isNullOrBlank()) return null
-    return MessageContentPart.Image(base64 = data.orEmpty(), mediaType = mediaType)
+    return MessageContentPart.Image(
+        base64 = data.orEmpty(), mediaType = mediaType?.takeIf { it.isNotBlank() } ?: "image/unknown",
+        unavailableReason = ImageUnavailableReason.Missing.takeIf { data.isNullOrBlank() },
+    )
 }
 
-/** Decodes a `source.type == "url"` image source. Only inline `data:` URLs are retained. */
+/** Decodes inline data URLs and HTTP sources supported by the host image loader. */
 private fun parseUrlImageSource(source: JsonObject): MessageContentPart.Image? {
     val url = source.fieldContent("url") ?: return null
     return parseImageDataUrl(url)
 }
 
 private fun parseImageDataUrl(url: String): MessageContentPart.Image? {
+    if (url.startsWith("https://") || url.startsWith("http://")) {
+        return MessageContentPart.Image("", "image/unknown", url = url)
+    }
     val prefix = "data:"
     val separator = ";base64,"
-    if (!url.startsWith(prefix)) return null
     val separatorIndex = url.indexOf(separator)
-    if (separatorIndex < 0) return null
+    if (!url.startsWith(prefix) || separatorIndex < 0) return null
     val mediaType = url.substring(prefix.length, separatorIndex)
     val base64 = url.substring(separatorIndex + separator.length)
     if (mediaType.isBlank() || base64.isBlank()) return null

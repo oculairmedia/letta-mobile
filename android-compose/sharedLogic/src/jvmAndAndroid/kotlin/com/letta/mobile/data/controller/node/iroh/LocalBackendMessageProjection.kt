@@ -122,6 +122,7 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
     private fun normalizeImagePart(o: JsonObject): JsonObject? {
         if (o["type"]?.stringOrNull() != "image") return null
         val source = o["source"] as? JsonObject
+        if (o["unavailable_reason"] != null || source?.get("type")?.stringOrNull() == "url") return o
         val data = source?.get("data")?.stringOrNull() ?: o["data"]?.stringOrNull() ?: run {
             // Keep unavailable data visible as a failed image in the shared UI, and
             // record the boundary failure without recording the image payload.
@@ -138,6 +139,7 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             ?: "image/jpeg"
         return buildJsonObject {
             put("type", "image")
+            if (o["image_ref"] != null && data.isBlank()) put("unavailable_reason", "unsupported_source")
             put(
                 "source",
                 buildJsonObject {

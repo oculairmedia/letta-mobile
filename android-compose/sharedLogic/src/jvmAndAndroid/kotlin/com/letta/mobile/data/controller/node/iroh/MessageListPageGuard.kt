@@ -19,8 +19,10 @@ import com.letta.mobile.util.Telemetry
  * rejected by the frame layer (admin_rpc.stream.response_too_large,
  * maxFrameBytes=1MiB). Long histories are the product, so the serve path must
  * PAGINATE, not prune: this guard bounds every message.list page to stay under
- * the frame cap. The byte budget is soft for an indivisible row or call/return window; frame_part carries
- * those oversized windows. If the projected page
+ * the frame cap. The byte budget is soft for an indivisible row or call/return window when
+ * frame_part was negotiated, up to the logical response cap. Incapable peers use the page budget
+ * as their hard cap. Inline images that exceed that cap become explicit too-large markers.
+ * If the projected page
  * is still too large it shrinks the window (dropping the OLDEST rows, keeping the
  * newest so the chat opens at the tail) and marks the response with a
  * continuation cursor so the client can load older windows.
@@ -42,6 +44,9 @@ object MessageListPageGuard {
      */
     const val MAX_PAGE_BYTES = 900 * 1024
 
+    /** Room for array brackets, cursor metadata and the RPC envelope within the hard budget. */
+    private const val PAGE_METADATA_BYTES = 1024
+
     /**
      * Bound [projected] (a message.list projection — a JsonArray or {messages:[]})
      * so it fits under [maxPageBytes]. Returns the same shape when it already
@@ -49,20 +54,27 @@ object MessageListPageGuard {
      *
      * [newestLast]: true when the array is oldest->newest (default Letta order),
      * so the NEWEST rows are at the end and we trim from the FRONT.
+     * [maxResponseBytes] is the peer's hard response budget, including page metadata; the caller
+     * supplies [MAX_PAGE_BYTES] for peers without frame_part. Inline images that make a row or
+     * atomic window exceed that budget are replaced with unavailable markers, retaining IDs/text.
      * Calls outside the projected page cannot be restored by this guard.
      */
     fun bound(
         projected: JsonElement,
         maxPageBytes: Int = MAX_PAGE_BYTES,
         newestLast: Boolean = true,
+        maxResponseBytes: Int = IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES - MAX_PAGE_BYTES,
     ): JsonElement {
-        val messages = extractMessages(projected) ?: return projected.alsoLogUnboundableShape()
-        // Measure each element once — both the fit check and the trim loop reuse
-        // these lengths so we do not re-serialize UTF-8 for every pass.
-        val lengths = IntArray(messages.size) { index -> byteLen(messages[index]) }
+        val rowBudget = maxResponseBytes - PAGE_METADATA_BYTES
+        val pageBudget = minOf(maxPageBytes, rowBudget)
+        val original = extractMessages(projected) ?: return projected.alsoLogUnboundableShape()
+        val lengths = IntArray(original.size) { index -> byteLen(original[index]) }
+        val messages = original.mapIndexed { index, row ->
+            if (lengths[index] <= rowBudget) row else stripInlineImages(row).also { lengths[index] = byteLen(it) }
+        }.toMutableList()
         val totalBytes = totalByteLen(lengths)
-        if (!isWrapped(projected) && totalBytes <= maxPageBytes) {
-            return projected
+        if (!isWrapped(projected) && totalBytes <= pageBudget) {
+            return if (messages.indices.all { messages[it] === original[it] }) projected else JsonArray(messages)
         }
         // Keep the newest rows that fit under the budget.
         val keptIndices = ArrayDeque<Int>()
@@ -74,11 +86,11 @@ object MessageListPageGuard {
         }
         for (index in orderedIndices) {
             val add = lengths[index] + 1
-            if (keptIndices.isNotEmpty() && bytes + add > maxPageBytes) break
+            if (keptIndices.isNotEmpty() && bytes + add > pageBudget) break
             if (newestLast) keptIndices.addFirst(index) else keptIndices.addLast(index)
             bytes += add
         }
-        keepInvokingCalls(messages, lengths, keptIndices)
+        keepInvokingCalls(messages, lengths, keptIndices, rowBudget)
         val kept = keptIndices.map { messages[it] }
         val trimmed = kept.size < messages.size
         val keptArray = JsonArray(kept.toList())
@@ -229,7 +241,9 @@ object MessageListPageGuard {
 }
 
 /** Keep an invoking call in the same page as its return, preserving cursor continuity. */
-private fun keepInvokingCalls(messages: List<JsonElement>, lengths: IntArray, kept: ArrayDeque<Int>) {
+private fun keepInvokingCalls(
+    messages: MutableList<JsonElement>, lengths: IntArray, kept: ArrayDeque<Int>, maxResponseBytes: Int,
+) {
     if (kept.isEmpty()) return
     val callIndices = messages.indices.mapNotNull { index ->
         val call = (messages[index] as? JsonObject)?.get("tool_call") as? JsonObject
@@ -239,9 +253,35 @@ private fun keepInvokingCalls(messages: List<JsonElement>, lengths: IntArray, ke
     val dependencies = returnedIds.mapNotNull(callIndices::get)
     val first = minOf(kept.first(), dependencies.minOrNull() ?: kept.first())
     val last = maxOf(kept.last(), dependencies.maxOrNull() ?: kept.last())
-    // Leave envelope headroom below the logical-frame limit.
-    val bytes = (first..last).sumOf { lengths[it].toLong() + 1 }
-    if (bytes > IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES - MessageListPageGuard.MAX_PAGE_BYTES) return
+    var bytes = (first..last).sumOf { lengths[it].toLong() + 1 }
+    if (bytes > maxResponseBytes) {
+        for (index in first..last) {
+            messages[index] = stripInlineImages(messages[index])
+            lengths[index] = messages[index].toString().encodeToByteArray().size
+        }
+        bytes = (first..last).sumOf { lengths[it].toLong() + 1 }
+    }
+    if (bytes > maxResponseBytes) return
     kept.clear()
     for (index in first..last) kept.addLast(index)
+}
+
+/** Replace inline images, including JSON-string tool returns, without dropping row/call identity or text. */
+private fun stripInlineImages(value: JsonElement): JsonElement = when (value) {
+    is JsonArray -> JsonArray(value.map(::stripInlineImages))
+    is JsonObject -> when (value["type"]?.let { (it as? JsonPrimitive)?.contentOrNull }) {
+        "image", "image_url" -> buildJsonObject {
+            put("type", JsonPrimitive("image"))
+            put("unavailable_reason", JsonPrimitive("too_large"))
+        }
+        else -> JsonObject(value.mapValues { (_, child) -> stripInlineImages(child) })
+    }
+    is JsonPrimitive -> {
+        val text = value.contentOrNull.orEmpty()
+        val parsed = if (value.isString && (text.startsWith("[") || text.startsWith("{"))) {
+            runCatching { kotlinx.serialization.json.Json.parseToJsonElement(text) }.getOrNull()
+        } else null
+        if (parsed == null) value else JsonPrimitive(stripInlineImages(parsed).toString())
+    }
+    else -> value
 }

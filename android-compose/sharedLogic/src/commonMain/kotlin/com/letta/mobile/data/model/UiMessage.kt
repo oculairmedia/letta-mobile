@@ -1,5 +1,6 @@
 package com.letta.mobile.data.model
 
+import com.letta.mobile.data.attachment.ImageUnavailableReason
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.messaging.AgentMessageProvenance
 import com.letta.mobile.data.runtime.PendingApprovalDetails
@@ -107,6 +108,10 @@ data class UiImageAttachment(
      * placeholder labelled with [storedByteSize].
      */
     val storedByteSize: Long? = null,
+    /** Explicit failure retained from the message attachment. */
+    val unavailableReason: ImageUnavailableReason? = null,
+    /** Remote source supported by the host image loader. */
+    val url: String? = null,
 )
 
 @Immutable

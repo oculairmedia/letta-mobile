@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline.snapshot
 
+import com.letta.mobile.data.attachment.ImageUnavailableReason
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolCall
@@ -210,6 +211,7 @@ internal object StoredEnvelopeFingerprint {
                 mixString(attachment.uriOrUrl)
                 mixString(attachment.thumbnailBase64)
                 attachment.toolCallId?.let(::mixString)
+                attachment.unavailableReason?.let(::mixString)
                 attachment.bodyReference?.let {
                     mixString(it.sha256)
                     mix(it.decodedBytes)
@@ -245,7 +247,7 @@ fun TimelineEvent.Confirmed.toStoredTimelineEvent(): StoredTimelineEvent =
         },
         attachments = attachments.mapNotNull {
             val rawBase64 = it.base64
-            if (rawBase64.isEmpty() && it.storedByteSize == null) return@mapNotNull null
+            if (rawBase64.isEmpty() && it.storedByteSize == null && it.unavailableReason == null && it.url == null) return@mapNotNull null
             val estimatedBytes = if (rawBase64.isNotEmpty()) {
                 val padding = rawBase64.takeLast(2).count { ch -> ch == '=' }
                 ((rawBase64.length * 3L) / 4L) - padding
@@ -260,6 +262,8 @@ fun TimelineEvent.Confirmed.toStoredTimelineEvent(): StoredTimelineEvent =
                 byteSize = estimatedBytes,
                 thumbnailBase64 = thumbnail,
                 toolCallId = it.toolCallId,
+                unavailableReason = it.unavailableReason?.wireValue,
+                uriOrUrl = it.url,
             )
         },
     )
@@ -270,7 +274,13 @@ suspend fun TimelineEvent.Confirmed.toStoredTimelineEventWithImageBodies(
 ): StoredTimelineEvent = toStoredTimelineEvent().copy(
     attachments = attachments.mapNotNull { image ->
         if (image.base64.isEmpty()) {
-            image.storedByteSize?.let { StoredImageAttachmentPointer(image.mediaType, it, toolCallId = image.toolCallId) }
+            when {
+                image.unavailableReason != null || image.url != null -> StoredImageAttachmentPointer(
+                    image.mediaType, uriOrUrl = image.url, toolCallId = image.toolCallId,
+                    unavailableReason = image.unavailableReason?.wireValue,
+                )
+                else -> image.storedByteSize?.let { StoredImageAttachmentPointer(image.mediaType, it, toolCallId = image.toolCallId) }
+            }
         } else {
             val reference = bodies.persistImage(image.base64)
             StoredImageAttachmentPointer(image.mediaType, reference.decodedBytes, bodyReference = reference, toolCallId = image.toolCallId)
@@ -297,7 +307,9 @@ suspend fun StoredTimelineEnvelope.withImageBodies(
     var changed = false
     val withBodies = events.mapIndexed { index, stored ->
         // Same filter as toStoredTimelineEvent, so attachment indices line up.
-        val images = confirmed[index].attachments.filterNot { it.base64.isEmpty() && it.storedByteSize == null }
+        val images = confirmed[index].attachments.filterNot {
+            it.base64.isEmpty() && it.storedByteSize == null && it.unavailableReason == null && it.url == null
+        }
         if (confirmed[index].serverId != stored.serverId || images.size != stored.attachments.size) {
             return@mapIndexed stored
         }
@@ -435,14 +447,17 @@ fun StoredTimelineEvent.toConfirmedTimelineEvent(): TimelineEvent.Confirmed {
             // attachment so the rehydrated message still surfaces an indicator
             // that an image is stored locally; renderers show a placeholder.
             val inline = pointer.thumbnailBase64
-            if (inline != null) {
-                MessageContentPart.Image(base64 = inline, mediaType = pointer.mediaType, toolCallId = pointer.toolCallId)
-            } else if (pointer.byteSize > 0) {
-                MessageContentPart.Image(
+            when {
+                inline != null -> MessageContentPart.Image(base64 = inline, mediaType = pointer.mediaType, toolCallId = pointer.toolCallId)
+                pointer.unavailableReason != null || pointer.uriOrUrl?.startsWith("https://") == true ||
+                    pointer.uriOrUrl?.startsWith("http://") == true -> MessageContentPart.Image(
+                        base64 = "", mediaType = pointer.mediaType, toolCallId = pointer.toolCallId,
+                        unavailableReason = ImageUnavailableReason.fromWire(pointer.unavailableReason), url = pointer.uriOrUrl,
+                    )
+                pointer.byteSize > 0 -> MessageContentPart.Image(
                     base64 = "", mediaType = pointer.mediaType, storedByteSize = pointer.byteSize, toolCallId = pointer.toolCallId,
                 )
-            } else {
-                null
+                else -> null
             }
         }.toPersistentList(),
         source = MessageSource.LETTA_SERVER,

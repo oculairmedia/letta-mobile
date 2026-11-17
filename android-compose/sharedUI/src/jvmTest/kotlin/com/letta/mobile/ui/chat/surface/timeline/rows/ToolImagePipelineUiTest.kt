@@ -13,6 +13,8 @@ import com.letta.mobile.ui.image.decodeImageBitmap
 import kotlin.test.assertNotNull
 import kotlin.test.assertContentEquals
 import org.junit.Assume.assumeTrue
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -57,6 +59,69 @@ import kotlinx.serialization.json.put
 
 /** Optional stored inputs supplement the portable, deterministic >1 MiB regression image. */
 class ToolImagePipelineUiTest {
+    @Test
+    fun explicitTooLargeMarkerRendersItsReasonThroughHistory() {
+        val wire = JSON.parseToJsonElement("""[
+            {"id":"marker-call","message_type":"tool_call_message","tool_call":{"name":"ViewImage","arguments":"{}","tool_call_id":"marker"}},
+            {"id":"marker-return","message_type":"tool_return_message","tool_call_id":"marker","tool_return":[{"type":"image","unavailable_reason":"too_large"}]}
+        ]""").jsonArray
+        val history = wire.map { JSON.decodeFromJsonElement<LettaMessage>(it) }
+        val empty = Timeline(CONVERSATION)
+        val timeline = TimelineHydrationReducer.reduce(CONVERSATION, history, empty, empty, emptyList()).timeline
+        val messages = timeline.events.mapNotNull { timelineEventToUiMessage(it) }.map { it.copy(runId = RUN) }
+        runDesktopComposeUiTest(width = 1000, height = 1600) {
+            setContent {
+                MaterialTheme {
+                    RenderRow(ChatRenderItem.RunBlock(RUN, messages.map { it to GroupPosition.None }), rowContext(), rowCallbacks())
+                }
+            }
+            onNodeWithText("Image unavailable: image is too large").assertExists()
+        }
+    }
+
+    @OptIn(coil3.annotation.DelicateCoilApi::class)
+    @Test
+    fun supportedUrlReachesTheHostLoaderAndPaintsPixels() {
+        val url = "https://example.com/image.png"
+        val requested = java.util.concurrent.atomic.AtomicReference<String>()
+        val previous = coil3.SingletonImageLoader.get(coil3.PlatformContext.INSTANCE)
+        val loader = coil3.ImageLoader.Builder(coil3.PlatformContext.INSTANCE).components {
+            add(coil3.intercept.Interceptor { chain ->
+                requested.set(chain.request.data.toString())
+                require(chain.request.data == url) { "unexpected image source" }
+                coil3.request.SuccessResult(
+                    image = coil3.ColorImage(color = URL_COLOR, width = URL_IMAGE_SIZE, height = URL_IMAGE_SIZE),
+                    request = chain.request,
+                )
+            })
+        }.build()
+        coil3.SingletonImageLoader.setUnsafe(loader)
+        try {
+            val parsed = com.letta.mobile.data.model.ToolReturnMessage(
+                id = "url-result", toolReturnRaw = JSON.parseToJsonElement(
+                    """{"type":"image","source":{"type":"url","url":"$url"}}""",
+                ),
+            ).attachments.single()
+            runDesktopComposeUiTest(width = 1000, height = 1600) {
+                setContent {
+                    MaterialTheme {
+                        ChatAttachmentImage(com.letta.mobile.data.model.UiImageAttachment(
+                            parsed.base64, parsed.mediaType, url = parsed.url,
+                        ))
+                    }
+                }
+                waitUntil(timeoutMillis = 10_000) { requested.get() == url }
+                waitForIdle()
+                val pixels = onNodeWithContentDescription("Attached image").captureToImage().toPixelMap()
+                assertEquals(URL_COLOR, pixels[pixels.width / 2, pixels.height / 2].toArgb(), "loader image must be painted")
+                onNodeWithText("Image unavailable: image data is missing").assertDoesNotExist()
+            }
+        } finally {
+            coil3.SingletonImageLoader.setUnsafe(previous)
+            loader.shutdown()
+        }
+    }
+
     @Test fun generatedLargePng() {
         val directory = Files.createTempDirectory("tool-image-generated").toFile()
         try { verifyInput(directory, generatedInput()) } finally { directory.deleteRecursively() }
@@ -241,6 +306,8 @@ class ToolImagePipelineUiTest {
     private companion object {
         const val CONVERSATION = "image-pipeline"
         const val RUN = "image-run"
+        const val URL_COLOR = -16711936
+        const val URL_IMAGE_SIZE = 16
         const val PAINT_SAMPLES = 16
         const val MIN_PAINTED_COLORS = 8
         const val MEBIBYTE = 1024 * 1024

@@ -57,6 +57,8 @@ data class AdminRpcRequestContext(
      * from a person's device. Only the serving connection sets it.
      */
     val pairedDevice: Boolean = false,
+    /** Transport encoding negotiated with this peer, independent of authorization grants. */
+    val supportsFrameParts: Boolean = false,
     /** The capabilities the serving connection granted this session, as it verified them; empty unless it set them. */
     val grantedCapabilities: Set<String> = emptySet(),
 ) {

@@ -23,6 +23,83 @@ import kotlin.test.assertFalse
 class MessageListPageGuardTest {
 
     @Test
+    fun singleReturnBeyondLogicalCapKeepsExplicitTooLargeImage() {
+        val returned = imageReturn(33_554_432)
+        val result = MessageListPageGuard.bound(JsonArray(listOf(returned)))
+        assertTrue(byteLen(result) < 33_554_432, "logical cap must strip inline bytes, not lose the page")
+        val kept = pageRows(result).single().jsonObject
+        assertEquals("image-result", kept.getValue("id").jsonPrimitive.content)
+        assertTrue(kept.toString().contains("too_large"), "explicit unavailable marker must survive")
+    }
+
+    @Test
+    fun peerWithoutFramePartsGetsUsableImagePageFromHandler() = kotlinx.coroutines.test.runTest {
+        val page = JsonArray(listOf(imageCall(), imageReturn(2_000_000)))
+        val client = object : com.letta.mobile.data.transport.appserver.AppServerClient {
+            override val events = kotlinx.coroutines.flow.emptyFlow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>()
+            override suspend fun runtimeStart(command: com.letta.mobile.data.transport.appserver.AppServerCommand.RuntimeStart) = error("unused")
+            override suspend fun input(command: com.letta.mobile.data.transport.appserver.AppServerCommand.Input) = error("unused")
+            override suspend fun sync(command: com.letta.mobile.data.transport.appserver.AppServerCommand.Sync) = error("unused")
+            override suspend fun abort(command: com.letta.mobile.data.transport.appserver.AppServerCommand.AbortMessage) = error("unused")
+            override suspend fun adminRpc(command: com.letta.mobile.data.transport.appserver.AppServerCommand.AdminRpc) = error("unused")
+            override suspend fun sendExternalToolResponse(command: com.letta.mobile.data.transport.appserver.AppServerCommand.ExternalToolCallResponse) = error("unused")
+            override suspend fun conversationMessagesList(command: com.letta.mobile.data.transport.appserver.AppServerCommand.ConversationMessagesList): com.letta.mobile.data.transport.appserver.AppServerInboundFrame.ConversationMessagesListResponse {
+                val owners = mapOf("image-conversation" to "image-agent")
+                val loadedAgents = setOf("image-agent")
+                if (owners[command.conversationId] !in loadedAgents) {
+                    return com.letta.mobile.data.transport.appserver.AppServerInboundFrame.ConversationMessagesListResponse(
+                        command.requestId, false, JsonArray(emptyList()), "Conversation or loaded agent not found",
+                    )
+                }
+                assertEquals("50", command.query?.get("limit")?.jsonPrimitive?.content)
+                assertTrue(command.query?.keys.orEmpty().all { it == "limit" }, "fixture is a first page in default order")
+                return com.letta.mobile.data.transport.appserver.AppServerInboundFrame.ConversationMessagesListResponse(
+                    command.requestId, true, page,
+                )
+            }
+        }
+        val router = AdminRpcRouter().also { ConversationAdminHandlers.register(it, NativeReadTiers(nativeClient = client)) }
+        for (frameParts in listOf(false, true)) {
+            val envelope = kotlinx.serialization.json.Json.parseToJsonElement(router.dispatch(
+                requestId = "image-page", method = "message.list",
+                params = buildJsonObject { put("conversation_id", "image-conversation") },
+                context = AdminRpcRequestContext(authenticated = true, supportsFrameParts = frameParts),
+            )).jsonObject
+            assertEquals("true", envelope.getValue("success").jsonPrimitive.content)
+            val rows = pageRows(envelope.getValue("result"))
+            assertEquals(listOf("image-request", "image-result"), rows.map { it.jsonObject.getValue("id").jsonPrimitive.content })
+            if (frameParts) {
+                assertEquals(page.toList(), rows, "negotiated peer retains the inline image")
+            } else {
+                assertTrue(byteLen(envelope) <= 921_600, "capability-off peer must receive a usable page")
+                assertTrue(rows.last().toString().contains("too_large"))
+            }
+        }
+    }
+
+    @Test
+    fun framePartPageKeepsLargeImagePayloadAndCall() {
+        val rows = listOf(imageCall(), imageReturn(2_000_000))
+        assertEquals(rows, pageRows(MessageListPageGuard.bound(JsonArray(rows))))
+    }
+
+    private fun imageCall() = buildJsonObject {
+        put("id", "image-request")
+        put("message_type", "tool_call_message")
+        put("tool_call", buildJsonObject { put("tool_call_id", "image-call"); put("name", "ViewImage"); put("arguments", "{}") })
+    }
+
+    private fun imageReturn(size: Int) = buildJsonObject {
+        put("id", "image-result")
+        put("message_type", "tool_return_message")
+        put("tool_call_id", "image-call")
+        put("tool_return", buildJsonArray {
+            add(buildJsonObject { put("type", "text"); put("text", "image result") })
+            add(buildJsonObject { put("type", "image"); put("data", "x".repeat(size)); put("mimeType", "image/png") })
+        })
+    }
+
+    @Test
     fun oversizedToolOutputKeepsItsCallAcrossBothPageOrders() {
         val call = buildJsonObject {
             put("id", "image-request")

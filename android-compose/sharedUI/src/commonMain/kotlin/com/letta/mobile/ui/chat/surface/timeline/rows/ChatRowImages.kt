@@ -16,6 +16,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import coil3.compose.AsyncImage
+import com.letta.mobile.data.attachment.ImageUnavailableReason
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +38,8 @@ import com.letta.mobile.sharedui.resources.rows_attached_image
 import com.letta.mobile.sharedui.resources.rows_image_not_loaded
 import com.letta.mobile.sharedui.resources.rows_image_missing
 import com.letta.mobile.sharedui.resources.rows_image_invalid
+import com.letta.mobile.sharedui.resources.rows_image_too_large
+import com.letta.mobile.sharedui.resources.rows_image_unsupported
 import com.letta.mobile.sharedui.resources.rows_more_count
 import com.letta.mobile.ui.chat.surface.rememberDecodedImageResult
 import com.letta.mobile.ui.chat.surface.rememberDecodedImage
@@ -204,7 +212,9 @@ internal fun ChatAttachmentImage(
         shape = attachmentShape(),
         border = if (touch) null else BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        if (bitmap != null) {
+        if (attachment.url != null) {
+            ChatRemoteImage(attachment, Modifier.fillMaxSize())
+        } else if (bitmap != null) {
             Image(
                 bitmap = bitmap,
                 // The only cue that an image is attached: unnamed, it is invisible to a
@@ -214,10 +224,12 @@ internal fun ChatAttachmentImage(
                 contentScale = ContentScale.Fit,
             )
         } else {
+            val unavailable = attachment.unavailableReason
             val reason = when {
+                unavailable != null -> imageFailureResource(unavailable)
                 attachment.storedByteSize != null -> Res.string.rows_image_not_loaded
-                attachment.base64.isBlank() -> Res.string.rows_image_missing
-                decoded?.isFailure == true -> Res.string.rows_image_invalid
+                attachment.base64.isBlank() -> imageFailureResource(ImageUnavailableReason.Missing)
+                decoded?.isFailure == true -> imageFailureResource(ImageUnavailableReason.Invalid)
                 else -> null
             }
             if (reason != null) Box(contentAlignment = Alignment.Center) {
@@ -244,4 +256,28 @@ private fun Modifier.attachmentAspectSize(bitmap: ImageBitmap): Modifier = fillM
     val height = constraints.constrainHeight(maxOf(cappedHeight, LettaDimens.Control.minTouchTarget.roundToPx()))
     val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
     layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
+}
+
+/** Shared thumbnail/viewer path for HTTP sources supported by the host's Coil loader. */
+@Composable
+internal fun ChatRemoteImage(attachment: UiImageAttachment, modifier: Modifier = Modifier) {
+    var failed by remember(attachment.url) { mutableStateOf(false) }
+    Box(modifier, contentAlignment = Alignment.Center) {
+        AsyncImage(
+            model = attachment.url,
+            contentDescription = stringResource(Res.string.rows_attached_image),
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+            onError = { failed = true },
+            onSuccess = { failed = false },
+        )
+        if (failed) Text(stringResource(imageFailureResource(ImageUnavailableReason.Invalid)))
+    }
+}
+
+private fun imageFailureResource(reason: ImageUnavailableReason) = when (reason) {
+    ImageUnavailableReason.Missing -> Res.string.rows_image_missing
+    ImageUnavailableReason.Invalid -> Res.string.rows_image_invalid
+    ImageUnavailableReason.TooLarge -> Res.string.rows_image_too_large
+    ImageUnavailableReason.UnsupportedSource -> Res.string.rows_image_unsupported
 }
