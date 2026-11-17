@@ -13,7 +13,8 @@ import kotlinx.serialization.Serializable
  * Every knob of the memory page's live graph simulation, with the shipped values as defaults: the
  * forces [MemoryGraphForceField] applies (many-body repulsion scaled by each node kind's charge,
  * a degree-scaled spring per edge kind, a cluster pull toward each node's agents, gravity toward
- * the centre, collision between drawn circles), how a graph with several agents is seeded, and the
+ * the centre, collision between drawn circles), how a graph with several agents is seeded, which
+ * nodes the renderer labels, and the
  * motion [MemoryGraphMotion] steps them with (friction, speed caps and cooling, tuned by how
  * crowded the graph is). The controller's deterministic layout keeps [MemoryGraphLayoutConfig];
  * this tunes only the live view.
@@ -27,10 +28,23 @@ data class MemoryGraphTuning(
     val nodeCharge: Map<MemoryGraphNodeKind, Float> = MemoryGraphNodeKind.entries.associateWith { 1f },
     /** Beyond this distance two nodes stop repelling; 0 repels at any distance. */
     val repulsionCutoff: Float = 0f,
+    /** Repulsion on a fully crowded graph, as a multiple of [repulsion] (blended in by crowding). */
+    val crowdedRepulsionScale: Float = 3f,
+    /** Above this many nodes repulsion uses a Barnes–Hut quadtree instead of every pair. */
+    val barnesHutAbove: Float = 300f,
+    /** Barnes–Hut's opening angle: a cell this small against its distance counts as one body. */
+    val barnesHutTheta: Float = 0.9f,
     /** Each edge kind's rest length. */
     val springLength: Map<MemoryGraphEdgeKind, Float> = MemoryGraphEdgeKind.entries.associateWith { 110f },
     /** Each edge kind's stiffness: force per unit stretched past its rest length. */
     val springStiffness: Map<MemoryGraphEdgeKind, Float> = MemoryGraphEdgeKind.entries.associateWith { 0.14f },
+    /**
+     * In a graph with several agents, the stiffness of every spoke from the backend: weak, so the
+     * backend's hundreds of spokes do not drag the agents into a ring around it.
+     */
+    val hubSpokeStrength: Float = 0.02f,
+    /** In a graph with several agents, whether the backend stays fixed at the centre. */
+    val pinBackend: Boolean = true,
     /**
      * How far d3-force's degree scaling is blended in, 0 (off) to 1 (full): a spring's stiffness
      * divided by the smaller of its ends' degrees, and its pull split toward the lower-degree end so
@@ -42,12 +56,12 @@ data class MemoryGraphTuning(
     /** The cluster pull per unit of distance from the owners' centroid, scaled by the cooling alpha. */
     val clusterStrength: Float = 0.05f,
     /**
-     * Whether a graph with several agents opens from a seeded layout: agents evenly on a ring, the
-     * backend at the centre, each other node near its agents' centroid.
+     * Whether a graph with several agents opens from a seeded layout: agents on a sunflower spiral
+     * around the backend at the centre, each other node near its agents' centroid.
      */
     val seededLayout: Boolean = true,
-    /** The seeded ring's radius per square root of the agent count. */
-    val seedRingRadius: Float = 60f,
+    /** Seeded agents spiral out from the centre (a sunflower pattern), this far apart per square root of their rank. */
+    val seedSpacing: Float = 60f,
     /** How far from its agents' centroid a seeded node may start (deterministic, by node id). */
     val seedJitter: Float = 30f,
     /** The pull of every node toward the centre, per unit of distance. */
@@ -56,6 +70,8 @@ data class MemoryGraphTuning(
     val collisionPadding: Float = 10f,
     /** How hard overlapping circles push apart, per unit of overlap. */
     val collisionStrength: Float = 0.6f,
+    /** Collision strength on a fully crowded graph (blended in by crowding). */
+    val crowdedCollisionStrength: Float = 3f,
     /** Each node kind's collision radius, as a multiple of its drawn radius. */
     val collisionRadiusScale: Map<MemoryGraphNodeKind, Float> = MemoryGraphNodeKind.entries.associateWith { 1f },
     /** Velocity kept per frame on a sparse graph (one agent's star). */
@@ -72,7 +88,7 @@ data class MemoryGraphTuning(
     val crowdedCrowding: Float = 240f,
     /** The cooling's starting alpha, which the forces are scaled by. */
     val alphaStart: Float = 1f,
-    /** Frames a fully crowded graph takes to cool from [alphaStart] to [alphaMin]. */
+    /** Frames a crowded graph takes to cool from [alphaStart] to [alphaMin]. */
     val coolingFrames: Float = 150f,
     /** Below this alpha a cooling simulation stops. */
     val alphaMin: Float = 0.001f,
@@ -80,6 +96,18 @@ data class MemoryGraphTuning(
     val settleSpeed: Float = 0.04f,
     /** The most frames one heat runs for, cooled or not. */
     val maxFramesPerHeat: Float = 360f,
+    /** A node with at least this many links keeps its label (shared hubs such as "persona"). */
+    val labelMinDegree: Float = 3f,
+    /** From this zoom on every node may be labelled. */
+    val labelZoomThreshold: Float = 1.6f,
+    /** A graph with at most this many nodes labels every node (one agent's star). */
+    val labelAllUnderNodes: Float = 60f,
+    /** Whether a label that would overlap a higher-priority one is skipped. */
+    val labelCulling: Boolean = true,
+    /** Whether hovering or selecting a node also labels its neighbours. */
+    val labelNeighboursOnFocus: Boolean = true,
+    /** Label text size, as a multiple of the graph's label styles. */
+    val labelFontScale: Float = 1f,
 ) {
     /** [kind]'s charge (1 when unset). */
     fun chargeOf(kind: MemoryGraphNodeKind): Float = nodeCharge[kind] ?: 1f
@@ -92,6 +120,16 @@ data class MemoryGraphTuning(
 
     /** [kind]'s collision radius multiple (1 when unset). */
     fun radiusScaleOf(kind: MemoryGraphNodeKind): Float = collisionRadiusScale[kind] ?: 1f
+
+    /**
+     * How crowded a graph of [nodes] nodes and [edges] edges is, 0 (sparse: one agent's star) to 1
+     * (crowded: the fleet view). Crowding counts every node plus twice each edge beyond a tree's.
+     */
+    fun crowdednessOf(nodes: Int, edges: Int): Float {
+        val crowding = nodes + 2 * (edges - nodes).coerceAtLeast(0)
+        val span = (crowdedCrowding - sparseCrowding).coerceAtLeast(1f)
+        return ((crowding - sparseCrowding) / span).coerceIn(0f, 1f)
+    }
 }
 
 private const val DEFAULT_SPRING_LENGTH = 110f
@@ -135,17 +173,23 @@ object MemoryGraphTunings {
             "repulsion" to tuning.repulsion.literal(),
             "nodeCharge" to tuning.nodeCharge.literal("MemoryGraphNodeKind"),
             "repulsionCutoff" to tuning.repulsionCutoff.literal(),
+            "crowdedRepulsionScale" to tuning.crowdedRepulsionScale.literal(),
+            "barnesHutAbove" to tuning.barnesHutAbove.literal(),
+            "barnesHutTheta" to tuning.barnesHutTheta.literal(),
             "springLength" to tuning.springLength.literal("MemoryGraphEdgeKind"),
             "springStiffness" to tuning.springStiffness.literal("MemoryGraphEdgeKind"),
+            "hubSpokeStrength" to tuning.hubSpokeStrength.literal(),
+            "pinBackend" to tuning.pinBackend.toString(),
             "degreeScaling" to tuning.degreeScaling.literal(),
             "clusterEnabled" to tuning.clusterEnabled.toString(),
             "clusterStrength" to tuning.clusterStrength.literal(),
             "seededLayout" to tuning.seededLayout.toString(),
-            "seedRingRadius" to tuning.seedRingRadius.literal(),
+            "seedSpacing" to tuning.seedSpacing.literal(),
             "seedJitter" to tuning.seedJitter.literal(),
             "gravity" to tuning.gravity.literal(),
             "collisionPadding" to tuning.collisionPadding.literal(),
             "collisionStrength" to tuning.collisionStrength.literal(),
+            "crowdedCollisionStrength" to tuning.crowdedCollisionStrength.literal(),
             "collisionRadiusScale" to tuning.collisionRadiusScale.literal("MemoryGraphNodeKind"),
             "sparseDamping" to tuning.sparseDamping.literal(),
             "crowdedDamping" to tuning.crowdedDamping.literal(),
@@ -158,6 +202,12 @@ object MemoryGraphTunings {
             "alphaMin" to tuning.alphaMin.literal(),
             "settleSpeed" to tuning.settleSpeed.literal(),
             "maxFramesPerHeat" to tuning.maxFramesPerHeat.literal(),
+            "labelMinDegree" to tuning.labelMinDegree.literal(),
+            "labelZoomThreshold" to tuning.labelZoomThreshold.literal(),
+            "labelAllUnderNodes" to tuning.labelAllUnderNodes.literal(),
+            "labelCulling" to tuning.labelCulling.toString(),
+            "labelNeighboursOnFocus" to tuning.labelNeighboursOnFocus.toString(),
+            "labelFontScale" to tuning.labelFontScale.literal(),
         )
         return fields.joinToString(separator = ",\n", prefix = "MemoryGraphTuning(\n", postfix = ",\n)") { (name, value) ->
             "    $name = $value"

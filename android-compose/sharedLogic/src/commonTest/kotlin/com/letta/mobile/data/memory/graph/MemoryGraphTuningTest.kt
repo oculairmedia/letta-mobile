@@ -6,6 +6,7 @@ import com.letta.mobile.data.memory.MemoryGraphNode
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.MemoryParityGraph
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -38,9 +39,16 @@ class MemoryGraphTuningTest {
             tuning.alphaStart, tuning.coolingFrames, tuning.alphaMin, tuning.settleSpeed, tuning.maxFramesPerHeat,
         ))
         // The force-model improvements ship switched on.
-        val improvements = listOf(tuning.degreeScaling, tuning.clusterStrength, tuning.seedRingRadius, tuning.seedJitter)
+        val improvements = listOf(tuning.degreeScaling, tuning.clusterStrength, tuning.seedSpacing, tuning.seedJitter)
         assertEquals(listOf(1f, 0.05f, 60f, 30f), improvements)
+        val fleet = listOf(tuning.hubSpokeStrength, tuning.crowdedRepulsionScale, tuning.crowdedCollisionStrength, tuning.barnesHutAbove)
+        assertEquals(listOf(0.02f, 3f, 3f, 300f), fleet)
+        assertEquals(0.9f, tuning.barnesHutTheta)
+        assertTrue(tuning.pinBackend)
         assertTrue(tuning.clusterEnabled && tuning.seededLayout)
+        val labels = listOf(tuning.labelMinDegree, tuning.labelZoomThreshold, tuning.labelAllUnderNodes, tuning.labelFontScale)
+        assertEquals(listOf(3f, 1.6f, 60f, 1f), labels)
+        assertTrue(tuning.labelCulling && tuning.labelNeighboursOnFocus)
     }
 
     @Test
@@ -127,6 +135,54 @@ class MemoryGraphTuningTest {
     }
 
     @Test
+    fun aFleetPinsItsBackendAndKeepsItsSpokesWeak() {
+        val view = MemoryGraphViews.build(sharedBlock(), emptySet())
+        // Only the spokes pull: every other spring is slack, so the agent moves by its spoke alone.
+        val tuning = MemoryGraphTuning(
+            repulsion = 0f,
+            gravity = 0f,
+            clusterEnabled = false,
+            springStiffness = MemoryGraphEdgeKind.entries.associateWith { 0f },
+        )
+        val field = MemoryGraphForceField(view.nodes.size, MemoryGraphForceField.springsOf(view))
+        field.applyTuning(tuning, nodeKinds(view), MemoryGraphForceField.springKindsOf(view))
+        val start = mapOf(
+            "backend" to MemoryGraphPoint(SPOKE_PULL, 0f),
+            "a1" to MemoryGraphPoint(SPOKE_PULL - STRETCHED, 0f),
+            "a2" to MemoryGraphPoint(SPOKE_PULL + STRETCHED, 0f),
+            "shared" to MemoryGraphPoint(SPOKE_PULL, FAR),
+        )
+        view.nodes.forEachIndexed { index, node -> field.place(index, start.getValue(node.id)) }
+        field.step(MemoryGraphForceField.FREE, MemoryGraphMotion.forGraph(view.nodes.size, view.edges.size, tuning), 1f)
+        val index = view.nodes.withIndex().associate { (i, node) -> node.id to i }
+        assertEquals(start.getValue("backend"), field.point(index.getValue("backend")), "the backend is pinned")
+        val agentMove = field.point(index.getValue("a1")).x - start.getValue("a1").x
+        val spokeOnly = tuning.hubSpokeStrength * (STRETCHED - REST)
+        assertTrue(agentMove > 0f && agentMove <= spokeOnly * 1.01f, "a weak spoke moved the agent $agentMove (at most $spokeOnly)")
+    }
+
+    @Test
+    fun barnesHutRepulsionMatchesEveryPairClosely() {
+        val count = 500
+        val random = kotlin.random.Random(SEED)
+        val points = List(count) { MemoryGraphPoint(random.nextFloat() * SPREAD, random.nextFloat() * SPREAD) }
+        val kinds = IntArray(count) { MemoryGraphNodeKind.Memory.ordinal }
+        fun moves(tuning: MemoryGraphTuning): List<MemoryGraphPoint> {
+            val field = MemoryGraphForceField(count, IntArray(0))
+            field.applyTuning(tuning, kinds, IntArray(0))
+            points.forEachIndexed { i, point -> field.place(i, point) }
+            field.step(MemoryGraphForceField.FREE, MemoryGraphMotion.forGraph(count, 0, tuning), 1f)
+            return List(count) { i -> MemoryGraphPoint(field.point(i).x - points[i].x, field.point(i).y - points[i].y) }
+        }
+        val base = MemoryGraphTuning(repulsion = WEAK, gravity = 0f)
+        val exact = moves(base.copy(barnesHutAbove = 100_000f))
+        val approximate = moves(base.copy(barnesHutAbove = 0f, barnesHutTheta = 0.5f))
+        val error = exact.indices.sumOf { i -> hypot(exact[i].x - approximate[i].x, exact[i].y - approximate[i].y).toDouble() }
+        val magnitude = exact.sumOf { hypot(it.x, it.y).toDouble() }
+        assertTrue(error / magnitude < 0.05, "Barnes-Hut off by ${error / magnitude}")
+    }
+
+    @Test
     fun aStoredTuningRoundTrips() {
         val tuned = MemoryGraphTuning(
             repulsion = 4200f,
@@ -146,7 +202,9 @@ class MemoryGraphTuningTest {
         assertTrue("    repulsion = 4200.0f," in source)
         assertTrue("MemoryGraphNodeKind.Agent to 1.0f" in source)
         assertTrue("MemoryGraphEdgeKind.Runs to 110.0f" in source)
-        assertTrue("    maxFramesPerHeat = 360.0f,\n)" in source)
+        assertTrue("    maxFramesPerHeat = 360.0f,\n" in source)
+        assertTrue("    labelCulling = true,\n" in source)
+        assertTrue("    labelFontScale = 1.0f,\n)" in source)
     }
 
     /** How far the agent of an agent–memory pair [PAIR_DISTANCE] apart moves in one step under [tuning]. */
@@ -192,7 +250,7 @@ class MemoryGraphTuningTest {
         return MemoryParityGraph(
             nodes = listOf(node("h1", MemoryGraphNodeKind.Agent), node("h2", MemoryGraphNodeKind.Agent)) +
                 leaves.map { node(it.second, MemoryGraphNodeKind.Memory) } +
-                listOf(node("p", MemoryGraphNodeKind.Backend), node("q", MemoryGraphNodeKind.Memory)),
+                listOf(node("p", MemoryGraphNodeKind.Memory), node("q", MemoryGraphNodeKind.Memory)),
             edges = listOf(edge("h1", "h2", MemoryGraphEdgeKind.Runs), edge("p", "q", MemoryGraphEdgeKind.Runs)) +
                 leaves.map { edge(it.first, it.second, MemoryGraphEdgeKind.Remembers) },
         )
@@ -231,5 +289,8 @@ class MemoryGraphTuningTest {
         const val STRETCHED = 200f
         const val REST = 110f
         const val FAR = 1_000f
+        const val SPOKE_PULL = 50f
+        const val SPREAD = 3_000f
+        const val SEED = 11
     }
 }

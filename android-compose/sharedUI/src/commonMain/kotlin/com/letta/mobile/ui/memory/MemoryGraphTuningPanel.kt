@@ -137,28 +137,55 @@ internal object MemoryGraphKnobs {
         MemoryGraphKnobSection("Gravity and collision", gravityAndCollision()),
         MemoryGraphKnobSection("Motion", motion()),
         MemoryGraphKnobSection("Cooling", cooling()),
+        MemoryGraphKnobSection("Labels", labels(), labelToggles()),
     )
 
     private fun repulsion(): List<MemoryGraphKnob> = listOf(
         MemoryGraphKnob("Strength", 0f..20_000f, { it.repulsion }, { t, v -> t.copy(repulsion = v) }),
         MemoryGraphKnob("Cut-off distance (0 = none)", 0f..1_000f, { it.repulsionCutoff }, { t, v -> t.copy(repulsionCutoff = v) }),
+        MemoryGraphKnob("Strength scale (crowded)", 0.5f..6f, { it.crowdedRepulsionScale }, { t, v -> t.copy(crowdedRepulsionScale = v) }),
+        MemoryGraphKnob("Barnes–Hut above nodes", 0f..2_000f, { it.barnesHutAbove }, { t, v -> t.copy(barnesHutAbove = v) }),
+        MemoryGraphKnob("Barnes–Hut theta", 0.1f..1.5f, { it.barnesHutTheta }, { t, v -> t.copy(barnesHutTheta = v) }),
     ) + MemoryGraphNodeKind.entries.map { kind ->
         MemoryGraphKnob("Charge: ${kind.name}", 0f..5f, { it.chargeOf(kind) }, { t, v -> t.copy(nodeCharge = t.nodeCharge + (kind to v)) })
     }
 
+    private fun labelToggles(): List<MemoryGraphToggle> = listOf(
+        MemoryGraphToggle("Cull overlapping labels", { it.labelCulling }, { t, v -> t.copy(labelCulling = v) }),
+        MemoryGraphToggle(
+            "Label neighbours on hover or select",
+            { it.labelNeighboursOnFocus },
+            { t, v -> t.copy(labelNeighboursOnFocus = v) },
+        ),
+    )
+
+    private fun labels(): List<MemoryGraphKnob> = listOf(
+        MemoryGraphKnob("Label at or over degree", 0f..20f, { it.labelMinDegree }, { t, v -> t.copy(labelMinDegree = v) }),
+        MemoryGraphKnob("Label everything from zoom", 0.2f..5f, { it.labelZoomThreshold }, { t, v -> t.copy(labelZoomThreshold = v) }),
+        MemoryGraphKnob(
+            "Label everything at or under nodes",
+            0f..400f,
+            { it.labelAllUnderNodes },
+            { t, v -> t.copy(labelAllUnderNodes = v) },
+        ),
+        MemoryGraphKnob("Label font scale", 0.5f..2f, { it.labelFontScale }, { t, v -> t.copy(labelFontScale = v) }),
+    )
+
     private fun clusterAndSeedToggles(): List<MemoryGraphToggle> = listOf(
         MemoryGraphToggle("Cluster force", { it.clusterEnabled }, { t, v -> t.copy(clusterEnabled = v) }),
         MemoryGraphToggle("Seeded layout", { it.seededLayout }, { t, v -> t.copy(seededLayout = v) }),
+        MemoryGraphToggle("Pin the backend at the centre (fleet)", { it.pinBackend }, { t, v -> t.copy(pinBackend = v) }),
     )
 
     private fun clustersAndSeeding(): List<MemoryGraphKnob> = listOf(
         MemoryGraphKnob("Cluster strength", 0f..0.5f, { it.clusterStrength }, { t, v -> t.copy(clusterStrength = v) }),
-        MemoryGraphKnob("Seed ring radius (per sqrt of agents)", 10f..200f, { it.seedRingRadius }, { t, v -> t.copy(seedRingRadius = v) }),
+        MemoryGraphKnob("Seed spacing (per sqrt of rank)", 10f..200f, { it.seedSpacing }, { t, v -> t.copy(seedSpacing = v) }),
         MemoryGraphKnob("Seed jitter", 0f..100f, { it.seedJitter }, { t, v -> t.copy(seedJitter = v) }),
     )
 
     private fun springs(): List<MemoryGraphKnob> = listOf(
         MemoryGraphKnob("Degree scaling (0 off, 1 d3)", 0f..1f, { it.degreeScaling }, { t, v -> t.copy(degreeScaling = v) }),
+        MemoryGraphKnob("Backend spoke stiffness (fleet)", 0f..0.3f, { it.hubSpokeStrength }, { t, v -> t.copy(hubSpokeStrength = v) }),
     ) + MemoryGraphEdgeKind.entries.flatMap { kind ->
         listOf(
             MemoryGraphKnob(
@@ -180,6 +207,12 @@ internal object MemoryGraphKnobs {
         MemoryGraphKnob("Centre gravity", 0f..0.1f, { it.gravity }, { t, v -> t.copy(gravity = v) }),
         MemoryGraphKnob("Collision padding", 0f..40f, { it.collisionPadding }, { t, v -> t.copy(collisionPadding = v) }),
         MemoryGraphKnob("Collision strength", 0f..3f, { it.collisionStrength }, { t, v -> t.copy(collisionStrength = v) }),
+        MemoryGraphKnob(
+            "Collision strength (crowded)",
+            0f..6f,
+            { it.crowdedCollisionStrength },
+            { t, v -> t.copy(crowdedCollisionStrength = v) },
+        ),
     ) + MemoryGraphNodeKind.entries.map { kind ->
         MemoryGraphKnob(
             "Collision radius: ${kind.name}",

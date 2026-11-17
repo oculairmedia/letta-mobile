@@ -87,8 +87,12 @@ internal class MemoryGraphPhysics private constructor(
     }
 
     companion object {
-        /** Above this many nodes the O(n²) step is not run per frame: the graph is static, drag moves one node. */
-        const val LIVE_NODE_LIMIT = 400
+        /**
+         * Above this many nodes the graph is not simulated per frame: it is static and a drag moves
+         * one node. Repulsion switches to Barnes–Hut well below this, so a fleet of hundreds of agents
+         * and their blocks still moves.
+         */
+        const val LIVE_NODE_LIMIT = 2000
 
         /** Where a bloom starts: the target layout shrunk toward its centre by this factor. */
         const val BLOOM_START_SCALE = 0.35f

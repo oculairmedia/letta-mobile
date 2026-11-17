@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.drag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,9 +30,11 @@ import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.data.memory.graph.MemoryGraphLayout
 import com.letta.mobile.data.memory.graph.MemoryGraphNodeMetrics
 import com.letta.mobile.data.memory.graph.MemoryGraphSize
+import com.letta.mobile.data.memory.graph.MemoryGraphTunings
 import com.letta.mobile.data.memory.graph.MemoryGraphView
 import com.letta.mobile.data.memory.graph.MemoryGraphViewport
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.sqrt
@@ -65,8 +68,13 @@ internal fun MemoryGraphCanvas(
     val density = LocalDensity.current
     // A docked inspector can leave a wide window's graph phone-narrow: label by the canvas's own width.
     val narrowCanvas = with(density) { viewportState.size.width.toDp() } < LettaDimens.Pane.wideBreakpoint
-    val labels = rememberMemoryNodeLabels(params.view, palette, params.compact || narrowCanvas)
+    val tuning by MemoryGraphTunings.current.collectAsState()
+    val labels = rememberMemoryNodeLabels(params.view, palette, params.compact || narrowCanvas, tuning.labelFontScale)
     val neighbours = remember(params.view) { params.view.adjacency() }
+    val labeler = remember(params.view, neighbours) { MemoryGraphLabeler(params.view, neighbours) }
+    val fade = remember { MemoryLabelFade() }
+    fade.durationNanos = if (LocalReducedMotion.current) 0L else MemoryLabelFade.DEFAULT_DURATION_NANOS
+    LaunchedEffect(fade) { fade.run() }
     val minTouchPx = MemoryGraphNodeMetrics.MIN_TOUCH_RADIUS * density.density
     var hoveredId by remember { mutableStateOf<String?>(null) }
     val current by rememberUpdatedState(params)
@@ -86,7 +94,10 @@ internal fun MemoryGraphCanvas(
             .pointerHoverIcon(if (hoveredId != null) PointerIcon.Hand else PointerIcon.Default)
             .semantics { contentDescription = "Memory graph, ${params.view.nodes.size} nodes" },
     ) {
-        val scene = GraphScene(params.view, neighbours, params.looks, labels, palette, params.selectedNodeId, hoveredId)
+        // Read so a fading label redraws the canvas each frame until it settles.
+        fade.frameNanos
+        val graphLabels = GraphLabels(labels, labeler, fade, tuning)
+        val scene = GraphScene(params.view, neighbours, params.looks, graphLabels, palette, params.selectedNodeId, hoveredId)
         drawGraph(GraphFrame(scene, params.live.layout, viewportState.viewport))
     }
 }

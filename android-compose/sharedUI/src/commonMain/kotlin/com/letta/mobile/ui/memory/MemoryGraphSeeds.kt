@@ -10,9 +10,10 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Where a graph with several agents (the fleet view) starts: agents evenly on a ring sized by
- * their count, the backend at the centre, and every other node near the centroid of the agents it
- * links to, jittered by a hash of its id so the same graph always starts the same way. A node that
+ * Where a graph with several agents (the fleet view) starts: agents on a sunflower spiral around
+ * the backend at the centre (a compact disc the forces open out, not a ring they cannot close), and
+ * every other node near the centroid of the agents it links to, jittered by a hash of its id so the
+ * same graph always starts the same way. A node that
  * arrives later starts near its agents as already shown. One agent's star never seeds this way.
  */
 internal object MemoryGraphSeeds {
@@ -23,10 +24,10 @@ internal object MemoryGraphSeeds {
     /** Every node's first position. */
     fun initial(view: MemoryGraphView, tuning: MemoryGraphTuning): Map<String, MemoryGraphPoint> {
         val agents = view.nodes.filter { it.kind == MemoryGraphNodeKind.Agent }
-        val radius = tuning.seedRingRadius * sqrt(agents.size.toFloat())
         val placed = LinkedHashMap<String, MemoryGraphPoint>(view.nodes.size)
-        agents.forEachIndexed { index, agent ->
-            val angle = 2.0 * PI * index / agents.size
+        agents.forEachIndexed { rank, agent ->
+            val radius = tuning.seedSpacing * sqrt(rank + HALF)
+            val angle = rank * GOLDEN_ANGLE
             placed[agent.id] = MemoryGraphPoint((radius * cos(angle)).toFloat(), (radius * sin(angle)).toFloat())
         }
         val owners = ownersOf(view)
@@ -82,6 +83,10 @@ internal object MemoryGraphSeeds {
     }
 
     private val ORIGIN = MemoryGraphPoint(0f, 0f)
+    private const val HALF = 0.5f
+
+    /** The sunflower's turn per rank: the golden angle, so no two agents line up along a spoke. */
+    private val GOLDEN_ANGLE = PI * (3.0 - kotlin.math.sqrt(5.0))
     private const val FNV_OFFSET = -2128831035
     private const val FNV_PRIME = 16777619
     private const val HALF_BITS = 16

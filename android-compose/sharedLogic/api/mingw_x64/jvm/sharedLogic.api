@@ -25117,57 +25117,82 @@ public final class com/letta/mobile/data/memory/graph/MemoryGraphSize {
 public final class com/letta/mobile/data/memory/graph/MemoryGraphTuning {
 	public static final field Companion Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning$Companion;
 	public fun <init> ()V
-	public fun <init> (FLjava/util/Map;FLjava/util/Map;Ljava/util/Map;FZFZFFFFFLjava/util/Map;FFFFFFFFFFF)V
-	public synthetic fun <init> (FLjava/util/Map;FLjava/util/Map;Ljava/util/Map;FZFZFFFFFLjava/util/Map;FFFFFFFFFFFILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (FLjava/util/Map;FFFFLjava/util/Map;Ljava/util/Map;FZFZFZFFFFFFLjava/util/Map;FFFFFFFFFFFFFFZZF)V
+	public synthetic fun <init> (FLjava/util/Map;FFFFLjava/util/Map;Ljava/util/Map;FZFZFZFFFFFFLjava/util/Map;FFFFFFFFFFFFFFZZFIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun chargeOf (Lcom/letta/mobile/data/memory/MemoryGraphNodeKind;)F
 	public final fun component1 ()F
-	public final fun component10 ()F
+	public final fun component10 ()Z
 	public final fun component11 ()F
-	public final fun component12 ()F
+	public final fun component12 ()Z
 	public final fun component13 ()F
-	public final fun component14 ()F
-	public final fun component15 ()Ljava/util/Map;
+	public final fun component14 ()Z
+	public final fun component15 ()F
 	public final fun component16 ()F
 	public final fun component17 ()F
 	public final fun component18 ()F
 	public final fun component19 ()F
 	public final fun component2 ()Ljava/util/Map;
 	public final fun component20 ()F
-	public final fun component21 ()F
+	public final fun component21 ()Ljava/util/Map;
 	public final fun component22 ()F
 	public final fun component23 ()F
 	public final fun component24 ()F
 	public final fun component25 ()F
 	public final fun component26 ()F
+	public final fun component27 ()F
+	public final fun component28 ()F
+	public final fun component29 ()F
 	public final fun component3 ()F
-	public final fun component4 ()Ljava/util/Map;
-	public final fun component5 ()Ljava/util/Map;
+	public final fun component30 ()F
+	public final fun component31 ()F
+	public final fun component32 ()F
+	public final fun component33 ()F
+	public final fun component34 ()F
+	public final fun component35 ()F
+	public final fun component36 ()Z
+	public final fun component37 ()Z
+	public final fun component38 ()F
+	public final fun component4 ()F
+	public final fun component5 ()F
 	public final fun component6 ()F
-	public final fun component7 ()Z
-	public final fun component8 ()F
-	public final fun component9 ()Z
-	public final fun copy (FLjava/util/Map;FLjava/util/Map;Ljava/util/Map;FZFZFFFFFLjava/util/Map;FFFFFFFFFFF)Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;FLjava/util/Map;FLjava/util/Map;Ljava/util/Map;FZFZFFFFFLjava/util/Map;FFFFFFFFFFFILjava/lang/Object;)Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;
+	public final fun component7 ()Ljava/util/Map;
+	public final fun component8 ()Ljava/util/Map;
+	public final fun component9 ()F
+	public final fun copy (FLjava/util/Map;FFFFLjava/util/Map;Ljava/util/Map;FZFZFZFFFFFFLjava/util/Map;FFFFFFFFFFFFFFZZF)Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;FLjava/util/Map;FFFFLjava/util/Map;Ljava/util/Map;FZFZFZFFFFFFLjava/util/Map;FFFFFFFFFFFFFFZZFIILjava/lang/Object;)Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;
+	public final fun crowdednessOf (II)F
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAlphaMin ()F
 	public final fun getAlphaStart ()F
+	public final fun getBarnesHutAbove ()F
+	public final fun getBarnesHutTheta ()F
 	public final fun getClusterEnabled ()Z
 	public final fun getClusterStrength ()F
 	public final fun getCollisionPadding ()F
 	public final fun getCollisionRadiusScale ()Ljava/util/Map;
 	public final fun getCollisionStrength ()F
 	public final fun getCoolingFrames ()F
+	public final fun getCrowdedCollisionStrength ()F
 	public final fun getCrowdedCrowding ()F
 	public final fun getCrowdedDamping ()F
 	public final fun getCrowdedMaxSpeed ()F
+	public final fun getCrowdedRepulsionScale ()F
 	public final fun getDegreeScaling ()F
 	public final fun getGravity ()F
+	public final fun getHubSpokeStrength ()F
+	public final fun getLabelAllUnderNodes ()F
+	public final fun getLabelCulling ()Z
+	public final fun getLabelFontScale ()F
+	public final fun getLabelMinDegree ()F
+	public final fun getLabelNeighboursOnFocus ()Z
+	public final fun getLabelZoomThreshold ()F
 	public final fun getMaxFramesPerHeat ()F
 	public final fun getNodeCharge ()Ljava/util/Map;
+	public final fun getPinBackend ()Z
 	public final fun getRepulsion ()F
 	public final fun getRepulsionCutoff ()F
 	public final fun getSeedJitter ()F
-	public final fun getSeedRingRadius ()F
+	public final fun getSeedSpacing ()F
 	public final fun getSeededLayout ()Z
 	public final fun getSettleSpeed ()F
 	public final fun getSparseCrowding ()F
@@ -25485,6 +25510,39 @@ public final class com/letta/mobile/data/memory/graph/SessionGraphMemoryBlockPor
 	public fun delete (Lcom/letta/mobile/data/memory/graph/MemoryBlockRef;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun load (Lcom/letta/mobile/data/memory/graph/MemoryBlockRef;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun save (Lcom/letta/mobile/data/memory/graph/MemoryBlockRef;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/memory/graph/barneshut/BarnesHutTree {
+	public fun <init> (I)V
+	public final fun repel (Lcom/letta/mobile/data/memory/graph/barneshut/ForceBodies;Lcom/letta/mobile/data/memory/graph/barneshut/RepulsionTerms;Lcom/letta/mobile/data/memory/graph/barneshut/ForceSums;)V
+}
+
+public final class com/letta/mobile/data/memory/graph/barneshut/CollisionTerms {
+	public fun <init> (FF)V
+	public final fun getPadding ()F
+	public final fun getStrength ()F
+}
+
+public final class com/letta/mobile/data/memory/graph/barneshut/ForceBodies {
+	public fun <init> ([F[F[F[F)V
+	public final fun getCharge ()[F
+	public final fun getRadii ()[F
+	public final fun getX ()[F
+	public final fun getY ()[F
+}
+
+public final class com/letta/mobile/data/memory/graph/barneshut/ForceSums {
+	public fun <init> ([F[F)V
+	public final fun getFx ()[F
+	public final fun getFy ()[F
+}
+
+public final class com/letta/mobile/data/memory/graph/barneshut/RepulsionTerms {
+	public fun <init> (FFLcom/letta/mobile/data/memory/graph/barneshut/CollisionTerms;F)V
+	public final fun getCollision ()Lcom/letta/mobile/data/memory/graph/barneshut/CollisionTerms;
+	public final fun getCutoffSq ()F
+	public final fun getStrength ()F
+	public final fun getTheta ()F
 }
 
 public final class com/letta/mobile/data/memory/memfs/AppServerMemfsSource : com/letta/mobile/data/memory/memfs/MemfsSource {

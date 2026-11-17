@@ -1,6 +1,11 @@
 package com.letta.mobile.data.memory.graph
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.memory.graph.barneshut.BarnesHutTree
+import com.letta.mobile.data.memory.graph.barneshut.CollisionTerms
+import com.letta.mobile.data.memory.graph.barneshut.ForceBodies
+import com.letta.mobile.data.memory.graph.barneshut.ForceSums
+import com.letta.mobile.data.memory.graph.barneshut.RepulsionTerms
 import com.letta.mobile.data.memory.MemoryGraphEdgeKind
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import kotlin.math.PI
@@ -150,6 +155,14 @@ class MemoryGraphForceField(
     private var ownerStart = IntArray(size + 1)
     private var owners = IntArray(0)
     private var gravity = config.gravity
+
+    // A node the live step never moves (the fleet's pinned backend), and the Barnes–Hut tree a big
+    // graph's repulsion walks instead of every pair (null: every pair).
+    private var anchor = FREE
+    private var quadtree: BarnesHutTree? = null
+    private var quadtreeTerms: RepulsionTerms? = null
+    private val bodies = ForceBodies(x, y, charge, radii)
+    private val sums = ForceSums(fx, fy)
     private var collisionPadding = COLLISION_PADDING
     private var collisionStrength = COLLISION_STRENGTH
 
@@ -159,15 +172,18 @@ class MemoryGraphForceField(
      * stiffness), in the orders the field was built with (see [springKindsOf]).
      */
     fun applyTuning(tuning: MemoryGraphTuning, nodeKinds: IntArray, springKinds: IntArray) {
-        repulsion = tuning.repulsion
+        val crowded = tuning.crowdednessOf(size, springs.size / 2)
+        repulsion = tuning.repulsion * lerp(1f, tuning.crowdedRepulsionScale, crowded)
         cutoffSq = tuning.repulsionCutoff * tuning.repulsionCutoff
         val nodeKindValues = MemoryGraphNodeKind.entries
         for (i in 0 until min(size, nodeKinds.size)) charge[i] = tuning.chargeOf(nodeKindValues[nodeKinds[i]])
-        applySpringTuning(tuning, springKinds)
+        applySpringTuning(tuning, nodeKinds, springKinds)
         applyClusterTuning(tuning, nodeKinds)
         gravity = tuning.gravity
         collisionPadding = tuning.collisionPadding
-        collisionStrength = tuning.collisionStrength
+        collisionStrength = lerp(tuning.collisionStrength, tuning.crowdedCollisionStrength, crowded)
+        quadtree = if (size > tuning.barnesHutAbove) (quadtree ?: BarnesHutTree(size)) else null
+        quadtreeTerms = RepulsionTerms(repulsion, cutoffSq, CollisionTerms(collisionPadding, collisionStrength), tuning.barnesHutTheta)
     }
 
     /**
@@ -175,7 +191,12 @@ class MemoryGraphForceField(
      * 1 / min(degree of its ends) and its pull split by degree (d3-force's forceLink), blended in by
      * [MemoryGraphTuning.degreeScaling]. Degrees are counted here, once per graph.
      */
-    private fun applySpringTuning(tuning: MemoryGraphTuning, springKinds: IntArray) {
+    private fun applySpringTuning(tuning: MemoryGraphTuning, nodeKinds: IntArray, springKinds: IntArray) {
+        // In a graph with several agents (the fleet view) every spoke from the backend is weak and
+        // unsplit, and the backend may be pinned at the centre.
+        val backend = nodeKinds.indexOfFirst { it == MemoryGraphNodeKind.Backend.ordinal }
+        val fleet = backend >= 0 && nodeKinds.count { it == MemoryGraphNodeKind.Agent.ordinal } >= 2
+        anchor = if (fleet && tuning.pinBackend) backend else FREE
         val degree = IntArray(size)
         springs.forEach { degree[it]++ }
         val blend = tuning.degreeScaling.coerceIn(0f, 1f)
@@ -185,10 +206,11 @@ class MemoryGraphForceField(
             val a = degree[springs[2 * s]].coerceAtLeast(1)
             val b = degree[springs[2 * s + 1]].coerceAtLeast(1)
             val bias = a.toFloat() / (a + b)
+            val spoke = fleet && (springs[2 * s] == backend || springs[2 * s + 1] == backend)
             restLength[s] = tuning.lengthOf(kind)
-            stiffness[s] = tuning.stiffnessOf(kind) * lerp(1f, 1f / min(a, b), blend)
-            sourceWeight[s] = lerp(1f, 2f * (1f - bias), blend)
-            targetWeight[s] = lerp(1f, 2f * bias, blend)
+            stiffness[s] = if (spoke) tuning.hubSpokeStrength else tuning.stiffnessOf(kind) * lerp(1f, 1f / min(a, b), blend)
+            sourceWeight[s] = if (spoke) 1f else lerp(1f, 2f * (1f - bias), blend)
+            targetWeight[s] = if (spoke) 1f else lerp(1f, 2f * bias, blend)
         }
     }
 
@@ -273,7 +295,9 @@ class MemoryGraphForceField(
     private fun applyForces() {
         fx.fill(0f)
         fy.fill(0f)
-        applyRepulsion()
+        val tree = quadtree
+        val terms = quadtreeTerms
+        if (tree != null && terms != null) tree.repel(bodies, terms, sums) else applyRepulsion()
         applySprings()
     }
 
@@ -343,7 +367,7 @@ class MemoryGraphForceField(
     private fun integrateLive(pinned: Int, motion: MemoryGraphMotion, alpha: Float): Float {
         var fastest = 0f
         for (i in 0 until size) {
-            if (i == pinned) continue
+            if (i == pinned || i == anchor) continue
             vx[i] = (vx[i] + (fx[i] - x[i] * gravity) * alpha) * motion.damping
             vy[i] = (vy[i] + (fy[i] - y[i] * gravity) * alpha) * motion.damping
             val speed = sqrt(vx[i] * vx[i] + vy[i] * vy[i])
@@ -424,11 +448,9 @@ data class MemoryGraphMotion(
          * sooner than a star.
          */
         fun forGraph(nodes: Int, edges: Int, tuning: MemoryGraphTuning = MemoryGraphTuning()): MemoryGraphMotion {
-            val crowding = nodes + 2 * (edges - nodes).coerceAtLeast(0)
-            val span = (tuning.crowdedCrowding - tuning.sparseCrowding).coerceAtLeast(1f)
-            val t = ((crowding - tuning.sparseCrowding) / span).coerceIn(0f, 1f)
+            val t = tuning.crowdednessOf(nodes, edges)
             if (t == 0f) return MemoryGraphMotion(tuning.sparseDamping, tuning.sparseMaxSpeed, alphaDecay = 0f, clampVelocity = false)
-            val coolingSteps = tuning.coolingFrames.coerceAtLeast(1f) / t
+            val coolingSteps = tuning.coolingFrames.coerceAtLeast(1f)
             val alphaRatio = (tuning.alphaMin / tuning.alphaStart.coerceAtLeast(tuning.alphaMin)).coerceIn(MIN_RATIO, 1f)
             return MemoryGraphMotion(
                 damping = lerp(tuning.sparseDamping, tuning.crowdedDamping, t),
