@@ -25,6 +25,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -110,6 +111,21 @@ class ChatRowImageFitUiTest {
             }
             assertEquals(bounds[0], bounds[1], "1024 PNG and 512 JPEG share their row geometry")
         }
+    }
+
+    @Test
+    fun corruptImageHasAnExplicitFailureReasonInTheTimeline() = runDesktopComposeUiTest(width = 1100, height = 1600) {
+        show(desktop, RowKind.FoldedReadRun, listOf(UiImageAttachment("invalid", "image/png")))
+        waitUntil(timeoutMillis = 10_000) {
+            onAllNodesWithText("Image unavailable: invalid image data").fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithText("Image unavailable: invalid image data").assertExists()
+    }
+
+    @Test
+    fun missingImageHasAnExplicitFailureReasonInTheTimeline() = runDesktopComposeUiTest(width = 1100, height = 1600) {
+        show(desktop, RowKind.FoldedReadRun, listOf(UiImageAttachment("", "image/png")))
+        onNodeWithText("Image unavailable: image data is missing").assertExists()
     }
 
     private fun checkSquare(environment: Environment) {

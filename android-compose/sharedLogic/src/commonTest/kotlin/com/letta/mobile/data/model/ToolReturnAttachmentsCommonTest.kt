@@ -17,6 +17,17 @@ class ToolReturnAttachmentsCommonTest {
     private fun parse(json: String): JsonElement = Json.parseToJsonElement(json)
 
     @Test
+    fun imageWithMissingPayloadSurvivesAsAFailurePlaceholder() {
+        val message = ToolReturnMessage(
+            id = "missing-image",
+            toolReturnRaw = parse("""[{"type":"image","source":{"type":"base64","media_type":"image/png"}}]"""),
+        )
+        assertEquals(1, message.attachments.size, "a missing image must remain visible as a failed image")
+        assertEquals("", message.attachments.single().base64)
+        assertEquals("image/png", message.attachments.single().mediaType)
+    }
+
+    @Test
     fun `object-typed type field does not crash attachment extraction`() {
         // `type` is an object, not a primitive — the exact crash shape.
         val raw = parse(
