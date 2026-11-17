@@ -227,6 +227,10 @@ private fun DebugWindows() {
     if (System.getenv("MERIDIAN_CANVAS_DEBUG") == "1") {
         com.letta.mobile.desktop.canvas.CanvasDebugWindow()
     }
+    if (System.getenv("MERIDIAN_GRAPH_LOOKDEV") == "1") {
+        val store = com.letta.mobile.desktop.data.defaultDesktopStateDirectory().resolve("dev/memory-graph-tuning.json")
+        com.letta.mobile.ui.memory.MemoryGraphTuningWindow(store)
+    }
 }
 
 /**

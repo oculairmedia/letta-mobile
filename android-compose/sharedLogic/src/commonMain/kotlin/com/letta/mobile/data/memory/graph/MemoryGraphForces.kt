@@ -1,6 +1,8 @@
 package com.letta.mobile.data.memory.graph
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.memory.MemoryGraphEdgeKind
+import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max
@@ -129,6 +131,38 @@ class MemoryGraphForceField(
     private val fx = FloatArray(size)
     private val fy = FloatArray(size)
 
+    // What [applyTuning] can change; the defaults are [config]'s, so an untuned field (the
+    // controller's layout) steps exactly as it always has.
+    private var repulsion = config.repulsion
+    private var cutoffSq = 0f
+    private val charge = FloatArray(size) { 1f }
+    private val restLength = FloatArray(springs.size / 2) { config.idealEdgeLength }
+    private val stiffness = FloatArray(springs.size / 2) { config.attraction }
+    private var gravity = config.gravity
+    private var collisionPadding = COLLISION_PADDING
+    private var collisionStrength = COLLISION_STRENGTH
+
+    /**
+     * Applies [tuning]'s forces: [nodeKinds] holds each node's [MemoryGraphNodeKind] ordinal (its
+     * charge) and [springKinds] each spring's [MemoryGraphEdgeKind] ordinal (its rest length and
+     * stiffness), in the orders the field was built with (see [springKindsOf]).
+     */
+    fun applyTuning(tuning: MemoryGraphTuning, nodeKinds: IntArray, springKinds: IntArray) {
+        repulsion = tuning.repulsion
+        cutoffSq = tuning.repulsionCutoff * tuning.repulsionCutoff
+        val nodeKindValues = MemoryGraphNodeKind.entries
+        for (i in 0 until min(size, nodeKinds.size)) charge[i] = tuning.chargeOf(nodeKindValues[nodeKinds[i]])
+        val edgeKindValues = MemoryGraphEdgeKind.entries
+        for (s in 0 until min(restLength.size, springKinds.size)) {
+            val kind = edgeKindValues[springKinds[s]]
+            restLength[s] = tuning.lengthOf(kind)
+            stiffness[s] = tuning.stiffnessOf(kind)
+        }
+        gravity = tuning.gravity
+        collisionPadding = tuning.collisionPadding
+        collisionStrength = tuning.collisionStrength
+    }
+
     /** Node [index]'s position. */
     fun point(index: Int): MemoryGraphPoint = MemoryGraphPoint(x[index], y[index])
 
@@ -153,7 +187,7 @@ class MemoryGraphForceField(
 
     /**
      * One live step under [motion]: the forces scaled by the cooling [alpha] (1 when hot, decaying
-     * toward [MemoryGraphMotion.ALPHA_MIN]), [MemoryGraphMotion.damping] friction and a speed cap.
+     * toward [MemoryGraphTuning.alphaMin]), [MemoryGraphMotion.damping] friction and a speed cap.
      * At [MemoryGraphMotion.forGraph]'s small-graph tuning and alpha 1 it is exactly [step].
      */
     fun step(pinned: Int, motion: MemoryGraphMotion, alpha: Float): Float {
@@ -181,8 +215,9 @@ class MemoryGraphForceField(
                 val distanceSq = max(dx * dx + dy * dy, MIN_DISTANCE_SQ)
                 val distance = sqrt(distanceSq)
                 // Drawn circles that overlap push apart harder; point masses have no radii.
-                val overlap = radii?.let { r -> max(0f, r[i] + r[j] + COLLISION_PADDING - distance) * COLLISION_STRENGTH } ?: 0f
-                val force = config.repulsion / distanceSq + overlap
+                val overlap = radii?.let { r -> max(0f, r[i] + r[j] + collisionPadding - distance) * collisionStrength } ?: 0f
+                val repels = cutoffSq == 0f || distanceSq <= cutoffSq
+                val force = (if (repels) repulsion * (charge[i] * charge[j]) / distanceSq else 0f) + overlap
                 val px = dx / distance * force
                 val py = dy / distance * force
                 fx[i] += px
@@ -201,7 +236,8 @@ class MemoryGraphForceField(
             val dx = x[b] - x[a]
             val dy = y[b] - y[a]
             val distance = max(sqrt(dx * dx + dy * dy), MIN_DISTANCE)
-            val force = config.attraction * (distance - config.idealEdgeLength)
+            val spring = s / 2
+            val force = stiffness[spring] * (distance - restLength[spring])
             val px = dx / distance * force
             val py = dy / distance * force
             fx[a] += px
@@ -217,8 +253,8 @@ class MemoryGraphForceField(
         var fastest = 0f
         for (i in 0 until size) {
             if (i == pinned) continue
-            vx[i] = (vx[i] + fx[i] - x[i] * config.gravity) * config.damping
-            vy[i] = (vy[i] + fy[i] - y[i] * config.gravity) * config.damping
+            vx[i] = (vx[i] + fx[i] - x[i] * gravity) * config.damping
+            vy[i] = (vy[i] + fy[i] - y[i] * gravity) * config.damping
             val speed = sqrt(vx[i] * vx[i] + vy[i] * vy[i])
             val scale = if (speed > config.maxStep) config.maxStep / speed else 1f
             x[i] += vx[i] * scale
@@ -233,8 +269,8 @@ class MemoryGraphForceField(
         var fastest = 0f
         for (i in 0 until size) {
             if (i == pinned) continue
-            vx[i] = (vx[i] + (fx[i] - x[i] * config.gravity) * alpha) * motion.damping
-            vy[i] = (vy[i] + (fy[i] - y[i] * config.gravity) * alpha) * motion.damping
+            vx[i] = (vx[i] + (fx[i] - x[i] * gravity) * alpha) * motion.damping
+            vy[i] = (vy[i] + (fy[i] - y[i] * gravity) * alpha) * motion.damping
             val speed = sqrt(vx[i] * vx[i] + vy[i] * vy[i])
             val scale = if (speed > motion.maxSpeed) motion.maxSpeed / speed else 1f
             if (motion.clampVelocity) {
@@ -265,6 +301,17 @@ class MemoryGraphForceField(
             return pairs.toIntArray()
         }
 
+        /** Each of [springsOf]'s springs' [MemoryGraphEdgeKind] ordinal, in the same order. */
+        fun springKindsOf(view: MemoryGraphView): IntArray {
+            val indexById = view.nodes.withIndex().associate { (index, node) -> node.id to index }
+            val kinds = ArrayList<Int>(view.edges.size)
+            view.edges.forEach { edge ->
+                val ends = listOfNotNull(indexById[edge.fromId], indexById[edge.toId]).distinct()
+                if (ends.size == 2) kinds += edge.kind.ordinal
+            }
+            return kinds.toIntArray()
+        }
+
         private const val MIN_DISTANCE = 0.01f
         private const val MIN_DISTANCE_SQ = 1f
         private const val COINCIDENT_NUDGE = 0.5f
@@ -275,11 +322,11 @@ class MemoryGraphForceField(
 
 /**
  * How the memory page's live view steps a [MemoryGraphForceField], tuned by how crowded the graph
- * is. A small graph (one agent's star) keeps the field's own friction and per-step cap and never
- * cools, so it moves as it always has; a crowded one (the fleet view: hundreds of label groups and
- * hubs shared by every agent) gets more friction, a lower speed cap that holds velocity too, and
- * d3-force style cooling: an alpha starting at 1 decays each step and scales the forces, and the
- * view stops once it falls below [ALPHA_MIN], so the graph comes to rest within a few seconds.
+ * is ([MemoryGraphTuning]'s thresholds). A sparse graph (one agent's star) keeps the sparse
+ * friction and per-step cap and never cools, so it moves as it always has; a crowded one (the fleet
+ * view: hundreds of label groups and hubs shared by every agent) gets more friction, a lower speed
+ * cap that holds velocity too, and d3-force style cooling: alpha decays each step and scales the
+ * forces, and the view stops once it falls below [MemoryGraphTuning.alphaMin].
  */
 @Immutable
 data class MemoryGraphMotion(
@@ -296,37 +343,27 @@ data class MemoryGraphMotion(
     fun cool(alpha: Float): Float = alpha * (1f - alphaDecay)
 
     companion object {
-        /** Below this alpha a cooling simulation stops. */
-        const val ALPHA_MIN: Float = 0.001f
-
-        /** Crowding at or below which a graph keeps the small-graph tuning. */
-        private const val SPARSE = 40f
-
-        /** Crowding at or above which a graph gets the full crowded tuning. */
-        private const val CROWDED = 240f
-
-        private const val CROWDED_DAMPING = 0.6f
-        private const val CROWDED_MAX_SPEED = 12f
-
-        /** Steps a fully crowded graph takes to cool from 1 to [ALPHA_MIN] (about 2.5 s at 60 fps). */
-        private const val CROWDED_COOLING_STEPS = 150
-
         /**
-         * The tuning for a graph of [nodes] nodes and [edges] edges. Crowding counts every node plus
-         * twice each edge beyond a tree's, so a hub-heavy graph tunes as crowded sooner than a star.
+         * The motion for a graph of [nodes] nodes and [edges] edges under [tuning]. Crowding counts
+         * every node plus twice each edge beyond a tree's, so a hub-heavy graph tunes as crowded
+         * sooner than a star.
          */
-        fun forGraph(nodes: Int, edges: Int, config: MemoryGraphLayoutConfig = MemoryGraphLayoutConfig()): MemoryGraphMotion {
+        fun forGraph(nodes: Int, edges: Int, tuning: MemoryGraphTuning = MemoryGraphTuning()): MemoryGraphMotion {
             val crowding = nodes + 2 * (edges - nodes).coerceAtLeast(0)
-            val t = ((crowding - SPARSE) / (CROWDED - SPARSE)).coerceIn(0f, 1f)
-            if (t == 0f) return MemoryGraphMotion(config.damping, config.maxStep, alphaDecay = 0f, clampVelocity = false)
-            val coolingSteps = CROWDED_COOLING_STEPS / t
+            val span = (tuning.crowdedCrowding - tuning.sparseCrowding).coerceAtLeast(1f)
+            val t = ((crowding - tuning.sparseCrowding) / span).coerceIn(0f, 1f)
+            if (t == 0f) return MemoryGraphMotion(tuning.sparseDamping, tuning.sparseMaxSpeed, alphaDecay = 0f, clampVelocity = false)
+            val coolingSteps = tuning.coolingFrames.coerceAtLeast(1f) / t
+            val alphaRatio = (tuning.alphaMin / tuning.alphaStart.coerceAtLeast(tuning.alphaMin)).coerceIn(MIN_RATIO, 1f)
             return MemoryGraphMotion(
-                damping = lerp(config.damping, CROWDED_DAMPING, t),
-                maxSpeed = lerp(config.maxStep, CROWDED_MAX_SPEED, t),
-                alphaDecay = 1f - ALPHA_MIN.toDouble().pow(1.0 / coolingSteps).toFloat(),
+                damping = lerp(tuning.sparseDamping, tuning.crowdedDamping, t),
+                maxSpeed = lerp(tuning.sparseMaxSpeed, tuning.crowdedMaxSpeed, t),
+                alphaDecay = 1f - alphaRatio.toDouble().pow(1.0 / coolingSteps).toFloat(),
                 clampVelocity = true,
             )
         }
+
+        private const val MIN_RATIO = 1e-9f
 
         private fun lerp(from: Float, to: Float, t: Float): Float = from + (to - from) * t
     }

@@ -42149,6 +42149,7 @@ final class com.letta.mobile.data.memory.graph/MemoryGraphForceField { // com.le
     final val size // com.letta.mobile.data.memory.graph/MemoryGraphForceField.size|{}size[0]
         final fun <get-size>(): kotlin/Int // com.letta.mobile.data.memory.graph/MemoryGraphForceField.size.<get-size>|<get-size>(){}[0]
 
+    final fun applyTuning(com.letta.mobile.data.memory.graph/MemoryGraphTuning, kotlin/IntArray, kotlin/IntArray) // com.letta.mobile.data.memory.graph/MemoryGraphForceField.applyTuning|applyTuning(com.letta.mobile.data.memory.graph.MemoryGraphTuning;kotlin.IntArray;kotlin.IntArray){}[0]
     final fun hold(kotlin/Int, com.letta.mobile.data.memory.graph/MemoryGraphPoint) // com.letta.mobile.data.memory.graph/MemoryGraphForceField.hold|hold(kotlin.Int;com.letta.mobile.data.memory.graph.MemoryGraphPoint){}[0]
     final fun place(kotlin/Int, com.letta.mobile.data.memory.graph/MemoryGraphPoint) // com.letta.mobile.data.memory.graph/MemoryGraphForceField.place|place(kotlin.Int;com.letta.mobile.data.memory.graph.MemoryGraphPoint){}[0]
     final fun point(kotlin/Int): com.letta.mobile.data.memory.graph/MemoryGraphPoint // com.letta.mobile.data.memory.graph/MemoryGraphForceField.point|point(kotlin.Int){}[0]
@@ -42159,6 +42160,7 @@ final class com.letta.mobile.data.memory.graph/MemoryGraphForceField { // com.le
         final const val FREE // com.letta.mobile.data.memory.graph/MemoryGraphForceField.Companion.FREE|{}FREE[0]
             final fun <get-FREE>(): kotlin/Int // com.letta.mobile.data.memory.graph/MemoryGraphForceField.Companion.FREE.<get-FREE>|<get-FREE>(){}[0]
 
+        final fun springKindsOf(com.letta.mobile.data.memory.graph/MemoryGraphView): kotlin/IntArray // com.letta.mobile.data.memory.graph/MemoryGraphForceField.Companion.springKindsOf|springKindsOf(com.letta.mobile.data.memory.graph.MemoryGraphView){}[0]
         final fun springsOf(com.letta.mobile.data.memory.graph/MemoryGraphView): kotlin/IntArray // com.letta.mobile.data.memory.graph/MemoryGraphForceField.Companion.springsOf|springsOf(com.letta.mobile.data.memory.graph.MemoryGraphView){}[0]
     }
 }
@@ -42270,10 +42272,7 @@ final class com.letta.mobile.data.memory.graph/MemoryGraphMotion { // com.letta.
     final fun toString(): kotlin/String // com.letta.mobile.data.memory.graph/MemoryGraphMotion.toString|toString(){}[0]
 
     final object Companion { // com.letta.mobile.data.memory.graph/MemoryGraphMotion.Companion|null[0]
-        final const val ALPHA_MIN // com.letta.mobile.data.memory.graph/MemoryGraphMotion.Companion.ALPHA_MIN|{}ALPHA_MIN[0]
-            final fun <get-ALPHA_MIN>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphMotion.Companion.ALPHA_MIN.<get-ALPHA_MIN>|<get-ALPHA_MIN>(){}[0]
-
-        final fun forGraph(kotlin/Int, kotlin/Int, com.letta.mobile.data.memory.graph/MemoryGraphLayoutConfig = ...): com.letta.mobile.data.memory.graph/MemoryGraphMotion // com.letta.mobile.data.memory.graph/MemoryGraphMotion.Companion.forGraph|forGraph(kotlin.Int;kotlin.Int;com.letta.mobile.data.memory.graph.MemoryGraphLayoutConfig){}[0]
+        final fun forGraph(kotlin/Int, kotlin/Int, com.letta.mobile.data.memory.graph/MemoryGraphTuning = ...): com.letta.mobile.data.memory.graph/MemoryGraphMotion // com.letta.mobile.data.memory.graph/MemoryGraphMotion.Companion.forGraph|forGraph(kotlin.Int;kotlin.Int;com.letta.mobile.data.memory.graph.MemoryGraphTuning){}[0]
     }
 }
 
@@ -42307,6 +42306,95 @@ final class com.letta.mobile.data.memory.graph/MemoryGraphSize { // com.letta.mo
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.memory.graph/MemoryGraphSize.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.memory.graph/MemoryGraphSize.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.memory.graph/MemoryGraphSize.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.memory.graph/MemoryGraphTuning { // com.letta.mobile.data.memory.graph/MemoryGraphTuning|null[0]
+    constructor <init>(kotlin/Float = ..., kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphNodeKind, kotlin/Float> = ..., kotlin/Float = ..., kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphEdgeKind, kotlin/Float> = ..., kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphEdgeKind, kotlin/Float> = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphNodeKind, kotlin/Float> = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ...) // com.letta.mobile.data.memory.graph/MemoryGraphTuning.<init>|<init>(kotlin.Float;kotlin.collections.Map<com.letta.mobile.data.memory.MemoryGraphNodeKind,kotlin.Float>;kotlin.Float;kotlin.collections.Map<com.letta.mobile.data.memory.MemoryGraphEdgeKind,kotlin.Float>;kotlin.collections.Map<com.letta.mobile.data.memory.MemoryGraphEdgeKind,kotlin.Float>;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.collections.Map<com.letta.mobile.data.memory.MemoryGraphNodeKind,kotlin.Float>;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
+
+    final val alphaMin // com.letta.mobile.data.memory.graph/MemoryGraphTuning.alphaMin|{}alphaMin[0]
+        final fun <get-alphaMin>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.alphaMin.<get-alphaMin>|<get-alphaMin>(){}[0]
+    final val alphaStart // com.letta.mobile.data.memory.graph/MemoryGraphTuning.alphaStart|{}alphaStart[0]
+        final fun <get-alphaStart>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.alphaStart.<get-alphaStart>|<get-alphaStart>(){}[0]
+    final val collisionPadding // com.letta.mobile.data.memory.graph/MemoryGraphTuning.collisionPadding|{}collisionPadding[0]
+        final fun <get-collisionPadding>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.collisionPadding.<get-collisionPadding>|<get-collisionPadding>(){}[0]
+    final val collisionRadiusScale // com.letta.mobile.data.memory.graph/MemoryGraphTuning.collisionRadiusScale|{}collisionRadiusScale[0]
+        final fun <get-collisionRadiusScale>(): kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphNodeKind, kotlin/Float> // com.letta.mobile.data.memory.graph/MemoryGraphTuning.collisionRadiusScale.<get-collisionRadiusScale>|<get-collisionRadiusScale>(){}[0]
+    final val collisionStrength // com.letta.mobile.data.memory.graph/MemoryGraphTuning.collisionStrength|{}collisionStrength[0]
+        final fun <get-collisionStrength>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.collisionStrength.<get-collisionStrength>|<get-collisionStrength>(){}[0]
+    final val coolingFrames // com.letta.mobile.data.memory.graph/MemoryGraphTuning.coolingFrames|{}coolingFrames[0]
+        final fun <get-coolingFrames>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.coolingFrames.<get-coolingFrames>|<get-coolingFrames>(){}[0]
+    final val crowdedCrowding // com.letta.mobile.data.memory.graph/MemoryGraphTuning.crowdedCrowding|{}crowdedCrowding[0]
+        final fun <get-crowdedCrowding>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.crowdedCrowding.<get-crowdedCrowding>|<get-crowdedCrowding>(){}[0]
+    final val crowdedDamping // com.letta.mobile.data.memory.graph/MemoryGraphTuning.crowdedDamping|{}crowdedDamping[0]
+        final fun <get-crowdedDamping>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.crowdedDamping.<get-crowdedDamping>|<get-crowdedDamping>(){}[0]
+    final val crowdedMaxSpeed // com.letta.mobile.data.memory.graph/MemoryGraphTuning.crowdedMaxSpeed|{}crowdedMaxSpeed[0]
+        final fun <get-crowdedMaxSpeed>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.crowdedMaxSpeed.<get-crowdedMaxSpeed>|<get-crowdedMaxSpeed>(){}[0]
+    final val gravity // com.letta.mobile.data.memory.graph/MemoryGraphTuning.gravity|{}gravity[0]
+        final fun <get-gravity>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.gravity.<get-gravity>|<get-gravity>(){}[0]
+    final val maxFramesPerHeat // com.letta.mobile.data.memory.graph/MemoryGraphTuning.maxFramesPerHeat|{}maxFramesPerHeat[0]
+        final fun <get-maxFramesPerHeat>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.maxFramesPerHeat.<get-maxFramesPerHeat>|<get-maxFramesPerHeat>(){}[0]
+    final val nodeCharge // com.letta.mobile.data.memory.graph/MemoryGraphTuning.nodeCharge|{}nodeCharge[0]
+        final fun <get-nodeCharge>(): kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphNodeKind, kotlin/Float> // com.letta.mobile.data.memory.graph/MemoryGraphTuning.nodeCharge.<get-nodeCharge>|<get-nodeCharge>(){}[0]
+    final val repulsion // com.letta.mobile.data.memory.graph/MemoryGraphTuning.repulsion|{}repulsion[0]
+        final fun <get-repulsion>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.repulsion.<get-repulsion>|<get-repulsion>(){}[0]
+    final val repulsionCutoff // com.letta.mobile.data.memory.graph/MemoryGraphTuning.repulsionCutoff|{}repulsionCutoff[0]
+        final fun <get-repulsionCutoff>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.repulsionCutoff.<get-repulsionCutoff>|<get-repulsionCutoff>(){}[0]
+    final val settleSpeed // com.letta.mobile.data.memory.graph/MemoryGraphTuning.settleSpeed|{}settleSpeed[0]
+        final fun <get-settleSpeed>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.settleSpeed.<get-settleSpeed>|<get-settleSpeed>(){}[0]
+    final val sparseCrowding // com.letta.mobile.data.memory.graph/MemoryGraphTuning.sparseCrowding|{}sparseCrowding[0]
+        final fun <get-sparseCrowding>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.sparseCrowding.<get-sparseCrowding>|<get-sparseCrowding>(){}[0]
+    final val sparseDamping // com.letta.mobile.data.memory.graph/MemoryGraphTuning.sparseDamping|{}sparseDamping[0]
+        final fun <get-sparseDamping>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.sparseDamping.<get-sparseDamping>|<get-sparseDamping>(){}[0]
+    final val sparseMaxSpeed // com.letta.mobile.data.memory.graph/MemoryGraphTuning.sparseMaxSpeed|{}sparseMaxSpeed[0]
+        final fun <get-sparseMaxSpeed>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.sparseMaxSpeed.<get-sparseMaxSpeed>|<get-sparseMaxSpeed>(){}[0]
+    final val springLength // com.letta.mobile.data.memory.graph/MemoryGraphTuning.springLength|{}springLength[0]
+        final fun <get-springLength>(): kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphEdgeKind, kotlin/Float> // com.letta.mobile.data.memory.graph/MemoryGraphTuning.springLength.<get-springLength>|<get-springLength>(){}[0]
+    final val springStiffness // com.letta.mobile.data.memory.graph/MemoryGraphTuning.springStiffness|{}springStiffness[0]
+        final fun <get-springStiffness>(): kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphEdgeKind, kotlin/Float> // com.letta.mobile.data.memory.graph/MemoryGraphTuning.springStiffness.<get-springStiffness>|<get-springStiffness>(){}[0]
+
+    final fun chargeOf(com.letta.mobile.data.memory/MemoryGraphNodeKind): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.chargeOf|chargeOf(com.letta.mobile.data.memory.MemoryGraphNodeKind){}[0]
+    final fun component1(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component1|component1(){}[0]
+    final fun component10(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component10|component10(){}[0]
+    final fun component11(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component11|component11(){}[0]
+    final fun component12(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component12|component12(){}[0]
+    final fun component13(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component13|component13(){}[0]
+    final fun component14(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component14|component14(){}[0]
+    final fun component15(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component15|component15(){}[0]
+    final fun component16(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component16|component16(){}[0]
+    final fun component17(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component17|component17(){}[0]
+    final fun component18(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component18|component18(){}[0]
+    final fun component19(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component19|component19(){}[0]
+    final fun component2(): kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphNodeKind, kotlin/Float> // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component2|component2(){}[0]
+    final fun component20(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component20|component20(){}[0]
+    final fun component3(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphEdgeKind, kotlin/Float> // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component4|component4(){}[0]
+    final fun component5(): kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphEdgeKind, kotlin/Float> // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component5|component5(){}[0]
+    final fun component6(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component6|component6(){}[0]
+    final fun component7(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component7|component7(){}[0]
+    final fun component8(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component8|component8(){}[0]
+    final fun component9(): kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphNodeKind, kotlin/Float> // com.letta.mobile.data.memory.graph/MemoryGraphTuning.component9|component9(){}[0]
+    final fun copy(kotlin/Float = ..., kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphNodeKind, kotlin/Float> = ..., kotlin/Float = ..., kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphEdgeKind, kotlin/Float> = ..., kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphEdgeKind, kotlin/Float> = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin.collections/Map<com.letta.mobile.data.memory/MemoryGraphNodeKind, kotlin/Float> = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ...): com.letta.mobile.data.memory.graph/MemoryGraphTuning // com.letta.mobile.data.memory.graph/MemoryGraphTuning.copy|copy(kotlin.Float;kotlin.collections.Map<com.letta.mobile.data.memory.MemoryGraphNodeKind,kotlin.Float>;kotlin.Float;kotlin.collections.Map<com.letta.mobile.data.memory.MemoryGraphEdgeKind,kotlin.Float>;kotlin.collections.Map<com.letta.mobile.data.memory.MemoryGraphEdgeKind,kotlin.Float>;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.collections.Map<com.letta.mobile.data.memory.MemoryGraphNodeKind,kotlin.Float>;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.memory.graph/MemoryGraphTuning.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.memory.graph/MemoryGraphTuning.hashCode|hashCode(){}[0]
+    final fun lengthOf(com.letta.mobile.data.memory/MemoryGraphEdgeKind): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.lengthOf|lengthOf(com.letta.mobile.data.memory.MemoryGraphEdgeKind){}[0]
+    final fun radiusScaleOf(com.letta.mobile.data.memory/MemoryGraphNodeKind): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.radiusScaleOf|radiusScaleOf(com.letta.mobile.data.memory.MemoryGraphNodeKind){}[0]
+    final fun stiffnessOf(com.letta.mobile.data.memory/MemoryGraphEdgeKind): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphTuning.stiffnessOf|stiffnessOf(com.letta.mobile.data.memory.MemoryGraphEdgeKind){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.memory.graph/MemoryGraphTuning.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.memory.graph/MemoryGraphTuning> { // com.letta.mobile.data.memory.graph/MemoryGraphTuning.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.memory.graph/MemoryGraphTuning.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.memory.graph/MemoryGraphTuning.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.memory.graph/MemoryGraphTuning.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.memory.graph/MemoryGraphTuning // com.letta.mobile.data.memory.graph/MemoryGraphTuning.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.memory.graph/MemoryGraphTuning) // com.letta.mobile.data.memory.graph/MemoryGraphTuning.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.memory.graph.MemoryGraphTuning){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.memory.graph/MemoryGraphTuning.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.memory.graph/MemoryGraphTuning.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.memory.graph/MemoryGraphTuning> // com.letta.mobile.data.memory.graph/MemoryGraphTuning.Companion.serializer|serializer(){}[0]
+    }
 }
 
 final class com.letta.mobile.data.memory.graph/MemoryGraphView { // com.letta.mobile.data.memory.graph/MemoryGraphView|null[0]
@@ -79330,6 +79418,20 @@ final object com.letta.mobile.data.memory.graph/MemoryGraphNodeMetrics { // com.
         final fun <get-MIN_TOUCH_RADIUS>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphNodeMetrics.MIN_TOUCH_RADIUS.<get-MIN_TOUCH_RADIUS>|<get-MIN_TOUCH_RADIUS>(){}[0]
 
     final fun radius(kotlin/Int): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphNodeMetrics.radius|radius(kotlin.Int){}[0]
+}
+
+final object com.letta.mobile.data.memory.graph/MemoryGraphTunings { // com.letta.mobile.data.memory.graph/MemoryGraphTunings|null[0]
+    final val current // com.letta.mobile.data.memory.graph/MemoryGraphTunings.current|{}current[0]
+        final fun <get-current>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.memory.graph/MemoryGraphTuning> // com.letta.mobile.data.memory.graph/MemoryGraphTunings.current.<get-current>|<get-current>(){}[0]
+    final val reheatRequests // com.letta.mobile.data.memory.graph/MemoryGraphTunings.reheatRequests|{}reheatRequests[0]
+        final fun <get-reheatRequests>(): kotlinx.coroutines.flow/StateFlow<kotlin/Int> // com.letta.mobile.data.memory.graph/MemoryGraphTunings.reheatRequests.<get-reheatRequests>|<get-reheatRequests>(){}[0]
+
+    final fun decode(kotlin/String): com.letta.mobile.data.memory.graph/MemoryGraphTuning? // com.letta.mobile.data.memory.graph/MemoryGraphTunings.decode|decode(kotlin.String){}[0]
+    final fun encode(com.letta.mobile.data.memory.graph/MemoryGraphTuning): kotlin/String // com.letta.mobile.data.memory.graph/MemoryGraphTunings.encode|encode(com.letta.mobile.data.memory.graph.MemoryGraphTuning){}[0]
+    final fun kotlinSource(com.letta.mobile.data.memory.graph/MemoryGraphTuning): kotlin/String // com.letta.mobile.data.memory.graph/MemoryGraphTunings.kotlinSource|kotlinSource(com.letta.mobile.data.memory.graph.MemoryGraphTuning){}[0]
+    final fun reheat() // com.letta.mobile.data.memory.graph/MemoryGraphTunings.reheat|reheat(){}[0]
+    final fun reset() // com.letta.mobile.data.memory.graph/MemoryGraphTunings.reset|reset(){}[0]
+    final fun set(com.letta.mobile.data.memory.graph/MemoryGraphTuning) // com.letta.mobile.data.memory.graph/MemoryGraphTunings.set|set(com.letta.mobile.data.memory.graph.MemoryGraphTuning){}[0]
 }
 
 final object com.letta.mobile.data.memory.graph/MemoryGraphViews { // com.letta.mobile.data.memory.graph/MemoryGraphViews|null[0]

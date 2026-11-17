@@ -5358,6 +5358,14 @@ public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphOv
 	public final fun getLambda$284266688$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
+public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphTuningPanelKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphTuningPanelKt;
+	public fun <init> ()V
+	public final fun getLambda$-1757374442$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-2015450785$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1536536983$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
 public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeCardKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeCardKt;
 	public fun <init> ()V
