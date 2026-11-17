@@ -43,6 +43,16 @@ class MessageListPageGuardTest {
     }
 
     @Test
+    fun oversizedSingleRowPreservesWrappedPaginationMetadata() {
+        val page = buildJsonObject {
+            put("messages", JsonArray(listOf(msg("one", 1000))))
+            put("has_more", true)
+            put("next_before", "earlier")
+        }
+        assertEquals(page, MessageListPageGuard.bound(page, maxPageBytes = 100))
+    }
+
+    @Test
     fun singleReturnBeyondLogicalCapKeepsExplicitTooLargeImage() {
         val returned = imageReturn(33_554_432)
         val result = MessageListPageGuard.bound(JsonArray(listOf(returned)))

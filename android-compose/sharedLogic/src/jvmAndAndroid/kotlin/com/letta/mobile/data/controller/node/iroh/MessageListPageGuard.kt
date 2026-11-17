@@ -68,19 +68,18 @@ object MessageListPageGuard {
         val rowBudget = maxResponseBytes - PAGE_METADATA_BYTES
         val pageBudget = minOf(maxPageBytes, rowBudget)
         val original = extractMessages(projected) ?: return projected.alsoLogUnboundableShape()
+        fun preservePageShape(rows: List<JsonElement>): JsonElement = when {
+            rows.indices.all { rows[it] === original[it] } -> projected
+            projected is JsonObject -> JsonObject(projected + ("messages" to JsonArray(rows)))
+            else -> JsonArray(rows)
+        }
         val lengths = IntArray(original.size) { index -> byteLen(original[index]) }
         val messages = original.mapIndexed { index, row ->
             if (lengths[index] <= rowBudget) row else stripInlineImages(row).also { lengths[index] = byteLen(it) }
         }.toMutableList()
         val totalBytes = totalByteLen(lengths)
         if (totalBytes <= pageBudget) {
-            val unchanged = messages.indices.all { messages[it] === original[it] }
-            val rows = JsonArray(messages)
-            return when {
-                unchanged -> projected
-                projected is JsonObject -> JsonObject(projected + ("messages" to rows))
-                else -> rows
-            }
+            return preservePageShape(messages)
         }
         // Keep the newest rows that fit under the budget.
         val keptIndices = ArrayDeque<Int>()
@@ -100,7 +99,7 @@ object MessageListPageGuard {
         val kept = keptIndices.map { messages[it] }
         val trimmed = kept.size < messages.size
         val keptArray = JsonArray(kept.toList())
-        if (!trimmed) return keptArray
+        if (!trimmed) return preservePageShape(kept)
         // P0.2: `kept` is always oldest->newest (addFirst on the reversed newest-first
         // stream, addLast on the natural newest-first stream). The oldest kept row —
         // the `next_before` cursor for the older window — is at the FRONT when
