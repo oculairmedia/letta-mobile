@@ -10,6 +10,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.toAwtImage
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
@@ -42,6 +46,24 @@ import kotlinx.collections.immutable.toPersistentList
  * and only the part of the held copy that prompt pushes above the line dissolves.
  */
 class TimelineStickyPromptShadingUiTest {
+    @Test
+    fun bottomFadeKeepsContentReadableUntilNearEdge() = runComposeUiTest {
+        setContent {
+            Box(Modifier.background(Color.Black)) {
+                Box(
+                    Modifier.size(100.dp).testTag("bottom-fade-probe")
+                        .timelineFadingEdges(TimelineFadeAlphas(top = 0f, bottom = 1f))
+                        .background(Color.White),
+                )
+            }
+        }
+        val pixels = onNodeWithTag("bottom-fade-probe").captureToImage().toPixelMap()
+        val inset = with(density) { 20.dp.roundToPx() }
+        val brightness = pixels[pixels.width / 2, pixels.height - inset].red
+        assertTrue(brightness >= 0.9f, "20dp from bottom should remain readable: $brightness")
+        assertTrue(pixels[pixels.width / 2, pixels.height - 1].red < 0.2f)
+    }
+
     private val longAnswer = (1..60).joinToString("\n\n") { "Paragraph $it of a long answer." }
     private val messages = listOf(
         UiMessage(id = "q1", role = "user", content = "First question", timestamp = "2026-09-12T12:00:00Z"),

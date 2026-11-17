@@ -6,9 +6,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasText
@@ -22,6 +27,12 @@ import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.presence.RunPhase
+import com.letta.mobile.ui.ambient.AmbientMotionStatus
+import com.letta.mobile.ui.chat.surface.ambient.AmbientGlowPlacement
+import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
+import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
+import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.canvas.CanvasLayout
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -60,7 +71,7 @@ class ChatSurfaceEdgeToEdgeUiTest {
         )
     }
 
-    private class Port(messages: List<UiMessage>) : ChatSessionPort {
+    private class Port(messages: List<UiMessage>, active: Boolean = false) : ChatSessionPort {
         override val uiState = MutableStateFlow(
             ChatUiState(
                 conversationState = ConversationState.Ready("conv-1"),
@@ -68,6 +79,7 @@ class ChatSurfaceEdgeToEdgeUiTest {
                 isLoadingMessages = false,
                 agentName = "Meridian",
                 agentId = "agent-1",
+                runPhase = if (active) RunPhase.REASONING else RunPhase.IDLE,
             ),
         )
         override val composer = MutableStateFlow(
@@ -83,19 +95,29 @@ class ChatSurfaceEdgeToEdgeUiTest {
     private fun ComposeUiTest.show(
         presentation: ChatSurfacePresentation,
         floating: Boolean = false,
+        active: Boolean = false,
         canvas: (@androidx.compose.runtime.Composable (ChatCanvasActions) -> Unit)? = null,
     ) {
         setContent {
             val platform = ChatSurfacePlatform(
                 showKeyboardHints = false,
+                pageBackground = if (active) { content ->
+                    Box(Modifier.fillMaxSize()) {
+                        ChatPanelAmbientGlow(ChatAmbient(AmbientMotionStatus.Running), AmbientGlowPlacement.Halo, Modifier.fillMaxSize())
+                        content()
+                    }
+                } else null,
                 timelineOverlay = { Box(Modifier.size(1.dp).testTag(OVERLAY_PROBE)) },
                 topChromeInset = if (floating) 0.dp else TOP_CHROME,
             )
-            MaterialTheme {
-                CompositionLocalProvider(LocalShellFloatingChromeInset provides if (floating) TOP_CHROME else 0.dp) {
+            MaterialTheme(colorScheme = if (active) darkColorScheme() else MaterialTheme.colorScheme) {
+                CompositionLocalProvider(
+                    LocalShellFloatingChromeInset provides if (floating) TOP_CHROME else 0.dp,
+                    LocalReducedMotion provides active,
+                ) {
                     ProvideLettaHost(LettaHost.Touch) {
                         ChatSurface(
-                            port = Port(messages),
+                            port = Port(messages, active),
                             presentation = presentation,
                             onIntent = {},
                             host = ChatSurfaceHost(openCanvas = {}),
@@ -108,6 +130,28 @@ class ChatSurfaceEdgeToEdgeUiTest {
             }
         }
         waitForIdle()
+    }
+
+    @Test
+    fun scrolledActiveTimelineKeepsTextBrightNearItsBottom() = runComposeUiTest {
+        show(ChatSurfacePresentation.ChatFirst, active = true)
+        onNodeWithTag(ChatTimelineTags.LIST).performScrollToIndex(10)
+        waitForIdle()
+        val list = onNodeWithTag(ChatTimelineTags.LIST).getBoundsInRoot()
+        val bottom = with(density) { list.bottom.toPx().toInt() }
+        val inset = with(density) { 20.dp.roundToPx() }
+        var brightest = 0f
+        repeat(8) {
+            val pixels = onRoot().captureToImage().toPixelMap()
+            val y = (bottom - inset).coerceIn(0, pixels.height - 1)
+            for (x in 0 until pixels.width) {
+                val c = pixels[x, y]
+                brightest = maxOf(brightest, c.red + c.green + c.blue)
+            }
+            onNodeWithTag(ChatTimelineTags.LIST).performTouchInput { swipeDown() }
+            waitForIdle()
+        }
+        assertTrue(brightest >= 2.4f, "scrolled text 20dp from list bottom: $brightest")
     }
 
     @Test

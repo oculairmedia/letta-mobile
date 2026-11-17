@@ -30,6 +30,10 @@ object LettaComponentDimens {
     /** How far a border beam's soft glow reaches inward from the edge (lettaBorderBeam, Orbit style). */
     val beamGlowOrbit: Dp = 20.dp
 
+    /** Composer beam dimensions and intensity relative to the standard orbit. */
+    internal const val composerBeamWidthScale = 0.5f
+    internal const val composerBeamIntensity = 0.6f
+
     /** The beam's glow reach on small controls (OrbitCompact): icon buttons, avatars, chips. */
     val beamGlowCompact: Dp = 4.dp
 

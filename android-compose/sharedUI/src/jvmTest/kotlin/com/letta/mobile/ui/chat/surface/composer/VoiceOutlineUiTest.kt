@@ -3,6 +3,14 @@
 package com.letta.mobile.ui.chat.surface.composer
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.captureToImage
+import com.letta.mobile.data.presence.RunPhase
+import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.theme.tokens.LocalLettaReducedMotion
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -114,6 +122,65 @@ private object UnusedOutlineResponder : VoiceResponder {
  * tablet and desktop widths in both input idioms.
  */
 class VoiceOutlineUiTest {
+    @Test
+    fun smallWorkingOutlineUsesQuietShader() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalReducedMotion provides true, LocalLettaReducedMotion provides true) {
+                    Box(
+                        Modifier.size(64.dp).testTag("small-outline-probe").background(Color.Black)
+                            .composerOutline(RoundedCornerShape(8.dp), ChatUiState(runPhase = RunPhase.WORKING)),
+                    )
+                }
+            }
+        }
+        val pixels = onNodeWithTag("small-outline-probe").captureToImage().toPixelMap()
+        var energy = 0f
+        for (y in 0 until pixels.height) for (x in 0 until pixels.width) {
+            val c = pixels[x, y]
+            energy += c.red + c.green + c.blue
+        }
+        assertTrue(energy < 353f, "small working shader energy: $energy")
+    }
+
+    @Test
+    fun workingOutlineHasQuietBorderEnergy() = runComposeUiTest {
+        var phase by mutableStateOf(RunPhase.WORKING)
+        setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalReducedMotion provides true, LocalLettaReducedMotion provides true) {
+                    Box(
+                        Modifier.size(width = 240.dp, height = 100.dp).testTag("outline-probe")
+                            .background(Color.Black)
+                            .composerOutline(RoundedCornerShape(12.dp), ChatUiState(runPhase = phase)),
+                    )
+                }
+            }
+        }
+        fun energy(): Float {
+            val pixels = onNodeWithTag("outline-probe").captureToImage().toPixelMap()
+            var total = 0f
+            for (y in 0 until pixels.height) for (x in 0 until pixels.width) {
+                if (inBorderBand(x, y, pixels.width, pixels.height)) {
+                    val c = pixels[x, y]
+                    total += c.red + c.green + c.blue
+                }
+            }
+            return total
+        }
+        val working = energy()
+        runOnIdle { phase = RunPhase.REASONING }
+        waitForIdle()
+        val thinking = energy()
+        println("composer border energy: working=$working thinking=$thinking")
+        assertTrue(working < 453f, "working border energy: $working")
+        assertTrue(thinking > 1f, "thinking border must rise above pixel noise: $thinking")
+        assertTrue(thinking < working, "thinking=$thinking should be lighter than working=$working")
+    }
+
+    private fun inBorderBand(x: Int, y: Int, width: Int, height: Int): Boolean =
+        x < 20 || x >= width - 20 || y < 20 || y >= height - 20
+
     /** The voice states that keep the composer as it is, with the placeholder and outline colour each shows. */
     private val running: List<Triple<VoiceModeState, String, VoiceGlowRole>> = listOf(
         Triple(VoiceModeState.Listening, "Listening…", VoiceGlowRole.You),

@@ -41,8 +41,7 @@ internal class BorderBeamFallback : BorderBeamRenderer {
     private val segment = Path()
     private val measure = PathMeasure()
     private val perimeterAngles = FloatArray(ANGLE_SAMPLES + 1)
-    private var strokeDensity = Float.NaN
-    private var strokeStyle: LettaBeamStyle? = null
+    private var strokeKey: StrokeKey? = null
     private var cachedStrokes: BeamStrokes? = null
     private var cachedPalette: BeamPalette? = null
     private var gradientColors: List<Color> = emptyList()
@@ -56,9 +55,9 @@ internal class BorderBeamFallback : BorderBeamRenderer {
         ensureOutline(frame.cornersPx)
         ensurePalette(frame.palette)
         val strength = frame.alpha.coerceIn(0f, 1f)
-        val strokes = strokesFor(frame.style)
+        val strokes = strokesFor(frame.style, frame.widthScale)
         clipPath(clip) {
-            if (frame.style == LettaBeamStyle.Sweep) {
+            if (frame.style == LettaBeamStyle.Sweep || frame.style == LettaBeamStyle.SweepTop) {
                 drawSweep(frame, strength, strokes)
             } else {
                 drawOrbit(frame, strength, strokes)
@@ -78,11 +77,11 @@ internal class BorderBeamFallback : BorderBeamRenderer {
     }
 
     /** Density and style, rather than the moving phase, determine the strokes. */
-    private fun DrawScope.strokesFor(style: LettaBeamStyle): BeamStrokes {
-        if (strokeDensity != density || strokeStyle != style) {
-            cachedStrokes = BeamStrokes(this, style)
-            strokeDensity = density
-            strokeStyle = style
+    private fun DrawScope.strokesFor(style: LettaBeamStyle, widthScale: Float): BeamStrokes {
+        val key = StrokeKey(density, style, widthScale)
+        if (strokeKey != key) {
+            cachedStrokes = BeamStrokes(this, style, widthScale)
+            strokeKey = key
         }
         return checkNotNull(cachedStrokes)
     }
@@ -169,10 +168,10 @@ internal class BorderBeamFallback : BorderBeamRenderer {
         drawPath(segment, brush, alpha = strength, style = strokes.core)
     }
 
-    /** A continuous gradient sweeping back and forth along the bottom edge. */
+    /** A continuous gradient sweeping back and forth along the selected horizontal edge. */
     private fun DrawScope.drawSweep(frame: BeamFrame, strength: Float, strokes: BeamStrokes) {
         val width = size.width
-        val y = size.height - INSET_DP * density
+        val y = if (frame.style == LettaBeamStyle.SweepTop) INSET_DP * density else size.height - INSET_DP * density
         val length = width * SWEEP_LENGTH
         val start = (width - length) * sweepPosition(frame.phase)
         val from = Offset(start, y)
@@ -194,8 +193,10 @@ internal class BorderBeamFallback : BorderBeamRenderer {
         const val INSET_DP = 1f
     }
 
+    private data class StrokeKey(val density: Float, val style: LettaBeamStyle, val widthScale: Float)
+
     /** The three stroke widths of one frame, in px. */
-    private class BeamStrokes(scope: DrawScope, style: LettaBeamStyle) {
+    private class BeamStrokes(scope: DrawScope, style: LettaBeamStyle, widthScale: Float) {
         val glow: Stroke
         val halo: Stroke
         val core: Stroke
@@ -203,9 +204,9 @@ internal class BorderBeamFallback : BorderBeamRenderer {
         init {
             with(scope) {
                 val glowWidth = max(style.glowReach.toPx() * GLOW_SHARE, LettaComponentDimens.beamMinGlowStroke.toPx())
-                glow = Stroke(glowWidth, cap = StrokeCap.Round)
-                halo = Stroke(LettaComponentDimens.beamHaloStroke.toPx(), cap = StrokeCap.Round)
-                core = Stroke(LettaComponentDimens.beamCoreStroke.toPx(), cap = StrokeCap.Round)
+                glow = Stroke(glowWidth * widthScale, cap = StrokeCap.Round)
+                halo = Stroke(LettaComponentDimens.beamHaloStroke.toPx() * widthScale, cap = StrokeCap.Round)
+                core = Stroke(LettaComponentDimens.beamCoreStroke.toPx() * widthScale, cap = StrokeCap.Round)
             }
         }
     }

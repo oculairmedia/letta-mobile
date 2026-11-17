@@ -17,6 +17,7 @@ internal class BeamFrame(
     val style: LettaBeamStyle,
     val direction: LettaBeamDirection,
     val palette: BeamPalette,
+    val widthScale: Float = 1f,
 ) {
     var phase: Float = 0f
     var alpha: Float = 1f

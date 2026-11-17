@@ -50,6 +50,9 @@ enum class LettaBeamStyle {
 
     /** A glow sweeping back and forth along the bottom edge: search and input bars. */
     Sweep,
+
+    /** A glow sweeping back and forth along the top edge of a card. */
+    SweepTop,
 }
 
 /** Which way an orbiting beam travels, judged along the top edge. */
@@ -122,11 +125,16 @@ object LettaBeamDefaults {
  * Ported from border-beam-android by ismnoiet (MIT, see sharedUI/THIRD_PARTY_LICENSES).
  */
 fun Modifier.lettaBorderBeam(spec: LettaBeamSpec, active: Boolean = true): Modifier =
-    graphicsLayer() then BorderBeamElement(spec, active)
+    graphicsLayer() then BorderBeamElement(spec, active, 1f, 1f)
 
-private data class BorderBeamElement(val spec: LettaBeamSpec, val active: Boolean) :
+internal fun Modifier.composerBorderBeam(spec: LettaBeamSpec, active: Boolean): Modifier =
+    graphicsLayer() then BorderBeamElement(
+        spec, active, LettaComponentDimens.composerBeamWidthScale, LettaComponentDimens.composerBeamIntensity,
+    )
+
+private data class BorderBeamElement(val spec: LettaBeamSpec, val active: Boolean, val widthScale: Float, val intensity: Float) :
     ModifierNodeElement<BorderBeamNode>() {
-    override fun create(): BorderBeamNode = BorderBeamNode(spec, active)
+    override fun create(): BorderBeamNode = BorderBeamNode(spec, active, widthScale, intensity)
 
     override fun update(node: BorderBeamNode) = node.update(spec, active)
 
@@ -142,19 +150,22 @@ internal val LettaBeamStyle.glowReach: Dp
     get() = when (this) {
         LettaBeamStyle.Orbit -> LettaComponentDimens.beamGlowOrbit
         LettaBeamStyle.OrbitCompact -> LettaComponentDimens.beamGlowCompact
-        LettaBeamStyle.Sweep -> LettaComponentDimens.beamGlowSweep
+        LettaBeamStyle.Sweep, LettaBeamStyle.SweepTop -> LettaComponentDimens.beamGlowSweep
     }
 
 /** Milliseconds per lap (orbit) or per there-and-back pass (sweep). */
 internal val LettaBeamStyle.periodMillis: Int
-    get() = if (this == LettaBeamStyle.Sweep) LettaBeamMotion.SWEEP_MILLIS else LettaBeamMotion.LAP_MILLIS
+    get() = when (this) {
+        LettaBeamStyle.Sweep, LettaBeamStyle.SweepTop -> LettaBeamMotion.SWEEP_MILLIS
+        LettaBeamStyle.Orbit, LettaBeamStyle.OrbitCompact -> LettaBeamMotion.LAP_MILLIS
+    }
 
 /** Below this the beam counts as faded out and is not drawn. */
 private const val VISIBLE_ALPHA = 0.001f
 
 private data class OutlineKey(val size: Size, val density: Float, val fontScale: Float, val direction: LayoutDirection)
 
-internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
+internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean, private val widthScale: Float = 1f, private val intensity: Float = 1f) :
     Modifier.Node(),
     DrawModifierNode,
     CompositionLocalConsumerModifierNode,
@@ -266,7 +277,7 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
         val alpha = fade.value
         if (alpha <= VISIBLE_ALPHA || size.minDimension <= 0f) return
         frame.phase = if (reducedMotion) LettaBeamMotion.STILL_PHASE else phase
-        frame.alpha = alpha
+        frame.alpha = alpha * intensity
         refreshGeometry()
         val renderer = resolveShader(size.width * size.height) ?: fallback
         with(renderer) { drawBeam(frame) }
@@ -291,7 +302,7 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
         return shader
     }
 
-    private fun frameFor(spec: LettaBeamSpec) = BeamFrame(spec.style, spec.direction, BeamPalette(spec.colors))
+    private fun frameFor(spec: LettaBeamSpec) = BeamFrame(spec.style, spec.direction, BeamPalette(spec.colors), widthScale)
 }
 
 /**
