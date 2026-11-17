@@ -160,7 +160,7 @@ class Capture:
         deadline = time.monotonic() + SCENARIO_TIMEOUTS[self.scenario]
         while time.monotonic() < deadline:
             self.tree = dump(self.directory, "latest")
-            wall_ms() - self.metadata["sendMs"]
+            wall_ms()
             if "turn.finished_relayed" in (self.directory / "wrapper.jsonl").read_text(errors="replace") and (
                 not any((n.get("content-desc") == "Stop" for n in self.tree.iter("node")))
             ):
