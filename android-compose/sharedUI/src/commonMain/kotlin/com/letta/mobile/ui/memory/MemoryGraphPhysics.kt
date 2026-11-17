@@ -77,6 +77,8 @@ internal class MemoryGraphPhysics private constructor(
         alpha = stepping.cool(alpha)
         ticksSinceHeat++
         isHot = fastest > tuning.settleSpeed && ticksSinceHeat < tuning.maxFramesPerHeat && alpha >= tuning.alphaMin
+        // Stopped means still: no leftover velocity for a later heat to start from.
+        if (!isHot) field.rest()
         return isHot
     }
 

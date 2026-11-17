@@ -34,6 +34,8 @@ data class MemoryGraphTuning(
     val barnesHutAbove: Float = 300f,
     /** Barnes–Hut's opening angle: a cell this small against its distance counts as one body. */
     val barnesHutTheta: Float = 0.9f,
+    /** Frames between rebuilding the Barnes–Hut tree (in between its cells follow their bodies), so its forces do not jump each frame. */
+    val barnesHutRebuildFrames: Float = 10f,
     /** Each edge kind's rest length. */
     val springLength: Map<MemoryGraphEdgeKind, Float> = MemoryGraphEdgeKind.entries.associateWith { 110f },
     /** Each edge kind's stiffness: force per unit stretched past its rest length. */
@@ -72,12 +74,19 @@ data class MemoryGraphTuning(
     val collisionStrength: Float = 0.6f,
     /** Collision strength on a fully crowded graph (blended in by crowding). */
     val crowdedCollisionStrength: Float = 3f,
+    /**
+     * The most of an overlap a node is pushed per frame (with its partner, twice this): stronger
+     * collision overshoots, so overlapping nodes bounce off each other instead of settling.
+     */
+    val collisionMaxShare: Float = 0.35f,
+    /** Collision cools with the other forces only once alpha falls below this, so overlaps keep resolving. */
+    val collisionFadeAlpha: Float = 0.1f,
     /** Each node kind's collision radius, as a multiple of its drawn radius. */
     val collisionRadiusScale: Map<MemoryGraphNodeKind, Float> = MemoryGraphNodeKind.entries.associateWith { 1f },
     /** Velocity kept per frame on a sparse graph (one agent's star). */
-    val sparseDamping: Float = 0.82f,
+    val sparseDamping: Float = 0.75f,
     /** Velocity kept per frame on a crowded graph (the fleet view). */
-    val crowdedDamping: Float = 0.6f,
+    val crowdedDamping: Float = 0.45f,
     /** The fastest a node moves per frame on a sparse graph. */
     val sparseMaxSpeed: Float = 30f,
     /** The fastest a node moves per frame on a crowded graph. */
@@ -182,6 +191,7 @@ class MemoryGraphTunings {
                 "crowdedRepulsionScale" to tuning.crowdedRepulsionScale.literal(),
                 "barnesHutAbove" to tuning.barnesHutAbove.literal(),
                 "barnesHutTheta" to tuning.barnesHutTheta.literal(),
+                "barnesHutRebuildFrames" to tuning.barnesHutRebuildFrames.literal(),
                 "springLength" to tuning.springLength.literal("MemoryGraphEdgeKind"),
                 "springStiffness" to tuning.springStiffness.literal("MemoryGraphEdgeKind"),
                 "hubSpokeStrength" to tuning.hubSpokeStrength.literal(),
@@ -196,6 +206,8 @@ class MemoryGraphTunings {
                 "collisionPadding" to tuning.collisionPadding.literal(),
                 "collisionStrength" to tuning.collisionStrength.literal(),
                 "crowdedCollisionStrength" to tuning.crowdedCollisionStrength.literal(),
+                "collisionMaxShare" to tuning.collisionMaxShare.literal(),
+                "collisionFadeAlpha" to tuning.collisionFadeAlpha.literal(),
                 "collisionRadiusScale" to tuning.collisionRadiusScale.literal("MemoryGraphNodeKind"),
                 "sparseDamping" to tuning.sparseDamping.literal(),
                 "crowdedDamping" to tuning.crowdedDamping.literal(),

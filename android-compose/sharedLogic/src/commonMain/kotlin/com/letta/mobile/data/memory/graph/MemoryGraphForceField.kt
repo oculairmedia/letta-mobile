@@ -39,6 +39,12 @@ class MemoryGraphForceField(
     private val fx = FloatArray(size)
     private val fy = FloatArray(size)
 
+    // Collision kept apart from the other forces: it is capped per frame and fades only at the very
+    // end of the cooling, so overlaps resolve without bouncing (see [integrate]).
+    private val ox = FloatArray(size)
+    private val oy = FloatArray(size)
+    private var collisionFadeAlpha = 0f
+
     // What [applyTuning] can change; the defaults are [config]'s, so an untuned field (the
     // controller's layout) steps exactly as it always has.
     private var repulsion = config.repulsion
@@ -65,7 +71,7 @@ class MemoryGraphForceField(
     private var quadtree: BarnesHutTree? = null
     private var quadtreeTerms: RepulsionTerms? = null
     private val bodies = ForceBodies(x, y, charge, radii)
-    private val sums = ForceSums(fx, fy)
+    private val sums = ForceSums(fx, fy, ox, oy)
     private var collisionPadding = COLLISION_PADDING
     private var collisionStrength = COLLISION_STRENGTH
 
@@ -84,8 +90,10 @@ class MemoryGraphForceField(
         applyClusterTuning(tuning, nodeKinds)
         gravity = tuning.gravity
         collisionPadding = tuning.collisionPadding
-        collisionStrength = lerp(tuning.collisionStrength, tuning.crowdedCollisionStrength, crowded)
+        collisionStrength = min(lerp(tuning.collisionStrength, tuning.crowdedCollisionStrength, crowded), tuning.collisionMaxShare)
+        collisionFadeAlpha = tuning.collisionFadeAlpha
         quadtree = if (size > tuning.barnesHutAbove) (quadtree ?: BarnesHutTree(size)) else null
+        quadtree?.rebuildEvery = tuning.barnesHutRebuildFrames.toInt().coerceAtLeast(1)
         quadtreeTerms = RepulsionTerms(repulsion, cutoffSq, CollisionTerms(collisionPadding, collisionStrength), tuning.barnesHutTheta)
     }
 
@@ -199,9 +207,17 @@ class MemoryGraphForceField(
         }
     }
 
+    /** Stops every node where it is, so a later heat starts from rest instead of old momentum. */
+    fun rest() {
+        vx.fill(0f)
+        vy.fill(0f)
+    }
+
     private fun applyForces() {
         fx.fill(0f)
         fy.fill(0f)
+        ox.fill(0f)
+        oy.fill(0f)
         val tree = quadtree
         val terms = quadtreeTerms
         if (tree != null && terms != null) tree.repel(bodies, terms, sums) else applyRepulsion()
@@ -223,13 +239,17 @@ class MemoryGraphForceField(
                 // Drawn circles that overlap push apart harder; point masses have no radii.
                 val overlap = radii?.let { r -> max(0f, r[i] + r[j] + collisionPadding - distance) * collisionStrength } ?: 0f
                 val repels = cutoffSq == 0f || distanceSq <= cutoffSq
-                val force = (if (repels) repulsion * (charge[i] * charge[j]) / distanceSq else 0f) + overlap
+                val force = if (repels) repulsion * (charge[i] * charge[j]) / distanceSq else 0f
                 val px = dx / distance * force
                 val py = dy / distance * force
                 fx[i] += px
                 fy[i] += py
                 fx[j] -= px
                 fy[j] -= py
+                ox[i] += dx / distance * overlap
+                oy[i] += dy / distance * overlap
+                ox[j] -= dx / distance * overlap
+                oy[j] -= dy / distance * overlap
             }
         }
     }
@@ -257,10 +277,13 @@ class MemoryGraphForceField(
     /** One damped step under the chosen pin, cooling and velocity policy. */
     private fun integrate(step: ForceStep): Float {
         var fastest = 0f
+        // Collision is not cooled with the other forces until alpha drops under the fade threshold,
+        // so overlaps keep resolving while the rest settles; an untuned field cools it like the rest.
+        val collision = if (collisionFadeAlpha > 0f) min(1f, step.alpha / collisionFadeAlpha) else step.alpha
         for (i in 0 until size) {
             if (step.holds(i)) continue
-            vx[i] = (vx[i] + fx[i] * step.alpha - x[i] * gravity * step.alpha) * step.motion.damping
-            vy[i] = (vy[i] + fy[i] * step.alpha - y[i] * gravity * step.alpha) * step.motion.damping
+            vx[i] = (vx[i] + fx[i] * step.alpha - x[i] * gravity * step.alpha + ox[i] * collision) * step.motion.damping
+            vy[i] = (vy[i] + fy[i] * step.alpha - y[i] * gravity * step.alpha + oy[i] * collision) * step.motion.damping
             val speed = sqrt(vx[i] * vx[i] + vy[i] * vy[i])
             val scale = if (speed > step.motion.maxSpeed) step.motion.maxSpeed / speed else 1f
             if (step.motion.clampVelocity) {

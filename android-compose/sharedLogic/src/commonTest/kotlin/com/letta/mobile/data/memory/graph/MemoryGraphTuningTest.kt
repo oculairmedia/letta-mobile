@@ -104,7 +104,8 @@ class MemoryGraphTuningTest {
         val tuning = MemoryGraphTuning()
         assertEquals(config.repulsion, tuning.repulsion)
         assertEquals(config.gravity, tuning.gravity)
-        assertEquals(config.damping, tuning.sparseDamping)
+        // Damping is raised from the layout's 0.82 so nodes stop vibrating; every force is unchanged.
+        assertEquals(0.75f, tuning.sparseDamping)
         assertEquals(config.maxStep, tuning.sparseMaxSpeed)
         assertEquals(0f, tuning.repulsionCutoff)
         MemoryGraphNodeKind.entries.forEach { kind ->
@@ -115,7 +116,7 @@ class MemoryGraphTuningTest {
             assertEquals(config.idealEdgeLength, tuning.lengthOf(kind))
             assertEquals(config.attraction, tuning.stiffnessOf(kind))
         }
-        assertEquals(listOf(10f, 0.6f, 0.6f, 12f, 40f, 240f), listOf(
+        assertEquals(listOf(10f, 0.6f, 0.45f, 12f, 40f, 240f), listOf(
             tuning.collisionPadding, tuning.collisionStrength, tuning.crowdedDamping,
             tuning.crowdedMaxSpeed, tuning.sparseCrowding, tuning.crowdedCrowding,
         ))
@@ -128,6 +129,7 @@ class MemoryGraphTuningTest {
         val fleet = listOf(tuning.hubSpokeStrength, tuning.crowdedRepulsionScale, tuning.crowdedCollisionStrength, tuning.barnesHutAbove)
         assertEquals(listOf(0.02f, 3f, 3f, 300f), fleet)
         assertEquals(0.9f, tuning.barnesHutTheta)
+        assertEquals(listOf(10f, 0.35f, 0.1f), listOf(tuning.barnesHutRebuildFrames, tuning.collisionMaxShare, tuning.collisionFadeAlpha))
         assertTrue(tuning.pinBackend)
         assertTrue(tuning.clusterEnabled && tuning.seededLayout)
         val labels = listOf(tuning.labelMinDegree, tuning.labelZoomThreshold, tuning.labelAllUnderNodes, tuning.labelFontScale)
@@ -141,11 +143,11 @@ class MemoryGraphTuningTest {
         val view = MemoryGraphViews.build(star(), emptySet())
         val seed = MemoryGraphLayoutEngine.layout(view, MemoryGraphLayoutMode.Radial)
         val plain = field(view, seed)
-        val off = MemoryGraphTuning(degreeScaling = 0f, clusterEnabled = false)
+        val off = MemoryGraphTuning(degreeScaling = 0f, clusterEnabled = false, sparseDamping = config.damping)
         val tuned = field(view, seed).also {
             it.applyTuning(off, nodeKinds(view), MemoryGraphForceField.springKindsOf(view))
         }
-        val motion = MemoryGraphMotion.forGraph(view.nodes.size, view.edges.size)
+        val motion = MemoryGraphMotion.forGraph(view.nodes.size, view.edges.size, off)
         repeat(STEPS) {
             plain.step()
             tuned.step(MemoryGraphForceField.FREE, motion, 1f)

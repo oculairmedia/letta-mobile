@@ -39,6 +39,12 @@ internal class BarnesHutCells(private val capacity: Int) {
         summarise()
     }
 
+    /** Keeps the cells as built and recomputes their charges and centres from where [bodies] are now. */
+    fun follow(bodies: ForceBodies) {
+        this.bodies = bodies
+        summarise()
+    }
+
     private fun newCell(bounds: CellBounds, parent: CellIndex): CellIndex {
         val cell = cells++
         cellX[cell] = bounds.x

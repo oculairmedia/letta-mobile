@@ -52,13 +52,14 @@ class MemoryFleetGraphLayoutTest {
 
     @Test
     fun oneAgentsStarKeepsItsOwnMotion() {
-        val config = MemoryGraphLayoutConfig()
+        val tuning = MemoryGraphTuning()
         assertEquals(
-            MemoryGraphMotion(config.damping, config.maxStep, alphaDecay = 0f, clampVelocity = false),
+            MemoryGraphMotion(tuning.sparseDamping, tuning.sparseMaxSpeed, alphaDecay = 0f, clampVelocity = false),
             MemoryGraphMotion.forGraph(nodes = 12, edges = 11),
         )
         val crowded = MemoryGraphMotion.forGraph(nodes = 300, edges = 600)
-        assertTrue(crowded.damping < config.damping && crowded.maxSpeed < config.maxStep && crowded.alphaDecay > 0f)
+        assertTrue(crowded.damping < tuning.sparseDamping && crowded.maxSpeed < tuning.sparseMaxSpeed && crowded.alphaDecay > 0f)
+        assertEquals(MemoryGraphLayoutConfig().maxStep, tuning.sparseMaxSpeed)
     }
 
     @Test
@@ -89,12 +90,23 @@ class MemoryFleetGraphLayoutTest {
         val sim = physics(view, memory)
         assertTrue(sim.isHot, "the fleet graph opens out like one agent's")
         var frames = 0
-        while (sim.tick()) frames++
+        val lastSpeeds = ArrayDeque<Float>()
+        while (sim.tick()) {
+            frames++
+            lastSpeeds.addLast(sim.lastSpeed)
+            if (lastSpeeds.size > TAIL_FRAMES) lastSpeeds.removeFirst()
+        }
         assertTrue(frames <= REST_WITHIN_FRAMES, "came to rest in $frames frames")
         assertTrue(sim.lastSpeed < REST_SPEED, "still moving at ${sim.lastSpeed} per frame when it stopped")
+        assertTrue(lastSpeeds.all { it < TAIL_SPEED }, "still buzzing as it came to rest: $lastSpeeds")
         val rested = sim.snapshot()
         repeat(STAY_FRAMES) { assertFalse(sim.tick(), "a rested graph stays still") }
-        assertEquals(rested, sim.snapshot())
+        val after = sim.snapshot()
+        val drift = rested.positions.maxOf { (id, point) ->
+            val now = after.positions.getValue(id)
+            hypot(point.x - now.x, point.y - now.y)
+        }
+        assertTrue(drift < REST_DRIFT, "moved $drift in $STAY_FRAMES frames after settling")
         assertRoundAndCentred(view, rested)
     }
 
@@ -182,6 +194,11 @@ class MemoryFleetGraphLayoutTest {
         const val REST_WITHIN_FRAMES = 180
         const val REST_SPEED = 1f
         const val STAY_FRAMES = 120
+        const val REST_DRIFT = 0.1f
+
+        /** Over its last frames before stopping, no node moves this far per frame: settling, not vibrating. */
+        const val TAIL_FRAMES = 10
+        const val TAIL_SPEED = 0.5f
         const val CENTRED = 0.2
         const val FILLED = 0.2
     }

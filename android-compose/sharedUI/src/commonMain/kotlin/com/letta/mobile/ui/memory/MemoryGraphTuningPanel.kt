@@ -146,6 +146,12 @@ internal object MemoryGraphKnobs {
         MemoryGraphKnob("Strength scale (crowded)", 0.5f..6f, { it.crowdedRepulsionScale }, { t, v -> t.copy(crowdedRepulsionScale = v) }),
         MemoryGraphKnob("Barnes–Hut above nodes", 0f..2_000f, { it.barnesHutAbove }, { t, v -> t.copy(barnesHutAbove = v) }),
         MemoryGraphKnob("Barnes–Hut theta", 0.1f..1.5f, { it.barnesHutTheta }, { t, v -> t.copy(barnesHutTheta = v) }),
+        MemoryGraphKnob(
+            "Barnes–Hut rebuild every N frames",
+            1f..60f,
+            { it.barnesHutRebuildFrames },
+            { t, v -> t.copy(barnesHutRebuildFrames = v) },
+        ),
     ) + MemoryGraphNodeKind.entries.map { kind ->
         MemoryGraphKnob("Charge: ${kind.name}", 0f..5f, { it.chargeOf(kind) }, { t, v -> t.copy(nodeCharge = t.nodeCharge + (kind to v)) })
     }
@@ -216,6 +222,8 @@ internal object MemoryGraphKnobs {
             { it.crowdedCollisionStrength },
             { t, v -> t.copy(crowdedCollisionStrength = v) },
         ),
+        MemoryGraphKnob("Collision push cap (share of overlap)", 0.05f..1f, { it.collisionMaxShare }, { t, v -> t.copy(collisionMaxShare = v) }),
+        MemoryGraphKnob("Collision fades below alpha", 0f..1f, { it.collisionFadeAlpha }, { t, v -> t.copy(collisionFadeAlpha = v) }),
     ) + MemoryGraphNodeKind.entries.map { kind ->
         MemoryGraphKnob(
             "Collision radius: ${kind.name}",
