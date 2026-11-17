@@ -249,7 +249,9 @@ def decode_frames(video, raw, begin, end):
 
 def settlement_window(rows, args):
     before = [row[1] for row in rows if args.settle_seconds - 1.0 <= row[0] <= args.settle_seconds - 0.2]
-    during = [row for row in rows if args.settle_seconds - 0.1 <= row[0] <= args.settle_seconds + args.post_seconds]
+    during = bounded_frames(rows, args.settle_seconds - 0.1,
+                            args.settle_seconds + args.post_seconds, 0)
+    during = [row for row in during if row[0] >= args.settle_seconds - 0.1]
     return before, during
 
 

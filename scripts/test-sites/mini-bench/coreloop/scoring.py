@@ -176,9 +176,10 @@ def check_pixels(evidence, require):
     if not isinstance(pixels, dict):
         pixels = {}
     require(pixel_coverage_complete(pixels), "pixel coverage missing or incomplete")
-    if "partial" in pixels:
+    if evidence.get("scenario") == "S3" or "partial" in pixels:
+        partial = pixels.get("partial")
         require(
-            pixel_coverage_complete(pixels["partial"]),
+            isinstance(partial, dict) and pixel_coverage_complete(partial),
             "partial pixel coverage missing or incomplete",
         )
     correlation = pixels.get("minimum_template_correlation")

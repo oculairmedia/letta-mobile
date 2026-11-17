@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 import re
-import shlex
 import subprocess
 import time
 import xml.etree.ElementTree as ET
@@ -22,7 +21,7 @@ def installed_app_hash():
     if len(paths) != 1 or not paths[0].startswith("package:"):
         raise RuntimeError("expected one installed capture APK")
     path = paths[0].removeprefix("package:")
-    return adb("shell", "sha256sum", shlex.quote(path)).split()[0]
+    return adb("shell", "sha256sum", path).split()[0]
 
 
 def wall_ms():

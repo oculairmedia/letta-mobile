@@ -32,6 +32,7 @@ def interrupt_reply(step):
     queued = dump(directory, "queued-resend")
     metadata["interruptRequestedMs"] = wall_ms() + metadata["phoneOffsetMs"]
     tap_node(queued, "text", "Send now")
+    metadata["followUpSentPhoneMs"] = wall_ms() + metadata["phoneOffsetMs"]
 
 
 def reconnect_reply(step):

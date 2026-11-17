@@ -21,10 +21,10 @@ from .device import (
     stop_process,
     reply_region,
 )
-from .fixture import select_conversation
+from .fixture import select_conversation, ensure_bench
 from .remote import REMOTE_AUDIT, REMOTE_TAIL
 from .scenarios import perform_scenario_step, ScenarioStep
-from .evidence import parse_log, normalize, has_partial_capture, measured_row_events
+from .evidence import parse_log, normalize, has_partial_capture, measured_row_events, wrapper_terminals
 
 
 @dataclass
@@ -57,6 +57,7 @@ class Capture:
         self.log_handle = (self.directory / "logcat.txt").open("w")
         self.wrapper_handle = (self.directory / "wrapper.jsonl").open("w")
         self.tree = None
+        self.owns_trial = False
 
     def collect(self):
         select_conversation(self.directory, self.scope)
@@ -149,6 +150,8 @@ class Capture:
             raise RuntimeError("screenrecord PID missing")
         adb("shell", "kill", "-0", self.video_pid)
         self.metadata["videoStartMs"] = wall_ms() + self.metadata["phoneOffsetMs"]
+        anchor_video(self.metadata)
+        self.owns_trial = True
         self.metadata["sendMs"] = send(self.directory, f"[core-loop:{self.scenario}] trial-{self.index}", "first")
         self.metadata["sendBeginPhoneMs"] = self.metadata["sendMs"] + self.metadata["phoneOffsetMs"]
         time.sleep(3)
@@ -161,9 +164,14 @@ class Capture:
         while time.monotonic() < deadline:
             self.tree = dump(self.directory, "latest")
             wall_ms()
-            if "turn.finished_relayed" in (self.directory / "wrapper.jsonl").read_text(errors="replace") and (
-                not any((n.get("content-desc") == "Stop" for n in self.tree.iter("node")))
-            ):
+            terminals, _ = wrapper_terminals(self.directory, self.metadata)
+            sent = self.metadata.get("resendMs", self.metadata.get("sendMs", 0)) + self.metadata["phoneOffsetMs"]
+            sent = max(sent, self.metadata.get("followUpSentPhoneMs", sent))
+            finished = any(
+                event["wallMs"] + self.metadata["miniToPhoneOffsetMs"] > sent
+                and "stopReason=end_turn" in event["line"] for event in terminals
+            )
+            if finished and not any(n.get("content-desc") == "Stop" for n in self.tree.iter("node")):
                 self.metadata["stopGoneMs"] = wall_ms() + self.metadata["phoneOffsetMs"]
                 break
             time.sleep(1)
@@ -261,9 +269,17 @@ class Capture:
             raise RuntimeError("; ".join(self.cleanup_errors))
 
     def recover(self):
+        if not self.owns_trial:
+            return
         if self.tree is None:
-            raise RuntimeError("final UI missing")
+            self.tree = dump(self.directory, "recovery-current")
         if any((n.get("content-desc") == "Stop" for n in self.tree.iter("node"))):
+            ensure_bench(self.tree)
+            scope = json.loads(command([
+                "ssh", "-o", "BatchMode=yes", "graphiti", "python3", "-c", shlex.quote(REMOTE_AUDIT)
+            ]))
+            if scope["conversation_id"] != self.metadata["conversationId"]:
+                raise RuntimeError("fixture ownership changed; refusing recovery")
             self.metadata["recoveryAfterStuckSpinner"] = True
             adb("shell", "am", "force-stop", PACKAGE)
             adb("shell", "am", "start", "-n", PACKAGE + "/com.letta.mobile.MainActivity")
@@ -273,6 +289,22 @@ class Capture:
                 (n.get("content-desc") == "Stop" for n in recovery.iter("node"))
             )
             (self.directory / "metadata.json").write_text(json.dumps(self.metadata, indent=2))
+
+    def finish_capture(self, preserve_error):
+        self.cleanup_errors = []
+        self.restore()
+        self.stop_recording()
+        self.recorder_log()
+        try:
+            self.recover()
+        except Exception as error:
+            self.metadata["recoveryError"] = str(error)
+            self.cleanup_errors.append("recovery: " + str(error))
+        try:
+            self.close_collectors()
+        except Exception:
+            if not preserve_error:
+                raise
 
     def run(self):
         self.prepare()
@@ -285,14 +317,29 @@ class Capture:
             self.start_video()
             self.wait_terminal()
             self.final_snapshot()
-        finally:
-            self.cleanup_errors = []
-            self.restore()
-            self.stop_recording()
-            self.recorder_log()
-            self.close_collectors()
-        self.recover()
+        except BaseException:
+            self.finish_capture(preserve_error=True)
+            raise
+        self.finish_capture(preserve_error=False)
         return analyze_capture(self.directory, self.metadata, self.tree, self.args.region)
+
+
+# Pixel 2 XL, 2026-11-17: five normal screenrecord launches, Winscope first
+# frame elapsed time paired with phone wall/uptime. Offset is observed origin
+# minus first-frame origin; subtract it (not the 300ms sleep).
+VIDEO_ORIGIN_CALIBRATION = dict(
+    method="pixel2xl-first-frame-calibration", serial=SERIAL, samples=5,
+    offsetMs=45.10498046875, minMs=-185.2392578125, maxMs=108.47314453125,
+    spreadMs=293.71240234375, measuredOn="2026-11-17",
+)
+
+
+def anchor_video(metadata):
+    if "videoStartMs" not in metadata or "videoOrigin" in metadata:
+        return
+    metadata["videoStartObservedMs"] = metadata["videoStartMs"]
+    metadata["videoOrigin"] = dict(VIDEO_ORIGIN_CALIBRATION)
+    metadata["videoStartMs"] -= VIDEO_ORIGIN_CALIBRATION["offsetMs"]
 
 
 def trial(args, scenario, index):
@@ -399,6 +446,8 @@ def analyze_capture(directory, metadata, tree, explicit_region=None):
 def rescore_captures(args):
     results = []
     for directory in sorted(args.output.glob("S[1-4]-*")):
+        if directory.name.split("-")[0] not in args.scenarios:
+            continue
         try:
             metadata = json.loads((directory / "metadata.json").read_text())
             for name in ("result", "evidence", "metadata"):
@@ -407,6 +456,7 @@ def rescore_captures(args):
                 if source.exists() and (not backup.exists()):
                     shutil.copy2(source, backup)
             tree = ET.parse(directory / "final.xml").getroot()
+            anchor_video(metadata)
             result = analyze_capture(directory, metadata, tree, args.region)
         except Exception as error:
             result = dict(scenario=directory.name.split("-")[0], client="pixel2xl", status="FAIL", errors=[str(error)])

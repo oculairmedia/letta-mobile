@@ -136,7 +136,9 @@ def raw_fixture(directory, duplicate):
         )
     )
     tree = ET.Element("hierarchy")
-    ET.SubElement(tree, "node", text=evidence.oracle.FIXED_REPLY)
+    timeline = ET.SubElement(tree, "node", scrollable="true")
+    row = ET.SubElement(timeline, "node", {"long-clickable": "true", "bounds": "[0,500][100,900]"})
+    ET.SubElement(row, "node", text=evidence.oracle.FIXED_REPLY)
     metadata = dict(
         scenario="S1",
         sendMs=0,
@@ -207,7 +209,9 @@ def history_fixture(root, behavior):
         )
     )
     tree = ET.Element("hierarchy")
-    ET.SubElement(tree, "node", text=evidence.oracle.FIXED_REPLY)
+    timeline = ET.SubElement(tree, "node", scrollable="true")
+    row = ET.SubElement(timeline, "node", {"long-clickable": "true", "bounds": "[0,500][100,900]"})
+    ET.SubElement(row, "node", text=evidence.oracle.FIXED_REPLY)
     metadata = dict(
         scenario="S1",
         sendMs=100,

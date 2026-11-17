@@ -84,7 +84,7 @@ class Trace:
         argv = [Path(tool.value).name, *map(stable_arg, args)] if isinstance(tool, Tool) else tool
         self.record("run_tool", argv)
         if "stdout" in kwargs and hasattr(kwargs["stdout"], "write"):
-            kwargs["stdout"].write("turn.finished_relayed\n")
+            kwargs["stdout"].write(json.dumps(dict(wallMs=100000, line="turn.finished_relayed conversationId=fixture stopReason=end_turn"))+"\n")
             kwargs["stdout"].flush()
         return Process()
 

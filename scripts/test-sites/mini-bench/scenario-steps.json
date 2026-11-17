@@ -67,6 +67,11 @@
           "Send now"
         ],
         {}
+      ],
+      [
+        "wall_ms",
+        [],
+        {}
       ]
     ],
     "metadata": {
@@ -74,7 +79,8 @@
       "partialRegion": "1,2,3,4",
       "interruptReferenceMs": 1005,
       "resendMs": 2000,
-      "interruptRequestedMs": 1005
+      "interruptRequestedMs": 1005,
+      "followUpSentPhoneMs": 1005
     }
   },
   "S4": {

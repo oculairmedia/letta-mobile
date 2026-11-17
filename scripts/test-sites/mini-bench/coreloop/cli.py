@@ -1,12 +1,11 @@
 "Pixel 2 XL-only core-loop evidence capture. Never selects an arbitrary adb device.\n\nRequires the main app plus opt-in root-debug CORE_LOOP diagnostics, mini-bench\nfixture installed on graphiti, and mini-bench already open in the phone. Run with\n--output <artifact directory>; records three trials per scenario by default.\nNetwork state is restored in finally and on termination; restoration failure is\nan error. No install, model changes, server restart or adb-server restart occurs."
 
 import json
-import os
 from pathlib import Path
 import re
 import time
 from . import scoring as oracle
-from tool_boundary import path_arg
+from tool_boundary import path_arg, Tool
 from .config import SERIAL, PACKAGE, HERE
 import argparse
 import hashlib
@@ -46,11 +45,10 @@ def apk_digest(path):
 
 
 def install_capture(args):
-    sdk = Path(os.environ.get("ANDROID_HOME", "/opt/android-sdk"))
-    candidates = sorted((sdk / "build-tools").glob("*/aapt"), reverse=True)
-    if not candidates:
+    aapt = Path(Tool.AAPT.value)
+    if not aapt.is_file():
         raise RuntimeError("aapt required to verify in-place dev package")
-    badging = command([str(candidates[0]), "dump", "badging", path_arg(args.apk, args.apk.parent)]).decode()
+    badging = command([str(aapt), "dump", "badging", path_arg(args.apk, args.apk.parent)]).decode()
     if not re.search("package: name='com\\.letta\\.mobile\\.dev'", badging):
         raise RuntimeError("refusing to install anything except com.letta.mobile.dev")
     adb("install", "-r", path_arg(args.apk, args.apk.parent))

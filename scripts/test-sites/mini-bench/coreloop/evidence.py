@@ -328,10 +328,38 @@ def scenario_evidence(context, held, expected_hold):
     )
 
 
+def node_top(node):
+    bounds = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node.get("bounds", ""))
+    return int(bounds[2]) if bounds else -1
+
+
+def final_reply_text(tree):
+    # Compose exposes each markdown paragraph separately inside a long-clickable
+    # message row; delivery time is a sibling, not reply text. Restrict selection
+    # to the timeline and pick the lowest reply, independent of expected content.
+    timelines = [n for n in tree.iter("node") if n.get("scrollable") == "true"]
+    if not timelines:
+        return ""
+    rows = [n for timeline in timelines for n in timeline.iter("node")
+            if n.get("long-clickable") == "true"]
+    users = [node_top(row) for row in rows
+             if any(n.get("text") == "You" for n in row.iter("node"))]
+    latest_user = max(users, default=-1)
+    replies = []
+    for row in rows:
+        texts = [n.get("text") for n in row.iter("node") if n.get("text")]
+        if texts and texts[0] != "You" and node_top(row) > latest_user:
+            replies.append((node_top(row), texts))
+    if not replies:
+        return ""
+    texts = max(replies, key=lambda item: item[0])[1]
+    if len(texts) > 1 and re.fullmatch(r"\d{1,2}:\d{2} [AP]M", texts[-1]):
+        texts = texts[:-1]
+    return "\n\n".join(texts)
+
+
 def normalized_evidence(context, stored):
-    text_nodes = [n.get("text", "") for n in context.tree.iter("node") if n.get("text")]
-    joined = "\n\n".join(text_nodes)
-    visible = context.expected if context.expected in joined else joined
+    visible = final_reply_text(context.tree)
     lifecycle = [dict(event="present", key=key) for key in sorted(context.initial)]
     lifecycle += [dict(event=e["event"], key=e["key"]) for e in context.observed if e["event"] in ("mount", "dispose")]
     return dict(

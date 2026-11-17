@@ -95,6 +95,7 @@ class OracleTest(unittest.TestCase):
                 cancelToResendMs=500,
             ),
         )
+        sample["pixels"]["partial"] = copy.deepcopy(sample["pixels"])
         self.assertEqual(oracle.score(sample)["status"], "PASS")
         for key in ("cancelled", "cancelledPartialIncomplete", "cancelToResendMs"):
             invalid = copy.deepcopy(sample)
