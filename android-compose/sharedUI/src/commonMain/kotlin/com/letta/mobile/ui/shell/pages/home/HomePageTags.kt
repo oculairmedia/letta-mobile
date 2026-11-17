@@ -13,7 +13,6 @@ object HomePageTags {
     const val SEARCH_RESULTS = "home_search_results"
     const val SEARCH_EMPTY = "home_search_empty"
     const val COMPOSER = "home_composer"
-    const val SEND = "home_send"
     const val PINNED_GRID = "home_pinned_grid"
     const val EDIT_PINS = "home_edit_pins"
     const val ADD_PIN = "home_add_pin"

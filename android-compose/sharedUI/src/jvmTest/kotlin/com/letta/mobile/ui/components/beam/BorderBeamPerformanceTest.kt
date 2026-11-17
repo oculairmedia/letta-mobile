@@ -4,16 +4,72 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import java.lang.reflect.Proxy
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.TimeSource
 
 /** A card-sized software canvas must fit a frame budget, rather than shade every pixel with 24 blobs. */
 class BorderBeamPerformanceTest {
+    @Test
+    fun fallbackBoundsStrokeCommandsAtFloorDeviceDensity() {
+        val renderer = BorderBeamFallback()
+        val bitmap = ImageBitmap(WIDTH, HEIGHT)
+        val delegate = Canvas(bitmap)
+        var commands = 0
+        val drawnPath = PathMeasure()
+        val canvas = Proxy.newProxyInstance(Canvas::class.java.classLoader, arrayOf(Canvas::class.java)) { _, method, args ->
+            if (method.name.startsWith("draw")) commands++
+            if (method.name == "drawPath") {
+                drawnPath.setPath(checkNotNull(args)[0] as Path, false)
+                assertTrue(drawnPath.length <= WIDTH + HEIGHT, "a stroke covers only the comet, not the full perimeter")
+            }
+            method.invoke(delegate, *(args ?: emptyArray()))
+        } as Canvas
+        val scope = CanvasDrawScope()
+        for (style in LettaBeamStyle.entries) {
+            val frame = BeamFrame(style, LettaBeamDirection.Clockwise, BeamPalette(listOf(Color.White)))
+            frame.cornersPx.fill(56f)
+            repeat(60) { index ->
+                frame.phase = index / 60f
+                commands = 0
+                scope.draw(Density(3.5f), LayoutDirection.Ltr, canvas, Size(WIDTH.toFloat(), HEIGHT.toFloat())) {
+                    with(renderer) { drawBeam(frame) }
+                }
+                assertTrue(commands <= 3, "$style phase ${frame.phase}: $commands strokes exceeds 3")
+            }
+        }
+    }
+
+    @Test
+    fun orbitReusesStopArraysAcrossFrames() {
+        val renderer = BorderBeamFallback()
+        val scope = CanvasDrawScope()
+        val canvas = Canvas(ImageBitmap(WIDTH, HEIGHT))
+        val frame = BeamFrame(LettaBeamStyle.Orbit, LettaBeamDirection.Clockwise, BeamPalette(listOf(Color.White)))
+        fun draw() = scope.draw(Density(3.5f), LayoutDirection.Ltr, canvas, Size(WIDTH.toFloat(), HEIGHT.toFloat())) {
+            with(renderer) { drawBeam(frame) }
+        }
+        draw()
+        val arrays = renderer.javaClass.declaredFields.filter { it.type.isArray }.onEach { it.isAccessible = true }
+        val colorArrays = arrays.filter { it.type.componentType == Color::class.java }
+        assertEquals(1, colorArrays.size, "orbit must retain one reusable color stop array")
+        val stops = colorArrays.single().get(renderer)
+        repeat(60) {
+            frame.phase = it / 60f
+            draw()
+            assertSame(stops, colorArrays.single().get(renderer), "stop storage must survive phase changes")
+        }
+    }
+
     @Test
     fun cardRenderingFitsTheFrameBudget() {
         val renderer = assertNotNull(createBorderBeamShader())

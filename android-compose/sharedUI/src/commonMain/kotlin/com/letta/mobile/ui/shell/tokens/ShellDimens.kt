@@ -18,9 +18,6 @@ internal object ShellDimens {
     /** The header's search trigger on a pointer window. */
     val headerSearchWidth: Dp = 260.dp
 
-    /** Tallest Home's chatbox grows before it scrolls. */
-    val homeComposerMaxHeight: Dp = 120.dp
-
     /** One agent in Home's avatar row: the avatar and its name under it. */
     val homeAvatarTile: Dp = 64.dp
 

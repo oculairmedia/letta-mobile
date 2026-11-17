@@ -1,6 +1,9 @@
 package com.letta.mobile.ui.components.foundation
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 
@@ -18,7 +21,25 @@ class LettaClickTarget(val shape: Shape = RectangleShape, val minimumTouchTarget
         /** A target on its own: the platform minimum of layout, a rectangular ripple. */
         val Standalone: LettaClickTarget = LettaClickTarget()
 
-        /** A line or a dense row: no minimum, a rectangular ripple. */
+        /**
+         * A line or a dense row: no minimum, a rectangular ripple. For a row a pointer hovers (a
+         * timeline line, a link-like label) use [lettaRowTarget], whose hover and press are rounded.
+         */
         val Inline: LettaClickTarget = LettaClickTarget(minimumTouchTarget = false)
     }
 }
+
+/**
+ * An inline target whose hover, focus and press state is drawn in the small shape token, the shape
+ * every clickable row's highlight takes (LettaListRow's): a timeline line, a disclosure header, a
+ * small text action. No minimum, so the row keeps its height.
+ */
+@Composable
+fun lettaRowTarget(): LettaClickTarget {
+    val shape = MaterialTheme.shapes.small
+    return remember(shape) { LettaClickTarget(shape, minimumTouchTarget = false) }
+}
+
+/** An inline target clipped to [shape]: a rounded cell (an image) whose press must not square it off. */
+@Composable
+fun lettaInlineTarget(shape: Shape): LettaClickTarget = remember(shape) { LettaClickTarget(shape, minimumTouchTarget = false) }

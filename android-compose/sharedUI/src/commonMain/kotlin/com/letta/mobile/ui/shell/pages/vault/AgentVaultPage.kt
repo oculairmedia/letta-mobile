@@ -2,21 +2,18 @@ package com.letta.mobile.ui.shell.pages.vault
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -30,12 +27,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
-import com.letta.mobile.ui.components.foundation.LettaIcon
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.data.secrets.AgentVaultActions
 import com.letta.mobile.data.secrets.AgentVaultLoad
 import com.letta.mobile.data.secrets.AgentVaultState
 import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.LettaPageHeader
+import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
@@ -137,31 +134,26 @@ private fun CompactVaultLayout(page: AgentVaultPageScope) {
     }
 }
 
+/** The vault's header on the shared page header: title, refresh and "Add secret", the storage note, progress and the error. */
 @Composable
 private fun VaultHeader(page: AgentVaultPageScope) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) {
-                if (page.options.showTitle) Text(PAGE_TITLE, style = MaterialTheme.typography.headlineSmall)
-            }
+    LettaPageHeader(
+        title = PAGE_TITLE.takeIf { page.options.showTitle },
+        primaryAction = LettaMenuItem(
+            label = ADD_LABEL,
+            enabled = page.state.agentId != null && !page.state.saving,
+            tag = AgentVaultPageTags.ADD,
+            onClick = page.actions::startAdding,
+        ),
+        caption = STORAGE_NOTE,
+        refresh = {
             LettaRefreshAction(
                 refreshing = page.state.load == AgentVaultLoad.Loading,
                 onRefresh = page.actions::refresh,
                 modifier = Modifier.testTag(AgentVaultPageTags.REFRESH),
             )
-            Button(
-                onClick = page.actions::startAdding,
-                enabled = page.state.agentId != null && !page.state.saving,
-                modifier = Modifier.testTag(AgentVaultPageTags.ADD),
-            ) {
-                LettaIcon(LettaIcons.Add, contentDescription = null)
-                Text(ADD_LABEL, modifier = Modifier.padding(start = LettaDimens.Space.xs))
-            }
-        }
-        Text(STORAGE_NOTE, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        },
+    ) {
         if (page.state.load == AgentVaultLoad.Loading || page.state.saving) LettaBusyBar()
         if (page.state.error != null) VaultError(page)
     }

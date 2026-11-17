@@ -2,6 +2,7 @@ package com.letta.mobile.ui.host
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 
 // letta-mobile-ckmub.17.36: one rule, so the shell's containers and the chat page never disagree.
@@ -39,3 +40,12 @@ fun ProvideLettaIdiom(compact: Boolean, content: @Composable () -> Unit) {
     val resolved = remember(host, idiom) { if (idiom == host.input) host else host.copy(input = idiom) }
     CompositionLocalProvider(LocalLettaHost provides resolved, content = content)
 }
+
+/**
+ * True while the window's own header names the current page (the compact desktop window's title bar
+ * reads "Home", "Schedules"): a page then leaves its own title out rather than say it twice. The shell
+ * workspace provides it; a phone header that shows the app's name or the agent leaves it false.
+ * The shared page header ([com.letta.mobile.ui.components.LettaPageHeader]) and the pages' own bars
+ * read it, so a page on either one follows the rule without doing anything.
+ */
+val LocalHostTitlesPage = compositionLocalOf { false }

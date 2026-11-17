@@ -2,6 +2,7 @@ package com.letta.mobile.ui.shell.workspace
 
 import com.letta.mobile.ui.shell.rail.rememberPinnedRailState
 import com.letta.mobile.ui.components.ProvideObjectVerbs
+import com.letta.mobile.ui.host.LocalHostTitlesPage
 import com.letta.mobile.data.objectverbs.VerbOutcome
 import com.letta.mobile.ui.host.Overlay
 import com.letta.mobile.ui.host.OverlayAction
@@ -238,7 +239,10 @@ private fun WorkspaceColumn(frame: WorkspaceFrame) {
             ShellWindowChrome.Inline -> if (floating == null) InlineHeader(header)
             is ShellWindowChrome.Hoisted -> SideEffect { chrome.onHeader(header) }
         }
-        WorkspaceBody(frame, floating, Modifier.weight(1f))
+        // A header that already names the page keeps the page from titling itself again.
+        CompositionLocalProvider(LocalHostTitlesPage provides header.namesPage()) {
+            WorkspaceBody(frame, floating, Modifier.weight(1f))
+        }
     }
 }
 

@@ -200,8 +200,10 @@ class ChatSurfaceUiTest {
         showScrolledUp(LettaInput.Pointer)
         val button = onNodeWithTag(ChatTimelineTags.SCROLL_TO_LATEST).getBoundsInRoot()
         val list = onNodeWithTag(ChatTimelineTags.LIST).getBoundsInRoot()
+        val card = onNodeWithTag(ComposerTestTags.CARD).getBoundsInRoot()
         assertEquals(((list.left + list.right) / 2).value, ((button.left + button.right) / 2).value, absoluteTolerance = 1f)
-        assertEquals((list.bottom - LettaDimens.Space.lg).value, button.bottom.value, absoluteTolerance = 1f)
+        // Nothing stands above the prompt, so the button rests one gap above the prompt itself.
+        assertEquals((card.top - LettaDimens.Space.lg).value, button.bottom.value, absoluteTolerance = 1f)
     }
 
     @Test

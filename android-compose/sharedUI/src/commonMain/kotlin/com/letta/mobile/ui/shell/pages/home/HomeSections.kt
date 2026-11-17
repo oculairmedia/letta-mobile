@@ -77,7 +77,7 @@ internal typealias HomeSectionView = LazyListScope.(page: HomePageScope) -> Unit
  * the list ([HomePage] does that while the lane holds it).
  */
 internal val homeSectionViews: Map<RuntimeViewId, HomeSectionView> = mapOf(
-    HomeViews.COMPOSER to section { page -> if (page.wide) item { HomeComposer(page) } },
+    HomeViews.COMPOSER to section { page -> if (page.wide) item { HomePromptBar(page) } },
     HomeViews.NOW to section { page -> homeNowStrip(page) },
     HomeViews.RECENTS to section { page -> homeRecents(page) },
     HomeViews.AGENTS to section { page -> homeAgentAvatarRow(page) },

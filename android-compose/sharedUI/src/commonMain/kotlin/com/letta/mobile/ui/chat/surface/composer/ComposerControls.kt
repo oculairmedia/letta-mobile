@@ -1,6 +1,17 @@
 package com.letta.mobile.ui.chat.surface.composer
 
 import androidx.compose.animation.animateColorAsState
+import com.letta.mobile.ui.theme.LocalReducedMotion
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +23,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
@@ -31,6 +43,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Lucide
@@ -48,6 +62,8 @@ import com.letta.mobile.sharedui.resources.composer_send
 import com.letta.mobile.sharedui.resources.composer_stop
 import com.letta.mobile.sharedui.resources.composer_stopping
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.context.ModelPickerHost
@@ -219,14 +235,43 @@ internal fun ComposerVoiceButton(model: ComposerModel) {
 }
 
 /**
- * Send, or Stop while a run streams with nothing to queue. A pending stop reads "stopping"
- * and a second press is the owner's local force-clear. Lifted from desktop's ComposerSendButton
- * and Android's stop morph.
+ * Send, or Stop while a run streams with nothing to queue: the one send button of every composer
+ * (the pointer card, the Touch bar, Home's prompt bar). Send only shows once there is something to
+ * send (text or an image). It takes no room until then, so what sits before it in the trailing row
+ * (the voice button) rests flush at the end; when Send arrives it fades and grows in at the end while
+ * its seat widens and pushes that neighbour left, on the chips' timing, and leaves the same way. Under
+ * reduced motion both are a plain cut. [leadingGap] is the gap to that neighbour, inside the seat so it
+ * comes and goes with Send; [seat] is the square Send centres in (the Touch bar's larger touch target).
+ * Stop always shows while it applies. A pending stop reads "stopping" and a second press is the owner's
+ * local force-clear. A send plays the launch cue and a stop a plain confirm on hosts with haptics.
  */
 @Composable
-internal fun ComposerActionButton(model: ComposerModel, modifier: Modifier = Modifier) {
+internal fun ComposerActionButton(
+    model: ComposerModel,
+    modifier: Modifier = Modifier,
+    seat: Dp = LettaDimens.Control.actionButton,
+    leadingGap: Dp = 0.dp,
+) {
     val stops = model.decisions.action == ComposerAction.Stop
+    Box {
+        AnimatedVisibility(
+            visible = stops || model.composer.hasPayload,
+            enter = actionButtonEnter(),
+            exit = actionButtonExit(),
+            label = "composerActionShown",
+        ) {
+            // [modifier] (a seat tag) goes on the seat itself, after the gap: the square Send centres in.
+            Box(Modifier.padding(start = leadingGap).then(modifier).size(seat), contentAlignment = Alignment.Center) {
+                ComposerActionSurface(model, stops)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ComposerActionSurface(model: ComposerModel, stops: Boolean) {
     val enabled = stops || model.decisions.sendEnabled
+    val haptics = LocalHaptics.current
     val colors = actionButtonColors(stops = stops, enabled = enabled)
     val scale by animateFloatAsState(
         targetValue = if (enabled) 1f else DisabledActionScale,
@@ -234,9 +279,12 @@ internal fun ComposerActionButton(model: ComposerModel, modifier: Modifier = Mod
         label = "composerActionScale",
     )
     Surface(
-        onClick = model::runAction,
+        onClick = {
+            haptics.play(if (stops) LettaHapticCue.Confirm else LettaHapticCue.SendLaunch)
+            model.runAction()
+        },
         enabled = enabled,
-        modifier = modifier
+        modifier = Modifier
             .size(LettaDimens.Control.actionButton)
             .testTag(if (stops) ComposerTestTags.STOP else ComposerTestTags.SEND)
             .graphicsLayer {
@@ -256,6 +304,28 @@ internal fun ComposerActionButton(model: ComposerModel, modifier: Modifier = Mod
         }
     }
 }
+
+/**
+ * Send's arrival: a fade and a small grow while its seat widens from the end, all on the chips'
+ * timing; a plain cut (no fade, no widening) under reduced motion.
+ */
+@Composable
+private fun actionButtonEnter(): EnterTransition {
+    if (LocalReducedMotion.current) return fadeIn(snap())
+    return fadeIn(tween(LettaMotionTokens.CHIP_MILLIS)) +
+        scaleIn(tween(LettaMotionTokens.CHIP_MILLIS), initialScale = HiddenActionScale) +
+        expandHorizontally(tween(LettaMotionTokens.CHIP_MILLIS), expandFrom = Alignment.End)
+}
+
+@Composable
+private fun actionButtonExit(): ExitTransition {
+    if (LocalReducedMotion.current) return fadeOut(snap())
+    return fadeOut(tween(LettaMotionTokens.CHIP_MILLIS)) +
+        scaleOut(tween(LettaMotionTokens.CHIP_MILLIS), targetScale = HiddenActionScale) +
+        shrinkHorizontally(tween(LettaMotionTokens.CHIP_MILLIS), shrinkTowards = Alignment.End)
+}
+
+private const val HiddenActionScale = 0.76f
 
 private const val DisabledActionScale = 0.9f
 
