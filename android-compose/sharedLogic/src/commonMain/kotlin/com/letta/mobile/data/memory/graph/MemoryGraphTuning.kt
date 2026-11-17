@@ -12,7 +12,8 @@ import kotlinx.serialization.Serializable
 /**
  * Every knob of the memory page's live graph simulation, with the shipped values as defaults: the
  * forces [MemoryGraphForceField] applies (many-body repulsion scaled by each node kind's charge,
- * a spring per edge kind, gravity toward the centre, collision between drawn circles) and the
+ * a degree-scaled spring per edge kind, a cluster pull toward each node's agents, gravity toward
+ * the centre, collision between drawn circles), how a graph with several agents is seeded, and the
  * motion [MemoryGraphMotion] steps them with (friction, speed caps and cooling, tuned by how
  * crowded the graph is). The controller's deterministic layout keeps [MemoryGraphLayoutConfig];
  * this tunes only the live view.
@@ -30,6 +31,25 @@ data class MemoryGraphTuning(
     val springLength: Map<MemoryGraphEdgeKind, Float> = MemoryGraphEdgeKind.entries.associateWith { 110f },
     /** Each edge kind's stiffness: force per unit stretched past its rest length. */
     val springStiffness: Map<MemoryGraphEdgeKind, Float> = MemoryGraphEdgeKind.entries.associateWith { 0.14f },
+    /**
+     * How far d3-force's degree scaling is blended in, 0 (off) to 1 (full): a spring's stiffness
+     * divided by the smaller of its ends' degrees, and its pull split toward the lower-degree end so
+     * hubs move less.
+     */
+    val degreeScaling: Float = 1f,
+    /** Whether shared label groups are pulled toward their agents' centroid (and blocks toward their agent). */
+    val clusterEnabled: Boolean = true,
+    /** The cluster pull per unit of distance from the owners' centroid, scaled by the cooling alpha. */
+    val clusterStrength: Float = 0.05f,
+    /**
+     * Whether a graph with several agents opens from a seeded layout: agents evenly on a ring, the
+     * backend at the centre, each other node near its agents' centroid.
+     */
+    val seededLayout: Boolean = true,
+    /** The seeded ring's radius per square root of the agent count. */
+    val seedRingRadius: Float = 60f,
+    /** How far from its agents' centroid a seeded node may start (deterministic, by node id). */
+    val seedJitter: Float = 30f,
     /** The pull of every node toward the centre, per unit of distance. */
     val gravity: Float = 0.01f,
     /** How far apart two drawn circles are pushed beyond touching. */
@@ -117,6 +137,12 @@ object MemoryGraphTunings {
             "repulsionCutoff" to tuning.repulsionCutoff.literal(),
             "springLength" to tuning.springLength.literal("MemoryGraphEdgeKind"),
             "springStiffness" to tuning.springStiffness.literal("MemoryGraphEdgeKind"),
+            "degreeScaling" to tuning.degreeScaling.literal(),
+            "clusterEnabled" to tuning.clusterEnabled.toString(),
+            "clusterStrength" to tuning.clusterStrength.literal(),
+            "seededLayout" to tuning.seededLayout.toString(),
+            "seedRingRadius" to tuning.seedRingRadius.literal(),
+            "seedJitter" to tuning.seedJitter.literal(),
             "gravity" to tuning.gravity.literal(),
             "collisionPadding" to tuning.collisionPadding.literal(),
             "collisionStrength" to tuning.collisionStrength.literal(),

@@ -138,6 +138,17 @@ class MemoryGraphForceField(
     private val charge = FloatArray(size) { 1f }
     private val restLength = FloatArray(springs.size / 2) { config.idealEdgeLength }
     private val stiffness = FloatArray(springs.size / 2) { config.attraction }
+
+    // Each spring's share of its pull on its source (a) and target (b): 1 and 1 untuned, split
+    // toward the lower-degree end under degree scaling so hubs move less.
+    private val sourceWeight = FloatArray(springs.size / 2) { 1f }
+    private val targetWeight = FloatArray(springs.size / 2) { 1f }
+
+    // Cluster force: each node's owning agents as a compressed list ([ownerStart] indexes
+    // [owners]); none untuned.
+    private var clusterStrength = 0f
+    private var ownerStart = IntArray(size + 1)
+    private var owners = IntArray(0)
     private var gravity = config.gravity
     private var collisionPadding = COLLISION_PADDING
     private var collisionStrength = COLLISION_STRENGTH
@@ -152,15 +163,59 @@ class MemoryGraphForceField(
         cutoffSq = tuning.repulsionCutoff * tuning.repulsionCutoff
         val nodeKindValues = MemoryGraphNodeKind.entries
         for (i in 0 until min(size, nodeKinds.size)) charge[i] = tuning.chargeOf(nodeKindValues[nodeKinds[i]])
-        val edgeKindValues = MemoryGraphEdgeKind.entries
-        for (s in 0 until min(restLength.size, springKinds.size)) {
-            val kind = edgeKindValues[springKinds[s]]
-            restLength[s] = tuning.lengthOf(kind)
-            stiffness[s] = tuning.stiffnessOf(kind)
-        }
+        applySpringTuning(tuning, springKinds)
+        applyClusterTuning(tuning, nodeKinds)
         gravity = tuning.gravity
         collisionPadding = tuning.collisionPadding
         collisionStrength = tuning.collisionStrength
+    }
+
+    /**
+     * Each spring's rest length and stiffness for its kind, the stiffness scaled by
+     * 1 / min(degree of its ends) and its pull split by degree (d3-force's forceLink), blended in by
+     * [MemoryGraphTuning.degreeScaling]. Degrees are counted here, once per graph.
+     */
+    private fun applySpringTuning(tuning: MemoryGraphTuning, springKinds: IntArray) {
+        val degree = IntArray(size)
+        springs.forEach { degree[it]++ }
+        val blend = tuning.degreeScaling.coerceIn(0f, 1f)
+        val edgeKindValues = MemoryGraphEdgeKind.entries
+        for (s in 0 until min(restLength.size, springKinds.size)) {
+            val kind = edgeKindValues[springKinds[s]]
+            val a = degree[springs[2 * s]].coerceAtLeast(1)
+            val b = degree[springs[2 * s + 1]].coerceAtLeast(1)
+            val bias = a.toFloat() / (a + b)
+            restLength[s] = tuning.lengthOf(kind)
+            stiffness[s] = tuning.stiffnessOf(kind) * lerp(1f, 1f / min(a, b), blend)
+            sourceWeight[s] = lerp(1f, 2f * (1f - bias), blend)
+            targetWeight[s] = lerp(1f, 2f * bias, blend)
+        }
+    }
+
+    /**
+     * The cluster force's owners: each node linked to agents (a label group or block) is owned by
+     * them. Only a graph with two or more agents (the fleet view) clusters, so one agent's star is
+     * left as it is.
+     */
+    private fun applyClusterTuning(tuning: MemoryGraphTuning, nodeKinds: IntArray) {
+        val agent = MemoryGraphNodeKind.Agent.ordinal
+        val backend = MemoryGraphNodeKind.Backend.ordinal
+        val agents = nodeKinds.count { it == agent }
+        clusterStrength = if (tuning.clusterEnabled && agents >= 2) tuning.clusterStrength else 0f
+        val owned = Array(size) { mutableListOf<Int>() }
+        fun own(node: Int, owner: Int) {
+            val kind = nodeKinds.getOrNull(node) ?: return
+            if (kind != agent && kind != backend && nodeKinds.getOrNull(owner) == agent) owned[node] += owner
+        }
+        var s = 0
+        while (s < springs.size) {
+            own(springs[s], springs[s + 1])
+            own(springs[s + 1], springs[s])
+            s += 2
+        }
+        ownerStart = IntArray(size + 1)
+        for (i in 0 until size) ownerStart[i + 1] = ownerStart[i] + owned[i].size
+        owners = owned.flatMap { it }.toIntArray()
     }
 
     /** Node [index]'s position. */
@@ -192,7 +247,27 @@ class MemoryGraphForceField(
      */
     fun step(pinned: Int, motion: MemoryGraphMotion, alpha: Float): Float {
         applyForces()
+        applyCluster()
         return integrateLive(pinned, motion, alpha)
+    }
+
+    /** Pulls each owned node toward its owners' centroid ([MemoryGraphTuning.clusterStrength]). */
+    private fun applyCluster() {
+        if (clusterStrength == 0f) return
+        for (i in 0 until size) {
+            val from = ownerStart[i]
+            val to = ownerStart[i + 1]
+            if (from == to) continue
+            var cx = 0f
+            var cy = 0f
+            for (k in from until to) {
+                cx += x[owners[k]]
+                cy += y[owners[k]]
+            }
+            val count = (to - from).toFloat()
+            fx[i] += (cx / count - x[i]) * clusterStrength
+            fy[i] += (cy / count - y[i]) * clusterStrength
+        }
     }
 
     private fun applyForces() {
@@ -240,10 +315,10 @@ class MemoryGraphForceField(
             val force = stiffness[spring] * (distance - restLength[spring])
             val px = dx / distance * force
             val py = dy / distance * force
-            fx[a] += px
-            fy[a] += py
-            fx[b] -= px
-            fy[b] -= py
+            fx[a] += px * sourceWeight[spring]
+            fy[a] += py * sourceWeight[spring]
+            fx[b] -= px * targetWeight[spring]
+            fy[b] -= py * targetWeight[spring]
             s += 2
         }
     }
@@ -364,7 +439,7 @@ data class MemoryGraphMotion(
         }
 
         private const val MIN_RATIO = 1e-9f
-
-        private fun lerp(from: Float, to: Float, t: Float): Float = from + (to - from) * t
     }
 }
+
+private fun lerp(from: Float, to: Float, t: Float): Float = from + (to - from) * t

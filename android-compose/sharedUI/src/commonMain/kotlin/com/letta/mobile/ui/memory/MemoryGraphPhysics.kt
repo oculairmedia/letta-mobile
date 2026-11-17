@@ -33,7 +33,8 @@ internal class MemoryGraphPhysics private constructor(
 ) {
     private val n = ids.size
     private val tuning = start.tuning
-    private val motion = start.motion && n <= LIVE_NODE_LIMIT
+    /** Whether this graph moves at all (reduced motion off, and small enough to simulate). */
+    val motion = start.motion && n <= LIVE_NODE_LIMIT
     private val indexById = ids.withIndex().associate { (index, id) -> id to index }
     private var pinned = MemoryGraphForceField.FREE
     private var ticksSinceHeat = 0
@@ -112,10 +113,34 @@ internal class MemoryGraphPhysics private constructor(
             val field = MemoryGraphForceField(ids.size, springs, radii = radii)
             field.applyTuning(tuning, IntArray(ids.size) { view.nodes[it].kind.ordinal }, MemoryGraphForceField.springKindsOf(view))
             val physics = MemoryGraphPhysics(ids, field, start, MemoryGraphMotion.forGraph(ids.size, springs.size / 2, tuning))
-            val moved = physics.seed(target, start)
+            val moved = if (physics.motion && MemoryGraphSeeds.applies(view, tuning)) {
+                physics.seedFleet(view, target, start.previous)
+            } else {
+                physics.seed(target, start)
+            }
             if (moved || start.reheat) physics.heat()
             return physics
         }
+    }
+
+    /**
+     * A graph with several agents: a first open starts from [MemoryGraphSeeds.initial]; an update
+     * keeps every shown node and starts a new one near its agents ([target] for one with none shown).
+     * Returns whether anything starts away from where it was shown.
+     */
+    private fun seedFleet(view: MemoryGraphView, target: MemoryGraphLayout, previous: MemoryGraphLayout?): Boolean {
+        val seeds = if (previous == null) MemoryGraphSeeds.initial(view, tuning) else null
+        val owners = if (previous != null) MemoryGraphSeeds.ownersOf(view) else emptyMap()
+        var moved = previous == null
+        ids.forEachIndexed { index, id ->
+            val point = seeds?.get(id) ?: previous?.get(id) ?: run {
+                moved = true
+                MemoryGraphSeeds.near(owners[id].orEmpty(), { previous?.get(it) }, id, tuning.seedJitter)
+                    ?: target[id] ?: target.bounds.center
+            }
+            field.place(index, point)
+        }
+        return moved
     }
 
     /** Place every node; returns whether anything starts away from the target (so should move). */

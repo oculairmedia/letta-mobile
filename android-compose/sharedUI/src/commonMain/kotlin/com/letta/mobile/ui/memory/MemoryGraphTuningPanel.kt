@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,6 +53,7 @@ internal fun MemoryGraphTuningPanel(tuning: MemoryGraphTuning, actions: MemoryGr
         }
         MemoryGraphKnobs.sections.forEach { section ->
             LettaSectionLabel(section.title)
+            section.toggles.forEach { toggle -> ToggleRow(toggle, tuning, actions.onChange) }
             section.knobs.forEach { knob -> KnobRow(knob, tuning, actions.onChange) }
         }
     }
@@ -73,6 +75,18 @@ private fun KnobRow(knob: MemoryGraphKnob, tuning: MemoryGraphTuning, onChange: 
             modifier = Modifier.weight(KNOB_SLIDER_WEIGHT),
         )
         KnobField(value, { onChange(knob.write(tuning, it)) }, Modifier.weight(KNOB_FIELD_WEIGHT))
+    }
+}
+
+@Composable
+private fun ToggleRow(toggle: MemoryGraphToggle, tuning: MemoryGraphTuning, onChange: (MemoryGraphTuning) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    ) {
+        Text(toggle.label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+        Switch(checked = toggle.read(tuning), onCheckedChange = { onChange(toggle.write(tuning, it)) })
     }
 }
 
@@ -100,14 +114,26 @@ internal class MemoryGraphKnob(
     val write: (MemoryGraphTuning, Float) -> MemoryGraphTuning,
 )
 
-/** A titled group of knobs. */
-internal class MemoryGraphKnobSection(val title: String, val knobs: List<MemoryGraphKnob>)
+/** One on/off knob: its [label], and how it reads and writes a tuning. */
+internal class MemoryGraphToggle(
+    val label: String,
+    val read: (MemoryGraphTuning) -> Boolean,
+    val write: (MemoryGraphTuning, Boolean) -> MemoryGraphTuning,
+)
+
+/** A titled group of knobs, its switches first. */
+internal class MemoryGraphKnobSection(
+    val title: String,
+    val knobs: List<MemoryGraphKnob>,
+    val toggles: List<MemoryGraphToggle> = emptyList(),
+)
 
 /** Every knob of [MemoryGraphTuning], by section. */
 internal object MemoryGraphKnobs {
     val sections: List<MemoryGraphKnobSection> = listOf(
         MemoryGraphKnobSection("Repulsion", repulsion()),
         MemoryGraphKnobSection("Springs", springs()),
+        MemoryGraphKnobSection("Clusters and seeding", clustersAndSeeding(), clusterAndSeedToggles()),
         MemoryGraphKnobSection("Gravity and collision", gravityAndCollision()),
         MemoryGraphKnobSection("Motion", motion()),
         MemoryGraphKnobSection("Cooling", cooling()),
@@ -120,7 +146,20 @@ internal object MemoryGraphKnobs {
         MemoryGraphKnob("Charge: ${kind.name}", 0f..5f, { it.chargeOf(kind) }, { t, v -> t.copy(nodeCharge = t.nodeCharge + (kind to v)) })
     }
 
-    private fun springs(): List<MemoryGraphKnob> = MemoryGraphEdgeKind.entries.flatMap { kind ->
+    private fun clusterAndSeedToggles(): List<MemoryGraphToggle> = listOf(
+        MemoryGraphToggle("Cluster force", { it.clusterEnabled }, { t, v -> t.copy(clusterEnabled = v) }),
+        MemoryGraphToggle("Seeded layout", { it.seededLayout }, { t, v -> t.copy(seededLayout = v) }),
+    )
+
+    private fun clustersAndSeeding(): List<MemoryGraphKnob> = listOf(
+        MemoryGraphKnob("Cluster strength", 0f..0.5f, { it.clusterStrength }, { t, v -> t.copy(clusterStrength = v) }),
+        MemoryGraphKnob("Seed ring radius (per sqrt of agents)", 10f..200f, { it.seedRingRadius }, { t, v -> t.copy(seedRingRadius = v) }),
+        MemoryGraphKnob("Seed jitter", 0f..100f, { it.seedJitter }, { t, v -> t.copy(seedJitter = v) }),
+    )
+
+    private fun springs(): List<MemoryGraphKnob> = listOf(
+        MemoryGraphKnob("Degree scaling (0 off, 1 d3)", 0f..1f, { it.degreeScaling }, { t, v -> t.copy(degreeScaling = v) }),
+    ) + MemoryGraphEdgeKind.entries.flatMap { kind ->
         listOf(
             MemoryGraphKnob(
                 "Length: ${kind.name}",
