@@ -79,3 +79,34 @@ class DriverTest(unittest.TestCase):
                 driver.main()
             self.assertEqual(stopped.exception.code,2)
             adb.assert_not_called()
+
+    def test_existing_assistant_remount_is_not_excluded_as_history(self):
+        for behavior in ('stable','assistant_remount','user_duplicate'):
+            with self.subTest(behavior=behavior), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                lines = ['0.010 1 2 I System.out: CORE_LOOP mount key=old',
+                         '0.020 1 2 I System.out: CORE_LOOP draw key=old identity=old-id stored=true assistant=true hashes=1',
+                         '0.150 1 2 I System.out: CORE_LOOP mount key=new',
+                         '0.160 1 2 I System.out: CORE_LOOP draw key=new identity=new-id stored=false assistant=true hashes=0',
+                         '0.300 1 2 I System.out: CORE_LOOP draw key=new identity=new-id stored=true assistant=true hashes=699287813']
+                if behavior=='assistant_remount':
+                    lines += ['0.250 1 2 I System.out: CORE_LOOP dispose key=old',
+                              '0.260 1 2 I System.out: CORE_LOOP mount key=old']
+                if behavior=='user_duplicate':
+                    lines += ['0.170 1 2 I System.out: CORE_LOOP mount key=user-a',
+                              '0.180 1 2 I System.out: CORE_LOOP draw key=user-a identity=client-id stored=true assistant=false hashes=7',
+                              '0.190 1 2 I System.out: CORE_LOOP mount key=user-b',
+                              '0.195 1 2 I System.out: CORE_LOOP draw key=user-b identity=client-id stored=true assistant=false hashes=7']
+                lines += [f'{ms/1000:.3f} 1 2 I System.out: CORE_LOOP resident key={key}'
+                          for ms in range(150,5300,50) for key in ('old','new')]
+                lines.sort(key=lambda line:float(line.split()[0]))
+                (root/'logcat.txt').write_text('\n'.join(lines))
+                (root/'wrapper.jsonl').write_text(json.dumps(dict(wallMs=140,line='input.accepted conversationId=fixture disposition=queued'))+'\n'+
+                    json.dumps(dict(wallMs=200,line='turn.finished_relayed conversationId=fixture stopReason=end_turn'))+'\n')
+                (root/'pixels').mkdir()
+                (root/'pixels'/'summary.json').write_text(json.dumps(dict(frames=100,minimum_template_correlation=1,dip_percent=0)))
+                tree=ET.Element('hierarchy');ET.SubElement(tree,'node',text=driver.oracle.FIXED_REPLY)
+                metadata=dict(scenario='S1',sendMs=100,phoneOffsetMs=0,miniToPhoneOffsetMs=0,
+                    existingKeys=['old'],stopGoneMs=400,clockAligned=True,conversationId='fixture')
+                result=driver.normalize(root,metadata,tree)
+                self.assertEqual(result['status'],'PASS' if behavior=='stable' else 'FAIL',result['errors'])

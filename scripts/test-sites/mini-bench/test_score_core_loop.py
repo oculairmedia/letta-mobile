@@ -10,7 +10,7 @@ spec.loader.exec_module(oracle)
 
 
 def evidence():
-    return dict(scenario='S2', client='pixel2xl', terminalMs=200, storedDisplayedMs=250,
+    return dict(scenario='S2', client='pixel2xl',initialUnclassifiedRows=0,duplicateUserRowSamples=0,terminalMs=200, storedDisplayedMs=250,
                 stopGoneMs=300, finalStopPresent=False, visibleText='DONE', clockAligned=True,
                 scenarioEvidence=dict(terminalReason='end_turn',inputCount=1,newStoredTextObserved=True,heldToolMs=40000,heldToolExpectedMs=40000),
                 lifecycle=[dict(event='mount', key='reply-1')],
@@ -45,6 +45,8 @@ class OracleTest(unittest.TestCase):
             lambda e: e['pixels'].update(dip_percent=40),
             lambda e: e['pixels'].update(dip_percent=float('nan')),
             lambda e: e.update(terminalMs=True),
+            lambda e: e.update(duplicateUserRowSamples=1),
+            lambda e: e.update(initialUnclassifiedRows=1),
             lambda e: e.update(frames=e['frames'][::4]),
         ]
         for index, mutate in enumerate(mutations):
@@ -62,9 +64,9 @@ class OracleTest(unittest.TestCase):
         sample = evidence()
         sample.update(scenario='S3',visibleText=oracle.FIXED_REPLY,
             scenarioEvidence=dict(terminalReason='end_turn',inputCount=2,newStoredTextObserved=True,
-                                  cancelled=True,cancelToResendMs=500))
+                                  cancelled=True,cancelledPartialIncomplete=True,cancelToResendMs=500))
         self.assertEqual(oracle.score(sample)['status'],'PASS')
-        for key in ('cancelled','cancelToResendMs'):
+        for key in ('cancelled','cancelledPartialIncomplete','cancelToResendMs'):
             invalid = copy.deepcopy(sample)
             del invalid['scenarioEvidence'][key]
             self.assertEqual(oracle.score(invalid)['status'],'FAIL')

@@ -135,13 +135,37 @@ def parse_log(path):
 
 
 def normalize(directory, metadata, tree):
-    events = parse_log(directory / 'logcat.txt')
+    all_events = parse_log(directory / 'logcat.txt')
     start = metadata.get('sendBeginPhoneMs',metadata.get('videoStartMs',metadata['sendMs'] + metadata['phoneOffsetMs']))
-    events = [e for e in events if e['ms'] >= start]
-    assistant = {e['key'] for e in events if e['event'] == 'draw' and e.get('assistant') == 'true'}
-    # Existing history is explicitly excluded using the pre-send mounted-key snapshot.
-    assistant -= set(metadata['existingKeys'])
-    observed = [e for e in events if e.get('key') in assistant]
+    events = [event for event in all_events if event['ms'] >= start]
+    assistant = {event['key'] for event in all_events if event['event']=='draw' and event.get('assistant')=='true'}
+    users = {event['key'] for event in all_events if event['event']=='draw' and event.get('assistant')=='false'}
+    prior = {}
+    for event in all_events:
+        if event['ms'] >= start:
+            break
+        if event['event']=='dispose':
+            prior.pop(event['key'],None)
+        else:
+            prior[event['key']] = event
+    initial_assistants = set(prior) & assistant
+    new_keys = assistant - set(prior)
+    unknown_initial = set(prior)-assistant-users
+    unknown_removed = [event['key'] for event in events if event['event']=='dispose'
+                       and event['key'] in set(prior)-assistant-users]
+    observed = [event for event in events if event.get('key') in assistant]
+    user_identities = {event['key']:event.get('identity') for event in all_events
+                       if event['event']=='draw' and event['key'] in users}
+    user_state = {key:user_identities[key] for key in set(prior)&users}
+    duplicate_user_samples = set()
+    for event in events:
+        if event['key'] in users:
+            if event['event']=='dispose':
+                user_state.pop(event['key'],None)
+            else:
+                user_state[event['key']] = user_identities[event['key']]
+        if len(user_state.values()) != len(set(user_state.values())):
+            duplicate_user_samples.add(event['ms'])
     terminal = []
     wrapper_events = []
     for line in (directory / 'wrapper.jsonl').read_text(errors='replace').splitlines():
@@ -164,19 +188,35 @@ def normalize(directory, metadata, tree):
         expected_hash -= 0x100000000
     last_terminal = terminal[-1]['wallMs'] + metadata['miniToPhoneOffsetMs'] if terminal else None
     stored = [e['ms'] for e in observed if e['event'] == 'draw' and e.get('stored') == 'true'
-              and last_terminal is not None and e['ms'] >= last_terminal and str(expected_hash) in e.get('hashes','').split(',')]
-    lifecycle = [dict(event=e['event'], key=e['key']) for e in observed if e['event'] in ('mount', 'dispose')]
+              and e['key'] in new_keys and last_terminal is not None and e['ms'] >= last_terminal and str(expected_hash) in e.get('hashes','').split(',')]
+    stored_keys = {event['key'] for event in observed if event['event']=='draw' and event.get('stored')=='true'
+                   and event['key'] in new_keys and last_terminal is not None and event['ms']>=last_terminal
+                   and str(expected_hash) in event.get('hashes','').split(',')}
+    final_run = re.search(r'runId=(\S+)',terminal[-1]['line']) if terminal else None
+    live_keys = {event['key'] for event in observed if event['event']=='draw' and final_run
+                 and event.get('identity')==final_run[1] and event.get('stored')=='false'}
+    preserved = stored_keys & live_keys
+    if preserved:
+        stored = [event['ms'] for event in observed if event['event']=='draw' and event['key'] in preserved
+                  and event.get('stored')=='true' and event['ms']>=last_terminal
+                  and str(expected_hash) in event.get('hashes','').split(',')]
+    elif len(stored_keys)!=1:
+        stored = []
+    lifecycle = [dict(event='present',key=key) for key in sorted(initial_assistants)]
+    lifecycle += [dict(event=e['event'], key=e['key']) for e in observed if e['event'] in ('mount', 'dispose')]
     # Reconstruct resident identities from actual lifecycle events; draw events update identity.
     # Each sample is supported by uninterrupted logcat lifecycle coverage, not by UI polling.
     state = {}
     frames = []
     identities = {}
     aliases = {}
-    for e in observed:
-        if e['event'] == 'draw':
+    tracked_keys = initial_assistants | {event['key'] for event in observed}
+    for e in all_events:
+        if e['event'] == 'draw' and e['key'] in tracked_keys:
             raw_identity = e.get('identity')
             owner = identities.setdefault(e['key'], aliases.get(raw_identity, raw_identity))
             aliases[raw_identity] = owner
+    state.update({key:identities.get(key,key) for key in initial_assistants})
     for e in observed:
         if e['event'] == 'dispose':
             state.pop(e['key'], None)
@@ -185,6 +225,7 @@ def normalize(directory, metadata, tree):
         frames.append(dict(ms=e['ms'], rows=[dict(key=k, id=v) for k, v in state.items()]))
     frames = list({frame['ms']: frame for frame in frames}.values())
     evidence = dict(scenario=metadata['scenario'], client='pixel2xl', terminalMs=last_terminal,
+                    initialUnclassifiedRows=len(unknown_initial),duplicateUserRowSamples=len(duplicate_user_samples),
                     finalStopPresent=any(n.get('content-desc')=='Stop' for n in tree.iter('node')),
                     storedDisplayedMs=min(stored) if stored else None,
                     stopGoneMs=metadata.get('stopGoneMs'), visibleText=visible,
@@ -201,7 +242,7 @@ def normalize(directory, metadata, tree):
             evidence['pixels']['dip_percent'] = max(evidence['pixels'].get('dip_percent', 100), partial_pixels['dip_percent'])
         else:
             evidence['pixels'] = {}
-    scenario_errors = []
+    scenario_errors = ['initial row disposed without role evidence'] if unknown_removed else []
     held = []
     expected_hold = None
     if metadata['scenario'] == 'S3' and not any('stopReason=cancelled' in e['line'] for e in terminal):
@@ -229,10 +270,18 @@ def normalize(directory, metadata, tree):
             scenario_errors.append('current held tool start/end missing or hold too short')
     if any(n.get('content-desc') == 'Stop' for n in tree.iter('node')):
         scenario_errors.append('Stop still visible in final UI')
-    if not any(e.get('stored') == 'true' and str(expected_hash) in e.get('hashes', '').split(',') for e in observed):
+    if not any(e['key'] in new_keys and e.get('stored') == 'true' and str(expected_hash) in e.get('hashes', '').split(',') for e in observed):
         scenario_errors.append('fixed reply not evidenced in a newly drawn stored row')
     accepted = [event for event in wrapper_events if f"input.accepted conversationId={metadata['conversationId']} " in event['line']]
     cancelled = [event for event in terminal if 'stopReason=cancelled' in event['line']]
+    cancelled_live = []
+    if cancelled:
+        run = re.search(r'runId=(\S+)',cancelled[0]['line'])
+        cancelled_live = [event for event in observed if event['event']=='draw' and run
+                          and event.get('identity')==run[1]
+                          and event['ms']<=cancelled[0]['wallMs']+metadata['miniToPhoneOffsetMs']]
+    incomplete_partial = bool(cancelled_live) and any(event.get('hashes') not in (None,'','0') for event in cancelled_live)
+    incomplete_partial = incomplete_partial and not any(str(expected_hash) in event.get('hashes','').split(',') for event in cancelled_live)
     following = [event['wallMs']-cancelled[0]['wallMs'] for event in accepted
                  if cancelled and event['wallMs'] >= cancelled[0]['wallMs']]
     disabled = metadata.get('networkDisabledMs')
@@ -241,18 +290,22 @@ def normalize(directory, metadata, tree):
     evidence['scenarioEvidence'] = dict(
         terminalReason='end_turn' if terminal and 'stopReason=end_turn' in terminal[-1]['line'] else None,
         inputCount=len(accepted), heldToolMs=max(held) if held else None, heldToolExpectedMs=expected_hold,
-        cancelled=bool(cancelled), cancelToResendMs=min(following) if following else None,
+        cancelled=bool(cancelled),cancelledPartialIncomplete=incomplete_partial,cancelToResendMs=min(following) if following else None,
         networkDownMs=outage,
         networkOverlappedLive=bool(metadata.get('networkDisabled') and oracle.number(disabled)
             and oracle.number(last_terminal) and disabled < last_terminal
             and any(e['event']=='draw' and e.get('stored')=='false' and e['ms']<disabled for e in observed)),
-        newStoredTextObserved=any(e.get('stored')=='true' and str(expected_hash) in e.get('hashes','').split(',') for e in observed),
+        newStoredTextObserved=any(e['key'] in new_keys and e.get('stored')=='true' and str(expected_hash) in e.get('hashes','').split(',') for e in observed),
     )
     (directory/'evidence.json').write_text(json.dumps(evidence,indent=2))
     result = oracle.score(evidence)
     result['errors'] = sorted(set(result['errors'] + scenario_errors))
+    result['storedCopyAssociation'] = 'preservedLiveKey' if preserved else ('uniqueNewStoredText' if len(stored_keys)==1 else 'unresolved')
+    result['matchingNewStoredRows'] = len(stored_keys)
+    result['cancelledPartialIncomplete'] = incomplete_partial
     result['cancelToResendMs'] = evidence['scenarioEvidence']['cancelToResendMs']
     result['networkDownMs'] = outage
+    result['initialUnclassifiedDisposals'] = len(unknown_removed)
     result['heldToolMs'] = evidence['scenarioEvidence']['heldToolMs']
     result['status'] = 'FAIL' if result['errors'] else 'PASS'
     return result

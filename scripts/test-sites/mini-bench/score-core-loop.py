@@ -52,11 +52,14 @@ def score(evidence):
     if scenario == 'S3':
         delta = scenario_evidence.get('cancelToResendMs')
         require(scenario_evidence.get('cancelled') is True, 'cancelled terminal not observed')
+        require(scenario_evidence.get('cancelledPartialIncomplete') is True, 'cancelled partial reply was not evidenced before completion')
         require(number(delta) and 0 <= delta <= 1500, 'follow-up did not reach the tight cancellation window')
     if scenario == 'S4':
         outage = scenario_evidence.get('networkDownMs')
         require(number(outage) and outage >= 5000, 'network outage timing missing or too short')
         require(scenario_evidence.get('networkOverlappedLive') is True, 'network drop did not overlap observed live reply')
+    require(evidence.get('initialUnclassifiedRows') == 0, 'initial row roles missing from evidence')
+    require(evidence.get('duplicateUserRowSamples') == 0, 'user duplicate evidence missing or duplicates observed')
     terminal = evidence.get('terminalMs')
     stored = evidence.get('storedDisplayedMs')
     spinner = evidence.get('stopGoneMs')
@@ -114,7 +117,7 @@ def score(evidence):
     mounts = evidence.get('lifecycle')
     require(isinstance(mounts, list) and bool(mounts), 'mount/dispose evidence missing')
     if isinstance(mounts, list):
-        require(all(isinstance(event, dict) and event.get('event') == 'mount'
+        require(all(isinstance(event, dict) and event.get('event') in ('mount','present')
                     and event.get('key') in identities.values() for event in mounts), 'row disposed or invalid lifecycle event')
         require({event.get('key') for event in mounts if isinstance(event, dict)} == set(identities.values()),
                 'lifecycle does not cover observed rows')
@@ -132,7 +135,8 @@ def score(evidence):
     return dict(scenario=evidence.get('scenario') if evidence.get('scenario') in SCENARIOS else None,
                 client=evidence.get('client') if evidence.get('client') in ('pixel2xl','desktop') else None,
                 rowIdentityStable=bool(identities) and not retired and not rekeyed_ids and disposes == 0,
-                rowDisposeCount=disposes, rekeyedRowCount=len(rekeyed_ids), duplicateRowFrames=duplicate_frames,
+                rowDisposeCount=disposes, duplicateUserRowSamples=evidence.get('duplicateUserRowSamples'),
+                initialUnclassifiedRows=evidence.get('initialUnclassifiedRows'), rekeyedRowCount=len(rekeyed_ids), duplicateRowFrames=duplicate_frames,
                 finalTextCorrect=isinstance(expected,str) and evidence.get('visibleText') == expected,
                 spinnerClearedWithinLimit=number(stop_latency) and 0 <= stop_latency <= MAX_SPINNER_MS and evidence.get('finalStopPresent') is False,
                 newStoredTextObserved=scenario_evidence.get('newStoredTextObserved'),
