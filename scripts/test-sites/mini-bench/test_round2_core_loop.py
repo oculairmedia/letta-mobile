@@ -114,6 +114,9 @@ def test_07_new_reply_full_text_is_preserved(tmp_path, actual):
     for top, text in ((100, 'DONE'), (300, 'You'), (500, actual)):
         row = ET.SubElement(timeline, 'node', {'long-clickable': 'true', 'bounds': f'[0,{top}][100,{top+50}]'})
         ET.SubElement(row, 'node', text=text)
+        if text == 'You':
+            ET.SubElement(row, 'node', text='[core-loop:S2] trial-1')
+    metadata['trial'] = 1
     context = evidence.Observation(tmp_path, metadata, tree)
     observed = evidence.normalized_evidence(context, [250])
     assert observed['visibleText'] == actual
@@ -188,6 +191,9 @@ def test_07_old_reply_cannot_replace_missing_new_reply(tmp_path):
     for top, text in ((100, scoring.FIXED_REPLY), (300, 'You')):
         row = ET.SubElement(timeline, 'node', {'long-clickable': 'true', 'bounds': f'[0,{top}][100,{top+50}]'})
         ET.SubElement(row, 'node', text=text)
+        if text == 'You':
+            ET.SubElement(row, 'node', text='[core-loop:S2] trial-1')
+    metadata['trial'] = 1
     context = evidence.Observation(tmp_path, metadata, tree)
     assert evidence.normalized_evidence(context, [250])['visibleText'] == ''
 
@@ -196,8 +202,29 @@ def test_07_reply_paragraphs_and_delivery_timestamp(tmp_path):
     metadata, _ = raw_fixture(tmp_path, False)
     tree = ET.Element('hierarchy')
     timeline = ET.SubElement(tree, 'node', scrollable='true')
+    user = ET.SubElement(timeline, 'node', {'long-clickable': 'true', 'bounds':'[0,300][100,400]'})
+    ET.SubElement(user, 'node', text='You')
+    ET.SubElement(user, 'node', text='[core-loop:S1] trial-1')
     row = ET.SubElement(timeline, 'node', {'long-clickable': 'true', 'bounds':'[0,500][100,900]'})
-    for text in [*scoring.FIXED_REPLY.split('\n\n'), '11:39 PM']:
+    for text in scoring.FIXED_REPLY.split('\n\n'):
         ET.SubElement(row, 'node', text=text)
+    ET.SubElement(row, 'node', {'text': '11:39 PM', 'resource-id': 'delivery-time'})
+    metadata['trial'] = 1
     context = evidence.Observation(tmp_path, metadata, tree)
     assert evidence.normalized_evidence(context, [250])['visibleText'] == scoring.FIXED_REPLY
+
+
+def test_reply_requires_this_trial_prompt(tmp_path):
+    tree = ET.fromstring("""<hierarchy><node scrollable="true">
+      <node long-clickable="true" bounds="[0,100][100,150]"><node text="You"/><node text="[core-loop:S1] trial-2"/></node>
+      <node long-clickable="true" bounds="[0,200][100,250]"><node text="old reply"/></node>
+    </node></hierarchy>""")
+    metadata, _ = raw_fixture(tmp_path, False)
+    metadata.update(scenario='S1', trial=1)
+    context = evidence.Observation(tmp_path, metadata, tree)
+    assert evidence.normalized_evidence(context, [250])['visibleText'] == ''
+
+
+def test_reply_preserves_time_shaped_markdown_paragraph():
+    row = ET.fromstring("""<node><node text="DONE"/><node text="11:39 PM"/></node>""")
+    assert evidence.row_texts(row) == ['DONE', '11:39 PM']

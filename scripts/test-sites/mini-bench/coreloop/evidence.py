@@ -340,27 +340,26 @@ def timeline_rows(tree):
 
 
 def row_texts(row):
-    texts = [n.get("text") for n in row.iter("node") if n.get("text")]
-    # DeliveryTime follows the markdown content in AgentText's touch Column.
-    if len(texts) > 1 and re.fullmatch(r"\d{1,2}:\d{2} [AP]M", texts[-1]):
-        return texts[:-1]
-    return texts
+    return [n.get("text") for n in row.iter("node")
+            if n.get("text") and n.get("resource-id") != "delivery-time"]
 
 
-def final_reply_text(tree):
-    # Compose exposes markdown paragraphs inside a long-clickable message row.
-    # Select by timeline position, never by matching the expected reply content.
+def final_reply_text(tree, prompt):
     rows = [(node_top(row), row_texts(row)) for row in timeline_rows(tree)]
-    users = [top for top, texts in rows if texts[:1] == ["You"]]
-    replies = [(top, texts) for top, texts in rows if texts[:1] != ["You"]]
-    top, texts = max(replies, default=(-1, []), key=lambda item: item[0])
-    if top <= max(users, default=-1):
+    users = [top for top, texts in rows if texts[:2] == ["You", prompt] and top >= 0]
+    if not users:
         return ""
+    prompt_top = max(users)
+    replies = [(top, texts) for top, texts in rows if top > prompt_top and texts and texts[0] != "You"]
+    _, texts = max(replies, default=(-1, []), key=lambda item: item[0])
     return "\n\n".join(texts)
 
 
 def normalized_evidence(context, stored):
-    visible = final_reply_text(context.tree)
+    scenario, trial = context.metadata.get("scenario"), context.metadata.get("trial")
+    kind = "follow-up" if scenario == "S3" else "trial"
+    prompt = f"[core-loop:{scenario}] {kind}-{trial}"
+    visible = final_reply_text(context.tree, prompt)
     lifecycle = [dict(event="present", key=key) for key in sorted(context.initial)]
     lifecycle += [dict(event=e["event"], key=e["key"]) for e in context.observed if e["event"] in ("mount", "dispose")]
     return dict(
