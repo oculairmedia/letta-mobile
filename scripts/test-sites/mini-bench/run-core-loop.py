@@ -20,10 +20,14 @@ import select
 import shutil
 import subprocess
 import time
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from tool_boundary import evidence_path, number_arg, region_arg, run_tool
 import xml.etree.ElementTree as ET
 
 SERIAL = '711KPAE0914240'
 PACKAGE = 'com.letta.mobile.dev'
+SCENARIO_TIMEOUTS = {'S1': 75, 'S2': 150, 'S3': 75, 'S4': 75}
 HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('oracle', HERE / 'score-core-loop.py')
 oracle = importlib.util.module_from_spec(spec)
@@ -31,7 +35,7 @@ spec.loader.exec_module(oracle)
 
 
 def command(argv, **kwargs):
-    return subprocess.run(argv, check=True, capture_output=True, timeout=30, **kwargs).stdout
+    return run_tool(argv, check=True, capture_output=True, timeout=30, **kwargs).stdout
 
 
 def adb(*args):
@@ -127,17 +131,65 @@ def stop_process(process):
 def parse_log(path):
     events = []
     for line in path.read_text(errors='replace').splitlines():
-        match = re.search(r'^\s*(\d+\.\d+).*(?:CORE_LOOP |Telemetry/CoreLoop: )(mount|dispose|draw|resident) (.*)$', line)
-        if match:
-            fields = dict(re.findall(r'(\w+)=([^ ]+)', match[3]))
-            events.append(dict(ms=float(match[1]) * 1000, event=match[2], **fields))
+        timestamp = line.lstrip().split(maxsplit=1)[0] if line.strip() else ''
+        if not re.fullmatch(r'[0-9]+\.[0-9]+', timestamp):
+            continue
+        positions = [(line.find(marker), marker) for marker in ('CORE_LOOP ', 'Telemetry/CoreLoop: ')]
+        positions = [(position, marker) for position, marker in positions if position >= 0]
+        if not positions:
+            continue
+        position, marker = min(positions)
+        parts = line[position + len(marker):].split()
+        if not parts or parts[0] not in ('mount', 'dispose', 'draw', 'resident'):
+            continue
+        fields = {}
+        for part in parts[1:]:
+            key, separator, value = part.partition('=')
+            if separator and re.fullmatch(r'\w+', key) and value:
+                fields[key] = value
+        events.append(dict(ms=float(timestamp) * 1000, event=parts[0], **fields))
     return events
 
 
-def normalize(directory, metadata, tree):
-    all_events = parse_log(directory / 'logcat.txt')
-    start = metadata.get('sendBeginPhoneMs',metadata.get('videoStartMs',metadata['sendMs'] + metadata['phoneOffsetMs']))
-    events = [event for event in all_events if event['ms'] >= start]
+def wrapper_terminals(directory, metadata):
+    terminal = []
+    wrapper_events = []
+    for line in (directory / 'wrapper.jsonl').read_text(errors='replace').splitlines():
+        try:
+            event = json.loads(line)
+            wrapper_events.append(event)
+            if 'turn.finished_relayed' in event['line'] and f"conversationId={metadata['conversationId']} " in event['line']:
+                terminal.append(event)
+        except (ValueError, KeyError):
+            continue
+    return terminal, wrapper_events
+
+
+def row_frames(all_events, observed, initial_assistants):
+    # Reconstruct resident identities from actual lifecycle events; draw events update identity.
+    # Each sample is supported by uninterrupted logcat lifecycle coverage, not by UI polling.
+    state = {}
+    frames = []
+    identities = {}
+    aliases = {}
+    tracked_keys = initial_assistants | {event['key'] for event in observed}
+    for e in all_events:
+        if e['event'] == 'draw' and e['key'] in tracked_keys:
+            raw_identity = e.get('identity')
+            owner = identities.setdefault(e['key'], aliases.get(raw_identity, raw_identity))
+            aliases[raw_identity] = owner
+    state.update({key:identities.get(key,key) for key in initial_assistants})
+    for e in observed:
+        if e['event'] == 'dispose':
+            state.pop(e['key'], None)
+        else:
+            state[e['key']] = identities.get(e['key'], e['key'])
+        frames.append(dict(ms=e['ms'], rows=[dict(key=k, id=v) for k, v in state.items()]))
+    frames = list({frame['ms']: frame for frame in frames}.values())
+    return frames
+
+
+def classify_events(all_events, events, start):
     assistant = {event['key'] for event in all_events if event['event']=='draw' and event.get('assistant')=='true'}
     users = {event['key'] for event in all_events if event['event']=='draw' and event.get('assistant')=='false'}
     prior = {}
@@ -166,27 +218,10 @@ def normalize(directory, metadata, tree):
                 user_state[event['key']] = user_identities[event['key']]
         if len(user_state.values()) != len(set(user_state.values())):
             duplicate_user_samples.add(event['ms'])
-    terminal = []
-    wrapper_events = []
-    for line in (directory / 'wrapper.jsonl').read_text(errors='replace').splitlines():
-        try:
-            event = json.loads(line)
-            wrapper_events.append(event)
-            if 'turn.finished_relayed' in event['line'] and f"conversationId={metadata['conversationId']} " in event['line']:
-                terminal.append(event)
-        except (ValueError, KeyError):
-            continue
-    text_nodes = [n.get('text', '') for n in tree.iter('node') if n.get('text')]
-    expected = 'DONE' if metadata['scenario'] == 'S2' else oracle.FIXED_REPLY
-    # Accessibility can split paragraph nodes. Only accept an exact complete visible reply.
-    joined = '\n\n'.join(text_nodes)
-    visible = expected if expected in joined else joined
-    expected_hash = 0
-    for character in expected:
-        expected_hash = (31 * expected_hash + ord(character)) & 0xffffffff
-    if expected_hash >= 0x80000000:
-        expected_hash -= 0x100000000
-    last_terminal = terminal[-1]['wallMs'] + metadata['miniToPhoneOffsetMs'] if terminal else None
+    return initial_assistants, new_keys, unknown_initial, unknown_removed, observed, duplicate_user_samples
+
+
+def stored_copy(observed, new_keys, last_terminal, expected_hash, terminal):
     stored = [e['ms'] for e in observed if e['event'] == 'draw' and e.get('stored') == 'true'
               and e['key'] in new_keys and last_terminal is not None and e['ms'] >= last_terminal and str(expected_hash) in e.get('hashes','').split(',')]
     stored_keys = {event['key'] for event in observed if event['event']=='draw' and event.get('stored')=='true'
@@ -202,46 +237,19 @@ def normalize(directory, metadata, tree):
                   and str(expected_hash) in event.get('hashes','').split(',')]
     elif len(stored_keys)!=1:
         stored = []
-    lifecycle = [dict(event='present',key=key) for key in sorted(initial_assistants)]
-    lifecycle += [dict(event=e['event'], key=e['key']) for e in observed if e['event'] in ('mount', 'dispose')]
-    # Reconstruct resident identities from actual lifecycle events; draw events update identity.
-    # Each sample is supported by uninterrupted logcat lifecycle coverage, not by UI polling.
-    state = {}
-    frames = []
-    identities = {}
-    aliases = {}
-    tracked_keys = initial_assistants | {event['key'] for event in observed}
-    for e in all_events:
-        if e['event'] == 'draw' and e['key'] in tracked_keys:
-            raw_identity = e.get('identity')
-            owner = identities.setdefault(e['key'], aliases.get(raw_identity, raw_identity))
-            aliases[raw_identity] = owner
-    state.update({key:identities.get(key,key) for key in initial_assistants})
-    for e in observed:
-        if e['event'] == 'dispose':
-            state.pop(e['key'], None)
-        else:
-            state[e['key']] = identities.get(e['key'], e['key'])
-        frames.append(dict(ms=e['ms'], rows=[dict(key=k, id=v) for k, v in state.items()]))
-    frames = list({frame['ms']: frame for frame in frames}.values())
-    evidence = dict(scenario=metadata['scenario'], client='pixel2xl', terminalMs=last_terminal,
-                    initialUnclassifiedRows=len(unknown_initial),duplicateUserRowSamples=len(duplicate_user_samples),
-                    finalStopPresent=any(n.get('content-desc')=='Stop' for n in tree.iter('node')),
-                    storedDisplayedMs=min(stored) if stored else None,
-                    stopGoneMs=metadata.get('stopGoneMs'), visibleText=visible,
-                    lifecycle=lifecycle, frames=frames, clockAligned=metadata['clockAligned'])
-    # Never fabricate continuous row frames to satisfy the <=100 ms coverage gate.
-    # If rendering/logging was sparse, the oracle correctly fails evidence coverage.
-    pixels = directory / 'pixels' / 'summary.json'
-    evidence['pixels'] = json.loads(pixels.read_text()) if pixels.exists() else {}
-    if metadata['scenario'] == 'S3':
-        partial_summary = directory/'partial-pixels'/'summary.json'
-        if partial_summary.exists():
-            partial_pixels = json.loads(partial_summary.read_text())
-            evidence['pixels']['minimum_template_correlation'] = min(evidence['pixels'].get('minimum_template_correlation', 0), partial_pixels['minimum_template_correlation'])
-            evidence['pixels']['dip_percent'] = max(evidence['pixels'].get('dip_percent', 100), partial_pixels['dip_percent'])
-        else:
-            evidence['pixels'] = {}
+    return stored, stored_keys, preserved
+
+
+def is_new_stored_reply(event, new_keys, expected_hash):
+    return (event['key'] in new_keys and event.get('stored') == 'true'
+            and str(expected_hash) in event.get('hashes', '').split(','))
+
+
+def has_partial_capture(scenario, terminals, metadata):
+    return scenario == 'S3' and terminals and metadata.get('interruptReferenceMs')
+
+
+def scenario_checks(metadata, directory, unknown_removed, terminal, last_terminal, observed, tree, new_keys, expected_hash, start):
     scenario_errors = ['initial row disposed without role evidence'] if unknown_removed else []
     held = []
     expected_hold = None
@@ -270,8 +278,51 @@ def normalize(directory, metadata, tree):
             scenario_errors.append('current held tool start/end missing or hold too short')
     if any(n.get('content-desc') == 'Stop' for n in tree.iter('node')):
         scenario_errors.append('Stop still visible in final UI')
-    if not any(e['key'] in new_keys and e.get('stored') == 'true' and str(expected_hash) in e.get('hashes', '').split(',') for e in observed):
+    if not any(is_new_stored_reply(e, new_keys, expected_hash) for e in observed):
         scenario_errors.append('fixed reply not evidenced in a newly drawn stored row')
+    return scenario_errors, held, expected_hold
+
+
+def normalize(directory, metadata, tree):
+    all_events = parse_log(directory / 'logcat.txt')
+    start = metadata.get('sendBeginPhoneMs',metadata.get('videoStartMs',metadata['sendMs'] + metadata['phoneOffsetMs']))
+    events = [event for event in all_events if event['ms'] >= start]
+    initial_assistants, new_keys, unknown_initial, unknown_removed, observed, duplicate_user_samples = classify_events(all_events, events, start)
+    terminal, wrapper_events = wrapper_terminals(directory, metadata)
+    text_nodes = [n.get('text', '') for n in tree.iter('node') if n.get('text')]
+    expected = 'DONE' if metadata['scenario'] == 'S2' else oracle.FIXED_REPLY
+    # Accessibility can split paragraph nodes. Only accept an exact complete visible reply.
+    joined = '\n\n'.join(text_nodes)
+    visible = expected if expected in joined else joined
+    expected_hash = 0
+    for character in expected:
+        expected_hash = (31 * expected_hash + ord(character)) & 0xffffffff
+    if expected_hash >= 0x80000000:
+        expected_hash -= 0x100000000
+    last_terminal = terminal[-1]['wallMs'] + metadata['miniToPhoneOffsetMs'] if terminal else None
+    stored, stored_keys, preserved = stored_copy(observed, new_keys, last_terminal, expected_hash, terminal)
+    lifecycle = [dict(event='present',key=key) for key in sorted(initial_assistants)]
+    lifecycle += [dict(event=e['event'], key=e['key']) for e in observed if e['event'] in ('mount', 'dispose')]
+    frames = row_frames(all_events, observed, initial_assistants)
+    evidence = dict(scenario=metadata['scenario'], client='pixel2xl', terminalMs=last_terminal,
+                    initialUnclassifiedRows=len(unknown_initial),duplicateUserRowSamples=len(duplicate_user_samples),
+                    finalStopPresent=any(n.get('content-desc')=='Stop' for n in tree.iter('node')),
+                    storedDisplayedMs=min(stored) if stored else None,
+                    stopGoneMs=metadata.get('stopGoneMs'), visibleText=visible,
+                    lifecycle=lifecycle, frames=frames, clockAligned=metadata['clockAligned'])
+    # Never fabricate continuous row frames to satisfy the <=100 ms coverage gate.
+    # If rendering/logging was sparse, the oracle correctly fails evidence coverage.
+    pixels = directory / 'pixels' / 'summary.json'
+    evidence['pixels'] = json.loads(pixels.read_text()) if pixels.exists() else {}
+    if metadata['scenario'] == 'S3':
+        partial_summary = directory/'partial-pixels'/'summary.json'
+        if partial_summary.exists():
+            partial_pixels = json.loads(partial_summary.read_text())
+            evidence['pixels']['minimum_template_correlation'] = min(evidence['pixels'].get('minimum_template_correlation', 0), partial_pixels['minimum_template_correlation'])
+            evidence['pixels']['dip_percent'] = max(evidence['pixels'].get('dip_percent', 100), partial_pixels['dip_percent'])
+        else:
+            evidence['pixels'] = {}
+    scenario_errors, held, expected_hold = scenario_checks(metadata, directory, unknown_removed, terminal, last_terminal, observed, tree, new_keys, expected_hash, start)
     accepted = [event for event in wrapper_events if f"input.accepted conversationId={metadata['conversationId']} " in event['line']]
     cancelled = [event for event in terminal if 'stopReason=cancelled' in event['line']]
     cancelled_live = []
@@ -295,7 +346,7 @@ def normalize(directory, metadata, tree):
         networkOverlappedLive=bool(metadata.get('networkDisabled') and oracle.number(disabled)
             and oracle.number(last_terminal) and disabled < last_terminal
             and any(e['event']=='draw' and e.get('stored')=='false' and e['ms']<disabled for e in observed)),
-        newStoredTextObserved=any(e['key'] in new_keys and e.get('stored')=='true' and str(expected_hash) in e.get('hashes','').split(',') for e in observed),
+        newStoredTextObserved=any(is_new_stored_reply(e, new_keys, expected_hash) for e in observed),
     )
     (directory/'evidence.json').write_text(json.dumps(evidence,indent=2))
     result = oracle.score(evidence)
@@ -346,13 +397,67 @@ def wait_for_pixel():
         parent = int(Path(f'/proc/{parent}/stat').read_text().split(') ')[1].split()[1])
     deadline = time.monotonic() + 300
     while True:
-        owners = subprocess.run(['pgrep', '-af', SERIAL], capture_output=True, text=True)
+        owners = run_tool(['pgrep', '-af', SERIAL], capture_output=True, text=True)
         other = [line for line in owners.stdout.splitlines() if int(line.split()[0]) not in ancestors]
         if not other:
             break
         if time.monotonic() >= deadline:
             raise RuntimeError('Pixel already owned: ' + '; '.join(other))
         time.sleep(5)
+
+
+def perform_scenario_step(directory, metadata, scenario, index, wifi, data):
+    if scenario == 'S3':
+        partial_tree = dump(directory, 'before-interrupt')
+        region = reply_region(partial_tree,oracle.FIXED_REPLY[:30],70)
+        if region:
+            metadata['partialRegion'] = region
+            metadata['interruptReferenceMs'] = wall_ms() + metadata['phoneOffsetMs']
+        metadata['resendMs'] = send(directory, f'[core-loop:S3] follow-up-{index}', 'second', fast=True)
+        queued = dump(directory,'queued-resend')
+        metadata['interruptRequestedMs'] = wall_ms() + metadata['phoneOffsetMs']
+        tap_node(queued,'text','Send now')
+    if scenario == 'S4':
+        adb('shell', 'svc', 'wifi', 'disable')
+        adb('shell', 'svc', 'data', 'disable')
+        metadata['networkDisabledMs'] = wall_ms() + metadata['phoneOffsetMs']
+        metadata['networkDisabled'] = adb('shell','settings','get','global','wifi_on') == '0' and adb('shell','settings','get','global','mobile_data') == '0'
+        time.sleep(5)
+        restore_network(wifi, data)
+        metadata['networkRestoredMs'] = wall_ms() + metadata['phoneOffsetMs']
+        metadata['networkVariant'] = 'wifi off/on; cellular disabled during drop'
+    return None
+
+
+def select_conversation(directory, scope):
+    before = dump(directory, 'before')
+    if not any(n.get('text') == 'mini-bench' or n.get('content-desc') == 'mini-bench' for n in before.iter('node')):
+        raise RuntimeError('mini-bench must be open; refusing to send to another agent')
+    if any(n.get('content-desc') == 'Stop' for n in before.iter('node')):
+        raise RuntimeError('existing run active; refusing to interrupt another run')
+    title = scope.get('conversationTitle')
+    if not isinstance(title,str) or not title.startswith('core-loop-harness'):
+        raise RuntimeError('fixture conversation needs its unique core-loop-harness title')
+    if any(n.get('text')==title for n in before.iter('node')):
+        tap_node(before,'text',title)
+    else:
+        if not any(n.get('content-desc')=='Close navigation menu' for n in before.iter('node')):
+            tap_node(before,'content-desc','Agents and conversations')
+        menu = dump(directory,'conversation-menu')
+        if not any(n.get('text')==title for n in menu.iter('node')):
+            tap_node(menu,'content-desc','mini-bench')
+            menu = dump(directory,'fixture-agent-chat')
+            if not any(n.get('content-desc')=='Close navigation menu' for n in menu.iter('node')):
+                tap_node(menu,'content-desc','Agents and conversations')
+                menu = dump(directory,'fixture-agent-menu')
+        tap_node(menu,'text',title)
+    time.sleep(1.5)
+    selected = dump(directory,'selected-conversation')
+    if not any(n.get('text')=='mini-bench' for n in selected.iter('node')):
+        raise RuntimeError('fixture chat did not open')
+    if any(n.get('content-desc')=='Stop' for n in selected.iter('node')):
+        raise RuntimeError('fixture already active after selection')
+    return None
 
 
 def trial(args, scenario, index):
@@ -376,44 +481,18 @@ def trial(args, scenario, index):
     wrapper_handle = (directory / 'wrapper.jsonl').open('w')
     tree = None
     try:
-        before = dump(directory, 'before')
-        if not any(n.get('text') == 'mini-bench' or n.get('content-desc') == 'mini-bench' for n in before.iter('node')):
-            raise RuntimeError('mini-bench must be open; refusing to send to another agent')
-        if any(n.get('content-desc') == 'Stop' for n in before.iter('node')):
-            raise RuntimeError('existing run active; refusing to interrupt another run')
-        title = scope.get('conversationTitle')
-        if not isinstance(title,str) or not title.startswith('core-loop-harness'):
-            raise RuntimeError('fixture conversation needs its unique core-loop-harness title')
-        if any(n.get('text')==title for n in before.iter('node')):
-            tap_node(before,'text',title)
-        else:
-            if not any(n.get('content-desc')=='Close navigation menu' for n in before.iter('node')):
-                tap_node(before,'content-desc','Agents and conversations')
-            menu = dump(directory,'conversation-menu')
-            if not any(n.get('text')==title for n in menu.iter('node')):
-                tap_node(menu,'content-desc','mini-bench')
-                menu = dump(directory,'fixture-agent-chat')
-                if not any(n.get('content-desc')=='Close navigation menu' for n in menu.iter('node')):
-                    tap_node(menu,'content-desc','Agents and conversations')
-                    menu = dump(directory,'fixture-agent-menu')
-            tap_node(menu,'text',title)
-        time.sleep(1.5)
-        selected = dump(directory,'selected-conversation')
-        if not any(n.get('text')=='mini-bench' for n in selected.iter('node')):
-            raise RuntimeError('fixture chat did not open')
-        if any(n.get('content-desc')=='Stop' for n in selected.iter('node')):
-            raise RuntimeError('fixture already active after selection')
-        logcat = subprocess.Popen(['adb', '-s', SERIAL, 'logcat', '-v', 'epoch', '-T', '1'], stdout=log_handle, stderr=subprocess.STDOUT)
-        wrapper = subprocess.Popen(['ssh', '-o', 'BatchMode=yes', 'graphiti', 'python3', '-u', '-c',
-                                    shlex.quote(REMOTE_TAIL)], stdout=wrapper_handle, stderr=subprocess.STDOUT)
+        select_conversation(directory, scope)
+        logcat = run_tool(['adb', '-s', SERIAL, 'logcat', '-v', 'epoch', '-T', '1'], stdout=log_handle, stderr=subprocess.STDOUT, popen=True)
+        wrapper = run_tool(['ssh', '-o', 'BatchMode=yes', 'graphiti', 'python3', '-u', '-c',
+                                    shlex.quote(REMOTE_TAIL)], stdout=wrapper_handle, stderr=subprocess.STDOUT, popen=True)
         begin = wall_ms()
         phone = float(adb('shell', 'date', '+%s%3N'))
         end = wall_ms()
         metadata['phoneRttMs'] = end - begin
         metadata['phoneOffsetMs'] = phone - (begin + end) / 2
-        clock_process = subprocess.Popen(['ssh','-o','BatchMode=yes','graphiti','python3','-u','-c',
+        clock_process = run_tool(['ssh','-o','BatchMode=yes','graphiti','python3','-u','-c',
             shlex.quote('import sys,time\nfor line in sys.stdin: print(time.time_ns()/1000000,flush=True)')],
-            stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True)
+            stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True,popen=True)
         clock_samples = []
         for _ in range(4):
             begin = wall_ms()
@@ -452,27 +531,9 @@ def trial(args, scenario, index):
         metadata['sendMs'] = send(directory, f'[core-loop:{scenario}] trial-{index}', 'first')
         metadata['sendBeginPhoneMs'] = metadata['sendMs'] + metadata['phoneOffsetMs']
         time.sleep(3)
-        if scenario == 'S3':
-            partial_tree = dump(directory, 'before-interrupt')
-            region = reply_region(partial_tree,oracle.FIXED_REPLY[:30],70)
-            if region:
-                metadata['partialRegion'] = region
-                metadata['interruptReferenceMs'] = wall_ms() + metadata['phoneOffsetMs']
-            metadata['resendMs'] = send(directory, f'[core-loop:S3] follow-up-{index}', 'second', fast=True)
-            queued = dump(directory,'queued-resend')
-            metadata['interruptRequestedMs'] = wall_ms() + metadata['phoneOffsetMs']
-            tap_node(queued,'text','Send now')
-        if scenario == 'S4':
-            adb('shell', 'svc', 'wifi', 'disable')
-            adb('shell', 'svc', 'data', 'disable')
-            metadata['networkDisabledMs'] = wall_ms() + metadata['phoneOffsetMs']
-            metadata['networkDisabled'] = adb('shell','settings','get','global','wifi_on') == '0' and adb('shell','settings','get','global','mobile_data') == '0'
-            time.sleep(5)
-            restore_network(wifi, data)
-            metadata['networkRestoredMs'] = wall_ms() + metadata['phoneOffsetMs']
-            metadata['networkVariant'] = 'wifi off/on; cellular disabled during drop'
+        perform_scenario_step(directory, metadata, scenario, index, wifi, data)
         # Wait through fixture completion, then capture post-terminal Stop clearance.
-        deadline = time.monotonic() + (150 if scenario == 'S2' else 75)
+        deadline = time.monotonic() + SCENARIO_TIMEOUTS[scenario]
         while time.monotonic() < deadline:
             tree = dump(directory, 'latest')
             elapsed = wall_ms() - metadata['sendMs']
@@ -499,7 +560,7 @@ def trial(args, scenario, index):
                 adb('shell','kill','-2',video_pid)
                 record_deadline = time.monotonic() + 10
                 while time.monotonic() < record_deadline:
-                    alive = subprocess.run(['adb','-s',SERIAL,'shell','kill','-0',video_pid],capture_output=True,timeout=10)
+                    alive = run_tool(['adb','-s',SERIAL,'shell','kill','-0',video_pid],capture_output=True,timeout=10)
                     if alive.returncode != 0:
                         break
                     time.sleep(.25)
@@ -507,7 +568,7 @@ def trial(args, scenario, index):
                     adb('shell','kill','-9',video_pid)
                     raise RuntimeError('screenrecord did not stop cleanly')
                 metadata['recordStopVerified'] = True
-                command(['adb','-s',SERIAL,'pull','/sdcard/core-loop.mp4',str(directory / 'screen.mp4')])
+                command(['adb','-s',SERIAL,'pull','/sdcard/core-loop.mp4',evidence_path(directory / 'screen.mp4', directory)])
             except Exception as error:
                 cleanup_errors.append(str(error))
         try:
@@ -541,6 +602,19 @@ def trial(args, scenario, index):
     return analyze_capture(directory, metadata, tree, args.region)
 
 
+def analyze_final_pixels(directory, metadata, region, terminals):
+    if terminals:
+        seconds = (terminals[-1]['wallMs'] + metadata['miniToPhoneOffsetMs'] - metadata['videoStartMs']) / 1000
+        analysis = run_tool(['python3', str(HERE/'analyze-settle.py'), evidence_path(directory/'screen.mp4', directory),
+            evidence_path(directory/'pixels', directory), '--region', region_arg(region), '--settle-seconds', number_arg(seconds), '--post-seconds','5'],
+            capture_output=True, timeout=300)
+        (directory/'pixel-analysis.log').write_bytes(analysis.stdout + analysis.stderr)
+        if analysis.returncode:
+            raise RuntimeError('pixel analysis failed; see pixel-analysis.log')
+        # MP4 plus timestamps remain authoritative; decoded PNGs are reproducible.
+        shutil.rmtree(directory/'pixels'/'raw', ignore_errors=True)
+
+
 def analyze_capture(directory, metadata, tree, explicit_region=None):
     # Derive a reply-only region from the final accessibility node before pixel scoring.
     scenario = metadata['scenario']
@@ -551,32 +625,44 @@ def analyze_capture(directory, metadata, tree, explicit_region=None):
     if region:
         terminal_lines = [json.loads(line) for line in (directory/'wrapper.jsonl').read_text().splitlines() if line.startswith('{')]
         terminals = [e for e in terminal_lines if 'turn.finished_relayed' in e['line'] and f"conversationId={metadata['conversationId']} " in e['line']]
-        if terminals:
-            seconds = (terminals[-1]['wallMs'] + metadata['miniToPhoneOffsetMs'] - metadata['videoStartMs']) / 1000
-            analysis = subprocess.run(['python3', str(HERE/'analyze-settle.py'), str(directory/'screen.mp4'),
-                str(directory/'pixels'), '--region', region, '--settle-seconds', str(seconds), '--post-seconds','5'],
-                capture_output=True, timeout=300)
-            (directory/'pixel-analysis.log').write_bytes(analysis.stdout + analysis.stderr)
-            if analysis.returncode:
-                raise RuntimeError('pixel analysis failed; see pixel-analysis.log')
-            # MP4 plus timestamps remain authoritative; decoded PNGs are reproducible.
-            shutil.rmtree(directory/'pixels'/'raw', ignore_errors=True)
-        if scenario == 'S3' and terminals and metadata.get('interruptReferenceMs'):
+        analyze_final_pixels(directory, metadata, region, terminals)
+        if has_partial_capture(scenario, terminals, metadata):
             partial_tree = ET.parse(directory/'before-interrupt.xml').getroot()
             metadata['partialRegion'] = reply_region(partial_tree,oracle.FIXED_REPLY[:30],70)
             if not metadata['partialRegion']:
                 return normalize(directory,metadata,tree)
             seconds = (terminals[0]['wallMs'] + metadata['miniToPhoneOffsetMs'] - metadata['videoStartMs']) / 1000
             reference = (metadata['interruptReferenceMs'] - metadata['videoStartMs']) / 1000
-            analysis = subprocess.run(['python3', str(HERE/'analyze-settle.py'), str(directory/'screen.mp4'),
-                str(directory/'partial-pixels'), '--region', metadata['partialRegion'], '--settle-seconds', str(seconds),
-                '--reference-seconds',str(reference),'--post-seconds','5','--track-y','1000'],capture_output=True,timeout=300)
+            analysis = run_tool(['python3', str(HERE/'analyze-settle.py'), evidence_path(directory/'screen.mp4', directory),
+                evidence_path(directory/'partial-pixels', directory), '--region', region_arg(metadata['partialRegion']), '--settle-seconds', number_arg(seconds),
+                '--reference-seconds',number_arg(reference),'--post-seconds','5','--track-y','1000'],capture_output=True,timeout=300)
             (directory/'partial-pixel-analysis.log').write_bytes(analysis.stdout + analysis.stderr)
             if analysis.returncode:
                 raise RuntimeError('partial pixel analysis failed; see partial-pixel-analysis.log')
             shutil.rmtree(directory/'partial-pixels'/'raw',ignore_errors=True)
     (directory/'metadata.json').write_text(json.dumps(metadata,indent=2))
     return normalize(directory, metadata, tree)
+
+
+def rescore_captures(args):
+    results = []
+    for directory in sorted(args.output.glob('S[1-4]-*')):
+        try:
+            metadata = json.loads((directory/'metadata.json').read_text())
+            for name in ('result','evidence','metadata'):
+                source = directory/(name+'.json')
+                backup = directory/(name+'-pre-rescore.json')
+                if source.exists() and not backup.exists():
+                    shutil.copy2(source,backup)
+            tree = ET.parse(directory/'final.xml').getroot()
+            result = analyze_capture(directory,metadata,tree,args.region)
+        except Exception as error:
+            result = dict(scenario=directory.name.split('-')[0],client='pixel2xl',status='FAIL',errors=[str(error)])
+        (directory/'result.json').write_text(json.dumps(result,indent=2))
+        results.append(result)
+    if not results:
+        raise RuntimeError('no captures to rescore')
+    return results
 
 
 def main():
@@ -594,22 +680,7 @@ def main():
     results = []
     if args.rescore:
         args.output = args.rescore
-        for directory in sorted(args.output.glob('S[1-4]-*')):
-            try:
-                metadata = json.loads((directory/'metadata.json').read_text())
-                for name in ('result','evidence','metadata'):
-                    source = directory/(name+'.json')
-                    backup = directory/(name+'-pre-rescore.json')
-                    if source.exists() and not backup.exists():
-                        shutil.copy2(source,backup)
-                tree = ET.parse(directory/'final.xml').getroot()
-                result = analyze_capture(directory,metadata,tree,args.region)
-            except Exception as error:
-                result = dict(scenario=directory.name.split('-')[0],client='pixel2xl',status='FAIL',errors=[str(error)])
-            (directory/'result.json').write_text(json.dumps(result,indent=2))
-            results.append(result)
-        if not results:
-            raise RuntimeError('no captures to rescore')
+        results = rescore_captures(args)
     else:
         if args.serial != SERIAL:
             parser.error('fresh captures require --serial ' + SERIAL)

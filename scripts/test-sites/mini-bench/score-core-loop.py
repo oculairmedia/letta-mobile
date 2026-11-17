@@ -29,6 +29,105 @@ def number(value):
     return type(value) in (int, float) and math.isfinite(value)
 
 
+def check_scenario(scenario, scenario_evidence, require):
+    if scenario == 'S2':
+        held = scenario_evidence.get('heldToolMs')
+        expected_hold = scenario_evidence.get('heldToolExpectedMs')
+        require(number(expected_hold) and 7000 <= expected_hold <= 110000, 'held-tool fixture duration missing or invalid')
+        require(number(held) and number(expected_hold) and held >= expected_hold - 1000, 'current held tool start/end missing or hold too short')
+    if scenario == 'S3':
+        delta = scenario_evidence.get('cancelToResendMs')
+        require(scenario_evidence.get('cancelled') is True, 'cancelled terminal not observed')
+        require(scenario_evidence.get('cancelledPartialIncomplete') is True, 'cancelled partial reply was not evidenced before completion')
+        require(number(delta) and 0 <= delta <= 1500, 'follow-up did not reach the tight cancellation window')
+    if scenario == 'S4':
+        outage = scenario_evidence.get('networkDownMs')
+        require(number(outage) and outage >= 5000, 'network outage timing missing or too short')
+        require(scenario_evidence.get('networkOverlappedLive') is True, 'network drop did not overlap observed live reply')
+    return None
+
+
+def has_row_identity(row):
+    return isinstance(row, dict) and bool(row.get('id')) and bool(row.get('key'))
+
+
+def check_rows(rows, identities, retired, rekeyed_ids, require, errors):
+    current = set()
+    keys = []
+    for row in rows:
+        if not has_row_identity(row):
+            errors.append('row identity missing')
+            continue
+        row_id, key = row['id'], row['key']
+        require(isinstance(row_id, str) and isinstance(key, str), 'invalid identity type')
+        if not isinstance(row_id, str) or not isinstance(key, str):
+            continue
+        require(row_id not in current, 'duplicate assistant row')
+        require(row_id not in retired, 'assistant row removed and re-added')
+        if row_id in identities and identities[row_id] != key:
+            rekeyed_ids.add(row_id)
+        require(row_id not in identities or identities[row_id] == key, 'assistant row key changed')
+        identities[row_id] = key
+        current.add(row_id)
+        keys.append(key)
+    return current, keys
+
+
+def check_frames(evidence, terminal, stored, require, errors):
+    frames = evidence.get('frames', [])
+    require(isinstance(frames, list) and len(frames) >= 2, 'row frames missing')
+    identities = {}
+    rekeyed_ids = set()
+    duplicate_frames = 0
+    retired = set()
+    previous = set()
+    stamps = []
+    if isinstance(frames, list):
+        for frame in frames:
+            if not isinstance(frame, dict) or not number(frame.get('ms')) or not isinstance(frame.get('rows'), list):
+                errors.append('invalid row frame')
+                continue
+            stamps.append(frame['ms'])
+            current, keys = check_rows(frame['rows'], identities, retired, rekeyed_ids, require, errors)
+            if len(keys) != len(set(keys)) or len(current) != len(keys):
+                duplicate_frames += 1
+            require(len(keys) == len(set(keys)), 'duplicate row key')
+            retired.update(previous - current)
+            previous = current
+    require(bool(identities), 'no assistant identity observed')
+    require(not retired, 'assistant row removed from observed window')
+    require(bool(stamps) and all(0 < b - a <= MAX_FRAME_GAP_MS for a, b in zip(stamps, stamps[1:])),
+            'row evidence has gaps or is unordered')
+    require(bool(stamps) and number(terminal) and number(stored) and stamps[0] < terminal
+            and stamps[-1] >= max(terminal + MAX_SPINNER_MS, stored), 'row window does not cover settlement')
+    return identities, retired, rekeyed_ids, duplicate_frames
+
+
+def check_lifecycle(evidence, identities, require):
+    mounts = evidence.get('lifecycle')
+    require(isinstance(mounts, list) and bool(mounts), 'mount/dispose evidence missing')
+    if isinstance(mounts, list):
+        require(all(isinstance(event, dict) and event.get('event') in ('mount','present')
+                    and event.get('key') in identities.values() for event in mounts), 'row disposed or invalid lifecycle event')
+        require({event.get('key') for event in mounts if isinstance(event, dict)} == set(identities.values()),
+                'lifecycle does not cover observed rows')
+        require(len(mounts) == len(identities), 'row mounted more than once')
+    return mounts
+
+
+def check_pixels(evidence, require):
+    pixels = evidence.get('pixels', {})
+    if not isinstance(pixels, dict):
+        pixels = {}
+    correlation = pixels.get('minimum_template_correlation')
+    dip = pixels.get('dip_percent')
+    require(number(correlation) and MIN_CORRELATION <= correlation <= 1, 'pixel template missing or lost')
+    require(number(dip) and dip <= MAX_DIP_PERCENT, 'reply luminance missing or dipped')
+    require(number(pixels.get('frames')) and pixels['frames'] >= 2, 'pixel frames missing')
+    require(evidence.get('clockAligned') is True, 'clock alignment missing')
+    return correlation, dip
+
+
 def score(evidence):
     errors = []
     def require(condition, reason):
@@ -44,20 +143,7 @@ def score(evidence):
     require(scenario_evidence.get('newStoredTextObserved') is True, 'fixed reply not evidenced in a newly drawn stored row')
     inputs = scenario_evidence.get('inputCount')
     require(type(inputs) is int and inputs >= (2 if scenario == 'S3' else 1), 'scenario input evidence missing')
-    if scenario == 'S2':
-        held = scenario_evidence.get('heldToolMs')
-        expected_hold = scenario_evidence.get('heldToolExpectedMs')
-        require(number(expected_hold) and 7000 <= expected_hold <= 110000, 'held-tool fixture duration missing or invalid')
-        require(number(held) and number(expected_hold) and held >= expected_hold - 1000, 'current held tool start/end missing or hold too short')
-    if scenario == 'S3':
-        delta = scenario_evidence.get('cancelToResendMs')
-        require(scenario_evidence.get('cancelled') is True, 'cancelled terminal not observed')
-        require(scenario_evidence.get('cancelledPartialIncomplete') is True, 'cancelled partial reply was not evidenced before completion')
-        require(number(delta) and 0 <= delta <= 1500, 'follow-up did not reach the tight cancellation window')
-    if scenario == 'S4':
-        outage = scenario_evidence.get('networkDownMs')
-        require(number(outage) and outage >= 5000, 'network outage timing missing or too short')
-        require(scenario_evidence.get('networkOverlappedLive') is True, 'network drop did not overlap observed live reply')
+    check_scenario(scenario, scenario_evidence, require)
     require(evidence.get('initialUnclassifiedRows') == 0, 'initial row roles missing from evidence')
     require(evidence.get('duplicateUserRowSamples') == 0, 'user duplicate evidence missing or duplicates observed')
     terminal = evidence.get('terminalMs')
@@ -71,66 +157,9 @@ def score(evidence):
     expected = 'DONE' if evidence.get('scenario') == 'S2' else FIXED_REPLY
     require(isinstance(expected, str) and bool(expected) and evidence.get('visibleText') == expected,
             'visible final text differs or is missing')
-    frames = evidence.get('frames', [])
-    require(isinstance(frames, list) and len(frames) >= 2, 'row frames missing')
-    identities = {}
-    rekeyed_ids = set()
-    duplicate_frames = 0
-    retired = set()
-    previous = set()
-    stamps = []
-    if isinstance(frames, list):
-        for frame in frames:
-            if not isinstance(frame, dict) or not number(frame.get('ms')) or not isinstance(frame.get('rows'), list):
-                errors.append('invalid row frame')
-                continue
-            stamps.append(frame['ms'])
-            current = set()
-            keys = []
-            for row in frame['rows']:
-                if not isinstance(row, dict) or not row.get('id') or not row.get('key'):
-                    errors.append('row identity missing')
-                    continue
-                row_id, key = row['id'], row['key']
-                require(isinstance(row_id, str) and isinstance(key, str), 'invalid identity type')
-                if not isinstance(row_id, str) or not isinstance(key, str):
-                    continue
-                require(row_id not in current, 'duplicate assistant row')
-                require(row_id not in retired, 'assistant row removed and re-added')
-                if row_id in identities and identities[row_id] != key:
-                    rekeyed_ids.add(row_id)
-                require(row_id not in identities or identities[row_id] == key, 'assistant row key changed')
-                identities[row_id] = key
-                current.add(row_id)
-                keys.append(key)
-            if len(keys) != len(set(keys)) or len(current) != len(keys):
-                duplicate_frames += 1
-            require(len(keys) == len(set(keys)), 'duplicate row key')
-            retired.update(previous - current)
-            previous = current
-    require(bool(identities), 'no assistant identity observed')
-    require(not retired, 'assistant row removed from observed window')
-    require(bool(stamps) and all(0 < b - a <= MAX_FRAME_GAP_MS for a, b in zip(stamps, stamps[1:])),
-            'row evidence has gaps or is unordered')
-    require(bool(stamps) and number(terminal) and number(stored) and stamps[0] < terminal
-            and stamps[-1] >= max(terminal + MAX_SPINNER_MS, stored), 'row window does not cover settlement')
-    mounts = evidence.get('lifecycle')
-    require(isinstance(mounts, list) and bool(mounts), 'mount/dispose evidence missing')
-    if isinstance(mounts, list):
-        require(all(isinstance(event, dict) and event.get('event') in ('mount','present')
-                    and event.get('key') in identities.values() for event in mounts), 'row disposed or invalid lifecycle event')
-        require({event.get('key') for event in mounts if isinstance(event, dict)} == set(identities.values()),
-                'lifecycle does not cover observed rows')
-        require(len(mounts) == len(identities), 'row mounted more than once')
-    pixels = evidence.get('pixels', {})
-    if not isinstance(pixels, dict):
-        pixels = {}
-    correlation = pixels.get('minimum_template_correlation')
-    dip = pixels.get('dip_percent')
-    require(number(correlation) and MIN_CORRELATION <= correlation <= 1, 'pixel template missing or lost')
-    require(number(dip) and dip <= MAX_DIP_PERCENT, 'reply luminance missing or dipped')
-    require(number(pixels.get('frames')) and pixels['frames'] >= 2, 'pixel frames missing')
-    require(evidence.get('clockAligned') is True, 'clock alignment missing')
+    identities, retired, rekeyed_ids, duplicate_frames = check_frames(evidence, terminal, stored, require, errors)
+    mounts = check_lifecycle(evidence, identities, require)
+    correlation, dip = check_pixels(evidence, require)
     disposes = sum(isinstance(event, dict) and event.get('event') == 'dispose' for event in mounts) if isinstance(mounts,list) else None
     return dict(scenario=evidence.get('scenario') if evidence.get('scenario') in SCENARIOS else None,
                 client=evidence.get('client') if evidence.get('client') in ('pixel2xl','desktop') else None,
