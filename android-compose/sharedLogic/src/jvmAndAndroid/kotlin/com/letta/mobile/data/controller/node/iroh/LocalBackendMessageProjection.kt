@@ -122,33 +122,35 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
     private fun normalizeImagePart(o: JsonObject): JsonObject? {
         if (o["type"]?.stringOrNull() != "image") return null
         val source = o["source"] as? JsonObject
-        if (o["unavailable_reason"] != null || source?.get("type")?.stringOrNull() == "url") return o
-        val data = source?.get("data")?.stringOrNull() ?: o["data"]?.stringOrNull() ?: run {
-            // Keep unavailable data visible as a failed image in the shared UI, and
-            // record the boundary failure without recording the image payload.
-            Telemetry.event(
-                IMAGE_PIPELINE_TAG,
-                "hydrate.image_unavailable",
-                "reason" attr if (o["image_ref"] != null) "image_ref_pointer" else "no_base64_data",
-                level = Telemetry.Level.WARN,
-            )
-            ""
+        return when {
+            o["unavailable_reason"] != null -> o
+            source?.get("type")?.stringOrNull() == "url" -> o
+            else -> normalizeBase64Image(o, source)
         }
-        val mediaType = source?.get("media_type")?.stringOrNull()
-            ?: o["mimeType"]?.stringOrNull()
-            ?: "image/jpeg"
+    }
+
+    private fun normalizeBase64Image(o: JsonObject, source: JsonObject?): JsonObject {
+        val data = source?.get("data")?.stringOrNull() ?: o["data"]?.stringOrNull() ?: missingImageData(o)
+        val mediaType = source?.get("media_type")?.stringOrNull() ?: o["mimeType"]?.stringOrNull() ?: "image/jpeg"
         return buildJsonObject {
             put("type", "image")
             if (o["image_ref"] != null && data.isBlank()) put("unavailable_reason", "unsupported_source")
-            put(
-                "source",
-                buildJsonObject {
-                    put("type", "base64")
-                    put("media_type", mediaType)
-                    put("data", data)
-                },
-            )
+            put("source", buildJsonObject {
+                put("type", "base64")
+                put("media_type", mediaType)
+                put("data", data)
+            })
         }
+    }
+
+    private fun missingImageData(o: JsonObject): String {
+        Telemetry.event(
+            IMAGE_PIPELINE_TAG,
+            "hydrate.image_unavailable",
+            "reason" attr if (o["image_ref"] != null) "image_ref_pointer" else "no_base64_data",
+            level = Telemetry.Level.WARN,
+        )
+        return ""
     }
 
     /** Port of translate.ts stripSystemReminders (user-role only). */

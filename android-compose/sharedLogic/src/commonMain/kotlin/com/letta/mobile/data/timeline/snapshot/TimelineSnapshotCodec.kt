@@ -222,6 +222,9 @@ internal object StoredEnvelopeFingerprint {
     }
 }
 
+private fun MessageContentPart.Image.hasSnapshotContent(): Boolean =
+    base64.isNotEmpty() || storedByteSize != null || unavailableReason != null || url != null
+
 fun TimelineEvent.Confirmed.toStoredTimelineEvent(): StoredTimelineEvent =
     StoredTimelineEvent(
         position = position,
@@ -247,7 +250,7 @@ fun TimelineEvent.Confirmed.toStoredTimelineEvent(): StoredTimelineEvent =
         },
         attachments = attachments.mapNotNull {
             val rawBase64 = it.base64
-            if (rawBase64.isEmpty() && it.storedByteSize == null && it.unavailableReason == null && it.url == null) return@mapNotNull null
+            if (!it.hasSnapshotContent()) return@mapNotNull null
             val estimatedBytes = if (rawBase64.isNotEmpty()) {
                 val padding = rawBase64.takeLast(2).count { ch -> ch == '=' }
                 ((rawBase64.length * 3L) / 4L) - padding
