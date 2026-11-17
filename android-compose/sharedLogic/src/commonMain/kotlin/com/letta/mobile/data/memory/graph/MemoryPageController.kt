@@ -180,7 +180,9 @@ class MemoryPageController private constructor(
     ): MemoryNodeSelection? {
         val nodeId = selection.detail.nodeId
         val refreshed = MemoryNodeDetails.resolve(parity.memory, nodeId)?.takeIf { view.node(nodeId) != null }
-        return MemoryNodeSelections.reconcile(selection, refreshed)
+        val reconciled = MemoryNodeSelections.reconcile(selection, refreshed)
+        if (reconciled == null) cancelNodeJobs()
+        return reconciled
     }
 
     private fun updateOpenSelection(transform: (MemoryNodeSelection) -> MemoryNodeSelection) {

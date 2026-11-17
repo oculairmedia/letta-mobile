@@ -111,7 +111,7 @@ class ScheduleFleetControllerTest {
         controller.refresh()
         advanceUntilIdle()
         assertEquals(listOf("s1", "s2"), controller.state.value.schedules.map { it.id })
-        assertNull(controller.state.value.errorMessage)
+        assertEquals("Could not load schedules for 2 agents.", controller.state.value.errorMessage)
     }
 
     @Test

@@ -74,7 +74,7 @@ private fun KnobRow(knob: MemoryGraphKnob, tuning: MemoryGraphTuning, onChange: 
             valueRange = knob.range,
             modifier = Modifier.weight(KNOB_SLIDER_WEIGHT),
         )
-        KnobField(value, { onChange(knob.write(tuning, it)) }, Modifier.weight(KNOB_FIELD_WEIGHT))
+        KnobField(value, knob.range, { onChange(knob.write(tuning, it)) }, Modifier.weight(KNOB_FIELD_WEIGHT))
     }
 }
 
@@ -92,13 +92,13 @@ private fun ToggleRow(toggle: MemoryGraphToggle, tuning: MemoryGraphTuning, onCh
 
 /** The knob's exact value, typed; a number that does not parse is kept as text until it does. */
 @Composable
-private fun KnobField(value: Float, onValue: (Float) -> Unit, modifier: Modifier) {
+private fun KnobField(value: Float, range: ClosedFloatingPointRange<Float>, onValue: (Float) -> Unit, modifier: Modifier) {
     var text by remember(value) { mutableStateOf(value.toString()) }
     OutlinedTextField(
         value = text,
         onValueChange = { typed ->
             text = typed
-            typed.toFloatOrNull()?.let(onValue)
+            typed.toFloatOrNull()?.takeIf { it.isFinite() && it in range }?.let(onValue)
         },
         singleLine = true,
         textStyle = MaterialTheme.typography.bodySmall,

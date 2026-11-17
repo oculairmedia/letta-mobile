@@ -43,6 +43,16 @@ class SchedulesFleetScopeTest {
     }
 
     @Test
+    fun aHiddenCronCannotHideAVisibleNativeSchedulesHistoryAndOrphansStayVisible() {
+        val history = library.runHistory + ("orphan" to listOf(RunRecord("orphan", at, true)))
+        val state = SchedulesPageState(library = library.copy(
+            crons = library.crons + CronTask(id = "s1", agentId = "a2"),
+            runHistory = history,
+        ))
+        assertEquals(setOf("s1", "shared", "orphan"), state.scopedRunHistory().keys)
+    }
+
+    @Test
     fun aHiddenAgentsCronIsNotTheTargetOfAVisibleRow() {
         val state = SchedulesPageState(library = library)
         assertEquals(null, state.deleteTarget("c2"))

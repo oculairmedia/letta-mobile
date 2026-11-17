@@ -59,15 +59,17 @@ internal class MemoryGraphLiveLayout {
 
     /**
      * Apply [next] (a dev tuning window's change) or a new [request] to reheat: the simulation is
-     * rebuilt from where every node is and set moving. The first call only records them.
+     * rebuilt from where every node is and set moving. The first call records unchanged defaults
+     * without reheating; changed tuning takes effect immediately.
      */
     fun retune(next: MemoryGraphTuning, request: Int) {
         val first = reheatRequest == null
-        if (!first && next == tuning && request == reheatRequest) return
         val changed = next != tuning
+        val requested = request != reheatRequest
+        if (!changed && !requested) return
         tuning = next
         reheatRequest = request
-        if (!first || changed) rebuild(reheat = !first)
+        if (!first || changed) rebuild(reheat = true)
     }
 
     private fun rebuild(reheat: Boolean) {

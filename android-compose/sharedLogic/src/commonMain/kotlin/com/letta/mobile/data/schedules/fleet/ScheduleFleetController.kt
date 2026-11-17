@@ -126,7 +126,8 @@ class ScheduleFleetController(
     private suspend fun readAgent(agent: AgentId): AgentScheduleRead {
         val native = if (nativeUnserved) null else nativeOrNull(agent)
         val crons = runCatchingCancellable { sources.crons?.listCrons(agent) }
-        return if (native == null) null to crons.getOrThrow() else native to crons.getOrNull()
+        if (native == null) crons.getOrThrow()
+        return AgentScheduleRead(native, crons.getOrNull(), crons.exceptionOrNull())
     }
 
     /** The agent's native schedules, or null when the host does not serve the route. */

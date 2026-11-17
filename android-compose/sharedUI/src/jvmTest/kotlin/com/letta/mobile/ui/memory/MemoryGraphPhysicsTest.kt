@@ -36,6 +36,17 @@ class MemoryGraphPhysicsTest {
     )
 
     @Test
+    fun theFirstChangedTuningKeepsAnExistingLayoutHot() {
+        val live = MemoryGraphLiveLayout()
+        live.retarget(view, target, emptyMap(), motion = true)
+        live.retune(com.letta.mobile.data.memory.graph.MemoryGraphTuning(repulsion = 6400f), 0)
+        assertFalse(live.isSettled, "changed forces must run after the first retune")
+        live.retarget(view, target, emptyMap(), motion = false)
+        live.retune(com.letta.mobile.data.memory.graph.MemoryGraphTuning(repulsion = 6500f), 1)
+        assertTrue(live.isSettled, "reduced motion stays settled")
+    }
+
+    @Test
     fun aFirstOpenBloomsFromTheCentreAndSettlesNearTheControllersLayout() {
         val sim = physics()
         assertTrue(sim.isHot, "a first open blooms")

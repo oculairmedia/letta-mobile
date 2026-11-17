@@ -143,8 +143,12 @@ private fun SchedulesPageState.hasWriter(cron: CronTask): Boolean = !showsFleet 
  */
 internal fun SchedulesPageState.scopedRunHistory(): Map<String, List<RunRecord>> {
     val scope = scopeAgentId?.takeIf { showsFleet } ?: return library.runHistory
-    val owners = library.schedules.associate { it.id to it.agentId } + (crons + library.crons).associate { it.id to it.agentId }
-    return library.runHistory.filterKeys { id -> owners[id] in setOf(null, scope) }
+    val tasks = crons + library.crons
+    val knownIds = (library.schedules.map { it.id } + tasks.map { it.id }).toSet()
+    val nativeIds = library.schedules.filter { it.agentId == scope }.map { it.id }
+    val cronIds = tasks.filter { inFocus(it) }.map { it.id }
+    val visibleIds = (nativeIds + cronIds).toSet()
+    return library.runHistory.filterKeys { id -> id in visibleIds || id !in knownIds }
 }
 
 /** Only an active or paused cron (or one whose host reports no status) can be paused or resumed. */
