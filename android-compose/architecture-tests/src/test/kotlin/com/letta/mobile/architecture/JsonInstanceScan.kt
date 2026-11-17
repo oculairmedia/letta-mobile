@@ -21,8 +21,9 @@ internal object JsonInstanceScan {
     /** `Json {`, `Json(from = x) {` and the fully qualified `kotlinx.serialization.json.Json {`. */
     private val construction = Regex("""(?<!class )(?:(?<![.\w])|(?<=serialization\.json\.))Json(\([^)]*\))?\s*\{""")
     private val commentPrefixes = listOf("//", "*", "/*")
-    private val excludedSegments = listOf("/build/", "/generated/", "/ksp/")
+    /** Build output and tool caches: never production source, and rewritten while tests run. */
     private val prunedDirectories = setOf("build", "generated", "ksp", ".gradle", ".kotlin", "node_modules")
+    private val excludedSegments = prunedDirectories.map { "/$it/" }
 
     fun constructsJson(source: String): Boolean = source.lineSequence()
         .map(String::trim)
