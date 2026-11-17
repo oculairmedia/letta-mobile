@@ -5497,14 +5497,6 @@ public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphTu
 	public final fun getLambda$1536536983$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
-public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphTuningWindow_jvmKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphTuningWindow_jvmKt;
-	public fun <init> ()V
-	public final fun getLambda$-457887684$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-942893993$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-978729328$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-}
-
 public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeCardKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeCardKt;
 	public fun <init> ()V
@@ -5516,6 +5508,10 @@ public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeEdi
 	public static final field INSTANCE Lcom/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeEditorPaneKt;
 	public fun <init> ()V
 	public final fun getLambda$1277442814$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
+public final class com/letta/mobile/ui/memory/MemoryGraphLiveLayoutKt {
+	public static final fun getLocalMemoryGraphTunings ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public final class com/letta/mobile/ui/memory/MemoryGraphPalette {
@@ -5555,7 +5551,7 @@ public final class com/letta/mobile/ui/memory/MemoryGraphPaletteKt {
 }
 
 public final class com/letta/mobile/ui/memory/MemoryGraphTuningWindow_jvmKt {
-	public static final fun MemoryGraphTuningWindow (Ljava/nio/file/Path;Landroidx/compose/runtime/Composer;I)V
+	public static final fun MemoryGraphTuningWindow (Ljava/nio/file/Path;Lcom/letta/mobile/data/memory/graph/MemoryGraphTunings;Landroidx/compose/runtime/Composer;I)V
 }
 
 public final class com/letta/mobile/ui/memory/MemoryGraphViewportState {

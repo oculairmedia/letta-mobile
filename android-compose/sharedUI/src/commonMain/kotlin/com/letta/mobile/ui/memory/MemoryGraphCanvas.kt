@@ -68,7 +68,9 @@ internal fun MemoryGraphCanvas(
     val density = LocalDensity.current
     // A docked inspector can leave a wide window's graph phone-narrow: label by the canvas's own width.
     val narrowCanvas = with(density) { viewportState.size.width.toDp() } < LettaDimens.Pane.wideBreakpoint
-    val tuning by MemoryGraphTunings.current.collectAsState()
+    val localTunings = LocalMemoryGraphTunings.current
+    val tunings = remember(localTunings) { localTunings ?: MemoryGraphTunings() }
+    val tuning by tunings.current.collectAsState()
     val labels = rememberMemoryNodeLabels(params.view, palette, params.compact || narrowCanvas, tuning.labelFontScale)
     val neighbours = remember(params.view) { params.view.adjacency() }
     val labeler = remember(params.view, neighbours) { MemoryGraphLabeler(params.view, neighbours) }

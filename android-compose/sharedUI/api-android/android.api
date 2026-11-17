@@ -5379,6 +5379,10 @@ public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeEdi
 	public final fun getLambda$1277442814$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
+public final class com/letta/mobile/ui/memory/MemoryGraphLiveLayoutKt {
+	public static final fun getLocalMemoryGraphTunings ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
 public final class com/letta/mobile/ui/memory/MemoryGraphPalette {
 	public static final field $stable I
 	public synthetic fun <init> (Ljava/util/Map;Ljava/util/Map;JJJJJJJLkotlin/jvm/internal/DefaultConstructorMarker;)V

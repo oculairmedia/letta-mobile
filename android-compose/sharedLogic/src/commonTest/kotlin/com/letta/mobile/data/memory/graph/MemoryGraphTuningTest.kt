@@ -183,6 +183,18 @@ class MemoryGraphTuningTest {
     }
 
     @Test
+    fun tuningInstancesKeepChangesAndReheatsIndependent() {
+        val first = MemoryGraphTunings()
+        val second = MemoryGraphTunings()
+        first.set(MemoryGraphTuning(repulsion = 4200f))
+        first.reheat()
+        assertEquals(4200f, first.current.value.repulsion)
+        assertEquals(1, first.reheatRequests.value)
+        assertEquals(MemoryGraphTuning(), second.current.value)
+        assertEquals(0, second.reheatRequests.value)
+    }
+
+    @Test
     fun aStoredTuningRoundTrips() {
         val tuned = MemoryGraphTuning(
             repulsion = 4200f,

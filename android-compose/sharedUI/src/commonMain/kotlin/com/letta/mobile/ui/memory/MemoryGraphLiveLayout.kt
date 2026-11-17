@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.data.memory.MemoryGraphNode
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.MemoryParityItem
@@ -114,6 +115,8 @@ internal class MemoryGraphLiveLayout {
     }
 }
 
+val LocalMemoryGraphTunings = staticCompositionLocalOf<MemoryGraphTunings?> { null }
+
 /** Keeps a [MemoryGraphLiveLayout] retargeted (before the next draw) whenever the graph changes. */
 @Composable
 internal fun rememberMemoryGraphLiveLayout(
@@ -123,8 +126,10 @@ internal fun rememberMemoryGraphLiveLayout(
     motion: Boolean,
 ): MemoryGraphLiveLayout {
     val live = remember { MemoryGraphLiveLayout() }
-    val tuning by MemoryGraphTunings.current.collectAsState()
-    val reheats by MemoryGraphTunings.reheatRequests.collectAsState()
+    val localTunings = LocalMemoryGraphTunings.current
+    val tunings = remember(localTunings) { localTunings ?: MemoryGraphTunings() }
+    val tuning by tunings.current.collectAsState()
+    val reheats by tunings.reheatRequests.collectAsState()
     DisposableEffect(view, target, looks, motion) {
         live.retarget(view, target, looks, motion)
         onDispose { }

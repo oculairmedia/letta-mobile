@@ -136,10 +136,9 @@ private const val DEFAULT_SPRING_LENGTH = 110f
 private const val DEFAULT_SPRING_STIFFNESS = 0.14f
 
 /**
- * The one [MemoryGraphTuning] the live memory graph reads. Production never changes it, so it is
- * always the defaults; a dev tuning window sets it, and every open graph re-applies it and heats.
+ * Lifecycle-owned tuning shared by a graph host and its optional developer window.
  */
-object MemoryGraphTunings {
+class MemoryGraphTunings {
     private val state = MutableStateFlow(MemoryGraphTuning())
     private val reheats = MutableStateFlow(0)
 
@@ -160,62 +159,64 @@ object MemoryGraphTunings {
         reheats.value += 1
     }
 
-    /** [tuning] as JSON, for a dev store. */
-    fun encode(tuning: MemoryGraphTuning): String = LettaJson.persisted.encodeToString(MemoryGraphTuning.serializer(), tuning)
+    companion object {
+        /** [tuning] as JSON, for a dev store. */
+        fun encode(tuning: MemoryGraphTuning): String = LettaJson.persisted.encodeToString(MemoryGraphTuning.serializer(), tuning)
 
-    /** A stored tuning, or null when [text] is not one; keys it lacks take their defaults. */
-    fun decode(text: String): MemoryGraphTuning? =
-        runCatching { LettaJson.persisted.decodeFromString(MemoryGraphTuning.serializer(), text) }.getOrNull()
+        /** A stored tuning, or null when [text] is not one; keys it lacks take their defaults. */
+        fun decode(text: String): MemoryGraphTuning? =
+            runCatching { LettaJson.persisted.decodeFromString(MemoryGraphTuning.serializer(), text) }.getOrNull()
 
-    /** [tuning] as the Kotlin that constructs it, for baking a tuned set in as the defaults. */
-    fun kotlinSource(tuning: MemoryGraphTuning): String {
-        val fields = listOf(
-            "repulsion" to tuning.repulsion.literal(),
-            "nodeCharge" to tuning.nodeCharge.literal("MemoryGraphNodeKind"),
-            "repulsionCutoff" to tuning.repulsionCutoff.literal(),
-            "crowdedRepulsionScale" to tuning.crowdedRepulsionScale.literal(),
-            "barnesHutAbove" to tuning.barnesHutAbove.literal(),
-            "barnesHutTheta" to tuning.barnesHutTheta.literal(),
-            "springLength" to tuning.springLength.literal("MemoryGraphEdgeKind"),
-            "springStiffness" to tuning.springStiffness.literal("MemoryGraphEdgeKind"),
-            "hubSpokeStrength" to tuning.hubSpokeStrength.literal(),
-            "pinBackend" to tuning.pinBackend.toString(),
-            "degreeScaling" to tuning.degreeScaling.literal(),
-            "clusterEnabled" to tuning.clusterEnabled.toString(),
-            "clusterStrength" to tuning.clusterStrength.literal(),
-            "seededLayout" to tuning.seededLayout.toString(),
-            "seedSpacing" to tuning.seedSpacing.literal(),
-            "seedJitter" to tuning.seedJitter.literal(),
-            "gravity" to tuning.gravity.literal(),
-            "collisionPadding" to tuning.collisionPadding.literal(),
-            "collisionStrength" to tuning.collisionStrength.literal(),
-            "crowdedCollisionStrength" to tuning.crowdedCollisionStrength.literal(),
-            "collisionRadiusScale" to tuning.collisionRadiusScale.literal("MemoryGraphNodeKind"),
-            "sparseDamping" to tuning.sparseDamping.literal(),
-            "crowdedDamping" to tuning.crowdedDamping.literal(),
-            "sparseMaxSpeed" to tuning.sparseMaxSpeed.literal(),
-            "crowdedMaxSpeed" to tuning.crowdedMaxSpeed.literal(),
-            "sparseCrowding" to tuning.sparseCrowding.literal(),
-            "crowdedCrowding" to tuning.crowdedCrowding.literal(),
-            "alphaStart" to tuning.alphaStart.literal(),
-            "coolingFrames" to tuning.coolingFrames.literal(),
-            "alphaMin" to tuning.alphaMin.literal(),
-            "settleSpeed" to tuning.settleSpeed.literal(),
-            "maxFramesPerHeat" to tuning.maxFramesPerHeat.literal(),
-            "labelMinDegree" to tuning.labelMinDegree.literal(),
-            "labelZoomThreshold" to tuning.labelZoomThreshold.literal(),
-            "labelAllUnderNodes" to tuning.labelAllUnderNodes.literal(),
-            "labelCulling" to tuning.labelCulling.toString(),
-            "labelNeighboursOnFocus" to tuning.labelNeighboursOnFocus.toString(),
-            "labelFontScale" to tuning.labelFontScale.literal(),
-        )
-        return fields.joinToString(separator = ",\n", prefix = "MemoryGraphTuning(\n", postfix = ",\n)") { (name, value) ->
-            "    $name = $value"
+        /** [tuning] as the Kotlin that constructs it, for baking a tuned set in as the defaults. */
+        fun kotlinSource(tuning: MemoryGraphTuning): String {
+            val fields = listOf(
+                "repulsion" to tuning.repulsion.literal(),
+                "nodeCharge" to tuning.nodeCharge.literal("MemoryGraphNodeKind"),
+                "repulsionCutoff" to tuning.repulsionCutoff.literal(),
+                "crowdedRepulsionScale" to tuning.crowdedRepulsionScale.literal(),
+                "barnesHutAbove" to tuning.barnesHutAbove.literal(),
+                "barnesHutTheta" to tuning.barnesHutTheta.literal(),
+                "springLength" to tuning.springLength.literal("MemoryGraphEdgeKind"),
+                "springStiffness" to tuning.springStiffness.literal("MemoryGraphEdgeKind"),
+                "hubSpokeStrength" to tuning.hubSpokeStrength.literal(),
+                "pinBackend" to tuning.pinBackend.toString(),
+                "degreeScaling" to tuning.degreeScaling.literal(),
+                "clusterEnabled" to tuning.clusterEnabled.toString(),
+                "clusterStrength" to tuning.clusterStrength.literal(),
+                "seededLayout" to tuning.seededLayout.toString(),
+                "seedSpacing" to tuning.seedSpacing.literal(),
+                "seedJitter" to tuning.seedJitter.literal(),
+                "gravity" to tuning.gravity.literal(),
+                "collisionPadding" to tuning.collisionPadding.literal(),
+                "collisionStrength" to tuning.collisionStrength.literal(),
+                "crowdedCollisionStrength" to tuning.crowdedCollisionStrength.literal(),
+                "collisionRadiusScale" to tuning.collisionRadiusScale.literal("MemoryGraphNodeKind"),
+                "sparseDamping" to tuning.sparseDamping.literal(),
+                "crowdedDamping" to tuning.crowdedDamping.literal(),
+                "sparseMaxSpeed" to tuning.sparseMaxSpeed.literal(),
+                "crowdedMaxSpeed" to tuning.crowdedMaxSpeed.literal(),
+                "sparseCrowding" to tuning.sparseCrowding.literal(),
+                "crowdedCrowding" to tuning.crowdedCrowding.literal(),
+                "alphaStart" to tuning.alphaStart.literal(),
+                "coolingFrames" to tuning.coolingFrames.literal(),
+                "alphaMin" to tuning.alphaMin.literal(),
+                "settleSpeed" to tuning.settleSpeed.literal(),
+                "maxFramesPerHeat" to tuning.maxFramesPerHeat.literal(),
+                "labelMinDegree" to tuning.labelMinDegree.literal(),
+                "labelZoomThreshold" to tuning.labelZoomThreshold.literal(),
+                "labelAllUnderNodes" to tuning.labelAllUnderNodes.literal(),
+                "labelCulling" to tuning.labelCulling.toString(),
+                "labelNeighboursOnFocus" to tuning.labelNeighboursOnFocus.toString(),
+                "labelFontScale" to tuning.labelFontScale.literal(),
+            )
+            return fields.joinToString(separator = ",\n", prefix = "MemoryGraphTuning(\n", postfix = ",\n)") { (name, value) ->
+                "    $name = $value"
+            }
         }
+
+        private fun Float.literal(): String = "${this}f"
+
+        private fun <K : Enum<K>> Map<K, Float>.literal(type: String): String =
+            entries.joinToString(prefix = "mapOf(", postfix = ")") { (kind, value) -> "$type.${kind.name} to ${value.literal()}" }
     }
-
-    private fun Float.literal(): String = "${this}f"
-
-    private fun <K : Enum<K>> Map<K, Float>.literal(type: String): String =
-        entries.joinToString(prefix = "mapOf(", postfix = ")") { (kind, value) -> "$type.${kind.name} to ${value.literal()}" }
 }

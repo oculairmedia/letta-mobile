@@ -368,8 +368,8 @@ class MemoryGraphForceField(
         var fastest = 0f
         for (i in 0 until size) {
             if (i == pinned || i == anchor) continue
-            vx[i] = (vx[i] + (fx[i] - x[i] * gravity) * alpha) * motion.damping
-            vy[i] = (vy[i] + (fy[i] - y[i] * gravity) * alpha) * motion.damping
+            vx[i] = (vx[i] + fx[i] * alpha - x[i] * gravity * alpha) * motion.damping
+            vy[i] = (vy[i] + fy[i] * alpha - y[i] * gravity * alpha) * motion.damping
             val speed = sqrt(vx[i] * vx[i] + vy[i] * vy[i])
             val scale = if (speed > motion.maxSpeed) motion.maxSpeed / speed else 1f
             if (motion.clampVelocity) {

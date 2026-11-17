@@ -42502,6 +42502,25 @@ final class com.letta.mobile.data.memory.graph/MemoryGraphTuning { // com.letta.
     }
 }
 
+final class com.letta.mobile.data.memory.graph/MemoryGraphTunings { // com.letta.mobile.data.memory.graph/MemoryGraphTunings|null[0]
+    constructor <init>() // com.letta.mobile.data.memory.graph/MemoryGraphTunings.<init>|<init>(){}[0]
+
+    final val current // com.letta.mobile.data.memory.graph/MemoryGraphTunings.current|{}current[0]
+        final fun <get-current>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.memory.graph/MemoryGraphTuning> // com.letta.mobile.data.memory.graph/MemoryGraphTunings.current.<get-current>|<get-current>(){}[0]
+    final val reheatRequests // com.letta.mobile.data.memory.graph/MemoryGraphTunings.reheatRequests|{}reheatRequests[0]
+        final fun <get-reheatRequests>(): kotlinx.coroutines.flow/StateFlow<kotlin/Int> // com.letta.mobile.data.memory.graph/MemoryGraphTunings.reheatRequests.<get-reheatRequests>|<get-reheatRequests>(){}[0]
+
+    final fun reheat() // com.letta.mobile.data.memory.graph/MemoryGraphTunings.reheat|reheat(){}[0]
+    final fun reset() // com.letta.mobile.data.memory.graph/MemoryGraphTunings.reset|reset(){}[0]
+    final fun set(com.letta.mobile.data.memory.graph/MemoryGraphTuning) // com.letta.mobile.data.memory.graph/MemoryGraphTunings.set|set(com.letta.mobile.data.memory.graph.MemoryGraphTuning){}[0]
+
+    final object Companion { // com.letta.mobile.data.memory.graph/MemoryGraphTunings.Companion|null[0]
+        final fun decode(kotlin/String): com.letta.mobile.data.memory.graph/MemoryGraphTuning? // com.letta.mobile.data.memory.graph/MemoryGraphTunings.Companion.decode|decode(kotlin.String){}[0]
+        final fun encode(com.letta.mobile.data.memory.graph/MemoryGraphTuning): kotlin/String // com.letta.mobile.data.memory.graph/MemoryGraphTunings.Companion.encode|encode(com.letta.mobile.data.memory.graph.MemoryGraphTuning){}[0]
+        final fun kotlinSource(com.letta.mobile.data.memory.graph/MemoryGraphTuning): kotlin/String // com.letta.mobile.data.memory.graph/MemoryGraphTunings.Companion.kotlinSource|kotlinSource(com.letta.mobile.data.memory.graph.MemoryGraphTuning){}[0]
+    }
+}
+
 final class com.letta.mobile.data.memory.graph/MemoryGraphView { // com.letta.mobile.data.memory.graph/MemoryGraphView|null[0]
     constructor <init>(kotlin.collections/List<com.letta.mobile.data.memory/MemoryGraphNode> = ..., kotlin.collections/List<com.letta.mobile.data.memory/MemoryGraphEdge> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/List<com.letta.mobile.data.memory/MemoryGraphNodeKind> = ..., kotlin.collections/Set<com.letta.mobile.data.memory/MemoryGraphNodeKind> = ..., kotlin/String = ...) // com.letta.mobile.data.memory.graph/MemoryGraphView.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.memory.MemoryGraphNode>;kotlin.collections.List<com.letta.mobile.data.memory.MemoryGraphEdge>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.List<com.letta.mobile.data.memory.MemoryGraphNodeKind>;kotlin.collections.Set<com.letta.mobile.data.memory.MemoryGraphNodeKind>;kotlin.String){}[0]
 
@@ -79523,20 +79542,6 @@ final object com.letta.mobile.data.memory.graph/MemoryGraphNodeMetrics { // com.
         final fun <get-MIN_TOUCH_RADIUS>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphNodeMetrics.MIN_TOUCH_RADIUS.<get-MIN_TOUCH_RADIUS>|<get-MIN_TOUCH_RADIUS>(){}[0]
 
     final fun radius(kotlin/Int): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphNodeMetrics.radius|radius(kotlin.Int){}[0]
-}
-
-final object com.letta.mobile.data.memory.graph/MemoryGraphTunings { // com.letta.mobile.data.memory.graph/MemoryGraphTunings|null[0]
-    final val current // com.letta.mobile.data.memory.graph/MemoryGraphTunings.current|{}current[0]
-        final fun <get-current>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.memory.graph/MemoryGraphTuning> // com.letta.mobile.data.memory.graph/MemoryGraphTunings.current.<get-current>|<get-current>(){}[0]
-    final val reheatRequests // com.letta.mobile.data.memory.graph/MemoryGraphTunings.reheatRequests|{}reheatRequests[0]
-        final fun <get-reheatRequests>(): kotlinx.coroutines.flow/StateFlow<kotlin/Int> // com.letta.mobile.data.memory.graph/MemoryGraphTunings.reheatRequests.<get-reheatRequests>|<get-reheatRequests>(){}[0]
-
-    final fun decode(kotlin/String): com.letta.mobile.data.memory.graph/MemoryGraphTuning? // com.letta.mobile.data.memory.graph/MemoryGraphTunings.decode|decode(kotlin.String){}[0]
-    final fun encode(com.letta.mobile.data.memory.graph/MemoryGraphTuning): kotlin/String // com.letta.mobile.data.memory.graph/MemoryGraphTunings.encode|encode(com.letta.mobile.data.memory.graph.MemoryGraphTuning){}[0]
-    final fun kotlinSource(com.letta.mobile.data.memory.graph/MemoryGraphTuning): kotlin/String // com.letta.mobile.data.memory.graph/MemoryGraphTunings.kotlinSource|kotlinSource(com.letta.mobile.data.memory.graph.MemoryGraphTuning){}[0]
-    final fun reheat() // com.letta.mobile.data.memory.graph/MemoryGraphTunings.reheat|reheat(){}[0]
-    final fun reset() // com.letta.mobile.data.memory.graph/MemoryGraphTunings.reset|reset(){}[0]
-    final fun set(com.letta.mobile.data.memory.graph/MemoryGraphTuning) // com.letta.mobile.data.memory.graph/MemoryGraphTunings.set|set(com.letta.mobile.data.memory.graph.MemoryGraphTuning){}[0]
 }
 
 final object com.letta.mobile.data.memory.graph/MemoryGraphViews { // com.letta.mobile.data.memory.graph/MemoryGraphViews|null[0]

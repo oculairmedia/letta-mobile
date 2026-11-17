@@ -25154,15 +25154,19 @@ public final class com/letta/mobile/data/memory/graph/MemoryGraphTuning$Companio
 }
 
 public final class com/letta/mobile/data/memory/graph/MemoryGraphTunings {
-	public static final field INSTANCE Lcom/letta/mobile/data/memory/graph/MemoryGraphTunings;
-	public final fun decode (Ljava/lang/String;)Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;
-	public final fun encode (Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;)Ljava/lang/String;
+	public static final field Companion Lcom/letta/mobile/data/memory/graph/MemoryGraphTunings$Companion;
+	public fun <init> ()V
 	public final fun getCurrent ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getReheatRequests ()Lkotlinx/coroutines/flow/StateFlow;
-	public final fun kotlinSource (Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;)Ljava/lang/String;
 	public final fun reheat ()V
 	public final fun reset ()V
 	public final fun set (Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;)V
+}
+
+public final class com/letta/mobile/data/memory/graph/MemoryGraphTunings$Companion {
+	public final fun decode (Ljava/lang/String;)Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;
+	public final fun encode (Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;)Ljava/lang/String;
+	public final fun kotlinSource (Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/memory/graph/MemoryGraphView {

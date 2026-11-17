@@ -38,11 +38,11 @@ import kotlinx.coroutines.withContext
  * loaded back on the next launch; nothing else ever reads that file.
  */
 @Composable
-fun MemoryGraphTuningWindow(store: Path) {
+fun MemoryGraphTuningWindow(store: Path, tunings: MemoryGraphTunings) {
     var visible by remember { mutableStateOf(true) }
-    LaunchedEffect(store) {
-        withContext(Dispatchers.IO) { MemoryGraphTuningStore.load(store) }?.let(MemoryGraphTunings::set)
-        MemoryGraphTunings.current.drop(1).collectLatest { tuning ->
+    LaunchedEffect(store, tunings) {
+        withContext(Dispatchers.IO) { MemoryGraphTuningStore.load(store) }?.let(tunings::set)
+        tunings.current.drop(1).collectLatest { tuning ->
             delay(PERSIST_DELAY_MS)
             withContext(Dispatchers.IO) { MemoryGraphTuningStore.save(store, tuning) }
         }
@@ -56,19 +56,19 @@ fun MemoryGraphTuningWindow(store: Path) {
     ) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(modifier = Modifier.fillMaxSize()) {
-                val tuning by MemoryGraphTunings.current.collectAsState()
-                MemoryGraphTuningPanel(tuning, devActions)
+                val tuning by tunings.current.collectAsState()
+                MemoryGraphTuningPanel(tuning, devActions(tunings))
             }
         }
     }
 }
 
-private val devActions = MemoryGraphTuningActions(
-    onChange = MemoryGraphTunings::set,
-    onReset = MemoryGraphTunings::reset,
-    onReheat = MemoryGraphTunings::reheat,
+private fun devActions(tunings: MemoryGraphTunings) = MemoryGraphTuningActions(
+    onChange = tunings::set,
+    onReset = tunings::reset,
+    onReheat = tunings::reheat,
     onCopy = {
-        val source = MemoryGraphTunings.kotlinSource(MemoryGraphTunings.current.value)
+        val source = MemoryGraphTunings.kotlinSource(tunings.current.value)
         Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(source), null)
     },
 )
