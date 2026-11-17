@@ -111,7 +111,7 @@ def reply_rows(tree, entries):
         row = ET.SubElement(timeline, 'node', {'long-clickable': 'true', 'bounds': f'[0,{top}][100,{top+50}]'})
         ET.SubElement(row, 'node', text=text)
         if text == 'You':
-            ET.SubElement(row, 'node', text='[core-loop:S2] trial-1')
+            ET.SubElement(row, 'node', text='[core-loop:S2] trial-1-fixture')
 
 
 @pytest.mark.parametrize('actual', ['unexpected prefix DONE', 'DONE unexpected suffix', 'wrong reply'])
@@ -204,11 +204,11 @@ def test_07_reply_paragraphs_and_delivery_timestamp(tmp_path):
     timeline = ET.SubElement(tree, 'node', scrollable='true')
     user = ET.SubElement(timeline, 'node', {'long-clickable': 'true', 'bounds':'[0,300][100,400]'})
     ET.SubElement(user, 'node', text='You')
-    ET.SubElement(user, 'node', text='[core-loop:S1] trial-1')
+    ET.SubElement(user, 'node', text='[core-loop:S1] trial-1-fixture')
     row = ET.SubElement(timeline, 'node', {'long-clickable': 'true', 'bounds':'[0,500][100,900]'})
     for text in scoring.FIXED_REPLY.split('\n\n'):
         ET.SubElement(row, 'node', text=text)
-    ET.SubElement(row, 'node', {'text': '11:39 PM', 'resource-id': 'delivery-time'})
+    ET.SubElement(row, 'node', {'text': '11:39 PM', 'resource-id': 'chat-row-clock'})
     metadata['trial'] = 1
     context = evidence.Observation(tmp_path, metadata, tree)
     assert evidence.normalized_evidence(context, [250])['visibleText'] == scoring.FIXED_REPLY

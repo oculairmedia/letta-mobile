@@ -27,7 +27,7 @@ def test_recorded_steps(scenario):
         for name, result in values.items():
             stack.enter_context(patch.object(driver, name, side_effect=record_call(calls, name, result)))
         stack.enter_context(patch.object(driver.time, "sleep", side_effect=record_call(calls, "sleep", None)))
-        metadata = {"phoneOffsetMs": 5}
+        metadata = {"phoneOffsetMs": 5, "captureId": "fixture", "scenario": scenario, "trial": 2}
         driver.perform_scenario_step(ScenarioStep(Path("capture"), metadata, 2, ("1", "0")), scenario)
     expected = json.loads(Path(__file__).with_name("scenario-steps.json").read_text())[scenario]
     assert {"calls": calls, "metadata": metadata} == expected

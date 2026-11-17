@@ -171,6 +171,18 @@ def check_lifecycle(evidence, identities, require):
     return mounts
 
 
+def check_pixel_metrics(pixels, require, prefix=""):
+    correlation = pixels.get("minimum_template_correlation")
+    dip = pixels.get("dip_percent")
+    require(
+        number(correlation) and MIN_CORRELATION <= correlation <= 1,
+        prefix + "pixel template missing or lost",
+    )
+    require(number(dip) and dip <= MAX_DIP_PERCENT, prefix + "reply luminance missing or dipped")
+    require(number(pixels.get("frames")) and pixels["frames"] >= 2, prefix + "pixel frames missing")
+    return correlation, dip
+
+
 def check_pixels(evidence, require):
     pixels = evidence.get("pixels", {})
     if not isinstance(pixels, dict):
@@ -182,14 +194,8 @@ def check_pixels(evidence, require):
             isinstance(partial, dict) and pixel_coverage_complete(partial),
             "partial pixel coverage missing or incomplete",
         )
-    correlation = pixels.get("minimum_template_correlation")
-    dip = pixels.get("dip_percent")
-    require(
-        number(correlation) and MIN_CORRELATION <= correlation <= 1,
-        "pixel template missing or lost",
-    )
-    require(number(dip) and dip <= MAX_DIP_PERCENT, "reply luminance missing or dipped")
-    require(number(pixels.get("frames")) and pixels["frames"] >= 2, "pixel frames missing")
+        check_pixel_metrics(partial if isinstance(partial, dict) else {}, require, "partial ")
+    correlation, dip = check_pixel_metrics(pixels, require)
     require(evidence.get("clockAligned") is True, "clock alignment missing")
     return correlation, dip
 

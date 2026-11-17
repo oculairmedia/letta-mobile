@@ -122,7 +122,7 @@ def trace_trial(root, scenario, module=capture, step_module=scenarios):
         stack.enter_context(patch.object(module, "analyze_capture", return_value={}))
         stack.enter_context(patch.object(module.select, "select", return_value=([1], [], [])))
         stack.enter_context(patch.object(module.time, "sleep", trace.noop("sleep")))
-        args = SimpleNamespace(output=root, apk_sha256="hash", region=None)
+        args = SimpleNamespace(output=root, apk_sha256="hash", region=None, capture_id="fixture")
         module.trial(args, scenario, 2)
     return trace.calls
 

@@ -91,7 +91,7 @@ def reply_tree():
     timeline = ET.SubElement(tree, "node", scrollable="true")
     user = ET.SubElement(timeline, "node", {"long-clickable": "true", "bounds": "[0,300][100,400]"})
     ET.SubElement(user, "node", text="You")
-    ET.SubElement(user, "node", text="[core-loop:S1] trial-1")
+    ET.SubElement(user, "node", text="[core-loop:S1] trial-1-fixture")
     row = ET.SubElement(timeline, "node", {"long-clickable": "true", "bounds": "[0,500][100,900]"})
     ET.SubElement(row, "node", text=evidence.oracle.FIXED_REPLY)
     return tree
@@ -151,6 +151,7 @@ def raw_fixture(directory, duplicate):
     metadata = dict(
         scenario="S1",
         trial=1,
+        captureId="fixture",
         sendMs=0,
         phoneOffsetMs=0,
         miniToPhoneOffsetMs=0,
@@ -222,6 +223,7 @@ def history_fixture(root, behavior):
     metadata = dict(
         scenario="S1",
         trial=1,
+        captureId="fixture",
         sendMs=100,
         phoneOffsetMs=0,
         miniToPhoneOffsetMs=0,

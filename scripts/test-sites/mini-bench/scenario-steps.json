@@ -2,13 +2,19 @@
   "S1": {
     "calls": [],
     "metadata": {
-      "phoneOffsetMs": 5
+      "phoneOffsetMs": 5,
+      "captureId": "fixture",
+      "scenario": "S1",
+      "trial": 2
     }
   },
   "S2": {
     "calls": [],
     "metadata": {
-      "phoneOffsetMs": 5
+      "phoneOffsetMs": 5,
+      "captureId": "fixture",
+      "scenario": "S2",
+      "trial": 2
     }
   },
   "S3": {
@@ -39,7 +45,7 @@
         "send",
         [
           "capture",
-          "[core-loop:S3] follow-up-2",
+          "[core-loop:S3] follow-up-2-fixture",
           "second"
         ],
         {
@@ -80,7 +86,10 @@
       "interruptReferenceMs": 1005,
       "resendMs": 2000,
       "interruptRequestedMs": 1005,
-      "followUpSentPhoneMs": 1005
+      "followUpSentPhoneMs": 1005,
+      "captureId": "fixture",
+      "scenario": "S3",
+      "trial": 2
     }
   },
   "S4": {
@@ -158,7 +167,10 @@
       "networkDisabledMs": 1005,
       "networkDisabled": true,
       "networkRestoredMs": 1005,
-      "networkVariant": "wifi off/on; cellular disabled during drop"
+      "networkVariant": "wifi off/on; cellular disabled during drop",
+      "captureId": "fixture",
+      "scenario": "S4",
+      "trial": 2
     }
   }
 }

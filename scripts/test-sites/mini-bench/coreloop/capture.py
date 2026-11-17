@@ -8,7 +8,7 @@ import time
 import xml.etree.ElementTree as ET
 from . import scoring as oracle
 from tool_boundary import run_tool, tool_arguments, path_arg, numeric_arg, crop_arg
-from .config import SERIAL, PACKAGE, SCENARIO_TIMEOUTS, HERE
+from .config import SERIAL, PACKAGE, SCENARIO_TIMEOUTS, HERE, trial_prompt
 from .device import (
     wait_for_pixel,
     adb,
@@ -45,7 +45,7 @@ class Capture:
         if actual_apk_hash != self.args.apk_sha256:
             raise RuntimeError("installed APK changed; refusing to send from an unverified client")
         self.metadata = dict(
-            scenario=self.scenario, trial=self.index, wifi=self.wifi, data=self.data, apkSha256=actual_apk_hash
+            scenario=self.scenario, trial=self.index, captureId=self.args.capture_id, wifi=self.wifi, data=self.data, apkSha256=actual_apk_hash
         )
         self.scope = json.loads(
             command(["ssh", "-o", "BatchMode=yes", "graphiti", "python3", "-c", shlex.quote(REMOTE_AUDIT)])
@@ -152,7 +152,7 @@ class Capture:
         self.metadata["videoStartMs"] = wall_ms() + self.metadata["phoneOffsetMs"]
         anchor_video(self.metadata)
         self.owns_trial = True
-        self.metadata["sendMs"] = send(self.directory, f"[core-loop:{self.scenario}] trial-{self.index}", "first")
+        self.metadata["sendMs"] = send(self.directory, trial_prompt(self.metadata), "first")
         self.metadata["sendBeginPhoneMs"] = self.metadata["sendMs"] + self.metadata["phoneOffsetMs"]
         time.sleep(3)
         perform_scenario_step(

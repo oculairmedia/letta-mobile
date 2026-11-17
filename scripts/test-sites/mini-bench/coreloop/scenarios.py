@@ -3,6 +3,7 @@ import time
 from . import scoring as oracle
 from .device import dump, reply_region, wall_ms, send, tap_node, adb, restore_network
 from dataclasses import dataclass
+from .config import trial_prompt
 
 
 @dataclass
@@ -28,7 +29,7 @@ def interrupt_reply(step):
     if region:
         metadata["partialRegion"] = region
         metadata["interruptReferenceMs"] = wall_ms() + metadata["phoneOffsetMs"]
-    metadata["resendMs"] = send(directory, f"[core-loop:S3] follow-up-{step.index}", "second", fast=True)
+    metadata["resendMs"] = send(directory, trial_prompt(metadata, follow_up=True), "second", fast=True)
     queued = dump(directory, "queued-resend")
     metadata["interruptRequestedMs"] = wall_ms() + metadata["phoneOffsetMs"]
     tap_node(queued, "text", "Send now")

@@ -10,6 +10,7 @@ from .config import SERIAL, PACKAGE, HERE
 import argparse
 import hashlib
 import signal
+import uuid
 from .device import wait_for_pixel, adb, installed_app_hash, command
 from .capture import trial, rescore_captures
 
@@ -75,6 +76,7 @@ def prepare_capture(args, parser):
         install_capture(args)
     if installed_app_hash() != args.apk_sha256:
         raise RuntimeError("install the exact capture APK before running the baseline")
+    args.capture_id = uuid.uuid4().hex
     args.output.mkdir(parents=True, exist_ok=False)
     signal.signal(signal.SIGTERM, interrupted)
 

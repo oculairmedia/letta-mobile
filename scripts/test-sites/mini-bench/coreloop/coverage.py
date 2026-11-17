@@ -53,6 +53,8 @@ def pixel_coverage_complete(pixels):
     arrays = [record.get(key) for key in ("frame_times", "draw_times", "log_times")]
     if not all(isinstance(values, list) for values in arrays) or post < 0:
         return False
+    if not all(all(map(finite, values)) for values in arrays):
+        return False
     recomputed = coverage_record(CoverageInput(*arrays, (settle - 1, settle + post)))
     return recomputed == record and recomputed["complete"]
 
