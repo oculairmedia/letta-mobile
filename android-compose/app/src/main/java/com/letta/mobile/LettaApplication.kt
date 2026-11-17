@@ -1,5 +1,8 @@
 package com.letta.mobile
 
+import ca.oculair.meridian.BuildConfig
+import com.letta.mobile.util.attr
+
 import com.letta.mobile.ui.components.beam.telemetry.installBeamShaderTelemetry
 
 import android.app.Application
@@ -73,6 +76,17 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         com.letta.mobile.util.Telemetry.delegate = com.letta.mobile.util.AndroidTelemetryDelegate()
+        // Core-loop capture is opt-in on the root debug flavour; release never enables it.
+        com.letta.mobile.util.Telemetry.renderDiagEnabled.set(
+            BuildConfig.DEBUG && BuildConfig.FLAVOR == "root" &&
+                android.util.Log.isLoggable("LettaCoreLoop", android.util.Log.VERBOSE),
+        )
+        if (BuildConfig.DEBUG && BuildConfig.FLAVOR == "root") {
+            com.letta.mobile.util.Telemetry.event(
+                "CoreLoop", "gate",
+                "enabled" attr com.letta.mobile.util.Telemetry.renderDiagEnabled.get(),
+            )
+        }
         installBeamShaderTelemetry()
         // CrashReporter and global exception handler must run on main thread
         // before anything else so uncaught exceptions are captured from the start.

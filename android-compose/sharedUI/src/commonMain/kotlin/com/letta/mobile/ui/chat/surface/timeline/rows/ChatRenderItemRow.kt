@@ -1,7 +1,11 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.attr
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -32,6 +36,7 @@ internal fun ChatRenderItemRow(
     modifier: Modifier = Modifier,
 ) {
     LocalRowComposed.current?.invoke(item.key)
+    CaptureRowLifecycle(item.key)
     // A docked panel's ambient glow already says "working": the rows' status glyphs then hold still.
     CompositionLocalProvider(LocalStatusGlyphAnimated provides LocalChatWorkingCueAnimated.current) {
         RowContent(item, context, callbacks, modifier)
@@ -187,3 +192,21 @@ private fun ChatRenderItem.loneGroupPosition(): GroupPosition = when (this) {
     is ChatRenderItem.RunBlock -> GroupPosition.None
     is ChatRenderItem.Single -> groupPosition
 }
+
+/** Root-debug opt-in mount/dispose evidence. No message text is logged; off on release hosts. */
+@Composable
+private fun CaptureRowLifecycle(rowKey: String) {
+    if (!com.letta.mobile.util.Telemetry.renderDiagEnabled.get()) return
+    LaunchedEffect(rowKey) {
+        while (true) {
+            kotlinx.coroutines.delay(CORE_LOOP_SAMPLE_MS)
+            Telemetry.event("CoreLoop", "resident", "key" attr rowKey)
+        }
+    }
+    DisposableEffect(rowKey) {
+        Telemetry.event("CoreLoop", "mount", "key" attr rowKey)
+        onDispose { Telemetry.event("CoreLoop", "dispose", "key" attr rowKey) }
+    }
+}
+
+private const val CORE_LOOP_SAMPLE_MS = 50L
