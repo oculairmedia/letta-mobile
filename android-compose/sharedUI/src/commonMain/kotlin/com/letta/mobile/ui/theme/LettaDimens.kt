@@ -190,6 +190,18 @@ object LettaDimens {
         /** Widest a notice banner over content (a board's storage fault) grows: a readable line. */
         val noticeMaxWidth: Dp = 560.dp
 
+        /**
+         * The narrowest a compact tool card gets (a sent message, a created subagent); a phone's
+         * column is narrower, so there it spans the column.
+         */
+        val compactCardMinWidth: Dp = 320.dp
+
+        /** The tallest a tool card's scrolling section (a skill's contents, a prompt) grows before it scrolls. */
+        val toolCardSectionMaxHeight: Dp = 280.dp
+
+        /** A tool card's facts list: the width of its label column ("Directory", "Description"). */
+        val toolCardFactLabelWidth: Dp = 96.dp
+
         /** A centred desktop modal (model picker, Models sheet): its width and tallest height. */
         val modalWidth: Dp = 520.dp
         val modalMaxHeight: Dp = 600.dp

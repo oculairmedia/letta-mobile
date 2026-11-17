@@ -517,11 +517,12 @@ class ChatRowInteractionUiTest {
             }
         }
 
-        // The call reads as its step line; opened, it shows the prompt it gave and a chip to the subagent.
-        onNodeWithText("Delegated").assertExists()
-        onNodeWithText("to general-purpose · \"Audit the build\"").performClick()
-        onNodeWithText("Look at gradle", substring = true, useUnmergedTree = true).assertExists()
-        onNodeWithText("Open subagent").performClick()
+        // The call reads as its "Created subagent" card: Detail shows the prompt it gave, the card opens the subagent.
+        onNodeWithText("Created subagent", useUnmergedTree = true).assertExists()
+        onNodeWithText("Audit the build", useUnmergedTree = true).assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_DETAIL).performClick()
+        awaitText("Look at gradle")
+        onNodeWithTag(ChatRowTestTags.CREATED_SUBAGENT_CARD).performClick()
         runOnIdle { assertEquals(ChatSubagentTarget("agent-call-1", "Audit the build", "agent-sub"), opened) }
     }
 

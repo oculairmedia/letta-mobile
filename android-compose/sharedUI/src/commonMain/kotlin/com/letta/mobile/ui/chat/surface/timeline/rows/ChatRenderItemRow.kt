@@ -96,6 +96,12 @@ internal object ChatRowTestTags {
     /** "Fork from here" beside a reply's Copy. */
     const val FORK_REPLY = "fork-reply"
     const val TOOL_CARD_TOGGLE = "tool-card-toggle"
+    const val SENT_MESSAGE_CARD = "sent-message-card"
+    const val SENT_MESSAGE_TEXT = "sent-message-text"
+    const val CREATED_SUBAGENT_CARD = "created-subagent-card"
+    const val SKILL_LOAD_CARD = "skill-load-card"
+    const val TOOL_CARD_STATUS = "tool-card-status"
+    const val TOOL_CARD_DETAIL = "tool-card-detail"
     const val TOOL_CARD_BODY = "tool-card-body"
     /** A running tool step's small spinner: the shared status glyph while it works. */
     const val TOOL_STATUS_GLYPH = "tool-status-glyph"

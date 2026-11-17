@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
@@ -361,9 +362,8 @@ class ChatTimelineUiTest {
             }
         }
 
-        // The dispatch reads as its step among the message's steps, its chip opening the subagent.
-        onNodeWithText("to general-purpose · \"Audit the build\"").performClick()
-        onNodeWithText("Open subagent").performClick()
+        // The dispatch reads as its "Created subagent" card, which opens the subagent.
+        onNodeWithTag(ChatRowTestTags.CREATED_SUBAGENT_CARD).performClick()
         runOnIdle { assertEquals(listOf<Triple<String, String?, String>>(Triple("agent-call-1", "agent-sub", "Audit the build")), opened) }
     }
 

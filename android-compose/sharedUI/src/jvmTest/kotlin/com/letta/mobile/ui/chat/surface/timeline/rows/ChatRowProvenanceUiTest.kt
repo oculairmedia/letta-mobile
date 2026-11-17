@@ -7,6 +7,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
@@ -174,9 +175,11 @@ class ChatRowProvenanceUiTest {
             }
         }
 
-        // The send reads as its own step line, its sender -> recipient label on it, no summary line
-        // to open first.
-        onNodeWithText("PM-letta-mobile → Meridian · Agent message").assertExists()
-        onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).assertExists()
+        // The send reads as its "Sent message to" card: the recipient, the message's preview and Detail.
+        onNodeWithTag(ChatRowTestTags.SENT_MESSAGE_CARD).assertExists()
+        onNodeWithText("Sent message to", useUnmergedTree = true).assertExists()
+        onNodeWithText("Meridian", useUnmergedTree = true).assertExists()
+        onNodeWithTag(ChatRowTestTags.SENT_MESSAGE_TEXT, useUnmergedTree = true).assertTextEquals("status update")
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_DETAIL).assertExists()
     }
 }

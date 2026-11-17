@@ -94,6 +94,11 @@ internal fun ToolStep(
     val running = resolved == ToolTimelineState.Running
     // A running step is where a working mascot looks (te3n1.2).
     Column(modifier = Modifier.fillMaxWidth().mascotAttention(AttentionKey("tool:$disclosureKey"), AttentionKind.TOOL, enabled = running)) {
+        // A message to another agent, a created subagent and a loaded skill are events of their own: a tool card.
+        if (isToolCallCard(toolCall)) {
+            ToolCallCard(toolCall, callbacks, LineDisclosure(isExpanded) { expansions.toggle(disclosureKey) })
+            return@Column
+        }
         val opens = stepOpens(toolCall, resolved)
         val disclosure = if (!opens) null else LineDisclosure(isExpanded) { expansions.toggle(disclosureKey) }
         ToolStepHeader(toolCall, resolved, callbacks, disclosure)
