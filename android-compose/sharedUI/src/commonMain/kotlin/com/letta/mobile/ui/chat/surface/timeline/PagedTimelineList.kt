@@ -26,6 +26,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import com.letta.mobile.ui.chat.surface.timeline.rows.TimelineRenderProbe
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -268,7 +270,18 @@ private fun LazyItemScope.RenderPagedSlot(scope: PagedRowsScope, index: Int) {
     PagedSlot(scope.rows, scope.settled, index) { item, row ->
         val live = scope.rows.assembly.live.getOrNull(index - scope.rows.leading)
         // Settled rows glide when displaced but never fade in on each page load.
-        val modifier = timelineRowMotion(fadesIn = live != null && !live.isUserPrompt())
+        val motion = timelineRowMotion(fadesIn = live != null && !live.isUserPrompt())
+        val probe = TimelineRenderProbe.sink
+        val modifier = if (item != null && probe != null) motion.drawWithContent {
+            drawContent()
+            val messages = when (item) {
+                is ChatRenderItem.Single -> listOf(item.message)
+                is ChatRenderItem.RunBlock -> item.messages.map { it.first }
+            }
+            val identity = messages.firstOrNull()?.runId ?: item.stableItemDiscriminator
+            val hashes = messages.filterNot { it.isReasoning }.joinToString(",") { it.content.hashCode().toString() }
+            probe.record("draw", item.key, identity, row != null, !item.isUserPrompt(), hashes)
+        } else motion
         val deferred = row?.takeIf { it.deferred != null }
         when {
             item == null -> Box(modifier.height(ChatTimelineDimens.placeholderRowHeight))

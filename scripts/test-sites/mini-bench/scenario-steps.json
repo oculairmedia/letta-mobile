@@ -1,0 +1,176 @@
+{
+  "S1": {
+    "calls": [],
+    "metadata": {
+      "phoneOffsetMs": 5,
+      "captureId": "fixture",
+      "scenario": "S1",
+      "trial": 2
+    }
+  },
+  "S2": {
+    "calls": [],
+    "metadata": {
+      "phoneOffsetMs": 5,
+      "captureId": "fixture",
+      "scenario": "S2",
+      "trial": 2
+    }
+  },
+  "S3": {
+    "calls": [
+      [
+        "dump",
+        [
+          "capture",
+          "before-interrupt"
+        ],
+        {}
+      ],
+      [
+        "reply_region",
+        [
+          "TREE",
+          "The garden is quiet after the ",
+          "70"
+        ],
+        {}
+      ],
+      [
+        "wall_ms",
+        [],
+        {}
+      ],
+      [
+        "send",
+        [
+          "capture",
+          "[core-loop:S3] follow-up-2-fixture",
+          "second"
+        ],
+        {
+          "fast": true
+        }
+      ],
+      [
+        "dump",
+        [
+          "capture",
+          "queued-resend"
+        ],
+        {}
+      ],
+      [
+        "wall_ms",
+        [],
+        {}
+      ],
+      [
+        "tap_node",
+        [
+          "TREE",
+          "text",
+          "Send now"
+        ],
+        {}
+      ],
+      [
+        "wall_ms",
+        [],
+        {}
+      ]
+    ],
+    "metadata": {
+      "phoneOffsetMs": 5,
+      "partialRegion": "1,2,3,4",
+      "interruptReferenceMs": 1005,
+      "resendMs": 2000,
+      "interruptRequestedMs": 1005,
+      "followUpSentPhoneMs": 1005,
+      "captureId": "fixture",
+      "scenario": "S3",
+      "trial": 2
+    }
+  },
+  "S4": {
+    "calls": [
+      [
+        "adb",
+        [
+          "shell",
+          "svc",
+          "wifi",
+          "disable"
+        ],
+        {}
+      ],
+      [
+        "adb",
+        [
+          "shell",
+          "svc",
+          "data",
+          "disable"
+        ],
+        {}
+      ],
+      [
+        "wall_ms",
+        [],
+        {}
+      ],
+      [
+        "adb",
+        [
+          "shell",
+          "settings",
+          "get",
+          "global",
+          "wifi_on"
+        ],
+        {}
+      ],
+      [
+        "adb",
+        [
+          "shell",
+          "settings",
+          "get",
+          "global",
+          "mobile_data"
+        ],
+        {}
+      ],
+      [
+        "sleep",
+        [
+          "5"
+        ],
+        {}
+      ],
+      [
+        "restore_network",
+        [
+          "1",
+          "0"
+        ],
+        {}
+      ],
+      [
+        "wall_ms",
+        [],
+        {}
+      ]
+    ],
+    "metadata": {
+      "phoneOffsetMs": 5,
+      "networkDisabledMs": 1005,
+      "networkDisabled": true,
+      "networkRestoredMs": 1005,
+      "networkVariant": "wifi off/on; cellular disabled during drop",
+      "captureId": "fixture",
+      "scenario": "S4",
+      "trial": 2
+    }
+  }
+}

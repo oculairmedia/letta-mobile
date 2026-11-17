@@ -2374,6 +2374,17 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSing
 	public final fun getLambda$598866409$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
+public final class com/letta/mobile/ui/chat/surface/timeline/rows/TimelineRenderProbe {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/rows/TimelineRenderProbe;
+	public final fun getSink ()Lcom/letta/mobile/ui/chat/surface/timeline/rows/TimelineRenderSink;
+	public final fun setSink (Lcom/letta/mobile/ui/chat/surface/timeline/rows/TimelineRenderSink;)V
+}
+
+public abstract interface class com/letta/mobile/ui/chat/surface/timeline/rows/TimelineRenderSink {
+	public abstract fun record (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZLjava/lang/String;)V
+}
+
 public final class com/letta/mobile/ui/chat/tools/ToolPresentersKt {
 	public static final fun ProvideToolPresenters (Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 	public static final fun ProvideToolStepExpansions (Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
