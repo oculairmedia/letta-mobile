@@ -94,17 +94,24 @@ internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modif
             val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithCache)) }
             val strokes = OutlineStrokes(this)
             onDrawBehind {
-                if (mode == ComposerOutlineMode.Thinking || (mode == ComposerOutlineMode.Idle && softness.value < 1f)) {
-                    clipRect(bottom = strokes.edge.width) {
-                        drawOutline(path, strokes, color.value, OutlineLight(brightness.floatValue, softness.value))
-                    }
-                } else {
-                    drawOutline(path, strokes, color.value, OutlineLight(brightness.floatValue, softness.value))
-                }
+                drawComposerOutline(path, strokes, color.value, OutlineLight(brightness.floatValue, softness.value), mode)
             }
         }
 }
 
+
+private fun topOnly(mode: ComposerOutlineMode, softness: Float): Boolean =
+    mode == ComposerOutlineMode.Thinking || (mode == ComposerOutlineMode.Idle && softness < 1f)
+
+private fun DrawScope.drawComposerOutline(
+    path: Path, strokes: OutlineStrokes, tint: Color, light: OutlineLight, mode: ComposerOutlineMode,
+) {
+    if (topOnly(mode, light.softness)) {
+        clipRect(bottom = strokes.edge.width) { drawOutline(path, strokes, tint, light) }
+    } else {
+        drawOutline(path, strokes, tint, light)
+    }
+}
 
 /** The outline's colour for [role]: the person's, the agent's, the error colour, or none. */
 @Composable

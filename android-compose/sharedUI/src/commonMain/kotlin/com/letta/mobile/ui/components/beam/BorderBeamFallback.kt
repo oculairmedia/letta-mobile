@@ -41,9 +41,7 @@ internal class BorderBeamFallback : BorderBeamRenderer {
     private val segment = Path()
     private val measure = PathMeasure()
     private val perimeterAngles = FloatArray(ANGLE_SAMPLES + 1)
-    private var strokeDensity = Float.NaN
-    private var strokeStyle: LettaBeamStyle? = null
-    private var strokeWidthScale = Float.NaN
+    private var strokeKey: StrokeKey? = null
     private var cachedStrokes: BeamStrokes? = null
     private var cachedPalette: BeamPalette? = null
     private var gradientColors: List<Color> = emptyList()
@@ -80,11 +78,10 @@ internal class BorderBeamFallback : BorderBeamRenderer {
 
     /** Density and style, rather than the moving phase, determine the strokes. */
     private fun DrawScope.strokesFor(style: LettaBeamStyle, widthScale: Float): BeamStrokes {
-        if (strokeDensity != density || strokeStyle != style || strokeWidthScale != widthScale) {
+        val key = StrokeKey(density, style, widthScale)
+        if (strokeKey != key) {
             cachedStrokes = BeamStrokes(this, style, widthScale)
-            strokeDensity = density
-            strokeStyle = style
-            strokeWidthScale = widthScale
+            strokeKey = key
         }
         return checkNotNull(cachedStrokes)
     }
@@ -195,6 +192,8 @@ internal class BorderBeamFallback : BorderBeamRenderer {
         const val GLOW_SHARE = 0.9f
         const val INSET_DP = 1f
     }
+
+    private data class StrokeKey(val density: Float, val style: LettaBeamStyle, val widthScale: Float)
 
     /** The three stroke widths of one frame, in px. */
     private class BeamStrokes(scope: DrawScope, style: LettaBeamStyle, widthScale: Float) {

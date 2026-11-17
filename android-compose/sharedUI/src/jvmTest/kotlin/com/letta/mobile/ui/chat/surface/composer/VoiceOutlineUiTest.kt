@@ -161,7 +161,7 @@ class VoiceOutlineUiTest {
             val pixels = onNodeWithTag("outline-probe").captureToImage().toPixelMap()
             var total = 0f
             for (y in 0 until pixels.height) for (x in 0 until pixels.width) {
-                if (x < 20 || x >= pixels.width - 20 || y < 20 || y >= pixels.height - 20) {
+                if (inBorderBand(x, y, pixels.width, pixels.height)) {
                     val c = pixels[x, y]
                     total += c.red + c.green + c.blue
                 }
@@ -174,8 +174,12 @@ class VoiceOutlineUiTest {
         val thinking = energy()
         println("composer border energy: working=$working thinking=$thinking")
         assertTrue(working < 453f, "working border energy: $working")
+        assertTrue(thinking > 1f, "thinking border must rise above pixel noise: $thinking")
         assertTrue(thinking < working, "thinking=$thinking should be lighter than working=$working")
     }
+
+    private fun inBorderBand(x: Int, y: Int, width: Int, height: Int): Boolean =
+        x < 20 || x >= width - 20 || y < 20 || y >= height - 20
 
     /** The voice states that keep the composer as it is, with the placeholder and outline colour each shows. */
     private val running: List<Triple<VoiceModeState, String, VoiceGlowRole>> = listOf(
