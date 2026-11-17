@@ -72,6 +72,30 @@ class ComposerTypingBenchmark {
         }
     }
 
+    @Test
+    fun workingTurnCompilationNone() {
+        benchmarkRule.measureRepeated(
+            packageName = TARGET_PACKAGE,
+            metrics = listOf(FrameTimingMetric()),
+            iterations = 1,
+            startupMode = StartupMode.WARM,
+            compilationMode = CompilationMode.None(),
+            setupBlock = {
+                val field = launchSeededConversation()
+                field.text = "benchmark fixture"
+                checkNotNull(device.wait(Until.findObject(By.desc("Send message")), FIELD_WAIT_MS)).click()
+                check(device.wait(Until.hasObject(By.desc("Stop")), TURN_WAIT_MS)) { "Turn never became active" }
+                Thread.sleep(WORKING_MARGIN_MS)
+            },
+        ) {
+            android.util.Log.i("WorkingTurnBenchmark", "window_start wallMs=${System.currentTimeMillis()}")
+            check(device.hasObject(By.desc("Stop"))) { "Stop missing at window start" }
+            Thread.sleep(WORKING_WINDOW_MS)
+            check(device.hasObject(By.desc("Stop"))) { "Stop missing at window end" }
+            android.util.Log.i("WorkingTurnBenchmark", "window_end wallMs=${System.currentTimeMillis()}")
+        }
+    }
+
     private fun type(compilationMode: CompilationMode) {
         benchmarkRule.measureRepeated(
             packageName = TARGET_PACKAGE,
@@ -133,6 +157,8 @@ class ComposerTypingBenchmark {
     private companion object {
         // Match the suffixed package from :app's `benchmark` buildType.
         const val TARGET_PACKAGE = "ca.oculair.meridian.benchmark"
+        const val WORKING_MARGIN_MS = 5_000L
+        const val WORKING_WINDOW_MS = 25_000L
         const val DEFAULT_ITERATIONS = 5
         const val TURN_WAIT_MS = 120_000L
         const val FIELD_WAIT_MS = 5_000L
