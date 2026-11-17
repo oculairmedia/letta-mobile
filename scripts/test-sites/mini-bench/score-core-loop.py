@@ -127,7 +127,7 @@ def score(evidence):
         pixels = {}
     correlation = pixels.get('minimum_template_correlation')
     dip = pixels.get('dip_percent')
-    require(number(correlation) and correlation >= MIN_CORRELATION, 'pixel template missing or lost')
+    require(number(correlation) and MIN_CORRELATION <= correlation <= 1, 'pixel template missing or lost')
     require(number(dip) and dip <= MAX_DIP_PERCENT, 'reply luminance missing or dipped')
     require(number(pixels.get('frames')) and pixels['frames'] >= 2, 'pixel frames missing')
     require(evidence.get('clockAligned') is True, 'clock alignment missing')

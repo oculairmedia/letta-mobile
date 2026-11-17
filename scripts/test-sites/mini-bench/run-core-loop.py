@@ -557,6 +557,8 @@ def analyze_capture(directory, metadata, tree, explicit_region=None):
                 str(directory/'pixels'), '--region', region, '--settle-seconds', str(seconds), '--post-seconds','5'],
                 capture_output=True, timeout=300)
             (directory/'pixel-analysis.log').write_bytes(analysis.stdout + analysis.stderr)
+            if analysis.returncode:
+                raise RuntimeError('pixel analysis failed; see pixel-analysis.log')
             # MP4 plus timestamps remain authoritative; decoded PNGs are reproducible.
             shutil.rmtree(directory/'pixels'/'raw', ignore_errors=True)
         if scenario == 'S3' and terminals and metadata.get('interruptReferenceMs'):
@@ -570,6 +572,8 @@ def analyze_capture(directory, metadata, tree, explicit_region=None):
                 str(directory/'partial-pixels'), '--region', metadata['partialRegion'], '--settle-seconds', str(seconds),
                 '--reference-seconds',str(reference),'--post-seconds','5','--track-y','1000'],capture_output=True,timeout=300)
             (directory/'partial-pixel-analysis.log').write_bytes(analysis.stdout + analysis.stderr)
+            if analysis.returncode:
+                raise RuntimeError('partial pixel analysis failed; see partial-pixel-analysis.log')
             shutil.rmtree(directory/'partial-pixels'/'raw',ignore_errors=True)
     (directory/'metadata.json').write_text(json.dumps(metadata,indent=2))
     return normalize(directory, metadata, tree)

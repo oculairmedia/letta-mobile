@@ -65,10 +65,15 @@ def main():
         pixels -= np.median(pixels)
         def score(offset):
             patch = pixels[offset:offset + height]
-            return float(patch[ink_rows, ink_columns] @ vector / denominator)
+            norm = float(np.sqrt(np.square(patch).sum() * denominator))
+            if norm == 0:
+                return 0.0
+            return float(np.clip(patch[ink_rows, ink_columns] @ vector / norm, -1.0, 1.0))
         # Cauchy-Schwarz bounds prune candidates without approximating the pixel oracle.
         row_norms = np.sqrt(np.square(pixels).sum(axis=1))
-        bounds = np.correlate(row_norms, reference_row_norms, mode='valid') / denominator
+        patch_norms = np.sqrt(np.convolve(np.square(row_norms), np.ones(height), mode='valid') * denominator)
+        bounds = np.divide(np.correlate(row_norms, reference_row_norms, mode='valid'),
+                           patch_norms, out=np.zeros_like(patch_norms), where=patch_norms > 0)
         offset, best = 0, -float('inf')
         for candidate in np.argsort(bounds)[::-1]:
             if bounds[candidate] + 1e-10 < best:

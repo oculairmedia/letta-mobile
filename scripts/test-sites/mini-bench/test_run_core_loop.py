@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+import subprocess
 
 spec = importlib.util.spec_from_file_location('driver', Path(__file__).with_name('run-core-loop.py'))
 driver = importlib.util.module_from_spec(spec)
@@ -43,27 +44,49 @@ class DriverTest(unittest.TestCase):
         self.assertEqual(events[1]['event'], 'resident')
 
     def test_complete_raw_observations_normalize_without_invented_frames(self):
+        for duplicate in (False, True):
+            with tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                lines = ['0.090 1 2 I System.out: CORE_LOOP mount key=run-a',
+                         '0.100 1 2 I System.out: CORE_LOOP draw key=run-a identity=message-a stored=false assistant=true']
+                lines += [f'{ms / 1000:.3f} 1 2 I System.out: CORE_LOOP resident key=run-a' for ms in range(150, 5250, 50)]
+                lines.append('0.230 1 2 I System.out: CORE_LOOP draw key=run-a identity=message-a stored=true assistant=true hashes=0')
+                lines.append('0.250 1 2 I System.out: CORE_LOOP draw key=run-a identity=durable-run-alias stored=true assistant=true hashes=699287813')
+                if duplicate:
+                    lines += ['0.270 1 2 I System.out: CORE_LOOP mount key=second',
+                              '0.280 1 2 I System.out: CORE_LOOP draw key=second identity=durable-run-alias stored=true assistant=true hashes=699287813']
+                lines.sort(key=lambda line: float(line.split()[0]))
+                (directory/'logcat.txt').write_text('\n'.join(lines))
+                (directory/'wrapper.jsonl').write_text(json.dumps(dict(wallMs=150,line='input.accepted conversationId=fixture-conversation disposition=queued'))+'\n'+json.dumps(dict(wallMs=200,
+                    line='turn.finished_relayed conversationId=fixture-conversation stopReason=end_turn'))+'\n')
+                (directory/'pixels').mkdir()
+                (directory/'pixels'/'summary.json').write_text(json.dumps(dict(frames=100,
+                    minimum_template_correlation=1.0,dip_percent=0.0)))
+                tree = ET.Element('hierarchy')
+                ET.SubElement(tree,'node',text=driver.oracle.FIXED_REPLY)
+                metadata = dict(scenario='S1',sendMs=0,phoneOffsetMs=0,miniToPhoneOffsetMs=0,
+                    clockAligned=True,existingKeys=[],stopGoneMs=300,conversationId='fixture-conversation')
+                result = driver.normalize(directory,metadata,tree)
+                self.assertEqual(result['status'],'FAIL' if duplicate else 'PASS',result['errors'])
+                if duplicate:
+                    self.assertIn('duplicate assistant row',result['errors'])
+                else:
+                    self.assertEqual(result['storedCopyLatencyMs'],50)
+
+    def test_failed_pixel_analysis_cannot_reuse_a_stale_summary(self):
         with tempfile.TemporaryDirectory() as temporary:
-            directory = Path(temporary)
-            lines = ['0.090 1 2 I System.out: CORE_LOOP mount key=run-a',
-                     '0.100 1 2 I System.out: CORE_LOOP draw key=run-a identity=message-a stored=false assistant=true']
-            lines += [f'{ms / 1000:.3f} 1 2 I System.out: CORE_LOOP resident key=run-a' for ms in range(150, 5250, 50)]
-            lines.append('0.230 1 2 I System.out: CORE_LOOP draw key=run-a identity=message-a stored=true assistant=true hashes=0')
-            lines.append('0.250 1 2 I System.out: CORE_LOOP draw key=run-a identity=durable-run-alias stored=true assistant=true hashes=699287813')
-            lines.sort(key=lambda line: float(line.split()[0]))
-            (directory/'logcat.txt').write_text('\n'.join(lines))
-            (directory/'wrapper.jsonl').write_text(json.dumps(dict(wallMs=150,line='input.accepted conversationId=fixture-conversation disposition=queued'))+'\n'+json.dumps(dict(wallMs=200,
-                line='turn.finished_relayed conversationId=fixture-conversation stopReason=end_turn'))+'\n')
-            (directory/'pixels').mkdir()
-            (directory/'pixels'/'summary.json').write_text(json.dumps(dict(frames=100,
-                minimum_template_correlation=1.0,dip_percent=0.0)))
-            tree = ET.Element('hierarchy')
-            ET.SubElement(tree,'node',text=driver.oracle.FIXED_REPLY)
-            metadata = dict(scenario='S1',sendMs=0,phoneOffsetMs=0,miniToPhoneOffsetMs=0,
-                clockAligned=True,existingKeys=[],stopGoneMs=300,conversationId='fixture-conversation')
-            result = driver.normalize(directory,metadata,tree)
-            self.assertEqual(result['status'],'PASS',result['errors'])
-            self.assertEqual(result['storedCopyLatencyMs'],50)
+            root = Path(temporary)
+            (root/'wrapper.jsonl').write_text(json.dumps(dict(wallMs=200,
+                line='turn.finished_relayed conversationId=fixture stopReason=end_turn'))+'\n')
+            (root/'pixels').mkdir()
+            (root/'pixels'/'summary.json').write_text('{}')
+            metadata = dict(scenario='S1', conversationId='fixture',miniToPhoneOffsetMs=0,videoStartMs=0)
+            failed = subprocess.CompletedProcess([],1,b'',b'invalid capture')
+            with patch.object(driver.subprocess,'run',return_value=failed), \
+                    patch.object(driver,'normalize',return_value={}) as normalize:
+                with self.assertRaisesRegex(RuntimeError,'pixel analysis failed'):
+                    driver.analyze_capture(root,metadata,ET.Element('hierarchy'),'0,0,64,64')
+                normalize.assert_not_called()
 
     def test_reply_region_selects_newest_physical_reply_not_xml_order(self):
         tree = ET.Element('hierarchy')

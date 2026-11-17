@@ -9,8 +9,9 @@ from PIL import Image
 
 class PixelTest(unittest.TestCase):
     def test_stable_ink_and_one_frame_paint_loss(self):
-        for missing in (False, True):
-            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temporary:
+        for missing, contrast, partial in ((False, 255, False), (True, 255, False),
+                                           (False, 100, False), (False, 100, True)):
+            with self.subTest(missing=missing, contrast=contrast, partial=partial), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 video = root/'frames'
                 video.mkdir()
@@ -23,6 +24,13 @@ class PixelTest(unittest.TestCase):
                 for index, seconds in enumerate((0,1,1.5,1.8,2,2.5,3)):
                     filename = f'{index}.png'
                     image = Image.new('RGB',(64,64),'white') if missing and seconds == 2.5 else ink
+                    if not missing and seconds < 2:
+                        image = image.point(lambda value: 255 - contrast if value == 0 else value)
+                    if partial and seconds >= 2:
+                        image = image.copy()
+                        for x in range(32):
+                            for y in range(64):
+                                image.putpixel((x,y),(255,255,255))
                     image.save(video/filename)
                     frames.append(dict(file=filename,seconds=seconds))
                 (video/'frames.json').write_text(json.dumps(frames))
@@ -31,5 +39,5 @@ class PixelTest(unittest.TestCase):
                     '--post-seconds','1','--track-y','0'],capture_output=True,text=True)
                 self.assertEqual(result.returncode,0,result.stderr)
                 score = json.loads((root/'analysis'/'summary.json').read_text())
-                self.assertAlmostEqual(score['minimum_template_correlation'],0 if missing else 1)
-                self.assertAlmostEqual(score['dip_percent'],100 if missing else 0)
+                self.assertAlmostEqual(score['minimum_template_correlation'],0 if missing else 0.5 ** 0.5 if partial else 1)
+                self.assertAlmostEqual(score['dip_percent'],100 if missing else 100 * (1 - 255 / contrast * (0.5 if partial else 1)))

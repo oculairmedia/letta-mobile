@@ -42,6 +42,7 @@ class OracleTest(unittest.TestCase):
             lambda e: e.update(finalStopPresent=True),
             lambda e: e.update(visibleText='DONE DONE'),
             lambda e: e['pixels'].update(minimum_template_correlation=0.4),
+            lambda e: e['pixels'].update(minimum_template_correlation=1.01),
             lambda e: e['pixels'].update(dip_percent=40),
             lambda e: e['pixels'].update(dip_percent=float('nan')),
             lambda e: e.update(terminalMs=True),
