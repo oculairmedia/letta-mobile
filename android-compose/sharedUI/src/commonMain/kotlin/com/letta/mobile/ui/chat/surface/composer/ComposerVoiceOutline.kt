@@ -94,7 +94,7 @@ internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modif
             val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithCache)) }
             val strokes = OutlineStrokes(this)
             onDrawBehind {
-                drawComposerOutline(path, strokes, color.value, OutlineLight(brightness.floatValue, softness.value), mode)
+                drawComposerOutline(path, strokes, color.value, OutlineLight(brightness.floatValue, softness.value, mode))
             }
         }
 }
@@ -104,9 +104,9 @@ private fun topOnly(mode: ComposerOutlineMode, softness: Float): Boolean =
     mode == ComposerOutlineMode.Thinking || (mode == ComposerOutlineMode.Idle && softness < 1f)
 
 private fun DrawScope.drawComposerOutline(
-    path: Path, strokes: OutlineStrokes, tint: Color, light: OutlineLight, mode: ComposerOutlineMode,
+    path: Path, strokes: OutlineStrokes, tint: Color, light: OutlineLight,
 ) {
-    if (topOnly(mode, light.softness)) {
+    if (topOnly(light.mode, light.softness)) {
         clipRect(bottom = strokes.edge.width) { drawOutline(path, strokes, tint, light) }
     } else {
         drawOutline(path, strokes, tint, light)
@@ -155,7 +155,7 @@ private class OutlineStrokes(density: Density) {
     val edge = Stroke(width = with(density) { LettaDimens.Space.xs.toPx() })
 }
 
-private data class OutlineLight(val lit: Float, val softness: Float)
+private data class OutlineLight(val lit: Float, val softness: Float, val mode: ComposerOutlineMode)
 
 /** Draws [path]'s glow, halo and edge in [tint] with [light] brightness; nothing for a transparent tint. */
 private fun DrawScope.drawOutline(path: Path, strokes: OutlineStrokes, tint: Color, light: OutlineLight) {
