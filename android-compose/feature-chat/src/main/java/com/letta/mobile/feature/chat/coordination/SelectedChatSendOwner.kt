@@ -6,6 +6,7 @@ import com.letta.mobile.runtime.BackendDescriptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -24,7 +25,8 @@ internal class SelectedChatSendOwner(
     private val readiness = Mutex()
     private val prepared = mutableSetOf<String>()
 
-    fun requireCurrent() { check(job.isActive) { "Selected send backend retired" } }
+    // Retirement is normal structured cancellation, including callbacks resumed during cleanup.
+    fun requireCurrent() { job.ensureActive() }
 
     suspend fun ready(conversationId: String) = readiness.withLock {
         requireCurrent()
