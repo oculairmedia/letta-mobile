@@ -411,3 +411,27 @@ def valid_log_field(key, separator, value):
 
 def held_evidence_valid(held, expected):
     return bool(held) and expected is not None and min(held) >= expected - 1000
+
+
+def measured_row_events(directory, metadata, terminal):
+    """Bind the pixel region to its run's live row and matching new stored copy."""
+    events = parse_log(directory / "logcat.txt")
+    run = run_id(terminal)
+    keys = live_keys_for_run(events, run)
+    cutoff = terminal["wallMs"] + metadata["miniToPhoneOffsetMs"]
+    expected = "DONE" if metadata["scenario"] == "S2" else oracle.FIXED_REPLY
+    new_keys = role_keys(events, "true") - set(metadata["existingKeys"])
+    stored = [e for e in events if is_draw(e) and e["ms"] >= cutoff
+              and is_new_stored_reply(e, new_keys, text_hash(expected))]
+    if "stopReason=end_turn" in terminal["line"]:
+        keys.update(e["key"] for e in stored)
+    return aligned_row_events(events, keys, metadata["videoStartMs"])
+
+
+def aligned_row_events(events, keys, origin):
+    row_events = [e for e in events if e.get("key") in keys and e["event"] in ("draw", "resident")]
+    return dict(
+        row_keys=sorted(keys),
+        draw_times=sorted({(e["ms"] - origin) / 1000 for e in row_events if is_draw(e)}),
+        log_times=sorted({(e["ms"] - origin) / 1000 for e in row_events}),
+    )

@@ -33,7 +33,7 @@ def evidence():
             dip_percent=0.0,
             settle_seconds=2,
             post_seconds=5,
-            coverage=dict(start_seconds=1, end_seconds=7, max_gap_seconds=0.1),
+            coverage=complete_pixel_record(),
         ),
     )
 
@@ -148,7 +148,7 @@ def test_pixel_coverage_record_is_mandatory():
 
 def test_pixel_coverage_boundaries():
     for gap, end, expected in (
-        (0.1, 7, "PASS"),
+        (6, 7, "PASS"),
         (0.15, 7, "FAIL"),
         (0.1, 6.95, "FAIL"),
     ):
@@ -160,4 +160,23 @@ def test_pixel_coverage_boundaries():
 def test_partial_pixel_coverage_is_enforced():
     sample = evidence()
     sample["pixels"]["partial"] = {}
+    assert oracle.score(sample)["status"] == "FAIL"
+
+
+def complete_pixel_record():
+    # Independent fixture: a six-second held image with uninterrupted row heartbeats.
+    return dict(
+        start_seconds=1, end_seconds=7, max_gap_seconds=6,
+        frame_times=[1, 7], draw_times=[], log_times=[1 + i / 20 for i in range(121)],
+        held_spans=[[1, 7]], missing_spans=[], log_continuous=True, complete=True, reasons=[],
+    )
+
+
+def test_scorer_recomputes_vfr_coverage_instead_of_trusting_flags():
+    sample = evidence()
+    assert oracle.score(sample)["status"] == "PASS"
+    sample["pixels"]["coverage"]["draw_times"] = [3]
+    assert oracle.score(sample)["status"] == "FAIL"
+    sample["pixels"]["coverage"]["draw_times"] = []
+    sample["pixels"]["coverage"]["log_times"] = [1, 7]
     assert oracle.score(sample)["status"] == "FAIL"

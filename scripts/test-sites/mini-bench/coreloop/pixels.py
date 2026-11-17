@@ -1,7 +1,7 @@
 """Measure reply ink across settlement against its final rendered pixels."""
 
 from dataclasses import dataclass
-from .scoring import pixel_coverage_complete
+from .coverage import CoverageInput, coverage_record
 
 import csv
 import json
@@ -25,7 +25,7 @@ from PIL import Image
 def select_frames(video, raw, begin, end):
     if video.is_dir():
         frames = json.loads((video / "frames.json").read_text())
-        selected = [frame for frame in frames if begin <= frame["seconds"] <= end]
+        selected = bounded_frames(frames, begin, end, "seconds")
         times = [frame["seconds"] for frame in selected]
         paths = [video / frame["file"] for frame in selected]
     else:
@@ -133,26 +133,21 @@ def make_template(reference, height):
 
 
 def pixel_coverage(rows, args):
-    times = [
-        row[0] for row in rows if args.settle_seconds - 1 <= row[0] <= args.settle_seconds + args.post_seconds
-    ]
-    gaps = [b - a for a, b in zip(times, times[1:])]
-    if not gaps:
-        raise ValueError("pixel coverage incomplete, unordered, or gapped")
-    coverage = dict(start_seconds=times[0], end_seconds=times[-1], max_gap_seconds=max(gaps))
-    summary = dict(
-        coverage=coverage,
-        settle_seconds=args.settle_seconds,
-        post_seconds=args.post_seconds,
+    data = CoverageInput(
+        [row[0] for row in rows],
+        getattr(args, "draw_times", []),
+        getattr(args, "log_times", []),
+        (args.settle_seconds - 1, args.settle_seconds + args.post_seconds),
     )
-    if min(gaps) <= 0 or not pixel_coverage_complete(summary):
-        raise ValueError("pixel coverage incomplete, unordered, or gapped")
-    return coverage
+    record = coverage_record(data)
+    if not record["complete"] and not getattr(args, "record_incomplete", False):
+        raise ValueError("pixel coverage: " + "; ".join(record["reasons"]))
+    return record
 
 
 def summarize(rows, args, template, reference_seconds):
     coverage = pixel_coverage(rows, args)
-    before, during = settlement_window(rows, args)
+    before, during = settlement_window(held_measurements(rows, coverage, args), args)
     if not before or not during:
         raise ValueError("video does not cover the settlement window")
     baseline = float(np.median(before))
@@ -195,6 +190,11 @@ def write_analysis(output, rows, summary):
 
 
 def analyze_pixels(args):
+    row_evidence = args.output / "row-evidence.json"
+    if row_evidence.exists():
+        events = json.loads(row_evidence.read_text())
+        args.draw_times, args.log_times = events["draw_times"], events["log_times"]
+    args.record_incomplete = True
     crop = Crop(*map(int, region_arg(args.region).split(",")))
     raw = args.output / "raw"
     raw.mkdir(parents=True, exist_ok=True)
@@ -211,7 +211,10 @@ def analyze_pixels(args):
 
 
 def decode_frames(video, raw, begin, end):
-    selection = filter_arg(begin, end)
+    frames = probe_frames(video)
+    frames = bounded_frames(frames, begin, end, "best_effort_timestamp_time")
+    selection = filter_arg(float(frames[0]["best_effort_timestamp_time"]) - 0.0000005,
+                           float(frames[-1]["best_effort_timestamp_time"]) + 0.0000005)
     video = Path(evidence_path(video, Path(video).parent))
     raw = Path(evidence_path(raw, Path(video).parent))
     run_tool(
@@ -224,13 +227,39 @@ def decode_frames(video, raw, begin, end):
                 path_arg(video, video.parent),
                 "-vf",
                 selection,
-                "-vsync",
-                "0",
+                "-fps_mode",
+                "passthrough",
+                "-enc_time_base",
+                "-1",
+                "-frame_pts",
+                "1",
+                "-y",
                 path_arg(raw / "%06d.png", video.parent),
             ]
         ),
         check=True,
     )
+    paths = [raw / f"{int(frame['best_effort_timestamp']):06d}.png" for frame in frames]
+    times = [float(frame["best_effort_timestamp_time"]) for frame in frames]
+    if not all(path.exists() for path in paths):
+        raise ValueError("decoded frame PTS do not match ffprobe")
+    (raw.parent / "timestamps.json").write_text(json.dumps(frames, indent=2))
+    return paths, times
+
+
+def settlement_window(rows, args):
+    before = [row[1] for row in rows if args.settle_seconds - 1.0 <= row[0] <= args.settle_seconds - 0.2]
+    during = [row for row in rows if args.settle_seconds - 0.1 <= row[0] <= args.settle_seconds + args.post_seconds]
+    return before, during
+
+
+def bounded_frames(frames, begin, end, key):
+    first = max((i for i, frame in enumerate(frames) if float(frame[key]) <= begin), default=0)
+    last = next((i for i, frame in enumerate(frames) if float(frame[key]) >= end), len(frames) - 1)
+    return frames[first:last + 1]
+
+
+def probe_frames(video):
     probe = json.loads(
         run_tool(
             *tool_arguments(
@@ -241,7 +270,7 @@ def decode_frames(video, raw, begin, end):
                     "-select_streams",
                     "v:0",
                     "-show_entries",
-                    "frame=best_effort_timestamp_time",
+                    "frame=best_effort_timestamp,best_effort_timestamp_time",
                     "-of",
                     "json",
                     path_arg(video, video.parent),
@@ -251,16 +280,14 @@ def decode_frames(video, raw, begin, end):
             capture_output=True,
         ).stdout
     )
-    times = [
-        float(frame["best_effort_timestamp_time"])
-        for frame in probe["frames"]
-        if begin <= float(frame["best_effort_timestamp_time"]) <= end
-    ]
-    paths = sorted(raw.glob("*.png"))
-    return paths, times
+    return probe["frames"]
 
 
-def settlement_window(rows, args):
-    before = [row[1] for row in rows if args.settle_seconds - 1.0 <= row[0] <= args.settle_seconds - 0.2]
-    during = [row for row in rows if args.settle_seconds - 0.1 <= row[0] <= args.settle_seconds + args.post_seconds]
-    return before, during
+def held_measurements(rows, coverage, args):
+    """Carry a held image's values into metric boundaries without inventing draws."""
+    boundaries = (args.settle_seconds - 1, args.settle_seconds - 0.2,
+                  args.settle_seconds - 0.1, args.settle_seconds + args.post_seconds)
+    previous = {row[0]: row for row in rows}
+    carried = [(stamp, *previous[start][1:]) for start, end in coverage["held_spans"]
+               for stamp in boundaries if start < stamp < end]
+    return sorted([*rows, *carried])

@@ -11,11 +11,11 @@ from model completion or spinner disappearance. See perf-gate.md.
 from dataclasses import dataclass, field
 
 import math
+from .coverage import MAX_FRAME_GAP_MS, pixel_coverage_complete
 
 SCENARIOS = ("S1", "S2", "S3", "S4")
 MAX_LATENCY_MS = 3000
 MAX_SPINNER_MS = 5000
-MAX_FRAME_GAP_MS = 100
 MIN_CORRELATION = 0.9
 MAX_DIP_PERCENT = 10
 FIXED_REPLY = "\n\n".join(
@@ -169,21 +169,6 @@ def check_lifecycle(evidence, identities, require):
         )
         require(len(mounts) == len(identities), "row mounted more than once")
     return mounts
-
-
-def pixel_coverage_complete(pixels):
-    coverage = pixels.get("coverage")
-    if not isinstance(coverage, dict):
-        return False
-    values = [coverage.get(key) for key in ("start_seconds", "end_seconds", "max_gap_seconds")]
-    settle, post = pixels.get("settle_seconds"), pixels.get("post_seconds")
-    if not all(number(value) for value in (*values, settle, post)):
-        return False
-    start, end, gap = values
-    limit = MAX_FRAME_GAP_MS / 1000
-    bounds = (post >= 0, start <= settle - 1 + limit, end >= settle + post)
-    ordered = (start < end, 0 < gap <= limit + 1e-9)
-    return all((*bounds, *ordered))
 
 
 def check_pixels(evidence, require):

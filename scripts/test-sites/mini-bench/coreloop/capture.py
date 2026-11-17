@@ -24,7 +24,7 @@ from .device import (
 from .fixture import select_conversation
 from .remote import REMOTE_AUDIT, REMOTE_TAIL
 from .scenarios import perform_scenario_step, ScenarioStep
-from .evidence import parse_log, normalize, has_partial_capture
+from .evidence import parse_log, normalize, has_partial_capture, measured_row_events
 
 
 @dataclass
@@ -301,6 +301,7 @@ def trial(args, scenario, index):
 
 def analyze_final_pixels(directory, metadata, region, terminals):
     if terminals:
+        write_row_evidence(directory, metadata, terminals[-1], "pixels")
         seconds = (terminals[-1]["wallMs"] + metadata["miniToPhoneOffsetMs"] - metadata["videoStartMs"]) / 1000
         analysis = run_tool(
             *tool_arguments(
@@ -343,6 +344,7 @@ def analyze_partial(directory, metadata, terminals):
     if not metadata["partialRegion"]:
         return False
     seconds = (terminals[0]["wallMs"] + metadata["miniToPhoneOffsetMs"] - metadata["videoStartMs"]) / 1000
+    write_row_evidence(directory, metadata, terminals[0], "partial-pixels")
     reference = (metadata["interruptReferenceMs"] - metadata["videoStartMs"]) / 1000
     analysis = run_tool(
         *tool_arguments(
@@ -413,3 +415,10 @@ def rescore_captures(args):
     if not results:
         raise RuntimeError("no captures to rescore")
     return results
+
+
+def write_row_evidence(directory, metadata, terminal, name):
+    output = directory / name
+    output.mkdir(exist_ok=True)
+    events = measured_row_events(directory, metadata, terminal)
+    (output / "row-evidence.json").write_text(json.dumps(events, indent=2))

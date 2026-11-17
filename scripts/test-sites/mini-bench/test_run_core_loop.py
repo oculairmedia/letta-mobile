@@ -54,6 +54,8 @@ class DriverTest(unittest.TestCase):
             (root / "pixels").mkdir()
             (root / "pixels" / "summary.json").write_text("{}")
             metadata = dict(scenario="S1", conversationId="fixture", miniToPhoneOffsetMs=0, videoStartMs=0)
+            (root / "logcat.txt").write_text("")
+            metadata["existingKeys"] = []
             failed = subprocess.CompletedProcess([], 1, b"", b"invalid capture")
             with (
                 patch.object(subprocess, "run", return_value=failed),
@@ -129,7 +131,7 @@ def raw_fixture(directory, duplicate):
                 dip_percent=0.0,
                 settle_seconds=2,
                 post_seconds=5,
-                coverage=dict(start_seconds=1, end_seconds=7, max_gap_seconds=0.05),
+                coverage=complete_pixel_record(),
             )
         )
     )
@@ -200,7 +202,7 @@ def history_fixture(root, behavior):
                 dip_percent=0,
                 settle_seconds=2,
                 post_seconds=5,
-                coverage=dict(start_seconds=1, end_seconds=7, max_gap_seconds=0.05),
+                coverage=complete_pixel_record(),
             )
         )
     )
@@ -298,3 +300,26 @@ def test_normalize_never_reads_previous_analysis(tmp_path, fails):
     result = evidence.normalize(tmp_path, metadata, tree)
     assert result["minimumCorrelation"] is None
     assert result["status"] == "FAIL"
+
+
+def complete_pixel_record():
+    # Independent fixture: a six-second held image with uninterrupted row heartbeats.
+    return dict(
+        start_seconds=1, end_seconds=7, max_gap_seconds=6,
+        frame_times=[1, 7], draw_times=[], log_times=[1 + i / 20 for i in range(121)],
+        held_spans=[[1, 7]], missing_spans=[], log_continuous=True, complete=True, reasons=[],
+    )
+
+
+def test_pixel_events_bind_measured_row_and_align_to_video(tmp_path):
+    events = [
+        '10.000 1 2 I Telemetry/CoreLoop: draw key=reply identity=run-a assistant=true stored=false hashes=0',
+        '10.050 1 2 I Telemetry/CoreLoop: resident key=reply',
+        '10.075 1 2 I Telemetry/CoreLoop: draw key=unrelated identity=run-b assistant=true stored=false hashes=0',
+        '10.100 1 2 I Telemetry/CoreLoop: draw key=reply identity=stored-a assistant=true stored=true hashes=0',
+    ]
+    (tmp_path / 'logcat.txt').write_text('\n'.join(events))
+    metadata = dict(scenario='S1', videoStartMs=9900, miniToPhoneOffsetMs=20, existingKeys=[])
+    terminal = dict(wallMs=10000, line='turn.finished_relayed runId=run-a stopReason=end_turn')
+    result = evidence.measured_row_events(tmp_path, metadata, terminal)
+    assert result == dict(row_keys=['reply'], draw_times=[0.1, 0.2], log_times=[0.1, 0.15, 0.2])
