@@ -12048,6 +12048,7 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Pane {
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaDimens$Pane;
 	public final fun getAgentPanelWidth-D9Ej5fM ()F
 	public final fun getAlertWidth-D9Ej5fM ()F
+	public final fun getCompactCardMinWidth-D9Ej5fM ()F
 	public final fun getContentMaxWidth-D9Ej5fM ()F
 	public final fun getDualViewBreakpoint-D9Ej5fM ()F
 	public final fun getEditorMinHeight-D9Ej5fM ()F
@@ -12068,6 +12069,8 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Pane {
 	public final fun getSettingsMediumBreakpoint-D9Ej5fM ()F
 	public final fun getSettingsWideBreakpoint-D9Ej5fM ()F
 	public final fun getSidePanelWidth-D9Ej5fM ()F
+	public final fun getToolCardFactLabelWidth-D9Ej5fM ()F
+	public final fun getToolCardSectionMaxHeight-D9Ej5fM ()F
 	public final fun getWideBreakpoint-D9Ej5fM ()F
 }
 
