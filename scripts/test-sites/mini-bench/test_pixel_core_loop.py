@@ -107,3 +107,21 @@ def test_analyzer_coverage_boundaries(times, valid):
     else:
         with pytest.raises(ValueError, match="coverage"):
             pixel_coverage(rows, args)
+
+@pytest.mark.parametrize("draws,logs,valid", [
+    ([], [1 + i / 20 for i in range(41)], True),
+    ([1.5], [1 + i / 20 for i in range(41)], False),
+    ([], [1, 1.5, 2, 2.5, 3], False),
+])
+def test_vfr_coverage_requires_draw_and_resident_evidence(draws, logs, valid):
+    from types import SimpleNamespace
+    from coreloop.pixels import pixel_coverage
+
+    rows = [(1.0, 1), (2.0, 1), (3.0, 1)]
+    args = SimpleNamespace(settle_seconds=2, post_seconds=1, draw_times=draws, log_times=logs)
+    try:
+        pixel_coverage(rows, args)
+        covered = True
+    except ValueError:
+        covered = False
+    assert covered is valid
