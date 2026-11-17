@@ -985,3 +985,7 @@ Internal query-generation tokens for schedule controller work. A captured revisi
 
 Host-confirmed toolset choices and preference selection. ToolsetControl sends one request and waits
 for the runtime's device-status echo; hosts bind their shared channel state and admin RPC.
+
+# Package com.letta.mobile.data.memory.graph.forces
+
+Internal spring endpoints shared by force tuning and cluster ownership collection. The force field owns the buffers and applies these values without changing arithmetic or visit order.

@@ -1,114 +1,16 @@
 package com.letta.mobile.data.memory.graph
 
-import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.memory.graph.barneshut.BarnesHutTree
 import com.letta.mobile.data.memory.graph.barneshut.CollisionTerms
 import com.letta.mobile.data.memory.graph.barneshut.ForceBodies
 import com.letta.mobile.data.memory.graph.barneshut.ForceSums
 import com.letta.mobile.data.memory.graph.barneshut.RepulsionTerms
+import com.letta.mobile.data.memory.graph.forces.SpringEnds
 import com.letta.mobile.data.memory.MemoryGraphEdgeKind
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
-import kotlin.math.PI
-import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.pow
-import kotlin.math.sin
 import kotlin.math.sqrt
-
-/**
- * Radial tree seed: the best-connected node sits at the origin, every other
- * node goes on a ring by its BFS depth from it, ordered by kind then by list
- * order. Unreachable nodes share one outer ring. Fully deterministic.
- */
-internal object MemoryGraphRadialSeed {
-    fun place(view: MemoryGraphView, config: MemoryGraphLayoutConfig): Map<String, MemoryGraphPoint> {
-        val ids = view.nodes.map { it.id }
-        val root = ids.maxByOrNull { view.degreeOf(it) } ?: return emptyMap()
-        val depthById = bfsDepths(root, adjacency(view))
-        val unreachableDepth = (depthById.values.maxOrNull() ?: 0) + 1
-        val rings = ids.filter { it != root }
-            .groupBy { depthById[it] ?: unreachableDepth }
-            .entries
-            .sortedBy { it.key }
-        val kindOrder = view.nodes.associate { it.id to it.kind.ordinal }
-        val positions = LinkedHashMap<String, MemoryGraphPoint>()
-        positions[root] = MemoryGraphPoint(0f, 0f)
-        rings.forEach { (depth, members) ->
-            val ordered = members.sortedBy { kindOrder[it] ?: 0 }
-            placeRing(ordered, depth, config, positions)
-        }
-        return ids.associateWith { positions.getValue(it) }
-    }
-
-    private fun placeRing(
-        members: List<String>,
-        depth: Int,
-        config: MemoryGraphLayoutConfig,
-        into: MutableMap<String, MemoryGraphPoint>,
-    ) {
-        val count = members.size
-        val radius = max(config.ringSpacing * depth, count * config.minArcLength / (2f * PI.toFloat()))
-        val phase = depth * RING_PHASE_STEP
-        members.forEachIndexed { index, id ->
-            val angle = phase + 2.0 * PI * index / count
-            into[id] = MemoryGraphPoint((radius * cos(angle)).toFloat(), (radius * sin(angle)).toFloat())
-        }
-    }
-
-    private fun adjacency(view: MemoryGraphView): Map<String, List<String>> {
-        val neighbours = HashMap<String, MutableList<String>>()
-        view.edges.forEach { edge ->
-            neighbours.getOrPut(edge.fromId) { mutableListOf() } += edge.toId
-            neighbours.getOrPut(edge.toId) { mutableListOf() } += edge.fromId
-        }
-        return neighbours
-    }
-
-    private fun bfsDepths(root: String, adjacency: Map<String, List<String>>): Map<String, Int> {
-        val depth = HashMap<String, Int>()
-        depth[root] = 0
-        val queue = ArrayDeque(listOf(root))
-        while (queue.isNotEmpty()) {
-            val current = queue.removeFirst()
-            val next = depth.getValue(current) + 1
-            adjacency[current].orEmpty().forEach { neighbour ->
-                if (neighbour !in depth) {
-                    depth[neighbour] = next
-                    queue.addLast(neighbour)
-                }
-            }
-        }
-        return depth
-    }
-
-    private const val RING_PHASE_STEP = 0.5
-}
-
-/**
- * Velocity-Verlet-free force relaxation of a whole graph: [MemoryGraphForceField] stepped a
- * budgeted number of times from a seed. Iterations shrink with n squared to respect the work budget.
- */
-internal class MemoryGraphForceSimulation(
-    view: MemoryGraphView,
-    private val config: MemoryGraphLayoutConfig,
-) {
-    private val ids = view.nodes.map { it.id }
-    private val field = MemoryGraphForceField(ids.size, MemoryGraphForceField.springsOf(view), config)
-
-    fun relax(seed: Map<String, MemoryGraphPoint>): Map<String, MemoryGraphPoint> {
-        ids.forEachIndexed { index, id -> field.place(index, seed.getValue(id)) }
-        repeat(iterationCount()) { field.step() }
-        return ids.withIndex().associate { (index, id) -> id to field.point(index) }
-    }
-
-    private fun iterationCount(): Int {
-        val n = ids.size
-        if (n < 2) return 0
-        val budgeted = config.workBudget / (n * n)
-        return min(config.iterations, max(config.minIterations, budgeted))
-    }
-}
 
 /**
  * The memory graph's force model, one step at a time: pairwise repulsion, spring attraction along
@@ -129,6 +31,7 @@ class MemoryGraphForceField(
     /** Each node's collision radius, or null for point masses. */
     private val radii: FloatArray? = null,
 ) {
+    private val staticMotion = MemoryGraphMotion(config.damping, config.maxStep, 0f, false)
     private val x = FloatArray(size)
     private val y = FloatArray(size)
     private val vx = FloatArray(size)
@@ -199,18 +102,25 @@ class MemoryGraphForceField(
         anchor = if (fleet && tuning.pinBackend) backend else FREE
         val degree = IntArray(size)
         springs.forEach { degree[it]++ }
-        val blend = tuning.degreeScaling.coerceIn(0f, 1f)
+        val tune = springTuner(tuning, degree, if (fleet) backend else FREE)
         val edgeKindValues = MemoryGraphEdgeKind.entries
-        for (s in 0 until min(restLength.size, springKinds.size)) {
-            val kind = edgeKindValues[springKinds[s]]
-            val a = degree[springs[2 * s]].coerceAtLeast(1)
-            val b = degree[springs[2 * s + 1]].coerceAtLeast(1)
+        for (spring in 0 until min(restLength.size, springKinds.size)) {
+            tune(spring, edgeKindValues[springKinds[spring]])
+        }
+    }
+
+    private fun springTuner(tuning: MemoryGraphTuning, degree: IntArray, backend: Int): (Int, MemoryGraphEdgeKind) -> Unit {
+        val blend = tuning.degreeScaling.coerceIn(0f, 1f)
+        return { spring, kind ->
+            val ends = SpringEnds.at(springs, spring)
+            val a = degree[ends.source].coerceAtLeast(1)
+            val b = degree[ends.target].coerceAtLeast(1)
             val bias = a.toFloat() / (a + b)
-            val spoke = fleet && (springs[2 * s] == backend || springs[2 * s + 1] == backend)
-            restLength[s] = tuning.lengthOf(kind)
-            stiffness[s] = if (spoke) tuning.hubSpokeStrength else tuning.stiffnessOf(kind) * lerp(1f, 1f / min(a, b), blend)
-            sourceWeight[s] = if (spoke) 1f else lerp(1f, 2f * (1f - bias), blend)
-            targetWeight[s] = if (spoke) 1f else lerp(1f, 2f * bias, blend)
+            val spoke = backend != FREE && ends.contains(backend)
+            restLength[spring] = tuning.lengthOf(kind)
+            stiffness[spring] = if (spoke) tuning.hubSpokeStrength else tuning.stiffnessOf(kind) * lerp(1f, 1f / min(a, b), blend)
+            sourceWeight[spring] = if (spoke) 1f else lerp(1f, 2f * (1f - bias), blend)
+            targetWeight[spring] = if (spoke) 1f else lerp(1f, 2f * bias, blend)
         }
     }
 
@@ -225,14 +135,11 @@ class MemoryGraphForceField(
         val agents = nodeKinds.count { it == agent }
         clusterStrength = if (tuning.clusterEnabled && agents >= 2) tuning.clusterStrength else 0f
         val owned = Array(size) { mutableListOf<Int>() }
-        fun own(node: Int, owner: Int) {
-            val kind = nodeKinds.getOrNull(node) ?: return
-            if (kind != agent && kind != backend && nodeKinds.getOrNull(owner) == agent) owned[node] += owner
-        }
         var s = 0
         while (s < springs.size) {
-            own(springs[s], springs[s + 1])
-            own(springs[s + 1], springs[s])
+            val ends = SpringEnds.at(springs, s / 2)
+            addOwner(owned, nodeKinds, ends)
+            addOwner(owned, nodeKinds, SpringEnds(ends.target, ends.source))
             s += 2
         }
         ownerStart = IntArray(size + 1)
@@ -259,7 +166,7 @@ class MemoryGraphForceField(
     /** One step. Node [pinned] (or none, [FREE]) stays where it is. Returns the fastest free node's speed. */
     fun step(pinned: Int = FREE): Float {
         applyForces()
-        return integrate(pinned)
+        return integrate(ForceStep(pinned, FREE, staticMotion))
     }
 
     /**
@@ -270,7 +177,7 @@ class MemoryGraphForceField(
     fun step(pinned: Int, motion: MemoryGraphMotion, alpha: Float): Float {
         applyForces()
         applyCluster()
-        return integrateLive(pinned, motion, alpha)
+        return integrate(ForceStep(pinned, anchor, motion, alpha))
     }
 
     /** Pulls each owned node toward its owners' centroid ([MemoryGraphTuning.clusterStrength]). */
@@ -347,37 +254,20 @@ class MemoryGraphForceField(
         }
     }
 
-    /** Damped step with a per-step cap; returns the fastest free node's speed. */
-    private fun integrate(pinned: Int): Float {
+    /** One damped step under the chosen pin, cooling and velocity policy. */
+    private fun integrate(step: ForceStep): Float {
         var fastest = 0f
         for (i in 0 until size) {
-            if (i == pinned) continue
-            vx[i] = (vx[i] + fx[i] - x[i] * gravity) * config.damping
-            vy[i] = (vy[i] + fy[i] - y[i] * gravity) * config.damping
+            if (step.holds(i)) continue
+            vx[i] = (vx[i] + fx[i] * step.alpha - x[i] * gravity * step.alpha) * step.motion.damping
+            vy[i] = (vy[i] + fy[i] * step.alpha - y[i] * gravity * step.alpha) * step.motion.damping
             val speed = sqrt(vx[i] * vx[i] + vy[i] * vy[i])
-            val scale = if (speed > config.maxStep) config.maxStep / speed else 1f
-            x[i] += vx[i] * scale
-            y[i] += vy[i] * scale
-            fastest = max(fastest, speed * scale)
-        }
-        return fastest
-    }
-
-    /** [integrate] under live [motion]: cooled forces, its friction, and (dense graphs) a velocity cap. */
-    private fun integrateLive(pinned: Int, motion: MemoryGraphMotion, alpha: Float): Float {
-        var fastest = 0f
-        for (i in 0 until size) {
-            if (i == pinned || i == anchor) continue
-            vx[i] = (vx[i] + fx[i] * alpha - x[i] * gravity * alpha) * motion.damping
-            vy[i] = (vy[i] + fy[i] * alpha - y[i] * gravity * alpha) * motion.damping
-            val speed = sqrt(vx[i] * vx[i] + vy[i] * vy[i])
-            val scale = if (speed > motion.maxSpeed) motion.maxSpeed / speed else 1f
-            if (motion.clampVelocity) {
-                // A capped hub keeps the capped speed, so it cannot carry momentum back past its rest point.
+            val scale = if (speed > step.motion.maxSpeed) step.motion.maxSpeed / speed else 1f
+            if (step.motion.clampVelocity) {
                 vx[i] *= scale
                 vy[i] *= scale
             }
-            val moved = if (motion.clampVelocity) 1f else scale
+            val moved = if (step.motion.clampVelocity) 1f else scale
             x[i] += vx[i] * moved
             y[i] += vy[i] * moved
             fastest = max(fastest, speed * scale)
@@ -419,49 +309,10 @@ class MemoryGraphForceField(
     }
 }
 
-/**
- * How the memory page's live view steps a [MemoryGraphForceField], tuned by how crowded the graph
- * is ([MemoryGraphTuning]'s thresholds). A sparse graph (one agent's star) keeps the sparse
- * friction and per-step cap and never cools, so it moves as it always has; a crowded one (the fleet
- * view: hundreds of label groups and hubs shared by every agent) gets more friction, a lower speed
- * cap that holds velocity too, and d3-force style cooling: alpha decays each step and scales the
- * forces, and the view stops once it falls below [MemoryGraphTuning.alphaMin].
- */
-@Immutable
-data class MemoryGraphMotion(
-    /** Velocity kept per step (1 minus friction). */
-    val damping: Float,
-    /** The fastest a node moves per step. */
-    val maxSpeed: Float,
-    /** The share of alpha lost per step; 0 never cools. */
-    val alphaDecay: Float,
-    /** Whether the cap also limits the velocity carried into the next step, not just this step's move. */
-    val clampVelocity: Boolean,
-) {
-    /** Alpha after one more step. */
-    fun cool(alpha: Float): Float = alpha * (1f - alphaDecay)
+internal fun lerp(from: Float, to: Float, t: Float): Float = from + (to - from) * t
 
-    companion object {
-        /**
-         * The motion for a graph of [nodes] nodes and [edges] edges under [tuning]. Crowding counts
-         * every node plus twice each edge beyond a tree's, so a hub-heavy graph tunes as crowded
-         * sooner than a star.
-         */
-        fun forGraph(nodes: Int, edges: Int, tuning: MemoryGraphTuning = MemoryGraphTuning()): MemoryGraphMotion {
-            val t = tuning.crowdednessOf(nodes, edges)
-            if (t == 0f) return MemoryGraphMotion(tuning.sparseDamping, tuning.sparseMaxSpeed, alphaDecay = 0f, clampVelocity = false)
-            val coolingSteps = tuning.coolingFrames.coerceAtLeast(1f)
-            val alphaRatio = (tuning.alphaMin / tuning.alphaStart.coerceAtLeast(tuning.alphaMin)).coerceIn(MIN_RATIO, 1f)
-            return MemoryGraphMotion(
-                damping = lerp(tuning.sparseDamping, tuning.crowdedDamping, t),
-                maxSpeed = lerp(tuning.sparseMaxSpeed, tuning.crowdedMaxSpeed, t),
-                alphaDecay = 1f - alphaRatio.toDouble().pow(1.0 / coolingSteps).toFloat(),
-                clampVelocity = true,
-            )
-        }
-
-        private const val MIN_RATIO = 1e-9f
-    }
+private fun addOwner(owned: Array<MutableList<Int>>, kinds: IntArray, ends: SpringEnds) {
+    val kind = kinds.getOrNull(ends.source) ?: return
+    if (kind == MemoryGraphNodeKind.Agent.ordinal || kind == MemoryGraphNodeKind.Backend.ordinal) return
+    if (kinds.getOrNull(ends.target) == MemoryGraphNodeKind.Agent.ordinal) owned[ends.source] += ends.target
 }
-
-private fun lerp(from: Float, to: Float, t: Float): Float = from + (to - from) * t
