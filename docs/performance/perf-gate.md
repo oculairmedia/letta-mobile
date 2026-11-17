@@ -329,3 +329,30 @@ Android 11 does not provide AndroidX's `frameOverrunMs` (it requires API 31),
 so an overrun-based jank percentage is unavailable on the Pixel 2 XL. Report
 `frameDurationCpuMs` separately and do not substitute a CPU-time threshold as
 if it were the overrun metric.
+
+### Mini working-turn fixture
+
+On the mini test server, run `scripts/test-sites/setup-mini-bench-agent.sh`
+from a checkout to start the local model and external-tool responder; set
+`BENCH_SECONDS` to an integer from 7 to 110 (default 40). The script prints
+its dedicated agent and conversation IDs. `--teardown` stops its processes.
+Only `mini-bench` uses `ollama/bench-model`; other mini agents retain their
+model. Re-run setup after a server restart. The setup requires port 11434 free.
+
+Use the seeded arguments above with
+`ComposerTypingBenchmark#workingTurnCompilationNone`, the default 40-second
+hold, and a populated fixture conversation. Preserve the raw JSON and the
+fixture's `model.log` and `worker.log` under
+`/opt/letta-test-server/bench-fixture/`, along with the device's
+`WorkingTurnBenchmark` window timestamps. A run is valid only when Stop was
+visible at both window endpoints, the matching tool start and end enclose the
+window by at least three seconds on each side, and the model log shows no
+assistant content in the tool-call response. Compare clocks before the run;
+clock skew or ambiguous log correlation invalidates the run. The tool call in
+flight with no assistant tokens implies WORKING through
+`RunPhaseReducer.kt:36` and `AppServerRuntimeEventMapper.kt:194`.
+
+The earlier Bash approach was blocked by letta-code's foreground-sleep guard,
+not by a model refusal: on the mini's pinned 0.34.39 installation,
+`letta.js:218232` contains the guard message, which appeared as the Bash tool
+result in the original probe conversation before the assistant reported it.
