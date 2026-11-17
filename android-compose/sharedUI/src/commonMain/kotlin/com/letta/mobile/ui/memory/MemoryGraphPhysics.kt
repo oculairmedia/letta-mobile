@@ -2,6 +2,7 @@ package com.letta.mobile.ui.memory
 
 import com.letta.mobile.data.memory.graph.MemoryGraphBounds
 import com.letta.mobile.data.memory.graph.MemoryGraphLayout
+import com.letta.mobile.data.memory.graph.MemoryGraphMotion
 import com.letta.mobile.data.memory.graph.MemoryGraphForceField
 import com.letta.mobile.data.memory.graph.MemoryGraphPoint
 import com.letta.mobile.data.memory.graph.MemoryGraphView
@@ -13,7 +14,10 @@ import com.letta.mobile.data.memory.graph.MemoryGraphView
  * controller's tuning, so a settled graph sits where the controller put it unless the user moved
  * something. Collision by drawn radius keeps big nodes from overlapping.
  *
- * [isHot] turns false once every node is nearly still (or after [MAX_TICKS_PER_HEAT]); callers
+ * Its friction, speed cap and cooling come from [MemoryGraphMotion.forGraph]: a crowded graph (the
+ * fleet view) cools and comes to rest within a few seconds; a small one moves as it always has.
+ *
+ * [isHot] turns false once every node is nearly still, it has cooled, or after [MAX_TICKS_PER_HEAT]; callers
  * stop ticking then, so a settled graph costs nothing per frame. With [motion] off (reduced motion
  * or a graph too big to simulate) nothing ever heats: a dragged node simply moves alone.
  */
@@ -21,6 +25,8 @@ internal class MemoryGraphPhysics private constructor(
     private val ids: List<String>,
     private val field: MemoryGraphForceField,
     private val motion: Boolean,
+    /** Friction, speed cap and cooling for this graph's size ([MemoryGraphMotion.forGraph]). */
+    private val tuning: MemoryGraphMotion,
 ) {
     private val n = ids.size
     private val indexById = ids.withIndex().associate { (index, id) -> id to index }
@@ -30,11 +36,19 @@ internal class MemoryGraphPhysics private constructor(
     var isHot: Boolean = false
         private set
 
+    /** The cooling: 1 when heated, decaying each step under [tuning]; forces are scaled by it. */
+    private var alpha = 1f
+
+    /** The fastest node's speed in the last step (layout units per step). */
+    var lastSpeed: Float = 0f
+        private set
+
     /** Wake the simulation, for a bloom, a drag or new nodes. A no-op without [motion]. */
     fun heat() {
         if (!motion || n < 2) return
         isHot = true
         ticksSinceHeat = 0
+        alpha = 1f
     }
 
     /** Hold [id] at [point] (layout space) until [release]; neighbours follow while it is hot. */
@@ -52,9 +66,11 @@ internal class MemoryGraphPhysics private constructor(
     /** One integration step. Returns whether the graph is still moving. */
     fun tick(): Boolean {
         if (!isHot) return false
-        val fastest = field.step(pinned)
+        val fastest = field.step(pinned, tuning, alpha)
+        lastSpeed = fastest
+        alpha = tuning.cool(alpha)
         ticksSinceHeat++
-        isHot = fastest > SETTLE_SPEED && ticksSinceHeat < MAX_TICKS_PER_HEAT
+        isHot = fastest > SETTLE_SPEED && ticksSinceHeat < MAX_TICKS_PER_HEAT && alpha >= MemoryGraphMotion.ALPHA_MIN
         return isHot
     }
 
@@ -84,9 +100,10 @@ internal class MemoryGraphPhysics private constructor(
         ): MemoryGraphPhysics {
             val ids = view.nodes.map { it.id }
             val radii = FloatArray(ids.size) { radiusOf(ids[it]) }
-            val field = MemoryGraphForceField(ids.size, MemoryGraphForceField.springsOf(view), radii = radii)
+            val springs = MemoryGraphForceField.springsOf(view)
+            val field = MemoryGraphForceField(ids.size, springs, radii = radii)
             val motion = start.motion && ids.size <= LIVE_NODE_LIMIT
-            val physics = MemoryGraphPhysics(ids, field, motion)
+            val physics = MemoryGraphPhysics(ids, field, motion, MemoryGraphMotion.forGraph(ids.size, springs.size / 2))
             val moved = physics.seed(target, start)
             if (moved) physics.heat()
             return physics

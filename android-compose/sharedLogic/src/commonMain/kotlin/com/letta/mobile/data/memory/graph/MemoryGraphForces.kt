@@ -1,9 +1,11 @@
 package com.letta.mobile.data.memory.graph
 
+import androidx.compose.runtime.Immutable
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -145,11 +147,25 @@ class MemoryGraphForceField(
 
     /** One step. Node [pinned] (or none, [FREE]) stays where it is. Returns the fastest free node's speed. */
     fun step(pinned: Int = FREE): Float {
+        applyForces()
+        return integrate(pinned)
+    }
+
+    /**
+     * One live step under [motion]: the forces scaled by the cooling [alpha] (1 when hot, decaying
+     * toward [MemoryGraphMotion.ALPHA_MIN]), [MemoryGraphMotion.damping] friction and a speed cap.
+     * At [MemoryGraphMotion.forGraph]'s small-graph tuning and alpha 1 it is exactly [step].
+     */
+    fun step(pinned: Int, motion: MemoryGraphMotion, alpha: Float): Float {
+        applyForces()
+        return integrateLive(pinned, motion, alpha)
+    }
+
+    private fun applyForces() {
         fx.fill(0f)
         fy.fill(0f)
         applyRepulsion()
         applySprings()
-        return integrate(pinned)
     }
 
     private fun applyRepulsion() {
@@ -212,6 +228,28 @@ class MemoryGraphForceField(
         return fastest
     }
 
+    /** [integrate] under live [motion]: cooled forces, its friction, and (dense graphs) a velocity cap. */
+    private fun integrateLive(pinned: Int, motion: MemoryGraphMotion, alpha: Float): Float {
+        var fastest = 0f
+        for (i in 0 until size) {
+            if (i == pinned) continue
+            vx[i] = (vx[i] + (fx[i] - x[i] * config.gravity) * alpha) * motion.damping
+            vy[i] = (vy[i] + (fy[i] - y[i] * config.gravity) * alpha) * motion.damping
+            val speed = sqrt(vx[i] * vx[i] + vy[i] * vy[i])
+            val scale = if (speed > motion.maxSpeed) motion.maxSpeed / speed else 1f
+            if (motion.clampVelocity) {
+                // A capped hub keeps the capped speed, so it cannot carry momentum back past its rest point.
+                vx[i] *= scale
+                vy[i] *= scale
+            }
+            val moved = if (motion.clampVelocity) 1f else scale
+            x[i] += vx[i] * moved
+            y[i] += vy[i] * moved
+            fastest = max(fastest, speed * scale)
+        }
+        return fastest
+    }
+
     companion object {
         /** No node is pinned. */
         const val FREE = -1
@@ -232,5 +270,64 @@ class MemoryGraphForceField(
         private const val COINCIDENT_NUDGE = 0.5f
         private const val COLLISION_PADDING = 10f
         private const val COLLISION_STRENGTH = 0.6f
+    }
+}
+
+/**
+ * How the memory page's live view steps a [MemoryGraphForceField], tuned by how crowded the graph
+ * is. A small graph (one agent's star) keeps the field's own friction and per-step cap and never
+ * cools, so it moves as it always has; a crowded one (the fleet view: hundreds of label groups and
+ * hubs shared by every agent) gets more friction, a lower speed cap that holds velocity too, and
+ * d3-force style cooling: an alpha starting at 1 decays each step and scales the forces, and the
+ * view stops once it falls below [ALPHA_MIN], so the graph comes to rest within a few seconds.
+ */
+@Immutable
+data class MemoryGraphMotion(
+    /** Velocity kept per step (1 minus friction). */
+    val damping: Float,
+    /** The fastest a node moves per step. */
+    val maxSpeed: Float,
+    /** The share of alpha lost per step; 0 never cools. */
+    val alphaDecay: Float,
+    /** Whether the cap also limits the velocity carried into the next step, not just this step's move. */
+    val clampVelocity: Boolean,
+) {
+    /** Alpha after one more step. */
+    fun cool(alpha: Float): Float = alpha * (1f - alphaDecay)
+
+    companion object {
+        /** Below this alpha a cooling simulation stops. */
+        const val ALPHA_MIN: Float = 0.001f
+
+        /** Crowding at or below which a graph keeps the small-graph tuning. */
+        private const val SPARSE = 40f
+
+        /** Crowding at or above which a graph gets the full crowded tuning. */
+        private const val CROWDED = 240f
+
+        private const val CROWDED_DAMPING = 0.6f
+        private const val CROWDED_MAX_SPEED = 12f
+
+        /** Steps a fully crowded graph takes to cool from 1 to [ALPHA_MIN] (about 2.5 s at 60 fps). */
+        private const val CROWDED_COOLING_STEPS = 150
+
+        /**
+         * The tuning for a graph of [nodes] nodes and [edges] edges. Crowding counts every node plus
+         * twice each edge beyond a tree's, so a hub-heavy graph tunes as crowded sooner than a star.
+         */
+        fun forGraph(nodes: Int, edges: Int, config: MemoryGraphLayoutConfig = MemoryGraphLayoutConfig()): MemoryGraphMotion {
+            val crowding = nodes + 2 * (edges - nodes).coerceAtLeast(0)
+            val t = ((crowding - SPARSE) / (CROWDED - SPARSE)).coerceIn(0f, 1f)
+            if (t == 0f) return MemoryGraphMotion(config.damping, config.maxStep, alphaDecay = 0f, clampVelocity = false)
+            val coolingSteps = CROWDED_COOLING_STEPS / t
+            return MemoryGraphMotion(
+                damping = lerp(config.damping, CROWDED_DAMPING, t),
+                maxSpeed = lerp(config.maxStep, CROWDED_MAX_SPEED, t),
+                alphaDecay = 1f - ALPHA_MIN.toDouble().pow(1.0 / coolingSteps).toFloat(),
+                clampVelocity = true,
+            )
+        }
+
+        private fun lerp(from: Float, to: Float, t: Float): Float = from + (to - from) * t
     }
 }

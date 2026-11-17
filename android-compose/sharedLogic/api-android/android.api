@@ -24893,6 +24893,7 @@ public final class com/letta/mobile/data/memory/graph/MemoryGraphForceField {
 	public final fun place (ILcom/letta/mobile/data/memory/graph/MemoryGraphPoint;)V
 	public final fun point (I)Lcom/letta/mobile/data/memory/graph/MemoryGraphPoint;
 	public final fun step (I)F
+	public final fun step (ILcom/letta/mobile/data/memory/graph/MemoryGraphMotion;F)F
 	public static synthetic fun step$default (Lcom/letta/mobile/data/memory/graph/MemoryGraphForceField;IILjava/lang/Object;)F
 }
 
@@ -24984,6 +24985,31 @@ public final class com/letta/mobile/data/memory/graph/MemoryGraphLayoutMode : ja
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/memory/graph/MemoryGraphLayoutMode;
 	public static fun values ()[Lcom/letta/mobile/data/memory/graph/MemoryGraphLayoutMode;
+}
+
+public final class com/letta/mobile/data/memory/graph/MemoryGraphMotion {
+	public static final field ALPHA_MIN F
+	public static final field Companion Lcom/letta/mobile/data/memory/graph/MemoryGraphMotion$Companion;
+	public fun <init> (FFFZ)V
+	public final fun component1 ()F
+	public final fun component2 ()F
+	public final fun component3 ()F
+	public final fun component4 ()Z
+	public final fun cool (F)F
+	public final fun copy (FFFZ)Lcom/letta/mobile/data/memory/graph/MemoryGraphMotion;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/memory/graph/MemoryGraphMotion;FFFZILjava/lang/Object;)Lcom/letta/mobile/data/memory/graph/MemoryGraphMotion;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlphaDecay ()F
+	public final fun getClampVelocity ()Z
+	public final fun getDamping ()F
+	public final fun getMaxSpeed ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/memory/graph/MemoryGraphMotion$Companion {
+	public final fun forGraph (IILcom/letta/mobile/data/memory/graph/MemoryGraphLayoutConfig;)Lcom/letta/mobile/data/memory/graph/MemoryGraphMotion;
+	public static synthetic fun forGraph$default (Lcom/letta/mobile/data/memory/graph/MemoryGraphMotion$Companion;IILcom/letta/mobile/data/memory/graph/MemoryGraphLayoutConfig;ILjava/lang/Object;)Lcom/letta/mobile/data/memory/graph/MemoryGraphMotion;
 }
 
 public final class com/letta/mobile/data/memory/graph/MemoryGraphNodeMetrics {

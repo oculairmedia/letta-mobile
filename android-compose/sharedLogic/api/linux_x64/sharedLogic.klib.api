@@ -42153,6 +42153,7 @@ final class com.letta.mobile.data.memory.graph/MemoryGraphForceField { // com.le
     final fun place(kotlin/Int, com.letta.mobile.data.memory.graph/MemoryGraphPoint) // com.letta.mobile.data.memory.graph/MemoryGraphForceField.place|place(kotlin.Int;com.letta.mobile.data.memory.graph.MemoryGraphPoint){}[0]
     final fun point(kotlin/Int): com.letta.mobile.data.memory.graph/MemoryGraphPoint // com.letta.mobile.data.memory.graph/MemoryGraphForceField.point|point(kotlin.Int){}[0]
     final fun step(kotlin/Int = ...): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphForceField.step|step(kotlin.Int){}[0]
+    final fun step(kotlin/Int, com.letta.mobile.data.memory.graph/MemoryGraphMotion, kotlin/Float): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphForceField.step|step(kotlin.Int;com.letta.mobile.data.memory.graph.MemoryGraphMotion;kotlin.Float){}[0]
 
     final object Companion { // com.letta.mobile.data.memory.graph/MemoryGraphForceField.Companion|null[0]
         final const val FREE // com.letta.mobile.data.memory.graph/MemoryGraphForceField.Companion.FREE|{}FREE[0]
@@ -42244,6 +42245,36 @@ final class com.letta.mobile.data.memory.graph/MemoryGraphLayoutConfig { // com.
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.memory.graph/MemoryGraphLayoutConfig.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.memory.graph/MemoryGraphLayoutConfig.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.memory.graph/MemoryGraphLayoutConfig.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.memory.graph/MemoryGraphMotion { // com.letta.mobile.data.memory.graph/MemoryGraphMotion|null[0]
+    constructor <init>(kotlin/Float, kotlin/Float, kotlin/Float, kotlin/Boolean) // com.letta.mobile.data.memory.graph/MemoryGraphMotion.<init>|<init>(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Boolean){}[0]
+
+    final val alphaDecay // com.letta.mobile.data.memory.graph/MemoryGraphMotion.alphaDecay|{}alphaDecay[0]
+        final fun <get-alphaDecay>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphMotion.alphaDecay.<get-alphaDecay>|<get-alphaDecay>(){}[0]
+    final val clampVelocity // com.letta.mobile.data.memory.graph/MemoryGraphMotion.clampVelocity|{}clampVelocity[0]
+        final fun <get-clampVelocity>(): kotlin/Boolean // com.letta.mobile.data.memory.graph/MemoryGraphMotion.clampVelocity.<get-clampVelocity>|<get-clampVelocity>(){}[0]
+    final val damping // com.letta.mobile.data.memory.graph/MemoryGraphMotion.damping|{}damping[0]
+        final fun <get-damping>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphMotion.damping.<get-damping>|<get-damping>(){}[0]
+    final val maxSpeed // com.letta.mobile.data.memory.graph/MemoryGraphMotion.maxSpeed|{}maxSpeed[0]
+        final fun <get-maxSpeed>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphMotion.maxSpeed.<get-maxSpeed>|<get-maxSpeed>(){}[0]
+
+    final fun component1(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphMotion.component1|component1(){}[0]
+    final fun component2(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphMotion.component2|component2(){}[0]
+    final fun component3(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphMotion.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // com.letta.mobile.data.memory.graph/MemoryGraphMotion.component4|component4(){}[0]
+    final fun cool(kotlin/Float): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphMotion.cool|cool(kotlin.Float){}[0]
+    final fun copy(kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Boolean = ...): com.letta.mobile.data.memory.graph/MemoryGraphMotion // com.letta.mobile.data.memory.graph/MemoryGraphMotion.copy|copy(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.memory.graph/MemoryGraphMotion.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.memory.graph/MemoryGraphMotion.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.memory.graph/MemoryGraphMotion.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.memory.graph/MemoryGraphMotion.Companion|null[0]
+        final const val ALPHA_MIN // com.letta.mobile.data.memory.graph/MemoryGraphMotion.Companion.ALPHA_MIN|{}ALPHA_MIN[0]
+            final fun <get-ALPHA_MIN>(): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphMotion.Companion.ALPHA_MIN.<get-ALPHA_MIN>|<get-ALPHA_MIN>(){}[0]
+
+        final fun forGraph(kotlin/Int, kotlin/Int, com.letta.mobile.data.memory.graph/MemoryGraphLayoutConfig = ...): com.letta.mobile.data.memory.graph/MemoryGraphMotion // com.letta.mobile.data.memory.graph/MemoryGraphMotion.Companion.forGraph|forGraph(kotlin.Int;kotlin.Int;com.letta.mobile.data.memory.graph.MemoryGraphLayoutConfig){}[0]
+    }
 }
 
 final class com.letta.mobile.data.memory.graph/MemoryGraphPoint { // com.letta.mobile.data.memory.graph/MemoryGraphPoint|null[0]
