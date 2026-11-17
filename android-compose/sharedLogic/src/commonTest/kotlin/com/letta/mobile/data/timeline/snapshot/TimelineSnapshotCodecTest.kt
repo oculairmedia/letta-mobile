@@ -21,6 +21,16 @@ import kotlin.test.assertTrue
 class TimelineSnapshotCodecTest {
 
     @Test
+    fun remotePointerSizeSurvivesSnapshotRoundTrip() {
+        val stored = userEvent().toStoredTimelineEvent().copy(
+            attachments = listOf(StoredImageAttachmentPointer("image/png", 128L, "https://example.invalid/image")),
+        )
+        val encoded = TimelineSnapshotCodec.encode(roundTripEnvelope().copy(events = listOf(stored)))
+        val restored = assertNotNull(TimelineSnapshotCodec.decode(encoded)).events.single().toConfirmedTimelineEvent()
+        assertEquals(128L, restored.attachments.single().storedByteSize)
+    }
+
+    @Test
     fun unavailableReasonAndLoadableUrlSurviveSnapshotRoundTrip() {
         val returned = com.letta.mobile.data.model.ToolReturnMessage(
             id = "unavailable-return", toolReturnRaw = kotlinx.serialization.json.Json.parseToJsonElement(

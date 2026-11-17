@@ -14,6 +14,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertContentEquals
 import org.junit.Assume.assumeTrue
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -59,6 +60,36 @@ import kotlinx.serialization.json.put
 
 /** Optional stored inputs supplement the portable, deterministic >1 MiB regression image. */
 class ToolImagePipelineUiTest {
+    @OptIn(coil3.annotation.DelicateCoilApi::class)
+    @Test
+    fun remoteLoadFailureShowsLoadFailureText() {
+        val previous = coil3.SingletonImageLoader.get(coil3.PlatformContext.INSTANCE)
+        val loader = coil3.ImageLoader.Builder(coil3.PlatformContext.INSTANCE).components {
+            add(coil3.intercept.Interceptor { chain ->
+                coil3.request.ErrorResult(image = null, request = chain.request, throwable = java.io.IOException("offline"))
+            })
+        }.build()
+        coil3.SingletonImageLoader.setUnsafe(loader)
+        try {
+            runDesktopComposeUiTest(width = 500, height = 500) {
+                setContent {
+                    MaterialTheme {
+                        ChatRemoteImage(
+                            com.letta.mobile.data.model.UiImageAttachment("", "image/png", url = "https://example.invalid/image"),
+                        )
+                    }
+                }
+                waitUntil(timeoutMillis = 10_000) {
+                    onAllNodesWithText("Image unavailable: could not load").fetchSemanticsNodes().isNotEmpty()
+                }
+                onNodeWithText("Image unavailable: could not load").assertExists()
+            }
+        } finally {
+            coil3.SingletonImageLoader.setUnsafe(previous)
+            loader.shutdown()
+        }
+    }
+
     @Test
     fun explicitTooLargeMarkerRendersItsReasonThroughHistory() {
         val wire = JSON.parseToJsonElement("""[

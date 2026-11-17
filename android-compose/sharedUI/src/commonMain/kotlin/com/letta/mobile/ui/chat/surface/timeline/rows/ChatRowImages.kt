@@ -38,6 +38,7 @@ import com.letta.mobile.sharedui.resources.rows_attached_image
 import com.letta.mobile.sharedui.resources.rows_image_not_loaded
 import com.letta.mobile.sharedui.resources.rows_image_missing
 import com.letta.mobile.sharedui.resources.rows_image_invalid
+import com.letta.mobile.sharedui.resources.rows_image_load_failed
 import com.letta.mobile.sharedui.resources.rows_image_too_large
 import com.letta.mobile.sharedui.resources.rows_image_unsupported
 import com.letta.mobile.sharedui.resources.rows_more_count
@@ -271,7 +272,12 @@ internal fun ChatRemoteImage(attachment: UiImageAttachment, modifier: Modifier =
             onError = { failed = true },
             onSuccess = { failed = false },
         )
-        if (failed) Text(stringResource(imageFailureResource(ImageUnavailableReason.Invalid)))
+        if (failed) Text(
+            text = stringResource(Res.string.rows_image_load_failed),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(LettaDimens.Space.xs),
+        )
     }
 }
 

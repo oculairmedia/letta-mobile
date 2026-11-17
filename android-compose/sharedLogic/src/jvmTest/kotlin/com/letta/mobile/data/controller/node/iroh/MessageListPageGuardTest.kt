@@ -23,6 +23,26 @@ import kotlin.test.assertFalse
 class MessageListPageGuardTest {
 
     @Test
+    fun dependenciesExpandTransitivelyAcrossInterveningReturns() {
+        fun call(id: String) = buildJsonObject { put("id", "call-$id"); put("tool_call", buildJsonObject { put("tool_call_id", id) }) }
+        fun returned(id: String, body: String) = buildJsonObject {
+            put("id", "return-$id"); put("tool_call_id", id); put("tool_return", body)
+        }
+        val rows = listOf(call("a"), call("b"), returned("a", "ok"), returned("b", "x".repeat(1000)))
+        assertEquals(rows, pageRows(MessageListPageGuard.bound(JsonArray(rows), maxPageBytes = 100)))
+    }
+
+    @Test
+    fun fittingWrappedPagePreservesPaginationMetadata() {
+        val page = buildJsonObject {
+            put("messages", JsonArray(listOf(msg("one", 10))))
+            put("has_more", true)
+            put("next_before", "earlier")
+        }
+        assertEquals(page, MessageListPageGuard.bound(page))
+    }
+
+    @Test
     fun singleReturnBeyondLogicalCapKeepsExplicitTooLargeImage() {
         val returned = imageReturn(33_554_432)
         val result = MessageListPageGuard.bound(JsonArray(listOf(returned)))

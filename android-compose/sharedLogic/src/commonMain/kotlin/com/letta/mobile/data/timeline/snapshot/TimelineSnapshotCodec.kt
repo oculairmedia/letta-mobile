@@ -456,6 +456,7 @@ fun StoredTimelineEvent.toConfirmedTimelineEvent(): TimelineEvent.Confirmed {
                     pointer.uriOrUrl?.startsWith("http://") == true -> MessageContentPart.Image(
                         base64 = "", mediaType = pointer.mediaType, toolCallId = pointer.toolCallId,
                         unavailableReason = ImageUnavailableReason.fromWire(pointer.unavailableReason), url = pointer.uriOrUrl,
+                        storedByteSize = pointer.byteSize.takeIf { it > 0 },
                     )
                 pointer.byteSize > 0 -> MessageContentPart.Image(
                     base64 = "", mediaType = pointer.mediaType, storedByteSize = pointer.byteSize, toolCallId = pointer.toolCallId,

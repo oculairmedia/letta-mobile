@@ -73,8 +73,14 @@ object MessageListPageGuard {
             if (lengths[index] <= rowBudget) row else stripInlineImages(row).also { lengths[index] = byteLen(it) }
         }.toMutableList()
         val totalBytes = totalByteLen(lengths)
-        if (projected !is JsonObject && totalBytes <= pageBudget) {
-            return if (messages.indices.all { messages[it] === original[it] }) projected else JsonArray(messages)
+        if (totalBytes <= pageBudget) {
+            val unchanged = messages.indices.all { messages[it] === original[it] }
+            val rows = JsonArray(messages)
+            return when {
+                unchanged -> projected
+                projected is JsonObject -> JsonObject(projected + ("messages" to rows))
+                else -> rows
+            }
         }
         // Keep the newest rows that fit under the budget.
         val keptIndices = ArrayDeque<Int>()
@@ -244,10 +250,17 @@ object MessageListPageGuard {
             val call = (messages[index] as? JsonObject)?.get("tool_call") as? JsonObject
             call?.get("tool_call_id")?.let { it to index }
         }.toMap()
-        val returnedIds = kept.mapNotNull { (messages[it] as? JsonObject)?.get("tool_call_id") }
-        val dependencies = returnedIds.mapNotNull(callIndices::get)
-        val first = minOf(kept.first(), dependencies.minOrNull() ?: kept.first())
-        val last = maxOf(kept.last(), dependencies.maxOrNull() ?: kept.last())
+        var first = kept.first()
+        var last = kept.last()
+        do {
+            val previousFirst = first
+            val previousLast = last
+            val dependencies = (first..last).mapNotNull { index ->
+                (messages[index] as? JsonObject)?.get("tool_call_id")?.let(callIndices::get)
+            }
+            first = minOf(first, dependencies.minOrNull() ?: first)
+            last = maxOf(last, dependencies.maxOrNull() ?: last)
+        } while (first != previousFirst || last != previousLast)
         var bytes = (first..last).sumOf { lengths[it].toLong() + 1 }
         if (bytes > maxResponseBytes) {
             for (index in first..last) {
