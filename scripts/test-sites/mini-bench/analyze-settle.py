@@ -65,7 +65,7 @@ def main():
         pixels -= np.median(pixels)
         def score(offset):
             patch = pixels[offset:offset + height]
-            norm = float(np.sqrt(np.square(patch).sum() * denominator))
+            norm = float(patch_norms[offset])
             if norm == 0:
                 return 0.0
             return float(np.clip(patch[ink_rows, ink_columns] @ vector / norm, -1.0, 1.0))
