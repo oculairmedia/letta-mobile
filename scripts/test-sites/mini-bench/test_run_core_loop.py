@@ -202,3 +202,25 @@ def test_existing_assistant_remount_is_not_excluded_as_history(tmp_path, behavio
     metadata, tree = history_fixture(root, behavior)
     result = evidence.normalize(root, metadata, tree)
     assert result["status"] == ("PASS" if behavior == "stable" else "FAIL"), result["errors"]
+
+
+def test_late_draw_alias_rekeys_earlier_identity():
+    events = [dict(event='draw', key='a', identity='run'),
+              dict(event='draw', key='b', identity='durable'),
+              dict(event='draw', key='a', identity='durable')]
+    identities = evidence.assistant_identities(events, {'a', 'b'})
+    assert identities['a'] == identities['b']
+
+
+def test_skipped_pixel_analysis_invalidates_stale_summaries(tmp_path):
+    for name in ('pixels', 'partial-pixels'):
+        folder = tmp_path / name
+        folder.mkdir()
+        (folder / 'summary.json').write_text('{}')
+    metadata = {'scenario': 'S3'}
+    with patch.object(capture, 'capture_region', return_value=None), \
+         patch.object(capture, 'normalize', return_value={'status': 'FAIL'}):
+        result = capture.analyze_capture(tmp_path, metadata, None)
+    assert result['status'] == 'FAIL'
+    assert not (tmp_path / 'pixels' / 'summary.json').exists()
+    assert not (tmp_path / 'partial-pixels' / 'summary.json').exists()

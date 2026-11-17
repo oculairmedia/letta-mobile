@@ -112,3 +112,22 @@ class OracleTest(unittest.TestCase):
         self.assertEqual(oracle.score(sample)["status"], "PASS")
         sample["scenarioEvidence"]["networkOverlappedLive"] = False
         self.assertEqual(oracle.score(sample)["status"], "FAIL")
+
+
+def test_nan_diagnostic_does_not_abort_batch(tmp_path):
+    import json
+    import subprocess
+    from pathlib import Path
+
+    invalid = evidence()
+    invalid['initialUnclassifiedRows'] = float('nan')
+    first, second = tmp_path / 'first.json', tmp_path / 'second.json'
+    first.write_text(json.dumps(invalid))
+    second.write_text(json.dumps(evidence()))
+    output = tmp_path / 'results'
+    process = subprocess.run(['python3', str(Path(__file__).with_name('score-core-loop.py')),
+                              str(first), str(second), '--output', str(output)], capture_output=True)
+    assert process.returncode == 1
+    assert (output / 'run-1.json').exists()
+    assert json.loads((output / 'run-1.json').read_text())['status'] == 'FAIL'
+    assert json.loads((output / 'run-2.json').read_text())['status'] == 'PASS'

@@ -151,9 +151,11 @@ def score_main():
     for index, path in enumerate(args.evidence):
         try:
             result = oracle.score(json.loads(path.read_text()))
+            serialized = json.dumps(result, indent=2, allow_nan=False)
         except (OSError, ValueError, TypeError, AttributeError) as error:
             result = dict(status="FAIL", errors=[f"invalid evidence: {error}"])
-        (args.output / f"run-{index + 1}.json").write_text(json.dumps(result, indent=2, allow_nan=False) + "\n")
+            serialized = json.dumps(result, indent=2, allow_nan=False)
+        (args.output / f"run-{index + 1}.json").write_text(serialized + "\n")
         results.append(result)
     print("| Scenario | Client | Result | Stored ms | Stop ms | Correlation | Dip % |")
     print("| --- | --- | --- | --- | --- | --- | --- |")

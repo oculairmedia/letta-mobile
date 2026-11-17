@@ -20,7 +20,7 @@ def ink_image():
 def frame_image(ink, seconds, options):
     missing, contrast, partial = options
     image = Image.new("RGB", (64, 64), "white") if missing and seconds == 2.5 else ink
-    if not missing and seconds < 2:
+    if not missing and seconds < 1.9:
         image = image.point(lambda value: 255 - contrast if value == 0 else value)
     if partial and seconds >= 2:
         image = image.copy()
@@ -31,7 +31,7 @@ def frame_image(ink, seconds, options):
 def make_frames(video, options):
     ink = ink_image()
     frames = []
-    for index, seconds in enumerate((0, 1, 1.5, 1.8, 2, 2.5, 3)):
+    for index, seconds in enumerate(index / 20 for index in range(61)):
         filename = f"{index}.png"
         frame_image(ink, seconds, options).save(video / filename)
         frames.append(dict(file=filename, seconds=seconds))
@@ -75,3 +75,14 @@ def expected_metrics(missing, contrast, partial):
     correlation = 0 if missing else 0.5**0.5 if partial else 1
     dip = 100 if missing else 100 * (1 - 255 / contrast * (0.5 if partial else 1))
     return correlation, dip
+
+
+def test_incomplete_pixel_window_is_rejected():
+    from types import SimpleNamespace
+    from coreloop.pixels import summarize
+
+    args = SimpleNamespace(settle_seconds=2, post_seconds=20, region='0,0,64,64', track_y=0)
+    template = SimpleNamespace(ink_pixels=100)
+    rows = [(t, 1, 0, 0, 1, 1) for t in (1, 1.5, 2)]
+    with pytest.raises(ValueError, match='coverage'):
+        summarize(rows, args, template, 1.5)

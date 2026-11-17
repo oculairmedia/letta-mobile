@@ -1,6 +1,7 @@
 """Measure reply ink across settlement against its final rendered pixels."""
 
 from dataclasses import dataclass
+from .scoring import MAX_FRAME_GAP_MS
 
 import csv
 import json
@@ -124,7 +125,20 @@ def make_template(reference, height):
     )
 
 
+def pixel_coverage(rows, args):
+    times = [row[0] for row in rows if args.settle_seconds - 1 <= row[0] <= args.settle_seconds + args.post_seconds]
+    limit = MAX_FRAME_GAP_MS / 1000
+    gaps = [b - a for a, b in zip(times, times[1:])]
+    valid = (len(times) >= 2 and times[0] <= args.settle_seconds - 1 + limit
+             and times[-1] >= args.settle_seconds + args.post_seconds - limit
+             and all(0 < gap <= limit + 1e-9 for gap in gaps))
+    if not valid:
+        raise ValueError("pixel coverage incomplete, unordered, or gapped")
+    return dict(start_seconds=times[0], end_seconds=times[-1], max_gap_seconds=max(gaps))
+
+
 def summarize(rows, args, template, reference_seconds):
+    coverage = pixel_coverage(rows, args)
     before, during = settlement_window(rows, args)
     if not before or not during:
         raise ValueError("video does not cover the settlement window")
@@ -132,6 +146,7 @@ def summarize(rows, args, template, reference_seconds):
     lowest = min(during, key=lambda row: row[1])
     return dict(
         frames=len(rows),
+        coverage=coverage,
         ink_pixels=template.ink_pixels,
         baseline_alpha=baseline,
         minimum_alpha=lowest[1],

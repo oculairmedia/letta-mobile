@@ -58,14 +58,24 @@ def update_state(state, event, value):
 
 
 def assistant_identities(all_events, tracked_keys):
-    identities, aliases = ({}, {})
+    parents, identities = {}, {}
+
+    def root(value):
+        parents.setdefault(value, value)
+        while parents[value] != value:
+            value = parents[value]
+        return value
+
     for event in all_events:
         if event["event"] != "draw" or event["key"] not in tracked_keys:
             continue
         raw = event.get("identity")
-        owner = identities.setdefault(event["key"], aliases.get(raw, raw))
-        aliases[raw] = owner
-    return identities
+        key = event["key"]
+        if key in identities:
+            parents[root(raw)] = root(identities[key])
+        else:
+            identities[key] = raw
+    return {key: root(identity) for key, identity in identities.items()}
 
 
 def row_frames(all_events, observed, initial_assistants):

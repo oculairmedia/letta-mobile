@@ -381,6 +381,8 @@ def capture_region(metadata, tree, explicit_region):
 
 
 def analyze_capture(directory, metadata, tree, explicit_region=None):
+    for name in ("pixels", "partial-pixels"):
+        (directory / name / "summary.json").unlink(missing_ok=True)
     region = capture_region(metadata, tree, explicit_region)
     if region:
         terminals = capture_terminals(directory, metadata)
