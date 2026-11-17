@@ -300,7 +300,10 @@ private fun messageAttachments(
     return if (uiToolCalls.orEmpty().any { it.generatedImageAttachments.isNotEmpty() }) {
         emptyList()
     } else {
-        attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize) }
+        attachments.map { UiImageAttachment(
+            base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize,
+            unavailableReason = it.unavailableReason, url = it.url,
+        ) }
     }
 }
 

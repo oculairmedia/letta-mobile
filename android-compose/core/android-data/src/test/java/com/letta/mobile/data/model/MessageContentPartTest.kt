@@ -1,5 +1,6 @@
 package com.letta.mobile.data.model
 
+import com.letta.mobile.data.attachment.ImageUnavailableReason
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -171,8 +172,7 @@ class MessageContentPartTest {
     }
 
     @Test
-    fun `non data url image parts are ignored`() {
-        // A bare https URL on the legacy shape is not decodable — drop it.
+    fun `legacy https image url is retained as a loadable attachment`() {
         val content = buildJsonArray {
             add(buildJsonObject {
                 put("type", JsonPrimitive("image_url"))
@@ -184,7 +184,9 @@ class MessageContentPartTest {
 
         val message = AssistantMessage(id = "a1", contentRaw = content)
 
-        assertTrue(message.attachments.isEmpty())
+        assertEquals(1, message.attachments.size)
+        assertEquals("https://example.com/image.png", message.attachments.single().url)
+        assertNull(message.attachments.single().unavailableReason)
     }
 
     @Test
@@ -383,10 +385,7 @@ class MessageContentPartTest {
     }
 
     @Test
-    fun `letta image source without inline data is dropped`() {
-        // A pure file-reference (no `data` field) can't be rendered inline —
-        // the caller would need to fetch via /v1/files. Until that path
-        // exists, drop it silently so we don't render a broken placeholder.
+    fun `letta image source without inline data reports missing payload`() {
         val content = buildJsonArray {
             add(buildJsonObject {
                 put("type", JsonPrimitive("image"))
@@ -400,7 +399,10 @@ class MessageContentPartTest {
 
         val message = AssistantMessage(id = "a-letta", contentRaw = content)
 
-        assertTrue(message.attachments.isEmpty())
+        assertEquals(1, message.attachments.size)
+        assertEquals(ImageUnavailableReason.Missing, message.attachments.single().unavailableReason)
+        assertEquals("", message.attachments.single().base64)
+        assertEquals("image/jpeg", message.attachments.single().mediaType)
     }
 
     @Test

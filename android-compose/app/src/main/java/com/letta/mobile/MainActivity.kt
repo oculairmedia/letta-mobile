@@ -1,5 +1,9 @@
 package com.letta.mobile
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.Modifier
+import ca.oculair.meridian.BuildConfig
 import android.Manifest
 import android.os.Bundle
 import android.view.MotionEvent
@@ -62,10 +66,7 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    /**
-     * Single field inject required by `@AndroidEntryPoint`. Collaborators live
-     * on [MainActivityDependencies] via constructor injection.
-     */
+    /** Entry-point collaborators live on [MainActivityDependencies] via constructor injection. */
     @Inject
     lateinit var deps: MainActivityDependencies
 
@@ -75,7 +76,6 @@ class MainActivity : ComponentActivity() {
     private val launchTarget = mutableStateOf<AppLaunchTarget?>(null)
 
     init {
-        // letta-mobile-erx7m: touch-stall probes, debug builds only.
         TouchDispatchDiagnostics.enableForDebugBuild()
     }
 
@@ -119,9 +119,9 @@ class MainActivity : ComponentActivity() {
                         settings = deps.secureSettingsStore,
                         runs = deps.conversationRunRegistry,
                     ) {
-                        Surface(modifier = debugRootPointerObserver(), color = MaterialTheme.colorScheme.background) {
+                        val rootModifier = debugRootPointerObserver().then(rootDebugSemantics())
+                        Surface(modifier = rootModifier, color = MaterialTheme.colorScheme.background) {
                             OverlayHostRoot(overlays) {
-                                // Mascots move between seats below the app's overlays (letta-mobile-te3n1.8).
                                 MascotTransportLayer {
                                     com.letta.mobile.ui.screens.canvas.AndroidCanvasHost(deps, canvasOwner) {
                                         val navController = rememberNavController()
@@ -138,9 +138,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        // Report that the app is fully interactive. This signals Android Vitals
-        // (Play Console) for accurate cold-start measurement beyond TTID. Called
-        // once — subsequent calls on the same activity are no-ops.
+        // Signal the first interactive frame to Android Vitals; subsequent calls are no-ops.
         reportFullyDrawn()
     }
 
@@ -241,5 +239,10 @@ class MainActivity : ComponentActivity() {
             }
         AutomationAuthBootstrap.importPendingConfig(this, settingsRepository)
         intent.removeExtra(AutomationAuthBootstrap.EXTRA_PAYLOAD_BASE64)
+    }
+    companion object {
+        /** Android accessibility binding for root-debug capture diagnostics. */
+        internal fun rootDebugSemantics(debug: Boolean = BuildConfig.DEBUG, flavor: String = BuildConfig.FLAVOR): Modifier =
+            if (debug && flavor == "root") Modifier.semantics { testTagsAsResourceId = true } else Modifier
     }
 }

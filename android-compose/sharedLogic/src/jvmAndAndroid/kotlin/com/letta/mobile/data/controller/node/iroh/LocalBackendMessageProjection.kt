@@ -116,41 +116,41 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
      * LocalImageContextStripper): the "flat" letta.js shape
      * `{type:"image", mimeType, data}` or the already-nested Letta wire shape
      * `{type:"image", source:{type:"base64", media_type, data}}`. Returns null
-     * when there is no usable base64 payload (e.g. an `image_ref` pointer left
-     * by the context stripper — those are not resolvable from this on-disk
-     * reader and are dropped, same as before this normalization existed).
+     * when the part is not an image. An unavailable payload stays as an empty image so
+     * the shared UI can show an explicit failure rather than silently dropping it.
      */
     private fun normalizeImagePart(o: JsonObject): JsonObject? {
         if (o["type"]?.stringOrNull() != "image") return null
         val source = o["source"] as? JsonObject
-        val data = source?.get("data")?.stringOrNull() ?: o["data"]?.stringOrNull() ?: run {
-            // Boundary telemetry (letta-mobile-iej8j): an image part that
-            // reaches hydration with no resolvable base64 is a SILENT user-
-            // visible loss (the image just isn't there on re-entry). The
-            // image pipeline previously had no observable failure signal at
-            // all — a break was only detectable by manual device testing.
-            Telemetry.event(
-                IMAGE_PIPELINE_TAG,
-                "hydrate.image_dropped",
-                "reason" attr if (o["image_ref"] != null) "image_ref_pointer" else "no_base64_data",
-                level = Telemetry.Level.WARN,
-            )
-            return null
+        return when {
+            o["unavailable_reason"] != null -> o
+            source?.get("type")?.stringOrNull() == "url" -> o
+            else -> normalizeBase64Image(o, source)
         }
-        val mediaType = source?.get("media_type")?.stringOrNull()
-            ?: o["mimeType"]?.stringOrNull()
-            ?: "image/jpeg"
+    }
+
+    private fun normalizeBase64Image(o: JsonObject, source: JsonObject?): JsonObject {
+        val data = source?.get("data")?.stringOrNull() ?: o["data"]?.stringOrNull() ?: missingImageData(o)
+        val mediaType = source?.get("media_type")?.stringOrNull() ?: o["mimeType"]?.stringOrNull() ?: "image/jpeg"
         return buildJsonObject {
             put("type", "image")
-            put(
-                "source",
-                buildJsonObject {
-                    put("type", "base64")
-                    put("media_type", mediaType)
-                    put("data", data)
-                },
-            )
+            if (o["image_ref"] != null && data.isBlank()) put("unavailable_reason", "unsupported_source")
+            put("source", buildJsonObject {
+                put("type", "base64")
+                put("media_type", mediaType)
+                put("data", data)
+            })
         }
+    }
+
+    private fun missingImageData(o: JsonObject): String {
+        Telemetry.event(
+            IMAGE_PIPELINE_TAG,
+            "hydrate.image_unavailable",
+            "reason" attr if (o["image_ref"] != null) "image_ref_pointer" else "no_base64_data",
+            level = Telemetry.Level.WARN,
+        )
+        return ""
     }
 
     /** Port of translate.ts stripSystemReminders (user-role only). */

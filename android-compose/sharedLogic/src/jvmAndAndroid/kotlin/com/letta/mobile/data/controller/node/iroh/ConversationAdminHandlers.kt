@@ -497,6 +497,11 @@ object ConversationAdminHandlers {
             MessageListPageGuard.bound(
                 MessageListIdentity.enrich(turnIdentity, convId, projected),
                 newestLast = param(params, AdminParamKey("order"))?.lowercase() != "desc",
+                maxResponseBytes = if (context.supportsFrameParts) {
+                    com.letta.mobile.data.transport.iroh.IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES - MessageListPageGuard.MAX_PAGE_BYTES
+                } else {
+                    MessageListPageGuard.MAX_PAGE_BYTES
+                },
             )
         }
         router.registerScoped("message.get") { params, context ->
