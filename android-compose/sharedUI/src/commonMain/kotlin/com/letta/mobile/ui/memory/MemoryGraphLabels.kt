@@ -35,14 +35,14 @@ internal fun rememberMemoryNodeLabels(
     view: MemoryGraphView,
     palette: MemoryGraphPalette,
     compact: Boolean,
-    fontScale: Float = 1f,
+    labelScale: Float = 1f,
 ): Map<String, MemoryNodeLabel> {
     val measurer = rememberTextMeasurer()
     val rootBase = LettaTextStyles.labelSemibold
     val leafBase = MaterialTheme.typography.labelMedium
     // The tuning's label scale on top of the named styles; 1 leaves them as they are.
-    val rootStyle = rootBase.merge(TextStyle(color = palette.label, fontSize = rootBase.fontSize.scaledBy(fontScale)))
-    val leafStyle = leafBase.merge(TextStyle(color = palette.label, fontSize = leafBase.fontSize.scaledBy(fontScale)))
+    val rootStyle = rootBase.merge(TextStyle(color = palette.label, fontSize = rootBase.fontSize.timesLabelScale(labelScale)))
+    val leafStyle = leafBase.merge(TextStyle(color = palette.label, fontSize = leafBase.fontSize.timesLabelScale(labelScale)))
     val density = LocalDensity.current
     val resting = if (compact) LettaDimens.Pane.nodeLabelMaxWidth else GraphDimens.labelWidth
     val shortWidth = with(density) { resting.roundToPx() }
@@ -61,7 +61,7 @@ internal fun rememberMemoryNodeLabels(
 }
 
 /** This size [scale] times; an unspecified size stays unspecified. */
-private fun TextUnit.scaledBy(scale: Float): TextUnit = if (isSpecified && scale != 1f) this * scale else this
+private fun TextUnit.timesLabelScale(scale: Float): TextUnit = if (isSpecified && scale != 1f) this * scale else this
 
 /** A label's box: its width cap in px and how many lines it may wrap to. */
 private class LabelBox(val maxWidthPx: Int, val maxLines: Int)

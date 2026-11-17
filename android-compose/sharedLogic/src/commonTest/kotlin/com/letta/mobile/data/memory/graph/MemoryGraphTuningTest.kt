@@ -296,10 +296,14 @@ class MemoryGraphTuningTest {
         assertEquals(lengths, restLengths(view, tuning), "the same edge always gets the same length")
         val base = tuning.lengthOf(MemoryGraphEdgeKind.Remembers)
         lengths.values.forEach { length ->
-            assertTrue(length in base * (1f - tuning.linkLengthSpread)..base * (1f + tuning.linkLengthSpread), "$length strays too far")
+            val low = base * (1f - tuning.linkLengthSpread) - BISECTION_TOLERANCE
+            val high = base * (1f + tuning.linkLengthSpread) + BISECTION_TOLERANCE
+            val bounds = low..high
+            assertTrue(length in bounds, "$length strays too far")
         }
         assertTrue(lengths.values.toSet().size > 1, "lengths vary")
-        assertEquals(setOf(base), restLengths(view, tuning.copy(linkLengthSpread = 0f)).values.toSet(), "spread 0 is one length")
+        val flat = restLengths(view, tuning.copy(linkLengthSpread = 0f)).values
+        assertTrue(flat.all { abs(it - base) < BISECTION_TOLERANCE }, "spread 0 is one length: $flat")
     }
 
     @Test
@@ -470,6 +474,9 @@ class MemoryGraphTuningTest {
         const val REST = 110f
         const val FAR = 1_000f
         const val BISECTIONS = 30
+
+        /** How close bisecting a spring's slack point gets to its true rest length. */
+        const val BISECTION_TOLERANCE = 0.01f
         const val SPOKE_PULL = 50f
         const val SPREAD = 3_000f
         const val SEED = 11
