@@ -124,7 +124,7 @@ object MemoryFleetMapper {
         fun toItem(names: Map<String, String>): MemoryParityItem.MemoryBlock {
             val owners = entries.map { it.first.value }.distinct().map { MemoryParityAgentOption(it, names[it] ?: it) }
             val shared = entries.map { it.second }.distinctBy { it.id }.singleOrNull()
-            val preview = shared?.let { MemoryParityMapper.previewOf(it.value) }.orEmpty()
+            val preview = shared?.let { MemoryParityMapper.previewOf(it) }.orEmpty()
             val subtitle = usedBy(owners)
             return MemoryParityItem.MemoryBlock(
                 id = "fleet:$key",

@@ -475,7 +475,7 @@ object MemoryParityMapper {
             emptyMessage = "No memory blocks attached.",
             status = loaded.toSectionStatus(),
             items = blocks.map { block ->
-                val preview = previewOf(block.value)
+                val preview = previewOf(block)
                 val subtitle = block.description?.takeIf { it.isNotBlank() }
                     ?: block.limit?.let { "Limit $it chars" }
                     ?: "Core memory"
@@ -530,8 +530,8 @@ object MemoryParityMapper {
         )
 
     /** A block value's first non-blank line, cut to a preview's length. */
-    internal fun previewOf(value: String): String =
-        value.lineSequence().firstOrNull { it.isNotBlank() }?.take(MAX_MEMORY_PREVIEW_CHARS) ?: ""
+    internal fun previewOf(block: Block): String =
+        block.value.lineSequence().firstOrNull { it.isNotBlank() }?.take(MAX_MEMORY_PREVIEW_CHARS) ?: ""
 
     internal fun channelsSection(
         backendDescriptor: BackendDescriptor,
