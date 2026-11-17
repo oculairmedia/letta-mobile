@@ -161,7 +161,11 @@ internal class MemoryLabelFade {
         while (iterator.hasNext()) {
             val entry = iterator.next()
             val target = if (entry.key in shown) 1f else 0f
-            val next = if (target > entry.value) (entry.value + step).coerceAtMost(1f) else (entry.value - step).coerceAtLeast(0f)
+            val next = when {
+                target > entry.value -> (entry.value + step).coerceAtMost(1f)
+                target < entry.value -> (entry.value - step).coerceAtLeast(0f)
+                else -> target
+            }
             if (next == 0f && target == 0f) iterator.remove() else entry.setValue(next)
             if (next != target) fading = true
         }

@@ -136,31 +136,33 @@ class BarnesHutTree(private val capacity: Int) {
 
     /** Every cell's total charge and charge-weighted centre, children before parents. */
     private fun summarise() {
-        for (cell in cells - 1 downTo 0) {
-            var charge = 0f
-            var sx = 0f
-            var sy = 0f
-            if (cellBody[cell] == INTERNAL) {
-                for (q in 0 until QUADRANTS) {
-                    val child = cellChild[cell * QUADRANTS + q]
-                    if (child == EMPTY) continue
-                    charge += cellCharge[child]
-                    sx += cellCx[child] * cellCharge[child]
-                    sy += cellCy[child] * cellCharge[child]
-                }
-            } else {
-                var body = cellBody[cell]
-                while (body != EMPTY) {
-                    charge += bodies.charge[body]
-                    sx += bodies.x[body] * bodies.charge[body]
-                    sy += bodies.y[body] * bodies.charge[body]
-                    body = nextBody[body]
-                }
+        for (cell in cells - 1 downTo 0) summariseCell(cell)
+    }
+
+    private fun summariseCell(cell: Int) {
+        var charge = 0f
+        var sx = 0f
+        var sy = 0f
+        if (cellBody[cell] == INTERNAL) {
+            for (q in 0 until QUADRANTS) {
+                val child = cellChild[cell * QUADRANTS + q]
+                if (child == EMPTY) continue
+                charge += cellCharge[child]
+                sx += cellCx[child] * cellCharge[child]
+                sy += cellCy[child] * cellCharge[child]
             }
-            cellCharge[cell] = charge
-            cellCx[cell] = if (charge != 0f) sx / charge else cellX[cell] + cellSize[cell] / 2f
-            cellCy[cell] = if (charge != 0f) sy / charge else cellY[cell] + cellSize[cell] / 2f
+        } else {
+            var body = cellBody[cell]
+            while (body != EMPTY) {
+                charge += bodies.charge[body]
+                sx += bodies.x[body] * bodies.charge[body]
+                sy += bodies.y[body] * bodies.charge[body]
+                body = nextBody[body]
+            }
         }
+        cellCharge[cell] = charge
+        cellCx[cell] = if (charge != 0f) sx / charge else cellX[cell] + cellSize[cell] / 2f
+        cellCy[cell] = if (charge != 0f) sy / charge else cellY[cell] + cellSize[cell] / 2f
     }
 
     private fun repelOne(i: Int) {
@@ -170,11 +172,7 @@ class BarnesHutTree(private val capacity: Int) {
         while (top > 0) {
             val cell = stack[--top]
             if (cellBody[cell] != INTERNAL) {
-                var body = cellBody[cell]
-                while (body != EMPTY) {
-                    if (body != i) pair(i, body)
-                    body = nextBody[body]
-                }
+                repelLeaf(i, cell)
                 continue
             }
             val dx = bodies.x[i] - cellCx[cell]
@@ -184,11 +182,25 @@ class BarnesHutTree(private val capacity: Int) {
             if (size * size < thetaSq * distanceSq) {
                 far(i, dx, dy, cellCharge[cell])
             } else {
-                for (q in 0 until QUADRANTS) {
-                    val child = cellChild[cell * QUADRANTS + q]
-                    if (child != EMPTY) stack[top++] = child
-                }
+                top = pushChildren(cell, top)
             }
+        }
+    }
+
+    private fun pushChildren(cell: Int, start: Int): Int {
+        var top = start
+        for (q in 0 until QUADRANTS) {
+            val child = cellChild[cell * QUADRANTS + q]
+            if (child != EMPTY) stack[top++] = child
+        }
+        return top
+    }
+
+    private fun repelLeaf(i: Int, cell: Int) {
+        var body = cellBody[cell]
+        while (body != EMPTY) {
+            if (body != i) pair(i, body)
+            body = nextBody[body]
         }
     }
 
