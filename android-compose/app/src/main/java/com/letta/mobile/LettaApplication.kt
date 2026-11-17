@@ -2,6 +2,7 @@ package com.letta.mobile
 
 import ca.oculair.meridian.BuildConfig
 import com.letta.mobile.util.attr
+import com.letta.mobile.ui.chat.surface.timeline.rows.TimelineRenderProbe
 
 import com.letta.mobile.ui.components.beam.telemetry.installBeamShaderTelemetry
 
@@ -86,6 +87,19 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
                 "CoreLoop", "gate",
                 "enabled" attr com.letta.mobile.util.Telemetry.renderDiagEnabled.get(),
             )
+        }
+        if (com.letta.mobile.util.Telemetry.renderDiagEnabled.get()) {
+            TimelineRenderProbe.sink = com.letta.mobile.ui.chat.surface.timeline.rows.TimelineRenderSink {
+                    name, key, identity, stored, assistant, hashes ->
+                if (name == "draw") {
+                    com.letta.mobile.util.Telemetry.event(
+                        "CoreLoop", name, "key" attr key, "identity" attr identity,
+                        "stored" attr stored, "assistant" attr assistant, "hashes" attr hashes,
+                    )
+                } else {
+                    com.letta.mobile.util.Telemetry.event("CoreLoop", name, "key" attr key)
+                }
+            }
         }
         installBeamShaderTelemetry()
         // CrashReporter and global exception handler must run on main thread

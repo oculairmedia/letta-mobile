@@ -1,7 +1,5 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
-import com.letta.mobile.util.Telemetry
-import com.letta.mobile.util.attr
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.LaunchedEffect
@@ -196,16 +194,20 @@ private fun ChatRenderItem.loneGroupPosition(): GroupPosition = when (this) {
 /** Root-debug opt-in mount/dispose evidence. No message text is logged; off on release hosts. */
 @Composable
 private fun CaptureRowLifecycle(rowKey: String) {
-    if (!com.letta.mobile.util.Telemetry.renderDiagEnabled.get()) return
+    val probe = TimelineRenderProbe.sink ?: return
     LaunchedEffect(rowKey) {
         while (true) {
             kotlinx.coroutines.delay(CORE_LOOP_SAMPLE_MS)
-            Telemetry.event("CoreLoop", "resident", "key" attr rowKey)
+            if (TimelineRenderProbe.residents.isHeartbeatOwner(rowKey)) probe.record("resident", rowKey, null, false, false, null)
         }
     }
     DisposableEffect(rowKey) {
-        Telemetry.event("CoreLoop", "mount", "key" attr rowKey)
-        onDispose { Telemetry.event("CoreLoop", "dispose", "key" attr rowKey) }
+        TimelineRenderProbe.residents.mount(rowKey)
+        probe.record("mount", rowKey, null, false, false, null)
+        onDispose {
+            TimelineRenderProbe.residents.dispose(rowKey)
+            probe.record("dispose", rowKey, null, false, false, null)
+        }
     }
 }
 
