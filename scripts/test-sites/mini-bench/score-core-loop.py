@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Score normalized core-loop evidence; missing/invalid observations always fail.
 
-This is an offline oracle, not a device driver. Times must be milliseconds in one
-monotonic clock domain (the collector must supply clock alignment). Row frames
+This is an offline oracle, not a device driver. Times must be aligned millisecond
+timestamps (the collector must supply clock alignment). Row frames
 must cover the visible assistant window continuously from before terminal until
 post-settle, including the cancelled partial row in S3. Never infer stored display
 from model completion or spinner disappearance. See perf-gate.md.
@@ -36,6 +36,27 @@ def score(evidence):
             errors.append(reason)
     require(evidence.get('scenario') in SCENARIOS, 'unknown scenario')
     require(evidence.get('client') in ('pixel2xl', 'desktop'), 'unknown client')
+    scenario = evidence.get('scenario')
+    scenario_evidence = evidence.get('scenarioEvidence', {})
+    if not isinstance(scenario_evidence, dict):
+        scenario_evidence = {}
+    require(scenario_evidence.get('terminalReason') == 'end_turn', 'natural final terminal missing')
+    require(scenario_evidence.get('newStoredTextObserved') is True, 'fixed reply not evidenced in a newly drawn stored row')
+    inputs = scenario_evidence.get('inputCount')
+    require(type(inputs) is int and inputs >= (2 if scenario == 'S3' else 1), 'scenario input evidence missing')
+    if scenario == 'S2':
+        held = scenario_evidence.get('heldToolMs')
+        expected_hold = scenario_evidence.get('heldToolExpectedMs')
+        require(number(expected_hold) and 7000 <= expected_hold <= 110000, 'held-tool fixture duration missing or invalid')
+        require(number(held) and number(expected_hold) and held >= expected_hold - 1000, 'current held tool start/end missing or hold too short')
+    if scenario == 'S3':
+        delta = scenario_evidence.get('cancelToResendMs')
+        require(scenario_evidence.get('cancelled') is True, 'cancelled terminal not observed')
+        require(number(delta) and 0 <= delta <= 1500, 'follow-up did not reach the tight cancellation window')
+    if scenario == 'S4':
+        outage = scenario_evidence.get('networkDownMs')
+        require(number(outage) and outage >= 5000, 'network outage timing missing or too short')
+        require(scenario_evidence.get('networkOverlappedLive') is True, 'network drop did not overlap observed live reply')
     terminal = evidence.get('terminalMs')
     stored = evidence.get('storedDisplayedMs')
     spinner = evidence.get('stopGoneMs')
@@ -43,12 +64,15 @@ def score(evidence):
     stop_latency = spinner - terminal if number(spinner) and number(terminal) else None
     require(number(latency) and 0 <= latency <= MAX_LATENCY_MS, 'stored-copy latency absent or exceeded')
     require(number(stop_latency) and 0 <= stop_latency <= MAX_SPINNER_MS, 'Stop disappearance absent or exceeded')
+    require(evidence.get('finalStopPresent') is False, 'final Stop state missing or still visible')
     expected = 'DONE' if evidence.get('scenario') == 'S2' else FIXED_REPLY
     require(isinstance(expected, str) and bool(expected) and evidence.get('visibleText') == expected,
             'visible final text differs or is missing')
     frames = evidence.get('frames', [])
     require(isinstance(frames, list) and len(frames) >= 2, 'row frames missing')
     identities = {}
+    rekeyed_ids = set()
+    duplicate_frames = 0
     retired = set()
     previous = set()
     stamps = []
@@ -70,10 +94,14 @@ def score(evidence):
                     continue
                 require(row_id not in current, 'duplicate assistant row')
                 require(row_id not in retired, 'assistant row removed and re-added')
+                if row_id in identities and identities[row_id] != key:
+                    rekeyed_ids.add(row_id)
                 require(row_id not in identities or identities[row_id] == key, 'assistant row key changed')
                 identities[row_id] = key
                 current.add(row_id)
                 keys.append(key)
+            if len(keys) != len(set(keys)) or len(current) != len(keys):
+                duplicate_frames += 1
             require(len(keys) == len(set(keys)), 'duplicate row key')
             retired.update(previous - current)
             previous = current
@@ -100,7 +128,14 @@ def score(evidence):
     require(number(dip) and dip <= MAX_DIP_PERCENT, 'reply luminance missing or dipped')
     require(number(pixels.get('frames')) and pixels['frames'] >= 2, 'pixel frames missing')
     require(evidence.get('clockAligned') is True, 'clock alignment missing')
-    return dict(scenario=evidence.get('scenario'), client=evidence.get('client'),
+    disposes = sum(isinstance(event, dict) and event.get('event') == 'dispose' for event in mounts) if isinstance(mounts,list) else None
+    return dict(scenario=evidence.get('scenario') if evidence.get('scenario') in SCENARIOS else None,
+                client=evidence.get('client') if evidence.get('client') in ('pixel2xl','desktop') else None,
+                rowIdentityStable=bool(identities) and not retired and not rekeyed_ids and disposes == 0,
+                rowDisposeCount=disposes, rekeyedRowCount=len(rekeyed_ids), duplicateRowFrames=duplicate_frames,
+                finalTextCorrect=isinstance(expected,str) and evidence.get('visibleText') == expected,
+                spinnerClearedWithinLimit=number(stop_latency) and 0 <= stop_latency <= MAX_SPINNER_MS and evidence.get('finalStopPresent') is False,
+                newStoredTextObserved=scenario_evidence.get('newStoredTextObserved'),
                 status='FAIL' if errors else 'PASS', storedCopyLatencyMs=latency,
                 stopLatencyMs=stop_latency, minimumCorrelation=correlation if number(correlation) else None,
                 dipPercent=dip if number(dip) else None,

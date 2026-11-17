@@ -5,6 +5,10 @@ import csv
 import json
 from pathlib import Path
 import subprocess
+import os
+# Small per-frame dot products must not launch a host-sized BLAS pool.
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['OMP_NUM_THREADS'] = '1'
 import numpy as np
 from PIL import Image
 
@@ -15,13 +19,15 @@ def main():
     parser.add_argument('output', type=Path)
     parser.add_argument('--region', required=True, help='x,y,width,height of reply text, excluding chrome')
     parser.add_argument('--settle-seconds', type=float, required=True)
+    parser.add_argument('--reference-seconds', type=float, help='explicit stable pre-event template timestamp')
     parser.add_argument('--post-seconds', type=float, default=20, help='include live clearance and post-send Paging revisions')
     parser.add_argument('--track-y', type=int, default=320, help='vertical search radius for the reply bounding box')
     args = parser.parse_args()
     x, y, width, height = map(int, args.region.split(','))
     raw = args.output / 'raw'
     raw.mkdir(parents=True, exist_ok=True)
-    begin, end = max(0, args.settle_seconds - 2), args.settle_seconds + args.post_seconds
+    begin = max(0,min(args.settle_seconds - 2,args.reference_seconds - .1 if args.reference_seconds is not None else args.settle_seconds - 2))
+    end = args.settle_seconds + args.post_seconds
     if args.video.is_dir():
         frames = json.loads((args.video / 'frames.json').read_text())
         selected = [frame for frame in frames if begin <= frame['seconds'] <= end]
@@ -41,7 +47,8 @@ def main():
     def luminance(path, margin=0):
         rgb = np.asarray(Image.open(path).convert('RGB').crop((x, y - margin, x + width, y + height + margin)), dtype=float)
         return rgb @ np.array([0.2126, 0.7152, 0.0722])
-    reference_index = min(range(len(times)), key=lambda i: abs(times[i] - (args.settle_seconds - 0.5)))
+    reference_seconds = args.reference_seconds if args.reference_seconds is not None else args.settle_seconds - 0.5
+    reference_index = min(range(len(times)), key=lambda i: abs(times[i] - reference_seconds))
     reference = luminance(paths[reference_index])
     contrast = reference - np.median(reference)
     ink = np.abs(contrast) > 40

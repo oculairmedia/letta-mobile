@@ -22,5 +22,16 @@ test('tool response contains no assistant text and subsequent response finishes'
     assert.ok(chunks.every(chunk => chunk.choices[0].delta.content === undefined));
     const entries = fs.readFileSync(path.join(dir, 'model.log'), 'utf8').trim().split('\n').map(JSON.parse);
     assert.equal(entries[0].assistantContent, null);
+    const began = Date.now();
+    const interrupted = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, {method:'POST', body:JSON.stringify({stream:true,messages:[{role:'user',content:'[core-loop:S3] interrupt'}]})});
+    const reader = interrupted.body.getReader();
+    let prefix = '';
+    while (prefix.split('data: ').length < 4) {
+      const next = await reader.read();
+      assert.equal(next.done, false);
+      prefix += new TextDecoder().decode(next.value);
+    }
+    assert.ok(Date.now() - began >= 350, 'S3 must leave a deterministic interruption window');
+    await reader.cancel();
   } finally { server.kill(); fs.rmSync(dir, {recursive:true,force:true}); }
 });
