@@ -2,6 +2,8 @@ package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -32,6 +34,7 @@ internal fun ChatRenderItemRow(
     modifier: Modifier = Modifier,
 ) {
     LocalRowComposed.current?.invoke(item.key)
+    CaptureRowLifecycle(item.key, item !is ChatRenderItem.Single || !isUserRole(item.message.role))
     // A docked panel's ambient glow already says "working": the rows' status glyphs then hold still.
     CompositionLocalProvider(LocalStatusGlyphAnimated provides LocalChatWorkingCueAnimated.current) {
         RowContent(item, context, callbacks, modifier)
@@ -187,3 +190,27 @@ private fun ChatRenderItem.loneGroupPosition(): GroupPosition = when (this) {
     is ChatRenderItem.RunBlock -> GroupPosition.None
     is ChatRenderItem.Single -> groupPosition
 }
+
+/** Root-debug opt-in mount/dispose evidence. No message text is logged; off on release hosts. */
+@Composable
+private fun CaptureRowLifecycle(rowKey: String, assistant: Boolean) {
+    val probe = TimelineRenderProbe.sink ?: return
+    LaunchedEffect(rowKey) {
+        while (true) {
+            kotlinx.coroutines.delay(CORE_LOOP_SAMPLE_MS)
+            if (TimelineRenderProbe.residents.isHeartbeatOwner(rowKey)) probe.record("resident", rowKey, null, false, false, null)
+        }
+    }
+    DisposableEffect(rowKey, assistant) {
+        if (TimelineRenderProbe.residents.mount(rowKey, assistant)) {
+            probe.record("mount", rowKey, null, false, false, null)
+        }
+        onDispose {
+            if (TimelineRenderProbe.residents.dispose(rowKey)) {
+                probe.record("dispose", rowKey, null, false, false, null)
+            }
+        }
+    }
+}
+
+private const val CORE_LOOP_SAMPLE_MS = 50L

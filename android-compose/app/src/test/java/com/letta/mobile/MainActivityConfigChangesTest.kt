@@ -1,5 +1,10 @@
 package com.letta.mobile
 
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsModifier
+import androidx.compose.ui.semantics.SemanticsPropertiesAndroid
+import org.junit.Assert.assertTrue
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 import org.junit.Assert.assertEquals
@@ -11,6 +16,19 @@ import org.w3c.dom.Element
  * reloaded the mascot and replayed composition state; Compose recomposes for these changes itself.
  */
 class MainActivityConfigChangesTest {
+    @Test
+    fun rootDebugExposesTagsOnlyForRootDebug() {
+        for ((debug, flavor) in listOf(true to "root", false to "root", true to "play", false to "play")) {
+            val modifier = MainActivity.rootDebugSemantics(debug, flavor)
+            val exposed = modifier.foldIn(false) { found, element ->
+                found || (element is SemanticsModifier &&
+                    element.semanticsConfiguration.getOrNull(SemanticsPropertiesAndroid.TestTagsAsResourceId) == true)
+            }
+            assertEquals("debug=$debug flavor=$flavor", debug && flavor == "root", exposed)
+            if (!exposed) assertTrue(modifier === Modifier)
+        }
+    }
+
     @Test
     fun mainActivityHandlesRotationAndResizeItself() {
         val declared = mainActivity().getAttributeNS(ANDROID_NS, "configChanges").split('|').toSet()

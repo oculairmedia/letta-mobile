@@ -356,3 +356,103 @@ The earlier Bash approach was blocked by letta-code's foreground-sleep guard,
 not by a model refusal: on the mini's pinned 0.34.39 installation,
 `letta.js:218232` contains the guard message, which appeared as the Bash tool
 result in the original probe conversation before the assistant reported it.
+
+### Core-loop end-to-end harness (letta-mobile-vu08m.1)
+
+The mini fixture accepts `[core-loop:S1]`, `[core-loop:S3]` and
+`[core-loop:S4]` in the latest user message to stream the fixed three-paragraph
+reply at 60 ms per word by default (`BENCH_TOKEN_INTERVAL_MS` configures it).
+S3 uses at least 200 ms per word to leave time for device input. `[core-loop:S2]` preserves `bench_wait` followed by
+`DONE`. The streaming fixture and `mini-bench/analyze-settle.py` reuse the
+fixture/analysis from `fix/settle-reply-pop` (#2515). They do not change app code.
+
+`python3 scripts/test-sites/mini-bench/score-core-loop.py evidence.json
+--output results` scores normalized observations and exits nonzero for absent
+or failing evidence. Each input yields a JSON verdict and a printed table.
+`test_score_core_loop.py` describes the observation schema and independently
+mutates it to check fail-closed behavior. Thresholds are 3 s stored-copy latency,
+5 s Stop clearance, template correlation >= 0.9 and luminance dip <= 10%.
+The visible assistant identity window must be sampled at least every 100 ms,
+cover terminal through five seconds afterwards, and retain all observed rows;
+mount/dispose observations must cover every row. Times require a shared,
+aligned millisecond clock; model completion is not a stored-display observation.
+The pixel input uses the summary emitted by `analyze-settle.py`.
+
+Run the Pixel-only collector with:
+
+```sh
+ANDROID_HOME=/opt/android-sdk python3 scripts/test-sites/mini-bench/run-core-loop.py \
+  --serial 711KPAE0914240 --install --output <new-artifact-directory>
+```
+
+The APK (default: this checkout’s root-debug build output, override with `--apk`)
+must be main plus this branch’s diagnostics only; no app bug
+fix belongs in the baseline. The root-debug application enables the existing
+render diagnostic flag only when `LettaCoreLoop` is VERBOSE. Shared rows log
+mount/dispose plus 50 ms residency samples. The paged slot logs its row key,
+identity and live/stored source after drawing. Release and other flavours leave
+this capture disabled. No message text is logged by these diagnostics.
+
+The collector waits for other owners of the serial, verifies the APK package
+before an optional in-place install, and checks the installed APK hash before
+every trial. It refuses to send until the mini-bench chat is selected and idle. It verifies both agent and conversation model settings on
+the mini and selects the fixture’s unique title through the conversation menu;
+a debug launch intent alone is not accepted as evidence of the selected scope. It checks other owners of the serial before every trial.
+It collects screenrecord, logcat, accessible text/Stop state, aligned phone/mini
+clocks and timestamped wrapper terminal lines. S3 queues its follow-up using the
+already-observed composer bounds to avoid UI-dump latency missing the stream;
+it requires a cancelled terminal. Android Send queues while busy, so the driver
+then clicks the queued item’s **Send now**, whose owner aborts the current turn
+and drains the follow-up from that terminal. Send alone is not an interrupt. S4 disables Wi-Fi and data for five seconds,
+then restores their original states in `finally`, including on SIGTERM/SIGINT.
+A missing SIM means Wi-Fi off/on is the applicable fallback, not a cellular hop.
+S2 requires a current held-tool start/end pair matching its configured duration
+(with one second of timing tolerance; the default is 40 seconds).
+
+Pixel analysis selects the newest matching reply by physical screen position
+(accessibility traversal is reversed) unless `--region`
+is supplied explicitly. A missing or untrackable region fails. The MP4 remains
+canonical; decoded PNGs are removed after analysis to limit disk usage. Each
+trial emits raw files, metadata, normalized evidence and a result JSON; the
+summary includes per-run latency/correlation/dip values and an overall nonzero
+exit if any run fails. Missing evidence is a harness failure, not proof of an
+app regression. A timing/coverage failure must retain its raw artifacts for
+review rather than being changed to a passing default.
+
+Limitations: this collector targets the Pixel only. The desktop path still
+needs an isolated launch/configuration and input/diagnostic collector. Pixel
+analysis measures a tracked reply region, not every pixel in the timeline;
+S3’s lifecycle evidence covers all newly observed assistant rows; pixel
+analysis tracks both its cancelled partial reply and the final reply. Rows scrolled out of the observed window
+fail conservatively. Tracking outside the vertical search window can also
+fail even when motion is legitimate; a pixel failure alone does not establish
+a paint-only regression. Raw lifecycle evidence separately establishes remounts. No missing-evidence verdict establishes S3's
+reported bug. `TimelineFrameRecorder` itself is JVM-test-only.
+
+The current fixture scope must have a title beginning `core-loop-harness`.
+`create.cjs` assigns a unique title after creating a fresh conversation. An
+existing scope pinned to a real model is rejected before sending anything;
+create a fresh dedicated mini-bench conversation rather than changing another
+agent. Preserve the old scope and fixture files plus a rollback command first.
+
+A stranded Stop is recorded as a failure before the collector cold-restarts
+only its owned dev app, preserving the failed final snapshot and raw video.
+This reset allows independent trials; it does not turn the failed run green.
+A logcat residency gap greater than 100 ms also fails conservatively even when
+pixel evidence remains stable; distinguish evidence gaps from app remounts.
+Live/durable run-id aliases are joined only through an unchanged mounted row
+key. They do not themselves count as row-key changes.
+
+Rebuild verdicts without device access using `run-core-loop.py --rescore
+<artifact-directory> --scenarios S1` (choose the scenarios present). This
+replays image analysis and normalizes the raw logs, preserving original JSON
+before overwriting verdicts. The MP4 and raw log/XML files are never changed.
+
+Run fixture tests with `node --test scripts/test-sites/mini-bench/*.test.cjs`
+and scorer tests with `python3 -m pytest
+scripts/test-sites/mini-bench/test_*core_loop.py`. Pixel acceptance requires
+serial `711KPAE0914240`; never select the first attached device. Before each run,
+check for another owner of that serial. Capture terminal, stored display, row
+lifecycle, UI text and Stop state plus pixel frames; restore networking on both
+normal completion and all exit paths. Do not deploy this fixture to production
+or change any other mini agent's model.
