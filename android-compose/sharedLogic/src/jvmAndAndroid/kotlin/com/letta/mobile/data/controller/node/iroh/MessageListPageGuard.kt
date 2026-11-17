@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.util.attr
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -48,6 +49,7 @@ object MessageListPageGuard {
      *
      * [newestLast]: true when the array is oldest->newest (default Letta order),
      * so the NEWEST rows are at the end and we trim from the FRONT.
+     * Calls outside the projected page cannot be restored by this guard.
      */
     fun bound(
         projected: JsonElement,
@@ -63,7 +65,7 @@ object MessageListPageGuard {
             return projected
         }
         // Keep the newest rows that fit under the budget.
-        val kept = ArrayDeque<JsonElement>()
+        val keptIndices = ArrayDeque<Int>()
         var bytes = 2 // "[]"
         val orderedIndices = if (newestLast) {
             messages.indices.reversed()
@@ -72,12 +74,12 @@ object MessageListPageGuard {
         }
         for (index in orderedIndices) {
             val add = lengths[index] + 1
-            if (kept.isNotEmpty() && bytes + add > maxPageBytes) break
-            val msg = messages[index]
-            if (newestLast) kept.addFirst(msg) else kept.addLast(msg)
+            if (keptIndices.isNotEmpty() && bytes + add > maxPageBytes) break
+            if (newestLast) keptIndices.addFirst(index) else keptIndices.addLast(index)
             bytes += add
         }
-        keepInvokingCalls(messages, kept)
+        keepInvokingCalls(messages, lengths, keptIndices)
+        val kept = keptIndices.map { messages[it] }
         val trimmed = kept.size < messages.size
         val keptArray = JsonArray(kept.toList())
         if (!trimmed) return keptArray
@@ -227,20 +229,19 @@ object MessageListPageGuard {
 }
 
 /** Keep an invoking call in the same page as its return, preserving cursor continuity. */
-private fun keepInvokingCalls(messages: List<JsonElement>, kept: ArrayDeque<JsonElement>) {
-    // A return without its invoking call is discarded by timeline hydration. Keep the
-    // contiguous dependency window, even when an inline image exceeds the soft budget.
-    // As with a single oversized row, frame_part carries this atomic window.
-    val returnedCallIds = kept.mapNotNull { (it as? JsonObject)?.get("tool_call_id") }.toSet()
-    val callIndices = messages.indices.filter { index ->
+private fun keepInvokingCalls(messages: List<JsonElement>, lengths: IntArray, kept: ArrayDeque<Int>) {
+    if (kept.isEmpty()) return
+    val callIndices = messages.indices.mapNotNull { index ->
         val call = (messages[index] as? JsonObject)?.get("tool_call") as? JsonObject
-        val callId = call?.get("tool_call_id")
-        callId != null && callId in returnedCallIds
-    }
-    val keptIndices = messages.indices.filter { messages[it] in kept }
-    val window = (keptIndices + callIndices).sorted()
-    if (window.isNotEmpty()) {
-        kept.clear()
-        for (index in window.first()..window.last()) kept.addLast(messages[index])
-    }
+        call?.get("tool_call_id")?.let { it to index }
+    }.toMap()
+    val returnedIds = kept.mapNotNull { (messages[it] as? JsonObject)?.get("tool_call_id") }
+    val dependencies = returnedIds.mapNotNull(callIndices::get)
+    val first = minOf(kept.first(), dependencies.minOrNull() ?: kept.first())
+    val last = maxOf(kept.last(), dependencies.maxOrNull() ?: kept.last())
+    // Leave envelope headroom below the logical-frame limit.
+    val bytes = (first..last).sumOf { lengths[it].toLong() + 1 }
+    if (bytes > IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES - MessageListPageGuard.MAX_PAGE_BYTES) return
+    kept.clear()
+    for (index in first..last) kept.addLast(index)
 }

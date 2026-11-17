@@ -45,6 +45,42 @@ class MessageListPageGuardTest {
         }
     }
 
+    @Test
+    fun duplicateRowsOutsideTheKeptWindowDoNotExpandIt() {
+        val duplicate = msg("duplicate", 20)
+        val rows = JsonArray(listOf(duplicate, msg("middle", 1000), duplicate))
+        val result = MessageListPageGuard.bound(rows, maxPageBytes = 200)
+        assertEquals(listOf(duplicate), pageRows(result))
+    }
+
+    @Test
+    fun oversizedDependencyWindowFallsBackToNewestReturn() {
+        val call = buildJsonObject {
+            put("id", "call")
+            put("tool_call", buildJsonObject { put("tool_call_id", "c") })
+        }
+        val returned = buildJsonObject {
+            put("id", "return")
+            put("tool_call_id", "c")
+        }
+        val gap = msg("gap", 33_554_432)
+        val result = MessageListPageGuard.bound(JsonArray(listOf(call, gap, returned)), maxPageBytes = 100)
+        assertEquals(listOf(returned), pageRows(result))
+    }
+
+    @Test
+    fun callOutsideProjectedPageCannotBeRestored() {
+        val returned = buildJsonObject {
+            put("id", "return")
+            put("tool_call_id", "outside-page")
+        }
+        val result = MessageListPageGuard.bound(JsonArray(listOf(msg("older", 500), returned)), maxPageBytes = 100)
+        assertEquals(listOf(returned), result.jsonObject.getValue("messages").jsonArray.toList())
+    }
+
+    private fun pageRows(result: kotlinx.serialization.json.JsonElement): List<kotlinx.serialization.json.JsonElement> =
+        if (result is JsonArray) result.toList() else result.jsonObject.getValue("messages").jsonArray.toList()
+
     /** A synthetic message with a body of [bodyBytes] filler. */
     private fun msg(id: String, bodyBytes: Int): JsonObject = buildJsonObject {
         put("id", JsonPrimitive(id))
