@@ -31,12 +31,9 @@ def select_menu_conversation(directory, before, title):
 
 def select_conversation(directory, scope):
     before = dump(directory, "before")
-    if not has_node(before, "text", "mini-bench") and (not has_node(before, "content-desc", "mini-bench")):
-        raise RuntimeError("mini-bench must be open; refusing to send to another agent")
+    ensure_bench(before)
     ensure_idle(before, "existing run active; refusing to interrupt another run")
-    title = scope.get("conversationTitle")
-    if not isinstance(title, str) or not title.startswith("core-loop-harness"):
-        raise RuntimeError("fixture conversation needs its unique core-loop-harness title")
+    title = fixture_title(scope)
     if has_node(before, "text", title):
         tap_node(before, "text", title)
     else:
@@ -47,3 +44,16 @@ def select_conversation(directory, scope):
         raise RuntimeError("fixture chat did not open")
     ensure_idle(selected, "fixture already active after selection")
     return None
+
+
+def ensure_bench(tree):
+    matches = has_node(tree, "text", "mini-bench") or has_node(tree, "content-desc", "mini-bench")
+    if not matches:
+        raise RuntimeError("mini-bench must be open; refusing to send to another agent")
+
+
+def fixture_title(scope):
+    title = scope.get("conversationTitle")
+    if not isinstance(title, str) or not title.startswith("core-loop-harness"):
+        raise RuntimeError("fixture conversation needs its unique core-loop-harness title")
+    return title

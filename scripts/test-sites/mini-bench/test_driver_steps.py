@@ -76,7 +76,7 @@ class Trace:
 
     def command(self, argv):
         self.record("command", argv)
-        if argv[:1] == ["ssh"] and "-c" in argv and "tail" not in argv:
+        if is_remote_audit(argv):
             return json.dumps(dict(conversation_id="fixture", modelLogOffset=0)).encode()
         return b"{}"
 
@@ -136,3 +136,7 @@ def patch_scenario(stack, module, replacements):
 def test_complete_driver_steps(tmp_path, scenario):
     expected = json.loads(Path(__file__).with_name("driver-steps.json").read_text())[scenario]
     assert trace_trial(tmp_path, scenario) == expected
+
+
+def is_remote_audit(argv):
+    return argv[:1] == ["ssh"] and "-c" in argv and "tail" not in argv

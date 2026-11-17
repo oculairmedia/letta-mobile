@@ -125,7 +125,9 @@ def check_frame(frame, window, require):
 
 
 def covers_settlement(stamps, terminal, stored):
-    if not stamps or not number(terminal) or not number(stored):
+    if not stamps:
+        return False
+    if not settlement_times_valid(terminal, stored):
         return False
     return stamps[0] < terminal and stamps[-1] >= max(terminal + MAX_SPINNER_MS, stored)
 
@@ -285,3 +287,7 @@ def score(evidence):
     for check in CRITERIA:
         check(context)
     return score_result(context)
+
+
+def settlement_times_valid(terminal, stored):
+    return number(terminal) and number(stored)

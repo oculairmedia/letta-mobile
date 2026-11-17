@@ -125,8 +125,7 @@ def make_template(reference, height):
 
 
 def summarize(rows, args, template, reference_seconds):
-    before = [row[1] for row in rows if args.settle_seconds - 1.0 <= row[0] <= args.settle_seconds - 0.2]
-    during = [row for row in rows if args.settle_seconds - 0.1 <= row[0] <= args.settle_seconds + args.post_seconds]
+    before, during = settlement_window(rows, args)
     if not before or not during:
         raise ValueError("video does not cover the settlement window")
     baseline = float(np.median(before))
@@ -230,3 +229,9 @@ def decode_frames(video, raw, begin, end):
     ]
     paths = sorted(raw.glob("*.png"))
     return paths, times
+
+
+def settlement_window(rows, args):
+    before = [row[1] for row in rows if args.settle_seconds - 1.0 <= row[0] <= args.settle_seconds - 0.2]
+    during = [row for row in rows if args.settle_seconds - 0.1 <= row[0] <= args.settle_seconds + args.post_seconds]
+    return before, during

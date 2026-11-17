@@ -9,7 +9,7 @@ def log_fields(parts):
     fields = {}
     for part in parts:
         key, separator, value = part.partition("=")
-        if separator and re.fullmatch("\\w+", key) and value:
+        if valid_log_field(key, separator, value):
             fields[key] = value
     return fields
 
@@ -213,7 +213,7 @@ def check_special_scenario(context, errors):
     if scenario != "S2":
         return ([], None)
     held, expected = held_tool(context)
-    if not held or expected is None or min(held) < expected - 1000:
+    if not held_evidence_valid(held, expected):
         errors.append("current held tool start/end missing or hold too short")
     return (held, expected)
 
@@ -391,3 +391,11 @@ def cancelled_terminal_missing(context):
 def log_markers(line):
     markers = ("CORE_LOOP ", "Telemetry/CoreLoop: ")
     return [(line.find(marker), marker) for marker in markers if line.find(marker) >= 0]
+
+
+def valid_log_field(key, separator, value):
+    return separator and re.fullmatch(r"\w+", key) and value
+
+
+def held_evidence_valid(held, expected):
+    return bool(held) and expected is not None and min(held) >= expected - 1000
