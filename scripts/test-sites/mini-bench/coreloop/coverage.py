@@ -51,11 +51,13 @@ def pixel_coverage_complete(pixels):
     if not isinstance(record, dict) or not all(map(finite, (settle, post))):
         return False
     arrays = [record.get(key) for key in ("frame_times", "draw_times", "log_times")]
-    if not all(isinstance(values, list) for values in arrays) or post < 0:
-        return False
-    if not all(all(map(finite, values)) for values in arrays):
+    if not all(map(valid_timestamps, arrays)) or post < 0:
         return False
     recomputed = coverage_record(CoverageInput(*arrays, (settle - 1, settle + post)))
     return recomputed == record and recomputed["complete"]
 
 
+
+
+def valid_timestamps(values):
+    return isinstance(values, list) and all(map(finite, values))

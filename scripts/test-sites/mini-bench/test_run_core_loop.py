@@ -150,8 +150,7 @@ def raw_fixture(directory, duplicate):
     tree = reply_tree()
     metadata = dict(
         scenario="S1",
-        trial=1,
-        captureId="fixture",
+        trial=1, captureId="fixture",
         sendMs=0,
         phoneOffsetMs=0,
         miniToPhoneOffsetMs=0,
@@ -222,8 +221,7 @@ def history_fixture(root, behavior):
     tree = reply_tree()
     metadata = dict(
         scenario="S1",
-        trial=1,
-        captureId="fixture",
+        trial=1, captureId="fixture",
         sendMs=100,
         phoneOffsetMs=0,
         miniToPhoneOffsetMs=0,

@@ -346,8 +346,6 @@ def row_texts(row):
 
 
 def final_reply_text(tree, prompt):
-    if not prompt:
-        return ""
     rows = [(node_top(row), row_texts(row)) for row in timeline_rows(tree)]
     users = [top for top, texts in rows if texts[:2] == ["You", prompt] and top >= 0]
     if not users:
@@ -360,7 +358,7 @@ def final_reply_text(tree, prompt):
 
 def normalized_evidence(context, stored):
     prompt = trial_prompt(context.metadata, follow_up=context.metadata.get("scenario") == "S3")
-    visible = final_reply_text(context.tree, prompt)
+    visible = final_reply_text(context.tree, prompt) if prompt else ""
     lifecycle = [dict(event="present", key=key) for key in sorted(context.initial)]
     lifecycle += [dict(event=e["event"], key=e["key"]) for e in context.observed if e["event"] in ("mount", "dispose")]
     return dict(
