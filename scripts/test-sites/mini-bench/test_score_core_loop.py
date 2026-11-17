@@ -27,7 +27,14 @@ def evidence():
         ),
         lifecycle=[dict(event="mount", key="reply-1")],
         frames=[dict(ms=ms, rows=[dict(id="message-1", key="reply-1")]) for ms in range(0, 5300, 50)],
-        pixels=dict(frames=106, minimum_template_correlation=1.0, dip_percent=0.0),
+        pixels=dict(
+            frames=106,
+            minimum_template_correlation=1.0,
+            dip_percent=0.0,
+            settle_seconds=2,
+            post_seconds=5,
+            coverage=dict(start_seconds=1, end_seconds=7, max_gap_seconds=0.1),
+        ),
     )
 
 
@@ -131,3 +138,26 @@ def test_nan_diagnostic_does_not_abort_batch(tmp_path):
     assert (output / 'run-1.json').exists()
     assert json.loads((output / 'run-1.json').read_text())['status'] == 'FAIL'
     assert json.loads((output / 'run-2.json').read_text())['status'] == 'PASS'
+
+
+def test_pixel_coverage_record_is_mandatory():
+    sample = evidence()
+    del sample["pixels"]["coverage"]
+    assert oracle.score(sample)["status"] == "FAIL"
+
+
+def test_pixel_coverage_boundaries():
+    for gap, end, expected in (
+        (0.1, 7, "PASS"),
+        (0.15, 7, "FAIL"),
+        (0.1, 6.95, "FAIL"),
+    ):
+        sample = evidence()
+        sample["pixels"]["coverage"].update(max_gap_seconds=gap, end_seconds=end)
+        assert oracle.score(sample)["status"] == expected
+
+
+def test_partial_pixel_coverage_is_enforced():
+    sample = evidence()
+    sample["pixels"]["partial"] = {}
+    assert oracle.score(sample)["status"] == "FAIL"

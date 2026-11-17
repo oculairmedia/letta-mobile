@@ -88,7 +88,9 @@ def raw_fixture(directory, duplicate):
         "0.090 1 2 I System.out: CORE_LOOP mount key=run-a",
         "0.100 1 2 I System.out: CORE_LOOP draw key=run-a identity=message-a stored=false assistant=true",
     ]
-    lines += [f"{ms / 1000:.3f} 1 2 I System.out: CORE_LOOP resident key=run-a" for ms in range(150, 5250, 50)]
+    lines += [
+        f"{ms / 1000:.3f} 1 2 I System.out: CORE_LOOP resident key=run-a" for ms in range(150, 5250, 50)
+    ]
     lines.append(
         "0.230 1 2 I System.out: CORE_LOOP draw key=run-a identity=message-a stored=true assistant=true hashes=0"
     )
@@ -103,7 +105,12 @@ def raw_fixture(directory, duplicate):
     lines.sort(key=lambda line: float(line.split()[0]))
     (directory / "logcat.txt").write_text("\n".join(lines))
     (directory / "wrapper.jsonl").write_text(
-        json.dumps(dict(wallMs=150, line="input.accepted conversationId=fixture-conversation disposition=queued"))
+        json.dumps(
+            dict(
+                wallMs=150,
+                line="input.accepted conversationId=fixture-conversation disposition=queued",
+            )
+        )
         + "\n"
         + json.dumps(
             dict(
@@ -115,7 +122,16 @@ def raw_fixture(directory, duplicate):
     )
     (directory / "pixels").mkdir()
     (directory / "pixels" / "summary.json").write_text(
-        json.dumps(dict(frames=100, minimum_template_correlation=1.0, dip_percent=0.0))
+        json.dumps(
+            dict(
+                frames=100,
+                minimum_template_correlation=1.0,
+                dip_percent=0.0,
+                settle_seconds=2,
+                post_seconds=5,
+                coverage=dict(start_seconds=1, end_seconds=7, max_gap_seconds=0.05),
+            )
+        )
     )
     tree = ET.Element("hierarchy")
     ET.SubElement(tree, "node", text=evidence.oracle.FIXED_REPLY)
@@ -160,14 +176,33 @@ def history_fixture(root, behavior):
     lines.sort(key=lambda line: float(line.split()[0]))
     (root / "logcat.txt").write_text("\n".join(lines))
     (root / "wrapper.jsonl").write_text(
-        json.dumps(dict(wallMs=140, line="input.accepted conversationId=fixture disposition=queued"))
+        json.dumps(
+            dict(
+                wallMs=140,
+                line="input.accepted conversationId=fixture disposition=queued",
+            )
+        )
         + "\n"
-        + json.dumps(dict(wallMs=200, line="turn.finished_relayed conversationId=fixture stopReason=end_turn"))
+        + json.dumps(
+            dict(
+                wallMs=200,
+                line="turn.finished_relayed conversationId=fixture stopReason=end_turn",
+            )
+        )
         + "\n"
     )
     (root / "pixels").mkdir()
     (root / "pixels" / "summary.json").write_text(
-        json.dumps(dict(frames=100, minimum_template_correlation=1, dip_percent=0))
+        json.dumps(
+            dict(
+                frames=100,
+                minimum_template_correlation=1,
+                dip_percent=0,
+                settle_seconds=2,
+                post_seconds=5,
+                coverage=dict(start_seconds=1, end_seconds=7, max_gap_seconds=0.05),
+            )
+        )
     )
     tree = ET.Element("hierarchy")
     ET.SubElement(tree, "node", text=evidence.oracle.FIXED_REPLY)
@@ -224,3 +259,42 @@ def test_skipped_pixel_analysis_invalidates_stale_summaries(tmp_path):
     assert result['status'] == 'FAIL'
     assert not (tmp_path / 'pixels' / 'summary.json').exists()
     assert not (tmp_path / 'partial-pixels' / 'summary.json').exists()
+
+
+def test_late_alias_check_rows_has_no_false_removal():
+    events = [
+        dict(event="draw", key="a", identity="run", ms=0),
+        dict(event="draw", key="b", identity="durable", ms=50),
+        dict(event="draw", key="a", identity="durable", ms=100),
+    ]
+    frames = evidence.row_frames(events, events, set())
+    window = evidence.oracle.RowWindow()
+    errors = []
+    for frame in frames:
+        evidence.oracle.check_frame(
+            frame, window, lambda ok, reason: errors.append(reason) if not ok else None
+        )
+    assert len(window.identities) == 1
+    assert "assistant row removed and re-added" not in errors
+
+
+@pytest.mark.parametrize("fails", (False, True))
+def test_normalize_never_reads_previous_analysis(tmp_path, fails):
+    metadata, tree = raw_fixture(tmp_path, False)
+    with (
+        patch.object(capture, "capture_region", return_value="1,2,3,4" if fails else None),
+        patch.object(capture, "capture_terminals", return_value=[]),
+        patch.object(
+            capture,
+            "analyze_final_pixels",
+            side_effect=RuntimeError("analysis failed") if fails else None,
+        ),
+    ):
+        if fails:
+            with pytest.raises(RuntimeError, match="analysis failed"):
+                capture.analyze_capture(tmp_path, metadata, tree)
+        else:
+            assert capture.analyze_capture(tmp_path, metadata, tree)["status"] == "FAIL"
+    result = evidence.normalize(tmp_path, metadata, tree)
+    assert result["minimumCorrelation"] is None
+    assert result["status"] == "FAIL"

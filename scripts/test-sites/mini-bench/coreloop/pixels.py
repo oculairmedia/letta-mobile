@@ -1,13 +1,20 @@
 """Measure reply ink across settlement against its final rendered pixels."""
 
 from dataclasses import dataclass
-from .scoring import MAX_FRAME_GAP_MS
+from .scoring import pixel_coverage_complete
 
 import csv
 import json
 from pathlib import Path
 import os
-from tool_boundary import evidence_path, region_arg, run_tool, tool_arguments, path_arg, filter_arg
+from tool_boundary import (
+    evidence_path,
+    region_arg,
+    run_tool,
+    tool_arguments,
+    path_arg,
+    filter_arg,
+)
 
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -126,15 +133,21 @@ def make_template(reference, height):
 
 
 def pixel_coverage(rows, args):
-    times = [row[0] for row in rows if args.settle_seconds - 1 <= row[0] <= args.settle_seconds + args.post_seconds]
-    limit = MAX_FRAME_GAP_MS / 1000
+    times = [
+        row[0] for row in rows if args.settle_seconds - 1 <= row[0] <= args.settle_seconds + args.post_seconds
+    ]
     gaps = [b - a for a, b in zip(times, times[1:])]
-    valid = (len(times) >= 2 and times[0] <= args.settle_seconds - 1 + limit
-             and times[-1] >= args.settle_seconds + args.post_seconds - limit
-             and all(0 < gap <= limit + 1e-9 for gap in gaps))
-    if not valid:
+    if not gaps:
         raise ValueError("pixel coverage incomplete, unordered, or gapped")
-    return dict(start_seconds=times[0], end_seconds=times[-1], max_gap_seconds=max(gaps))
+    coverage = dict(start_seconds=times[0], end_seconds=times[-1], max_gap_seconds=max(gaps))
+    summary = dict(
+        coverage=coverage,
+        settle_seconds=args.settle_seconds,
+        post_seconds=args.post_seconds,
+    )
+    if min(gaps) <= 0 or not pixel_coverage_complete(summary):
+        raise ValueError("pixel coverage incomplete, unordered, or gapped")
+    return coverage
 
 
 def summarize(rows, args, template, reference_seconds):
@@ -153,6 +166,7 @@ def summarize(rows, args, template, reference_seconds):
         dip_percent=100 * (baseline - lowest[1]) / baseline,
         minimum_seconds=lowest[0],
         settle_seconds=args.settle_seconds,
+        post_seconds=args.post_seconds,
         region=list(map(int, region_arg(args.region).split(","))),
         reference_seconds=reference_seconds,
         vertical_search=args.track_y,

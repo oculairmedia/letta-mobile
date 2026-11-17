@@ -171,13 +171,37 @@ def check_lifecycle(evidence, identities, require):
     return mounts
 
 
+def pixel_coverage_complete(pixels):
+    coverage = pixels.get("coverage")
+    if not isinstance(coverage, dict):
+        return False
+    values = [coverage.get(key) for key in ("start_seconds", "end_seconds", "max_gap_seconds")]
+    settle, post = pixels.get("settle_seconds"), pixels.get("post_seconds")
+    if not all(number(value) for value in (*values, settle, post)):
+        return False
+    start, end, gap = values
+    limit = MAX_FRAME_GAP_MS / 1000
+    bounds = post >= 0 and start <= settle - 1 + limit and end >= settle + post
+    ordered = start < end and 0 < gap <= limit + 1e-9
+    return bounds and ordered
+
+
 def check_pixels(evidence, require):
     pixels = evidence.get("pixels", {})
     if not isinstance(pixels, dict):
         pixels = {}
+    require(pixel_coverage_complete(pixels), "pixel coverage missing or incomplete")
+    if "partial" in pixels:
+        require(
+            pixel_coverage_complete(pixels["partial"]),
+            "partial pixel coverage missing or incomplete",
+        )
     correlation = pixels.get("minimum_template_correlation")
     dip = pixels.get("dip_percent")
-    require(number(correlation) and MIN_CORRELATION <= correlation <= 1, "pixel template missing or lost")
+    require(
+        number(correlation) and MIN_CORRELATION <= correlation <= 1,
+        "pixel template missing or lost",
+    )
     require(number(dip) and dip <= MAX_DIP_PERCENT, "reply luminance missing or dipped")
     require(number(pixels.get("frames")) and pixels["frames"] >= 2, "pixel frames missing")
     require(evidence.get("clockAligned") is True, "clock alignment missing")

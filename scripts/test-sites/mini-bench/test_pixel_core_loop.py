@@ -86,3 +86,24 @@ def test_incomplete_pixel_window_is_rejected():
     rows = [(t, 1, 0, 0, 1, 1) for t in (1, 1.5, 2)]
     with pytest.raises(ValueError, match='coverage'):
         summarize(rows, args, template, 1.5)
+
+
+@pytest.mark.parametrize(
+    "times,valid",
+    (
+        ([1 + i / 10 for i in range(21)], True),
+        ([1, 1.15] + [1.2 + i / 10 for i in range(19)], False),
+        ([1 + i / 20 for i in range(40)], False),
+    ),
+)
+def test_analyzer_coverage_boundaries(times, valid):
+    from types import SimpleNamespace
+    from coreloop.pixels import pixel_coverage
+
+    rows = [(t, 1) for t in times]
+    args = SimpleNamespace(settle_seconds=2, post_seconds=1)
+    if valid:
+        assert pixel_coverage(rows, args)["end_seconds"] == 3
+    else:
+        with pytest.raises(ValueError, match="coverage"):
+            pixel_coverage(rows, args)

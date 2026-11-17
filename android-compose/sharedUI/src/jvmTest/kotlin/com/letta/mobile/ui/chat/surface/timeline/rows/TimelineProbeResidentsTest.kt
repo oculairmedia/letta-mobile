@@ -18,4 +18,24 @@ class TimelineProbeResidentsTest {
         residents.dispose("second")
         assertFalse(residents.isHeartbeatOwner("second"))
     }
+    @Test
+    fun userResidentCannotOwnAssistantHeartbeat() {
+        val residents = TimelineProbeResidents()
+        residents.mount("prompt", assistant = false)
+        residents.mount("reply", assistant = true)
+        assertFalse(residents.isHeartbeatOwner("prompt"))
+        assertTrue(residents.isHeartbeatOwner("reply"))
+    }
+
+    @Test
+    fun overlappingCopiesRemainUntilLastDisposal() {
+        val residents = TimelineProbeResidents()
+        assertTrue(residents.mount("reply"))
+        assertFalse(residents.mount("reply"))
+        assertFalse(residents.dispose("reply"))
+        assertTrue(residents.isHeartbeatOwner("reply"))
+        assertTrue(residents.dispose("reply"))
+        assertFalse(residents.isHeartbeatOwner("reply"))
+        assertFalse(residents.dispose("reply"))
+    }
 }

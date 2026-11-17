@@ -14,8 +14,26 @@ object TimelineRenderProbe {
 }
 
 internal class TimelineProbeResidents {
-    private val keys = linkedSetOf<String>()
-    fun mount(key: String) { keys.add(key) }
-    fun dispose(key: String) { keys.remove(key) }
-    fun isHeartbeatOwner(key: String): Boolean = keys.firstOrNull() == key
+    private val copies = linkedMapOf<String, Int>()
+    private val assistants = linkedSetOf<String>()
+
+    fun mount(key: String, assistant: Boolean = true): Boolean {
+        val count = (copies[key] ?: 0) + 1
+        copies[key] = count
+        if (assistant) assistants.add(key)
+        return count == 1
+    }
+
+    fun dispose(key: String): Boolean {
+        val count = copies[key] ?: return false
+        if (count > 1) {
+            copies[key] = count - 1
+            return false
+        }
+        copies.remove(key)
+        assistants.remove(key)
+        return true
+    }
+
+    fun isHeartbeatOwner(key: String): Boolean = assistants.firstOrNull() == key
 }

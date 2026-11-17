@@ -280,8 +280,10 @@ def load_pixels(context):
     if not partial_path.exists():
         return {}
     partial = json.loads(partial_path.read_text())
+    pixels["partial"] = partial
     pixels["minimum_template_correlation"] = min(
-        pixels.get("minimum_template_correlation", 0), partial["minimum_template_correlation"]
+        pixels.get("minimum_template_correlation", 0),
+        partial["minimum_template_correlation"],
     )
     pixels["dip_percent"] = max(pixels.get("dip_percent", 100), partial["dip_percent"])
     return pixels
