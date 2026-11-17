@@ -416,8 +416,7 @@ def held_evidence_valid(held, expected):
 def measured_row_events(directory, metadata, terminal):
     """Bind the pixel region to its run's live row and matching new stored copy."""
     events = parse_log(directory / "logcat.txt")
-    run = run_id(terminal)
-    keys = live_keys_for_run(events, run)
+    keys = measured_live_keys(events, metadata, terminal)
     cutoff = terminal["wallMs"] + metadata["miniToPhoneOffsetMs"]
     expected = "DONE" if metadata["scenario"] == "S2" else oracle.FIXED_REPLY
     new_keys = role_keys(events, "true") - set(metadata["existingKeys"])
@@ -435,3 +434,14 @@ def aligned_row_events(events, keys, origin):
         draw_times=sorted({(e["ms"] - origin) / 1000 for e in row_events if is_draw(e)}),
         log_times=sorted({(e["ms"] - origin) / 1000 for e in row_events}),
     )
+
+
+def measured_live_keys(events, metadata, terminal):
+    live_keys = live_keys_for_run(events, run_id(terminal))
+    draws = [e for e in events if is_draw(e) and e["key"] in live_keys]
+    if "stopReason=cancelled" in terminal["line"]:
+        cutoff = metadata["interruptReferenceMs"]
+        return {e["key"] for e in draws if e["ms"] <= cutoff and e.get("hashes") not in (None, "", "0")}
+    expected = "DONE" if metadata["scenario"] == "S2" else oracle.FIXED_REPLY
+    text_keys = {e["key"] for e in events if str(text_hash(expected)) in e.get("hashes", "").split(",")}
+    return live_keys & text_keys

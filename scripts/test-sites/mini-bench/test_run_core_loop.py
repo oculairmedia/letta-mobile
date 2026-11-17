@@ -316,7 +316,9 @@ def test_pixel_events_bind_measured_row_and_align_to_video(tmp_path):
         '10.000 1 2 I Telemetry/CoreLoop: draw key=reply identity=run-a assistant=true stored=false hashes=0',
         '10.050 1 2 I Telemetry/CoreLoop: resident key=reply',
         '10.075 1 2 I Telemetry/CoreLoop: draw key=unrelated identity=run-b assistant=true stored=false hashes=0',
-        '10.100 1 2 I Telemetry/CoreLoop: draw key=reply identity=stored-a assistant=true stored=true hashes=0',
+        '10.100 1 2 I Telemetry/CoreLoop: draw key=reply identity=stored-a assistant=true stored=true hashes=699287813',
+        '10.080 1 2 I Telemetry/CoreLoop: draw key=reasoning identity=run-a assistant=true stored=false',
+        '10.090 1 2 I Telemetry/CoreLoop: resident key=reasoning',
     ]
     (tmp_path / 'logcat.txt').write_text('\n'.join(events))
     metadata = dict(scenario='S1', videoStartMs=9900, miniToPhoneOffsetMs=20, existingKeys=[])
