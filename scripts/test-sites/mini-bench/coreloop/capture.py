@@ -443,6 +443,14 @@ def analyze_capture(directory, metadata, tree, explicit_region=None):
     return normalize(directory, metadata, tree)
 
 
+def backup_capture(directory):
+    for name in ("result", "evidence", "metadata"):
+        source = directory / (name + ".json")
+        backup = directory / (name + "-pre-rescore.json")
+        if source.exists() and not backup.exists():
+            shutil.copy2(source, backup)
+
+
 def rescore_captures(args):
     results = []
     for directory in sorted(args.output.glob("S[1-4]-*")):
@@ -450,11 +458,7 @@ def rescore_captures(args):
             continue
         try:
             metadata = json.loads((directory / "metadata.json").read_text())
-            for name in ("result", "evidence", "metadata"):
-                source = directory / (name + ".json")
-                backup = directory / (name + "-pre-rescore.json")
-                if source.exists() and (not backup.exists()):
-                    shutil.copy2(source, backup)
+            backup_capture(directory)
             tree = ET.parse(directory / "final.xml").getroot()
             anchor_video(metadata)
             result = analyze_capture(directory, metadata, tree, args.region)

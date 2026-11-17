@@ -85,6 +85,15 @@ class DriverTest(unittest.TestCase):
             adb.assert_not_called()
 
 
+
+def reply_tree():
+    tree = ET.Element("hierarchy")
+    timeline = ET.SubElement(tree, "node", scrollable="true")
+    row = ET.SubElement(timeline, "node", {"long-clickable": "true", "bounds": "[0,500][100,900]"})
+    ET.SubElement(row, "node", text=evidence.oracle.FIXED_REPLY)
+    return tree
+
+
 def raw_fixture(directory, duplicate):
     lines = [
         "0.090 1 2 I System.out: CORE_LOOP mount key=run-a",
@@ -135,10 +144,7 @@ def raw_fixture(directory, duplicate):
             )
         )
     )
-    tree = ET.Element("hierarchy")
-    timeline = ET.SubElement(tree, "node", scrollable="true")
-    row = ET.SubElement(timeline, "node", {"long-clickable": "true", "bounds": "[0,500][100,900]"})
-    ET.SubElement(row, "node", text=evidence.oracle.FIXED_REPLY)
+    tree = reply_tree()
     metadata = dict(
         scenario="S1",
         sendMs=0,
@@ -208,10 +214,7 @@ def history_fixture(root, behavior):
             )
         )
     )
-    tree = ET.Element("hierarchy")
-    timeline = ET.SubElement(tree, "node", scrollable="true")
-    row = ET.SubElement(timeline, "node", {"long-clickable": "true", "bounds": "[0,500][100,900]"})
-    ET.SubElement(row, "node", text=evidence.oracle.FIXED_REPLY)
+    tree = reply_tree()
     metadata = dict(
         scenario="S1",
         sendMs=100,

@@ -333,28 +333,29 @@ def node_top(node):
     return int(bounds[2]) if bounds else -1
 
 
-def final_reply_text(tree):
-    # Compose exposes each markdown paragraph separately inside a long-clickable
-    # message row; delivery time is a sibling, not reply text. Restrict selection
-    # to the timeline and pick the lowest reply, independent of expected content.
+def timeline_rows(tree):
     timelines = [n for n in tree.iter("node") if n.get("scrollable") == "true"]
-    if not timelines:
-        return ""
-    rows = [n for timeline in timelines for n in timeline.iter("node")
+    return [n for timeline in timelines for n in timeline.iter("node")
             if n.get("long-clickable") == "true"]
-    users = [node_top(row) for row in rows
-             if any(n.get("text") == "You" for n in row.iter("node"))]
-    latest_user = max(users, default=-1)
-    replies = []
-    for row in rows:
-        texts = [n.get("text") for n in row.iter("node") if n.get("text")]
-        if texts and texts[0] != "You" and node_top(row) > latest_user:
-            replies.append((node_top(row), texts))
-    if not replies:
-        return ""
-    texts = max(replies, key=lambda item: item[0])[1]
+
+
+def row_texts(row):
+    texts = [n.get("text") for n in row.iter("node") if n.get("text")]
+    # DeliveryTime follows the markdown content in AgentText's touch Column.
     if len(texts) > 1 and re.fullmatch(r"\d{1,2}:\d{2} [AP]M", texts[-1]):
-        texts = texts[:-1]
+        return texts[:-1]
+    return texts
+
+
+def final_reply_text(tree):
+    # Compose exposes markdown paragraphs inside a long-clickable message row.
+    # Select by timeline position, never by matching the expected reply content.
+    rows = [(node_top(row), row_texts(row)) for row in timeline_rows(tree)]
+    users = [top for top, texts in rows if texts[:1] == ["You"]]
+    replies = [(top, texts) for top, texts in rows if texts[:1] != ["You"]]
+    top, texts = max(replies, default=(-1, []), key=lambda item: item[0])
+    if top <= max(users, default=-1):
+        return ""
     return "\n\n".join(texts)
 
 
