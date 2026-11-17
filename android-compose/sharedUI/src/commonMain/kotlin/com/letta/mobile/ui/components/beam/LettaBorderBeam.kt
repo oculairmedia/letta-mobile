@@ -13,6 +13,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -114,14 +115,14 @@ object LettaBeamDefaults {
  *
  * Drawn by a runtime shader on Android 13+, desktop and web, and by Canvas strokes elsewhere.
  * Switching [active] fades the beam in or out. Its cost, which is zero while it is still:
- * - each frame only redraws this element; it never recomposes or relayouts anything
+ * - a graphics layer confines redraws to this element; frames never recompose or relayout anything
  * - the frame loop stops while the beam is off (after its fade), while the element is scrolled or
  *   clipped out of the window, and under reduced motion, where the beam stays lit but still
  *
  * Ported from border-beam-android by ismnoiet (MIT, see sharedUI/THIRD_PARTY_LICENSES).
  */
 fun Modifier.lettaBorderBeam(spec: LettaBeamSpec, active: Boolean = true): Modifier =
-    this then BorderBeamElement(spec, active)
+    graphicsLayer() then BorderBeamElement(spec, active)
 
 private data class BorderBeamElement(val spec: LettaBeamSpec, val active: Boolean) :
     ModifierNodeElement<BorderBeamNode>() {
