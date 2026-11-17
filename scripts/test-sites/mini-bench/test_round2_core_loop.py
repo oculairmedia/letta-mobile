@@ -105,17 +105,21 @@ def test_06_art_path_reaches_tool_boundary_without_quotes():
     assert calls[-1][-1] == path
 
 
+def reply_rows(tree, entries):
+    timeline = ET.SubElement(tree, 'node', scrollable='true')
+    for top, text in entries:
+        row = ET.SubElement(timeline, 'node', {'long-clickable': 'true', 'bounds': f'[0,{top}][100,{top+50}]'})
+        ET.SubElement(row, 'node', text=text)
+        if text == 'You':
+            ET.SubElement(row, 'node', text='[core-loop:S2] trial-1')
+
+
 @pytest.mark.parametrize('actual', ['unexpected prefix DONE', 'DONE unexpected suffix', 'wrong reply'])
 def test_07_new_reply_full_text_is_preserved(tmp_path, actual):
     metadata, tree = raw_fixture(tmp_path, False)
     metadata['scenario'] = 'S2'
     tree.clear()
-    timeline = ET.SubElement(tree, 'node', scrollable='true')
-    for top, text in ((100, 'DONE'), (300, 'You'), (500, actual)):
-        row = ET.SubElement(timeline, 'node', {'long-clickable': 'true', 'bounds': f'[0,{top}][100,{top+50}]'})
-        ET.SubElement(row, 'node', text=text)
-        if text == 'You':
-            ET.SubElement(row, 'node', text='[core-loop:S2] trial-1')
+    reply_rows(tree, ((100, 'DONE'), (300, 'You'), (500, actual)))
     metadata['trial'] = 1
     context = evidence.Observation(tmp_path, metadata, tree)
     observed = evidence.normalized_evidence(context, [250])
@@ -186,13 +190,9 @@ def test_03_recovery_refreshes_missing_tree_and_checks_ownership(tmp_path):
 
 def test_07_old_reply_cannot_replace_missing_new_reply(tmp_path):
     metadata, _ = raw_fixture(tmp_path, False)
+    metadata['scenario'] = 'S2'
     tree = ET.Element('hierarchy')
-    timeline = ET.SubElement(tree, 'node', scrollable='true')
-    for top, text in ((100, scoring.FIXED_REPLY), (300, 'You')):
-        row = ET.SubElement(timeline, 'node', {'long-clickable': 'true', 'bounds': f'[0,{top}][100,{top+50}]'})
-        ET.SubElement(row, 'node', text=text)
-        if text == 'You':
-            ET.SubElement(row, 'node', text='[core-loop:S2] trial-1')
+    reply_rows(tree, ((100, scoring.FIXED_REPLY), (300, 'You')))
     metadata['trial'] = 1
     context = evidence.Observation(tmp_path, metadata, tree)
     assert evidence.normalized_evidence(context, [250])['visibleText'] == ''
