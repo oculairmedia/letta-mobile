@@ -38,6 +38,14 @@ data class MemoryGraphTuning(
     val barnesHutRebuildFrames: Float = 10f,
     /** Each edge kind's rest length. */
     val springLength: Map<MemoryGraphEdgeKind, Float> = MemoryGraphEdgeKind.entries.associateWith { 110f },
+    /**
+     * How far each edge's rest length strays from its kind's, as a fraction either way: drawn from a
+     * stable hash of the edge's ends, so the same graph always looks the same and adding a node
+     * leaves every other edge as it was. 0 gives every edge of a kind the same length.
+     */
+    val linkLengthSpread: Float = 0.25f,
+    /** How much longer an edge to a hub is (up to this fraction, for a node of 64 links or more); 0 is off. */
+    val linkLengthDegreeBias: Float = 0.1f,
     /** Each edge kind's stiffness: force per unit stretched past its rest length. */
     val springStiffness: Map<MemoryGraphEdgeKind, Float> = MemoryGraphEdgeKind.entries.associateWith { 0.14f },
     /**
@@ -193,6 +201,8 @@ class MemoryGraphTunings {
                 "barnesHutTheta" to tuning.barnesHutTheta.literal(),
                 "barnesHutRebuildFrames" to tuning.barnesHutRebuildFrames.literal(),
                 "springLength" to tuning.springLength.literal("MemoryGraphEdgeKind"),
+                "linkLengthSpread" to tuning.linkLengthSpread.literal(),
+                "linkLengthDegreeBias" to tuning.linkLengthDegreeBias.literal(),
                 "springStiffness" to tuning.springStiffness.literal("MemoryGraphEdgeKind"),
                 "hubSpokeStrength" to tuning.hubSpokeStrength.literal(),
                 "pinBackend" to tuning.pinBackend.toString(),

@@ -117,7 +117,8 @@ internal class MemoryGraphPhysics private constructor(
             val radii = FloatArray(ids.size) { radiusOf(ids[it]) * tuning.radiusScaleOf(view.nodes[it].kind) }
             val springs = MemoryGraphForceField.springsOf(view)
             val field = MemoryGraphForceField(ids.size, springs, radii = radii)
-            field.applyTuning(tuning, IntArray(ids.size) { view.nodes[it].kind.ordinal }, MemoryGraphForceField.springKindsOf(view))
+            val kinds = IntArray(ids.size) { view.nodes[it].kind.ordinal }
+            field.applyTuning(tuning, kinds, MemoryGraphForceField.springKindsOf(view), MemoryGraphForceField.springSeedsOf(view))
             val physics = MemoryGraphPhysics(ids, field, start, MemoryGraphMotion.forGraph(ids.size, springs.size / 2, tuning))
             val moved = if (physics.motion && MemoryGraphSeeds.applies(view, tuning)) {
                 physics.seedFleet(view, target, start.previous)

@@ -194,6 +194,18 @@ internal object MemoryGraphKnobs {
 
     private fun springs(): List<MemoryGraphKnob> = listOf(
         MemoryGraphKnob("Degree scaling (0 off, 1 d3)", 0f..1f, { it.degreeScaling }, { t, v -> t.copy(degreeScaling = v) }),
+        MemoryGraphKnob(
+            "Link length spread (fraction)",
+            0f..0.8f,
+            { it.linkLengthSpread },
+            { t, v -> t.copy(linkLengthSpread = v) },
+        ),
+        MemoryGraphKnob(
+            "Link length degree bias (fraction)",
+            0f..0.5f,
+            { it.linkLengthDegreeBias },
+            { t, v -> t.copy(linkLengthDegreeBias = v) },
+        ),
         MemoryGraphKnob("Backend spoke stiffness (fleet)", 0f..0.3f, { it.hubSpokeStrength }, { t, v -> t.copy(hubSpokeStrength = v) }),
     ) + MemoryGraphEdgeKind.entries.flatMap { kind ->
         listOf(

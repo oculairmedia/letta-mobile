@@ -8,6 +8,7 @@ import com.letta.mobile.data.memory.graph.barneshut.RepulsionTerms
 import com.letta.mobile.data.memory.graph.forces.SpringEnds
 import com.letta.mobile.data.memory.MemoryGraphEdgeKind
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
+import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -74,13 +75,16 @@ class MemoryGraphForceField(
     private val sums = ForceSums(fx, fy, ox, oy)
     private var collisionPadding = COLLISION_PADDING
     private var collisionStrength = COLLISION_STRENGTH
+    private var springSeeds = IntArray(0)
 
     /**
      * Applies [tuning]'s forces: [nodeKinds] holds each node's [MemoryGraphNodeKind] ordinal (its
-     * charge) and [springKinds] each spring's [MemoryGraphEdgeKind] ordinal (its rest length and
-     * stiffness), in the orders the field was built with (see [springKindsOf]).
+     * charge), [springKinds] each spring's [MemoryGraphEdgeKind] ordinal (its rest length and
+     * stiffness) and [springSeeds] each spring's stable hash of its ends (see [springSeedsOf]; empty:
+     * no length variation), in the orders the field was built with (see [springKindsOf]).
      */
-    fun applyTuning(tuning: MemoryGraphTuning, nodeKinds: IntArray, springKinds: IntArray) {
+    fun applyTuning(tuning: MemoryGraphTuning, nodeKinds: IntArray, springKinds: IntArray, springSeeds: IntArray = IntArray(0)) {
+        this.springSeeds = springSeeds
         val crowded = tuning.crowdednessOf(size, springs.size / 2)
         repulsion = tuning.repulsion * lerp(1f, tuning.crowdedRepulsionScale, crowded)
         cutoffSq = tuning.repulsionCutoff * tuning.repulsionCutoff
@@ -125,11 +129,27 @@ class MemoryGraphForceField(
             val b = degree[ends.target].coerceAtLeast(1)
             val bias = a.toFloat() / (a + b)
             val spoke = backend != FREE && ends.contains(backend)
-            restLength[spring] = tuning.lengthOf(kind)
+            restLength[spring] = tuning.lengthOf(kind) * lengthVariation(tuning, spring) * degreeLength(tuning, maxOf(a, b))
             stiffness[spring] = if (spoke) tuning.hubSpokeStrength else tuning.stiffnessOf(kind) * lerp(1f, 1f / min(a, b), blend)
             sourceWeight[spring] = if (spoke) 1f else lerp(1f, 2f * (1f - bias), blend)
             targetWeight[spring] = if (spoke) 1f else lerp(1f, 2f * bias, blend)
         }
+    }
+
+    /**
+     * 1 plus this spring's share of [MemoryGraphTuning.linkLengthSpread], drawn from its ends' stable
+     * hash: the same edge always gets the same length, whatever else the graph holds.
+     */
+    private fun lengthVariation(tuning: MemoryGraphTuning, spring: Int): Float {
+        val seed = springSeeds.getOrNull(spring) ?: return 1f
+        val unit = (seed and UNIT_MASK).toFloat() / UNIT_RANGE
+        return 1f + tuning.linkLengthSpread * (2f * unit - 1f)
+    }
+
+    /** 1 plus [MemoryGraphTuning.linkLengthDegreeBias] times how much of a hub the spring's busier end is. */
+    private fun degreeLength(tuning: MemoryGraphTuning, degree: Int): Float {
+        if (tuning.linkLengthDegreeBias == 0f || degree <= 1) return 1f
+        return 1f + tuning.linkLengthDegreeBias * min(1f, ln(degree.toFloat()) / ln(HUB_DEGREE))
     }
 
     /**
@@ -323,6 +343,33 @@ class MemoryGraphForceField(
             }
             return kinds.toIntArray()
         }
+
+        /**
+         * Each of [springsOf]'s springs' stable hash of its two ends' ids, in either order (FNV-1a),
+         * so an edge's length variation never depends on what else is in the graph.
+         */
+        fun springSeedsOf(view: MemoryGraphView): IntArray {
+            val ids = view.nodes.mapTo(HashSet()) { it.id }
+            return view.edges
+                .filter { it.fromId != it.toId && it.fromId in ids && it.toId in ids }
+                .map { edge -> stableHash(minOf(edge.fromId, edge.toId) + SEPARATOR + maxOf(edge.fromId, edge.toId)) }
+                .toIntArray()
+        }
+
+        private fun stableHash(text: String): Int {
+            var hash = FNV_OFFSET
+            text.forEach { char -> hash = (hash xor char.code) * FNV_PRIME }
+            return hash
+        }
+
+        private const val SEPARATOR = '\u0000'
+        private const val FNV_OFFSET = -2128831035
+        private const val FNV_PRIME = 16777619
+        private const val UNIT_MASK = 0xFFFFFF
+        private const val UNIT_RANGE = 16777216f
+
+        /** A node with this many links counts as a full hub for the degree length bias. */
+        private const val HUB_DEGREE = 64f
 
         private const val MIN_DISTANCE = 0.01f
         private const val MIN_DISTANCE_SQ = 1f

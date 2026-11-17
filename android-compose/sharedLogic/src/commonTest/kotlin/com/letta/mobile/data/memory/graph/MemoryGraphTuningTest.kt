@@ -129,6 +129,7 @@ class MemoryGraphTuningTest {
         val fleet = listOf(tuning.hubSpokeStrength, tuning.crowdedRepulsionScale, tuning.crowdedCollisionStrength, tuning.barnesHutAbove)
         assertEquals(listOf(0.02f, 3f, 3f, 300f), fleet)
         assertEquals(0.9f, tuning.barnesHutTheta)
+        assertEquals(listOf(0.25f, 0.1f), listOf(tuning.linkLengthSpread, tuning.linkLengthDegreeBias))
         assertEquals(listOf(10f, 0.35f, 0.1f), listOf(tuning.barnesHutRebuildFrames, tuning.collisionMaxShare, tuning.collisionFadeAlpha))
         assertTrue(tuning.pinBackend)
         assertTrue(tuning.clusterEnabled && tuning.seededLayout)
@@ -143,9 +144,15 @@ class MemoryGraphTuningTest {
         val view = MemoryGraphViews.build(star(), emptySet())
         val seed = MemoryGraphLayoutEngine.layout(view, MemoryGraphLayoutMode.Radial)
         val plain = field(view, seed)
-        val off = MemoryGraphTuning(degreeScaling = 0f, clusterEnabled = false, sparseDamping = config.damping)
+        val off = MemoryGraphTuning(
+            degreeScaling = 0f,
+            clusterEnabled = false,
+            sparseDamping = config.damping,
+            linkLengthSpread = 0f,
+            linkLengthDegreeBias = 0f,
+        )
         val tuned = field(view, seed).also {
-            it.applyTuning(off, nodeKinds(view), MemoryGraphForceField.springKindsOf(view))
+            it.applyTuning(off, nodeKinds(view), MemoryGraphForceField.springKindsOf(view), MemoryGraphForceField.springSeedsOf(view))
         }
         val motion = MemoryGraphMotion.forGraph(view.nodes.size, view.edges.size, off)
         repeat(STEPS) {
@@ -282,6 +289,79 @@ class MemoryGraphTuningTest {
     }
 
     @Test
+    fun eachLinkGetsItsOwnStableLengthWithinTheSpread() {
+        val view = MemoryGraphViews.build(star(), emptySet())
+        val tuning = MemoryGraphTuning(linkLengthDegreeBias = 0f)
+        val lengths = restLengths(view, tuning)
+        assertEquals(lengths, restLengths(view, tuning), "the same edge always gets the same length")
+        val base = tuning.lengthOf(MemoryGraphEdgeKind.Remembers)
+        lengths.values.forEach { length ->
+            assertTrue(length in base * (1f - tuning.linkLengthSpread)..base * (1f + tuning.linkLengthSpread), "$length strays too far")
+        }
+        assertTrue(lengths.values.toSet().size > 1, "lengths vary")
+        assertEquals(setOf(base), restLengths(view, tuning.copy(linkLengthSpread = 0f)).values.toSet(), "spread 0 is one length")
+    }
+
+    @Test
+    fun addingANodeLeavesEveryOtherLinksLength() {
+        val before = MemoryGraphViews.build(star(), emptySet())
+        val grown = star().let { graph ->
+            val newcomer = node("newcomer", MemoryGraphNodeKind.Memory)
+            val anchor = node("other-agent", MemoryGraphNodeKind.Agent)
+            MemoryParityGraph(
+                nodes = graph.nodes + anchor + newcomer,
+                edges = graph.edges + MemoryGraphEdge("other->new", anchor.id, newcomer.id, "remembers", MemoryGraphEdgeKind.Remembers),
+            )
+        }
+        val after = MemoryGraphViews.build(grown, emptySet())
+        val lengthsBefore = restLengths(before, MemoryGraphTuning())
+        val lengthsAfter = restLengths(after, MemoryGraphTuning())
+        lengthsBefore.forEach { (edge, length) -> assertEquals(length, lengthsAfter[edge], edge) }
+    }
+
+    @Test
+    fun theDegreeBiasLengthensLinksToHubs() {
+        val view = MemoryGraphViews.build(star(), emptySet())
+        val plain = restLengths(view, MemoryGraphTuning(linkLengthSpread = 0f, linkLengthDegreeBias = 0f))
+        val biased = restLengths(view, MemoryGraphTuning(linkLengthSpread = 0f, linkLengthDegreeBias = 0.2f))
+        plain.forEach { (edge, length) -> assertTrue(biased.getValue(edge) > length, "$edge to the hub is longer") }
+    }
+
+    /**
+     * Each edge's rest length under [tuning], read back as where a spring stops pulling: a lone
+     * pair placed at a candidate length moves neither way only at its rest length. Measured by
+     * bisection on a two-node field per edge, so no field internals are exposed.
+     */
+    private fun restLengths(view: MemoryGraphView, tuning: MemoryGraphTuning): Map<String, Float> {
+        val springs = MemoryGraphForceField.springsOf(view)
+        val kinds = MemoryGraphForceField.springKindsOf(view)
+        val seeds = MemoryGraphForceField.springSeedsOf(view)
+        val quiet = tuning.copy(repulsion = 0f, gravity = 0f, clusterEnabled = false, degreeScaling = 0f)
+        return view.edges.indices.associate { s ->
+            val edge = view.edges[s]
+            val field = MemoryGraphForceField(view.nodes.size, springs)
+            field.applyTuning(quiet, nodeKinds(view), kinds, seeds)
+            edge.id to bisectRest(field, springs[2 * s], springs[2 * s + 1], view)
+        }
+    }
+
+    /** The distance at which the spring between [a] and [b] is slack, every other node far away. */
+    private fun bisectRest(field: MemoryGraphForceField, a: Int, b: Int, view: MemoryGraphView): Float {
+        var low = 1f
+        var high = 1_000f
+        repeat(BISECTIONS) {
+            val mid = (low + high) / 2f
+            view.nodes.indices.forEach { i -> field.place(i, MemoryGraphPoint(i * FAR * 10f, FAR * 10f)) }
+            field.rest()
+            field.place(a, MemoryGraphPoint(0f, 0f))
+            field.place(b, MemoryGraphPoint(mid, 0f))
+            field.step(a, MemoryGraphMotion.forGraph(view.nodes.size, view.edges.size), 1f)
+            if (field.point(b).x < mid) high = mid else low = mid
+        }
+        return (low + high) / 2f
+    }
+
+    @Test
     fun aStoredTuningRoundTrips() {
         val tuned = MemoryGraphTuning(
             repulsion = 4200f,
@@ -389,6 +469,7 @@ class MemoryGraphTuningTest {
         const val STRETCHED = 200f
         const val REST = 110f
         const val FAR = 1_000f
+        const val BISECTIONS = 30
         const val SPOKE_PULL = 50f
         const val SPREAD = 3_000f
         const val SEED = 11
