@@ -30,7 +30,10 @@ import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_attached_image
 import com.letta.mobile.sharedui.resources.rows_image_not_loaded
+import com.letta.mobile.sharedui.resources.rows_image_missing
+import com.letta.mobile.sharedui.resources.rows_image_invalid
 import com.letta.mobile.sharedui.resources.rows_more_count
+import com.letta.mobile.ui.chat.surface.rememberDecodedImageResult
 import com.letta.mobile.ui.chat.surface.rememberDecodedImage
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.theme.ChatRowDimens
@@ -184,7 +187,8 @@ internal fun ChatAttachmentImage(
     modifier: Modifier = Modifier,
     cellHeight: Dp? = null,
 ) {
-    val bitmap = rememberAttachmentBitmap(attachment)
+    val decoded = rememberDecodedImageResult(attachment.base64)
+    val bitmap = decoded?.getOrNull()
     // Unknown aspect (loading, failure or stored pointer) keeps the old 220dp placeholder.
     // Fixed cells are reserved for multiple images and the compact thumbnail strip.
     val size = when {
@@ -209,10 +213,16 @@ internal fun ChatAttachmentImage(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
             )
-        } else if (attachment.storedByteSize != null) {
-            Box(contentAlignment = Alignment.Center) {
+        } else {
+            val reason = when {
+                attachment.storedByteSize != null -> Res.string.rows_image_not_loaded
+                attachment.base64.isBlank() -> Res.string.rows_image_missing
+                decoded?.isFailure == true -> Res.string.rows_image_invalid
+                else -> null
+            }
+            if (reason != null) Box(contentAlignment = Alignment.Center) {
                 Text(
-                    text = stringResource(Res.string.rows_image_not_loaded),
+                    text = stringResource(reason),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(LettaDimens.Space.xs),

@@ -18,7 +18,8 @@ import com.letta.mobile.util.Telemetry
  * rejected by the frame layer (admin_rpc.stream.response_too_large,
  * maxFrameBytes=1MiB). Long histories are the product, so the serve path must
  * PAGINATE, not prune: this guard bounds every message.list page to stay under
- * the frame cap. It NEVER lets a response exceed the cap — if the projected page
+ * the frame cap. The byte budget is soft for an indivisible row or call/return window; frame_part carries
+ * those oversized windows. If the projected page
  * is still too large it shrinks the window (dropping the OLDEST rows, keeping the
  * newest so the chat opens at the tail) and marks the response with a
  * continuation cursor so the client can load older windows.
@@ -76,6 +77,7 @@ object MessageListPageGuard {
             if (newestLast) kept.addFirst(msg) else kept.addLast(msg)
             bytes += add
         }
+        keepInvokingCalls(messages, kept)
         val trimmed = kept.size < messages.size
         val keptArray = JsonArray(kept.toList())
         if (!trimmed) return keptArray
@@ -221,5 +223,24 @@ object MessageListPageGuard {
         return buildJsonObject {
             for ((key, value) in response) if (key != field) put(key, value)
         }
+    }
+}
+
+/** Keep an invoking call in the same page as its return, preserving cursor continuity. */
+private fun keepInvokingCalls(messages: List<JsonElement>, kept: ArrayDeque<JsonElement>) {
+    // A return without its invoking call is discarded by timeline hydration. Keep the
+    // contiguous dependency window, even when an inline image exceeds the soft budget.
+    // As with a single oversized row, frame_part carries this atomic window.
+    val returnedCallIds = kept.mapNotNull { (it as? JsonObject)?.get("tool_call_id") }.toSet()
+    val callIndices = messages.indices.filter { index ->
+        val call = (messages[index] as? JsonObject)?.get("tool_call") as? JsonObject
+        val callId = call?.get("tool_call_id")
+        callId != null && callId in returnedCallIds
+    }
+    val keptIndices = messages.indices.filter { messages[it] in kept }
+    val window = (keptIndices + callIndices).sorted()
+    if (window.isNotEmpty()) {
+        kept.clear()
+        for (index in window.first()..window.last()) kept.addLast(messages[index])
     }
 }

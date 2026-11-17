@@ -11,6 +11,8 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.graphics.toArgb
 import com.letta.mobile.ui.image.decodeImageBitmap
 import kotlin.test.assertNotNull
+import kotlin.test.assertContentEquals
+import org.junit.Assume.assumeTrue
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -55,19 +57,64 @@ import kotlinx.serialization.json.put
 
 /** Optional stored inputs supplement the portable, deterministic >1 MiB regression image. */
 class ToolImagePipelineUiTest {
-    @Test
-    fun historyAndLiveToolImagesReachTheFoldedRun() {
-        inputs().forEach { input ->
-            val directory = Files.createTempDirectory("tool-image-pipeline").toFile()
-            try {
-                verifyInput(directory, input)
-            } finally {
-                directory.deleteRecursively()
-            }
+    @Test fun generatedLargePng() {
+        val directory = Files.createTempDirectory("tool-image-generated").toFile()
+        try { verifyInput(directory, generatedInput()) } finally { directory.deleteRecursively() }
+    }
+
+    @Test fun failingPng() = verifyNamed("failing-png-toolresult.json")
+    @Test fun shownJpeg() = verifyNamed("shown-jpeg-toolresult.json")
+    @Test fun shownSmallPng() = verifyNamed("shown-small-png-toolresult.json")
+    @Test fun strippedBigPng() = verifyNamed("v1-big-png-stripped.png")
+    @Test fun bigJpeg() = verifyNamed("v2-big-jpeg-q100.jpg")
+    @Test fun smallPngWithPrompt() = verifyNamed("v3-small-png-with-prompt.png")
+
+    private fun verifyNamed(name: String) {
+        assumeTrue("Stored evidence is opt-in; the generated regression always runs", System.getenv("BXFQ6_FIXTURES") != null)
+        val input = inputs().first { it.first == name }.second
+        val directory = Files.createTempDirectory("tool-image-pipeline").toFile()
+        try {
+            verifyInput(directory, input)
+        } finally {
+            directory.deleteRecursively()
         }
     }
 
     private fun verifyInput(directory: File, input: JsonObject) {
+        val message = input.getValue("message").jsonObject
+        val imagePart = message.getValue("content").jsonArray.first {
+            it.jsonObject["type"]?.jsonPrimitive?.content == "image"
+        }.jsonObject
+        val expectedBytes = Base64.decode(imagePart.getValue("data").jsonPrimitive.content)
+        val native = projectStored(directory, input)
+        val projected = MessageListWireProjection.projectMessageList(native, CONVERSATION)
+        val bounded = MessageListPageGuard.bound(projected)
+        val rows = if (bounded is JsonArray) bounded else bounded.jsonObject.getValue("messages").jsonArray
+        assertEquals(2, rows.size, "page must retain the invoking call")
+        val history = rows.map { JSON.decodeFromJsonElement<LettaMessage>(it) }
+        assertEquals(1, history.filterIsInstance<com.letta.mobile.data.model.ToolReturnMessage>().single().attachments.size,
+            "wire must retain the image")
+        val empty = Timeline(CONVERSATION)
+        val hydrated = TimelineHydrationReducer.reduce(CONVERSATION, history, empty, empty, emptyList()).timeline
+        assertRendered(hydrated, expectedBytes, message.getValue("id").jsonPrimitive.content + " history")
+        val live = (projected as JsonArray).flatMap { row ->
+            val envelope = buildJsonObject { put("type", "stream_delta"); put("delta", row) }
+            RuntimeEventServerFrameMapper.map(
+                RuntimeEventPayload.RemoteStreamFrame("frame", null, null, envelope.toString()),
+                RuntimeEventServerFrameMapper.Context("image-agent", CONVERSATION, "image-turn", RUN),
+            ).map { requireNotNull(WsFrameMapper.toLettaMessage(it)) }
+        }
+        var timeline = empty
+        var pending = persistentMapOf<String, com.letta.mobile.data.model.ToolReturnMessage>()
+        live.forEach { frame ->
+            val result = reduceStreamFrame(TimelineReducerInput(timeline, frame, pending))
+            timeline = result.next
+            pending = result.updatedPendingToolReturnsByCallId
+        }
+        assertRendered(timeline, expectedBytes, message.getValue("id").jsonPrimitive.content + " live")
+    }
+
+    private fun projectStored(directory: File, input: JsonObject): JsonArray {
         val message = input.getValue("message").jsonObject
         val callId = message.getValue("toolCallId").jsonPrimitive.content
         val call = buildJsonObject {
@@ -84,36 +131,41 @@ class ToolImagePipelineUiTest {
         val storeDirectory = File(directory, "conversations/$key").apply { mkdirs() }
         File(storeDirectory, "conversation.json").writeText("""{"id":"$CONVERSATION","agent_id":"image-agent"}""")
         File(storeDirectory, "messages.jsonl").writeText("$call\n$input\n")
-        val native = LocalBackendAdminStore(directory).listMessagesProjected(CONVERSATION, null, MessagePage(null, null, null, null))!!
-        val projected = MessageListWireProjection.projectMessageList(native, CONVERSATION)
-        val bounded = MessageListPageGuard.bound(projected)
-        val rows = if (bounded is JsonArray) bounded else bounded.jsonObject.getValue("messages").jsonArray
-        val history = rows.map { JSON.decodeFromJsonElement<LettaMessage>(it) }
-        val empty = Timeline(CONVERSATION)
-        val hydrated = TimelineHydrationReducer.reduce(CONVERSATION, history, empty, empty, emptyList()).timeline
-        assertRendered(hydrated, message.getValue("id").jsonPrimitive.content + " history")
-        val live = rows.flatMap { row ->
-            val envelope = buildJsonObject { put("type", "stream_delta"); put("delta", row) }
-            RuntimeEventServerFrameMapper.map(
-                RuntimeEventPayload.RemoteStreamFrame("frame", null, null, envelope.toString()),
-                RuntimeEventServerFrameMapper.Context("image-agent", CONVERSATION, "image-turn", RUN),
-            ).map { requireNotNull(WsFrameMapper.toLettaMessage(it)) }
-        }
-        var timeline = empty
-        var pending = persistentMapOf<String, com.letta.mobile.data.model.ToolReturnMessage>()
-        live.forEach { frame ->
-            val result = reduceStreamFrame(TimelineReducerInput(timeline, frame, pending))
-            timeline = result.next
-            pending = result.updatedPendingToolReturnsByCallId
-        }
-        assertRendered(timeline, message.getValue("id").jsonPrimitive.content + " live")
+        return LocalBackendAdminStore(directory).listMessagesProjected(CONVERSATION, null, MessagePage(null, null, null, null))!!
     }
 
-    private fun assertRendered(timeline: Timeline, label: String) {
+    @Test
+    fun missingStoredPayloadRemainsAnImage() {
+        val input = generatedInput()
+        val message = input.getValue("message").jsonObject
+        val missing = JsonObject(input + ("message" to JsonObject(message + ("content" to buildJsonArray {
+            add(buildJsonObject { put("type", "image"); put("mimeType", "image/png") })
+        }))))
+        val directory = Files.createTempDirectory("tool-image-missing").toFile()
+        try {
+            val wire = MessageListWireProjection.projectMessageList(projectStored(directory, missing), CONVERSATION) as JsonArray
+            val returned = wire.map { JSON.decodeFromJsonElement<LettaMessage>(it) }
+                .filterIsInstance<com.letta.mobile.data.model.ToolReturnMessage>().single()
+            assertEquals(1, returned.attachments.size, "missing payload must retain a failure placeholder")
+            assertEquals("", returned.attachments.single().base64)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    private fun assertRendered(timeline: Timeline, expectedBytes: ByteArray, label: String) {
         val messages = timeline.events.mapNotNull { timelineEventToUiMessage(it) }.map { it.copy(runId = RUN) }
         val images = messages.flatMap { it.toolCalls.orEmpty() }.flatMap { it.generatedImageAttachments }
-        assertEquals(1, images.size, "$label projected attachment")
-        val expected = ImageIO.read(Base64.decode(images.single().base64).inputStream())
+        assertEquals(1, images.size, "$label projected attachment; " +
+            timeline.events.joinToString { event ->
+                when (event) {
+                    is com.letta.mobile.data.timeline.TimelineEvent.Confirmed ->
+                        "${event.messageType} calls=${event.toolCalls.map { it.effectiveId }} attachments=${event.attachments.size}"
+                    is com.letta.mobile.data.timeline.TimelineEvent.Local -> "local"
+                }
+            })
+        assertContentEquals(expectedBytes, Base64.decode(images.single().base64), "$label preserved image bytes")
+        val expected = ImageIO.read(expectedBytes.inputStream())
         val decoded = assertNotNull(decodeImageBitmap(Base64.decode(images.single().base64)), label)
         assertEquals(expected.width, decoded.width, label)
         assertEquals(expected.height, decoded.height, label)
@@ -141,32 +193,44 @@ class ToolImagePipelineUiTest {
             }
             val painted = onAllNodesWithContentDescription("Attached image", useUnmergedTree = true)[0].captureToImage()
             assertTrue(painted.width > 0 && painted.height > 0, "$label painted image")
+            val renderedPixels = painted.toPixelMap()
+            val colors = (1..PAINT_SAMPLES).flatMap { x ->
+                (1..PAINT_SAMPLES).map { y ->
+                    renderedPixels[x * (painted.width - 1) / PAINT_SAMPLES, y * (painted.height - 1) / PAINT_SAMPLES].toArgb()
+                }
+            }.toSet()
+            assertTrue(colors.size > MIN_PAINTED_COLORS, "$label must paint image content")
         }
     }
 
-    private fun inputs(): List<JsonObject> {
+    private fun inputs(): List<Pair<String, JsonObject>> {
         val supplied = System.getenv("BXFQ6_FIXTURES")?.let(::File)
         if (supplied != null) {
             val stored = supplied.listFiles()!!.filter { it.extension == "json" }.sortedBy { it.name }
-                .map { JSON.parseToJsonElement(it.readText()).jsonObject }
-            val template = stored.first()
+                .map { it.name to JSON.parseToJsonElement(it.readText()).jsonObject }
+            val template = stored.first().second
             return stored + supplied.listFiles()!!.filter { it.extension != "json" }.sortedBy { it.name }.map { file ->
                 val message = template.getValue("message").jsonObject
                 val mime = if (file.extension == "jpg") "image/jpeg" else "image/png"
-                JsonObject(template + ("message" to JsonObject(message + ("content" to imageParts(file.readBytes(), mime)))))
+                file.name to JsonObject(template + ("message" to JsonObject(message + ("content" to imageParts(file.readBytes(), mime)))))
             }
         }
+        return emptyList()
+    }
+
+    private fun generatedInput(): JsonObject {
         val random = Random(418027)
         val image = BufferedImage(832, 1216, BufferedImage.TYPE_INT_RGB)
         for (y in 0 until image.height) for (x in 0 until image.width) image.setRGB(x, y, random.nextInt())
         val bytes = ByteArrayOutputStream().also { ImageIO.write(image, "png", it) }.toByteArray()
         assertTrue(bytes.size > MEBIBYTE, "regression must exercise a real large PNG")
-        return listOf(buildJsonObject {
+        return buildJsonObject {
+            put("type", "message")
             put("message", buildJsonObject {
                 put("id", "large-image"); put("role", "toolResult"); put("toolCallId", "image-call")
                 put("toolName", "ViewImage"); put("content", imageParts(bytes, "image/png"))
             })
-        })
+        }
     }
 
     private fun imageParts(bytes: ByteArray, mime: String) = buildJsonArray {
@@ -177,6 +241,8 @@ class ToolImagePipelineUiTest {
     private companion object {
         const val CONVERSATION = "image-pipeline"
         const val RUN = "image-run"
+        const val PAINT_SAMPLES = 16
+        const val MIN_PAINTED_COLORS = 8
         const val MEBIBYTE = 1024 * 1024
         val JSON = Json { ignoreUnknownKeys = true }
     }

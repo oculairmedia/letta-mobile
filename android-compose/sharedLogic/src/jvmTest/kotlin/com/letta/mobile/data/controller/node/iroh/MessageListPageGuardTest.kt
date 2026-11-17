@@ -8,6 +8,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,6 +21,29 @@ import kotlin.test.assertFalse
  * paginates a huge (synthetic) transcript instead of shipping one giant frame.
  */
 class MessageListPageGuardTest {
+
+    @Test
+    fun oversizedToolOutputKeepsItsCallAcrossBothPageOrders() {
+        val call = buildJsonObject {
+            put("id", "image-request")
+            put("message_type", "tool_call_message")
+            put("tool_call", buildJsonObject { put("tool_call_id", "image-call") })
+        }
+        val returned = buildJsonObject {
+            put("id", "image-result")
+            put("message_type", "tool_return_message")
+            put("tool_call_id", "image-call")
+            put("tool_return", "x".repeat(MessageListPageGuard.MAX_PAGE_BYTES))
+        }
+        for (ascending in listOf(true, false)) {
+            val rows = listOf(msg("older", 100), call, returned).let { if (ascending) it else it.reversed() }
+            val bounded = MessageListPageGuard.bound(JsonArray(rows), newestLast = ascending).jsonObject
+            val kept = bounded.getValue("messages").jsonArray
+            assertEquals(if (ascending) listOf(call, returned) else listOf(returned, call), kept.toList())
+            assertEquals("image-request", bounded.getValue("next_before").jsonPrimitive.content)
+            assertTrue(bounded.getValue("has_more").jsonPrimitive.content.toBoolean())
+        }
+    }
 
     /** A synthetic message with a body of [bodyBytes] filler. */
     private fun msg(id: String, bodyBytes: Int): JsonObject = buildJsonObject {

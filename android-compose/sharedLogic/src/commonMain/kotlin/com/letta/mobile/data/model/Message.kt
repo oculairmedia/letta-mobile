@@ -235,7 +235,10 @@ private fun extractContentPartResponse(raw: JsonElement?): String? {
  * fourth shape lands.
  */
 private fun parseLettaImagePart(obj: JsonObject): MessageContentPart.Image? =
-    parseFlatLettaImagePart(obj) ?: parseWrappedLettaImagePart(obj)
+    parseFlatLettaImagePart(obj) ?: parseWrappedLettaImagePart(obj) ?: MessageContentPart.Image(
+        base64 = obj.fieldContent("data").orEmpty(),
+        mediaType = obj.fieldContent("mimeType") ?: obj.fieldContent("media_type") ?: "image/unknown",
+    )
 
 /**
  * Flat image shape: `{ "type":"image", "data":"…", "mimeType":"…" }`.
@@ -275,8 +278,8 @@ private fun parseWrappedLettaImagePart(obj: JsonObject): MessageContentPart.Imag
 private fun parseBase64ImageSource(source: JsonObject): MessageContentPart.Image? {
     val mediaType = source.fieldContent("media_type")
     val data = source.fieldContent("data")
-    if (mediaType.isNullOrBlank() || data.isNullOrBlank()) return null
-    return MessageContentPart.Image(base64 = data, mediaType = mediaType)
+    if (mediaType.isNullOrBlank()) return null
+    return MessageContentPart.Image(base64 = data.orEmpty(), mediaType = mediaType)
 }
 
 /** Decodes a `source.type == "url"` image source. Only inline `data:` URLs are retained. */

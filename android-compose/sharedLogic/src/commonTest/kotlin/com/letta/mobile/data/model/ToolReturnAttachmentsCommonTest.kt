@@ -28,6 +28,13 @@ class ToolReturnAttachmentsCommonTest {
     }
 
     @Test
+    fun imageWithoutMetadataSurvivesAsAFailurePlaceholder() {
+        val message = ToolReturnMessage(id = "missing-metadata", toolReturnRaw = parse("""{"type":"image"}"""))
+        assertEquals(1, message.attachments.size)
+        assertEquals("", message.attachments.single().base64)
+    }
+
+    @Test
     fun `object-typed type field does not crash attachment extraction`() {
         // `type` is an object, not a primitive — the exact crash shape.
         val raw = parse(
