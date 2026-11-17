@@ -21,6 +21,7 @@ import com.letta.mobile.data.memory.graph.MemoryGraphTuning
 import com.letta.mobile.data.memory.graph.MemoryGraphView
 import com.letta.mobile.data.memory.graph.MemoryGraphViewport
 import com.letta.mobile.ui.theme.graph.GraphDimens
+import kotlin.math.round
 
 /** The labels a draw pass places: their measured text, which to show, their fade and the tuning. */
 internal class GraphLabels(
@@ -177,10 +178,11 @@ private fun DrawScope.labelChip(frame: GraphFrame, node: MemoryGraphNode): Label
     val label = frame.scene.labels.texts[node.id] ?: return null
     val centre = frame.screen(node.id) ?: return null
     val text = if (node.id == frame.focusId) label.full else label.short
-    val pad = Offset(GraphDimens.labelChipPadX.toPx(), GraphDimens.labelChipPadY.toPx())
+    val pad = Offset(round(GraphDimens.labelChipPadX.toPx()), round(GraphDimens.labelChipPadY.toPx()))
     val chipSize = Size(text.size.width + pad.x * 2f, text.size.height + pad.y * 2f)
-    val topLeft = labelChipTopLeft(frame, node, centre, chipSize) ?: return null
-    return LabelChip(text, topLeft, chipSize, pad)
+    val placed = labelChipTopLeft(frame, node, centre, chipSize) ?: return null
+    // Whole device pixels, so text moving with its node never shimmers between sub-pixel positions.
+    return LabelChip(text, Offset(round(placed.x), round(placed.y)), chipSize, pad)
 }
 
 private fun DrawScope.drawLabel(frame: GraphFrame, node: MemoryGraphNode, fade: Float) {
@@ -195,8 +197,9 @@ private fun DrawScope.drawLabel(frame: GraphFrame, node: MemoryGraphNode, fade: 
  * off. A dimmed node's label that would run off is dropped instead, so it never crowds the focus.
  */
 private fun DrawScope.labelChipTopLeft(frame: GraphFrame, node: MemoryGraphNode, centre: Offset, chip: Size): Offset? {
-    val neighbours = frame.scene.neighbours[node.id].orEmpty().mapNotNull(frame::screen)
-    val direction = MemoryLabelPlacement.direction(centre, neighbours)
+    val direction = frame.scene.labels.labeler.direction(node.id) {
+        MemoryLabelPlacement.direction(centre, frame.scene.neighbours[node.id].orEmpty().mapNotNull(frame::screen))
+    }
     val arcGap = if (frame.scene.looks[node.id]?.usage != null) GraphDimens.usageGap.toPx() else 0f
     val reach = frame.radiusOf(node) + GraphDimens.labelGap.toPx() + arcGap
     val placed = MemoryLabelPlacement.topLeft(centre, reach, direction, chip)

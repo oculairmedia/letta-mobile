@@ -75,6 +75,53 @@ class MemoryGraphLabelerTest {
     }
 
     @Test
+    fun aLabelJitteringAcrossAnOverlapBoundaryDoesNotFlicker() {
+        val steady = MemoryLabelContext(null, null, 1f, tuning.copy(labelCullInterval = 1f))
+        assertTrue(jitter(MemoryGraphLabeler(view, view.adjacency()), steady).all { it }, "hysteresis holds the label")
+        val twitchy = MemoryLabelContext(null, null, 1f, steady.tuning.copy(labelHysteresisCount = 1f, labelHysteresisMargin = 0f))
+        val flicker = jitter(MemoryGraphLabeler(view, view.adjacency()), twitchy).toSet()
+        assertEquals(setOf(true, false), flicker, "without it the label flickers")
+    }
+
+    @Test
+    fun theLabelsHoldOnceTheGraphStopsUntilFocusChanges() {
+        labeler.moving = true
+        labeler.shown(context(), ::apart)
+        labeler.moving = false
+        val rested = labeler.shown(context(), ::apart).toSet()
+        // Even a layout that would now cull "human" leaves the rested labels as they are.
+        val clash = { node: MemoryGraphNode -> if (node.id == "persona" || node.id == "human") CLASH else apart(node) }
+        repeat(FRAMES) { assertEquals(rested, labeler.shown(context(), clash).toSet()) }
+    }
+
+    @Test
+    fun hoveringUpdatesTheLabelsInTheSameFrame() {
+        labeler.moving = false
+        repeat(FRAMES) { labeler.shown(context(), ::apart) }
+        assertFalse("leaf-a" in labeler.shown(context(), ::apart))
+        assertTrue("leaf-a" in labeler.shown(context(hovered = "a1"), ::apart), "the hovered agent's block is labelled at once")
+    }
+
+    /**
+     * Frames of "human" jittering a pixel either side of touching "persona" while the graph moves:
+     * whether its label showed each frame.
+     */
+    private fun jitter(labeler: MemoryGraphLabeler, context: MemoryLabelContext): List<Boolean> {
+        labeler.moving = true
+        return (0 until FRAMES).map { frame ->
+            val left = CLASH.right + if (frame % 2 == 0) 1f else -1f
+            val chips = { node: MemoryGraphNode ->
+                when (node.id) {
+                    "persona" -> CLASH
+                    "human" -> Rect(Offset(left, CLASH.top), Size(CHIP_WIDTH, CHIP_HEIGHT))
+                    else -> apart(node)
+                }
+            }
+            "human" in labeler.shown(context, chips)
+        }
+    }
+
+    @Test
     fun labelsFadeInOverTheDurationAndInstantlyUnderReducedMotion() {
         val fade = MemoryLabelFade()
         fade.advance(setOf("a1"), 0L, DURATION)
@@ -127,5 +174,6 @@ class MemoryGraphLabelerTest {
         val CLASH = Rect(Offset(500f, 500f), Size(CHIP_WIDTH, CHIP_HEIGHT))
         const val DURATION = 160_000_000L
         const val FRAME = 16_000_000L
+        const val FRAMES = 20
     }
 }

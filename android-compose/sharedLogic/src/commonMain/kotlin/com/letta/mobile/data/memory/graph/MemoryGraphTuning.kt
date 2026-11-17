@@ -108,6 +108,12 @@ data class MemoryGraphTuning(
     val labelNeighboursOnFocus: Boolean = true,
     /** Label text size, as a multiple of the graph's label styles. */
     val labelFontScale: Float = 1f,
+    /** Decisions running a label must overlap (or be clear) before culling hides (or shows) it. */
+    val labelHysteresisCount: Float = 3f,
+    /** Pixels a shown label's chip is shrunk (and a hidden one's grown) by when culling tests it. */
+    val labelHysteresisMargin: Float = 6f,
+    /** While the graph moves, frames between culling decisions; at rest the labels hold until focus or zoom changes. */
+    val labelCullInterval: Float = 8f,
 ) {
     /** [kind]'s charge (1 when unset). */
     fun chargeOf(kind: MemoryGraphNodeKind): Float = nodeCharge[kind] ?: 1f
@@ -208,6 +214,9 @@ class MemoryGraphTunings {
                 "labelCulling" to tuning.labelCulling.toString(),
                 "labelNeighboursOnFocus" to tuning.labelNeighboursOnFocus.toString(),
                 "labelFontScale" to tuning.labelFontScale.literal(),
+                "labelHysteresisCount" to tuning.labelHysteresisCount.literal(),
+                "labelHysteresisMargin" to tuning.labelHysteresisMargin.literal(),
+                "labelCullInterval" to tuning.labelCullInterval.literal(),
             )
             return fields.joinToString(separator = ",\n", prefix = "MemoryGraphTuning(\n", postfix = ",\n)") { (name, value) ->
                 "    $name = $value"

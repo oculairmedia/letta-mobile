@@ -49,6 +49,7 @@ class MemoryGraphTuningTest {
         val labels = listOf(tuning.labelMinDegree, tuning.labelZoomThreshold, tuning.labelAllUnderNodes, tuning.labelFontScale)
         assertEquals(listOf(3f, 1.6f, 60f, 1f), labels)
         assertTrue(tuning.labelCulling && tuning.labelNeighboursOnFocus)
+        assertEquals(listOf(3f, 6f, 8f), listOf(tuning.labelHysteresisCount, tuning.labelHysteresisMargin, tuning.labelCullInterval))
     }
 
     @Test
@@ -216,7 +217,8 @@ class MemoryGraphTuningTest {
         assertTrue("MemoryGraphEdgeKind.Runs to 110.0f" in source)
         assertTrue("    maxFramesPerHeat = 360.0f,\n" in source)
         assertTrue("    labelCulling = true,\n" in source)
-        assertTrue("    labelFontScale = 1.0f,\n)" in source)
+        assertTrue("    labelFontScale = 1.0f,\n" in source)
+        assertTrue("    labelCullInterval = 8.0f,\n)" in source)
     }
 
     /** How far the agent of an agent–memory pair [PAIR_DISTANCE] apart moves in one step under [tuning]. */

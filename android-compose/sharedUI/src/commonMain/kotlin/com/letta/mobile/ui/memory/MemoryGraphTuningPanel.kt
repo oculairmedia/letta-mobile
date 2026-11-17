@@ -169,6 +169,9 @@ internal object MemoryGraphKnobs {
             { t, v -> t.copy(labelAllUnderNodes = v) },
         ),
         MemoryGraphKnob("Label font scale", 0.5f..2f, { it.labelFontScale }, { t, v -> t.copy(labelFontScale = v) }),
+        MemoryGraphKnob("Hysteresis (decisions)", 1f..10f, { it.labelHysteresisCount }, { t, v -> t.copy(labelHysteresisCount = v) }),
+        MemoryGraphKnob("Hysteresis margin (px)", 0f..30f, { it.labelHysteresisMargin }, { t, v -> t.copy(labelHysteresisMargin = v) }),
+        MemoryGraphKnob("Cull every N frames while moving", 1f..30f, { it.labelCullInterval }, { t, v -> t.copy(labelCullInterval = v) }),
     )
 
     private fun clusterAndSeedToggles(): List<MemoryGraphToggle> = listOf(

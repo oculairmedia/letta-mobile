@@ -98,6 +98,7 @@ internal fun MemoryGraphCanvas(
     ) {
         // Read so a fading label redraws the canvas each frame until it settles.
         fade.frameNanos
+        labeler.moving = !params.live.isSettled
         val graphLabels = GraphLabels(labels, labeler, fade, tuning)
         val scene = GraphScene(params.view, neighbours, params.looks, graphLabels, palette, params.selectedNodeId, hoveredId)
         drawGraph(GraphFrame(scene, params.live.layout, viewportState.viewport))
