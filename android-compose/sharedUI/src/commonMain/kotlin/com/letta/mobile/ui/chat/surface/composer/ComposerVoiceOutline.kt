@@ -31,7 +31,7 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.components.beam.LettaBeamDefaults
 import com.letta.mobile.ui.components.beam.LettaBeamSpec
-import com.letta.mobile.ui.components.beam.lettaBorderBeam
+import com.letta.mobile.ui.components.beam.composerBorderBeam
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -87,7 +87,7 @@ internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modif
             voiceOutlineRole = role
             voiceOutlineAnimated = level != null
         }
-        .lettaBorderBeam(beam, active = mode == ComposerOutlineMode.Working)
+        .composerBorderBeam(beam, active = mode == ComposerOutlineMode.Working)
         .drawWithCache {
             val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithCache)) }
             val strokes = OutlineStrokes(this)

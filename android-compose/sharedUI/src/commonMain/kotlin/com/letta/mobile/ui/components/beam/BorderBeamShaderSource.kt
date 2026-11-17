@@ -20,6 +20,7 @@ uniform float phase;          // 0...1, loops
 uniform float direction;      // +1 clockwise (left to right along the top), -1 counter-clockwise
 uniform float mode;           // 0 = orbit the border, 1 = sweep along the bottom edge
 uniform float arc;            // orbit: the comet's length as a fraction of the lap
+uniform float widthScale;     // relative thickness of the crisp edge
 uniform float glow;           // soft inner glow reach in dp
 uniform float intensity;      // overall brightness and fade, 0...1
 uniform float count;          // colours in the palette, 1...8
@@ -177,7 +178,7 @@ half4 main(float2 fragCoord) {
         float tt = (fract(a - direction * phase) - (1.0 - arc)) / arc;
         if (tt >= 0.0) {
             float profile = pow(max(sin(PI * clamp(tt, 0.0, 1.0)), 0.0), 1.2);
-            float crisp = 1.0 - smoothstep(0.5, 2.25, dist);
+            float crisp = 1.0 - smoothstep(0.5 * widthScale, 2.25 * widthScale, dist);
             float halo = 0.6 * exp(-dist / max(glow * 0.1, 0.6));
             float4 c4 = samplePalette(tt);
             float w = (crisp + halo) * profile * clamp(c4.a, 0.0, 1.0);
@@ -196,7 +197,7 @@ half4 main(float2 fragCoord) {
         float tp = 1.0 - abs(2.0 * k - 1.0);
         float profile = tp * tp * (3.0 - 2.0 * tp);
         float4 c4 = samplePalette(k);
-        float crisp = 1.0 - smoothstep(0.5, 2.25, edgeDist);
+        float crisp = 1.0 - smoothstep(0.5 * widthScale, 2.25 * widthScale, edgeDist);
         float halo = 0.8 * exp(-edgeDist / max(glow * 0.2, 0.5));
         float wide = 0.6 * exp(-pow(edgeDist / max(glow, 0.001), 1.4));
         float w = ((crisp + halo) * profile + wide * profile) * clamp(c4.a, 0.0, 1.0);
@@ -221,7 +222,8 @@ internal class BeamUniforms(scope: DrawScope, frame: BeamFrame) {
     val direction: Float = frame.direction.sign
     val mode: Float = if (frame.style == LettaBeamStyle.Sweep) 1f else 0f
     val arc: Float = frame.style.arc
-    val glow: Float = with(scope) { frame.style.glowReach.toPx() } / density
+    val glow: Float = with(scope) { frame.style.glowReach.toPx() } / density * frame.widthScale
+    val widthScale: Float = frame.widthScale
     val intensity: Float = frame.alpha.coerceIn(0f, 1f)
     val count: Float = frame.palette.count.toFloat()
     val colors: FloatArray = frame.palette.packed

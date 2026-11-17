@@ -27,7 +27,7 @@ object ChatTimelineDimens {
     val coveredEdgeGradeLength: Dp = 16.dp
 
     /** Bottom fade ramp into the composer. */
-    val bottomFadeLength: Dp = 44.dp
+    val bottomFadeLength: Dp = 12.dp
 
     /** The thinking token's bright band, as wide as a phone line of it; it crosses three widths per sweep. */
     val thinkingSweepBand: Dp = 320.dp

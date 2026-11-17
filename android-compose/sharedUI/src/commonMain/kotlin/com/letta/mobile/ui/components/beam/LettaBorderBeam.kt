@@ -122,11 +122,16 @@ object LettaBeamDefaults {
  * Ported from border-beam-android by ismnoiet (MIT, see sharedUI/THIRD_PARTY_LICENSES).
  */
 fun Modifier.lettaBorderBeam(spec: LettaBeamSpec, active: Boolean = true): Modifier =
-    graphicsLayer() then BorderBeamElement(spec, active)
+    graphicsLayer() then BorderBeamElement(spec, active, 1f, 1f)
 
-private data class BorderBeamElement(val spec: LettaBeamSpec, val active: Boolean) :
+internal fun Modifier.composerBorderBeam(spec: LettaBeamSpec, active: Boolean): Modifier =
+    graphicsLayer() then BorderBeamElement(
+        spec, active, LettaComponentDimens.composerBeamWidthScale, LettaComponentDimens.composerBeamIntensity,
+    )
+
+private data class BorderBeamElement(val spec: LettaBeamSpec, val active: Boolean, val widthScale: Float, val intensity: Float) :
     ModifierNodeElement<BorderBeamNode>() {
-    override fun create(): BorderBeamNode = BorderBeamNode(spec, active)
+    override fun create(): BorderBeamNode = BorderBeamNode(spec, active, widthScale, intensity)
 
     override fun update(node: BorderBeamNode) = node.update(spec, active)
 
@@ -154,7 +159,7 @@ private const val VISIBLE_ALPHA = 0.001f
 
 private data class OutlineKey(val size: Size, val density: Float, val fontScale: Float, val direction: LayoutDirection)
 
-internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
+internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean, private val widthScale: Float = 1f, private val intensity: Float = 1f) :
     Modifier.Node(),
     DrawModifierNode,
     CompositionLocalConsumerModifierNode,
@@ -266,7 +271,7 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
         val alpha = fade.value
         if (alpha <= VISIBLE_ALPHA || size.minDimension <= 0f) return
         frame.phase = if (reducedMotion) LettaBeamMotion.STILL_PHASE else phase
-        frame.alpha = alpha
+        frame.alpha = alpha * intensity
         refreshGeometry()
         val renderer = resolveShader(size.width * size.height) ?: fallback
         with(renderer) { drawBeam(frame) }
@@ -291,7 +296,7 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean) :
         return shader
     }
 
-    private fun frameFor(spec: LettaBeamSpec) = BeamFrame(spec.style, spec.direction, BeamPalette(spec.colors))
+    private fun frameFor(spec: LettaBeamSpec) = BeamFrame(spec.style, spec.direction, BeamPalette(spec.colors), widthScale)
 }
 
 /**
