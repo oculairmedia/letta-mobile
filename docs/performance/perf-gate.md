@@ -356,3 +356,43 @@ The earlier Bash approach was blocked by letta-code's foreground-sleep guard,
 not by a model refusal: on the mini's pinned 0.34.39 installation,
 `letta.js:218232` contains the guard message, which appeared as the Bash tool
 result in the original probe conversation before the assistant reported it.
+
+### Core-loop harness prerequisites (letta-mobile-vu08m.1)
+
+The mini fixture accepts `[core-loop:S1]`, `[core-loop:S3]` and
+`[core-loop:S4]` in the latest user message to stream the fixed three-paragraph
+reply at 60 ms per word. `[core-loop:S2]` preserves `bench_wait` followed by
+`DONE`. The streaming fixture and `mini-bench/analyze-settle.py` reuse the
+fixture/analysis from `fix/settle-reply-pop` (#2515). They do not change app code.
+
+`python3 scripts/test-sites/mini-bench/score-core-loop.py evidence.json
+--output results` scores normalized observations and exits nonzero for absent
+or failing evidence. Each input yields a JSON verdict and a printed table.
+`test_score_core_loop.py` describes the observation schema and independently
+mutates it to check fail-closed behavior. Thresholds are 3 s stored-copy latency,
+5 s Stop clearance, template correlation >= 0.9 and luminance dip <= 10%.
+The visible assistant identity window must be sampled at least every 100 ms,
+cover terminal through five seconds afterwards, and retain all observed rows;
+mount/dispose observations must cover every row. Times require a shared,
+aligned monotonic clock; model completion is not a stored-display observation.
+The pixel input uses the summary emitted by `analyze-settle.py`.
+
+**Incomplete: this is not yet an automated end-to-end harness.** The scorer
+accepts normalized observations, not raw logcat. No collector currently creates
+those observations. `TimelineFrameRecorder` is a JVM-test helper, not installed
+app diagnostics. The remaining work is debug-only row mount/dispose and
+stored-display instrumentation, a serial-restricted Pixel driver with network
+restoration, raw-evidence provenance/coverage validation and scenario event
+checks (held tool, cancellation/resend and actual network loss). In particular,
+a normalized S3 verdict alone does not establish that an interruption occurred.
+No baseline may be claimed from these unit checks. Missing device runs must be
+reported as BLOCKED, with n=0, separately from measured app failures.
+
+Run fixture tests with `node --test scripts/test-sites/mini-bench/*.test.cjs`
+and scorer tests with `python3 -m pytest
+scripts/test-sites/mini-bench/test_score_core_loop.py`. Pixel acceptance requires
+serial `711KPAE0914240`; never select the first attached device. Before each run,
+check for another owner of that serial. Capture terminal, stored display, row
+lifecycle, UI text and Stop state plus pixel frames; restore networking on both
+normal completion and all exit paths. Do not deploy this fixture to production
+or change any other mini agent's model.
