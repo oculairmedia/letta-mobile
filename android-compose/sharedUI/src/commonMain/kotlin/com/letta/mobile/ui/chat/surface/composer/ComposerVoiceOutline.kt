@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
@@ -30,6 +31,7 @@ import com.letta.mobile.ui.ambient.AmbientVoice
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.components.beam.LettaBeamDefaults
+import com.letta.mobile.ui.components.beam.LettaBeamStyle
 import com.letta.mobile.ui.components.beam.LettaBeamSpec
 import com.letta.mobile.ui.components.beam.composerBorderBeam
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
@@ -75,7 +77,7 @@ internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modif
     val level = state?.let { handle?.glowLevel(it) }.takeIf { mode == ComposerOutlineMode.Listening && !reducedMotion }
     val brightness = rememberOutlineBrightness(level)
     val colors = LettaBeamDefaults.colors()
-    val beam = remember(colors, shape) { LettaBeamSpec(colors, shape) }
+    val beam = remember(colors, shape) { LettaBeamSpec(colors, shape, LettaBeamStyle.SweepTop) }
     val softness = animateFloatAsState(
         targetValue = if (mode == ComposerOutlineMode.Thinking) 0f else 1f,
         animationSpec = if (reducedMotion) snap() else tween(ChatMotionTokens.AmbientGlow.GLIDE_MILLIS),
@@ -92,7 +94,13 @@ internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modif
             val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithCache)) }
             val strokes = OutlineStrokes(this)
             onDrawBehind {
-                drawOutline(path, strokes, color.value, OutlineLight(brightness.floatValue, softness.value))
+                if (mode == ComposerOutlineMode.Thinking || (mode == ComposerOutlineMode.Idle && softness.value < 1f)) {
+                    clipRect(bottom = strokes.edge.width) {
+                        drawOutline(path, strokes, color.value, OutlineLight(brightness.floatValue, softness.value))
+                    }
+                } else {
+                    drawOutline(path, strokes, color.value, OutlineLight(brightness.floatValue, softness.value))
+                }
             }
         }
 }

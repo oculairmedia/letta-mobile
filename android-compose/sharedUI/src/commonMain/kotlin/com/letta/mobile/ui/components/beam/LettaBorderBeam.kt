@@ -50,6 +50,9 @@ enum class LettaBeamStyle {
 
     /** A glow sweeping back and forth along the bottom edge: search and input bars. */
     Sweep,
+
+    /** A glow sweeping back and forth along the top edge of a card. */
+    SweepTop,
 }
 
 /** Which way an orbiting beam travels, judged along the top edge. */
@@ -147,12 +150,15 @@ internal val LettaBeamStyle.glowReach: Dp
     get() = when (this) {
         LettaBeamStyle.Orbit -> LettaComponentDimens.beamGlowOrbit
         LettaBeamStyle.OrbitCompact -> LettaComponentDimens.beamGlowCompact
-        LettaBeamStyle.Sweep -> LettaComponentDimens.beamGlowSweep
+        LettaBeamStyle.Sweep, LettaBeamStyle.SweepTop -> LettaComponentDimens.beamGlowSweep
     }
 
 /** Milliseconds per lap (orbit) or per there-and-back pass (sweep). */
 internal val LettaBeamStyle.periodMillis: Int
-    get() = if (this == LettaBeamStyle.Sweep) LettaBeamMotion.SWEEP_MILLIS else LettaBeamMotion.LAP_MILLIS
+    get() = when (this) {
+        LettaBeamStyle.Sweep, LettaBeamStyle.SweepTop -> LettaBeamMotion.SWEEP_MILLIS
+        LettaBeamStyle.Orbit, LettaBeamStyle.OrbitCompact -> LettaBeamMotion.LAP_MILLIS
+    }
 
 /** Below this the beam counts as faded out and is not drawn. */
 private const val VISIBLE_ALPHA = 0.001f

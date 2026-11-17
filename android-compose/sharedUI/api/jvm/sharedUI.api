@@ -2591,6 +2591,7 @@ public final class com/letta/mobile/ui/components/beam/LettaBeamStyle : java/lan
 	public static final field Orbit Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;
 	public static final field OrbitCompact Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;
 	public static final field Sweep Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;
+	public static final field SweepTop Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;
 	public static fun values ()[Lcom/letta/mobile/ui/components/beam/LettaBeamStyle;

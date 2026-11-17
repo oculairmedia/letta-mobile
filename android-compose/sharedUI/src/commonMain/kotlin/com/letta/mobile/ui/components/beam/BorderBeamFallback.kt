@@ -59,7 +59,7 @@ internal class BorderBeamFallback : BorderBeamRenderer {
         val strength = frame.alpha.coerceIn(0f, 1f)
         val strokes = strokesFor(frame.style, frame.widthScale)
         clipPath(clip) {
-            if (frame.style == LettaBeamStyle.Sweep) {
+            if (frame.style == LettaBeamStyle.Sweep || frame.style == LettaBeamStyle.SweepTop) {
                 drawSweep(frame, strength, strokes)
             } else {
                 drawOrbit(frame, strength, strokes)
@@ -171,10 +171,10 @@ internal class BorderBeamFallback : BorderBeamRenderer {
         drawPath(segment, brush, alpha = strength, style = strokes.core)
     }
 
-    /** A continuous gradient sweeping back and forth along the bottom edge. */
+    /** A continuous gradient sweeping back and forth along the selected horizontal edge. */
     private fun DrawScope.drawSweep(frame: BeamFrame, strength: Float, strokes: BeamStrokes) {
         val width = size.width
-        val y = size.height - INSET_DP * density
+        val y = if (frame.style == LettaBeamStyle.SweepTop) INSET_DP * density else size.height - INSET_DP * density
         val length = width * SWEEP_LENGTH
         val start = (width - length) * sweepPosition(frame.phase)
         val from = Offset(start, y)

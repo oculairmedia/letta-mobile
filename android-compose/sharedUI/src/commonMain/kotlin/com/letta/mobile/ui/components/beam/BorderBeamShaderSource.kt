@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
  *
  * Ported from border-beam-android by ismnoiet (MIT, see sharedUI/THIRD_PARTY_LICENSES), itself a port
  * of the iOS Metal shader. Changes: per-corner radii, the fade and intensity are one `intensity`
- * uniform, and the sweep always runs along the bottom edge.
+ * uniform, and the sweep runs along the selected horizontal edge.
  */
 internal const val BORDER_BEAM_SHADER = """
 uniform float2 size;          // draw area in dp
@@ -18,7 +18,7 @@ uniform float density;        // px per dp
 uniform float4 radii;         // dp corner radii (top-right, bottom-right, bottom-left, top-left), each clamped to half the shorter side
 uniform float phase;          // 0...1, loops
 uniform float direction;      // +1 clockwise (left to right along the top), -1 counter-clockwise
-uniform float mode;           // 0 = orbit the border, 1 = sweep along the bottom edge
+uniform float mode;           // 0 = orbit, 1 = bottom sweep, 2 = top sweep
 uniform float arc;            // orbit: the comet's length as a fraction of the lap
 uniform float widthScale;     // relative thickness of the crisp edge
 uniform float glow;           // soft inner glow reach in dp
@@ -187,7 +187,7 @@ half4 main(float2 fragCoord) {
         acc += 0.55 * orbitGlowBlobs(p, dist, hs, r, max(glow, 0.001) * 0.7);
     } else {
         float u = position.x / size.x;
-        float edgeDist = size.y - position.y;
+        float edgeDist = mode > 1.5 ? position.y : size.y - position.y;
         float len = 0.28;
         float tri = phase < 0.5 ? phase * 2.0 : (1.0 - phase) * 2.0;
         float eased = tri * tri * (3.0 - 2.0 * tri);
@@ -220,7 +220,11 @@ internal class BeamUniforms(scope: DrawScope, frame: BeamFrame) {
     val radii: FloatArray = FloatArray(CORNERS) { frame.cornersPx[it] / density }
     val phase: Float = frame.phase
     val direction: Float = frame.direction.sign
-    val mode: Float = if (frame.style == LettaBeamStyle.Sweep) 1f else 0f
+    val mode: Float = when (frame.style) {
+        LettaBeamStyle.Sweep -> 1f
+        LettaBeamStyle.SweepTop -> 2f
+        LettaBeamStyle.Orbit, LettaBeamStyle.OrbitCompact -> 0f
+    }
     val arc: Float = frame.style.arc
     val glow: Float = with(scope) { frame.style.glowReach.toPx() } / density * frame.widthScale
     val widthScale: Float = frame.widthScale
