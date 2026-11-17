@@ -73,7 +73,7 @@ class HomeLayoutModulesTest {
                         Surface(Modifier.fillMaxSize()) {
                             val lane = config?.homeLane()?.map { it.view } ?: LocalHomeLane.current
                             CompositionLocalProvider(LocalHomeLane provides lane) {
-                                HomePage(state = state(), callbacks = InertHomeCallbacks)
+                                HomePage(state = state(), callbacks = InertHomeCallbacks, options = HomePageOptions().withSharedPromptBar())
                             }
                         }
                     }

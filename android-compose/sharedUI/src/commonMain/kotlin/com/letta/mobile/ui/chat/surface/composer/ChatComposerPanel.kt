@@ -13,6 +13,20 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.letta.mobile.ui.chat.surface.LocalChatLaneBounds
+import com.letta.mobile.ui.chat.surface.LANE_CARD
+import com.letta.mobile.ui.chat.surface.LANE_ABOVE_CARD
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.foundation.layout.Box
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.QueuedSendActions
 import com.letta.mobile.ui.chat.QueuedSendsPanel
@@ -76,12 +90,15 @@ internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modi
         decisions = decisions,
     )
     val images = rememberComposerImages(composer, actions, modifier)
+    val parts = remember { mutableStateMapOf<String, Rect>() }
+    PublishLaneBounds(parts, enabled = mode != ChatSurfaceMode.Docked)
     if (touchStyle()) {
-        TouchComposerPanel(model, images.attach, images.modifier)
+        TouchComposerPanel(model, images.attach, images.modifier.measuredAs(parts, PART_COMPOSER), parts)
         return
     }
     Column(
         modifier = images.modifier
+            .measuredAs(parts, PART_COMPOSER)
             .fillMaxWidth()
             .accessibilityTraversal(AccessibilityTraversal.COMPOSER)
             .liftAboveKeyboard()
@@ -95,11 +112,13 @@ internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modi
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        ComposerAboveCard(model)
+        ComposerAboveCard(model, parts)
         if (mode == ChatSurfaceMode.Docked) {
             DockedComposerBar(model, images.attach)
         } else {
-            ComposerCompanionRow(model) { ComposerPromptCard(model, images.attach) }
+            Box(Modifier.measuredAs(parts, PART_CARD)) {
+                ComposerCompanionRow(model) { ComposerPromptCard(model, images.attach) }
+            }
             ComposerUnderCardLine(model)
         }
     }
@@ -136,7 +155,7 @@ private fun rememberComposerImages(
  * across the whole width. On the canvas the bar leads with a chevron back up to the chat.
  */
 @Composable
-private fun TouchComposerPanel(model: ComposerModel, attachImage: () -> Unit, modifier: Modifier) {
+private fun TouchComposerPanel(model: ComposerModel, attachImage: () -> Unit, modifier: Modifier, parts: SnapshotStateMap<String, Rect>) {
     Column(
         modifier = modifier.fillMaxWidth().accessibilityTraversal(AccessibilityTraversal.COMPOSER).liftAboveKeyboard(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -146,12 +165,13 @@ private fun TouchComposerPanel(model: ComposerModel, attachImage: () -> Unit, mo
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
-            ComposerAboveCard(model)
+            ComposerAboveCard(model, parts)
         }
         if (model.mode != ChatSurfaceMode.Docked) TouchCompanionSlot(model)
         TouchComposerBar(
             model = model,
             onAttachImage = attachImage,
+            modifier = Modifier.measuredAs(parts, PART_CARD),
             leading = if (model.mode == ChatSurfaceMode.Docked) {
                 { TouchOpenChatButton(onOpen = { model.onIntent(ChatSurfaceIntent.Expand) }) }
             } else {
@@ -186,7 +206,7 @@ private fun ComposerUnderCardLine(model: ComposerModel) {
 
 /** What stacks above the prompt: the queue, the error, the working directory, suggestions. */
 @Composable
-private fun ComposerAboveCard(model: ComposerModel) {
+private fun ComposerAboveCard(model: ComposerModel, parts: SnapshotStateMap<String, Rect>) {
     val actions = model.actions
     QueuedSendsPanel(
         queue = model.uiState.sendQueue,
@@ -212,11 +232,63 @@ private fun ComposerAboveCard(model: ComposerModel) {
         model.composer.permissionMode?.let { state -> ComposerPermissionModeNoteRow(state) }
         ComposerAgentMentionChips(model.composer.text, actions::updateComposerText)
     }
-    if (model.composer.backgroundProcesses.isNotEmpty()) {
+    if (model.composer.backgroundProcesses.isEmpty()) {
+        SideEffect { parts.remove(PART_SHELF) }
+    } else {
         BackgroundProcessShelf(
+            modifier = Modifier.measuredAs(parts, PART_SHELF),
             processes = model.composer.backgroundProcesses,
             onStop = { actions.stopBackgroundProcess(ProcessId(it)) },
+            // An agent task's id is its subagent's task id: the page's subagent view finds it by that.
+            onOpen = model.host.openSubagent?.let { open -> { process -> open(process.id, null, process.description.orEmpty()) } },
         )
     }
     ComposerSuggestions(model.composer, model.decisions.autocomplete, actions)
+}
+
+private const val PART_COMPOSER = "composer"
+private const val PART_CARD = "card"
+private const val PART_SHELF = "shelf"
+
+/** Records this element's root bounds in [parts] under [key]. */
+private fun Modifier.measuredAs(parts: SnapshotStateMap<String, Rect>, key: String): Modifier =
+    onGloballyPositioned { parts[key] = it.boundsInRoot() }
+
+/**
+ * Tells the chat lane around this composer where its prompt is and what stands above it
+ * ([LANE_CARD], [LANE_ABOVE_CARD]), so the lane's scroll-to-latest button rests just above the
+ * prompt unless something there is in its way. Nothing while [enabled] is false (the canvas dock).
+ */
+@Composable
+private fun PublishLaneBounds(parts: SnapshotStateMap<String, Rect>, enabled: Boolean) {
+    val lane = LocalChatLaneBounds.current ?: return
+    // The band's own padding and gap: a band no taller than that holds nothing.
+    val slackPx = with(LocalDensity.current) { (LettaDimens.Space.sm * 2 + LettaDimens.Space.hair).toPx() }
+    LaunchedEffect(lane, parts, enabled, slackPx) {
+        snapshotFlow { if (enabled) parts[PART_CARD] to aboveCardObstacle(parts, slackPx) else null to null }
+            .collect { (card, above) ->
+                if (card == null) lane.remove(LANE_CARD) else lane[LANE_CARD] = card
+                if (above == null) lane.remove(LANE_ABOVE_CARD) else lane[LANE_ABOVE_CARD] = above
+            }
+    }
+    DisposableEffect(lane) {
+        onDispose {
+            lane.remove(LANE_CARD)
+            lane.remove(LANE_ABOVE_CARD)
+        }
+    }
+}
+
+/**
+ * What above the prompt could sit under the scroll-to-latest button: nothing when the band between
+ * the composer's top and the prompt holds only its padding; the chips' own extent when the shelf is
+ * all it holds; else the whole band (the queue, a notice, suggestions span the column).
+ */
+private fun aboveCardObstacle(parts: Map<String, Rect>, slackPx: Float): Rect? {
+    val composer = parts[PART_COMPOSER] ?: return null
+    val card = parts[PART_CARD] ?: return null
+    val band = Rect(composer.left, composer.top, composer.right, card.top)
+    if (band.height <= slackPx) return null
+    val shelf = parts[PART_SHELF]
+    return if (shelf != null && band.height - shelf.height <= slackPx) shelf else band
 }

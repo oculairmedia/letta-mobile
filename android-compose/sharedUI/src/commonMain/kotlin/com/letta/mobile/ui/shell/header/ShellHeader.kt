@@ -29,6 +29,7 @@ import com.letta.mobile.ui.components.foundation.LettaButtonIcon
 import com.letta.mobile.ui.components.foundation.LettaIconButton
 import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.shell.tokens.ShellDimens
+import com.letta.mobile.ui.host.LocalHostTitlesPage
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.search.LettaSearchAnchor
@@ -51,6 +52,13 @@ sealed interface HeaderTitle {
 
     data object None : HeaderTitle
 }
+
+/**
+ * A page's own bar title (Settings, Plugins): [title], or none under a window header that already
+ * names the page ([LocalHostTitlesPage]), where the bar keeps only its controls.
+ */
+@Composable
+fun pageBarTitle(title: String): HeaderTitle = if (LocalHostTitlesPage.current) HeaderTitle.None else HeaderTitle.Text(title)
 
 /** The leading affordance: back on a pushed page, the drawer on a root page, or a host's own control. */
 sealed interface HeaderNav {
