@@ -181,9 +181,9 @@ def pixel_coverage_complete(pixels):
         return False
     start, end, gap = values
     limit = MAX_FRAME_GAP_MS / 1000
-    bounds = post >= 0 and start <= settle - 1 + limit and end >= settle + post
-    ordered = start < end and 0 < gap <= limit + 1e-9
-    return bounds and ordered
+    bounds = (post >= 0, start <= settle - 1 + limit, end >= settle + post)
+    ordered = (start < end, 0 < gap <= limit + 1e-9)
+    return all((*bounds, *ordered))
 
 
 def check_pixels(evidence, require):
