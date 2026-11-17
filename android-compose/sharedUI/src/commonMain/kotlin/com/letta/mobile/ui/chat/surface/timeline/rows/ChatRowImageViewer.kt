@@ -181,7 +181,15 @@ private fun ViewerPage(attachment: UiImageAttachment, page: Int, inset: Boolean,
             .then(if (inset) Modifier else Modifier.zoomableImageGestures(page, transform, { containerSize.value }, onDismiss)),
         contentAlignment = Alignment.Center,
     ) {
-        if (bitmap != null) {
+        if (attachment.url != null) {
+            ChatRemoteImage(attachment, Modifier.fillMaxSize().graphicsLayer {
+                val state = transform.value
+                scaleX = state.scale
+                scaleY = state.scale
+                translationX = state.offset.x
+                translationY = state.offset.y
+            })
+        } else if (bitmap != null) {
             Image(
                 bitmap = bitmap,
                 contentDescription = stringResource(Res.string.rows_image_fullscreen),

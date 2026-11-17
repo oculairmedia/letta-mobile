@@ -171,6 +171,11 @@
 
     <!-- Images -->
     <string name="rows_attached_image">Attached image</string>
+    <string name="rows_image_missing">Image unavailable: image data is missing</string>
+    <string name="rows_image_load_failed">Image unavailable: could not load</string>
+    <string name="rows_image_invalid">Image unavailable: invalid image data</string>
+    <string name="rows_image_too_large">Image unavailable: image is too large</string>
+    <string name="rows_image_unsupported">Image unavailable: unsupported image source</string>
     <string name="rows_image_not_loaded">Image not loaded</string>
     <string name="rows_image_fullscreen">Attachment fullscreen</string>
     <string name="rows_image_decode_failed">Image could not be decoded</string>

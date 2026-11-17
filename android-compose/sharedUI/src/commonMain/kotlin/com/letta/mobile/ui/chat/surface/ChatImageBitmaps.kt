@@ -112,13 +112,20 @@ private class ShownConversation {
  */
 @Composable
 internal fun rememberDecodedImage(base64: String): ImageBitmap? {
+    return rememberDecodedImageResult(base64)?.getOrNull()
+}
+
+/** Null while loading; a completed failure is distinct from an image still being decoded. */
+@Composable
+internal fun rememberDecodedImageResult(base64: String): Result<ImageBitmap>? {
     val key = remember(base64) { ImageContentKey.of(base64) }
-    val cached = remember(key) { if (base64.isBlank()) null else ChatImageBitmaps.cache[key] }
+    val cached = remember(key) { ChatImageBitmaps.cache[key]?.let { Result.success(it) } }
     val state = produceState(cached, key) {
-        if (value != null || base64.isBlank()) return@produceState
+        if (value != null) return@produceState
         val decoded = withContext(Dispatchers.Default) { ChatImageBitmaps.decode(base64) }
         if (decoded != null) ChatImageBitmaps.cache.put(key, decoded)
-        value = decoded
+        value = decoded?.let { Result.success(it) }
+            ?: Result.failure(IllegalArgumentException("Invalid image data"))
     }
     return state.value
 }

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.model
 
+import com.letta.mobile.data.attachment.ImageUnavailableReason
 import androidx.compose.runtime.Immutable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -60,13 +61,17 @@ sealed class MessageContentPart {
         val storedByteSize: Long? = null,
         /** Local projection ownership, not part of the outbound image wire format. */
         val toolCallId: String? = null,
+        /** Explicit failure from the producer or parser, independent of [base64]. */
+        val unavailableReason: ImageUnavailableReason? = null,
+        /** A supported remote source, loaded by the host image loader. */
+        val url: String? = null,
     ) : MessageContentPart() {
         /**
          * Build an `data:<mediaType>;base64,<base64>` URL. NOT used on the
          * outbound wire (see class docs); kept for in-app rendering callers
          * that feed image bytes into Coil/AsyncImage.
          */
-        fun toDataUrl(): String = "data:$mediaType;base64,$base64"
+        fun toDataUrl(): String = url ?: "data:$mediaType;base64,$base64"
     }
 }
 

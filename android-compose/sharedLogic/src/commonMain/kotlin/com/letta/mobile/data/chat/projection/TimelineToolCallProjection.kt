@@ -105,7 +105,10 @@ internal fun com.letta.mobile.data.model.ToolCall.generatedImageAttachments(
 ): List<UiImageAttachment> =
     attachments.filter { it.toolCallId == effectiveId || (it.toolCallId == null && allowUnowned) }
         .distinctBy { it.base64.takeIf(String::isNotEmpty) ?: it }
-        .map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize) }
+        .map { UiImageAttachment(
+            base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize,
+            unavailableReason = it.unavailableReason, url = it.url,
+        ) }
 
 /**
  * Approval chip for a TOOL_CALL event. An explicit
