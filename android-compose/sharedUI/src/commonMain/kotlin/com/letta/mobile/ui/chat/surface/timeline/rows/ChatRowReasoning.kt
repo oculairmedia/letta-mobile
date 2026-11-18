@@ -128,7 +128,8 @@ private fun reasoningTitle(message: UiMessage, isActive: Boolean): String {
 private fun ReasoningBody(message: UiMessage, isActive: Boolean) {
     if (isActive) {
         val shown = if (message.content.isBlank()) stringResource(Res.string.rows_thinking) else message.content
-        val text = rememberSmoothedStreamingText(rawText = shown, isStreaming = true)
+        // Seeded with what shows, so a body composed again mid-stream (a scroll back, a run regrouping) does not type out again.
+        val text = rememberSmoothedStreamingText(rawText = shown, isStreaming = true, seedText = shown)
         Text(text = text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
