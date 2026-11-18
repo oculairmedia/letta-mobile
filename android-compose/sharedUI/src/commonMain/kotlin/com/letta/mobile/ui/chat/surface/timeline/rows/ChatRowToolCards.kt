@@ -210,7 +210,7 @@ private fun SkillLoadCard(toolCall: UiToolCall, detail: LineDisclosure) {
     val running = state == ToolTimelineState.Running
     val result = toolCall.result.orEmpty()
     val instructions = toolCall.skillInstructions
-    val body = remember(result, instructions) { instructions?.let { skillBody(skillEnvelopeText(it)) } ?: skillBody(result) }
+    val body = remember(result, instructions) { skillContents(toolCall) }
     val pages = toolCall.toolCallId?.let(LocalSkillInstructionPages.current)
     val contentsTitle = stringResource(Res.string.rows_tool_card_section_contents)
     val instructionsTitle = stringResource(Res.string.rows_tool_card_section_instructions)
@@ -231,16 +231,16 @@ private fun SkillLoadCard(toolCall: UiToolCall, detail: LineDisclosure) {
             trailing = failureTrailing(state.isFailure(), stringResource(Res.string.rows_tool_card_failed)),
             expansion = detail,
         ),
-        body = cardBody(skillFacts(result, body.first), sections),
+        body = cardBody(skillFacts(toolCall, body), sections),
     )
 }
 
-/** A skill's directory (from its result) and description (from its frontmatter), where they are known. */
+/** A skill's directory (from its result) and description (from the frontmatter of its [contents]), where they are known. */
 @Composable
-private fun skillFacts(result: String, frontmatter: String?): List<LettaToolCardFact> = listOfNotNull(
-    remember(result) { skillDirectory(result) }
+private fun skillFacts(toolCall: UiToolCall, contents: Pair<String?, String?>): List<LettaToolCardFact> = listOfNotNull(
+    remember(toolCall.result) { toolCall.result?.let(::skillDirectory) }
         ?.let { LettaToolCardFact(stringResource(Res.string.rows_tool_card_fact_directory), it, monospace = true) },
-    frontmatter?.let(::skillDescription)
+    contents.first?.let(::skillDescription)
         ?.let { LettaToolCardFact(stringResource(Res.string.rows_tool_card_fact_description), it) },
 )
 
@@ -317,12 +317,16 @@ private fun skillBody(result: String): Pair<String?, String?> {
     return body.substring(FENCE.length, end) to body.substring(end + FENCE.length + 1).trim().ifBlank { null }
 }
 
-/** A skill envelope's text without its wrapping tags (`<skill_content name="pdf">` … `</skill_content>`, or a bare slug tag). */
-private fun skillEnvelopeText(envelope: String): String {
-    val lines = envelope.trim().lines()
+/**
+ * The skill's frontmatter and contents ([skillBody]): from its instructions when the runtime sent
+ * them apart from the result, without their wrapping tags (`<skill_content name="pdf">` ...
+ * `</skill_content>`, or a bare slug tag); from its result otherwise.
+ */
+private fun skillContents(toolCall: UiToolCall): Pair<String?, String?> {
+    val lines = toolCall.skillInstructions?.trim()?.lines() ?: return skillBody(toolCall.result.orEmpty())
     val opens = lines.firstOrNull()?.trim()?.let(ENVELOPE_OPENING::matches) == true
     val closes = lines.size > 1 && lines.last().trim().let(ENVELOPE_CLOSING::matches)
-    return lines.subList(if (opens) 1 else 0, if (closes) lines.size - 1 else lines.size).joinToString("\n")
+    return skillBody(lines.subList(if (opens) 1 else 0, if (closes) lines.size - 1 else lines.size).joinToString("\n"))
 }
 
 /** The frontmatter's `description:` value, unquoted. */
