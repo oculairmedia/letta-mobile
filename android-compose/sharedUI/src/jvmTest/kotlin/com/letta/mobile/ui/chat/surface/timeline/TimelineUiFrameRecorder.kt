@@ -96,7 +96,9 @@ internal class TimelineUiFrameRecorder(
             Thread.sleep(REAL_MILLIS_PER_FRAME)
             main.drain()
             test.mainClock.advanceTimeBy(FRAME_MILLIS)
-            record(step)
+            var frame: UiFrame? = null
+            test.runOnIdle { frame = observe(step) }
+            recorded += checkNotNull(frame)
         }
     }
 
@@ -113,12 +115,6 @@ internal class TimelineUiFrameRecorder(
             check(deadline.hasNotPassedNow()) { "$step never finished (store failures: [${rig.storeFailures}]); last frame: ${recorded.last()}" }
             advance(step, 1)
         }
-    }
-
-    private fun record(step: String) {
-        var frame: UiFrame? = null
-        test.runOnIdle { frame = observe(step) }
-        recorded += checkNotNull(frame)
     }
 
     private fun observe(step: String): UiFrame {
