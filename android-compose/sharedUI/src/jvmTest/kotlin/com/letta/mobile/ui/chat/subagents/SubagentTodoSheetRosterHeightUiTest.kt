@@ -61,7 +61,18 @@ class SubagentTodoSheetRosterHeightUiTest {
         // The roster reaches the pane's bottom, less the sheet's bottom padding.
         assertNear(pane.bottom - LettaDimens.Space.xxl, roster.bottom)
         assertTrue(finishedRowsComposed() > 1, "more than one finished row is shown")
-        onNodeWithText("No todos yet").assertIsDisplayed()
+        // No todos: no message, no band; the roster starts right under the pane's header.
+        onNodeWithText("No todos yet").assertDoesNotExist()
+        assertTrue(roster.top - pane.top < NO_BAND_MAX, "roster $roster starts under the header of $pane, not below an empty band")
+    }
+
+    @Test
+    fun whileTodosLoadBesideTheRosterThereIsNoSpinnerBlock() = runDesktopComposeUiTest(width = 1400, height = 1500) {
+        show(TALL_FRAME_WIDTH, TALL_FRAME_HEIGHT, LettaHost.Pointer, SubagentTodoSheetState.Loading)
+        onNodeWithTag(SubagentTodoSheetTags.LOADING).assertDoesNotExist()
+        val pane = onNodeWithTag(InspectorTags.DOCKED).getUnclippedBoundsInRoot()
+        val roster = onNodeWithTag(SubagentTodoSheetTags.ROSTER).getUnclippedBoundsInRoot()
+        assertTrue(roster.top - pane.top < NO_BAND_MAX, "roster $roster starts under the header of $pane while todos load")
     }
 
     @Test
@@ -132,5 +143,8 @@ class SubagentTodoSheetRosterHeightUiTest {
         val PHONE_WIDTH = 360.dp
         val PHONE_HEIGHT = 800.dp
         val TOLERANCE = 1.dp
+
+        /** The pane's header and the sheet's top spacing: anything taller above the roster is an empty band. */
+        val NO_BAND_MAX = 96.dp
     }
 }
