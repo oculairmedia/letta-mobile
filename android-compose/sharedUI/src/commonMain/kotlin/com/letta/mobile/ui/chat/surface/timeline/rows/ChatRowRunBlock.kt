@@ -281,8 +281,14 @@ private fun RunHeader(state: RunHeaderState) {
         animationSpec = if (reducedMotion) snap() else tween(LettaMotionTokens.CONTENT_SIZE_MILLIS),
         label = "runHeader",
     )
-    if (!state.visible && !state.activity.isActive && shown == 0f) return
+    if (state.isGone(shown)) return
     RevealedHeader(state, shown)
+}
+
+/** Whether the header draws nothing at [shown]: hidden, settled and fully folded away. */
+private fun RunHeaderState.isGone(shown: Float): Boolean {
+    if (visible || activity.isActive) return false
+    return shown == 0f
 }
 
 /** The header at [shown] of its height and opacity, its semantics only while it shows. */
