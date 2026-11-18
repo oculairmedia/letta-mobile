@@ -20,6 +20,9 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.letta.mobile.ui.components.disclosure.LocalDisclosureHighlightFloor
+import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -155,17 +158,25 @@ internal fun SubagentNotificationCard(
             .then(if (continued) Modifier.dropBottom(ChatRowSpacing.runHeaderToggleFloor) else Modifier),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        if (isSubagent) {
-            // A subagent's report is the shared tool card line; command and task reports keep theirs.
-            val expansion = LineDisclosure(expanded = detailsExpanded, labels = detailsLabels(model), onToggle = actions.onToggleDetails)
-            SubagentReportCard(notification, actions.onOpen, expansion)
-        } else if (model.isSuccessfulCompletion) {
-            CompletedSummaryRow(model, detailsExpanded, actions.onToggleDetails)
-            if (detailsExpanded) NotificationBody(model, detailsExpanded, actions)
-        } else {
-            NotificationHeader(model, detailsExpanded, actions.onToggleDetails)
-            NotificationBody(model, detailsExpanded, actions)
+        // The continuing step rises into this line's floor, so its hover and press stop above it, as a run header's do.
+        CompositionLocalProvider(LocalDisclosureHighlightFloor provides if (continued) ChatRowSpacing.runHeaderToggleFloor else 0.dp) {
+            NotificationContent(model, detailsExpanded, actions, isSubagent)
         }
+    }
+}
+
+@Composable
+private fun NotificationContent(model: NotificationModel, detailsExpanded: Boolean, actions: NotificationActions, isSubagent: Boolean) {
+    if (isSubagent) {
+        // A subagent's report is the shared tool card line; command and task reports keep theirs.
+        val expansion = LineDisclosure(expanded = detailsExpanded, labels = detailsLabels(model), onToggle = actions.onToggleDetails)
+        SubagentReportCard(model.notification, actions.onOpen, expansion)
+    } else if (model.isSuccessfulCompletion) {
+        CompletedSummaryRow(model, detailsExpanded, actions.onToggleDetails)
+        if (detailsExpanded) NotificationBody(model, detailsExpanded, actions)
+    } else {
+        NotificationHeader(model, detailsExpanded, actions.onToggleDetails)
+        NotificationBody(model, detailsExpanded, actions)
     }
 }
 
