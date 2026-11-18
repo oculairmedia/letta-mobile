@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
+import com.letta.mobile.data.model.SubagentTodoProgressWire
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -17,11 +18,13 @@ import kotlin.test.assertEquals
  * over its chat page from the conversation's registry entries.
  */
 class SubagentRingsOverlayTest {
-    private fun entry(id: String, type: String = "General-purpose", status: String = "running") = SubagentEntry(
+    /** A run with a plan (one of two todos done) unless [planned] is false. */
+    private fun entry(id: String, type: String = "General-purpose", status: String = "running", planned: Boolean = true) = SubagentEntry(
         toolCallId = id,
         description = "work $id",
         subagentType = type,
         status = status,
+        todoProgress = SubagentTodoProgressWire(completed = 1, total = 2).takeIf { planned },
     )
 
     @Test
@@ -67,6 +70,21 @@ class SubagentRingsOverlayTest {
         onNodeWithTag(ActiveSubagentRingsTags.ring("live")).performClick()
         waitForIdle()
         onNodeWithTag(SubagentRosterTag.ENDED.of("old-failure")).assertExists()
+    }
+
+    @Test
+    fun aRunWithoutAPlanDrawsNoRing() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                SubagentRingsOverlay(
+                    listOf(entry("planned"), entry("unplanned", planned = false)),
+                    SubagentTodoLoader { Result.success(emptyList()) },
+                    rosterEntries = emptyList(),
+                )
+            }
+        }
+        onNodeWithTag(ActiveSubagentRingsTags.ring("planned")).assertExists()
+        onNodeWithTag(ActiveSubagentRingsTags.ring("unplanned")).assertDoesNotExist()
     }
 
     @Test
