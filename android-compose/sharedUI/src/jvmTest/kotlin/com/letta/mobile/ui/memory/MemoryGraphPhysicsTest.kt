@@ -25,15 +25,26 @@ import kotlin.test.assertTrue
 
 /** The memory graph's live layout, label rules and number formatting. */
 class MemoryGraphPhysicsTest {
-    private val view: MemoryGraphView = MemoryGraphViews.build(star(6), emptySet())
+    private val view: MemoryGraphView = MemoryGraphViews.build(star(LEAVES), emptySet())
     private val target: MemoryGraphLayout = MemoryGraphLayoutEngine.layout(view)
 
     private fun physics(previous: MemoryGraphLayout? = null, motion: Boolean = true) = MemoryGraphPhysics.create(
         view = view,
         target = target,
         radiusOf = { MemoryNodeLooks.SMALL_RADIUS },
-        start = MemoryGraphPhysicsStart(previous = previous, bloom = true, motion = motion),
+        start = MemoryGraphPhysicsStart(previous, bloom = true, motion = motion, tuning = MemoryGraphTestTunings.classic),
     )
+
+    @Test
+    fun theFirstChangedTuningKeepsAnExistingLayoutHot() {
+        val live = MemoryGraphLiveLayout()
+        live.retarget(view, target, emptyMap(), motion = true)
+        live.retune(com.letta.mobile.data.memory.graph.MemoryGraphTuning(repulsion = 6400f), 0)
+        assertFalse(live.isSettled, "changed forces must run after the first retune")
+        live.retarget(view, target, emptyMap(), motion = false)
+        live.retune(com.letta.mobile.data.memory.graph.MemoryGraphTuning(repulsion = 6500f), 1)
+        assertTrue(live.isSettled, "reduced motion stays settled")
+    }
 
     @Test
     fun aFirstOpenBloomsFromTheCentreAndSettlesNearTheControllersLayout() {
@@ -55,16 +66,22 @@ class MemoryGraphPhysicsTest {
         val sim = physics(previous = target)
         assertFalse(sim.isHot, "an unchanged graph does not move")
         val hub = "agent"
-        val leaf = "leaf-0"
-        val before = sim.snapshot()[leaf]!!
         val pin = MemoryGraphPoint(target[hub]!!.x + 200f, target[hub]!!.y)
+        // The leaf the drag stretches most, not one the hub is dragged onto (which collision, not
+        // its spring, would move).
+        val leaf = (0 until LEAVES).map { "leaf-$it" }.maxBy { id ->
+            val at = target[id]!!
+            hypot(at.x - pin.x, at.y - pin.y)
+        }
+        val before = sim.snapshot()[leaf]!!
         repeat(30) {
             sim.pin(hub, pin)
             sim.tick()
         }
         assertEquals(pin, sim.snapshot()[hub])
         val after = sim.snapshot()[leaf]!!
-        assertTrue(hypot(after.x - before.x, after.y - before.y) > 5f, "a neighbour follows the dragged hub")
+        val followed = hypot(after.x - before.x, after.y - before.y)
+        assertTrue(followed > 5f, "a neighbour follows the dragged hub: moved $followed")
         sim.release()
         while (sim.tick()) Unit
         assertFalse(sim.isHot)
@@ -126,5 +143,9 @@ class MemoryGraphPhysicsTest {
         val nodes = (0 until leaves).map { MemoryGraphNode("leaf-$it", "Leaf $it", "", MemoryGraphNodeKind.Memory) }
         val edges = nodes.map { MemoryGraphEdge("agent->${it.id}", "agent", it.id, "remembers", MemoryGraphEdgeKind.Remembers) }
         return MemoryParityGraph(listOf(hub) + nodes, edges)
+    }
+
+    private companion object {
+        const val LEAVES = 6
     }
 }

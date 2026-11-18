@@ -100,7 +100,6 @@ internal fun initializeDesktopLifecycleMainThread() {
         }
     }
 }
-
 @OptIn(ExperimentalComposeUiApi::class)
 private fun runDesktopApplication(
     args: Array<String>,
@@ -134,10 +133,12 @@ private fun runDesktopApplication(
             val mascots = remember { com.letta.mobile.ui.mascot.MascotIdentityRegistry() }
             // The transport verb: one mascot per agent, moved between the seats the surfaces declare.
             val mascotTransport = remember { com.letta.mobile.ui.mascot.MascotTransport() }
+            val graphTunings = remember { com.letta.mobile.data.memory.graph.MemoryGraphTunings() }
             val desktopDensity = rememberDesktopDensity() // pointer preference; the window owns platform density
             val highContrastPref = remember { com.letta.mobile.ui.theme.HighContrastPreference(DesktopPreferences.store) }
             CompositionLocalProvider(
                 LocalDensity provides desktopDensity,
+                com.letta.mobile.ui.memory.LocalMemoryGraphTunings provides graphTunings,
                 LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory,
                 LocalMermaidDiagramRenderer provides DesktopMermaidDiagramRenderer,
                 com.letta.mobile.ui.theme.LocalHighContrastPreference provides highContrastPref,
@@ -168,7 +169,6 @@ private fun runDesktopApplication(
                             // undecorated frame.
                             DesktopWindowsChrome.applyStandardChrome(window)
                         }
-
                         // Ctrl+scroll scales app type, persisted across
                         // launches. Wraps the shell only, so the custom title
                         // bar (a composition sibling) keeps its fixed chrome
@@ -193,7 +193,7 @@ private fun runDesktopApplication(
                     // Spotlight-style floating query bar, summoned by the global
                     // hotkey without raising the main window.
                     DesktopQuickQueryWindow(quickQuery)
-                    DebugWindows()
+                    DebugWindows(graphTunings)
                 }
             }
         }
@@ -217,7 +217,7 @@ private fun rememberDesktopDensity(): Density {
  * is how that function grows without anyone deciding it should.
  */
 @Composable
-private fun DebugWindows() {
+private fun DebugWindows(graphTunings: com.letta.mobile.data.memory.graph.MemoryGraphTunings) {
     // Realtime shader lookdev, for tuning the ambient glow against the real app theme and
     // backend state.
     if (System.getenv("LETTA_SHADER_LOOKDEV") == "1") {
@@ -226,6 +226,10 @@ private fun DebugWindows() {
     // Canvas Workspace verification host.
     if (System.getenv("MERIDIAN_CANVAS_DEBUG") == "1") {
         com.letta.mobile.desktop.canvas.CanvasDebugWindow()
+    }
+    if (System.getenv("MERIDIAN_GRAPH_LOOKDEV") == "1") {
+        val store = com.letta.mobile.desktop.data.defaultDesktopStateDirectory().resolve("dev/memory-graph-tuning.json")
+        com.letta.mobile.ui.memory.MemoryGraphTuningWindow(store, graphTunings)
     }
 }
 

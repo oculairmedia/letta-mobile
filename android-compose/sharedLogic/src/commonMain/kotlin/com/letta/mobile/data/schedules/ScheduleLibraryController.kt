@@ -56,7 +56,17 @@ data class ScheduleLibraryState(
     val leases: List<Lease> = emptyList(),
     /** Cron controls waiting for host confirmation and the refreshed list. */
     val pendingCronIds: Set<String> = emptySet(),
+    /**
+     * True for the fleet view (no agent focused): every agent's schedules, each row carrying its
+     * own agent; [selectedAgentId] is null then.
+     */
+    val fleet: Boolean = false,
+    /** In [fleet] mode, the one agent whose schedules the page narrows to; null shows every agent's. */
+    val agentFilter: String? = null,
 ) {
+    /** The agent whose schedules show: the selected one, else the fleet's filter; null shows all. */
+    val scopeAgentId: String? get() = selectedAgentId ?: agentFilter.takeIf { fleet }
+
     /** Crons scoped to the selected agent (cron tasks may carry no agent id). */
     val cronsForSelectedAgent: List<CronTask>
         get() = selectedAgentId?.let { agentId ->
@@ -68,8 +78,10 @@ data class ScheduleLibraryState(
 
     val emptyMessage: String
         get() = when {
+            !scheduleAdminAvailable && !cronMode -> scheduleAdminMessage ?: SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE
+            fleet && agents.isEmpty() -> "No agents available."
+            fleet -> "No schedules across your agents."
             cronMode -> "No schedules for this agent."
-            !scheduleAdminAvailable -> scheduleAdminMessage ?: SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE
             selectedAgentId == null -> "No agents available."
             else -> "No schedules for this agent."
         }

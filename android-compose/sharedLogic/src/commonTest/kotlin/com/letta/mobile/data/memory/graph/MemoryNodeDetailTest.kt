@@ -10,6 +10,16 @@ class MemoryNodeDetailTest {
     private val memory = MemoryGraphFixtures.memory()
 
     @Test
+    fun aFleetEditorClosesWhenItsBlockReferenceChanges() {
+        val detail = requireNotNull(MemoryNodeDetails.resolve(memory, MemoryGraphFixtures.blockNodeId(MemoryGraphFixtures.human)))
+            .copy(nodeId = "memory:fleet:label:human")
+        val selection = MemoryNodeSelection(detail, MemoryNodeContent.Loaded("Ada"), MemoryNodeEditor("Ada", "draft"), writable = true)
+        val replacement = detail.copy(blockRef = MemoryBlockRef("a2", "human", "block-bo"))
+        assertNull(MemoryNodeSelections.reconcile(selection, replacement))
+        assertEquals(selection, MemoryNodeSelections.reconcile(selection, detail))
+    }
+
+    @Test
     fun blockNodeResolvesAnAgentScopedBlockRef() {
         val detail = MemoryNodeDetails.resolve(memory, MemoryGraphFixtures.blockNodeId(MemoryGraphFixtures.human))
 

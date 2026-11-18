@@ -104,9 +104,12 @@ internal object MemoryNodeSelections {
         writable = writable,
     )
 
-    /** Re-resolve after an overview reload; the card closes if its node vanished. */
-    fun reconcile(selection: MemoryNodeSelection?, refreshed: MemoryNodeDetail?): MemoryNodeSelection? =
-        if (selection == null || refreshed == null) null else selection.copy(detail = refreshed)
+    /** Re-resolve after an overview reload; the card closes if its node vanished or its block reference changed. */
+    fun reconcile(selection: MemoryNodeSelection?, refreshed: MemoryNodeDetail?): MemoryNodeSelection? {
+        if (selection == null || refreshed == null) return null
+        if (selection.detail.blockRef != refreshed.blockRef) return null
+        return selection.copy(detail = refreshed)
+    }
 
     fun beginEdit(selection: MemoryNodeSelection): MemoryNodeSelection {
         if (!selection.canEdit || selection.editor != null) return selection

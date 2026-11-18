@@ -46,9 +46,9 @@ import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import com.letta.mobile.ui.theme.customColors
 
 /**
- * The "New schedule" form: name, prompt and the cron builder with a live
- * preview of the next runs, starting from [initial] (a slot tapped on the calendar prefills its
- * time). A [LettaPaneKind.Modal]: a sheet on a phone, a dialog on a pointer.
+ * The "New schedule" form: the agent when the page shows every agent's, then name, prompt and the
+ * cron builder with a live preview of the next runs, starting from [setup].
+ * A [LettaPaneKind.Modal]: a sheet on a phone, a dialog on a pointer.
  * [onSubmit] receives a complete draft only.
  */
 @Composable
@@ -56,9 +56,9 @@ internal fun ScheduleFormPane(
     clock: ScheduleClock,
     onDismiss: () -> Unit,
     onSubmit: (ScheduleFormDraft) -> Unit,
-    initial: ScheduleFormDraft = ScheduleFormDraft(),
+    setup: ScheduleFormSetup = ScheduleFormSetup(),
 ) {
-    var draft by remember { mutableStateOf(initial) }
+    var draft by remember { mutableStateOf(setup.initial) }
     LettaPane(
         kind = LettaPaneKind.Modal,
         onDismiss = onDismiss,
@@ -70,6 +70,10 @@ internal fun ScheduleFormPane(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.xl),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
+            if (setup.agents.isNotEmpty()) {
+                LettaSectionLabel("Agent")
+                AgentChoice(setup.agents, draft.agentId) { draft = draft.copy(agentId = it) }
+            }
             OutlinedTextField(
                 value = draft.name,
                 onValueChange = { draft = draft.copy(name = it) },
@@ -97,9 +101,27 @@ internal fun ScheduleFormPane(
             TextButton(onClick = onDismiss) { Text("Cancel") }
             Button(
                 onClick = { onSubmit(draft) },
-                enabled = draft.isComplete,
+                enabled = setup.canSubmit(draft),
                 modifier = Modifier.testTag(SchedulesPageTags.FORM_SUBMIT),
             ) { Text("Create schedule") }
+        }
+    }
+}
+
+/** The agents a schedule can be for, one chosen. */
+@Composable
+private fun AgentChoice(agents: Map<String, String>, selected: String?, onSelect: (String) -> Unit) {
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()).testTag(SchedulesPageTags.FORM_AGENTS),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    ) {
+        agents.forEach { (id, name) ->
+            LettaChipTab(
+                text = name,
+                active = id == selected,
+                onClick = { onSelect(id) },
+                modifier = Modifier.heightIn(min = LettaDimens.Control.iconButtonSm),
+            )
         }
     }
 }

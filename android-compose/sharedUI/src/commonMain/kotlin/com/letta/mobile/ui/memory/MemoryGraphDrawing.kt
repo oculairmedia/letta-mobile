@@ -2,12 +2,14 @@ package com.letta.mobile.ui.memory
 
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.data.memory.MemoryChannelStatus
@@ -15,16 +17,26 @@ import com.letta.mobile.data.memory.MemoryGraphEdge
 import com.letta.mobile.data.memory.MemoryGraphNode
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.graph.MemoryGraphLayout
+import com.letta.mobile.data.memory.graph.MemoryGraphTuning
 import com.letta.mobile.data.memory.graph.MemoryGraphView
 import com.letta.mobile.data.memory.graph.MemoryGraphViewport
 import com.letta.mobile.ui.theme.graph.GraphDimens
+import kotlin.math.round
+
+/** The labels a draw pass places: their measured text, which to show, their fade and the tuning. */
+internal class GraphLabels(
+    val texts: Map<String, MemoryNodeLabel>,
+    val labeler: MemoryGraphLabeler,
+    val fade: MemoryLabelFade,
+    val tuning: MemoryGraphTuning,
+)
 
 /** What one draw pass reads besides the live positions: the graph, its looks and the focus. */
 internal class GraphScene(
     val view: MemoryGraphView,
     val neighbours: Map<String, List<String>>,
     val looks: Map<String, MemoryNodeLook>,
-    val labels: Map<String, MemoryNodeLabel>,
+    val labels: GraphLabels,
     val palette: MemoryGraphPalette,
     val selectedId: String?,
     val hoveredId: String?,
@@ -41,8 +53,8 @@ internal class GraphFrame(
 
     private val focusSet: Set<String> = focusId?.let { id -> scene.neighbours[id].orEmpty().toSet() + id }.orEmpty()
 
-    /** Few enough nodes that every label fits; otherwise only roots, the focus and zoomed-in views label. */
-    private val labelsEverything = scene.view.nodes.size <= ALL_LABELS_NODE_LIMIT || viewport.scale >= LABEL_ZOOM_SCALE
+    /** What decides this frame's labels besides the graph. */
+    val labelContext = MemoryLabelContext(scene.selectedId, scene.hoveredId, viewport.scale, scene.labels.tuning)
 
     fun screen(nodeId: String): Offset? = layout[nodeId]?.let(viewport::toScreen)?.let { Offset(it.x, it.y) }
 
@@ -55,17 +67,22 @@ internal class GraphFrame(
 
     /** The edge touches the focus. */
     fun edgeLit(edge: MemoryGraphEdge): Boolean = focusId != null && (edge.fromId == focusId || edge.toId == focusId)
-
-    fun showsLabel(node: MemoryGraphNode): Boolean =
-        labelsEverything || node.id in focusSet || node.kind == MemoryGraphNodeKind.Agent || node.kind == MemoryGraphNodeKind.Backend
 }
 
 internal fun DrawScope.drawGraph(frame: GraphFrame) {
     drawEdges(frame)
     frame.scene.view.nodes.forEach { node -> frame.screen(node.id)?.let { drawNode(frame, node, it) } }
     // Labels last so no edge or node is drawn over text; the focus label goes on top of all.
-    frame.scene.view.nodes.filter { it.id != frame.focusId }.forEach { drawLabel(frame, it) }
-    frame.focusId?.let(frame.scene.view::node)?.let { drawLabel(frame, it) }
+    val labels = frame.scene.labels
+    val shown = labels.labeler.shown(frame.labelContext) { node -> labelChip(frame, node)?.rect }
+    labels.fade.advance(shown)
+    frame.scene.view.nodes.forEach { node -> if (node.id != frame.focusId) drawFadedLabel(frame, node) }
+    frame.focusId?.let(frame.scene.view::node)?.let { drawFadedLabel(frame, it) }
+}
+
+private fun DrawScope.drawFadedLabel(frame: GraphFrame, node: MemoryGraphNode) {
+    val fade = frame.scene.labels.fade.alphaOf(node.id)
+    if (fade > 0f) drawLabel(frame, node, fade)
 }
 
 /** Soft quadratic curves bowed a little to one side, so parallel spokes read as a fan. */
@@ -152,17 +169,27 @@ private fun DrawScope.drawStatusDot(palette: MemoryGraphPalette, status: MemoryC
     drawCircle(palette.statusColor(status), radius = dotRadius, center = dot, alpha = paint.alpha)
 }
 
-private fun DrawScope.drawLabel(frame: GraphFrame, node: MemoryGraphNode) {
-    if (!frame.showsLabel(node)) return
-    val label = frame.scene.labels[node.id] ?: return
-    val centre = frame.screen(node.id) ?: return
+/** One label as placed this frame: its text, its chip's box on screen and the text's inset in it. */
+private class LabelChip(val text: TextLayoutResult, val topLeft: Offset, val size: Size, val pad: Offset) {
+    val rect: Rect get() = Rect(topLeft, size)
+}
+
+private fun DrawScope.labelChip(frame: GraphFrame, node: MemoryGraphNode): LabelChip? {
+    val label = frame.scene.labels.texts[node.id] ?: return null
+    val centre = frame.screen(node.id) ?: return null
     val text = if (node.id == frame.focusId) label.full else label.short
-    val pad = Offset(GraphDimens.labelChipPadX.toPx(), GraphDimens.labelChipPadY.toPx())
+    val pad = Offset(round(GraphDimens.labelChipPadX.toPx()), round(GraphDimens.labelChipPadY.toPx()))
     val chipSize = Size(text.size.width + pad.x * 2f, text.size.height + pad.y * 2f)
-    val chip = labelChipTopLeft(frame, node, centre, chipSize) ?: return
-    val alpha = frame.alphaOf(node)
-    drawRoundRect(frame.scene.palette.labelChip, chip, chipSize, CornerRadius(chipSize.height / 2f), alpha = alpha)
-    drawText(text, topLeft = chip + pad, alpha = alpha)
+    val placed = labelChipTopLeft(frame, node, centre, chipSize) ?: return null
+    // Whole device pixels, so text moving with its node never shimmers between sub-pixel positions.
+    return LabelChip(text, Offset(round(placed.x), round(placed.y)), chipSize, pad)
+}
+
+private fun DrawScope.drawLabel(frame: GraphFrame, node: MemoryGraphNode, fade: Float) {
+    val chip = labelChip(frame, node) ?: return
+    val alpha = frame.alphaOf(node) * fade
+    drawRoundRect(frame.scene.palette.labelChip, chip.topLeft, chip.size, CornerRadius(chip.size.height / 2f), alpha = alpha)
+    drawText(chip.text, topLeft = chip.topLeft + chip.pad, alpha = alpha)
 }
 
 /**
@@ -170,8 +197,9 @@ private fun DrawScope.drawLabel(frame: GraphFrame, node: MemoryGraphNode) {
  * off. A dimmed node's label that would run off is dropped instead, so it never crowds the focus.
  */
 private fun DrawScope.labelChipTopLeft(frame: GraphFrame, node: MemoryGraphNode, centre: Offset, chip: Size): Offset? {
-    val neighbours = frame.scene.neighbours[node.id].orEmpty().mapNotNull(frame::screen)
-    val direction = MemoryLabelPlacement.direction(centre, neighbours)
+    val direction = frame.scene.labels.labeler.direction(node.id) {
+        MemoryLabelPlacement.direction(centre, frame.scene.neighbours[node.id].orEmpty().mapNotNull(frame::screen))
+    }
     val arcGap = if (frame.scene.looks[node.id]?.usage != null) GraphDimens.usageGap.toPx() else 0f
     val reach = frame.radiusOf(node) + GraphDimens.labelGap.toPx() + arcGap
     val placed = MemoryLabelPlacement.topLeft(centre, reach, direction, chip)
@@ -193,8 +221,6 @@ internal fun MemoryGraphView.adjacency(): Map<String, List<String>> {
     return neighbours
 }
 
-private const val ALL_LABELS_NODE_LIMIT = 60
-private const val LABEL_ZOOM_SCALE = 1.6f
 private const val EDGE_BOW = 0.12f
 private const val ROOT_FILL_ALPHA = 0.22f
 private const val ROOT_CORE_FRACTION = 0.42f

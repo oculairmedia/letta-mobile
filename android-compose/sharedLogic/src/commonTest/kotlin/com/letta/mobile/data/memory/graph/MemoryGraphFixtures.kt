@@ -113,6 +113,14 @@ internal class FakeMemoryParitySource(initial: MemoryParityControllerState) : Me
         selectedAgent = agentId
     }
 
+    var fleetSelections = 0
+        private set
+
+    override fun selectFleet() {
+        selectedAgent = null
+        fleetSelections += 1
+    }
+
     override fun close() = Unit
 }
 
