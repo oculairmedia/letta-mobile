@@ -46,15 +46,20 @@ internal class TimelineDomainRig private constructor(
     val storeFailures: String get() = store.failures.joinToString { it.toString() }
 
     /** The App Server `message.list` recent page, swapped per test step. Every other call fails the test. */
-    class MutableDurableTransport : TimelineTransport by unexpectedTransport() {
+    class MutableDurableTransport(private val scope: TimelineScope) : TimelineTransport by unexpectedTransport() {
         @Volatile var durable: List<LettaMessage> = emptyList()
 
-        override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
-            TimelineRemotePageResult.Page(
+        override suspend fun listConversationMessagePage(
+            request: TimelineRemotePageRequest,
+            progress: TimelinePageProgress?,
+        ): TimelineRemotePageResult {
+            check(request.scope == scope) { "Fixture scope is not loaded" }
+            return TimelineRemotePageResult.Page(
                 request.requestId, request.selectionGeneration,
                 durable.map { TimelineRemoteRecord(TimelineMessageId(it.id), it, 0) },
                 null, false, 0,
             )
+        }
     }
 
     /** Opens on history the ledger already holds. */
@@ -102,7 +107,7 @@ internal class TimelineDomainRig private constructor(
         private const val READ_LATENCY_MILLIS = 25L
 
         suspend fun open(scope: TimelineScope): TimelineDomainRig {
-            val transport = MutableDurableTransport()
+            val transport = MutableDurableTransport(scope)
             val store = UiFrameTimelineStore(READ_LATENCY_MILLIS)
             val coordinator = CanonicalTimelineCoordinator(store, transport)
             val owner = coordinator.acquire(scope)

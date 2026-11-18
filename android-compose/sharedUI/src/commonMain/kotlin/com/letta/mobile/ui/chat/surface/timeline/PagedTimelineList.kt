@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import com.letta.mobile.ui.chat.surface.collectForChatSurface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -94,10 +95,9 @@ internal fun PagedTimelineList(params: PagedTimelineParams, modifier: Modifier =
 private fun PagedTimelineContent(params: PagedTimelineParams, modifier: Modifier) {
     val presentation = params.presentation
     val queued = remember(params.state.sendQueue) { params.state.queuedPromptIdentities() }
-    // One page flow (and presenter) per presentation: queued prompts leave the rows at assembly, so a
-    // send while the agent works neither empties the list nor remounts its settled rows.
+    // Keep the page flow stable while filtering queued prompts during row assembly.
     val settled = presentation.settled.collectAsPagedTimelineItems()
-    val live by presentation.live.collectAsState()
+    val live by presentation.live.collectForChatSurface()
     val visibleLive = remember(live, queued) { live.filterNot(queued::containsQueuedPrompt) }
     val rows = rememberPagedRows(visibleLive, settled, if (params.thinking) 1 else 0, queued)
     ObserveResidentRows(presentation, settled) {
