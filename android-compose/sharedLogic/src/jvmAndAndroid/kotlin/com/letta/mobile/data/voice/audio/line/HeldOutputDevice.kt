@@ -2,9 +2,8 @@ package com.letta.mobile.data.voice.audio.line
 
 import com.letta.mobile.data.voice.audio.PcmFormat
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
@@ -17,14 +16,15 @@ import kotlin.time.Duration.Companion.seconds
  * Each [open] hands out a lease on a line. A lease released after playing out everything it
  * queued parks its line; the next [open] in the same format takes it back (its played-frame count
  * starts from zero again for the new stream), and a parked line nobody takes within [idle] is
- * released. A line that was aborted (the reply was interrupted or stopped), or released with
+ * released, as is one still parked when [owner] (the session that holds the speaker) ends. A line
+ * that was aborted (the reply was interrupted or stopped), or released with
  * queued audio still unplayed (it failed), is released at once and never reused. One lease at a
  * time: a player plays one stream after the other.
  */
 internal class HeldOutputDevice(
     private val device: PcmOutputDevice,
+    private val owner: CoroutineScope,
     private val idle: Duration = DEFAULT_IDLE,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) : PcmOutputDevice {
     private val lock = Any()
     private var parked: Parked? = null
@@ -40,17 +40,25 @@ internal class HeldOutputDevice(
         return Lease(device.open(format), format)
     }
 
+    /**
+     * Parks [line] and starts its idle timer. The timer's completion releases the line if it is still
+     * the one parked under that timer: when the idle passes, when [owner] ends (also before the timer
+     * ever ran), but not when [open] took the line back or a newer line replaced it.
+     */
     private fun park(line: PcmOutputLine, asked: PcmFormat) {
-        val closer = scope.launch {
-            delay(idle)
-            val expired = synchronized(lock) { parked?.takeIf { it.line === line }?.also { parked = null } }
-            expired?.line?.release()
-        }
+        val closer = owner.launch(start = CoroutineStart.LAZY) { delay(idle) }
         val previous = synchronized(lock) { parked.also { parked = Parked(line, asked, closer) } }
         previous?.let {
             it.closer.cancel()
             it.line.release()
         }
+        closer.invokeOnCompletion { expire(closer) }
+        closer.start()
+    }
+
+    private fun expire(closer: Job) {
+        val expired = synchronized(lock) { parked?.takeIf { it.closer === closer }?.also { parked = null } }
+        expired?.line?.release()
     }
 
     /** One stream's use of a line; its played frames count from the start of the lease. */

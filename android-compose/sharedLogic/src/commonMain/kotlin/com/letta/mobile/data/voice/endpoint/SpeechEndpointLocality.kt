@@ -12,15 +12,17 @@ import com.letta.mobile.data.voice.SpeechEndpointUrl
 internal object SpeechEndpointLocality {
     private const val OCTETS = 4
     private const val MAX_OCTET = 255
-    private const val PRIVATE_A = 10
-    private const val PRIVATE_B = 172
-    private const val PRIVATE_B_LOW = 16
-    private const val PRIVATE_B_HIGH = 31
-    private const val PRIVATE_C = 192
-    private const val PRIVATE_C_SECOND = 168
-    private const val LINK_LOCAL = 169
-    private const val LINK_LOCAL_SECOND = 254
     private const val MDNS_SUFFIX = ".local"
+
+    /** A private or link-local IPv4 block: its first octet and the second octets it spans. */
+    private class Block(val first: Int, val second: IntRange)
+
+    private val PrivateBlocks = listOf(
+        Block(10, 0..MAX_OCTET),
+        Block(172, 16..31),
+        Block(192, 168..168),
+        Block(169, 254..254),
+    )
 
     /** True when [url] is on this machine or a private network. */
     fun isLocal(url: SpeechEndpointUrl): Boolean {
@@ -29,15 +31,12 @@ internal object SpeechEndpointLocality {
     }
 
     private fun isPrivateIpv4(host: String): Boolean {
-        val octets = host.split('.').map { part -> part.toIntOrNull()?.takeIf { it in 0..MAX_OCTET && part == it.toString() } }
+        val octets = host.split('.').map(::octet)
         if (octets.size != OCTETS || null in octets) return false
         val (first, second) = octets.requireNoNulls()
-        return when (first) {
-            PRIVATE_A -> true
-            PRIVATE_B -> second in PRIVATE_B_LOW..PRIVATE_B_HIGH
-            PRIVATE_C -> second == PRIVATE_C_SECOND
-            LINK_LOCAL -> second == LINK_LOCAL_SECOND
-            else -> false
-        }
+        return PrivateBlocks.any { it.first == first && second in it.second }
     }
+
+    /** One decimal octet without leading zeros, or null. */
+    private fun octet(part: String): Int? = part.toIntOrNull()?.takeIf { it in 0..MAX_OCTET && part == it.toString() }
 }

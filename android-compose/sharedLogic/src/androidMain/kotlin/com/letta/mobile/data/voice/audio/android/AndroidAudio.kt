@@ -22,6 +22,7 @@ import com.letta.mobile.data.voice.audio.line.LineFrameSource
 import com.letta.mobile.data.voice.audio.line.LinePcmPlayer
 import com.letta.mobile.data.voice.audio.line.PlayerOptions
 import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
@@ -104,11 +105,17 @@ class AndroidAudio(private val context: Context) {
     /**
      * A speaker on a streaming `AudioTrack` with assistant usage, playing PCM as it arrives. Each
      * stream holds transient audio focus that lets other apps duck, abandoned when it has played
-     * out; losing focus stops it with PLAYBACK_FAILED. Consecutive streams (one reply's sentences) share
-     * one `AudioTrack`, released shortly after the last one.
+     * out; losing focus stops it with PLAYBACK_FAILED.
      */
     fun player(device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault): AudioPlayer =
-        FocusedPlayer(LinePcmPlayer(HeldOutputDevice(AudioTrackOutputDevice(context, device)), PlayerOptions()), manager)
+        FocusedPlayer(LinePcmPlayer(AudioTrackOutputDevice(context, device), PlayerOptions()), manager)
+
+    /**
+     * Like [player], but consecutive streams (one reply's sentences) share one `AudioTrack`, released
+     * shortly after the last one, and at the latest when [owner] ends.
+     */
+    fun heldPlayer(owner: CoroutineScope, device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault): AudioPlayer =
+        FocusedPlayer(LinePcmPlayer(HeldOutputDevice(AudioTrackOutputDevice(context, device), owner), PlayerOptions()), manager)
 
     /** Input devices, identified by their `AudioDeviceInfo` id. */
     fun inputs(): List<AudioDeviceOption> = manager.getDevices(AudioManager.GET_DEVICES_INPUTS)

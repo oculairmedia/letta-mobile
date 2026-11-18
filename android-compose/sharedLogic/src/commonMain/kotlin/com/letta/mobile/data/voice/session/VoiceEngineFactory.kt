@@ -154,7 +154,7 @@ class EndpointVoiceEngineFactory(
         val controls = request.controls
         controls.warmUpWith { synthesizer.warm() }
         val options = MouthOptions(speed = controls::speed, meter = controls.meter)
-        val speaker = controls.speaker(audio.speaker())
+        val speaker = controls.speaker(audio.speaker(request.scope))
         val mouth = TelemetryMouth(EndpointVoiceMouth(synthesizer, speaker, request.scope, options), telemetry)
         val session = TelemetryVoiceChatSession(request.session, telemetry)
         val responder = TelemetryResponder(VoiceChatResponder(session), telemetry, session)
