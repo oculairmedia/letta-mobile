@@ -65,8 +65,8 @@ internal class SentenceScan(
     }
 
     private fun isClauseBreak(index: Int): Boolean {
-        val next = text.getOrNull(index + 1)
-        if (index + 1 >= limit || next == null || !next.isWhitespace()) return false
+        val next = text.getOrNull(index + 1)?.takeIf { index + 1 < limit }
+        if (next?.isWhitespace() != true) return false
         // "e.g., i.e., etc.," keep their comma with the abbreviation.
         if (text.getOrNull(index - 1) == '.') return false
         return when (text[index]) {
