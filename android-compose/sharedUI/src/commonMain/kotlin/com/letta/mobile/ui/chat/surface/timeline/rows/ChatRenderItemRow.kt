@@ -182,7 +182,13 @@ internal object ChatRowTestTags {
 /** The messages [this] draws as a run, or null for a lone message outside any run. */
 private fun ChatRenderItem.runMessages(): List<UiMessage>? = when (this) {
     is ChatRenderItem.RunBlock -> messages.map { it.first }
-    is ChatRenderItem.Single -> listOf(message).takeIf { stableRunId != null || stableRunKey != null }
+    is ChatRenderItem.Single -> listOf(message).takeIf { drawsAsRun() }
+}
+
+/** Whether the row draws [this] as a run (a run block, or a lone message holding its run's key). */
+internal fun ChatRenderItem.drawsAsRun(): Boolean = when (this) {
+    is ChatRenderItem.RunBlock -> true
+    is ChatRenderItem.Single -> stableRunId != null || stableRunKey != null
 }
 
 /** A lone message's place in its speaker's group; a run block has none of its own. */

@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.surface
 
+import com.letta.mobile.ui.markdown.LocalSettledMarkdownParses
+import com.letta.mobile.ui.markdown.SettledMarkdownParses
 import com.letta.mobile.data.voice.session.VoiceChatSessions
 import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.chat.voice.VoiceSetupPaneHost
@@ -165,6 +167,9 @@ fun ChatSurface(
     AcknowledgeLaneTranscript(uiState)
     ReleaseImagesOnConversationChange(conversationId)
     val listState = remember(conversationId, pagedTimeline) { LazyListState() }
+    // Settled markdown parses live as long as the scroll position does: the full page, the docked
+    // panel and its collapsed bubble all draw the same rows, so expanding or docking reuses them.
+    val markdownParses = remember(conversationId, pagedTimeline) { SettledMarkdownParses() }
     val dock = rememberChatDockState(dockGeometry ?: ChatDockGeometry.Default, onDockGeometryChange)
     // Picked images encode in the page's scope: a mode switch composes a different composer
     // panel, and the encode must outlive the one that started it.
@@ -203,6 +208,7 @@ fun ChatSurface(
             LocalChatImageActions provides stablePlatform.imageActions,
             LocalVoiceMode provides voiceMode,
             LocalAmbientVoice provides rememberAmbientVoice(voiceMode),
+            LocalSettledMarkdownParses provides markdownParses,
         ) {
             // letta-mobile-ckmub.1 (S4): the page's insets are owned once, by its LettaPageScaffold.
             ChatSurfacePageFrame(modifier) {

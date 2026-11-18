@@ -70,7 +70,9 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
         val change = if (shown === state.messages) state.messageListChange else ChatMessageListChange.Full
         cache.renderItems(shown, params.appearance.displayMode, change, state.agentId)
     }
-    val rows = remember(items) { timelineRowsNewestFirst(items) }
+    // Each timestamp's local date is parsed once for the list, not again on every message emission.
+    val days = remember { TimelineDays() }
+    val rows = remember(items) { timelineRowsNewestFirst(items, days = days) }
     val conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId
     val listState = params.listState
     val thinking = state.isAgentTyping && params.showThinkingRow
@@ -149,8 +151,9 @@ private data class LegacyTail(
 internal fun timelineRowsNewestFirst(
     newestFirstItems: List<ChatRenderItem>,
     zone: TimeZone = TimeZone.currentSystemDefault(),
+    days: TimelineDays = TimelineDays(zone),
 ): List<TimelineRow> =
-    withDayDividers(groupToolCallRows(newestFirstItems.asReversed()), zone).asReversed()
+    withDayDividers(groupToolCallRows(newestFirstItems.asReversed()), zone, days).asReversed()
 
 private fun LazyListScope.legacyRows(
     rows: List<TimelineRow>,
@@ -159,29 +162,23 @@ private fun LazyListScope.legacyRows(
     edges: LegacyEdgeRows,
 ) {
     if (edges.thinking) item(key = THINKING_KEY) { ThinkingRow(edges.messages) }
-    items(count = rows.size, key = { rows[it].key }, contentType = { rows[it]::class.simpleName }) { index ->
+    items(count = rows.size, key = { rows[it].key }, contentType = { rows[it].contentType() }) { index ->
         val row = rows[index]
         val motion = timelineRowMotion(fadesIn = !row.isUserPrompt())
-        if (row is TimelineRow.Item) {
+        // A message, a run and a tool group all draw through the one row call: a lone tool row that
+        // grows into a group keeps its key, and with the one call site its composition too.
+        val item = row.drawnItem()
+        if (item != null) {
             // Newest first: the row above this one is the next index, the row below it the previous.
-            val older = (rows.getOrNull(index + 1) as? TimelineRow.Item)?.item
-            val newer = (rows.getOrNull(index - 1) as? TimelineRow.Item)?.item
-            TimelineItemRow(row.item, bindings, motion, rememberRowSpacing(row.item, older, newer))
-        } else {
-            TimelineRowContent(row, bindings, today, motion)
+            val older = rows.getOrNull(index + 1)?.drawnItem()
+            val newer = rows.getOrNull(index - 1)?.drawnItem()
+            TimelineItemRow(item, bindings, motion, rememberRowSpacing(item, older, newer))
+        } else if (row is TimelineRow.DayDivider) {
+            DayDividerRow(row.date, today, motion)
         }
     }
     if (edges.loadingOlder) {
         item(key = LOADING_OLDER_KEY) { TimelineOlderHistoryLoading(edges.agentId) }
-    }
-}
-
-@Composable
-private fun TimelineRowContent(row: TimelineRow, bindings: TimelineRowBindings, today: LocalDate, modifier: Modifier) {
-    when (row) {
-        is TimelineRow.Item -> TimelineItemRow(row.item, bindings, modifier)
-        is TimelineRow.ToolGroup -> ToolGroupRow(row, bindings.contexts, bindings.callbacks, modifier)
-        is TimelineRow.DayDivider -> DayDividerRow(row.date, today, modifier)
     }
 }
 

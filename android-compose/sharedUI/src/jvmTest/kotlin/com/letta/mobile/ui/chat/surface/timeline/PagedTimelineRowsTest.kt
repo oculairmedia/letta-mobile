@@ -42,7 +42,7 @@ class PagedTimelineRowsTest {
 
         assertEquals(5, cached.size)
         assertEquals(original[4].item.key, cached.key(4))
-        assertEquals("Single", cached.contentType(4))
+        assertEquals("message", cached.contentType(4))
         assertSame(original[4], cached.settledRowAt(4))
         assertSame(original[4].item, cached.itemAt(4))
         assertSame(original[4].item, cached.itemAt(3 + 1))
@@ -62,10 +62,10 @@ class PagedTimelineRowsTest {
 
         assertEquals(cached.size, replacement.size)
         assertEquals(old.item.key, cached.key(0))
-        assertEquals("Single", cached.contentType(0))
+        assertEquals("message", cached.contentType(0))
         assertSame(old.item, cached.itemAt(0))
         assertEquals(new.item.key, replacement.key(0))
-        assertEquals("RunBlock", replacement.contentType(0))
+        assertEquals("run", replacement.contentType(0))
         assertSame(new.item, replacement.itemAt(0))
     }
 
@@ -107,10 +107,52 @@ class PagedTimelineRowsTest {
         assertNull(captured.contentType(2))
         assertSame(resident.item, captured.itemAt(3))
         assertEquals(resident.item.key, captured.key(3))
-        assertEquals("Single", captured.contentType(3))
+        assertEquals("message", captured.contentType(3))
         assertNull(captured.itemAt(4))
         assertEquals(1, captured.indexOf("live"))
         assertEquals(3, captured.indexOf("settled"))
+    }
+
+    @Test
+    fun aQueuedSettledPromptLeavesTheRowsWithoutMovingAnyOtherRowsKey() {
+        val older = row("older")
+        val prompt = userRow("prompt", clientMessageId = "queued-send")
+        val newer = row("newer")
+        val snapshot = ItemSnapshotList(1, 0, listOf(older, prompt, newer))
+        val all = pagedRowsOf(PagedRowSources(emptyList(), snapshot), leading = 0)
+        val queued = pagedRowsOf(PagedRowSources(emptyList(), snapshot), leading = 0, queued = setOf("queued-send"))
+
+        assertEquals(all.size - 1, queued.size)
+        assertEquals(listOf("settled-slot-0", older.item.key, newer.item.key), (0 until queued.size).map(queued::key))
+        assertSame(newer, queued.settledRowAt(2))
+        assertEquals(3, queued.snapshotPosition(2), "the hint for the row after a hidden one names its own page slot")
+        assertEquals(2, queued.indexOf("newer"))
+        assertNull(queued.indexOf("prompt"))
+        // Dispatch puts it back, between the same rows, under its own key.
+        assertEquals(listOf("settled-slot-0", older.item.key, prompt.item.key, newer.item.key), (0 until all.size).map(all::key))
+    }
+
+    @Test
+    fun aRowsReusePoolIsWhatItDrawsNotItsClass() {
+        val lone = row("lone-reply")
+        val runKeyed = CanonicalTimelinePresentation.Row(
+            TimelineMessageId("keyed"),
+            1,
+            ChatRenderItem.Single(
+                UiMessage("keyed", "assistant", "keyed", "2026-10-26T10:00:00Z", runId = "r"),
+                GroupPosition.None,
+                stableRunKey = "run-r",
+                stableRunId = "r",
+            ),
+        )
+        val captured = rows(ItemSnapshotList(0, 0, listOf(lone, runKeyed, row("block", run = true))))
+        // A lone message holding its run's key draws as the run block it becomes: one pool, so the slot is reused.
+        assertEquals(listOf("message", "run", "run"), (0 until captured.size).map(captured::contentType))
+    }
+
+    private fun userRow(id: String, clientMessageId: String): CanonicalTimelinePresentation.Row {
+        val message = UiMessage(id, "user", id, "2026-10-26T10:00:00Z", clientMessageId = clientMessageId)
+        return CanonicalTimelinePresentation.Row(TimelineMessageId(id), 1, ChatRenderItem.Single(message, GroupPosition.None))
     }
 
     private fun rows(

@@ -487,7 +487,8 @@ internal fun BubbleText(
     /** With a length, the text dissolves at whichever edge has more to scroll to (the timeline's fades). */
     fadeLength: Dp? = null,
 ) {
-    val shown = if (turn.streaming) rememberSmoothedStreamingText(rawText = turn.text, isStreaming = true) else turn.text
+    // Seeded with the reply as it stands, so a bubble that fades back in does not type it out again.
+    val shown = rememberSmoothedStreamingText(rawText = turn.text, isStreaming = turn.streaming, seedText = turn.text)
     val scroll = rememberScrollState()
     LaunchedEffect(scroll, turn.streaming) {
         if (turn.streaming) snapshotFlow { scroll.maxValue }.collect { scroll.scrollTo(it) }
@@ -513,13 +514,14 @@ internal fun BubbleText(
             textColor = if (turn.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
             textStyle = textStyle,
         )
+        // Streaming, the text is not retained across updates (a reshaped block could pair stale offsets with new text).
         if (textStyle == null) {
-            SharedMarkdownText(text = shown, paint = paint)
+            SharedMarkdownText(text = shown, paint = paint, isStreaming = turn.streaming)
         } else {
             // A host's rich renderer (Android's) paints the timeline's own large body whatever the
             // paint asks; a bubble with a type of its own keeps the shared paint, which honours it.
             CompositionLocalProvider(LocalSharedRichMarkdownRenderer provides null) {
-                SharedMarkdownText(text = shown, paint = paint)
+                SharedMarkdownText(text = shown, paint = paint, isStreaming = turn.streaming)
             }
         }
     }

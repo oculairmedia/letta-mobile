@@ -44,12 +44,13 @@ import kotlin.time.Duration.Companion.milliseconds
 internal fun withDayDividers(
     chatOrderRows: List<TimelineRow>,
     zone: TimeZone = TimeZone.currentSystemDefault(),
+    days: TimelineDays = TimelineDays(zone),
 ): List<TimelineRow> {
     if (chatOrderRows.isEmpty()) return chatOrderRows
     val out = ArrayList<TimelineRow>(chatOrderRows.size + 1)
     var currentDay: LocalDate? = null
     chatOrderRows.forEach { row ->
-        val day = row.timestampOrNull()?.let { parseTimelineLocalDate(it, zone) }
+        val day = row.timestampOrNull()?.let(days::of)
         if (day != null && opensNewSection(day, currentDay)) {
             if (currentDay != null) out += TimelineRow.DayDivider(day)
             currentDay = day
@@ -73,16 +74,37 @@ internal fun pagedBoundaryDate(
     newer: ChatRenderItem,
     older: ChatRenderItem?,
     zone: TimeZone = TimeZone.currentSystemDefault(),
+    days: TimelineDays = TimelineDays(zone),
 ): LocalDate? {
     if (older == null) return null
-    val newerDay = parseTimelineLocalDate(newer.boundaryTimestamp, zone) ?: return null
-    val olderDay = parseTimelineLocalDate(older.boundaryTimestamp, zone)
+    val newerDay = days.of(newer.boundaryTimestamp) ?: return null
+    val olderDay = days.of(older.boundaryTimestamp)
     // letta-mobile-om38i: forward only, as in [withDayDividers]; an earlier-stamped row (a
     // compaction summary) never names a day behind the one its older neighbour already opened.
     // letta-mobile-ivsx0: an undated neighbour (a deferred body) is no evidence of a new day; it
     // stays in the open section, as an unreadable stamp does in [withDayDividers].
     val olderKnown = olderDay ?: return null
     return newerDay.takeIf { it > olderKnown }
+}
+
+/**
+ * The local dates of a list's timestamps in [zone], each parsed once. One per list, remembered with
+ * it: the list's rows are rebuilt on every message emission, and parsing (with its zone conversion)
+ * every row's timestamp again each time was the heaviest part of an append.
+ */
+internal class TimelineDays(private val zone: TimeZone = TimeZone.currentSystemDefault()) {
+    private val parsed = HashMap<String, LocalDate?>()
+
+    fun of(timestamp: String): LocalDate? {
+        if (timestamp in parsed) return parsed[timestamp]
+        // Bounded: a list that outlives this many distinct stamps starts over rather than grow.
+        if (parsed.size >= MAX_KEPT_DAYS) parsed.clear()
+        return parseTimelineLocalDate(timestamp, zone).also { parsed[timestamp] = it }
+    }
+
+    private companion object {
+        const val MAX_KEPT_DAYS = 8_192
+    }
 }
 
 /** ISO instant (`Z` or offset) in [zone], else a zone-less local date-time, else null. */

@@ -6,6 +6,8 @@ import com.letta.mobile.data.chat.projection.requiresUserInput
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.ui.chat.surface.timeline.rows.drawsAsRun
+import com.letta.mobile.ui.common.GroupPosition
 import kotlinx.datetime.LocalDate
 
 /**
@@ -58,6 +60,20 @@ internal sealed interface TimelineRow {
             single.message.toolCalls.orEmpty().any(UiToolCall::needsAttention)
         }
 
+        /**
+         * The group drawn as one tool-only message under the group's key: its newest member's message
+         * carrying every member's calls. A lone tool row and the group it grows into draw through the
+         * same row, so the row keeps its composition when the second call lands.
+         */
+        val item: ChatRenderItem.Single by lazy {
+            val newest = singles.last()
+            newest.copy(
+                message = newest.message.copy(toolCalls = singles.flatMap { it.message.toolCalls.orEmpty() }),
+                groupPosition = spanPosition(singles.first().groupPosition, newest.groupPosition),
+                keyOverride = key,
+            )
+        }
+
         /** "Bash ×5 · Read" - distinct tool names with counts, in first-seen order. */
         val toolNameCounts: List<Pair<String, Int>> by lazy {
             val counts = LinkedHashMap<String, Int>()
@@ -68,6 +84,35 @@ internal sealed interface TimelineRow {
         }
     }
 }
+
+/** The place in its speaker's group of a span from a row at [first] to one at [last]. */
+private fun spanPosition(first: GroupPosition, last: GroupPosition): GroupPosition {
+    val opens = first == GroupPosition.First || first == GroupPosition.None
+    val closes = last == GroupPosition.Last || last == GroupPosition.None
+    return when {
+        opens && closes -> GroupPosition.None
+        opens -> GroupPosition.First
+        closes -> GroupPosition.Last
+        else -> GroupPosition.Middle
+    }
+}
+
+/** The item a row draws: its message or run, or a tool group as one message; null for a divider. */
+internal fun TimelineRow.drawnItem(): ChatRenderItem? = when (this) {
+    is TimelineRow.Item -> item
+    is TimelineRow.ToolGroup -> item
+    is TimelineRow.DayDivider -> null
+}
+
+/** The lazy list's reuse pool for a row: what it draws, not its class. */
+internal fun TimelineRow.contentType(): String = drawnItem()?.drawnContentType() ?: DAY_DIVIDER_CONTENT
+
+/** The reuse pool for an item: a run (drawn by the run row) or a lone message, whatever its class. */
+internal fun ChatRenderItem.drawnContentType(): String = if (drawsAsRun()) RUN_CONTENT else MESSAGE_CONTENT
+
+private const val RUN_CONTENT = "run"
+private const val MESSAGE_CONTENT = "message"
+private const val DAY_DIVIDER_CONTENT = "day"
 
 /** Snapshot queue identities at the UI-state boundary; row filters need no send-queue dependency. */
 internal fun ChatUiState.queuedPromptIdentities(): Set<String> = buildSet {

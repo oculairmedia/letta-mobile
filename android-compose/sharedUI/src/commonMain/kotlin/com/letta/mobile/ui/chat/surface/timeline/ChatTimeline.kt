@@ -243,10 +243,14 @@ private fun TimelineBody(params: TimelineBodyParams, modifier: Modifier) {
     }
 }
 
-/** The list, with its settled markdown parses kept for as long as it is shown (rows reuse them on scroll back). */
+/**
+ * The list, with settled markdown parses its rows reuse on scroll back: the page's own (kept with
+ * its scroll position, so docking and expanding reuse them too), or, composed without a page, the
+ * list's for as long as it is shown.
+ */
 @Composable
 private fun TimelineList(params: TimelineBodyParams, modifier: Modifier) {
-    val parses = remember { SettledMarkdownParses() }
+    val parses = LocalSettledMarkdownParses.current ?: remember { SettledMarkdownParses() }
     CompositionLocalProvider(LocalSettledMarkdownParses provides parses) { TimelineLists(params, modifier) }
 }
 

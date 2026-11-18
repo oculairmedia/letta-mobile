@@ -188,25 +188,48 @@ private fun KeepSettledParse(parses: SettledMarkdownParses, state: MarkdownState
 
 /**
  * The parses of settled texts, kept outside the rows (rows leave composition as they scroll away),
- * newest last and at most [capacity] of them. One per timeline, created by the list's owner and
- * provided through [LocalSettledMarkdownParses]; it lives as long as that timeline. Composition reads
- * and writes it on the UI thread only. A streaming text is never kept: it changes every token.
+ * newest last and at most [capacity] of each kind: the shared renderer's parse, the rich renderer's
+ * block document, and its tables. One per chat page, created by the page with its scroll position
+ * and provided through [LocalSettledMarkdownParses]; it lives as long as that page's conversation.
+ * Composition reads and writes it on the UI thread only. A streaming text is never kept: it changes
+ * every token.
  */
 internal class SettledMarkdownParses(private val capacity: Int = SETTLED_MARKDOWN_PARSES) {
-    private val parses = LinkedHashMap<String, State.Success>()
+    private val parses = KeptByText<State.Success>(capacity)
+    private val documents = KeptByText<StreamingMarkdownDocument>(capacity)
+    private val tables = KeptByText<ParsedMarkdownTable>(capacity)
 
     operator fun get(text: String): State.Success? = parses[text]
 
-    operator fun contains(text: String): Boolean = text in parses
+    operator fun contains(text: String): Boolean = parses[text] != null
 
-    fun keep(parsed: State.Success) {
-        parses.remove(parsed.content)
-        parses[parsed.content] = parsed
-        while (parses.size > capacity) parses.remove(parses.keys.first())
+    fun keep(parsed: State.Success) = parses.keep(parsed.content, parsed)
+
+    /** The rich renderer's block document of [text], when it was kept. */
+    fun document(text: String): StreamingMarkdownDocument? = documents[text]
+
+    fun keepDocument(text: String, document: StreamingMarkdownDocument) = documents.keep(text, document)
+
+    /** A table block's parse, by its source, when it was kept. */
+    fun table(source: String): ParsedMarkdownTable? = tables[source]
+
+    fun keepTable(source: String, table: ParsedMarkdownTable) = tables.keep(source, table)
+}
+
+/** Values by their text, newest last, the oldest dropped past [capacity]. */
+private class KeptByText<V : Any>(private val capacity: Int) {
+    private val kept = LinkedHashMap<String, V>()
+
+    operator fun get(text: String): V? = kept[text]
+
+    fun keep(text: String, value: V) {
+        kept.remove(text)
+        kept[text] = value
+        while (kept.size > capacity) kept.remove(kept.keys.first())
     }
 }
 
-/** The timeline's [SettledMarkdownParses]; null (outside a timeline) parses every time, as before. */
+/** The chat page's [SettledMarkdownParses]; null (outside a chat page) parses every time, as before. */
 internal val LocalSettledMarkdownParses = staticCompositionLocalOf<SettledMarkdownParses?> { null }
 
 /** A state that is already [parsed]: the renderer draws it on its first frame. */
@@ -217,7 +240,7 @@ private class SettledMarkdownState(private val parsed: State.Success) : Markdown
     override suspend fun parse(): State = parsed
 }
 
-/** How many settled parses a timeline keeps: a long conversation's worth of rows to scroll back through. */
+/** How many settled parses of each kind a page keeps: a long conversation's worth of rows to scroll back through. */
 private const val SETTLED_MARKDOWN_PARSES = 512
 
 /**

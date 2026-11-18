@@ -32,8 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.paging.filter
-import kotlinx.coroutines.flow.map
 import com.letta.mobile.ui.chat.render.ChatUiState
 import androidx.paging.CombinedLoadStates
 import androidx.paging.LoadState
@@ -93,13 +91,12 @@ internal fun PagedTimelineList(params: PagedTimelineParams, modifier: Modifier =
 private fun PagedTimelineContent(params: PagedTimelineParams, modifier: Modifier) {
     val presentation = params.presentation
     val queued = remember(params.state.sendQueue) { params.state.queuedPromptIdentities() }
-    val visibleSettled = remember(presentation, queued) {
-        presentation.settled.map { page -> page.filter { !queued.containsQueuedPrompt(it.item) } }
-    }
-    val settled = visibleSettled.collectAsPagedTimelineItems()
+    // One page flow (and presenter) per presentation: queued prompts leave the rows at assembly, so a
+    // send while the agent works neither empties the list nor remounts its settled rows.
+    val settled = presentation.settled.collectAsPagedTimelineItems()
     val live by presentation.live.collectAsState()
     val visibleLive = remember(live, queued) { live.filterNot(queued::containsQueuedPrompt) }
-    val rows = rememberPagedRows(visibleLive, settled, if (params.thinking) 1 else 0)
+    val rows = rememberPagedRows(visibleLive, settled, if (params.thinking) 1 else 0, queued)
     ObserveResidentRows(presentation, settled) {
         residentReport(settled.itemSnapshotList.items, settled.loadState.refresh)
     }
@@ -137,6 +134,8 @@ private fun PagedTimelineBody(
     val pinned = rememberPinnedPrompt(listState, rows.size, params.topReserve, rows::itemAt)
     val glide = rememberNewestEdgeGlide(listState)
     val today = rememberCurrentDate()
+    // Each row's local date is parsed once for the list, not on every composition of the row.
+    val days = remember(presentation) { TimelineDays() }
     val bindings = rememberPagedRowBindings(params.bindings, rows)
 
     Box(modifier) {
@@ -169,7 +168,7 @@ private fun PagedTimelineBody(
             olderHistoryComplete = { settled.loadState.append.endOfPaginationReached },
             newerHistoryComplete = { settled.loadState.prepend.endOfPaginationReached },
         ) {
-            pagedRows(PagedRowsScope(rows, settled, params, today, bindings))
+            pagedRows(PagedRowsScope(rows, settled, params, TimelineCalendar(today, days), bindings))
         }
         presentation.missingTarget?.let { missing ->
             Text(
@@ -236,9 +235,12 @@ private class PagedRowsScope(
     val rows: PagedRows,
     val settled: PagedTimelineItems<CanonicalTimelinePresentation.Row>,
     val params: PagedTimelineParams,
-    val today: LocalDate,
+    val calendar: TimelineCalendar,
     val bindings: TimelineRowBindings,
 )
+
+/** The reader's date, and the list's parsed row dates. */
+private class TimelineCalendar(val today: LocalDate, val days: TimelineDays)
 
 private fun LazyListScope.pagedRows(scope: PagedRowsScope) {
     val rows = scope.rows
@@ -300,7 +302,9 @@ private fun LazyItemScope.RenderPagedSlot(scope: PagedRowsScope, index: Int) {
 private fun DeferredSettledRow(scope: PagedRowsScope, row: CanonicalTimelinePresentation.Row, index: Int, modifier: Modifier) {
     val presentation = scope.params.presentation
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        pagedBoundaryDate(row.item, scope.rows.itemAt(index + 1))?.let { date -> DayDividerRow(date, scope.today) }
+        pagedBoundaryDate(row.item, scope.rows.itemAt(index + 1), days = scope.calendar.days)?.let { date ->
+            DayDividerRow(date, scope.calendar.today)
+        }
         TimelineDeferredBody(
             rowKey = row.identity.value,
             read = { field, offset -> presentation.readTextWindow(row, field, offset, Dispatchers.Default) },
@@ -320,8 +324,8 @@ private fun DeferredSettledRow(scope: PagedRowsScope, row: CanonicalTimelinePres
 private fun PagedRow(item: ChatRenderItem, neighbours: Pair<ChatRenderItem?, ChatRenderItem?>, scope: PagedRowsScope, modifier: Modifier) {
     val older = neighbours.first
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        pagedBoundaryDate(item, older)?.let { date ->
-            DayDividerRow(date, scope.today)
+        pagedBoundaryDate(item, older, days = scope.calendar.days)?.let { date ->
+            DayDividerRow(date, scope.calendar.today)
         }
         TimelineItemRow(item, scope.bindings, spacing = rememberRowSpacing(item, older, neighbours.second))
         PendingPromptActions(item, scope.params.presentation)

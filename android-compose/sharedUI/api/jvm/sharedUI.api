@@ -4953,6 +4953,11 @@ public final class com/letta/mobile/ui/markdown/ParsedTableRow {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/markdown/SettledMarkdownDocumentsKt {
+	public static final fun rememberMarkdownTable (Ljava/lang/String;ZLandroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/markdown/ParsedMarkdownTable;
+	public static final fun rememberStreamingMarkdownDocument (Ljava/lang/String;Lcom/letta/mobile/ui/markdown/StreamingMarkdownDocumentState;ZLandroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/markdown/StreamingMarkdownDocument;
+}
+
 public final class com/letta/mobile/ui/markdown/SharedMarkdownCodeFenceKt {
 	public static final fun getLocalMermaidDiagramRenderer ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
