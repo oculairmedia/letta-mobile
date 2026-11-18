@@ -13,6 +13,7 @@ import com.letta.mobile.data.voice.endpoint.SpeechEndpointAddress
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointClient
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointConfig
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointException
+import com.letta.mobile.data.voice.endpoint.SpeechEndpointLocality
 import com.letta.mobile.data.voice.endpoint.SpeechSpeed
 import com.letta.mobile.data.voice.endpoint.SpeechTransportPolicy
 import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
@@ -23,12 +24,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-/** The person's voice-mode tuning: how fast replies are spoken and how long a pause ends their turn. */
+/**
+ * The person's voice-mode tuning: how fast replies are spoken, how long a pause ends their turn, and
+ * whether the server ear shows their words live.
+ */
 data class VoiceTuning(
     /** The speed replies are spoken at, sent to the speech endpoint. */
     val speechSpeed: SpeechSpeed = SpeechSpeed.Normal,
     /** The silence that ends a turn for the server ear (the device's recogniser decides its own). */
     val endOfTurnSilence: Duration = EndOfTurnPolicy.DEFAULT_TRAILING_SILENCE,
+    /** Whether the server ear requests live partial transcripts; null follows the endpoint ([VoiceSetup.livePartials]). */
+    val livePartials: Boolean? = null,
 )
 
 /** What the person configured for voice mode, as stored. Never carries the API key itself. */
@@ -49,6 +55,14 @@ data class VoiceSetup(
     /** Speech speed and end-of-turn silence. */
     val tuning: VoiceTuning = VoiceTuning(),
 ) {
+    /**
+     * Whether the server ear transcribes the turn so far while the person speaks (live partial
+     * transcripts, several requests per turn): the stored choice, or by default on only when the
+     * endpoint is on this machine or a private network (no per-request cost, nothing leaves it).
+     */
+    val livePartials: Boolean
+        get() = tuning.livePartials ?: (endpoint.baseUrl?.let(SpeechEndpointLocality::isLocal) == true)
+
     /** Whether speaking over a reply interrupts it, on a microphone path that is [echoCancelled] or not. */
     fun bargeInByVoice(echoCancelled: Boolean): Boolean = echoCancelled || interruptBySpeaking
 
@@ -182,6 +196,15 @@ class VoiceSetupStore(
         state.value = read()
     }
 
+    /** Whether the server ear shows the person's words live; see [VoiceSetup.livePartials]. */
+    val livePartials: Boolean get() = state.value.livePartials
+
+    /** Stores whether to request live partial transcripts; null returns to the endpoint-based default. Takes effect from the next start. */
+    fun setLivePartials(enabled: Boolean?) {
+        if (enabled == null) settings.remove(KEY_LIVE_PARTIALS) else settings.putString(KEY_LIVE_PARTIALS, enabled.toString())
+        state.value = read()
+    }
+
     /** Stores the silence that ends a turn, clamped to the allowed range; takes effect from the next start. */
     fun setEndOfTurnSilence(silence: Duration) {
         val clamped = silence.coerceIn(EndOfTurnPolicy.MIN_TRAILING_SILENCE, EndOfTurnPolicy.MAX_TRAILING_SILENCE)
@@ -218,7 +241,8 @@ class VoiceSetupStore(
         val speed = settings.getString(KEY_SPEECH_SPEED)?.toFloatOrNull()?.let(SpeechSpeed::coerce) ?: SpeechSpeed.Normal
         val silence = settings.getString(KEY_END_OF_TURN_SILENCE_MS)?.toLongOrNull()?.milliseconds
             ?.coerceIn(EndOfTurnPolicy.MIN_TRAILING_SILENCE, EndOfTurnPolicy.MAX_TRAILING_SILENCE)
-        return VoiceTuning(speed, silence ?: EndOfTurnPolicy.DEFAULT_TRAILING_SILENCE)
+        val partials = settings.getString(KEY_LIVE_PARTIALS)?.toBooleanStrictOrNull()
+        return VoiceTuning(speed, silence ?: EndOfTurnPolicy.DEFAULT_TRAILING_SILENCE, partials)
     }
 
     private fun parseGrants(text: String): Set<VoiceEndpointGrant> = text.split(GRANT_SEPARATOR).mapNotNull { entry ->
@@ -248,6 +272,9 @@ class VoiceSetupStore(
 
         /** The server ear's end-of-turn silence, in milliseconds. */
         const val KEY_END_OF_TURN_SILENCE_MS: String = "voice.endOfTurnSilenceMs"
+
+        /** Whether to request live partial transcripts; absent follows the endpoint. */
+        const val KEY_LIVE_PARTIALS: String = "voice.livePartials"
 
         private const val GRANT_SEPARATOR = "\n"
         private const val FIELD_SEPARATOR = " "
