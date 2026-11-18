@@ -418,8 +418,8 @@ class CanonicalTimelinePresentation private constructor(
          * renders, with no record drawn twice. A live row draws only the records no resident settled
          * row draws yet, whatever key that row has (a settled row first drawn before the live frame
          * for its records arrived, after a reconnect catch-up, keeps its own key), and is hidden once
-         * none are left. A live row that keeps records under a key a settled row holds is listed as
-         * `<key>~live` (TimelineRowAssembly.displayedLive).
+         * none are left. A live row that keeps records under a key a settled row holds keeps that key,
+         * and the settled row is listed as `<key>~part` (TimelineRowAssembly.assemble).
          */
         fun assemble(live: List<ChatRenderItem>, settled: List<Row?>): TimelineRowAssembly {
             val drawnNames = settled.flatMapTo(HashSet()) { it?.liveNames.orEmpty() }

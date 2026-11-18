@@ -120,6 +120,22 @@ class TimelineToolGroupsTest {
         assertEquals(one.key, two.key)
     }
 
+    /**
+     * A lone tool row and the group it grows into are drawn as the same thing under the same key: one
+     * tool message (the group's carrying every call) in one reuse pool, through the one row call, so
+     * the row keeps its composition when the second call lands.
+     */
+    @Test
+    fun aLoneToolRowAndItsGroupDrawAsOneMessageRow() {
+        val one = groupToolCallRows(listOf(toolMessage("1"))).single()
+        val two = groupToolCallRows(listOf(toolMessage("1"), toolMessage("2"))).single() as TimelineRow.ToolGroup
+        val drawn = two.drawnItem() as ChatRenderItem.Single
+        assertEquals(one.drawnItem()?.key, drawn.key)
+        assertEquals(one.contentType(), two.contentType())
+        assertEquals(listOf("tc-1", "tc-2"), drawn.message.toolCalls.orEmpty().map { it.toolCallId })
+        assertEquals("2", drawn.message.id, "the group draws as its newest member")
+    }
+
     @Test
     fun theGroupKeySurvivesTheReversedListToo() {
         // The reversed list folds in chat order, so the key is still the OLDEST member's.

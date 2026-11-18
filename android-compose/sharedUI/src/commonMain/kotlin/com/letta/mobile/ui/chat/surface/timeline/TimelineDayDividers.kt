@@ -1,27 +1,9 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import com.letta.mobile.data.chat.projection.ChatRenderItem
-import kotlinx.coroutines.delay
-import kotlinx.datetime.DatePeriod
+import com.letta.mobile.ui.chat.surface.timeline.days.TimelineDays
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atStartOfDayIn
-import kotlinx.datetime.daysUntil
-import kotlinx.datetime.format.MonthNames
-import kotlinx.datetime.format.char
-import kotlinx.datetime.plus
-import kotlinx.datetime.toLocalDateTime
-import kotlinx.datetime.todayIn
-import kotlin.time.Clock
-import kotlin.time.Instant
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Day sections, lifted from desktop's DesktopChatDayDividers and rewritten on
@@ -44,12 +26,13 @@ import kotlin.time.Duration.Companion.milliseconds
 internal fun withDayDividers(
     chatOrderRows: List<TimelineRow>,
     zone: TimeZone = TimeZone.currentSystemDefault(),
+    days: TimelineDays = TimelineDays(zone),
 ): List<TimelineRow> {
     if (chatOrderRows.isEmpty()) return chatOrderRows
     val out = ArrayList<TimelineRow>(chatOrderRows.size + 1)
     var currentDay: LocalDate? = null
     chatOrderRows.forEach { row ->
-        val day = row.timestampOrNull()?.let { parseTimelineLocalDate(it, zone) }
+        val day = row.timestampOrNull()?.let(days::of)
         if (day != null && opensNewSection(day, currentDay)) {
             if (currentDay != null) out += TimelineRow.DayDivider(day)
             currentDay = day
@@ -73,73 +56,15 @@ internal fun pagedBoundaryDate(
     newer: ChatRenderItem,
     older: ChatRenderItem?,
     zone: TimeZone = TimeZone.currentSystemDefault(),
+    days: TimelineDays = TimelineDays(zone),
 ): LocalDate? {
     if (older == null) return null
-    val newerDay = parseTimelineLocalDate(newer.boundaryTimestamp, zone) ?: return null
-    val olderDay = parseTimelineLocalDate(older.boundaryTimestamp, zone)
+    val newerDay = days.of(newer.boundaryTimestamp) ?: return null
+    val olderDay = days.of(older.boundaryTimestamp)
     // letta-mobile-om38i: forward only, as in [withDayDividers]; an earlier-stamped row (a
     // compaction summary) never names a day behind the one its older neighbour already opened.
     // letta-mobile-ivsx0: an undated neighbour (a deferred body) is no evidence of a new day; it
     // stays in the open section, as an unreadable stamp does in [withDayDividers].
     val olderKnown = olderDay ?: return null
     return newerDay.takeIf { it > olderKnown }
-}
-
-/** ISO instant (`Z` or offset) in [zone], else a zone-less local date-time, else null. */
-internal fun parseTimelineLocalDate(timestamp: String, zone: TimeZone): LocalDate? {
-    if (timestamp.isBlank()) return null
-    return runCatching { Instant.parse(timestamp).toLocalDateTime(zone).date }
-        .recoverCatching { LocalDateTime.parse(timestamp).date }
-        .getOrNull()
-}
-
-/** What a divider says, relative to [today]. Resolved to text by the composable. */
-internal sealed interface DayLabel {
-    data object Today : DayLabel
-    data object Yesterday : DayLabel
-    data class Date(val text: String) : DayLabel
-}
-
-private val SameYearFormat = LocalDate.Format {
-    monthName(MonthNames.ENGLISH_FULL)
-    char(' ')
-    day(padding = kotlinx.datetime.format.Padding.NONE)
-}
-
-private val OtherYearFormat = LocalDate.Format {
-    monthName(MonthNames.ENGLISH_FULL)
-    char(' ')
-    day(padding = kotlinx.datetime.format.Padding.NONE)
-    chars(", ")
-    year()
-}
-
-/** "Today" / "Yesterday" / "March 4" / "December 30, 2025" (desktop and Android copy). */
-internal fun dayLabelOf(date: LocalDate, today: LocalDate): DayLabel = when {
-    date.daysUntil(today) == 0 -> DayLabel.Today
-    date.daysUntil(today) == 1 -> DayLabel.Yesterday
-    date.year == today.year -> DayLabel.Date(SameYearFormat.format(date))
-    else -> DayLabel.Date(OtherYearFormat.format(date))
-}
-
-/** Milliseconds from [now] to the next local midnight in [zone]; floored at 1 so a wait loop yields. */
-internal fun millisUntilNextMidnight(now: Instant, zone: TimeZone): Long {
-    val nextMidnight = now.toLocalDateTime(zone).date.plus(DatePeriod(days = 1)).atStartOfDayIn(zone)
-    return (nextMidnight - now).inWholeMilliseconds.coerceAtLeast(1L)
-}
-
-/**
- * The current local date, recomputed when the day turns over, so "Today" does not keep naming
- * yesterday in a window left open overnight. One watcher per list, not per divider.
- */
-@Composable
-internal fun rememberCurrentDate(zone: TimeZone = TimeZone.currentSystemDefault()): LocalDate {
-    var today by remember(zone) { mutableStateOf(Clock.System.todayIn(zone)) }
-    LaunchedEffect(zone) {
-        while (true) {
-            delay(millisUntilNextMidnight(Clock.System.now(), zone).milliseconds)
-            today = Clock.System.todayIn(zone)
-        }
-    }
-    return today
 }

@@ -88,6 +88,11 @@ internal suspend fun <T : Any> PagedTimelineItems<T>.hintPagedSnapshot(
  * The thinking row, the live overlay and the settled pages as one index space, read from one
  * snapshot of each source (TimelineRowAssembly). Content, neighbours, keys and types all read
  * that captured snapshot, even while Paging replaces its presenter and lazy slots recompose.
+ *
+ * A settled prompt still owned by the send queue ([hidden], ascending snapshot positions) is left
+ * out of the index space here, at assembly, not by filtering the pages: a filtered page flow is a new
+ * flow per queue change, and a new flow is a new presenter, so every send while the agent worked
+ * emptied the list for a frame and remounted every settled row.
  */
 @Immutable
 internal class PagedRows(
@@ -97,13 +102,16 @@ internal class PagedRows(
     val identity: Pair<List<ChatRenderItem>, ItemSnapshotList<CanonicalTimelinePresentation.Row>>,
     /** Distinguishes presented generations even when every row and placeholder compares equal. */
     val presented: Long = 0L,
+    /** Snapshot positions of settled rows left out of the list, ascending. */
+    private val hidden: List<Int> = emptyList(),
 ) {
     val size: Int get() = leading + assembly.size
     val liveCount: Int get() = assembly.liveCount
 
     fun key(index: Int): String = assembly.key(index - leading) ?: "settled-slot-${index - leading}"
 
-    fun contentType(index: Int): String? = itemAt(index)?.let { it::class.simpleName }
+    /** The reuse pool a row draws from: what it draws (a run, a message), not its class. */
+    fun contentType(index: Int): String? = itemAt(index)?.drawnContentType()
 
     fun itemAt(index: Int): ChatRenderItem? {
         val i = index - leading
@@ -112,12 +120,22 @@ internal class PagedRows(
     }
 
     fun settledRowAt(index: Int): CanonicalTimelinePresentation.Row? =
-        pagedSnapshotItem(identity.second, index - leading - liveCount)
+        pagedSnapshotItem(identity.second, snapshotPosition(index - leading - liveCount))
 
-    fun indexOf(rowIdentity: String): Int? =
-        canonicalRowIndex(assembly.live, identity.second.items, rowIdentity)?.let {
-            it + leading + if (it >= liveCount) identity.second.placeholdersBefore else 0
-        }
+    /** The Paging snapshot position of settled row [settledIndex] (hidden rows skipped). */
+    fun snapshotPosition(settledIndex: Int): Int {
+        var position = settledIndex
+        for (skipped in hidden) if (skipped <= position) position++ else break
+        return position
+    }
+
+    fun indexOf(rowIdentity: String): Int? {
+        val index = canonicalRowIndex(assembly.live, identity.second.items, rowIdentity) ?: return null
+        if (index < liveCount) return index + leading
+        val position = index - liveCount + identity.second.placeholdersBefore
+        if (position in hidden) return null
+        return position - hidden.count { it < position } + liveCount + leading
+    }
 }
 
 /** Capture one presentation for keys, content and hints, including equal-content replacements. */
@@ -126,13 +144,33 @@ internal fun rememberPagedRows(
     live: List<ChatRenderItem>,
     settled: PagedTimelineItems<CanonicalTimelinePresentation.Row>,
     leading: Int,
+    queued: Set<String> = emptySet(),
 ): PagedRows {
     val presented = settled.presentedSnapshot
     val snapshot = presented.second
-    return remember(live, presented.first, leading) {
-        val assembly = CanonicalTimelinePresentation.assemble(live, snapshot)
-        PagedRows(leading, assembly, identity = live to snapshot, presented = presented.first)
+    return remember(live, presented.first, leading, queued) {
+        pagedRowsOf(PagedRowSources(live, snapshot, presented.first), leading, queued)
     }
+}
+
+/** One read of the live overlay and the presented settled [snapshot], in its [presented] generation. */
+internal class PagedRowSources(
+    val live: List<ChatRenderItem>,
+    val snapshot: ItemSnapshotList<CanonicalTimelinePresentation.Row>,
+    val presented: Long = 0L,
+)
+
+/** [sources] as the list's rows, a settled prompt still owned by the send queue ([queued]) left out. */
+internal fun pagedRowsOf(sources: PagedRowSources, leading: Int, queued: Set<String> = emptySet()): PagedRows {
+    val snapshot = sources.snapshot
+    val hidden = if (queued.isEmpty()) {
+        emptyList()
+    } else {
+        snapshot.indices.filter { position -> snapshot[position]?.item?.let(queued::containsQueuedPrompt) == true }
+    }
+    val shown = if (hidden.isEmpty()) snapshot else snapshot.filterIndexed { position, _ -> position !in hidden }
+    val assembly = CanonicalTimelinePresentation.assemble(sources.live, shown)
+    return PagedRows(leading, assembly, identity = sources.live to snapshot, presented = sources.presented, hidden = hidden)
 }
 
 /** The mounted slot owns its hint effect; row rendering always reads its captured presentation. */
@@ -145,7 +183,7 @@ internal fun PagedSlot(
 ) {
     val offset = index - rows.leading
     val live = rows.assembly.live.getOrNull(offset)
-    val pagingIndex = offset - rows.liveCount
+    val pagingIndex = rows.snapshotPosition(offset - rows.liveCount)
     if (live == null) {
         LaunchedEffect(settled, rows.presented, pagingIndex) {
             settled.hintPagedSnapshot(rows.identity.second, pagingIndex)
