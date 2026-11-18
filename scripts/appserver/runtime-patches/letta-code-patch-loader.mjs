@@ -1982,8 +1982,37 @@ function subagentErrorLog(state) {
   Object.assign(state, { patched, appliedPatches, skippedPatches });
 }
 
+// lcp-agent-task-status (letta-mobile-mdhuf): publish every running-state
+// transition together, or leave the bundle untouched if any anchor drifts.
+function agentTaskStatus(state) {
+  const token = "// lcp-agent-task-status";
+  if (state.patched.includes(token)) return;
+  const sites = [
+    ['  backgroundTasks.set(taskId, bgTask);\n  registerSubagentAbortHook(subagentId, buildBackgroundTaskAbortHook(taskId, abortController));', 'bgTask'],
+    ['    bgTask.status = result3.success ? "completed" : "failed";\n    if (result3.error) {', 'bgTask'],
+    ['    bgTask.status = "failed";\n    bgTask.error = errorMessage5;', 'bgTask'],
+    ['      task.status = "failed";\n      scheduleBackgroundTaskCleanup(task_id);', 'task'],
+  ];
+  const counts = sites.map(([anchor]) => countOccurrences(state.patched, anchor));
+  if (counts.every((count) => count === 1)) {
+    for (const [anchor, task] of sites) {
+      const newline = anchor.indexOf("\n");
+      const indent = anchor.match(/^ */)[0];
+      const replacement = anchor.slice(0, newline) + `\n${indent}notifyBackgroundProcessStateChanged(${task}.runtimeScope); ${token}` + anchor.slice(newline);
+      state.patched = state.patched.replace(anchor, replacement);
+    }
+    state.appliedPatches += 1;
+  } else {
+    state.skippedPatches += 1;
+    if (state.warn) process.stderr.write(
+      `[letta-code-patch] WARN: lcp-agent-task-status anchors matched ${counts.join(",")} (expected 1 each) in ${state.path} — running without agent task status notifications\n`,
+    );
+  }
+}
+
 // Patch order is significant: each step receives the previous step's output.
 const PATCH_STEPS = [
+  agentTaskStatus,
   retryOtid,
   agentLazyload,
   conversationListMtime,
