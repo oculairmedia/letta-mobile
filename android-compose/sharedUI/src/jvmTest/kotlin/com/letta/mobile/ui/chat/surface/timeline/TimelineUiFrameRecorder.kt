@@ -97,7 +97,7 @@ internal class TimelineUiFrameRecorder(
             main.drain()
             test.mainClock.advanceTimeBy(FRAME_MILLIS)
             var frame: UiFrame? = null
-            test.runOnIdle { frame = observe(step) }
+            test.runOnIdle { frame = observe(FrameStep(step)) }
             recorded += checkNotNull(frame)
         }
     }
@@ -117,7 +117,9 @@ internal class TimelineUiFrameRecorder(
         }
     }
 
-    private fun observe(step: String): UiFrame {
+    private data class FrameStep(val label: String)
+
+    private fun observe(step: FrameStep): UiFrame {
         val info = listState.layoutInfo
         val rows = info.visibleItemsInfo.map { item ->
             val top = if (info.reverseLayout) info.viewportEndOffset - item.offset - item.size else item.offset
@@ -125,7 +127,7 @@ internal class TimelineUiFrameRecorder(
         }
         return UiFrame(
             index = recorded.size,
-            step = step,
+            step = step.label,
             rows = rows.sortedBy { it.top },
             spinnerVisible = spinnerVisible(rows),
             firstVisibleItemIndex = listState.firstVisibleItemIndex,
