@@ -2,6 +2,8 @@
 
 package com.letta.mobile.ui.chat.surface
 
+import com.letta.mobile.ui.chat.surface.timeline.days.TimelineDays
+import com.letta.mobile.ui.chat.surface.timeline.days.parseTimelineLocalDate
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
@@ -21,8 +23,6 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
-import com.letta.mobile.ui.chat.surface.timeline.TimelineDays
-import com.letta.mobile.ui.chat.surface.timeline.parseTimelineLocalDate
 import com.letta.mobile.ui.markdown.LocalSettledMarkdownParses
 import com.letta.mobile.ui.markdown.MarkdownSource
 import com.letta.mobile.ui.markdown.SettledMarkdownParses
