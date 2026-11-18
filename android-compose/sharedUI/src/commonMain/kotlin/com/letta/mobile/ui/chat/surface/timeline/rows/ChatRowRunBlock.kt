@@ -7,6 +7,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import kotlin.math.roundToInt
+import com.letta.mobile.ui.theme.LettaMotionTokens
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.NonRestartableComposable
@@ -84,28 +92,11 @@ internal fun RunBlockRow(
     ) {
         val header = plan.header(callbacks.actions)
         RunHeader(header)
-        val lone = plan.loneMessage
-        if (lone != null) {
-            RunLoneStep(PositionedRunStep(RunStep.Message(lone), position), header, row)
-        } else {
-            RunBody(plan.body, header, row)
-        }
+        // One call site for one message and for many: the run's first message keeps its composition
+        // when the second lands. Drawn through a separate lone-message branch, it was torn down and
+        // composed again (its markdown parsed again) the moment a run went from one step to two.
+        RunBody(plan.body, header, row, lone = position.takeIf { plan.loneMessage != null })
     }
-}
-
-/**
- * One message under its header keeps its own row's beat, and lifts it (and the header's floor) away
- * while the header shows, so the reply starts right under the summary label. The header's height
- * and the lift ease together, so the row keeps its height as the header shows or folds away.
- */
-@Composable
-private fun RunLoneStep(positioned: PositionedRunStep, header: RunHeaderState, row: RunRowScope) {
-    // A notice line alone in its block is the block's header-rail line: the list's leading space is
-    // its whole gap, as it is a run header's; a step beat on top of it doubled the space above it.
-    val notice = !header.visible && (positioned.step as? RunStep.Message)?.message?.subagentNotification != null
-    val top = if (notice) 0.dp else positioned.top()
-    val lift by animateRunBodyLift(if (header.visible) runHeaderFloor(header) + top else 0.dp)
-    RunStepRow(positioned, row, Modifier.pullUp { lift }.padding(top = top))
 }
 
 /** What the header's floor leaves under its label: the folding line's is taller. */
@@ -280,12 +271,39 @@ private fun isRunStreaming(messages: List<UiMessage>, context: ChatRowContext): 
 @NonRestartableComposable
 private fun RunHeader(state: RunHeaderState) {
     val reducedMotion = LocalReducedMotion.current
-    AnimatedVisibility(
-        visible = state.visible,
-        enter = ChatRowMotion(reducedMotion).expansionEnter(),
-        // The steps below ease up into the header's place (legacy settled-run body lift).
-        exit = ChatRowMotion(reducedMotion).runLabelFoldExit(),
+    // One structure for every state, live or settled: a live run keeps its header composed from its
+    // first step, hidden (no height, no semantics) until it shows. Shown inside an AnimatedVisibility,
+    // a run whose first step hid it composed the whole line for the first time, and started its grow,
+    // in the very frame its second step landed; and switching structure at settle lost the label's
+    // cross-fade from "Working…" to its settled copy.
+    val shown by animateFloatAsState(
+        targetValue = if (state.visible) 1f else 0f,
+        animationSpec = if (reducedMotion) snap() else tween(LettaMotionTokens.CONTENT_SIZE_MILLIS),
         label = "runHeader",
+    )
+    if (state.isGone(shown)) return
+    RevealedHeader(state, shown)
+}
+
+/** Whether the header draws nothing at [shown]: hidden, settled and fully folded away. */
+private fun RunHeaderState.isGone(shown: Float): Boolean {
+    if (visible || activity.isActive) return false
+    return shown == 0f
+}
+
+/** The header at [shown] of its height and opacity, its semantics only while it shows. */
+@Composable
+private fun RevealedHeader(state: RunHeaderState, shown: Float) {
+    Box(
+        Modifier
+            .clipToBounds()
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val height = (placeable.height * shown).roundToInt()
+                layout(placeable.width, height) { placeable.place(0, 0) }
+            }
+            .graphicsLayer { alpha = shown }
+            .then(if (state.visible) Modifier else Modifier.clearAndSetSemantics {}),
     ) {
         RunSummaryLine(state)
     }
@@ -298,21 +316,21 @@ private fun RunHeader(state: RunHeaderState) {
  * beat) or the run's prose opening a section (the ungrouped one).
  */
 @Composable
-private fun RunBody(body: RunBodyState, header: RunHeaderState, row: RunRowScope) {
+private fun RunBody(body: RunBodyState, header: RunHeaderState, row: RunRowScope, lone: GroupPosition? = null) {
     val steps = remember(body.messages) { compactRunSteps(body.messages) }
     // Images stay visible when work folds away. Keep their top beat below the header's full bounds,
     // using the same lift open and folded so settling does not introduce another geometry change.
     val floor = if (steps.any { it.hasImages() }) 0.dp else runHeaderFloor(header)
-    val lift by animateRunBodyLift(if (body.lifted) floor + firstStepTop(steps) else 0.dp)
+    val lift by animateRunBodyLift(if (body.lifted) floor + firstStepTop(steps, lone.takeIf { steps.size == 1 }) else 0.dp)
     Box(Modifier.fillMaxWidth().pullUp { lift }) {
-        RunSteps(steps, body, row)
+        RunSteps(steps, body, row, lone?.let { it to !header.visible })
     }
 }
 
 /** The beat above the run's first step; a hidden (folded) work step takes the grouped one, as the prose after it does. */
-private fun firstStepTop(steps: List<RunStep>): Dp {
+private fun firstStepTop(steps: List<RunStep>, lone: GroupPosition?): Dp {
     val first = steps.firstOrNull() ?: return 0.dp
-    return PositionedRunStep(first, stepPosition(0, steps.size)).top()
+    return PositionedRunStep(first, lone ?: stepPosition(0, steps.size)).top()
 }
 
 /** Draws the content [distance] higher and reports it [distance] shorter (legacy pullUp). */
@@ -329,14 +347,18 @@ private fun Modifier.pullUp(distance: () -> Dp): Modifier = layout { measurable,
  * it never jumps.
  */
 @Composable
-private fun RunSteps(steps: List<RunStep>, body: RunBodyState, row: RunRowScope) {
+private fun RunSteps(steps: List<RunStep>, body: RunBodyState, row: RunRowScope, lone: LoneStep? = null) {
     val imageCallsBeforeMessage = remember(body.messages) { runImageCallsBeforeMessages(body.messages) }
+    // Only a run that is one step is drawn as its lone message (one message can be prose and calls: two steps).
+    val single = lone?.takeIf { steps.size == 1 }
     Column(modifier = Modifier.fillMaxWidth()) {
         steps.forEachIndexed { index, step ->
             key(step.key) {
-                val positioned = PositionedRunStep(step, stepPosition(index, steps.size))
+                val positioned = PositionedRunStep(step, single?.first ?: stepPosition(index, steps.size))
+                // A work step always draws through the one folding call site, so a run's lone reasoning keeps its
+                // composition when the run's second step lands; while alone it shows as the run's own row.
                 if (step.isWork()) {
-                    RunWorkStep(positioned, body, row)
+                    RunWorkStep(positioned, body, row, single)
                 } else {
                     val message = (step as RunStep.Message).message
                     RunStepImages(imageCallsBeforeMessage[message.id].orEmpty(), positioned, body, row)
@@ -344,7 +366,7 @@ private fun RunSteps(steps: List<RunStep>, body: RunBodyState, row: RunRowScope)
                     // sits one beat under its words, as it does on a touch host.
                     val followed = steps.subList(index + 1, steps.size).any { it.showsIn(body) }
                     CompositionLocalProvider(LocalReplyActionsLine provides !followed) {
-                        RunStepRow(positioned, row, Modifier.padding(top = positioned.top()))
+                        RunStepRow(positioned, row, Modifier.padding(top = single.topOf(positioned)))
                     }
                 }
             }
@@ -357,6 +379,19 @@ private fun RunSteps(steps: List<RunStep>, body: RunBodyState, row: RunRowScope)
             }
         }
     }
+}
+
+/**
+ * A run's only message: its row's position in its speaker's group, and whether its block has no
+ * header (so a notice line alone in it takes the list's leading space as its whole gap).
+ */
+private typealias LoneStep = Pair<GroupPosition, Boolean>
+
+/** The beat above [positioned]: none for a lone notice line (a step beat doubled the space above it). */
+private fun LoneStep?.topOf(positioned: PositionedRunStep): Dp {
+    if (this == null || !second) return positioned.top()
+    val notice = (positioned.step as? RunStep.Message)?.message?.subagentNotification != null
+    return if (notice) 0.dp else positioned.top()
 }
 
 /** Whether the step draws anything in [body]: prose always, work only while open, tool images always. */
@@ -390,23 +425,30 @@ private fun runImageCallsBeforeMessages(messages: List<UiMessage>): Map<String?,
     return images
 }
 
+/**
+ * A work step, folding with the run's summary line. While it is the run's [lone] step it always shows,
+ * on the row's own rail and beat, as the run's message would; the call site is the same either way.
+ */
 @Composable
 @NonRestartableComposable
-private fun RunWorkStep(positioned: PositionedRunStep, body: RunBodyState, row: RunRowScope) {
+private fun RunWorkStep(positioned: PositionedRunStep, body: RunBodyState, row: RunRowScope, lone: LoneStep?) {
     val motion = ChatRowMotion(LocalReducedMotion.current)
+    val rail = if (lone != null) LocalLineRail.current else LineRail.Step
+    val replyLine = lone != null || LocalReplyActionsLine.current
+    val modifier = if (lone != null) {
+        Modifier.padding(top = lone.topOf(positioned))
+    } else {
+        Modifier.testTag(ChatRowTestTags.RUN_WORK_STEP).then(positioned.workPadding(body, row.context.runWidthPx))
+    }
     AnimatedVisibility(
-        visible = !body.collapsed,
+        visible = lone != null || !body.collapsed,
         enter = motion.expansionEnter(),
         exit = motion.expansionExit(),
         label = "runWorkStep",
     ) {
         // A work step's lines (a folded command report among them) sit on the step rail, under the header.
-        CompositionLocalProvider(LocalLineRail provides LineRail.Step) {
-            RunStepRow(
-                positioned,
-                row,
-                Modifier.testTag(ChatRowTestTags.RUN_WORK_STEP).then(positioned.workPadding(body, row.context.runWidthPx)),
-            )
+        CompositionLocalProvider(LocalLineRail provides rail, LocalReplyActionsLine provides replyLine) {
+            RunStepRow(positioned, row, modifier)
         }
     }
 }
