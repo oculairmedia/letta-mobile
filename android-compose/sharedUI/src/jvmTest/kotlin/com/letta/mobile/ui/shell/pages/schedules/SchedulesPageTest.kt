@@ -228,23 +228,24 @@ class SchedulesPageTest {
 
     @Test
     fun aFocusedPageDoesNotDispatchAnotherSelection() = runComposeUiTest {
-        val selected = mutableListOf<String>()
+        val selected = mutableListOf<String?>()
         val agents = listOf(AgentSummary(AgentId("a1"), "Ada"), AgentSummary(AgentId("a2"), "Bo"))
         val library = ScheduleLibraryState(isLoading = false, agents = agents, selectedAgentId = "a2")
-        show(state(focusedAgentId = "a1", library = library), SchedulesPageActions(onSelectAgent = { selected += it }))
+        show(state(focusedAgentId = "a1", library = library), SchedulesPageActions(onFilterAgent = { selected += it }))
         waitForIdle()
         assertEquals(emptyList(), selected)
         onNodeWithTag(SchedulesPageTags.agent("a2")).assertDoesNotExist()
     }
 
     @Test
-    fun agentChipsSwitchTheLibraryAgent() = runComposeUiTest {
-        val selected = mutableListOf<String>()
+    fun agentChipsFilterTheFleet() = runComposeUiTest {
+        val selected = mutableListOf<String?>()
         val agents = listOf(AgentSummary(AgentId("a1"), "Ada"), AgentSummary(AgentId("a2"), "Bo"))
-        val library = ScheduleLibraryState(isLoading = false, agents = agents, selectedAgentId = "a1")
-        show(state(focusedAgentId = null, library = library), SchedulesPageActions(onSelectAgent = { selected += it }))
+        val library = ScheduleLibraryState(isLoading = false, agents = agents, fleet = true)
+        show(state(focusedAgentId = null, library = library), SchedulesPageActions(onFilterAgent = { selected += it }))
         onNodeWithTag(SchedulesPageTags.agent("a2")).performClick()
-        assertEquals(listOf("a2"), selected)
+        onNodeWithTag(SchedulesPageTags.ALL_AGENTS).performClick()
+        assertEquals(listOf("a2", null), selected)
     }
 
     @Test

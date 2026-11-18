@@ -85,6 +85,8 @@ object MemoryNodeDetails {
         agentId: String?,
     ): MemoryNodeDetail {
         val label = item.label
+        // The fleet view edits a label group only when every owner holds the same block.
+        val writer = agentId ?: item.owners.firstOrNull()?.id?.takeIf { item.sharedBlockId != null }
         return MemoryNodeDetail(
             nodeId = node.id,
             title = item.title,
@@ -92,7 +94,7 @@ object MemoryNodeDetails {
             subtitle = item.subtitle,
             body = item.preview.ifBlank { item.detailText },
             metadataLabels = item.metadataLabels,
-            blockRef = if (agentId != null && label != null) MemoryBlockRef(agentId, label, item.id) else null,
+            blockRef = if (writer != null && label != null) MemoryBlockRef(writer, label, item.sharedBlockId ?: item.id) else null,
             readOnly = item.readOnly,
             limit = item.limit,
         )

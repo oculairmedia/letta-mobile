@@ -106,7 +106,8 @@ private fun SchedulesRulesView(body: SchedulesBody) {
         modifier = Modifier.fillMaxSize().padding(horizontal = LettaDimens.Space.lg),
     ) { def, row ->
         val cadence = ScheduleRailText.cadence(def, body.data.clock.zone)
-        val subtitle = listOfNotNull(cadence, def.cron?.takeIf { it != cadence }).joinToString(" · ")
+        val agent = def.agentId?.let { body.data.agentNames[it] ?: it }.takeIf { body.state.showsFleet && body.state.scopeAgentId == null }
+        val subtitle = listOfNotNull(agent, cadence, def.cron?.takeIf { it != cadence }).joinToString(" · ")
         RosterListRow(
             spec = LettaListRowSpec(title = def.name, subtitle = subtitle, emphasized = def.active, quiet = !def.active),
             row = row,

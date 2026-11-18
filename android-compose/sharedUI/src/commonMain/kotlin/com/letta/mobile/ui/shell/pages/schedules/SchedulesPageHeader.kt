@@ -144,13 +144,13 @@ private fun RowScope.rangeLabelModifier(compact: Boolean): Modifier {
 /** What the filter row shows: the library's agents, and the paused toggle when any schedule is paused. */
 internal class SchedulesFilterParams(
     val state: SchedulesPageState,
-    val onSelectAgent: (String) -> Unit,
+    val onFilterAgent: (String?) -> Unit,
     /** Null hides the toggle (nothing is paused). */
     val showPaused: Boolean?,
     val onTogglePaused: () -> Unit,
 )
 
-/** The library's agents as chips when the host has not focused one, then whether paused schedules show. */
+/** "All" and the library's agents as filter chips when the host has not focused one, then whether paused schedules show. */
 @Composable
 private fun SchedulesFilters(params: SchedulesFilterParams) {
     val state = params.state
@@ -165,12 +165,19 @@ private fun SchedulesFilters(params: SchedulesFilterParams) {
 private fun SchedulesAgentChips(params: SchedulesFilterParams) {
     val library = params.state.library
     if (!params.state.showsAgentChips) return
+    val scope = params.state.scopeAgentId
+    LettaChipTab(
+        text = "All",
+        active = scope == null,
+        onClick = { params.onFilterAgent(null) },
+        modifier = Modifier.testTag(SchedulesPageTags.ALL_AGENTS),
+    )
     library.agents.forEach { agent ->
         val id = agent.id.value
         LettaChipTab(
             text = agent.name,
-            active = id == library.selectedAgentId,
-            onClick = { params.onSelectAgent(id) },
+            active = id == scope,
+            onClick = { params.onFilterAgent(id) },
             modifier = Modifier.testTag(SchedulesPageTags.agent(id)),
         )
     }

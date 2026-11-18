@@ -21,6 +21,9 @@ import com.letta.mobile.data.repository.iroh.IrohSkillsApi
 import com.letta.mobile.data.schedules.RepositoryCronScheduleSource
 import com.letta.mobile.data.schedules.ScheduleLibraryController
 import com.letta.mobile.data.schedules.ScheduleRecordSources
+import com.letta.mobile.data.schedules.fleet.ScheduleFleetController
+import com.letta.mobile.data.schedules.fleet.ScheduleFleetPolicy
+import com.letta.mobile.data.schedules.fleet.ScheduleFleetSources
 import com.letta.mobile.data.schedules.runs.CronRunHistory
 import com.letta.mobile.data.schedules.runs.LeaseHistory
 import com.letta.mobile.data.session.SessionRepositoryGraph
@@ -59,6 +62,8 @@ class ShellLibraryControllers(
     val skills: SkillsCatalogController,
     val home: HomePageController,
     val memfs: MemfsPageController,
+    /** Every agent's schedules, which the Schedules page shows while no agent is focused. */
+    val scheduleFleet: ScheduleFleetController,
 )
 
 /** The controllers over one graph generation; each is built from the shared controller classes. */
@@ -81,6 +86,23 @@ object ShellLibraryFactory {
                 runHistory = CronRunHistory(graph.channelTransport)::load,
                 leases = LeaseHistory(graph.channelTransport)::load,
             ),
+        )
+
+    /** The Schedules page with no agent focused: the same sources as [schedules], read for every agent. */
+    fun scheduleFleet(graph: SessionRepositoryGraph, scope: CoroutineScope): ScheduleFleetController =
+        ScheduleFleetController(
+            ScheduleFleetSources(
+                agents = graph.agentRepository,
+                schedules = graph.scheduleRepository,
+                crons = graph.ifSupported(SessionRoute.SCHEDULES) { cronRepository }?.let(::RepositoryCronScheduleSource),
+                runHistory = CronRunHistory(graph.channelTransport)::load,
+            ),
+            ScheduleFleetPolicy(
+                errorMessage = ShellPageErrors::message,
+                nativeUnavailable = ShellPageErrors::isNotServed,
+                nativeRoute = graph.capabilities.supports(SessionRoute.SCHEDULES),
+            ),
+            scope,
         )
 
     fun channels(provider: ShellGraphProvider, scope: CoroutineScope): ChannelsPageController =
@@ -126,6 +148,7 @@ fun rememberShellLibraryControllers(
         skills = remember(generation, scope) { ShellLibraryFactory.skills(graph, scope) },
         home = remember(provider, sources.settings, scope) { ShellLibraryFactory.home(provider, sources.settings, scope) },
         memfs = remember(sources.memfs, scope) { MemfsPageController(sources.memfs, scope) },
+        scheduleFleet = remember(generation, scope) { ShellLibraryFactory.scheduleFleet(graph, scope) },
     )
     ShellLibraryLifecycles(controllers)
     return controllers
@@ -140,6 +163,7 @@ private fun ShellLibraryLifecycles(controllers: ShellLibraryControllers) {
     StartedWhileComposed(controllers.skills) {}
     StartedWhileComposed(controllers.home) { it.start() }
     StartedWhileComposed(controllers.memfs) { it.start() }
+    StartedWhileComposed(controllers.scheduleFleet) {}
 }
 
 @Composable
@@ -149,18 +173,29 @@ private fun <T : AutoCloseable> StartedWhileComposed(controller: T, start: (T) -
 }
 
 /**
- * The page on screen follows the focused [agent]: Memory and Schedules select it, and Skills loads
- * its installed set whenever the page opens or the agent changes.
+ * The page on screen follows the focused [agent]: Memory and Schedules select it, or with no agent
+ * focused show the whole fleet (so no earlier agent's state lingers), and Skills loads its installed
+ * set whenever the page opens or the agent changes.
  */
 @Composable
 fun ShellLibraryFocusEffects(controllers: ShellLibraryControllers, page: ShellPageKind, agent: AgentId?) {
     LaunchedEffect(controllers.memory, page, agent) {
-        if (page == ShellPageKind.Memory && agent != null) controllers.memory.selectAgent(agent.value)
+        if (page == ShellPageKind.Memory) controllers.memory.follow(agent)
     }
-    LaunchedEffect(controllers.schedules, page, agent) {
-        if (page == ShellPageKind.Schedules && agent != null) controllers.schedules.selectAgent(agent.value)
+    LaunchedEffect(controllers.schedules, controllers.scheduleFleet, page, agent) {
+        if (page == ShellPageKind.Schedules) controllers.followSchedules(agent)
     }
     LaunchedEffect(controllers.skills, page, agent) {
         if (page == ShellPageKind.Skills) controllers.skills.reload(agent?.value)
     }
+}
+
+/** Shows [agent]'s memory, or every agent's when none is focused. */
+private fun MemoryPageController.follow(agent: AgentId?) {
+    if (agent == null) selectFleet() else selectAgent(agent.value)
+}
+
+/** Shows [agent]'s schedules, or reads every agent's when none is focused. */
+private fun ShellLibraryControllers.followSchedules(agent: AgentId?) {
+    if (agent == null) scheduleFleet.refresh() else schedules.selectAgent(agent.value)
 }
