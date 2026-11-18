@@ -45,17 +45,17 @@ class SentPromptThroughSettleTest {
     @Test fun aLeavingPromptIsHeldUntilResidentButADismissedOneIsNot() {
         val record = CanonicalPendingLocalStore.Record(PROMPT_OTID, "hi", emptyList(), "2026-11-18T09:05:00.100Z")
         val old = 1_794_992_401_000L
-        val prompts = HandedOverPrompts()
+        val prompts = CanonicalTimelinePresentation.HandedOverPrompts()
         prompts.hold(listOf(record), emptySet(), old)
         assertEquals(listOf(record), prompts.hold(emptyList(), emptySet(), old), "held while its durable copy is not on screen")
         assertEquals(emptyList(), prompts.hold(emptyList(), setOf(PROMPT_OTID), old), "released once resident")
 
-        val dismissed = HandedOverPrompts()
+        val dismissed = CanonicalTimelinePresentation.HandedOverPrompts()
         dismissed.hold(listOf(record), emptySet(), old)
         dismissed.forget(PROMPT_OTID)
         assertEquals(emptyList(), dismissed.hold(emptyList(), emptySet(), old), "a dismissed prompt is meant to leave")
 
-        val lost = HandedOverPrompts()
+        val lost = CanonicalTimelinePresentation.HandedOverPrompts()
         lost.hold(listOf(record), emptySet(), old)
         lost.hold(emptyList(), emptySet(), old)
         assertEquals(emptyList(), lost.hold(emptyList(), emptySet(), old + 10 * 60_000), "released once history is past its send")
