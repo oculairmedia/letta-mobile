@@ -1703,8 +1703,8 @@ public final class com/letta/mobile/ui/chat/subagents/ComposableSingletons$Subag
 public final class com/letta/mobile/ui/chat/subagents/ComposableSingletons$SubagentTodoSheetKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/subagents/ComposableSingletons$SubagentTodoSheetKt;
 	public fun <init> ()V
+	public final fun getLambda$-585959606$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1324139675$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$1328555247$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/chat/subagents/ExternalAgentBadgeKt {
@@ -1926,6 +1926,7 @@ public final class com/letta/mobile/ui/chat/subagents/SubagentTodoSheetState$Loa
 public final class com/letta/mobile/ui/chat/subagents/SubagentTodoSheetTags {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/subagents/SubagentTodoSheetTags;
+	public static final field LOADING Ljava/lang/String;
 	public static final field ROSTER Ljava/lang/String;
 	public static final field SHEET Ljava/lang/String;
 }
