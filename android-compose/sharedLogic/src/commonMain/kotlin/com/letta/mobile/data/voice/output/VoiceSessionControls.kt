@@ -86,9 +86,12 @@ class VoiceSessionControls internal constructor(
     /** [source], silent while the microphone is muted. */
     internal fun microphone(source: AudioFrameSource): AudioFrameSource = MutedFrameSource(source, mutableMicrophoneMuted)
 
-    /** [ear] and [mouth] as the session's loop drives them: muted turns dropped, speech followed. */
+    /**
+     * [ear] and [mouth] as the session's loop drives them: muted turns dropped, speech followed, and
+     * the spoken progress cleared whenever the ear hears the person start a new turn.
+     */
     internal fun engines(ear: VoiceEar, mouth: VoiceMouth): Pair<VoiceEar, VoiceMouth> =
-        MutedEar(ear, mutableMicrophoneMuted) to tracker.track(mouth)
+        MutedEar(ear, mutableMicrophoneMuted, tracker::newReply) to tracker.track(mouth)
 
     /** Warms the session's speech path with [block] when the person starts speaking. */
     internal fun warmUpWith(block: suspend () -> Unit) = warmer.attach(block)
