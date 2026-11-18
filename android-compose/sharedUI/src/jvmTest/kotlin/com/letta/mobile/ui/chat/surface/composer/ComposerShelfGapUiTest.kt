@@ -25,11 +25,13 @@ import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.mascot.FakeMascotShell
+import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.collections.immutable.persistentListOf
 import kotlin.math.abs
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -56,6 +58,7 @@ class ComposerShelfGapUiTest {
             shell.Provide {
                 MaterialTheme {
                     CompositionLocalProvider(LocalLettaHost provides LettaHost(input = style)) {
+                        if (mascotAway) MascotSeat(AGENT, MascotStage.AGENT_PANE_HERO, size = 48.dp, empty = {})
                         Box(Modifier.width(width)) {
                             ChatComposerPanel(
                                 ComposerInputs(
@@ -71,6 +74,7 @@ class ComposerShelfGapUiTest {
         }
         if (mascotAway) shell.transport.transportTo(AGENT, MascotStage.AGENT_PANE_HERO)
         waitForIdle()
+        if (mascotAway) assertEquals(MascotStage.AGENT_PANE_HERO, shell.transport.activeStage(AGENT))
         val shelf = bounds(SHELF)
         val prompt = bounds(if (style == LettaInput.Touch) ComposerTestTags.TOUCH_BAR else ComposerTestTags.CARD)
         val gap = prompt.top - shelf.bottom

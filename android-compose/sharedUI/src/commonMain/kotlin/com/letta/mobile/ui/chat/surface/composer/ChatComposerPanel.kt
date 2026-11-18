@@ -19,6 +19,8 @@ import com.letta.mobile.ui.chat.surface.LANE_ABOVE_CARD
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.snapshotFlow
@@ -161,7 +163,11 @@ private fun TouchComposerPanel(model: ComposerModel, attachImage: () -> Unit, mo
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.md),
+            modifier = Modifier.fillMaxWidth().layout { measurable, constraints ->
+                val content = measurable.measure(constraints)
+                val gap = if (content.height > 0) LettaDimens.Space.sm.roundToPx() else 0
+                layout(content.width, constraints.constrainHeight(content.height + gap)) { content.placeRelative(0, 0) }
+            }.padding(horizontal = LettaDimens.Space.md),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
