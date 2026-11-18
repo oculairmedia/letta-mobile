@@ -10,7 +10,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import com.composables.icons.lucide.BookOpen
 import com.composables.icons.lucide.Lucide
 import com.letta.mobile.sharedui.resources.rows_tool_card_section_message
 import com.letta.mobile.ui.components.LettaToolCardAction
@@ -34,16 +33,11 @@ import com.letta.mobile.sharedui.resources.rows_tool_card_created_subagent
 import com.letta.mobile.sharedui.resources.rows_tool_card_done
 import com.letta.mobile.sharedui.resources.rows_tool_card_fact_agent_type
 import com.letta.mobile.sharedui.resources.rows_tool_card_fact_delivery
-import com.letta.mobile.sharedui.resources.rows_tool_card_fact_description
-import com.letta.mobile.sharedui.resources.rows_tool_card_fact_directory
 import com.letta.mobile.sharedui.resources.rows_tool_card_fact_failure
 import com.letta.mobile.sharedui.resources.rows_tool_card_fact_message_id
 import com.letta.mobile.sharedui.resources.rows_tool_card_fact_recipient
 import com.letta.mobile.sharedui.resources.rows_tool_card_fact_subagent_id
 import com.letta.mobile.sharedui.resources.rows_tool_card_failed
-import com.letta.mobile.sharedui.resources.rows_tool_card_loaded_skill
-import com.letta.mobile.sharedui.resources.rows_tool_card_loading_skill
-import com.letta.mobile.sharedui.resources.rows_tool_card_section_contents
 import com.letta.mobile.sharedui.resources.rows_tool_card_section_prompt
 import com.letta.mobile.sharedui.resources.rows_tool_card_sent_message_to
 import com.letta.mobile.sharedui.resources.rows_tool_open_subagent
@@ -188,51 +182,8 @@ private fun RowScope.SubagentTrailing(toolCall: UiToolCall) {
     SubagentStatus(toolCall)
 }
 
-/**
- * "Loaded skill pdf" as a quiet line whose chevron opens a panel: the skill's directory and
- * description, then its contents, rendered and scrolling in a capped height. "Loading skill" with
- * a spinner while the call runs.
- */
-@Composable
-private fun SkillLoadCard(toolCall: UiToolCall, detail: LineDisclosure) {
-    val state = remember(toolCall) { classifyToolCallState(toolCall) }
-    val running = state == ToolTimelineState.Running
-    val result = toolCall.result.orEmpty()
-    val body = remember(result) { skillBody(result) }
-    val facts = listOfNotNull(
-        remember(result) { skillDirectory(result) }
-            ?.let { LettaToolCardFact(stringResource(Res.string.rows_tool_card_fact_directory), it, monospace = true) },
-        body.first?.let(::skillDescription)
-            ?.let { LettaToolCardFact(stringResource(Res.string.rows_tool_card_fact_description), it) },
-    )
-    val contents = body.second
-    val contentsTitle = stringResource(Res.string.rows_tool_card_section_contents)
-    val failedLabel = stringResource(Res.string.rows_tool_card_failed)
-    LettaToolCard(
-        header = LettaToolCardHeader(
-            label = stringResource(if (running) Res.string.rows_tool_card_loading_skill else Res.string.rows_tool_card_loaded_skill),
-            title = SKILL_KEYS.firstNotNullOfOrNull { toolCall.facts().string(it) } ?: skillNameIn(result),
-            icon = Lucide.BookOpen,
-            working = running,
-        ),
-        modifier = Modifier.testTag(ChatRowTestTags.SKILL_LOAD_CARD),
-        parts = LettaToolCardParts(
-            style = LettaToolCardStyle.Line,
-            trailing = failureTrailing(state.isFailure(), failedLabel),
-            expansion = detail,
-        ),
-        body = if (facts.isEmpty() && contents == null) null else ({
-            LettaToolCardFacts(facts)
-            contents?.let { text ->
-                if (facts.isNotEmpty()) LettaToolCardDivider()
-                LettaToolCardSection(contentsTitle) { CardMarkdown(text) }
-            }
-        }),
-    )
-}
-
 /** A card's "Failed" status at its header's end when [failed]; nothing otherwise. */
-private fun failureTrailing(failed: Boolean, label: String): (@Composable RowScope.() -> Unit)? =
+internal fun failureTrailing(failed: Boolean, label: String): (@Composable RowScope.() -> Unit)? =
     if (failed) ({ CardStatus(label, StatusTone.Failed) }) else null
 
 /** Running while the call runs or its report says so; Done or Failed once its report says. Nothing else is guessed. */
@@ -262,51 +213,9 @@ private fun CardStatus(text: String, tone: StatusTone) {
 
 /** A card section's markdown, in the timeline's renderer. */
 @Composable
-private fun CardMarkdown(text: String) {
+internal fun CardMarkdown(text: String) {
     SharedMarkdownText(text = text, textColor = MaterialTheme.colorScheme.onSurface)
 }
 
-/** The skill's name from its result when the call's arguments do not name it: "Launching skill: pdf", else its directory's name. */
-private fun skillNameIn(result: String): String? {
-    LAUNCHING_NAME.find(result)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-    return skillDirectory(result)?.trimEnd('/', '\\')?.substringAfterLast('/')?.substringAfterLast('\\')?.ifEmpty { null }
-}
-
-/** The skill's directory, from its result's "Base directory for this skill: …" (or "Directory: …") line. */
-private fun skillDirectory(result: String): String? =
-    SKILL_DIRECTORY.find(result)?.groupValues?.get(1)?.trim()?.ifEmpty { null }
-
-/**
- * The result's frontmatter block (between `---` fences at its top) and its markdown contents,
- * without the directory line or the "Launching skill" line; (null, contents) when it has no
- * frontmatter, and null contents when nothing is left.
- */
-private fun skillBody(result: String): Pair<String?, String?> {
-    val body = result.lineSequence()
-        .filterNot { SKILL_DIRECTORY.containsMatchIn(it) || it.trimStart().startsWith(LAUNCHING_SKILL, ignoreCase = true) }
-        .joinToString("\n")
-        .trim()
-    if (!body.startsWith(FENCE)) return null to body.ifBlank { null }
-    val end = body.indexOf("\n$FENCE", startIndex = FENCE.length)
-    if (end < 0) return null to body
-    return body.substring(FENCE.length, end) to body.substring(end + FENCE.length + 1).trim().ifBlank { null }
-}
-
-/** The frontmatter's `description:` value, unquoted. */
-private fun skillDescription(frontmatter: String): String? =
-    SKILL_DESCRIPTION.find(frontmatter)?.groupValues?.get(1)?.trim()?.trim('"', '\'')?.ifEmpty { null }
-
-
-private val SKILL_KEYS = listOf("skill", "command", "name", "skill_name", "skillName")
-private val LAUNCHING_NAME = Regex("""Launching skill:\s*(\S+)""", RegexOption.IGNORE_CASE)
-private const val FENCE = "---"
-private const val LAUNCHING_SKILL = "Launching skill"
-// Flags as options, not an inline (?im) prefix: JavaScript RegExp (web/wasm) rejects inline flags.
-private val SKILL_LINE_OPTIONS = setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)
-private val SKILL_DIRECTORY = Regex(
-    """^\s*(?:base directory(?: for this skill)?|skill directory|directory)\s*:\s*(.+)$""",
-    SKILL_LINE_OPTIONS,
-)
-private val SKILL_DESCRIPTION = Regex("""^description\s*:\s*(.+)$""", SKILL_LINE_OPTIONS)
 private val DONE_WORDS = setOf("completed", "complete", "success", "succeeded", "done")
 private val FAILED_WORDS = setOf("failed", "error", "errored", "cancelled", "canceled", "killed")
