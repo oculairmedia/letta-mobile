@@ -51,14 +51,14 @@ test("lcp-model-catalog adds GPT-6.2 Sol and Astra from the Sol template without
   const result = evaluate(source, { [haiku.id]: haiku }, { [sol.id]: sol });
   for (const [id, name] of [["gpt-6.2-sol", "GPT-6.2 Sol"], ["gpt-6.2-astra", "GPT-6.2 Astra"]]) {
     const entry = result.openai[id];
-    assert.equal(entry?.id, id);
-    assert.equal(entry?.name, name);
-    assert.equal(entry?.contextWindow, 872000, id);
-    assert.equal(entry?.maxTokens, 128000, id);
-    assert.equal(entry?.api, "openai-responses", id);
+    assert.equal(entry.id, id);
+    assert.equal(entry.name, name);
+    assert.equal(entry.contextWindow, 872000, id);
+    assert.equal(entry.maxTokens, 128000, id);
+    assert.equal(entry.api, "openai-responses", id);
   }
-  assert.equal(result.openai[sol.id]?.id, sol.id);
-  assert.equal(result.openai[sol.id]?.name, sol.name);
+  assert.equal(result.openai[sol.id].id, sol.id);
+  assert.equal(result.openai[sol.id].name, sol.name);
 });
 
 test("lcp-model-catalog keeps an upstream GPT-6.2 entry when a future bundle ships one", () => {
