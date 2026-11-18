@@ -184,6 +184,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           python3 -m unittest discover -s scripts/tests -p test_parity_gates.py -v
+          python3 -m unittest discover -s scripts/tests -p test_clean_arch.py -v
           bash scripts/tests/platform-ui-gate-test.sh
           bash scripts/tests/apt-install-retry-test.sh
           # A stale mingw_x64 API dump is otherwise seen only by the Windows runner.
@@ -195,12 +196,15 @@ jobs:
           set -euo pipefail
           status=0
           python3 scripts/ci/parity_gates.py || status=1
+          python3 scripts/ci/clean_arch.py --base "${CLEAN_ARCH_BASE:-$(git rev-parse HEAD^)}" || status=1
           bash scripts/ci/platform-ui-gate.sh --enforce > /tmp/platform-ui.txt || status=1
           cat /tmp/platform-ui.txt
           grep -E '^ERROR\|' /tmp/platform-ui.txt | while IFS='|' read -r _ rule path msg; do
             echo "::error file=${path},title=${rule}::${msg}"
           done || true
           exit "$status"
+        env:
+          CLEAN_ARCH_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
 
       - name: Enforce API package documentation contract
         working-directory: ${{ github.workspace }}
