@@ -31,6 +31,8 @@ import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoiceText
@@ -57,8 +59,10 @@ import com.letta.mobile.ui.chat.voice.VoiceCardSwitch
 import com.letta.mobile.ui.chat.voice.VoiceCardConversation
 import com.letta.mobile.ui.chat.voice.VoiceModeHandle
 import com.letta.mobile.ui.chat.voice.VoiceModeTags
-import com.letta.mobile.ui.chat.voice.VoiceSpokenSegment
+import com.letta.mobile.data.voice.endpoint.SpeechSpeed
+import com.letta.mobile.data.voice.output.SpokenSegment
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,8 +94,8 @@ internal object CardQuietEngines : VoiceEar, VoiceMouth, VoiceResponder {
 internal class FakeVoiceCardFeed(var clock: Long = 0L, controls: Boolean = true) : VoiceCardFeed {
     val micMuted = MutableStateFlow(false)
     val speakerMuted = MutableStateFlow(false)
-    val speedValue = MutableStateFlow(1f)
-    override val spokenSegments = MutableStateFlow<List<VoiceSpokenSegment>>(emptyList())
+    val speedValue = MutableStateFlow(SpeechSpeed.Normal)
+    override val spokenSegments = MutableStateFlow<List<SpokenSegment>>(emptyList())
     override val microphoneMute: VoiceCardSwitch? = VoiceCardSwitch(micMuted) { micMuted.value = it }.takeIf { controls }
     override val speakerMute: VoiceCardSwitch? = VoiceCardSwitch(speakerMuted) { speakerMuted.value = it }.takeIf { controls }
     override val speed: VoiceCardSpeed? = VoiceCardSpeed(speedValue, { speedValue.value = it }).takeIf { controls }
@@ -155,23 +159,29 @@ class VoiceModeCardUiTest {
         showCard(FakeVoiceCardFeed())
         waitForIdle()
         onNodeWithTag(VoiceModeTags.CARD_SPEAKER, useUnmergedTree = true).assert(hasText("You"))
-        inCard("Listening…").assertExists()
+        // The status is the header's; the body holds words only.
+        onNodeWithTag(VoiceModeTags.CARD_STATUS, useUnmergedTree = true).assert(hasText("Listening"))
+        inCard("Listening…").assertDoesNotExist()
 
         state.value = VoiceModeState.Hearing
         words.value = VoiceText("what time is it in Lisbon")
         waitForIdle()
         inCard("what time is it in Lisbon").assertExists()
-        inCard("Hearing you…").assertDoesNotExist()
+        onNodeWithTag(VoiceModeTags.CARD_STATUS, useUnmergedTree = true).assert(hasText("Hearing you"))
 
         state.value = VoiceModeState.WaitingForReply
         waitForIdle()
         onNodeWithTag(VoiceModeTags.CARD_SPEAKER, useUnmergedTree = true).assert(hasText("Scout"))
-        inCard("Thinking…").assertExists()
+        onNodeWithTag(VoiceModeTags.CARD_STATUS, useUnmergedTree = true).assert(hasText("Thinking…"))
+        // While the reply is awaited, the person's last words stay in view.
+        inCard("what time is it in Lisbon").assertExists()
 
         reply = "It is just after nine in the evening there."
         state.value = VoiceModeState.Speaking
         waitForIdle()
         inCard("It is just after nine in the evening there.").assertExists()
+        inCard("Speaking… — press to interrupt").assertDoesNotExist()
+        onNodeWithTag(VoiceModeTags.CARD_INTERRUPT).assertContentDescriptionEquals("Stop speaking and listen")
 
         state.value = VoiceModeState.TurnFailed(VoiceErrorCode.TRANSCRIPTION_FAILED, retryable = true)
         waitForIdle()
@@ -216,10 +226,11 @@ class VoiceModeCardUiTest {
         showCard(feed, reducedMotion = reducedMotion)
         val first = "I can help refactor code,"
         val second = "draft pull requests,"
+        // The chat's reply holds the words not yet spoken: they show dimmed after the lit ones.
+        reply = "$first $second or summarize complex documents."
         feed.spokenSegments.value = listOf(
-            VoiceSpokenSegment(0, first, startedAtMs = 0, audioDurationMs = 2_000, finishedAtMs = 2_000),
-            VoiceSpokenSegment(1, second, startedAtMs = 2_000, audioDurationMs = 2_000),
-            VoiceSpokenSegment(2, "or summarize complex documents."),
+            SpokenSegment(0, VoiceText(first), startedAtMs = 0, audioDurationMs = 2_000, finishedAtMs = 2_000),
+            SpokenSegment(1, VoiceText(second), startedAtMs = 2_000, audioDurationMs = 2_000, finishedAtMs = null),
         )
         feed.clock = 2_000
         frame()
@@ -232,14 +243,14 @@ class VoiceModeCardUiTest {
         feed.clock = 4_000
         frame()
         assertEquals(first.length + 1 + second.length, litCharacters(), "a finished piece lights whole")
+        assertEquals(reply, bodyText().text, "the rest of the reply shows, dimmed")
     }
 
     /** How many characters of the card's body are in the bright ink (the body's first span). */
-    private fun ComposeUiTest.litCharacters(): Int {
-        val body = onNodeWithTag(VoiceModeTags.CARD_BODY, useUnmergedTree = true).fetchSemanticsNode()
-        val text = body.config[SemanticsProperties.Text].single()
-        return text.spanStyles.minByOrNull { it.start }?.end ?: 0
-    }
+    private fun ComposeUiTest.litCharacters(): Int = bodyText().spanStyles.minByOrNull { it.start }?.end ?: 0
+
+    private fun ComposeUiTest.bodyText() =
+        onNodeWithTag(VoiceModeTags.CARD_BODY, useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text].single()
 
     @Test
     fun theMutesAndTheSpeedAreLabelledControlsThatSetTheFeed() = runComposeUiTest {
@@ -264,7 +275,7 @@ class VoiceModeCardUiTest {
         waitForIdle()
         onNodeWithTag("${VoiceModeTags.CARD_SPEED}-1.25").performClick()
         waitForIdle()
-        assertEquals(1.25f, feed.speedValue.value)
+        assertEquals(1.25f, feed.speedValue.value.value)
         onNodeWithTag(VoiceModeTags.CARD_SPEED).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "1.25×"))
     }
 
@@ -307,7 +318,16 @@ class VoiceModeCardUiTest {
             val part = bounds(tag)
             assertTrue(part.left >= card.left && part.right <= card.right + 1.dp, "$tag stays inside the card $where")
         }
+        val speed = bounds(VoiceModeTags.CARD_SPEED)
+        // End and the speed pill draw as tall as the round controls; their semantics may report the
+        // platform's minimum touch target around them, never more.
+        listOf(end, speed).forEach { pill ->
+            val fits = pill.height in mic.height..LettaControlTokens.minTouchTarget
+            assertTrue(fits, "a pill ${pill.height} sized with the round controls $where")
+        }
+        assertTrue(abs((mic.width - mic.height).value) < 1f, "the round controls are round: ${mic.width} x ${mic.height} $where")
         val centre = { rect: DpRect -> (rect.top + rect.bottom) / 2 }
+        assertTrue(abs((centre(speed) - centre(mic)).value) < 2f, "the speed pill shares the round controls' line $where")
         assertTrue(abs((centre(end) - centre(speaker)).value) < 2f, "End shares the speaker's line $where")
         val sameLine = abs((centre(mic) - centre(speaker)).value) < 2f
         assertEquals(oneLine, sameLine, "the controls share the speaker's line: $oneLine $where")

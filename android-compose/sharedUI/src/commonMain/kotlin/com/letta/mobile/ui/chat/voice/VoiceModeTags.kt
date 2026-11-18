@@ -29,7 +29,13 @@ object VoiceModeTags {
     /** The card's timer: how long the current speaker has had the turn. */
     const val CARD_TIMER: String = "voice-card-timer"
 
-    /** The card's body: the person's words, the status, the error or the reply. */
+    /** The card's status words in its header ("Listening", "Thinking", "Speaking"). */
+    const val CARD_STATUS: String = "voice-card-status"
+
+    /** The card's stop button while the reply is spoken: stops it and listens. */
+    const val CARD_INTERRUPT: String = "voice-card-interrupt"
+
+    /** The card's body: the person's words, the reply, or the failed utterance. */
     const val CARD_BODY: String = "voice-card-body"
 
     /** The card's microphone mute toggle. */

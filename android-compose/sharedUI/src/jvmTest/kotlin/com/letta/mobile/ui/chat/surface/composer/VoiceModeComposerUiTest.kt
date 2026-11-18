@@ -357,7 +357,7 @@ class VoiceModeComposerUiTest {
     }
 
     @Test
-    fun aTapTurnsVoiceModeOnAndASecondTapTurnsItOff() = runComposeUiTest {
+    fun aTapTurnsVoiceModeOnAndTheCardsEndTurnsItOff() = runComposeUiTest {
         var handle: VoiceModeHandle? = null
         showComposer(360.dp, LettaInput.Touch, voice = VoiceOptions(onHandle = { handle = it }))
         onNodeWithTag(VoiceModeTags.BUTTON)
@@ -367,13 +367,13 @@ class VoiceModeComposerUiTest {
 
         onNodeWithTag(VoiceModeTags.BUTTON).performClick()
         waitForState({ handle }, VoiceModeState.Listening)
-        onNodeWithTag(VoiceModeTags.BUTTON)
-            .assertContentDescriptionEquals("Stop voice conversation")
-            .assert(stateDescription("On, listening"))
-        onNodeWithTag(ComposerTestTags.TOUCH_BAR, useUnmergedTree = true)
+        waitForIdle()
+        // Running, the voice card holds the controls and the glow: the bar's button steps aside.
+        onNodeWithTag(VoiceModeTags.BUTTON).assertDoesNotExist()
+        onNodeWithTag(VoiceModeTags.CARD, useUnmergedTree = true)
             .assert(SemanticsMatcher.expectValue(VoiceOutlineRoleKey, VoiceGlowRole.You))
 
-        onNodeWithTag(VoiceModeTags.BUTTON).performClick()
+        onNodeWithTag(VoiceModeTags.CARD_END).performClick()
         waitForState({ handle }, VoiceModeState.Off)
         waitForIdle()
         onNodeWithTag(VoiceModeTags.STRIP).assertDoesNotExist()

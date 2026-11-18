@@ -1,7 +1,8 @@
 package com.letta.mobile.ui.chat.surface.composer
 
 import androidx.compose.ui.graphics.Color
-import com.letta.mobile.ui.chat.voice.VoiceSpokenSegment
+import com.letta.mobile.data.voice.VoiceText
+import com.letta.mobile.data.voice.output.SpokenSegment
 import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,39 +13,41 @@ import kotlin.test.assertEquals
  * queued; under reduced motion the playing piece lights whole, so the light moves a piece at a time.
  */
 class VoiceSpokenTextTest {
-    private val first = VoiceSpokenSegment(0, "I can help refactor code,", startedAtMs = 0, audioDurationMs = 2_000, finishedAtMs = 2_000)
-    private val second = VoiceSpokenSegment(1, "draft pull requests,", startedAtMs = 2_000, audioDurationMs = 2_000)
-    private val third = VoiceSpokenSegment(2, "or summarize documents.")
-    private val reply = listOf(first, second, third)
+    private fun piece(index: Int, text: String, startedAtMs: Long, durationMs: Long? = null, finishedAtMs: Long? = null) =
+        SpokenSegment(index, VoiceText(text), startedAtMs, durationMs, finishedAtMs)
+
+    private val first = piece(0, "I can help refactor code,", startedAtMs = 0, durationMs = 2_000, finishedAtMs = 2_000)
+    private val second = piece(1, "draft pull requests,", startedAtMs = 2_000, durationMs = 2_000)
+    private val third = piece(2, "or summarize documents.", startedAtMs = 4_000)
+    private val reply = listOf(first, second)
 
     @Test
     fun thePiecesJoinWithOneSpaceInIndexOrder() {
         assertEquals(
             "I can help refactor code, draft pull requests, or summarize documents.",
-            spokenReply(listOf(third, first, second).map { it.copy(text = " ${it.text} ") }),
+            spokenReply(listOf(third, first, second).map { it.copy(text = VoiceText(" ${it.text.value} ")) }),
         )
     }
 
     @Test
     fun theFinishedPieceLightsWholeAndThePlayingOneByItsShareOfAudio() {
-        val firstLength = first.text.length
+        val firstLength = first.text.value.length
         // The second piece (with the space before it) is half played.
-        val half = ((" " + second.text).length * 0.5f).roundToInt()
+        val half = ((" " + second.text.value).length * 0.5f).roundToInt()
         assertEquals(firstLength, spokenCharacters(reply, nowMs = 2_000, interpolate = true))
         assertEquals(firstLength + half, spokenCharacters(reply, nowMs = 3_000, interpolate = true))
-        assertEquals(firstLength + (" " + second.text).length, spokenCharacters(reply, nowMs = 9_000, interpolate = true))
+        assertEquals(firstLength + (" " + second.text.value).length, spokenCharacters(reply, nowMs = 9_000, interpolate = true))
     }
 
     @Test
-    fun aQueuedPieceAndEverythingAfterItStayDim() {
-        val queued = listOf(first, second.copy(startedAtMs = null), third.copy(startedAtMs = 5_000, finishedAtMs = 6_000))
-        assertEquals(first.text.length, spokenCharacters(queued, nowMs = 10_000, interpolate = true))
-        assertEquals(0, spokenCharacters(listOf(third), nowMs = 10_000, interpolate = true))
+    fun aPieceThatHasJustStartedCountsNothingYet() {
+        assertEquals(first.text.value.length, spokenCharacters(reply, nowMs = 2_000, interpolate = true))
+        assertEquals(0, spokenCharacters(emptyList(), nowMs = 10_000, interpolate = true))
     }
 
     @Test
     fun underReducedMotionThePlayingPieceLightsWholeAtItsStart() {
-        val bothLit = first.text.length + (" " + second.text).length
+        val bothLit = first.text.value.length + (" " + second.text.value).length
         assertEquals(bothLit, spokenCharacters(reply, nowMs = 2_001, interpolate = false))
         assertEquals(bothLit, spokenCharacters(reply, nowMs = 3_000, interpolate = false))
     }
@@ -52,7 +55,8 @@ class VoiceSpokenTextTest {
     @Test
     fun aPieceWhoseAudioLengthIsUnknownLightsWholeWhilePlaying() {
         val unknown = listOf(first, second.copy(audioDurationMs = null))
-        assertEquals(first.text.length + (" " + second.text).length, spokenCharacters(unknown, nowMs = 2_100, interpolate = true))
+        val bothLit = first.text.value.length + (" " + second.text.value).length
+        assertEquals(bothLit, spokenCharacters(unknown, nowMs = 2_100, interpolate = true))
     }
 
     @Test

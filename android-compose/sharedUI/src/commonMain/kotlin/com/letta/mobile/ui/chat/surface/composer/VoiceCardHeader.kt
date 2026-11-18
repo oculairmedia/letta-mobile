@@ -27,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -37,6 +39,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextOverflow
+import com.letta.mobile.data.voice.endpoint.SpeechSpeed
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.voice_card_collapse
 import com.letta.mobile.sharedui.resources.voice_card_elapsed
@@ -49,23 +52,20 @@ import com.letta.mobile.sharedui.resources.voice_card_speed
 import com.letta.mobile.sharedui.resources.voice_card_speed_value
 import com.letta.mobile.sharedui.resources.voice_card_toggle_off
 import com.letta.mobile.sharedui.resources.voice_card_toggle_on
+import com.letta.mobile.sharedui.resources.voice_mode_interrupt
 import com.letta.mobile.ui.chat.voice.VoiceCardFeed
+import com.letta.mobile.ui.chat.voice.VoiceCardMuteLook
+import com.letta.mobile.ui.chat.voice.VoiceCardSpeaker
 import com.letta.mobile.ui.chat.voice.VoiceCardSpeed
 import com.letta.mobile.ui.chat.voice.VoiceCardSwitch
-import com.letta.mobile.ui.chat.voice.VoiceModeHandle
-import com.letta.mobile.ui.chat.voice.VoiceSpeaker
 import com.letta.mobile.ui.chat.voice.VoiceCardTurn
-import com.letta.mobile.ui.chat.voice.VoiceCardMuteLook
+import com.letta.mobile.ui.chat.voice.VoiceModeHandle
 import com.letta.mobile.ui.chat.voice.VoiceModeTags
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.components.disclosure.LettaFoldButton
 import com.letta.mobile.ui.components.disclosure.LettaMenuIndicator
 import com.letta.mobile.ui.components.disclosure.LettaUnfoldButton
-import com.letta.mobile.ui.components.foundation.LettaButtonIcon
-import com.letta.mobile.ui.components.foundation.LettaChip
-import com.letta.mobile.ui.components.foundation.LettaChipSlots
 import com.letta.mobile.ui.components.foundation.LettaIcon
-import com.letta.mobile.ui.components.foundation.LettaIconButton
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.foundation.LettaVerticalDivider
@@ -79,50 +79,50 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * The card's header. On a card at least [LettaDimens.Pane.voiceCardOneLine] wide ([oneLine]) it is
- * one line: the speaker, then the audio controls, fold, a rule and End. On a narrower card the
- * speaker, fold and End keep the first line and the audio controls take a second, shown only while
- * the card is unfolded (folded, the card is its first line).
+ * one line: the speaker (glyph, name, timer and status), then the round controls, fold, a rule and
+ * End. On a narrower card the speaker, fold and End keep the first line and the round controls take
+ * a second, shown only while the card is unfolded (folded, the card is its first line). Every control
+ * is [LettaControlTokens.iconButtonLg] tall, End included.
  */
 @Composable
 internal fun VoiceCardHeader(handle: VoiceModeHandle, turn: VoiceCardTurn, oneLine: Boolean) {
-    val folded = handle.cardCollapsed
     if (oneLine) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             VoiceCardSpeakerLine(turn)
-            AudioControls(handle)
+            RoundControls(handle, turn)
             FoldControl(handle)
-            LettaVerticalDivider(Modifier.height(LettaControlTokens.iconSm).padding(horizontal = LettaDimens.Space.xs))
+            LettaVerticalDivider(Modifier.height(LettaControlTokens.icon))
             EndButton(handle)
         }
         return
     }
-    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             VoiceCardSpeakerLine(turn)
             FoldControl(handle)
             EndButton(handle)
         }
-        if (!folded && handle.cardFeed.hasAudioControls()) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-                AudioControls(handle)
+        if (!handle.cardCollapsed && (handle.cardFeed.hasRoundControls() || turn.speaking)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+                RoundControls(handle, turn)
             }
         }
     }
 }
 
-private fun VoiceCardFeed.hasAudioControls(): Boolean =
-    microphoneMute != null || speakerMute != null || speed != null
+private fun VoiceCardFeed.hasRoundControls(): Boolean = microphoneMute != null || speakerMute != null || speed != null
 
 /**
- * The speaker's glyph in their tint, their name, and the muted timer of their turn: it takes the
- * header's spare width (the name ellipsizes first), so the controls after it sit at the line's end.
+ * The speaker's glyph in their tint, their name, the muted timer of their turn and what voice mode is
+ * doing ("Listening", "Thinking", "Speaking"): it takes the header's spare width (the name and status
+ * ellipsize first), so the controls after it sit at the line's end.
  */
 @Composable
 private fun RowScope.VoiceCardSpeakerLine(turn: VoiceCardTurn) {
     Row(
         modifier = Modifier.weight(1f),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         SpeakerGlyph(turn)
         Text(
@@ -142,6 +142,14 @@ private fun RowScope.VoiceCardSpeakerLine(turn: VoiceCardTurn) {
             maxLines = 1,
             modifier = Modifier.testTag(VoiceModeTags.CARD_TIMER).clearAndSetSemantics { contentDescription = spoken },
         )
+        Text(
+            text = turn.status,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false).testTag(VoiceModeTags.CARD_STATUS),
+        )
     }
 }
 
@@ -150,15 +158,15 @@ private fun RowScope.VoiceCardSpeakerLine(turn: VoiceCardTurn) {
 private fun SpeakerGlyph(turn: VoiceCardTurn) {
     val style = LettaIconStyle(LettaControlTokens.icon, turn.tint)
     when {
-        turn.thinking -> ThinkingDots(turn)
-        turn.speaker == VoiceSpeaker.You -> LettaIcon(LettaIcons.Mic, contentDescription = null, style = style)
+        turn.thinking -> ThinkingDots(turn.tint)
+        turn.speaker == VoiceCardSpeaker.You -> LettaIcon(LettaIcons.Mic, contentDescription = null, style = style)
         else -> LettaIcon(LettaIcons.AudioLines, contentDescription = null, style = style)
     }
 }
 
-/** Three dots in the agent's tint, pulsing one after another (still under reduced motion), in a glyph's box. */
+/** Three dots in [tint], pulsing one after another (still under reduced motion), in a glyph's box. */
 @Composable
-private fun ThinkingDots(turn: VoiceCardTurn) {
+private fun ThinkingDots(tint: Color) {
     val reducedMotion = LocalReducedMotion.current
     val transition = rememberInfiniteTransition(label = "voiceCardThinking")
     Row(
@@ -180,20 +188,16 @@ private fun ThinkingDots(turn: VoiceCardTurn) {
                     label = "voiceCardDot$dot",
                 )
             }
-            Box(
-                Modifier
-                    .size(LettaDimens.Space.xs)
-                    .alpha(pulse?.value ?: 1f)
-                    .background(turn.tint, CircleShape),
-            )
+            Box(Modifier.size(LettaDimens.Space.xs).alpha(pulse?.value ?: 1f).background(tint, CircleShape))
         }
     }
 }
 
-/** The microphone and speaker mutes and the speaking speed, each where the controller offers it. */
+/** While the reply is spoken, the round stop (interrupt and listen); then the mutes and speed the controller offers. */
 @Composable
-private fun AudioControls(handle: VoiceModeHandle) {
+private fun RoundControls(handle: VoiceModeHandle, turn: VoiceCardTurn) {
     val feed = handle.cardFeed
+    if (turn.speaking) InterruptButton(handle)
     feed.microphoneMute?.let {
         val label = stringResource(Res.string.voice_card_mic_mute)
         MuteToggle(it, VoiceCardMuteLook(VoiceModeTags.CARD_MIC, label, LettaIcons.Mic, LettaIcons.MicOff))
@@ -205,54 +209,104 @@ private fun AudioControls(handle: VoiceModeHandle) {
     feed.speed?.let { SpeedControl(it) }
 }
 
+/**
+ * One round control: a filled circle [LettaControlTokens.iconButtonLg] across (the platform's minimum
+ * touch target around it), [glyph] in [tint], announced as a button by [semantics].
+ */
+@Composable
+private fun RoundButton(
+    glyph: ImageVector,
+    tint: Color,
+    onClick: () -> Unit,
+    modifier: Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        modifier = modifier.size(LettaControlTokens.iconButtonLg),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            LettaIcon(glyph, contentDescription = null, style = LettaIconStyle(LettaControlTokens.icon, tint))
+        }
+    }
+}
+
+/** Stops the reply and listens again, as the voice button did while the reply was spoken. */
+@Composable
+private fun InterruptButton(handle: VoiceModeHandle) {
+    val label = stringResource(Res.string.voice_mode_interrupt)
+    RoundButton(
+        glyph = LettaIcons.Square,
+        tint = MaterialTheme.colorScheme.onSurface,
+        onClick = handle::press,
+        modifier = Modifier.testTag(VoiceModeTags.CARD_INTERRUPT).semantics(mergeDescendants = true) {
+            role = Role.Button
+            contentDescription = label
+        },
+    )
+}
+
 /** A round mute switch: its label with its state ("On" while muted), the crossed glyph in the error colour while muted. */
 @Composable
 private fun MuteToggle(switch: VoiceCardSwitch, look: VoiceCardMuteLook) {
     val muted by switch.on.collectAsState()
     val state = stringResource(if (muted) Res.string.voice_card_toggle_on else Res.string.voice_card_toggle_off)
-    val tint = if (muted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-    LettaIconButton(
-        icon = LettaButtonIcon(
-            imageVector = if (muted) look.mutedGlyph else look.glyph,
-            contentDescription = look.label,
-            glyph = LettaIconStyle(LettaControlTokens.icon, tint),
-        ),
+    RoundButton(
+        glyph = if (muted) look.mutedGlyph else look.glyph,
+        tint = if (muted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
         onClick = { switch.set(!muted) },
-        modifier = Modifier.testTag(look.tag).semantics {
+        modifier = Modifier.testTag(look.tag).semantics(mergeDescendants = true) {
+            role = Role.Switch
+            contentDescription = look.label
             toggleableState = ToggleableState(muted)
             stateDescription = state
         },
     )
 }
 
-/** The speaking speed as a chip ("1×" and the menu mark) opening the speeds to pick from. */
+/** The speaking speed as a round-ended pill ("1×" and the menu mark), as tall as the round controls, opening the speeds. */
 @Composable
 private fun SpeedControl(speed: VoiceCardSpeed) {
     val value by speed.value.collectAsState()
     var open by remember { mutableStateOf(false) }
     val label = stringResource(Res.string.voice_card_speed)
-    val shown = stringResource(Res.string.voice_card_speed_value, speedText(value))
+    val shown = stringResource(Res.string.voice_card_speed_value, speedText(value.value))
     Box {
-        LettaChip(
-            text = shown,
+        Surface(
             onClick = { open = true },
-            modifier = Modifier.testTag(VoiceModeTags.CARD_SPEED).semantics(mergeDescendants = true) {
-                role = Role.Button
-                contentDescription = label
-                stateDescription = shown
-            },
-            slots = LettaChipSlots(trailing = { LettaMenuIndicator() }),
-        )
-        val items = speed.choices.map { choice ->
-            LettaMenuItem(
-                label = stringResource(Res.string.voice_card_speed_value, speedText(choice)),
-                tag = "${VoiceModeTags.CARD_SPEED}-${speedText(choice)}",
-                onClick = { speed.set(choice) },
-            )
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier
+                .height(LettaControlTokens.iconButtonLg)
+                .testTag(VoiceModeTags.CARD_SPEED)
+                .semantics(mergeDescendants = true) {
+                    role = Role.Button
+                    contentDescription = label
+                    stateDescription = shown
+                },
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.md),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+            ) {
+                Text(shown, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                LettaMenuIndicator()
+            }
         }
+        val items = speed.choices.map { choice -> speedItem(choice, speed) }
         LettaPopupMenu(expanded = open, onDismiss = { open = false }, items = items)
     }
 }
+
+@Composable
+private fun speedItem(choice: SpeechSpeed, speed: VoiceCardSpeed): LettaMenuItem = LettaMenuItem(
+    label = stringResource(Res.string.voice_card_speed_value, speedText(choice.value)),
+    tag = "${VoiceModeTags.CARD_SPEED}-${speedText(choice.value)}",
+    onClick = { speed.set(choice) },
+)
 
 /** A speed's words: "1", "0.75", "1.5". */
 internal fun speedText(speed: Float): String {
@@ -263,10 +317,10 @@ internal fun speedText(speed: Float): String {
     return "$whole.${fraction.toString().padStart(2, '0').trimEnd('0')}"
 }
 
-/** Fold the card to its header line, or unfold it back. */
+/** Fold the card to its header line, or unfold it back; as tall as the round controls. */
 @Composable
 private fun FoldControl(handle: VoiceModeHandle) {
-    val modifier = Modifier.size(LettaControlTokens.iconButton).testTag(VoiceModeTags.CARD_COLLAPSE)
+    val modifier = Modifier.size(LettaControlTokens.iconButtonLg).testTag(VoiceModeTags.CARD_COLLAPSE)
     if (handle.cardCollapsed) {
         val label = stringResource(Res.string.voice_card_expand)
         LettaUnfoldButton(onClick = { handle.cardCollapsed = false }, contentDescription = label, modifier = modifier)
@@ -276,7 +330,7 @@ private fun FoldControl(handle: VoiceModeHandle) {
     }
 }
 
-/** The red End pill: a cross and "End"; it turns voice mode off. */
+/** The red End pill, as tall as the round controls: a cross and "End"; it turns voice mode off. */
 @Composable
 private fun EndButton(handle: VoiceModeHandle) {
     val description = stringResource(Res.string.voice_card_end_description)
@@ -285,13 +339,16 @@ private fun EndButton(handle: VoiceModeHandle) {
         shape = CircleShape,
         color = MaterialTheme.colorScheme.error,
         contentColor = MaterialTheme.colorScheme.onError,
-        modifier = Modifier.testTag(VoiceModeTags.CARD_END).semantics(mergeDescendants = true) {
-            role = Role.Button
-            contentDescription = description
-        },
+        modifier = Modifier
+            .height(LettaControlTokens.iconButtonLg)
+            .testTag(VoiceModeTags.CARD_END)
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = description
+            },
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {

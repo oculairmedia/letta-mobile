@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
  */
 
 /** Whose turn the voice card shows. */
-internal enum class VoiceSpeaker {
+internal enum class VoiceCardSpeaker {
     /** The person: voice mode is listening to them, hearing them, or listening on after a failed utterance. */
     You,
 
@@ -22,13 +22,19 @@ internal enum class VoiceSpeaker {
 @Immutable
 internal class VoiceCardConversation(val name: String, val reply: String?)
 
-/** The header's turn: whose it is, their [name] and [tint], whether the agent is still [thinking], and how long it has run. */
+/**
+ * The header's turn: whose it is, their [name] and [tint], what voice mode is doing ([status]:
+ * "Listening", "Thinking", "Speaking"), whether the agent is still [thinking] or [speaking], and how
+ * long the turn has run.
+ */
 @Immutable
 internal class VoiceCardTurn(
-    val speaker: VoiceSpeaker,
+    val speaker: VoiceCardSpeaker,
     val name: String,
     val tint: Color,
+    val status: String,
     val thinking: Boolean,
+    val speaking: Boolean,
     val elapsedMs: () -> Long,
 )
 

@@ -41,7 +41,7 @@ import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
 import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.chat.voice.VoiceModeHandle
-import com.letta.mobile.ui.chat.voice.VoiceSpokenSegment
+import com.letta.mobile.data.voice.output.SpokenSegment
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.ProvideLettaHost
 import com.letta.mobile.ui.theme.LettaDimens
@@ -58,11 +58,12 @@ import kotlin.test.Test
 /**
  * The voice card docked above the composer, with the composer's voice outline and the page's ambient
  * glow behind (dot texture on), at the review widths (360, 700, 760, 1200 dp) in Dark and Light,
- * written to build/voice-card-render/ for review: the agent speaking (its reply lit up to the spoken
- * edge) and the person being heard. Neutral demo text only; no audio.
+ * written to build/voice-card-render/ for review: the person being heard (their words live), the
+ * agent thinking (their last words held) and speaking (its reply lit up to the spoken edge, the rest
+ * dim). Neutral demo text only; no audio.
  */
 class VoiceModeCardRenderTest {
-    private enum class Scene { Speaking, Hearing }
+    private enum class Scene { Listening, Thinking, Speaking }
 
     @Test
     fun theCardRendersAtEveryReviewWidthInBothThemes() {
@@ -76,8 +77,14 @@ class VoiceModeCardRenderTest {
     private fun render(scene: Scene, width: Int, dark: Boolean) = runDesktopComposeUiTest(width = width, height = HEIGHT) {
         val feed = FakeVoiceCardFeed(clock = SPOKEN_AT)
         feed.spokenSegments.value = REPLY
-        val state = MutableStateFlow(if (scene == Scene.Speaking) VoiceModeState.Speaking else VoiceModeState.Hearing)
-        val words = MutableStateFlow(VoiceText(HEARD).takeIf { scene == Scene.Hearing })
+        val state = MutableStateFlow(
+            when (scene) {
+                Scene.Listening -> VoiceModeState.Hearing
+                Scene.Thinking -> VoiceModeState.WaitingForReply
+                Scene.Speaking -> VoiceModeState.Speaking
+            },
+        )
+        val words = MutableStateFlow(VoiceText(HEARD).takeIf { scene != Scene.Speaking })
         val touch = width < LettaDimens.Pane.wideBreakpoint.value
         mainClock.autoAdvance = false
         setContent {
@@ -102,8 +109,11 @@ class VoiceModeCardRenderTest {
             }
             ScenePage(handle, touch, dark)
         }
-        repeat(FRAMES) { mainClock.advanceTimeByFrame() }
-        waitForIdle()
+        // Twice: string resources load off the frame clock, and their first frame may show the last scene's words.
+        repeat(2) {
+            repeat(FRAMES) { mainClock.advanceTimeByFrame() }
+            waitForIdle()
+        }
         val name = "${scene.name.lowercase()}-$width-${if (dark) "dark" else "light"}.png"
         val file = File("build/voice-card-render").apply { mkdirs() }.resolve(name)
         ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", file)
@@ -129,7 +139,7 @@ class VoiceModeCardRenderTest {
                                         permissionMode = ChatPermissionModeUiState(selected = AppServerPermissionMode.Unrestricted),
                                     ),
                                     actions = RecordingChatActions(),
-                                    uiState = ChatUiState(agentName = AGENT, messages = persistentListOf<UiMessage>()),
+                                    uiState = ChatUiState(agentName = AGENT, messages = persistentListOf(REPLY_MESSAGE)),
                                 ),
                                 modifier = Modifier.fillMaxWidth(),
                             )
@@ -152,9 +162,14 @@ class VoiceModeCardRenderTest {
         /** Half way through the second piece. */
         const val SPOKEN_AT = 3_000L
         val REPLY = listOf(
-            VoiceSpokenSegment(0, "I can help refactor code,", startedAtMs = 0, audioDurationMs = 2_000, finishedAtMs = 2_000),
-            VoiceSpokenSegment(1, "draft pull requests,", startedAtMs = 2_000, audioDurationMs = 2_000),
-            VoiceSpokenSegment(2, "or summarize long documents."),
+            SpokenSegment(0, VoiceText("I can help refactor code,"), startedAtMs = 0, audioDurationMs = 2_000, finishedAtMs = 2_000),
+            SpokenSegment(1, VoiceText("draft pull requests,"), startedAtMs = 2_000, audioDurationMs = 2_000, finishedAtMs = null),
+        )
+        val REPLY_MESSAGE = UiMessage(
+            id = "reply",
+            role = "assistant",
+            content = "I can help refactor code, draft pull requests, or summarize long documents. Which one first?",
+            timestamp = "2026-11-18T09:00:00Z",
         )
     }
 }

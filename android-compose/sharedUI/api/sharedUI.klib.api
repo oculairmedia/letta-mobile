@@ -913,7 +913,7 @@ abstract interface com.letta.mobile.ui.chat.voice/VoiceCardFeed { // com.letta.m
     abstract val speed // com.letta.mobile.ui.chat.voice/VoiceCardFeed.speed|{}speed[0]
         abstract fun <get-speed>(): com.letta.mobile.ui.chat.voice/VoiceCardSpeed? // com.letta.mobile.ui.chat.voice/VoiceCardFeed.speed.<get-speed>|<get-speed>(){}[0]
     abstract val spokenSegments // com.letta.mobile.ui.chat.voice/VoiceCardFeed.spokenSegments|{}spokenSegments[0]
-        abstract fun <get-spokenSegments>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.ui.chat.voice/VoiceSpokenSegment>> // com.letta.mobile.ui.chat.voice/VoiceCardFeed.spokenSegments.<get-spokenSegments>|<get-spokenSegments>(){}[0]
+        abstract fun <get-spokenSegments>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.voice.output/SpokenSegment>> // com.letta.mobile.ui.chat.voice/VoiceCardFeed.spokenSegments.<get-spokenSegments>|<get-spokenSegments>(){}[0]
 
     abstract fun now(): kotlin/Long // com.letta.mobile.ui.chat.voice/VoiceCardFeed.now|now(){}[0]
 }
@@ -3191,18 +3191,18 @@ final class com.letta.mobile.ui.chat.surface/ChatSurfacePlatform { // com.letta.
 }
 
 final class com.letta.mobile.ui.chat.voice/VoiceCardSpeed { // com.letta.mobile.ui.chat.voice/VoiceCardSpeed|null[0]
-    constructor <init>(kotlinx.coroutines.flow/StateFlow<kotlin/Float>, kotlin/Function1<kotlin/Float, kotlin/Unit>, kotlin.collections/List<kotlin/Float> = ...) // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.<init>|<init>(kotlinx.coroutines.flow.StateFlow<kotlin.Float>;kotlin.Function1<kotlin.Float,kotlin.Unit>;kotlin.collections.List<kotlin.Float>){}[0]
+    constructor <init>(kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.voice.endpoint/SpeechSpeed>, kotlin/Function1<com.letta.mobile.data.voice.endpoint/SpeechSpeed, kotlin/Unit>, kotlin.collections/List<com.letta.mobile.data.voice.endpoint/SpeechSpeed> = ...) // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.<init>|<init>(kotlinx.coroutines.flow.StateFlow<com.letta.mobile.data.voice.endpoint.SpeechSpeed>;kotlin.Function1<com.letta.mobile.data.voice.endpoint.SpeechSpeed,kotlin.Unit>;kotlin.collections.List<com.letta.mobile.data.voice.endpoint.SpeechSpeed>){}[0]
 
     final val choices // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.choices|{}choices[0]
-        final fun <get-choices>(): kotlin.collections/List<kotlin/Float> // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.choices.<get-choices>|<get-choices>(){}[0]
+        final fun <get-choices>(): kotlin.collections/List<com.letta.mobile.data.voice.endpoint/SpeechSpeed> // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.choices.<get-choices>|<get-choices>(){}[0]
     final val set // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.set|{}set[0]
-        final fun <get-set>(): kotlin/Function1<kotlin/Float, kotlin/Unit> // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.set.<get-set>|<get-set>(){}[0]
+        final fun <get-set>(): kotlin/Function1<com.letta.mobile.data.voice.endpoint/SpeechSpeed, kotlin/Unit> // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.set.<get-set>|<get-set>(){}[0]
     final val value // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.value|{}value[0]
-        final fun <get-value>(): kotlinx.coroutines.flow/StateFlow<kotlin/Float> // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.value.<get-value>|<get-value>(){}[0]
+        final fun <get-value>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.voice.endpoint/SpeechSpeed> // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.value.<get-value>|<get-value>(){}[0]
 
     final object Companion { // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.Companion|null[0]
         final val DEFAULT_CHOICES // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.Companion.DEFAULT_CHOICES|{}DEFAULT_CHOICES[0]
-            final fun <get-DEFAULT_CHOICES>(): kotlin.collections/List<kotlin/Float> // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.Companion.DEFAULT_CHOICES.<get-DEFAULT_CHOICES>|<get-DEFAULT_CHOICES>(){}[0]
+            final fun <get-DEFAULT_CHOICES>(): kotlin.collections/List<com.letta.mobile.data.voice.endpoint/SpeechSpeed> // com.letta.mobile.ui.chat.voice/VoiceCardSpeed.Companion.DEFAULT_CHOICES.<get-DEFAULT_CHOICES>|<get-DEFAULT_CHOICES>(){}[0]
     }
 }
 
@@ -3237,31 +3237,6 @@ final class com.letta.mobile.ui.chat.voice/VoiceSetupAccess { // com.letta.mobil
         final fun <get-localListening>(): com.letta.mobile.data.voice.local/LocalSpeechAvailability // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.localListening.<get-localListening>|<get-localListening>(){}[0]
     final val store // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.store|{}store[0]
         final fun <get-store>(): com.letta.mobile.data.voice.session/VoiceSetupStore // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.store.<get-store>|<get-store>(){}[0]
-}
-
-final class com.letta.mobile.ui.chat.voice/VoiceSpokenSegment { // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment|null[0]
-    constructor <init>(kotlin/Int, kotlin/String, kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ...) // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.<init>|<init>(kotlin.Int;kotlin.String;kotlin.Long?;kotlin.Long?;kotlin.Long?){}[0]
-
-    final val audioDurationMs // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.audioDurationMs|{}audioDurationMs[0]
-        final fun <get-audioDurationMs>(): kotlin/Long? // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.audioDurationMs.<get-audioDurationMs>|<get-audioDurationMs>(){}[0]
-    final val finishedAtMs // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.finishedAtMs|{}finishedAtMs[0]
-        final fun <get-finishedAtMs>(): kotlin/Long? // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.finishedAtMs.<get-finishedAtMs>|<get-finishedAtMs>(){}[0]
-    final val index // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.index|{}index[0]
-        final fun <get-index>(): kotlin/Int // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.index.<get-index>|<get-index>(){}[0]
-    final val startedAtMs // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.startedAtMs|{}startedAtMs[0]
-        final fun <get-startedAtMs>(): kotlin/Long? // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.startedAtMs.<get-startedAtMs>|<get-startedAtMs>(){}[0]
-    final val text // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.text|{}text[0]
-        final fun <get-text>(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.text.<get-text>|<get-text>(){}[0]
-
-    final fun component1(): kotlin/Int // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.component1|component1(){}[0]
-    final fun component2(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.component2|component2(){}[0]
-    final fun component3(): kotlin/Long? // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.component3|component3(){}[0]
-    final fun component4(): kotlin/Long? // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.component4|component4(){}[0]
-    final fun component5(): kotlin/Long? // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.component5|component5(){}[0]
-    final fun copy(kotlin/Int = ..., kotlin/String = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ...): com.letta.mobile.ui.chat.voice/VoiceSpokenSegment // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.copy|copy(kotlin.Int;kotlin.String;kotlin.Long?;kotlin.Long?;kotlin.Long?){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceSpokenSegment.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.ui.chat/AgentIdentity { // com.letta.mobile.ui.chat/AgentIdentity|null[0]
@@ -9383,6 +9358,8 @@ final object com.letta.mobile.ui.chat.voice/VoiceModeTags { // com.letta.mobile.
         final fun <get-CARD_COLLAPSE>(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_COLLAPSE.<get-CARD_COLLAPSE>|<get-CARD_COLLAPSE>(){}[0]
     final const val CARD_END // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_END|{}CARD_END[0]
         final fun <get-CARD_END>(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_END.<get-CARD_END>|<get-CARD_END>(){}[0]
+    final const val CARD_INTERRUPT // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_INTERRUPT|{}CARD_INTERRUPT[0]
+        final fun <get-CARD_INTERRUPT>(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_INTERRUPT.<get-CARD_INTERRUPT>|<get-CARD_INTERRUPT>(){}[0]
     final const val CARD_MIC // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_MIC|{}CARD_MIC[0]
         final fun <get-CARD_MIC>(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_MIC.<get-CARD_MIC>|<get-CARD_MIC>(){}[0]
     final const val CARD_SPEAKER // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_SPEAKER|{}CARD_SPEAKER[0]
@@ -9391,6 +9368,8 @@ final object com.letta.mobile.ui.chat.voice/VoiceModeTags { // com.letta.mobile.
         final fun <get-CARD_SPEAKER_MUTE>(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_SPEAKER_MUTE.<get-CARD_SPEAKER_MUTE>|<get-CARD_SPEAKER_MUTE>(){}[0]
     final const val CARD_SPEED // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_SPEED|{}CARD_SPEED[0]
         final fun <get-CARD_SPEED>(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_SPEED.<get-CARD_SPEED>|<get-CARD_SPEED>(){}[0]
+    final const val CARD_STATUS // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_STATUS|{}CARD_STATUS[0]
+        final fun <get-CARD_STATUS>(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_STATUS.<get-CARD_STATUS>|<get-CARD_STATUS>(){}[0]
     final const val CARD_TIMER // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_TIMER|{}CARD_TIMER[0]
         final fun <get-CARD_TIMER>(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_TIMER.<get-CARD_TIMER>|<get-CARD_TIMER>(){}[0]
     final const val HANDOVER // com.letta.mobile.ui.chat.voice/VoiceModeTags.HANDOVER|{}HANDOVER[0]
@@ -12973,7 +12952,6 @@ final val com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceCar
 final val com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceModeHandle$stableprop // com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceModeHandle$stableprop|#static{}com_letta_mobile_ui_chat_voice_VoiceModeHandle$stableprop[0]
 final val com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceModeTags$stableprop // com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceModeTags$stableprop|#static{}com_letta_mobile_ui_chat_voice_VoiceModeTags$stableprop[0]
 final val com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceSetupAccess$stableprop // com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceSetupAccess$stableprop|#static{}com_letta_mobile_ui_chat_voice_VoiceSetupAccess$stableprop[0]
-final val com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceSpokenSegment$stableprop // com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceSpokenSegment$stableprop|#static{}com_letta_mobile_ui_chat_voice_VoiceSpokenSegment$stableprop[0]
 final val com.letta.mobile.ui.chat/ChatColumnMaxWidth // com.letta.mobile.ui.chat/ChatColumnMaxWidth|{}ChatColumnMaxWidth[0]
     final fun <get-ChatColumnMaxWidth>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.chat/ChatColumnMaxWidth.<get-ChatColumnMaxWidth>|<get-ChatColumnMaxWidth>(){}[0]
 final val com.letta.mobile.ui.chat/com_letta_mobile_ui_chat_AgentIdentity$stableprop // com.letta.mobile.ui.chat/com_letta_mobile_ui_chat_AgentIdentity$stableprop|#static{}com_letta_mobile_ui_chat_AgentIdentity$stableprop[0]
@@ -13962,7 +13940,6 @@ final fun com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceCar
 final fun com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceModeHandle$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceModeHandle$stableprop_getter|com_letta_mobile_ui_chat_voice_VoiceModeHandle$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceModeTags$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceModeTags$stableprop_getter|com_letta_mobile_ui_chat_voice_VoiceModeTags$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceSetupAccess$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceSetupAccess$stableprop_getter|com_letta_mobile_ui_chat_voice_VoiceSetupAccess$stableprop_getter(){}[0]
-final fun com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceSpokenSegment$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.chat.voice/com_letta_mobile_ui_chat_voice_VoiceSpokenSegment$stableprop_getter|com_letta_mobile_ui_chat_voice_VoiceSpokenSegment$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.chat.voice/rememberVoiceSetupAccess(com.letta.mobile.data.storage/SecureSettingsStore, androidx.compose.runtime/Composer?, kotlin/Int): com.letta.mobile.ui.chat.voice/VoiceSetupAccess? // com.letta.mobile.ui.chat.voice/rememberVoiceSetupAccess|rememberVoiceSetupAccess(com.letta.mobile.data.storage.SecureSettingsStore;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.chat.voice/voiceErrorText(com.letta.mobile.data.voice/VoiceErrorCode): org.jetbrains.compose.resources/StringResource // com.letta.mobile.ui.chat.voice/voiceErrorText|voiceErrorText(com.letta.mobile.data.voice.VoiceErrorCode){}[0]
 final fun com.letta.mobile.ui.chat/AgentActivityOrb(androidx.compose.ui.unit/Dp, com.letta.mobile.ui.chat/AgentActivity, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.chat/AgentActivityOrb|AgentActivityOrb(androidx.compose.ui.unit.Dp;com.letta.mobile.ui.chat.AgentActivity;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]

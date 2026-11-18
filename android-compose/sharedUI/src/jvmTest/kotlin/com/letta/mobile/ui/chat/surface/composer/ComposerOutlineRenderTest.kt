@@ -108,11 +108,13 @@ class ComposerOutlineRenderTest {
         }
         waitForIdle()
         val workingEnergy = onRoot().captureToImage().toPixelMap().energy()
+        // While voice mode runs, its glow is the voice card's (voiceCardOutline): the prompt keeps the
+        // run's own treatment. Voice mode stopped on an error still marks the prompt.
         listOf(
-            Triple(VoiceModeState.Listening, ComposerOutlineMode.Voice, VoiceGlowRole.You),
-            Triple(VoiceModeState.Hearing, ComposerOutlineMode.Voice, VoiceGlowRole.You),
-            Triple(VoiceModeState.WaitingForReply, ComposerOutlineMode.Working, VoiceGlowRole.Agent),
-            Triple(VoiceModeState.Speaking, ComposerOutlineMode.Voice, VoiceGlowRole.Agent),
+            Triple(VoiceModeState.Listening, ComposerOutlineMode.Working, VoiceGlowRole.Idle),
+            Triple(VoiceModeState.Hearing, ComposerOutlineMode.Working, VoiceGlowRole.Idle),
+            Triple(VoiceModeState.WaitingForReply, ComposerOutlineMode.Working, VoiceGlowRole.Idle),
+            Triple(VoiceModeState.Speaking, ComposerOutlineMode.Working, VoiceGlowRole.Idle),
             Triple(VoiceModeState.Error(VoiceErrorCode.ENGINE_FAILED), ComposerOutlineMode.Error, VoiceGlowRole.Error),
         ).forEach { (state, mode, role) ->
             voice.value = state

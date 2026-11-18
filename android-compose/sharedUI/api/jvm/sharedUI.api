@@ -2159,7 +2159,6 @@ public final class com/letta/mobile/ui/chat/surface/composer/ComposableSingleton
 public final class com/letta/mobile/ui/chat/surface/composer/ComposableSingletons$VoiceCardHeaderKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/composer/ComposableSingletons$VoiceCardHeaderKt;
 	public fun <init> ()V
-	public final fun getLambda$1445183779$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$1725770366$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
@@ -2469,10 +2468,12 @@ public final class com/letta/mobile/ui/chat/voice/VoiceModeTags {
 	public static final field CARD_BODY Ljava/lang/String;
 	public static final field CARD_COLLAPSE Ljava/lang/String;
 	public static final field CARD_END Ljava/lang/String;
+	public static final field CARD_INTERRUPT Ljava/lang/String;
 	public static final field CARD_MIC Ljava/lang/String;
 	public static final field CARD_SPEAKER Ljava/lang/String;
 	public static final field CARD_SPEAKER_MUTE Ljava/lang/String;
 	public static final field CARD_SPEED Ljava/lang/String;
+	public static final field CARD_STATUS Ljava/lang/String;
 	public static final field CARD_TIMER Ljava/lang/String;
 	public static final field HANDOVER Ljava/lang/String;
 	public static final field HANDOVER_CLOSE Ljava/lang/String;
@@ -2490,27 +2491,6 @@ public final class com/letta/mobile/ui/chat/voice/VoiceSetupAccess {
 	public final fun getEchoCancelled ()Z
 	public final fun getLocalListening ()Lcom/letta/mobile/data/voice/local/LocalSpeechAvailability;
 	public final fun getStore ()Lcom/letta/mobile/data/voice/session/VoiceSetupStore;
-}
-
-public final class com/letta/mobile/ui/chat/voice/VoiceSpokenSegment {
-	public static final field $stable I
-	public fun <init> (ILjava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;)V
-	public synthetic fun <init> (ILjava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()I
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Ljava/lang/Long;
-	public final fun component4 ()Ljava/lang/Long;
-	public final fun component5 ()Ljava/lang/Long;
-	public final fun copy (ILjava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;)Lcom/letta/mobile/ui/chat/voice/VoiceSpokenSegment;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/chat/voice/VoiceSpokenSegment;ILjava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;ILjava/lang/Object;)Lcom/letta/mobile/ui/chat/voice/VoiceSpokenSegment;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAudioDurationMs ()Ljava/lang/Long;
-	public final fun getFinishedAtMs ()Ljava/lang/Long;
-	public final fun getIndex ()I
-	public final fun getStartedAtMs ()Ljava/lang/Long;
-	public final fun getText ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/components/ComposableSingletons$ImageDropOverlayKt {

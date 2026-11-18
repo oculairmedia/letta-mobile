@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.hasTestTag
@@ -78,8 +79,8 @@ private object QuietEngines : VoiceEar, VoiceMouth, VoiceResponder {
 }
 
 /**
- * The person's words so far, in the voice card docked above the prompt while voice mode hears them:
- * in place of the "Hearing you…" status, kept in view however long they get (the card holds at most a
+ * The person's words so far, live in the voice card docked above the prompt while voice mode hears
+ * them (its header saying "Hearing you"), kept in view however long they get (the card holds at most a
  * few lines and scrolls), never resizing the prompt or moving its controls and never typed into the
  * draft. At the phone, tablet and desktop widths, on touch and with a pointer.
  */
@@ -124,22 +125,19 @@ class VoicePartialComposerUiTest {
         waitForIdle()
         val where = "at $width ($style)"
         val barBefore = bounds(bar)
-        val buttonBefore = bounds(VoiceModeTags.BUTTON)
         val slotBefore = bounds(ComposerTestTags.TRAILING_ACTIONS)
         val fieldBefore = bounds(ComposerTestTags.INPUT)
-        inCard("Hearing you…").assertExists()
+        onNodeWithTag(VoiceModeTags.CARD_STATUS, useUnmergedTree = true).assert(hasText("Hearing you"))
 
         words.value = VoiceText("what time")
         waitForIdle()
         inCard("what time").assertExists()
-        inCard("Hearing you…").assertDoesNotExist()
         val shortCard = bounds(VoiceModeTags.CARD)
         words.value = VoiceText(LONG_WORDS)
         waitForIdle()
 
         val card = bounds(VoiceModeTags.CARD)
         assertEquals(barBefore, bounds(bar), "the prompt keeps its size $where")
-        assertEquals(buttonBefore, bounds(VoiceModeTags.BUTTON), "the voice button stays put $where")
         assertEquals(slotBefore, bounds(ComposerTestTags.TRAILING_ACTIONS), "the trailing controls stay put $where")
         assertEquals(fieldBefore, bounds(ComposerTestTags.INPUT), "the field keeps its size $where")
         assertTrue(card.bottom <= barBefore.top, "the card sits above the prompt $where")
@@ -150,7 +148,7 @@ class VoicePartialComposerUiTest {
 
         words.value = null
         waitForIdle()
-        inCard("Hearing you…").assertExists()
+        inCard(LONG_WORDS).assertDoesNotExist()
         assertEquals(barBefore, bounds(bar), "the prompt is unchanged once the words clear $where")
     }
 

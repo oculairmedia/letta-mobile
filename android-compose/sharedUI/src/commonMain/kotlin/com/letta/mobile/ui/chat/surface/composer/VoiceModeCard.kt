@@ -26,36 +26,45 @@ import com.letta.mobile.data.voice.session.VoiceModeState
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.voice_card_agent
 import com.letta.mobile.sharedui.resources.voice_card_label
+import com.letta.mobile.sharedui.resources.voice_card_status_failed
+import com.letta.mobile.sharedui.resources.voice_card_status_hearing
+import com.letta.mobile.sharedui.resources.voice_card_status_listening
+import com.letta.mobile.sharedui.resources.voice_card_status_speaking
+import com.letta.mobile.sharedui.resources.voice_card_status_thinking
 import com.letta.mobile.sharedui.resources.voice_card_you
-import com.letta.mobile.ui.chat.voice.VoiceCardFeed
-import com.letta.mobile.ui.chat.voice.VoiceModeHandle
-import com.letta.mobile.ui.chat.voice.VoiceSpeaker
-import com.letta.mobile.ui.chat.voice.VoiceCardTurn
 import com.letta.mobile.ui.chat.voice.VoiceCardConversation
+import com.letta.mobile.ui.chat.voice.VoiceCardFeed
+import com.letta.mobile.ui.chat.voice.VoiceCardSpeaker
+import com.letta.mobile.ui.chat.voice.VoiceCardTurn
+import com.letta.mobile.ui.chat.voice.VoiceModeHandle
 import com.letta.mobile.ui.chat.voice.VoiceModeTags
 import com.letta.mobile.ui.components.foundation.LettaPanel
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.theme.tokens.LettaShapes
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /** Whose turn [state] is. */
-internal fun voiceSpeaker(state: VoiceModeState): VoiceSpeaker = when (state) {
-    VoiceModeState.WaitingForReply, VoiceModeState.Speaking -> VoiceSpeaker.Agent
-    else -> VoiceSpeaker.You
+internal fun voiceSpeaker(state: VoiceModeState): VoiceCardSpeaker = when (state) {
+    VoiceModeState.WaitingForReply, VoiceModeState.Speaking -> VoiceCardSpeaker.Agent
+    else -> VoiceCardSpeaker.You
 }
 
 /**
- * The voice card docked above the prompt while voice mode runs (it draws nothing otherwise): a header
- * line with whose turn it is (the person, or the agent by name), how long they have had it, and the
- * controls (microphone and speaker mutes and the speaking speed where the controller offers them,
- * fold, End); under it, unless folded, the person's words as they are heard, the agent thinking, the
- * reply with its spoken words lit and the rest dimmed, or a failed utterance with Retry or Set up.
+ * The voice card docked above the prompt while voice mode runs (it draws nothing otherwise), the
+ * composer's voice controls and glow while it shows. A header line: whose turn it is (the person, or
+ * the agent by name), how long they have had it and what voice mode is doing, then round controls
+ * (the reply's stop while it is spoken, the microphone and speaker mutes, the speaking speed), fold
+ * and a red End. Under it, unless folded, two to four lines of large text: the person's words as they
+ * are heard, then the reply with its spoken words lit and the rest dimmed, or a failed utterance with
+ * Retry or Set up. Its edge glows in the speaker's colour, with the voice's level.
  *
- * Built from the design system: the panel container, the shared icon buttons, chip, menu and fold
- * controls, the theme's type scale and its voice tints (customColors.voiceYouColor and
- * voiceAgentColor). Under reduced motion it holds still: no fold animation, a still thinking mark,
- * and the reply lit a piece at a time.
+ * Built from the design system: the panel container, the shared fold controls and menu, the theme's
+ * type scale, control sizes and voice tints (customColors.voiceYouColor and voiceAgentColor). Under
+ * reduced motion it holds still: no fold animation, a still thinking mark and glow, and the reply lit
+ * a piece at a time.
  */
 @Composable
 internal fun VoiceModeCard(handle: VoiceModeHandle, conversation: VoiceCardConversation, modifier: Modifier = Modifier) {
@@ -70,6 +79,7 @@ internal fun VoiceModeCard(handle: VoiceModeHandle, conversation: VoiceCardConve
     LettaPanel(
         modifier = modifier
             .fillMaxWidth()
+            .voiceCardOutline(LettaShapes.panel, handle, state)
             .testTag(VoiceModeTags.CARD)
             .semantics {
                 paneTitle = label
@@ -79,14 +89,16 @@ internal fun VoiceModeCard(handle: VoiceModeHandle, conversation: VoiceCardConve
         Column(
             modifier = Modifier
                 .then(if (reducedMotion) Modifier else Modifier.animateContentSize())
-                .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             val turn = VoiceCardTurn(
                 speaker = speaker,
                 name = speakerName(speaker, conversation.name),
                 tint = speakerTint(speaker),
+                status = stringResource(statusOf(state)),
                 thinking = state == VoiceModeState.WaitingForReply,
+                speaking = state == VoiceModeState.Speaking,
                 elapsedMs = elapsedMs,
             )
             BoxWithConstraints {
@@ -97,18 +109,27 @@ internal fun VoiceModeCard(handle: VoiceModeHandle, conversation: VoiceCardConve
     }
 }
 
+/** What voice mode is doing in [state], as the header says it. */
+private fun statusOf(state: VoiceModeState): StringResource = when (state) {
+    VoiceModeState.Hearing -> Res.string.voice_card_status_hearing
+    VoiceModeState.WaitingForReply -> Res.string.voice_card_status_thinking
+    VoiceModeState.Speaking -> Res.string.voice_card_status_speaking
+    is VoiceModeState.TurnFailed -> Res.string.voice_card_status_failed
+    else -> Res.string.voice_card_status_listening
+}
+
 /** "You", or the agent's [agentName] ("Agent" when it has none). */
 @Composable
-private fun speakerName(speaker: VoiceSpeaker, agentName: String): String = when (speaker) {
-    VoiceSpeaker.You -> stringResource(Res.string.voice_card_you)
-    VoiceSpeaker.Agent -> agentName.ifBlank { stringResource(Res.string.voice_card_agent) }
+private fun speakerName(speaker: VoiceCardSpeaker, agentName: String): String = when (speaker) {
+    VoiceCardSpeaker.You -> stringResource(Res.string.voice_card_you)
+    VoiceCardSpeaker.Agent -> agentName.ifBlank { stringResource(Res.string.voice_card_agent) }
 }
 
 /** The speaker's voice tint: the theme's cool tint for the person, its warm tint for the agent. */
 @Composable
-internal fun speakerTint(speaker: VoiceSpeaker): Color = when (speaker) {
-    VoiceSpeaker.You -> MaterialTheme.customColors.voiceYouColor
-    VoiceSpeaker.Agent -> MaterialTheme.customColors.voiceAgentColor
+internal fun speakerTint(speaker: VoiceCardSpeaker): Color = when (speaker) {
+    VoiceCardSpeaker.You -> MaterialTheme.customColors.voiceYouColor
+    VoiceCardSpeaker.Agent -> MaterialTheme.customColors.voiceAgentColor
 }
 
 /**

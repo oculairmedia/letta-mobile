@@ -32,12 +32,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -184,12 +183,12 @@ class VoiceOutlineUiTest {
     private fun inBorderBand(x: Int, y: Int, width: Int, height: Int): Boolean =
         x < 20 || x >= width - 20 || y < 20 || y >= height - 20
 
-    /** The running voice states, with the status the voice card shows (no words, no reply yet) and the outline colour each shows. */
+    /** The running voice states, with the status the voice card's header shows and the colour its glow shows. */
     private val running: List<Triple<VoiceModeState, String, VoiceGlowRole>> = listOf(
-        Triple(VoiceModeState.Listening, "Listening…", VoiceGlowRole.You),
-        Triple(VoiceModeState.Hearing, "Hearing you…", VoiceGlowRole.You),
+        Triple(VoiceModeState.Listening, "Listening", VoiceGlowRole.You),
+        Triple(VoiceModeState.Hearing, "Hearing you", VoiceGlowRole.You),
         Triple(VoiceModeState.WaitingForReply, "Thinking…", VoiceGlowRole.Agent),
-        Triple(VoiceModeState.Speaking, "Speaking… — press to interrupt", VoiceGlowRole.Agent),
+        Triple(VoiceModeState.Speaking, "Speaking", VoiceGlowRole.Agent),
     )
 
     @Composable
@@ -307,8 +306,9 @@ class VoiceOutlineUiTest {
 
     /**
      * Every running state keeps the prompt's bounds and docks the voice card above it (the conversation
-     * gives up the card's height, never its top), the card says what voice mode is doing whether or
-     * not text is typed, and the outline shows its colour role either way.
+     * gives up the card's height, never its top). The card owns voice mode's controls and glow while it
+     * shows: the prompt's voice button and voice outline step aside, the card's header says what voice
+     * mode is doing whether or not text is typed, and its edge glows in the speaker's colour.
      */
     private fun ComposeUiTest.runningStatesHold(page: Page, base: Baseline) {
         val roles = mutableMapOf<VoiceModeState, VoiceGlowRole>()
@@ -316,28 +316,31 @@ class VoiceOutlineUiTest {
             page.text = ""
             page.state.value = shown
             waitForIdle()
-            assertFixed(base, base.off, "while $shown")
+            assertEquals(base.off.getValue(base.bar), bounds(base.bar), "the prompt keeps its bounds while $shown ${base.where}")
+            assertEquals(Absent, bounds(VoiceModeTags.BUTTON), "the card holds the voice controls while $shown ${base.where}")
             val card = bounds(VoiceModeTags.CARD)
             assertEquals(base.timeline.top, bounds(TIMELINE).top, "the conversation keeps its top while $shown ${base.where}")
             assertTrue(bounds(TIMELINE).bottom <= card.top, "the card docks below the conversation while $shown ${base.where}")
             assertTrue(card.bottom <= base.off.getValue(base.bar).top, "the card docks above the prompt while $shown ${base.where}")
             onNodeWithTag(VoiceModeTags.STRIP).assertDoesNotExist()
-            onNode(hasText(status) and hasAnyAncestor(hasTestTag(VoiceModeTags.CARD)), useUnmergedTree = true).assertExists()
-            assertEquals(role, semantic(base.bar, VoiceOutlineRoleKey), "the outline's colour role while $shown ${base.where}")
+            onNodeWithTag(VoiceModeTags.CARD_STATUS, useUnmergedTree = true).assert(hasText(status))
+            val where = "while $shown ${base.where}"
+            assertEquals(role, semantic(VoiceModeTags.CARD, VoiceOutlineRoleKey), "the card's glow $where")
+            assertEquals(VoiceGlowRole.Idle, semantic(base.bar, VoiceOutlineRoleKey), "no voice outline on the prompt $where")
             roles[shown] = role
 
             page.text = "typed"
             waitForIdle()
-            onNode(hasText(status) and hasAnyAncestor(hasTestTag(VoiceModeTags.CARD)), useUnmergedTree = true).assertExists()
-            assertEquals(role, semantic(base.bar, VoiceOutlineRoleKey), "the outline carries $shown once text is typed ${base.where}")
-            assertFixed(base, base.typedOff, "with text while $shown")
+            onNodeWithTag(VoiceModeTags.CARD_STATUS, useUnmergedTree = true).assert(hasText(status))
+            assertEquals(role, semantic(VoiceModeTags.CARD, VoiceOutlineRoleKey), "the card's glow once text is typed $where")
+            assertEquals(base.typedOff.getValue(base.bar), bounds(base.bar), "the prompt keeps its bounds with text $where")
         }
         val hearing = roles[VoiceModeState.Hearing]
         assertNotEquals(hearing, roles[VoiceModeState.WaitingForReply], "hearing and thinking differ in colour ${base.where}")
         assertNotEquals(hearing, roles[VoiceModeState.Speaking], "hearing and speaking differ in colour ${base.where}")
     }
 
-    /** The outline only draws: the last row, the field and the voice button still take their clicks. */
+    /** The card and its glow only draw: the last row and the field still take their clicks. */
     private fun ComposeUiTest.clicksGetThrough(page: Page, base: Baseline) {
         page.state.value = VoiceModeState.Hearing
         page.text = ""
@@ -348,10 +351,6 @@ class VoiceOutlineUiTest {
         onNodeWithTag(ComposerTestTags.INPUT).performClick()
         waitForIdle()
         onNodeWithTag(ComposerTestTags.INPUT).assertIsFocused()
-        onNodeWithTag(VoiceModeTags.BUTTON).performClick()
-        waitForIdle()
-        assertTrue(page.handle!!.setupOpen, "the voice button takes its click ${base.where}")
-        page.handle!!.setupOpen = false
     }
 
     /**
@@ -369,8 +368,8 @@ class VoiceOutlineUiTest {
             onNodeWithTag(slot, useUnmergedTree = true).assertExists()
             onNodeWithTag(actionTag, useUnmergedTree = true).assertExists()
             onNodeWithText(action, useUnmergedTree = true).assertExists()
-            assertEquals(role, semantic(base.bar, VoiceOutlineRoleKey), "the outline $where")
-            assertFixed(base, base.off, "while $shown")
+            assertEquals(role, semantic(slot.takeIf { inCard } ?: base.bar, VoiceOutlineRoleKey), "the glow $where")
+            assertEquals(base.off.getValue(base.bar), bounds(base.bar), "the prompt keeps its bounds $where")
             assertEquals(base.timeline.top, bounds(TIMELINE).top, "the conversation keeps its top $where")
             assertTrue(bounds(slot).bottom <= base.off.getValue(base.bar).top, "the failure sits above the prompt $where")
         }
@@ -417,15 +416,15 @@ class VoiceOutlineUiTest {
                 showPage(1200.dp, LettaInput.Pointer, page, reducedMotion = reduced)
                 page.state.value = VoiceModeState.Hearing
                 waitForIdle()
-                assertEquals(VoiceGlowRole.You, semantic(ComposerTestTags.CARD, VoiceOutlineRoleKey))
-                assertEquals(moves, semantic(ComposerTestTags.CARD, VoiceOutlineAnimatedKey), "reduced motion $reduced")
+                assertEquals(VoiceGlowRole.You, semantic(VoiceModeTags.CARD, VoiceOutlineRoleKey))
+                assertEquals(moves, semantic(VoiceModeTags.CARD, VoiceOutlineAnimatedKey), "reduced motion $reduced")
                 page.state.value = VoiceModeState.WaitingForReply
                 waitForIdle()
-                assertFalse(semantic(ComposerTestTags.CARD, VoiceOutlineAnimatedKey), "the thinking outline holds still")
+                assertFalse(semantic(VoiceModeTags.CARD, VoiceOutlineAnimatedKey), "the thinking glow holds still")
                 page.state.value = VoiceModeState.Speaking
                 waitForIdle()
-                assertEquals(VoiceGlowRole.Agent, semantic(ComposerTestTags.CARD, VoiceOutlineRoleKey))
-                val speakingMoves = semantic(ComposerTestTags.CARD, VoiceOutlineAnimatedKey)
+                assertEquals(VoiceGlowRole.Agent, semantic(VoiceModeTags.CARD, VoiceOutlineRoleKey))
+                val speakingMoves = semantic(VoiceModeTags.CARD, VoiceOutlineAnimatedKey)
                 assertEquals(moves, speakingMoves, "the spoken reply moves the outline, reduced motion $reduced")
             }
         }

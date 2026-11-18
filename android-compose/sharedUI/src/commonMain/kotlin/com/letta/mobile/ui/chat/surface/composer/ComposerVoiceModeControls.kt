@@ -122,11 +122,22 @@ internal fun ComposerVoiceSlot(uiState: ChatUiState) {
     )
 }
 
-/** The newest reply's text: what voice mode speaks while the controller publishes no spoken pieces. */
-private fun latestReplyText(state: ChatUiState): String? =
-    state.messages.lastOrNull { it.role == ASSISTANT && !it.isReasoning && it.content.isNotBlank() }?.content
+/**
+ * The reply to the person's newest message, as far as the chat has it: what the voice card lights as
+ * it is spoken. Null before anything answers that message (never the previous reply).
+ */
+private fun latestReplyText(state: ChatUiState): String? {
+    for (message in state.messages.asReversed()) {
+        when {
+            message.role == USER -> return null
+            message.role == ASSISTANT && !message.isReasoning && message.content.isNotBlank() -> return message.content
+        }
+    }
+    return null
+}
 
 private const val ASSISTANT = "assistant"
+private const val USER = "user"
 
 /**
  * Voice mode's notice in the composer's notice slot above the prompt card, when voice mode has stopped

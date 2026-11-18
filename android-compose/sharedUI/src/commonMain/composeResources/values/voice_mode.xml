@@ -24,6 +24,11 @@
     <string name="voice_status_permission">Voice mode needs the microphone. Allow it when asked, or in system settings.</string>
     <string name="voice_action_retry">Retry</string>
     <string name="voice_card_label">Voice conversation</string>
+    <string name="voice_card_status_listening">Listening</string>
+    <string name="voice_card_status_hearing">Hearing you</string>
+    <string name="voice_card_status_thinking">Thinking…</string>
+    <string name="voice_card_status_speaking">Speaking</string>
+    <string name="voice_card_status_failed">Not sent</string>
     <string name="voice_card_you">You</string>
     <string name="voice_card_agent">Agent</string>
     <string name="voice_card_elapsed">%1$s on this turn</string>
