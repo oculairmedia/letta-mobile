@@ -6,8 +6,8 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import kotlinx.atomicfu.atomic
 
-/** LazyColumn-stable identity: prefer client otid across Pending → Confirmed. */
-internal fun UiMessage.stableListKey(): String {
+/** Presentation identity: retain the client otid or host logical id across canonical settlement. */
+fun UiMessage.stableListKey(): String {
     val base = clientMessageId?.takeIf { it.isNotBlank() } ?: id
     // Reasoning and assistant events can share an otid without a runId; keep
     // LazyColumn keys distinct so both rows survive.

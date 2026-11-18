@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import com.letta.mobile.ui.chat.surface.timeline.rows.LocalRunStepLifetime
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -20,6 +22,8 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.UiMessage
+import kotlinx.collections.immutable.persistentListOf
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
@@ -46,6 +50,7 @@ internal class TimelineUiFrameRecorder(
 ) : AutoCloseable {
     private val compositions = RowCompositionCounter()
     private val recorded = mutableListOf<UiFrame>()
+    val stepLifetimes = mutableListOf<Pair<String, Boolean>>()
     private var uiDensity = Density(1f)
     private lateinit var listState: LazyListState
     private var scrollProbe: ScrollCommandProbe? = null
@@ -56,6 +61,10 @@ internal class TimelineUiFrameRecorder(
     /** The last frame composed no row content: what the previous step changed has all been drawn. */
     val isQuiet: Boolean get() = recorded.lastOrNull()?.rowCompositions == 0
 
+    fun streaming(message: UiMessage, active: Boolean) {
+        state = state.copy(messages = persistentListOf(message), isStreaming = active)
+    }
+
     fun mount() = with(test) {
         mainClock.autoAdvance = false
         setContent {
@@ -63,6 +72,9 @@ internal class TimelineUiFrameRecorder(
             uiDensity = LocalDensity.current
             MaterialTheme {
                 Box(Modifier.size(width = WIDTH.dp, height = HEIGHT.dp)) {
+                    CompositionLocalProvider(LocalRunStepLifetime provides { identity, mounted ->
+                        stepLifetimes += identity to mounted
+                    }) {
                     ChatTimeline(
                         state = state,
                         pagedTimeline = rig.presentation,
@@ -72,6 +84,7 @@ internal class TimelineUiFrameRecorder(
                         appearance = ChatSurfaceAppearance(),
                         listState = listState,
                     )
+                    }
                 }
             }
         }
@@ -83,7 +96,9 @@ internal class TimelineUiFrameRecorder(
             Thread.sleep(REAL_MILLIS_PER_FRAME)
             main.drain()
             test.mainClock.advanceTimeBy(FRAME_MILLIS)
-            record(step)
+            var frame: UiFrame? = null
+            test.runOnIdle { frame = observe(FrameStep(step)) }
+            recorded += checkNotNull(frame)
         }
     }
 
@@ -102,13 +117,9 @@ internal class TimelineUiFrameRecorder(
         }
     }
 
-    private fun record(step: String) {
-        var frame: UiFrame? = null
-        test.runOnIdle { frame = observe(step) }
-        recorded += checkNotNull(frame)
-    }
+    private data class FrameStep(val label: String)
 
-    private fun observe(step: String): UiFrame {
+    private fun observe(step: FrameStep): UiFrame {
         val info = listState.layoutInfo
         val rows = info.visibleItemsInfo.map { item ->
             val top = if (info.reverseLayout) info.viewportEndOffset - item.offset - item.size else item.offset
@@ -116,7 +127,7 @@ internal class TimelineUiFrameRecorder(
         }
         return UiFrame(
             index = recorded.size,
-            step = step,
+            step = step.label,
             rows = rows.sortedBy { it.top },
             spinnerVisible = spinnerVisible(rows),
             firstVisibleItemIndex = listState.firstVisibleItemIndex,

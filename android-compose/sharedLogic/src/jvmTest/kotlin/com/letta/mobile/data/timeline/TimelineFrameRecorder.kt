@@ -38,7 +38,13 @@ internal class TimelineFrameRecorder private constructor(
     private val scope: TimelineScope,
 ) {
     /** One row as the list keys and draws it. */
-    data class FrameRow(val key: String, val source: String, val messages: List<String>, val contents: List<String>)
+    data class FrameRow(
+        val key: String,
+        val source: String,
+        val messages: List<String>,
+        val contents: List<String>,
+        val liveNames: Set<String> = emptySet(),
+    )
 
     /**
      * [loadStates] are the Paging refresh/append states the presenter reported since the previous
@@ -89,6 +95,7 @@ internal class TimelineFrameRecorder private constructor(
                 source = source,
                 messages = item?.messageRows().orEmpty().map { it.logicalId() },
                 contents = item?.messageRows().orEmpty().map { it.content },
+                liveNames = if (index < assembly.liveCount) emptySet() else snapshot[index - assembly.liveCount]?.liveNames.orEmpty(),
             )
         }
         if (recorded.lastOrNull()?.rows == rows) return@synchronized
@@ -231,6 +238,13 @@ internal class TimelineFrameRecorder private constructor(
         repeat(SETTLE_YIELDS) { yield(); kotlinx.coroutines.delay(1) }
     }
 
+    suspend fun awaitFrameContaining(message: String): Frame {
+        awaitCondition({ "message $message never appeared: ${frames.lastOrNull()}" }) {
+            frames.lastOrNull()?.rows?.any { message in it.messages } == true
+        }
+        return lastFrame()
+    }
+
     fun lastFrame(): Frame = frames.last()
 
     suspend fun close() {
@@ -239,15 +253,20 @@ internal class TimelineFrameRecorder private constructor(
     }
 
     /** The App Server `message.list` recent page, swapped per test step. */
-    class MutableDurableTransport : TimelineTransport by unexpectedTimelineTransport() {
+    class MutableDurableTransport(private val scope: TimelineScope) : TimelineTransport by unexpectedTimelineTransport() {
         @Volatile var durable: List<LettaMessage> = emptyList()
 
-        override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
-            TimelineRemotePageResult.Page(
+        override suspend fun listConversationMessagePage(
+            request: TimelineRemotePageRequest,
+            progress: TimelinePageProgress?,
+        ): TimelineRemotePageResult {
+            check(request.scope == scope) { "Fixture scope is not loaded" }
+            return TimelineRemotePageResult.Page(
                 request.requestId, request.selectionGeneration,
                 durable.map { TimelineRemoteRecord(TimelineMessageId(it.id), it, 0) },
                 null, false, 0,
             )
+        }
     }
 
     companion object {
@@ -256,7 +275,7 @@ internal class TimelineFrameRecorder private constructor(
 
         /** [store] defaults to the shared in-memory ledger; a test may wrap it to read like another store. */
         suspend fun open(scope: TimelineScope, store: TimelineBoundedStore = InMemoryTimelineStore()): TimelineFrameRecorder {
-            val transport = MutableDurableTransport()
+            val transport = MutableDurableTransport(scope)
             val coordinator = CanonicalTimelineCoordinator(store, transport)
             val owner = coordinator.acquire(scope)
             val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)

@@ -37,6 +37,7 @@ import com.letta.mobile.ui.theme.tokens.LocalLettaReducedMotion
 import kotlin.math.min
 import kotlin.random.Random
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -263,12 +264,12 @@ internal class BorderBeamNode(spec: LettaBeamSpec, active: Boolean, private val 
 
     private suspend fun runFrames() {
         var last = 0L
-        while (coroutineScope.isActive) {
+        while (currentCoroutineContext().isActive && isAttached) {
             withInfiniteAnimationFrameNanos { now ->
                 if (last != 0L) phase = advanceBeamPhase(phase, now - last, spec.style.periodMillis)
                 last = now
             }
-            invalidateDraw()
+            if (isAttached) invalidateDraw()
         }
     }
 

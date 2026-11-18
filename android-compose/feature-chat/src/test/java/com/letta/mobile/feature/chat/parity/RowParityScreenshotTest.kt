@@ -103,6 +103,7 @@ class RowParityScreenshotTest {
                 val shared = capture { target = row }
                 record(output, row, shared)
             }.getOrElse { failure ->
+                failure.printStackTrace()
                 ParityResult(themeName, row.id, row.label, null, null, null, "render failed: ${failure::class.simpleName}: ${failure.message?.take(MAX_NOTE)}")
             }
         }
@@ -110,6 +111,7 @@ class RowParityScreenshotTest {
         RowParityReport.writeResults(dir, themeName, results)
         val report = RowParityReport.rebuild(dir, ParityRow.all.map { it.id })
         println(report)
+        assertTrue("row capture failed:\n$report", results.none { it.note.startsWith("render failed:") })
         assertTrue("no row rendered:\n$report", results.any { it.diffPercent != null })
         val moved = results.filter { (it.diffPercent ?: 0.0) > MAX_DIFF_PERCENT }
         assertTrue("rows moved from their golden by more than $MAX_DIFF_PERCENT%:\n$report", moved.isEmpty())

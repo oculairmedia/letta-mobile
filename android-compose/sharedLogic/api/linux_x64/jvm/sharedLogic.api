@@ -14012,6 +14012,7 @@ public final class com/letta/mobile/data/chat/projection/MessageGroupingKt {
 	public static final fun deduplicateRenderKeys (Ljava/util/List;)Ljava/util/List;
 	public static final fun groupMessagesForRender (Ljava/util/List;)Ljava/util/List;
 	public static final fun runKey (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun stableListKey (Lcom/letta/mobile/data/model/UiMessage;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/chat/projection/MonitorDisplayKt {
