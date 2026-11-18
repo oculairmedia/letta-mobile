@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -21,6 +22,7 @@ import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.theme.ChatMascotDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import kotlin.math.roundToInt
 
 /** Test tags for the composer companion. */
 internal object ComposerCompanionTags {
@@ -69,7 +71,11 @@ internal fun ComposerCompanionRow(model: ComposerModel, content: @Composable () 
             // Composed even while the slot is closed: the seat must stay declared for the
             // character to come back to it.
             Box(
-                Modifier.testTag(ComposerCompanionTags.SLOT).width(slot).padding(end = LettaDimens.Space.lg),
+                Modifier
+                    .testTag(ComposerCompanionTags.SLOT)
+                    .width(slot)
+                    .heightFollowsSlot { slot / ChatMascotDimens.composerCompanionSlot }
+                    .padding(end = LettaDimens.Space.lg),
                 contentAlignment = Alignment.Center,
             ) {
                 if (available) CompanionSeatHere(agentId!!, model)
@@ -77,6 +83,18 @@ internal fun ComposerCompanionRow(model: ComposerModel, content: @Composable () 
         }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { content() }
     }
+}
+
+/**
+ * The seat's share of the row's height follows the slot's open [fraction]: a closed slot (the
+ * character stands elsewhere) adds no height, so the row is the prompt's own height and nothing
+ * above or below the prompt moves away from it; an open slot keeps the full seat. The seat stays
+ * composed and centred on the row either way, so the character can come back to it.
+ */
+private fun Modifier.heightFollowsSlot(fraction: () -> Float): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    val height = (placeable.height * fraction().coerceIn(0f, 1f)).roundToInt()
+    layout(placeable.width, height) { placeable.place(0, (height - placeable.height) / 2) }
 }
 
 /** On a chat page, a spot the page's one seat stands over; elsewhere, a seat of its own. */

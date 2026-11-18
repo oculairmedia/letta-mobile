@@ -174,13 +174,14 @@ private fun AssistantPrimaryContent(
 
 /**
  * The legacy bubble's role label (MessageBubbleSurface) on a structured
- * row: generated UI, approvals, a subagent's report, images, a tool's own output. Plain prose and
+ * row: generated UI, approvals, images, a tool's own output. Notices have their own heading. Plain prose and
  * a bare tool-call line stay unlabelled (bubble-less), errors label themselves, and only the
  * first row of a speaker's group carries it.
  */
 internal fun showsSpeakerHeader(message: UiMessage, position: GroupPosition): Boolean {
     if (position != GroupPosition.First && position != GroupPosition.None) return false
     if (message.isError) return false
+    if (message.subagentNotification != null) return false
     return when (message.role) {
         "tool" -> true
         "assistant" -> message.hasStructuredContent()
