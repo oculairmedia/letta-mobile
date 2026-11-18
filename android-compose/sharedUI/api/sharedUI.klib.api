@@ -9354,6 +9354,8 @@ final object com.letta.mobile.ui.chat.voice/VoiceModeTags { // com.letta.mobile.
         final fun <get-CARD_ACTION>(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_ACTION.<get-CARD_ACTION>|<get-CARD_ACTION>(){}[0]
     final const val CARD_BODY // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_BODY|{}CARD_BODY[0]
         final fun <get-CARD_BODY>(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_BODY.<get-CARD_BODY>|<get-CARD_BODY>(){}[0]
+    final const val CARD_CAPTION // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_CAPTION|{}CARD_CAPTION[0]
+        final fun <get-CARD_CAPTION>(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_CAPTION.<get-CARD_CAPTION>|<get-CARD_CAPTION>(){}[0]
     final const val CARD_COLLAPSE // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_COLLAPSE|{}CARD_COLLAPSE[0]
         final fun <get-CARD_COLLAPSE>(): kotlin/String // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_COLLAPSE.<get-CARD_COLLAPSE>|<get-CARD_COLLAPSE>(){}[0]
     final const val CARD_END // com.letta.mobile.ui.chat.voice/VoiceModeTags.CARD_END|{}CARD_END[0]

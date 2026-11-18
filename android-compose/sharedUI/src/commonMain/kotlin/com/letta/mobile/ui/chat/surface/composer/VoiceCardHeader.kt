@@ -82,12 +82,12 @@ import org.jetbrains.compose.resources.stringResource
  * one line: the speaker (glyph, name, timer and status), then the round controls, fold, a rule and
  * End. On a narrower card the speaker, fold and End keep the first line and the round controls take
  * a second, shown only while the card is unfolded (folded, the card is its first line). Every control
- * is [LettaControlTokens.iconButtonLg] tall, End included.
+ * is [LettaControlTokens.iconButton] tall, End included.
  */
 @Composable
 internal fun VoiceCardHeader(handle: VoiceModeHandle, turn: VoiceCardTurn, oneLine: Boolean) {
     if (oneLine) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             VoiceCardSpeakerLine(turn)
             RoundControls(handle, turn)
             FoldControl(handle)
@@ -97,13 +97,13 @@ internal fun VoiceCardHeader(handle: VoiceModeHandle, turn: VoiceCardTurn, oneLi
         return
     }
     Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             VoiceCardSpeakerLine(turn)
             FoldControl(handle)
             EndButton(handle)
         }
         if (!handle.cardCollapsed && (handle.cardFeed.hasRoundControls() || turn.speaking)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
                 RoundControls(handle, turn)
             }
         }
@@ -127,7 +127,7 @@ private fun RowScope.VoiceCardSpeakerLine(turn: VoiceCardTurn) {
         SpeakerGlyph(turn)
         Text(
             text = turn.name,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -210,7 +210,7 @@ private fun RoundControls(handle: VoiceModeHandle, turn: VoiceCardTurn) {
 }
 
 /**
- * One round control: a filled circle [LettaControlTokens.iconButtonLg] across (the platform's minimum
+ * One round control: a filled circle [LettaControlTokens.iconButton] across (the platform's minimum
  * touch target around it), [glyph] in [tint], announced as a button by [semantics].
  */
 @Composable
@@ -224,10 +224,10 @@ private fun RoundButton(
         onClick = onClick,
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        modifier = modifier.size(LettaControlTokens.iconButtonLg),
+        modifier = modifier.size(LettaControlTokens.iconButton),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            LettaIcon(glyph, contentDescription = null, style = LettaIconStyle(LettaControlTokens.icon, tint))
+            LettaIcon(glyph, contentDescription = null, style = LettaIconStyle(LettaControlTokens.iconSm, tint))
         }
     }
 }
@@ -279,7 +279,7 @@ private fun SpeedControl(speed: VoiceCardSpeed) {
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
             contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
-                .height(LettaControlTokens.iconButtonLg)
+                .height(LettaControlTokens.iconButton)
                 .testTag(VoiceModeTags.CARD_SPEED)
                 .semantics(mergeDescendants = true) {
                     role = Role.Button
@@ -288,11 +288,11 @@ private fun SpeedControl(speed: VoiceCardSpeed) {
                 },
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = LettaDimens.Space.md),
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.sm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             ) {
-                Text(shown, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                Text(shown, style = MaterialTheme.typography.labelMedium, maxLines = 1)
                 LettaMenuIndicator()
             }
         }
@@ -320,7 +320,7 @@ internal fun speedText(speed: Float): String {
 /** Fold the card to its header line, or unfold it back; as tall as the round controls. */
 @Composable
 private fun FoldControl(handle: VoiceModeHandle) {
-    val modifier = Modifier.size(LettaControlTokens.iconButtonLg).testTag(VoiceModeTags.CARD_COLLAPSE)
+    val modifier = Modifier.size(LettaControlTokens.iconButton).testTag(VoiceModeTags.CARD_COLLAPSE)
     if (handle.cardCollapsed) {
         val label = stringResource(Res.string.voice_card_expand)
         LettaUnfoldButton(onClick = { handle.cardCollapsed = false }, contentDescription = label, modifier = modifier)
@@ -340,7 +340,7 @@ private fun EndButton(handle: VoiceModeHandle) {
         color = MaterialTheme.colorScheme.error,
         contentColor = MaterialTheme.colorScheme.onError,
         modifier = Modifier
-            .height(LettaControlTokens.iconButtonLg)
+            .height(LettaControlTokens.iconButton)
             .testTag(VoiceModeTags.CARD_END)
             .semantics(mergeDescendants = true) {
                 role = Role.Button
@@ -348,12 +348,12 @@ private fun EndButton(handle: VoiceModeHandle) {
             },
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.md),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             LettaIcon(LettaIcons.Close, contentDescription = null, style = LettaIconStyle(LettaControlTokens.iconSm))
-            Text(stringResource(Res.string.voice_card_end), style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            Text(stringResource(Res.string.voice_card_end), style = MaterialTheme.typography.labelMedium, maxLines = 1)
         }
     }
 }

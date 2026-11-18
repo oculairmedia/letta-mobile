@@ -34,6 +34,10 @@ import com.letta.mobile.data.voice.session.VoiceModeState
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.voice_action_retry
 import com.letta.mobile.sharedui.resources.voice_action_setup
+import com.letta.mobile.sharedui.resources.voice_card_status_speaking
+import com.letta.mobile.sharedui.resources.voice_status_hearing
+import com.letta.mobile.sharedui.resources.voice_status_listening
+import com.letta.mobile.sharedui.resources.voice_status_thinking
 import com.letta.mobile.ui.chat.voice.VoiceModeHandle
 import com.letta.mobile.ui.chat.voice.VoiceModeTags
 import com.letta.mobile.ui.chat.voice.voiceErrorText
@@ -42,12 +46,13 @@ import com.letta.mobile.ui.components.foundation.LettaChip
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.customColors
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
 /**
- * The card's body for [state], in large type, never the status (the header says that): the person's
- * words live as they are heard; while the reply is awaited, their last words dimmed; while it is
+ * The card's body for [state], in large type: the person's words live as they are heard (one quiet
+ * caption line until there are any); while the reply is awaited, their last words dimmed; while it is
  * spoken, the reply with its spoken words lit and the rest dimmed; after a failed utterance, what went
  * wrong and what helps. [reply] is the chat's newest reply text; [now] is the card's clock.
  */
@@ -61,9 +66,13 @@ internal fun VoiceCardBody(handle: VoiceModeHandle, state: VoiceModeState, reply
     when (state) {
         is VoiceModeState.TurnFailed -> FailedTurn(handle, state)
         VoiceModeState.Speaking -> SpokenReply(handle, reply, now)
-        VoiceModeState.WaitingForReply -> FollowingText(spokenAnnotated(lastHeard, 0, ink, dim), follow = lastHeard.length)
+        VoiceModeState.WaitingForReply -> {
+            if (lastHeard.isEmpty()) return Caption(Res.string.voice_status_thinking)
+            FollowingText(spokenAnnotated(lastHeard, 0, ink, dim), follow = lastHeard.length)
+        }
         else -> {
-            val heard = words?.value.orEmpty()
+            val waiting = if (state == VoiceModeState.Hearing) Res.string.voice_status_hearing else Res.string.voice_status_listening
+            val heard = words?.value?.takeIf { it.isNotBlank() } ?: return Caption(waiting)
             FollowingText(spokenAnnotated(heard, heard.length, ink, dim), follow = heard.length)
         }
     }
@@ -80,6 +89,7 @@ private fun SpokenReply(handle: VoiceModeHandle, reply: String?, now: State<Long
     val segments by handle.cardFeed.spokenSegments.collectAsState()
     val interpolate = !LocalReducedMotion.current
     val text = remember(segments, reply) { replyToShow(spokenReply(segments), reply) }
+    if (text.isEmpty()) return Caption(Res.string.voice_card_status_speaking)
     val spoken by remember(segments, interpolate) { derivedStateOf { spokenCharacters(segments, now.value, interpolate) } }
     val lit = if (segments.isEmpty()) text.length else spoken
     val bright = MaterialTheme.colorScheme.onSurface
@@ -113,10 +123,25 @@ private fun FailedTurn(handle: VoiceModeHandle, state: VoiceModeState.TurnFailed
 }
 
 /**
- * [text] in the card's large type in a box that always holds [MIN_LINES] lines and grows to
- * [MAX_LINES], scrolling beyond: whenever [follow] (a character offset) moves to another line, the
- * view scrolls to keep that line and the one before it in sight (in one step under reduced motion),
- * and the older lines above fade out at the top edge.
+ * While there are no words yet: one quiet line saying what voice mode is doing ("Listening…"), so the
+ * card stays compact until words arrive.
+ */
+@Composable
+private fun Caption(status: StringResource) {
+    Text(
+        text = stringResource(status),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.customColors.onSurfaceMutedColor,
+        maxLines = 1,
+        modifier = Modifier.testTag(VoiceModeTags.CARD_CAPTION).semantics { liveRegion = LiveRegionMode.Polite },
+    )
+}
+
+/**
+ * [text] in the card's large type, growing a line at a time to [MAX_LINES] and scrolling beyond:
+ * whenever [follow] (a character offset) moves to another line, the view scrolls to keep that line
+ * and the one before it in sight (in one step under reduced motion), and the older lines above fade
+ * out at the top edge.
  */
 @Composable
 private fun FollowingText(text: AnnotatedString, follow: Int) {
@@ -136,7 +161,7 @@ private fun FollowingText(text: AnnotatedString, follow: Int) {
     Box(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = line * MIN_LINES, max = line * MAX_LINES)
+            .heightIn(max = line * MAX_LINES)
             .lettaFadingEdges(
                 topFadeAlpha = if (scroll.value > 0) 1f else 0f,
                 bottomFadeAlpha = 0f,
@@ -158,5 +183,4 @@ private fun FollowingText(text: AnnotatedString, follow: Int) {
 @Composable
 private fun bodyStyle(): TextStyle = MaterialTheme.typography.headlineSmall
 
-private const val MIN_LINES = 2
 private const val MAX_LINES = 4

@@ -301,6 +301,12 @@ class VoiceOutlineUiTest {
         return base
     }
 
+    /** [card] extends from [bar]: it starts above it, its bottom tucked under the bar's top, a little narrower. */
+    private fun assertTucked(card: DpRect, bar: DpRect, where: String) {
+        assertTrue(card.top < bar.top && card.bottom > bar.top, "the card's bottom tucks under the prompt $where")
+        assertTrue(card.left > bar.left && card.right < bar.right, "the card is inset from the prompt's sides $where")
+    }
+
     private fun ComposeUiTest.assertFixed(base: Baseline, expected: Map<String, DpRect>, context: String) =
         base.fixed.forEach { tag -> assertEquals(expected.getValue(tag), bounds(tag), "$tag keeps its bounds $context ${base.where}") }
 
@@ -321,7 +327,7 @@ class VoiceOutlineUiTest {
             val card = bounds(VoiceModeTags.CARD)
             assertEquals(base.timeline.top, bounds(TIMELINE).top, "the conversation keeps its top while $shown ${base.where}")
             assertTrue(bounds(TIMELINE).bottom <= card.top, "the card docks below the conversation while $shown ${base.where}")
-            assertTrue(card.bottom <= base.off.getValue(base.bar).top, "the card docks above the prompt while $shown ${base.where}")
+            assertTucked(card, base.off.getValue(base.bar), "while $shown ${base.where}")
             onNodeWithTag(VoiceModeTags.STRIP).assertDoesNotExist()
             onNodeWithTag(VoiceModeTags.CARD_STATUS, useUnmergedTree = true).assert(hasText(status))
             val where = "while $shown ${base.where}"
@@ -371,7 +377,11 @@ class VoiceOutlineUiTest {
             assertEquals(role, semantic(slot.takeIf { inCard } ?: base.bar, VoiceOutlineRoleKey), "the glow $where")
             assertEquals(base.off.getValue(base.bar), bounds(base.bar), "the prompt keeps its bounds $where")
             assertEquals(base.timeline.top, bounds(TIMELINE).top, "the conversation keeps its top $where")
-            assertTrue(bounds(slot).bottom <= base.off.getValue(base.bar).top, "the failure sits above the prompt $where")
+            if (inCard) {
+                assertTucked(bounds(slot), base.off.getValue(base.bar), where)
+            } else {
+                assertTrue(bounds(slot).bottom <= base.off.getValue(base.bar).top, "the notice sits above the prompt $where")
+            }
         }
         onNodeWithTag(VoiceModeTags.STRIP_CLOSE, useUnmergedTree = true).performClick()
         waitForIdle()

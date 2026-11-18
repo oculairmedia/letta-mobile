@@ -2466,6 +2466,7 @@ public final class com/letta/mobile/ui/chat/voice/VoiceModeTags {
 	public static final field CARD Ljava/lang/String;
 	public static final field CARD_ACTION Ljava/lang/String;
 	public static final field CARD_BODY Ljava/lang/String;
+	public static final field CARD_CAPTION Ljava/lang/String;
 	public static final field CARD_COLLAPSE Ljava/lang/String;
 	public static final field CARD_END Ljava/lang/String;
 	public static final field CARD_INTERRUPT Ljava/lang/String;

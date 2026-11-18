@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.state.ToggleableState
@@ -137,7 +138,7 @@ class VoiceModeCardUiTest {
         MaterialTheme {
             CompositionLocalProvider(LocalReducedMotion provides reducedMotion) {
                 Box(Modifier.width(width)) {
-                    VoiceModeCard(handle, VoiceCardConversation("Scout", reply))
+                    VoiceModeCard(handle, VoiceCardConversation("Scout", reply), seamGlow = { Color.Transparent })
                 }
             }
         }
@@ -159,9 +160,10 @@ class VoiceModeCardUiTest {
         showCard(FakeVoiceCardFeed())
         waitForIdle()
         onNodeWithTag(VoiceModeTags.CARD_SPEAKER, useUnmergedTree = true).assert(hasText("You"))
-        // The status is the header's; the body holds words only.
+        // The status is the header's; until there are words the body is one quiet caption line.
         onNodeWithTag(VoiceModeTags.CARD_STATUS, useUnmergedTree = true).assert(hasText("Listening"))
-        inCard("Listening…").assertDoesNotExist()
+        onNodeWithTag(VoiceModeTags.CARD_CAPTION, useUnmergedTree = true).assert(hasText("Listening…"))
+        onNodeWithTag(VoiceModeTags.CARD_BODY, useUnmergedTree = true).assertDoesNotExist()
 
         state.value = VoiceModeState.Hearing
         words.value = VoiceText("what time is it in Lisbon")
@@ -283,16 +285,16 @@ class VoiceModeCardUiTest {
     fun foldingLeavesTheHeaderLineAndUnfoldingBringsTheBodyBack() = runComposeUiTest {
         showCard(FakeVoiceCardFeed(), width = 360.dp)
         waitForIdle()
-        onNodeWithTag(VoiceModeTags.CARD_BODY, useUnmergedTree = true).assertExists()
+        onNodeWithTag(VoiceModeTags.CARD_CAPTION, useUnmergedTree = true).assertExists()
         onNodeWithTag(VoiceModeTags.CARD_COLLAPSE).assertContentDescriptionEquals("Fold the voice card").performClick()
         waitForIdle()
-        onNodeWithTag(VoiceModeTags.CARD_BODY, useUnmergedTree = true).assertDoesNotExist()
+        onNodeWithTag(VoiceModeTags.CARD_CAPTION, useUnmergedTree = true).assertDoesNotExist()
         onNodeWithTag(VoiceModeTags.CARD_MIC).assertDoesNotExist()
         onNodeWithTag(VoiceModeTags.CARD_END).assertExists()
         onNodeWithTag(VoiceModeTags.CARD_SPEAKER, useUnmergedTree = true).assertExists()
         onNodeWithTag(VoiceModeTags.CARD_COLLAPSE).assertContentDescriptionEquals("Unfold the voice card").performClick()
         waitForIdle()
-        onNodeWithTag(VoiceModeTags.CARD_BODY, useUnmergedTree = true).assertExists()
+        onNodeWithTag(VoiceModeTags.CARD_CAPTION, useUnmergedTree = true).assertExists()
     }
 
     @Test

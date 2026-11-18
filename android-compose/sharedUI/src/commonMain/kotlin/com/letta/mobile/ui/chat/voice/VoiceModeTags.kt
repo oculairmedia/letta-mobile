@@ -32,6 +32,9 @@ object VoiceModeTags {
     /** The card's status words in its header ("Listening", "Thinking", "Speaking"). */
     const val CARD_STATUS: String = "voice-card-status"
 
+    /** The card's one quiet line while there are no words yet ("Listening…"). */
+    const val CARD_CAPTION: String = "voice-card-caption"
+
     /** The card's stop button while the reply is spoken: stops it and listens. */
     const val CARD_INTERRUPT: String = "voice-card-interrupt"
 

@@ -17,7 +17,6 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,7 +39,6 @@ import com.letta.mobile.data.voice.VoiceUserAction
 import com.letta.mobile.data.voice.session.VoiceModeState
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.render.ChatUiState
-import com.letta.mobile.ui.chat.voice.VoiceCardConversation
 import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.chat.voice.VoiceModeHandle
 import com.letta.mobile.ui.components.LettaInlineNotice
@@ -104,29 +102,22 @@ internal fun VoiceModeButton(handle: VoiceModeHandle, size: Dp, iconSize: Dp, mo
 }
 
 /**
- * Voice mode's place above the prompt: while it runs, the voice card (whose turn it is, the person's
- * words, the reply as it is spoken, a failed utterance with Retry or Set up) under the hand-over
- * notice when there is one; otherwise its notice when something needs the person.
+ * Voice mode's place above the prompt: while it runs, the hand-over notice when there is one (the
+ * voice card itself extends from the prompt bar, VoiceCardDock); otherwise its notice when
+ * something needs the person.
  */
 @Composable
-internal fun ComposerVoiceSlot(uiState: ChatUiState) {
+internal fun ComposerVoiceSlot() {
     val handle = LocalVoiceMode.current ?: return
     val state by handle.state.collectAsState()
-    if (!state.active) return ComposerVoiceNotice()
-    HandoverNotice(handle)
-    val reply = remember(uiState.messages) { latestReplyText(uiState) }
-    VoiceModeCard(
-        handle = handle,
-        conversation = VoiceCardConversation(uiState.agentName, reply),
-        modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
-    )
+    if (state.active) HandoverNotice(handle) else ComposerVoiceNotice()
 }
 
 /**
  * The reply to the person's newest message, as far as the chat has it: what the voice card lights as
  * it is spoken. Null before anything answers that message (never the previous reply).
  */
-private fun latestReplyText(state: ChatUiState): String? {
+internal fun latestReplyText(state: ChatUiState): String? {
     for (message in state.messages.asReversed()) {
         when {
             message.role == USER -> return null

@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -96,6 +97,18 @@ private class QuietEar : VoiceEar {
     override fun commitTurn() = Unit
 }
 
+/** An ear that opens and, once the person speaks, reports their words so far as a live partial: no microphone. */
+private class PartialEar(private val words: String) : VoiceEar {
+    override fun listen(): Flow<VoiceEarEvent> = flow {
+        emit(VoiceEarEvent.ListeningStarted)
+        emit(VoiceEarEvent.SpeechStarted)
+        emit(VoiceEarEvent.PartialTranscript(VoiceText(words)))
+        awaitCancellation()
+    }
+
+    override fun commitTurn() = Unit
+}
+
 /** A mouth that never plays anything. */
 private class QuietMouth : VoiceMouth {
     override val events: Flow<VoiceMouthEvent> = emptyFlow()
@@ -144,12 +157,12 @@ class VoiceModeComposerUiTest {
     private var composer by mutableStateOf(drafted)
 
     @Composable
-    private fun rememberVoice(configured: Boolean): VoiceModeHandle {
+    private fun rememberVoice(configured: Boolean, ear: () -> VoiceEar = { QuietEar() }): VoiceModeHandle {
         val scope = rememberCoroutineScope()
         return remember {
             val store = VoiceSetupStore(InMemorySecureSettingsStore(), InMemorySecureSettingsStore())
             if (configured) store.save(VoiceSetupDraft("http://127.0.0.1:8880", consent = true))
-            val engines = VoiceEngineFactory { VoiceEngineSet(VoiceEngines(QuietEar(), NoResponder, QuietMouth())) {} }
+            val engines = VoiceEngineFactory { VoiceEngineSet(VoiceEngines(ear(), NoResponder, QuietMouth())) {} }
             val runtime = VoiceLoopRuntime(scope, Dispatchers.Default)
             VoiceModeHandle(VoiceModeController(VoiceChatSessions { StillSession() }, store, engines, MicrophoneAccess.Granted, runtime))
         }
@@ -160,6 +173,7 @@ class VoiceModeComposerUiTest {
         val configured: Boolean = true,
         val shown: () -> Boolean = { true },
         val onHandle: (VoiceModeHandle) -> Unit = {},
+        val ear: () -> VoiceEar = { QuietEar() },
     )
 
     /**
@@ -174,7 +188,7 @@ class VoiceModeComposerUiTest {
     ) = setContent {
         val configured = voice.configured
         val withVoice = voice.shown
-        val handle = rememberVoice(configured).also(voice.onHandle)
+        val handle = rememberVoice(configured, voice.ear).also(voice.onHandle)
         MaterialTheme {
             CompositionLocalProvider(
                 LocalLettaHost provides LettaHost(input = style),
@@ -346,7 +360,10 @@ class VoiceModeComposerUiTest {
         waitForState({ handle }, VoiceModeState.Listening)
         waitForIdle()
         onNodeWithTag(VoiceModeTags.CARD).assertExists()
-        assertTrue(bounds(VoiceModeTags.CARD).bottom <= bounds(ComposerTestTags.TOUCH_BAR).top, "the card docks above the bar")
+        val card = bounds(VoiceModeTags.CARD)
+        val bar = bounds(ComposerTestTags.TOUCH_BAR)
+        assertTrue(card.top < bar.top && card.bottom > bar.top, "the card extends from the bar, its bottom tucked under it")
+        assertTrue(card.left > bar.left && card.right < bar.right, "the card is inset from the bar's sides")
         onNodeWithTag(VoiceModeTags.CARD_END)
             .assertContentDescriptionEquals("End voice conversation")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
@@ -354,6 +371,22 @@ class VoiceModeComposerUiTest {
         waitForState({ handle }, VoiceModeState.Off)
         waitForIdle()
         onNodeWithTag(VoiceModeTags.CARD).assertDoesNotExist()
+    }
+
+    /**
+     * The real wiring: an ear's live partial (the desktop server ear sends one per stretch of voiced
+     * audio) goes through the loop and the controller to the voice card, which shows the words as
+     * they are heard, in its body.
+     */
+    @Test
+    fun anEarsLivePartialReachesTheVoiceCard() = runComposeUiTest {
+        var handle: VoiceModeHandle? = null
+        showComposer(1200.dp, LettaInput.Pointer, voice = VoiceOptions(onHandle = { handle = it }, ear = { PartialEar(HEARD) }))
+        onNodeWithTag(VoiceModeTags.BUTTON).performClick()
+        waitUntil(timeoutMillis = 5_000) { handle?.controller?.partialTranscript?.value?.value == HEARD }
+        waitForIdle()
+        onNodeWithTag(VoiceModeTags.CARD_BODY, useUnmergedTree = true).assertTextEquals(HEARD)
+        onNodeWithTag(VoiceModeTags.CARD_CAPTION, useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test
@@ -396,6 +429,7 @@ class VoiceModeComposerUiTest {
         SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, text)
 
     private companion object {
+        const val HEARD = "can you hear me now"
         val PageHeight = 900.dp
     }
 }

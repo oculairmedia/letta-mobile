@@ -140,7 +140,7 @@ class VoicePartialComposerUiTest {
         assertEquals(barBefore, bounds(bar), "the prompt keeps its size $where")
         assertEquals(slotBefore, bounds(ComposerTestTags.TRAILING_ACTIONS), "the trailing controls stay put $where")
         assertEquals(fieldBefore, bounds(ComposerTestTags.INPUT), "the field keeps its size $where")
-        assertTrue(card.bottom <= barBefore.top, "the card sits above the prompt $where")
+        assertTrue(card.top < barBefore.top && card.bottom > barBefore.top, "the card extends from the prompt, tucked under it $where")
         assertTrue(card.right <= width + 1.dp && card.left >= (-1).dp, "the card stays inside the page $where")
         assertTrue(card.height < shortCard.height * MAX_GROWTH, "long words scroll in the card rather than growing it without end $where")
         inCard(LONG_WORDS).assertExists()

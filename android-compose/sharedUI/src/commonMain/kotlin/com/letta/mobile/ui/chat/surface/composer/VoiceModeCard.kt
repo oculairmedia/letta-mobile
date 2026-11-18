@@ -3,7 +3,9 @@ package com.letta.mobile.ui.chat.surface.composer
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -17,7 +19,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.paneTitle
@@ -42,7 +49,6 @@ import com.letta.mobile.ui.components.foundation.LettaPanel
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.customColors
-import com.letta.mobile.ui.theme.tokens.LettaShapes
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -59,7 +65,8 @@ internal fun voiceSpeaker(state: VoiceModeState): VoiceCardSpeaker = when (state
  * (the reply's stop while it is spoken, the microphone and speaker mutes, the speaking speed), fold
  * and a red End. Under it, unless folded, two to four lines of large text: the person's words as they
  * are heard, then the reply with its spoken words lit and the rest dimmed, or a failed utterance with
- * Retry or Set up. Its edge glows in the speaker's colour, with the voice's level.
+ * Retry or Set up. It extends from the prompt bar (VoiceCardDock places it behind the bar, its
+ * bottom tucked under), and the glow at that seam ([seamGlow]) lights its lower interior.
  *
  * Built from the design system: the panel container, the shared fold controls and menu, the theme's
  * type scale, control sizes and voice tints (customColors.voiceYouColor and voiceAgentColor). Under
@@ -67,7 +74,12 @@ internal fun voiceSpeaker(state: VoiceModeState): VoiceCardSpeaker = when (state
  * a piece at a time.
  */
 @Composable
-internal fun VoiceModeCard(handle: VoiceModeHandle, conversation: VoiceCardConversation, modifier: Modifier = Modifier) {
+internal fun VoiceModeCard(
+    handle: VoiceModeHandle,
+    conversation: VoiceCardConversation,
+    seamGlow: () -> Color,
+    modifier: Modifier = Modifier,
+) {
     val state by handle.state.collectAsState()
     if (!state.active) return
     val reducedMotion = LocalReducedMotion.current
@@ -79,34 +91,54 @@ internal fun VoiceModeCard(handle: VoiceModeHandle, conversation: VoiceCardConve
     LettaPanel(
         modifier = modifier
             .fillMaxWidth()
-            .voiceCardOutline(LettaShapes.panel, handle, state)
             .testTag(VoiceModeTags.CARD)
             .semantics {
                 paneTitle = label
                 isTraversalGroup = true
             },
     ) {
-        Column(
-            modifier = Modifier
-                .then(if (reducedMotion) Modifier else Modifier.animateContentSize())
-                .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-        ) {
-            val turn = VoiceCardTurn(
-                speaker = speaker,
-                name = speakerName(speaker, conversation.name),
-                tint = speakerTint(speaker),
-                status = stringResource(statusOf(state)),
-                thinking = state == VoiceModeState.WaitingForReply,
-                speaking = state == VoiceModeState.Speaking,
-                elapsedMs = elapsedMs,
-            )
-            BoxWithConstraints {
-                VoiceCardHeader(handle, turn, oneLine = maxWidth >= LettaDimens.Pane.voiceCardOneLine)
+        Box {
+            // The glow rising from the seam with the prompt bar, under the words.
+            Spacer(Modifier.matchParentSize().drawBehind { drawSeamGlow(seamGlow()) })
+            Column(
+                modifier = Modifier
+                    .then(if (reducedMotion) Modifier else Modifier.animateContentSize())
+                    // The bottom carries the edge tucked under the prompt bar (VoiceCardDock).
+                    .padding(
+                        start = LettaDimens.Space.md,
+                        end = LettaDimens.Space.md,
+                        top = LettaDimens.Space.sm,
+                        bottom = LettaDimens.Space.sm + LettaDimens.Radius.lg,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+            ) {
+                val turn = VoiceCardTurn(
+                    speaker = speaker,
+                    name = speakerName(speaker, conversation.name),
+                    tint = speakerTint(speaker),
+                    status = stringResource(statusOf(state)),
+                    thinking = state == VoiceModeState.WaitingForReply,
+                    speaking = state == VoiceModeState.Speaking,
+                    elapsedMs = elapsedMs,
+                )
+                BoxWithConstraints {
+                    VoiceCardHeader(handle, turn, oneLine = maxWidth >= LettaDimens.Pane.voiceCardOneLine)
+                }
+                if (!handle.cardCollapsed) VoiceCardBody(handle, state, conversation.reply, now)
             }
-            if (!handle.cardCollapsed) VoiceCardBody(handle, state, conversation.reply, now)
         }
     }
+}
+
+/** The seam's glow inside the card: [tint] rising from the bottom edge and fading out by mid-height. */
+private fun DrawScope.drawSeamGlow(tint: Color) {
+    if (tint.alpha <= HIDDEN_ALPHA) return
+    val top = size.height * (1f - GLOW_REACH)
+    drawRect(
+        Brush.verticalGradient(0f to Color.Transparent, 1f to tint.copy(alpha = tint.alpha * GLOW_ALPHA), startY = top, endY = size.height),
+        topLeft = Offset(0f, top),
+        size = Size(size.width, size.height - top),
+    )
 }
 
 /** What voice mode is doing in [state], as the header says it. */
@@ -160,4 +192,7 @@ internal fun rememberElapsedText(elapsedMs: () -> Long): State<String> =
     remember(elapsedMs) { derivedStateOf { formatElapsed(elapsedMs()) } }
 
 private const val MILLIS_PER_SECOND = 1_000L
+private const val GLOW_REACH = 0.7f
+private const val GLOW_ALPHA = 0.32f
+private const val HIDDEN_ALPHA = 0.001f
 private const val SECONDS_PER_MINUTE = 60L

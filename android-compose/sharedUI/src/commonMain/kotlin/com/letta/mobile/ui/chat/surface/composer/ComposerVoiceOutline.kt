@@ -29,9 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.ui.ambient.AmbientVoice
 import com.letta.mobile.ui.chat.render.ChatUiState
-import com.letta.mobile.data.voice.session.VoiceModeState
 import com.letta.mobile.ui.chat.voice.LocalVoiceMode
-import com.letta.mobile.ui.chat.voice.VoiceModeHandle
 import com.letta.mobile.ui.components.beam.LettaBeamDefaults
 import com.letta.mobile.ui.components.beam.LettaBeamStyle
 import com.letta.mobile.ui.components.beam.LettaBeamSpec
@@ -62,11 +60,18 @@ internal var SemanticsPropertyReceiver.composerOutlineMode by ComposerOutlineMod
 @Composable
 internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modifier {
     val handle = LocalVoiceMode.current
-    // While voice mode runs the voice card above carries its glow; the prompt keeps the run's own outline.
-    val state = handle?.state?.collectAsState()?.value?.takeUnless { it.active }
+    val voice = handle?.state?.collectAsState()?.value
+    // While voice mode runs, the voice card docked behind the prompt owns its glow (VoiceCardDock, a
+    // rim at the seam); the prompt draws no outline of its own then.
+    val voiceRunning = voice?.active == true
+    val state = voice?.takeUnless { voiceRunning }
     val role = state?.let(::voiceGlowRole) ?: VoiceGlowRole.Idle
     val presence = LocalMascotRegistry.current.presence[uiState.agentId]
-    val mode = composerOutlineMode(state, uiState.runPhase, companionWorking(uiState, presence))
+    val mode = if (voiceRunning) {
+        ComposerOutlineMode.Idle
+    } else {
+        composerOutlineMode(state, uiState.runPhase, companionWorking(uiState, presence))
+    }
     val reducedMotion = LocalReducedMotion.current
     val targetColor = when (mode) {
         ComposerOutlineMode.Voice, ComposerOutlineMode.Error -> outlineColor(role)
@@ -118,38 +123,9 @@ private fun DrawScope.drawComposerOutline(
     }
 }
 
-/**
- * The voice card's outline for running voice mode [state]: the voice glow in the speaker's colour,
- * following the microphone while the person talks and the playback while the reply is spoken (still
- * while the reply is awaited, and under reduced motion), or the error colour after a failed utterance.
- */
-@Composable
-internal fun Modifier.voiceCardOutline(shape: Shape, handle: VoiceModeHandle, state: VoiceModeState): Modifier {
-    val role = voiceGlowRole(state)
-    val mode = if (role == VoiceGlowRole.Error) ComposerOutlineMode.Error else ComposerOutlineMode.Voice
-    val reducedMotion = LocalReducedMotion.current
-    val color = animateColorAsState(
-        targetValue = outlineColor(role),
-        animationSpec = if (reducedMotion) snap() else tween(ChatMotionTokens.AmbientGlow.GLIDE_MILLIS),
-        label = "voiceCardOutlineColor",
-    )
-    val level = handle.glowLevel(state).takeIf { !reducedMotion }
-    val brightness = rememberOutlineBrightness(level)
-    return this
-        .semantics {
-            voiceOutlineRole = role
-            voiceOutlineAnimated = level != null
-        }
-        .drawWithCache {
-            val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithCache)) }
-            val strokes = OutlineStrokes(this)
-            onDrawBehind { drawOutline(path, strokes, color.value, OutlineLight(brightness.floatValue, 1f, mode)) }
-        }
-}
-
 /** The outline's colour for [role]: the person's, the agent's, the error colour, or none. */
 @Composable
-private fun outlineColor(role: VoiceGlowRole): Color = when (role) {
+internal fun outlineColor(role: VoiceGlowRole): Color = when (role) {
     VoiceGlowRole.You -> voiceYouColor()
     VoiceGlowRole.Agent -> voiceAgentColor()
     VoiceGlowRole.Error -> MaterialTheme.colorScheme.error
@@ -161,7 +137,7 @@ private fun outlineColor(role: VoiceGlowRole): Color = when (role) {
  * share in silence), or still at [STILL_BRIGHTNESS] when there is no level to follow.
  */
 @Composable
-private fun rememberOutlineBrightness(level: (() -> Float)?): MutableFloatState {
+internal fun rememberOutlineBrightness(level: (() -> Float)?): MutableFloatState {
     val brightness = remember { mutableFloatStateOf(STILL_BRIGHTNESS) }
     val currentLevel by rememberUpdatedState(level)
     val animated = level != null
