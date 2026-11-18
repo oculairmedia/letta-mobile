@@ -83,38 +83,40 @@ class RunStepAppendPerfTest {
      * before and after (a step drawn through another call site at step two would be a new node).
      */
     @Test
-    fun aRunsLoneReasoningKeepsItsCompositionAtTheSecondStep() {
-        messages = history()
-        runComposeUiTest {
-            mainClock.autoAdvance = false
-            show()
-            settle()
-            messages = messages + reasoning(RunStepId(RUN_ID, 1))
-            settle()
-            val before = reasoningGlyphNode()
-            messages = messages + step(RunStepId(RUN_ID, 2))
-            settle()
-            assertEquals(before, reasoningGlyphNode(), "the run's lone reasoning was rebuilt when its second step landed")
-        }
-    }
+    fun aRunsLoneReasoningKeepsItsCompositionAtTheSecondStep() = assertFirstStepSurvivesTheSecond(
+        firstStep = ::reasoning,
+        node = { reasoningGlyphNode() },
+        what = "the run's lone reasoning",
+    )
 
     /**
      * The opening prose's own subtree survives the run's second step: its text is the same layout node
      * before and after. This is the deterministic half of the prose-first case; the frame time is the other.
      */
     @Test
-    fun aRunsOpeningProseKeepsItsCompositionAtTheSecondStep() {
+    fun aRunsOpeningProseKeepsItsCompositionAtTheSecondStep() = assertFirstStepSurvivesTheSecond(
+        firstStep = ::prose,
+        node = { proseNode() },
+        what = "the run's opening prose",
+    )
+
+    /** Lands [firstStep] then a tool step, and asserts [node] (the first step's layout node) is the same one after. */
+    private fun assertFirstStepSurvivesTheSecond(
+        firstStep: (RunStepId) -> UiMessage,
+        node: ComposeUiTest.() -> Int,
+        what: String,
+    ) {
         messages = history()
         runComposeUiTest {
             mainClock.autoAdvance = false
             show()
             settle()
-            messages = messages + prose(RunStepId(RUN_ID, 1))
+            messages = messages + firstStep(RunStepId(RUN_ID, 1))
             settle()
-            val before = proseNode()
+            val before = node()
             messages = messages + step(RunStepId(RUN_ID, 2))
             settle()
-            assertEquals(before, proseNode(), "the run's opening prose was rebuilt when its second step landed")
+            assertEquals(before, node(), "$what was rebuilt when its second step landed")
         }
     }
 
