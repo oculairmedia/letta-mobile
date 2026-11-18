@@ -63,6 +63,12 @@ data class VoiceTurnClock(
  * appears when it starts playing, its duration firms up as its audio arrives (through this
  * tracker as the mouth's [SpeechAudioMeter]), and it is closed when it finishes or the mouth is
  * stopped. [newReply] starts over (the person spoke). Safe from any thread.
+ *
+ * While a segment's audio is still arriving its duration is the longer of the audio received and
+ * an estimate from its text: characters over the voice's speaking rate at the segment's speed. The
+ * rate starts at a typical [DEFAULT_CHARACTERS_PER_SECOND] and is learned from every segment whose
+ * audio has fully arrived (normalised to normal speed, so a speed change carries over), since a
+ * voice's real rate differs and an estimate that is too long makes the highlight trail the audio.
  */
 internal class SpokenProgressTracker(
     private val clock: () -> Long,
@@ -70,6 +76,9 @@ internal class SpokenProgressTracker(
 ) : SpeechAudioMeter {
     private val lock = SynchronizedObject()
     private val texts = mutableMapOf<SpeechSegmentId, VoiceText>()
+    private val speeds = mutableMapOf<SpeechSegmentId, SpeechSpeed>()
+    private var charactersPerSecond = DEFAULT_CHARACTERS_PER_SECOND
+    private var calibrated = false
     private val audio = mutableMapOf<SpeechSegmentId, SegmentAudio>()
     private val indices = mutableMapOf<SpeechSegmentId, Int>()
     private val mutableSegments = MutableStateFlow<List<SpokenSegment>>(emptyList())
@@ -85,6 +94,7 @@ internal class SpokenProgressTracker(
 
     override fun measured(id: SpeechSegmentId, audio: Duration, complete: Boolean) = synchronized(lock) {
         this.audio[id] = SegmentAudio(audio, complete)
+        if (complete) learnRate(id, audio)
         val index = indices[id] ?: return@synchronized
         edit(index) { it.copy(audioDurationMs = durationMs(it.text, id)) }
     }
@@ -99,6 +109,7 @@ internal class SpokenProgressTracker(
 
     private fun queued(segment: SpeechSegment) = synchronized(lock) {
         texts[segment.id] = segment.text
+        speeds[segment.id] = speed()
     }
 
     private fun started(id: SpeechSegmentId) = synchronized(lock) {
@@ -112,6 +123,7 @@ internal class SpokenProgressTracker(
         val index = indices.remove(id) ?: return@synchronized
         val now = clock()
         val known = audio.remove(id)?.takeIf { it.complete }
+        speeds.remove(id)
         edit(index) { segment ->
             val played = now - segment.startedAtMs
             segment.copy(audioDurationMs = known?.length?.inWholeMilliseconds ?: played, finishedAtMs = now)
@@ -124,7 +136,19 @@ internal class SpokenProgressTracker(
         indices.values.forEach { index -> edit(index) { it.copy(finishedAtMs = now) } }
         indices.clear()
         texts.clear()
+        speeds.clear()
         audio.clear()
+    }
+
+    /** Learns the voice's rate at normal speed from segment [id], whose audio of [length] has fully arrived. */
+    private fun learnRate(id: SpeechSegmentId, length: Duration) {
+        val text = texts[id] ?: indices[id]?.let { mutableSegments.value.getOrNull(it)?.text } ?: return
+        val seconds = length.inWholeMilliseconds / MILLIS_PER_SECOND
+        if (seconds < MIN_CALIBRATION_SECONDS || text.value.isBlank()) return
+        val atNormal = text.value.length / seconds / (speeds[id] ?: speed()).value
+        val sample = atNormal.coerceIn(MIN_CHARACTERS_PER_SECOND, MAX_CHARACTERS_PER_SECOND)
+        charactersPerSecond = if (calibrated) charactersPerSecond + (sample - charactersPerSecond) * LEARNING_RATE else sample
+        calibrated = true
     }
 
     private fun edit(index: Int, change: (SpokenSegment) -> SpokenSegment) {
@@ -138,7 +162,8 @@ internal class SpokenProgressTracker(
         val known = audio[id]
         val received = known?.length?.inWholeMilliseconds ?: 0
         if (known?.complete == true) return received
-        val estimate = text.value.length * MILLIS_PER_SECOND / (CHARACTERS_PER_SECOND * speed().value)
+        val pace = (speeds[id] ?: speed()).value
+        val estimate = text.value.length * MILLIS_PER_SECOND / (charactersPerSecond * pace)
         return maxOf(received, estimate.roundToLong())
     }
 
@@ -168,8 +193,16 @@ internal class SpokenProgressTracker(
     }
 
     private companion object {
-        /** A typical speaking rate at normal speed, for the estimate before the audio has arrived. */
-        const val CHARACTERS_PER_SECOND = 15f
+        /** A typical speaking rate at normal speed, until the voice's own rate is learned. */
+        const val DEFAULT_CHARACTERS_PER_SECOND = 15f
+        const val MIN_CHARACTERS_PER_SECOND = 5f
+        const val MAX_CHARACTERS_PER_SECOND = 40f
+
+        /** How far each fully arrived segment moves the learned rate. */
+        const val LEARNING_RATE = 0.5f
+
+        /** Segments shorter than this say little about the rate. */
+        const val MIN_CALIBRATION_SECONDS = 0.3f
         const val MILLIS_PER_SECOND = 1_000f
     }
 }
