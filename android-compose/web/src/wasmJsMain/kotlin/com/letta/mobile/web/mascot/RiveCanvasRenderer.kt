@@ -18,6 +18,8 @@ import com.letta.mobile.ui.mascot.frame.RivePointerEvent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.await
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
@@ -37,10 +39,9 @@ import org.jetbrains.skia.ImageInfo
 internal class RiveCanvasRenderer : RiveFrameRenderer {
     private class Loaded(val rive: JsAny, val file: JsAny, val version: String)
 
+    private val preparing = Mutex()
     private var loaded: Loaded? by mutableStateOf(null)
-
     override val available: Boolean get() = loaded != null
-
     override val assetVersion: String get() = checkNotNull(loaded).version
 
     /** The page's one thread: a scene call runs in place, inside the frame that asked for it. */
@@ -50,8 +51,8 @@ internal class RiveCanvasRenderer : RiveFrameRenderer {
     override val stillStore: MascotStillStore? = null
 
     /** Brings up the runtime and the shipped mascot; safe to call again (it returns once loaded). */
-    override suspend fun prepare() {
-        if (loaded != null) return
+    override suspend fun prepare() = preparing.withLock {
+        if (loaded != null) return@withLock
         try {
             val rive = riveInitRuntime(RIVE_WASM_PATH).await<JsAny>()
             val bytes = riveFetchBytes(MASCOT_PATH).await<JsAny>()
@@ -172,7 +173,6 @@ private class RiveCanvasFrame(val size: IntSize) {
         const val BYTES_PER_PIXEL = 4
     }
 }
-
 
 /** The byte-by-byte copy (a Kotlin-to-JS call per byte, per frame, per mascot) has been reported. */
 private var slowCopyReported = false

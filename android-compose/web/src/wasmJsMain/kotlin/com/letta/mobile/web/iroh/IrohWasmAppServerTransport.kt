@@ -88,7 +88,7 @@ internal class IrohWasmAppServerTransport private constructor(
     ) {
         var pollIntervalMs = MIN_POLL_INTERVAL_MS
         try {
-            while (currentCoroutineContext().isActive && connected.value) {
+            while (currentCoroutineContext().isActive && !closed) {
                 val raw = poll()
                 if (raw != null) {
                     destination.emit(AppServerProtocol.decodeFrame(raw.text, channel))
