@@ -288,7 +288,12 @@ private val MessageDisclosureLabels = LineDisclosureLabels(
 private val SKILL_KEYS = listOf("skill", "command", "name")
 private const val FENCE = "---"
 private const val LAUNCHING_SKILL = "Launching skill"
-private val SKILL_DIRECTORY = Regex("""(?im)^\s*(?:base directory(?: for this skill)?|skill directory|directory)\s*:\s*(.+)$""")
-private val SKILL_DESCRIPTION = Regex("""(?im)^description\s*:\s*(.+)$""")
+// Flags as options, not an inline (?im) prefix: JavaScript RegExp (web/wasm) rejects inline flags.
+private val SKILL_LINE_OPTIONS = setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)
+private val SKILL_DIRECTORY = Regex(
+    """^\s*(?:base directory(?: for this skill)?|skill directory|directory)\s*:\s*(.+)$""",
+    SKILL_LINE_OPTIONS,
+)
+private val SKILL_DESCRIPTION = Regex("""^description\s*:\s*(.+)$""", SKILL_LINE_OPTIONS)
 private val DONE_WORDS = setOf("completed", "complete", "success", "succeeded", "done")
 private val FAILED_WORDS = setOf("failed", "error", "errored", "cancelled", "canceled", "killed")
