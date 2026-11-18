@@ -2365,6 +2365,12 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSing
 	public final fun getLambda$-1451332564$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
+public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowSubagentReportKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowSubagentReportKt;
+	public fun <init> ()V
+	public final fun getLambda$509840535$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
 public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowToolPreviewKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowToolPreviewKt;
 	public fun <init> ()V
