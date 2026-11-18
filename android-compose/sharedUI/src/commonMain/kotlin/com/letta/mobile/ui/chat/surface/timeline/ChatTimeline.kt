@@ -15,6 +15,8 @@ import com.letta.mobile.data.chat.tools.steps.ToolStepExpansions
 import com.letta.mobile.ui.chat.tools.LocalToolStepExpansions
 import com.letta.mobile.ui.chat.surface.timeline.rows.ToolPreviewPanes
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.ui.markdown.LocalSettledMarkdownParses
+import com.letta.mobile.ui.markdown.SettledMarkdownParses
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -241,8 +243,15 @@ private fun TimelineBody(params: TimelineBodyParams, modifier: Modifier) {
     }
 }
 
+/** The list, with its settled markdown parses kept for as long as it is shown (rows reuse them on scroll back). */
 @Composable
 private fun TimelineList(params: TimelineBodyParams, modifier: Modifier) {
+    val parses = remember { SettledMarkdownParses() }
+    CompositionLocalProvider(LocalSettledMarkdownParses provides parses) { TimelineLists(params, modifier) }
+}
+
+@Composable
+private fun TimelineLists(params: TimelineBodyParams, modifier: Modifier) {
     val paged = params.pagedTimeline
     // The agent's mascot beside the composer shows its thinking; the row would say it twice. On a
     // phone the composer carries the thinking token even without a mascot, as the legacy composer
