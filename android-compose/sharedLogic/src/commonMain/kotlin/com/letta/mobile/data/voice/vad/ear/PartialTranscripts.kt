@@ -32,10 +32,17 @@ data class LivePartials(
     val interval: Duration = 600.milliseconds,
     /** The most audio sent with one partial request: the end of the turn so far. */
     val window: Duration = 20.seconds,
+    /**
+     * No new partial is requested once the person has been silent this long: the turn is probably
+     * ending, and the transcription server should be idle when its final request arrives (a single
+     * worker serves requests in order, and cancelling a request does not stop the server's work).
+     */
+    val quietCutoff: Duration = 300.milliseconds,
 ) {
     init {
         require(interval.isPositive()) { "Partial interval must be positive" }
         require(window.isPositive()) { "Partial window must be positive" }
+        require(!quietCutoff.isNegative()) { "Partial quiet cutoff must not be negative" }
     }
 }
 
@@ -55,6 +62,9 @@ internal class PartialTranscripts(
 ) {
     private val interval = samplesOf(settings.interval)
     private val window = samplesOf(settings.window)
+    private val quietCutoff = samplesOf(settings.quietCutoff)
+    private var lastVoiced = 0L
+    private var voicedSoFar = 0L
     private val lock = SynchronizedObject()
     private var nextTick: Long? = null
     private var job: Job? = null
@@ -67,15 +77,23 @@ internal class PartialTranscripts(
         if (!settings.enabled) return
         turnEnded()
         nextTick = position + interval
+        lastVoiced = position
+        voicedSoFar = 0
     }
 
     /**
-     * The confirmed turn has audio up to [position]; [snapshot] copies its last `window` samples
-     * (called only when a request is sent).
+     * The confirmed turn has audio up to [position], [voiced] samples of it judged voice so far;
+     * [snapshot] copies its last `window` samples (called only when a request is sent). A tick that
+     * comes after the quiet cutoff of silence sends nothing.
      */
-    fun heard(position: Long, snapshot: (Long) -> ShortArray) {
+    fun heard(position: Long, voiced: Long, snapshot: (Long) -> ShortArray) {
+        if (voiced != voicedSoFar) {
+            voicedSoFar = voiced
+            lastVoiced = position
+        }
         val due = nextTick ?: return
         if (position < due) return
+        if (position - lastVoiced >= quietCutoff) return
         nextTick = position + interval
         if (job?.isActive == true) return
         val samples = snapshot(window)

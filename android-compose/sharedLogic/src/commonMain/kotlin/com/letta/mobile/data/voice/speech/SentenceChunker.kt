@@ -102,18 +102,22 @@ class SentenceChunker(
         private fun splitProse(): Boolean {
             val fence = pending.indexOf(FENCE)
             val limit = if (fence < 0) pending.length else fence
-            val scan = SentenceScan(pending, limit, mode)
-            val end = scan.firstEnd()
-            val clause = earlyClause(scan)
+            val end = firstCut(SentenceScan(pending, limit, mode))
             val overflow = overflowCut()
             return when {
-                clause != null && (end == null || clause.value < end.value) -> release(Cut(clause.value))
                 end != null -> release(Cut(end.value))
                 fence >= 0 -> openCodeBlock(Cut(fence, FENCE.length))
                 overflow != null -> releaseOverflow(overflow)
                 mode == ScanMode.FINAL -> emitAll()
                 else -> false
             }
+        }
+
+        /** The first sentence end, or the first segment's early clause end when that comes sooner. */
+        private fun firstCut(scan: SentenceScan): TextIndex? {
+            val end = scan.firstEnd()
+            val clause = earlyClause(scan) ?: return end
+            return if (end == null || clause.value < end.value) clause else end
         }
 
         /** Where the first segment may end early, while nothing has been released yet. */

@@ -168,8 +168,9 @@ class EndpointVoiceMouth(
             // A player that stopped taking this segment's audio has cancelled its channel; the rest is dropped.
             val streamed = runCatching {
                 synthesizer.stream(segment.text, options.speed()).collect { chunk ->
-                    audio.chunks.trySend(chunk)
+                    // Measured first: once the chunk is queued the segment may start, and its length should be known by then.
                     options.meter.measured(segment.id, audio.add(chunk), complete = false)
+                    audio.chunks.trySend(chunk)
                 }
             }
             val error = streamed.exceptionOrNull()

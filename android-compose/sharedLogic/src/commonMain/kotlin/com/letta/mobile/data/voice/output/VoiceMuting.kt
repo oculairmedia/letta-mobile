@@ -55,19 +55,25 @@ internal class MutedFrameSource(private val source: AudioFrameSource, private va
  */
 internal class MutedEar(private val ear: VoiceEar, private val muted: StateFlow<Boolean>) : VoiceEar by ear {
     override fun listen(): Flow<VoiceEarEvent> = flow {
-        var dropping = false
-        ear.listen().collect { event ->
-            when (event) {
-                VoiceEarEvent.SpeechStarted -> dropping = muted.value
-                is VoiceEarEvent.InputLevel -> if (muted.value) return@collect emit(VoiceEarEvent.InputLevel(AudioLevel.Silent))
-                else -> Unit
-            }
-            val ending = event is VoiceEarEvent.EndOfTurn || event is VoiceEarEvent.Failed
+        val filter = TurnFilter()
+        ear.listen().collect { event -> filter.pass(event)?.let { emit(it) } }
+    }
+
+    /** Decides, event by event, what of one listen goes through. */
+    private inner class TurnFilter {
+        private var dropping = false
+
+        /** What to emit for [event], or null to drop it. */
+        fun pass(event: VoiceEarEvent): VoiceEarEvent? {
+            if (event == VoiceEarEvent.SpeechStarted) dropping = muted.value
+            if (event is VoiceEarEvent.InputLevel) return if (muted.value) VoiceEarEvent.InputLevel(AudioLevel.Silent) else event
             val suppressed = dropping && event.belongsToTurn()
-            if (ending) dropping = false
-            if (!suppressed) emit(event)
+            if (event.endsTurn()) dropping = false
+            return event.takeUnless { suppressed }
         }
     }
+
+    private fun VoiceEarEvent.endsTurn(): Boolean = this is VoiceEarEvent.EndOfTurn || this is VoiceEarEvent.Failed
 
     private fun VoiceEarEvent.belongsToTurn(): Boolean = when (this) {
         VoiceEarEvent.SpeechStarted, VoiceEarEvent.SpeechEnded, is VoiceEarEvent.PartialTranscript, is VoiceEarEvent.EndOfTurn -> true

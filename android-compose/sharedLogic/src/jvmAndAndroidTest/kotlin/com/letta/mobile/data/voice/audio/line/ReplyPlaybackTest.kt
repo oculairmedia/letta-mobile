@@ -5,6 +5,7 @@ import com.letta.mobile.data.voice.audio.PcmFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -69,7 +70,7 @@ class ReplyPlaybackTest {
     @Test
     fun aReplysSegmentsShareOneLineThatClosesAfterTheIdle() = runBlocking {
         val speaker = InstantSpeaker()
-        val player = LinePcmPlayer(HeldOutputDevice(speaker, IDLE, timers), fast)
+        val player = LinePcmPlayer(HeldOutputDevice(speaker, timers, IDLE), fast)
         repeat(3) { player.play(stream(480)) {} }
         assertEquals(listOf("open1@24000"), speaker.log, "three segments, one line, nothing released between them")
         assertEquals(3 * 480, speaker.written.size)
@@ -86,7 +87,7 @@ class ReplyPlaybackTest {
     @Test
     fun aSegmentStartingWithinTheIdleKeepsTheLine() = runBlocking {
         val speaker = InstantSpeaker()
-        val player = LinePcmPlayer(HeldOutputDevice(speaker, IDLE, timers), fast)
+        val player = LinePcmPlayer(HeldOutputDevice(speaker, timers, IDLE), fast)
         player.play(stream(480)) {}
         timers.advanceTimeBy(IDLE / 2)
         player.play(stream(480)) {}
@@ -98,7 +99,7 @@ class ReplyPlaybackTest {
     @Test
     fun anInterruptAbortsAndReleasesTheLineAtOnce() = runBlocking {
         val speaker = InstantSpeaker()
-        val player = LinePcmPlayer(HeldOutputDevice(speaker, IDLE, timers), fast)
+        val player = LinePcmPlayer(HeldOutputDevice(speaker, timers, IDLE), fast)
         player.play(stream(480)) {}
         val endless = flow {
             emit(PcmChunk(ShortArray(480) { 1_000 }, PcmFormat(24_000)))
@@ -113,9 +114,22 @@ class ReplyPlaybackTest {
     }
 
     @Test
+    fun aParkedLineIsReleasedWhenItsOwnerEnds() = runBlocking {
+        val owner = TestScope()
+        val speaker = InstantSpeaker()
+        val player = LinePcmPlayer(HeldOutputDevice(speaker, owner, IDLE), fast)
+        player.play(stream(480)) {}
+        owner.runCurrent()
+        assertEquals(listOf("open1@24000"), speaker.log)
+        owner.cancel()
+        owner.runCurrent()
+        assertEquals(listOf("open1@24000", "release1"), speaker.log, "the session ended: its line goes with it")
+    }
+
+    @Test
     fun anotherRateOpensANewLine() = runBlocking {
         val speaker = InstantSpeaker()
-        val player = LinePcmPlayer(HeldOutputDevice(speaker, IDLE, timers), fast)
+        val player = LinePcmPlayer(HeldOutputDevice(speaker, timers, IDLE), fast)
         player.play(stream(480)) {}
         player.play(stream(320, rate = 16_000)) {}
         assertEquals(listOf("open1@24000", "release1", "open2@16000"), speaker.log)
@@ -124,7 +138,7 @@ class ReplyPlaybackTest {
     @Test
     fun aLineThatFailedIsNeverReused() = runBlocking {
         val speaker = InstantSpeaker()
-        val player = LinePcmPlayer(HeldOutputDevice(speaker, IDLE, timers), fast)
+        val player = LinePcmPlayer(HeldOutputDevice(speaker, timers, IDLE), fast)
         speaker.stuck = true
         runCatching { player.play(stream(480)) {} }
         speaker.stuck = false

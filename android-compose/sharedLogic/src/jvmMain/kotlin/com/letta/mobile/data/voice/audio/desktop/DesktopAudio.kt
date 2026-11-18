@@ -12,6 +12,7 @@ import com.letta.mobile.data.voice.audio.line.HeldOutputDevice
 import com.letta.mobile.data.voice.audio.line.LineFrameSource
 import com.letta.mobile.data.voice.audio.line.LinePcmPlayer
 import com.letta.mobile.data.voice.audio.line.PlayerOptions
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -52,11 +53,17 @@ object DesktopAudio {
 
     /**
      * A speaker on `SourceDataLine`, playing PCM as it arrives. Opens the line at the stream's
-     * rate, or at 48 kHz with resampling when the device refuses it. Consecutive streams (one
-     * reply's sentences) share one line, closed shortly after the last one.
+     * rate, or at 48 kHz with resampling when the device refuses it.
      */
     fun player(device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault): AudioPlayer =
-        LinePcmPlayer(HeldOutputDevice(JavaSoundOutputDevice(device)), PlayerOptions())
+        LinePcmPlayer(JavaSoundOutputDevice(device), PlayerOptions())
+
+    /**
+     * Like [player], but consecutive streams (one reply's sentences) share one line, released
+     * shortly after the last one, and at the latest when [owner] ends.
+     */
+    fun heldPlayer(owner: CoroutineScope, device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault): AudioPlayer =
+        LinePcmPlayer(HeldOutputDevice(JavaSoundOutputDevice(device), owner), PlayerOptions())
 
     /** Mixers that can capture. */
     fun inputs(): List<AudioDeviceOption> = devicesWith(TargetDataLine::class.java)

@@ -270,7 +270,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
         if (tracker.recording || signal is TurnSignal.Ended) peakDb = maxOf(peakDb, PcmLevels.dbfs(hop.samples))
         apply(signal, hop)
         // Acts only between a confirmed start and the end or drop of that turn.
-        partials.heard(hop.end.value, recorder::tail)
+        partials.heard(hop.end.value, tracker.voicedSamples, recorder::tail)
         recorder.remember(hop.samples)
     }
 
