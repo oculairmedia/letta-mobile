@@ -389,8 +389,9 @@ private typealias LoneStep = Pair<GroupPosition, Boolean>
 
 /** The beat above [positioned]: none for a lone notice line (a step beat doubled the space above it). */
 private fun LoneStep?.topOf(positioned: PositionedRunStep): Dp {
+    if (this == null || !second) return positioned.top()
     val notice = (positioned.step as? RunStep.Message)?.message?.subagentNotification != null
-    return if (this != null && second && notice) 0.dp else positioned.top()
+    return if (notice) 0.dp else positioned.top()
 }
 
 /** Whether the step draws anything in [body]: prose always, work only while open, tool images always. */

@@ -63,18 +63,18 @@ class RunStepAppendPerfTest {
      * newest step, so its row is never torn down and rebuilt.
      */
     @Test
-    fun aRunWhoseOpeningEchoesAnOlderReplyKeepsItsRow() = appendSteps(timed = false, firstStep = { run, _ ->
-        UiMessage(id = "$run-step-1", role = "assistant", content = PROSE, timestamp = ts(11), runId = run)
+    fun aRunWhoseOpeningEchoesAnOlderReplyKeepsItsRow() = appendSteps(timed = false, firstStep = { step ->
+        UiMessage(id = step.messageId, role = "assistant", content = PROSE, timestamp = ts(11), runId = step.run)
     })
 
     /** A run that opens with prose (drawn as a lone step) and then works. */
     @Test
-    fun aRunOpeningWithProseAppendsItsFirstToolWithoutRebuilding() = appendSteps(firstStep = { run, _ -> prose(run) })
+    fun aRunOpeningWithProseAppendsItsFirstToolWithoutRebuilding() = appendSteps(firstStep = ::prose)
 
     /** A run that opens with reasoning (drawn as the run's lone row) and then works: its row is never rebuilt. */
     @Test
     fun aRunOpeningWithReasoningAppendsItsFirstToolWithoutRebuilding() =
-        appendSteps(timed = false, firstStep = { run, _ -> reasoning(run) })
+        appendSteps(timed = false, firstStep = ::reasoning)
 
     /**
      * The lone reasoning's own subtree survives the run's second step: its glyph is the same layout node
@@ -87,10 +87,10 @@ class RunStepAppendPerfTest {
             mainClock.autoAdvance = false
             show()
             settle()
-            messages = messages + reasoning(RUN_ID)
+            messages = messages + reasoning(RunStepId(RUN_ID, 1))
             settle()
             val before = reasoningGlyphNode()
-            messages = messages + step(RUN_ID, 2)
+            messages = messages + step(RunStepId(RUN_ID, 2))
             settle()
             assertEquals(before, reasoningGlyphNode(), "the run's lone reasoning was rebuilt when its second step landed")
         }
@@ -103,7 +103,7 @@ class RunStepAppendPerfTest {
      * Plays the run once to warm the JIT and class loading (a first use of the live run's code would
      * otherwise be measured), then again in a fresh composition, measured.
      */
-    private fun appendSteps(timed: Boolean = true, firstStep: (String, Int) -> UiMessage) {
+    private fun appendSteps(timed: Boolean = true, firstStep: (RunStepId) -> UiMessage) {
         landSteps(firstStep)
         val passes = List(PASSES) { landSteps(firstStep) }
         passes.forEachIndexed { pass, landed ->
@@ -128,7 +128,7 @@ class RunStepAppendPerfTest {
     private fun median(values: List<Double>): Double = values.sorted()[values.size / 2]
 
     /** One run, its steps landing one frame at a time: each landing's frame time, probe events and row compositions. */
-    private fun landSteps(firstStep: (String, Int) -> UiMessage): Map<Int, StepLanding> {
+    private fun landSteps(firstStep: (RunStepId) -> UiMessage): Map<Int, StepLanding> {
         var landed: Map<Int, StepLanding> = emptyMap()
         messages = history()
         runComposeUiTest {
@@ -138,12 +138,12 @@ class RunStepAppendPerfTest {
             mainClock.autoAdvance = false
             show()
             settle()
-            messages = messages + firstStep(RUN_ID, 1)
+            messages = messages + firstStep(RunStepId(RUN_ID, 1))
             settle()
             landed = (2..LAST_STEP).associateWith { index ->
                 events.clear()
                 composed.clear()
-                messages = messages + step(RUN_ID, index)
+                messages = messages + step(RunStepId(RUN_ID, index))
                 val start = System.nanoTime()
                 mainClock.advanceTimeByFrame()
                 val frameMillis = (System.nanoTime() - start) / NANOS_PER_MILLI
@@ -187,39 +187,43 @@ class RunStepAppendPerfTest {
     /** An older two-step run (so the run block's code is warm), then the prompt the live run answers. */
     private fun history(): List<UiMessage> = listOf(
         UiMessage(id = "old-u", role = "user", content = "Earlier question", timestamp = ts(0)),
-        tool("old-1", "old-run", 1),
-        tool("old-2", "old-run", 2),
+        step(RunStepId("old-run", 1)),
+        step(RunStepId("old-run", 2)),
         UiMessage(id = "old-a", role = "assistant", content = PROSE, timestamp = ts(3), runId = "old-run"),
         UiMessage(id = "u0", role = "user", content = "Check the build and the tests", timestamp = ts(4)),
     )
 
-    private fun step(run: String, index: Int) = tool("$run-step-$index", run, index)
+    /** One step of a run: its run id and its place in the run (1 first). */
+    private data class RunStepId(val run: String, val index: Int) {
+        val messageId: String get() = "$run-step-$index"
+    }
 
-    private fun prose(run: String) =
-        UiMessage(id = "$run-step-1", role = "assistant", content = LIVE_PROSE, timestamp = ts(11), runId = run)
+    private fun prose(step: RunStepId) =
+        UiMessage(id = step.messageId, role = "assistant", content = LIVE_PROSE, timestamp = ts(11), runId = step.run)
 
-    private fun reasoning(run: String) = UiMessage(
-        id = "$run-step-1",
+    private fun reasoning(step: RunStepId) = UiMessage(
+        id = step.messageId,
         role = "assistant",
         content = "Looking at which module fails first.",
         timestamp = ts(11),
-        runId = run,
+        runId = step.run,
         isReasoning = true,
     )
 
-    private fun tool(id: String, runId: String, index: Int) = UiMessage(
-        id = id,
+    /** A tool step: one Bash call in [step]'s run. */
+    private fun step(step: RunStepId) = UiMessage(
+        id = step.messageId,
         role = "assistant",
         content = "",
-        timestamp = ts(10 + index),
-        runId = runId,
+        timestamp = ts(10 + step.index),
+        runId = step.run,
         toolCalls = listOf(
             UiToolCall(
                 name = "Bash",
-                arguments = """{"command":"./gradlew :module$index:check --console=plain"}""",
-                result = "BUILD SUCCESSFUL in ${index}s",
+                arguments = """{"command":"./gradlew :module${step.index}:check --console=plain"}""",
+                result = "BUILD SUCCESSFUL in ${step.index}s",
                 status = "success",
-                toolCallId = "$id-call",
+                toolCallId = "${step.messageId}-call",
             ),
         ),
     )
