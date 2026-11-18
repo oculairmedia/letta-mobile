@@ -51,6 +51,9 @@ import com.letta.mobile.sharedui.resources.composer_attach_failed
 import com.letta.mobile.sharedui.resources.composer_clipboard_unreadable_image
 import com.letta.mobile.sharedui.resources.composer_invalid_text
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightSource
+import com.letta.mobile.ui.chat.surface.sendflight.LocalSendFlight
+import com.letta.mobile.ui.chat.surface.sendflight.SendFlight
+import com.letta.mobile.ui.chat.surface.sendflight.SendFlightPhase
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
@@ -115,6 +118,21 @@ internal data class ComposerFieldStyle(
 }
 
 /**
+ * What the field shows: its own [value], except while a send flight carries exactly that text, when
+ * it shows nothing. The ghost appears at the prompt the frame the send is pressed, but the owner's
+ * cleared draft reaches the field later (its composer state re-emits on its own dispatcher, then the
+ * field adopts it), so for those frames the field and the ghost drew the same words, offset, and
+ * the prompt read as doubling as it left. A flight that is abandoned (the send did not go through)
+ * gives the field its text back.
+ */
+internal fun fieldShownBesideFlight(flight: SendFlight?, value: TextFieldValue): TextFieldValue {
+    if (flight == null || flight.phase == SendFlightPhase.Abandoned) return value
+    return if (value.text.trim() == flight.text) EmptyFieldValue else value
+}
+
+private val EmptyFieldValue = TextFieldValue("")
+
+/**
  * The prompt field. Lifted from desktop's ComposerTextField: it keeps its own
  * [TextFieldValue] (so an IME composition survives the owner echoing the same text back) and
  * adopts the owner's text only when it actually changes ([reconcileComposerFieldValue]).
@@ -149,7 +167,7 @@ internal fun ComposerTextField(
     val mascots = LocalMascotRegistry.current
     val (pasteError, textError) = composerTextErrors()
     BasicTextField(
-        value = fieldValue,
+        value = fieldShownBesideFlight(LocalSendFlight.current?.flight, fieldValue),
         onValueChange = onValueChange@{ next ->
             rejectedTextMessage(fieldValue, next.text, pasteError, textError)?.let {
                 return@onValueChange model.actions.reportComposerError(it)
