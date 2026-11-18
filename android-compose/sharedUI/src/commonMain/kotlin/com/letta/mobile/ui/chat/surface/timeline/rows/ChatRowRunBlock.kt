@@ -7,6 +7,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import kotlin.math.roundToInt
+import com.letta.mobile.ui.theme.LettaMotionTokens
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.NonRestartableComposable
@@ -263,12 +271,42 @@ private fun isRunStreaming(messages: List<UiMessage>, context: ChatRowContext): 
 @NonRestartableComposable
 private fun RunHeader(state: RunHeaderState) {
     val reducedMotion = LocalReducedMotion.current
+    // A live run keeps its header composed from its first step, hidden (no height, no semantics) until
+    // it shows: shown inside an AnimatedVisibility, a run whose first step hid it composed the whole
+    // line for the first time, and started its grow, in the very frame its second step landed.
+    if (state.activity.isActive) {
+        LiveRunHeader(state, reducedMotion)
+        return
+    }
     AnimatedVisibility(
         visible = state.visible,
         enter = ChatRowMotion(reducedMotion).expansionEnter(),
         // The steps below ease up into the header's place (legacy settled-run body lift).
         exit = ChatRowMotion(reducedMotion).runLabelFoldExit(),
         label = "runHeader",
+    ) {
+        RunSummaryLine(state)
+    }
+}
+
+/** A live run's header, always composed; it grows in and fades in from its top (snapping under reduced motion). */
+@Composable
+private fun LiveRunHeader(state: RunHeaderState, reducedMotion: Boolean) {
+    val shown by animateFloatAsState(
+        targetValue = if (state.visible) 1f else 0f,
+        animationSpec = if (reducedMotion) snap() else tween(LettaMotionTokens.CONTENT_SIZE_MILLIS),
+        label = "liveRunHeader",
+    )
+    Box(
+        Modifier
+            .clipToBounds()
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val height = (placeable.height * shown).roundToInt()
+                layout(placeable.width, height) { placeable.place(0, 0) }
+            }
+            .graphicsLayer { alpha = shown }
+            .then(if (state.visible) Modifier else Modifier.clearAndSetSemantics {}),
     ) {
         RunSummaryLine(state)
     }

@@ -33,8 +33,8 @@ import kotlin.test.assertTrue
 /**
  * A live run's steps append without restructuring its row: when a run's first step is followed by
  * its second (the lone first message becoming a run block), the row keeps its composition (no
- * dispose and remount of the run's row), and the frame that lands the second step costs about what
- * the third's does: for a run of bare tool calls, and for a run that opens with prose (whose message
+ * dispose and remount of the run's row), and the frame that lands the second step costs at most 1.3x
+ * the median of the later steps' frames: for a run of bare tool calls, and for a run that opens with prose (whose message
  * was drawn through a separate lone-message branch and rebuilt when the second step landed).
  */
 class RunStepAppendPerfTest {
@@ -53,6 +53,16 @@ class RunStepAppendPerfTest {
     @Test
     fun theSecondStepAppendsWithoutRebuildingTheRun() = appendSteps(firstStep = ::step)
 
+    /**
+     * A run that opens with an older reply's text: echo compaction drops it once the run has work, so the
+     * second step really does take a long block away (no frame bound). Its key must not follow its
+     * newest step, so its row is never torn down and rebuilt.
+     */
+    @Test
+    fun aRunWhoseOpeningEchoesAnOlderReplyKeepsItsRow() = appendSteps(timed = false, firstStep = { run, _ ->
+        UiMessage(id = "$run-step-1", role = "assistant", content = PROSE, timestamp = ts(11), runId = run)
+    })
+
     /** A run that opens with prose (drawn as a lone step) and then works. */
     @Test
     fun aRunOpeningWithProseAppendsItsFirstToolWithoutRebuilding() = appendSteps(firstStep = { run, _ -> prose(run) })
@@ -61,21 +71,29 @@ class RunStepAppendPerfTest {
      * Plays the run once to warm the JIT and class loading (a first use of the live run's code would
      * otherwise be measured), then again in a fresh composition, measured.
      */
-    private fun appendSteps(firstStep: (String, Int) -> UiMessage) {
+    private fun appendSteps(timed: Boolean = true, firstStep: (String, Int) -> UiMessage) {
         landSteps(firstStep)
-        val landed = landSteps(firstStep)
-        landed.forEach { (index, landing) ->
-            println("step $index: ${landing.frameMillis} ms, events=${landing.events}, composed=${landing.composed}")
+        val passes = List(PASSES) { landSteps(firstStep) }
+        passes.forEachIndexed { pass, landed ->
+            landed.forEach { (index, landing) ->
+                println("pass $pass step $index: ${landing.frameMillis} ms, events=${landing.events}, composed=${landing.composed}")
+            }
+            val second = landed.getValue(2)
+            assertTrue(second.events.none { it == "dispose $RUN_KEY" }, "the run's row was torn down at its second step: ${second.events}")
+            assertTrue(second.events.none { it == "mount $RUN_KEY" }, "the run's row was built again at its second step: ${second.events}")
         }
-        val second = landed.getValue(2)
-        assertTrue(second.events.none { it == "dispose $RUN_KEY" }, "the run's row was torn down at its second step: ${second.events}")
-        assertTrue(second.events.none { it == "mount $RUN_KEY" }, "the run's row was built again at its second step: ${second.events}")
-        val third = landed.getValue(3).frameMillis.coerceAtLeast(1.0)
+        // Each step's frame as the median over the passes, so one noisy frame on the runner cannot decide.
+        val frame = (2..LAST_STEP).associateWith { index -> median(passes.map { it.getValue(index).frameMillis }) }
+        val later = median((3..LAST_STEP).map { frame.getValue(it) })
+        println("medians: $frame, later steps: $later ms")
+        if (!timed) return
         assertTrue(
-            second.frameMillis <= third * RELATIVE_BUDGET + ABSOLUTE_SLACK_MILLIS,
-            "landing the second step took ${second.frameMillis} ms against the third's $third ms",
+            frame.getValue(2) <= later * RELATIVE_BUDGET,
+            "landing the second step took ${frame.getValue(2)} ms against the later steps' median of $later ms",
         )
     }
+
+    private fun median(values: List<Double>): Double = values.sorted()[values.size / 2]
 
     /** One run, its steps landing one frame at a time: each landing's frame time, probe events and row compositions. */
     private fun landSteps(firstStep: (String, Int) -> UiMessage): Map<Int, StepLanding> {
@@ -171,11 +189,11 @@ class RunStepAppendPerfTest {
         const val RUN_ID = "live-run"
         const val LIVE_PROSE = "Checking the build first, then the tests.\n\nI'll report what fails."
         const val RUN_KEY = "run-$RUN_ID"
-        const val LAST_STEP = 4
+        const val LAST_STEP = 5
         const val SETTLE_FRAMES = 30
         const val NANOS_PER_MILLI = 1_000_000.0
-        const val RELATIVE_BUDGET = 3.0
-        const val ABSOLUTE_SLACK_MILLIS = 8.0
+        const val RELATIVE_BUDGET = 1.3
+        const val PASSES = 3
         val PROSE = (1..12).joinToString("\n\n") { "Paragraph $it of the earlier reply, with **bold** and `code`." }
     }
 }
