@@ -101,6 +101,7 @@ class ScheduleFleetController(
         val repository = sources.crons?.repository ?: return
         val agent = task.agentId?.let(::AgentId) ?: return
         if (stateFlow.value.pendingCronIds.isNotEmpty()) return
+        mutationJob?.cancel()
         stateFlow.update { it.copy(pendingCronIds = setOf(task.id), errorMessage = null) }
         mutationJob = scope.launch { changePause(repository, agent, task, resume) }
     }
@@ -115,10 +116,12 @@ class ScheduleFleetController(
         val (agents, rosterError) = operations.loadAgentRoster { stateFlow.value.agents }
         val read = AgentFleetReads.read(agents.map { it.id }) { agent -> readAgent(agent) }
         if (sources.crons != null && read.nativeRouteUnserved()) nativeUnserved = true
-        val published = stateFlow.value.fleetTarget(agents).withFleetRead(read, policy.errorMessage)
-        stateFlow.value = published.copy(
-            errorMessage = published.errorMessage ?: rosterError?.let { policy.errorMessage(it, "Failed to load agents") },
-        )
+        stateFlow.update { current ->
+            val published = current.fleetTarget(agents).withFleetRead(read, policy.errorMessage)
+            published.copy(
+                errorMessage = published.errorMessage ?: rosterError?.let { policy.errorMessage(it, "Failed to load agents") },
+            )
+        }
         loadRunHistory()
     }
 

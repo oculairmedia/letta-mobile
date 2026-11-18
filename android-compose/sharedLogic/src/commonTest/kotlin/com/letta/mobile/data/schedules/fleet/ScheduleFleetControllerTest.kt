@@ -60,6 +60,40 @@ class ScheduleFleetControllerTest {
     }
 
     @Test
+    fun aTotalRefreshFailureKeepsExistingRowsOnScreen() = runTest {
+        val schedules = FakeScheduleRepository()
+        val controller = controller(schedules)
+        controller.refresh()
+        advanceUntilIdle()
+        assertEquals(listOf("s1", "s2"), controller.state.value.schedules.map { it.id })
+
+        schedules.failingAgents += listOf("a1", "a2")
+        controller.refresh()
+        advanceUntilIdle()
+        assertEquals(listOf("s1", "s2"), controller.state.value.schedules.map { it.id })
+        assertEquals("a1 down", controller.state.value.errorMessage)
+        assertFalse(controller.state.value.isLoading)
+    }
+
+    @Test
+    fun unservedNativeRouteLatchesEvenWhenOneAgentsCronFails() = runTest {
+        val crons = CronScheduleSource { agent ->
+            if (agent == AgentId("a2")) error("a2 cron timeout")
+            listOfNotNull(agent?.let { CronTask(id = "c-${it.value}", agentId = it.value) })
+        }
+        val schedules = FakeScheduleRepository().apply { error = RouteUnavailableException() }
+        val controller = controller(schedules, crons)
+        controller.refresh()
+        advanceUntilIdle()
+        assertEquals(listOf("c-a1"), controller.state.value.crons.map { it.id })
+
+        val probes = schedules.refreshScheduleCallCount
+        controller.refresh()
+        advanceUntilIdle()
+        assertEquals(probes, schedules.refreshScheduleCallCount, "the unserved native route latches despite a partial cron failure")
+    }
+
+    @Test
     fun anAgentFilterNarrowsTheRowsToThatAgentAndAllWidensThem() = runTest {
         val clock = ScheduleClock(Instant.parse("2026-11-16T12:00:00Z"), TimeZone.UTC)
         val controller = controller(FakeScheduleRepository())

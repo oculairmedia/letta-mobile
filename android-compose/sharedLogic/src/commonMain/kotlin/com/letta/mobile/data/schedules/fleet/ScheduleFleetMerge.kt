@@ -32,9 +32,9 @@ internal fun ScheduleLibraryState.withFleetRead(
     )
 }
 
-/** Every read answered and none on the native route: later fleet reads skip it. */
+/** Every responding agent answered with no native route: later fleet reads skip it. */
 internal fun AgentFleetRead<AgentId, AgentScheduleRead>.nativeRouteUnserved(): Boolean =
-    failures.isEmpty() && values.isNotEmpty() && values.none { it.second.native != null }
+    values.isNotEmpty() && values.none { it.second.native != null }
 
 /** These crons with [agent]'s replaced by [fresh], in [roster] order. */
 internal fun List<CronTask>.replacingAgentCrons(
@@ -54,6 +54,9 @@ internal fun ScheduleLibraryState.fleetTarget(agents: List<AgentSummary>): Sched
         agents = agents,
         fleet = true,
         agentFilter = agentFilter?.takeIf { filter -> agents.isEmpty() || agents.any { it.id.value == filter } },
+        schedules = schedules,
+        crons = crons,
+        cronMode = cronMode,
         runHistory = runHistory,
         pendingCronIds = pendingCronIds,
     )
