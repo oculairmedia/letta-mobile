@@ -18,6 +18,11 @@ import com.mikepenz.markdown.model.MarkdownState
 import com.mikepenz.markdown.model.MarkdownTypography
 import com.mikepenz.markdown.model.ReferenceLinkHandlerImpl
 import com.mikepenz.markdown.model.rememberMarkdownState
+import com.mikepenz.markdown.model.State
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.parser.MarkdownParser
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
@@ -152,17 +157,59 @@ private fun sharedMarkdownTypography(bodyStyle: TextStyle?): MarkdownTypography 
  */
 @Composable
 internal fun rememberSharedMarkdownState(text: String, retainState: Boolean): MarkdownState {
+    // A settled text already parsed once (its row scrolled away and back, or recomposed after
+    // leaving composition) starts from that parse: its first frame is its final layout. Parsing
+    // it again started from the empty loading box and the renderer grew the text in from the
+    // top, so every row replayed an entrance each time it scrolled back into view.
+    if (retainState) {
+        val settled = remember(text) { SettledMarkdownParses[text] }
+        if (settled != null) return remember(settled) { settledMarkdownState(settled) }
+    }
     val flavour = remember { GFMFlavourDescriptor() }
     val parser = remember(flavour) { MarkdownParser(flavour) }
     val links = remember { ReferenceLinkHandlerImpl() }
-    return rememberMarkdownState(
+    val state = rememberMarkdownState(
         content = text,
         retainState = retainState,
         flavour = flavour,
         parser = parser,
         referenceLinkHandler = links,
     )
+    if (retainState) {
+        LaunchedEffect(state, text) {
+            val parsed = state.state.first { it !is State.Loading }
+            if (parsed is State.Success && parsed.content == text) rememberSettledParse(text, parsed)
+        }
+    }
+    return state
 }
+
+/**
+ * The parses of settled texts, kept outside every row (rows leave composition as they scroll
+ * away), newest last and at most [SETTLED_MARKDOWN_PARSES] of them. Composition reads and writes
+ * it on the UI thread only. A streaming text is never kept: it changes every token.
+ */
+private val SettledMarkdownParses = LinkedHashMap<String, State.Success>()
+
+private fun rememberSettledParse(text: String, parsed: State.Success) {
+    SettledMarkdownParses.remove(text)
+    SettledMarkdownParses[text] = parsed
+    while (SettledMarkdownParses.size > SETTLED_MARKDOWN_PARSES) SettledMarkdownParses.remove(SettledMarkdownParses.keys.first())
+}
+
+/** A state that is already [parsed]: the renderer draws it on its first frame. */
+private fun settledMarkdownState(parsed: State.Success): MarkdownState = object : MarkdownState {
+    override val state: StateFlow<State> = MutableStateFlow(parsed)
+    override val links: StateFlow<Map<String, String>> = MutableStateFlow(emptyMap())
+
+    override suspend fun parse(): State = parsed
+}
+
+/** How many settled parses are kept: a long conversation's worth of rows to scroll back through. */
+private const val SETTLED_MARKDOWN_PARSES = 512
+
+/** Whether [text]'s settled parse is kept (tests). */
+internal fun hasSettledMarkdownParse(text: String): Boolean = text in SettledMarkdownParses
 
 /**
  * Tracks when retained parser state can safely survive a content update.
