@@ -44,13 +44,32 @@ data class EndOfTurnPolicy(
     val minVoiced: Duration = 320.milliseconds,
     /** While the app speaks, voice needed before a candidate interrupts it (barge-in). */
     val bargeInSustain: Duration = 400.milliseconds,
-    /** This much silence after voice ends the turn. */
-    val trailingSilence: Duration = 900.milliseconds,
+    /**
+     * This much silence after voice ends the turn. Shorter answers sooner but splits turns at
+     * longer pauses; see [DEFAULT_TRAILING_SILENCE].
+     */
+    val trailingSilence: Duration = DEFAULT_TRAILING_SILENCE,
     /** Audio kept from before the first speech hop, so the first syllable is not clipped. */
     val preRoll: Duration = 160.milliseconds,
     /** A turn is ended at this length whatever is heard. */
     val maxTurn: Duration = 20.seconds,
-)
+) {
+    /** Defaults and bounds. */
+    companion object {
+        /**
+         * The default trailing silence. Kept at 900 ms: the turn tracker's timing and the
+         * phantom-turn guards (stock phrases and fillers on short turns) are tuned against it, and a
+         * shorter hangover splits a turn at ordinary pauses into short fragments those guards see.
+         */
+        val DEFAULT_TRAILING_SILENCE: Duration = 900.milliseconds
+
+        /** The shortest trailing silence a person may choose. */
+        val MIN_TRAILING_SILENCE: Duration = 400.milliseconds
+
+        /** The longest trailing silence a person may choose. */
+        val MAX_TRAILING_SILENCE: Duration = 2.seconds
+    }
+}
 
 /** Why a heard sound was not passed on as a turn. */
 enum class TurnDiscardReason {

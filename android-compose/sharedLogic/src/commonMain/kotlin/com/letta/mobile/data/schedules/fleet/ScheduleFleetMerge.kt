@@ -20,7 +20,7 @@ internal fun ScheduleLibraryState.withFleetRead(
     val nativeServed = reads.any { it.native != null }
     val cronServed = reads.any { it.crons != null }
     val anyServed = nativeServed || cronServed
-    if (reads.isNotEmpty() && !anyServed) return adminUnavailable()
+    if (reads.isNotEmpty() && !anyServed) return adminUnavailable().copy(crons = emptyList(), cronMode = false)
     return copy(
         schedules = reads.flatMap { it.native.orEmpty() }.distinctBy { it.id },
         crons = reads.flatMap { it.crons.orEmpty() }.distinctBy { it.id },
@@ -48,14 +48,16 @@ internal fun List<CronTask>.replacingAgentCrons(
         .sortedBy { task -> task.agentId?.let(order::get) ?: Int.MAX_VALUE }
 }
 
-/** The fleet scope over [agents]: every agent's schedules, or only the filtered agent's when it is still listed. */
+/**
+ * The fleet scope over [agents]: every agent's schedules, or only the filtered agent's when it is still
+ * listed. The rows on screen stay until a read replaces them, so a failed read keeps them.
+ */
 internal fun ScheduleLibraryState.fleetTarget(agents: List<AgentSummary>): ScheduleLibraryState =
-    ScheduleLibraryState(
+    copy(
         agents = agents,
+        selectedAgentId = null,
         fleet = true,
         agentFilter = agentFilter?.takeIf { filter -> agents.isEmpty() || agents.any { it.id.value == filter } },
-        runHistory = runHistory,
-        pendingCronIds = pendingCronIds,
     )
 
 private fun fleetPartialFailure(failed: Int): String? = when (failed) {

@@ -5,6 +5,7 @@ import com.letta.mobile.data.voice.audio.AudioFrameSource
 import com.letta.mobile.data.voice.audio.AudioPlayer
 import com.letta.mobile.data.voice.local.LocalSpeechRecognizer
 import com.letta.mobile.data.voice.responder.VoiceChatSession
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -20,6 +21,13 @@ interface VoiceAudio {
 
     /** The speaker. It plays 16-bit PCM as it streams in. */
     fun speaker(): AudioPlayer
+
+    /**
+     * The speaker for one session whose [owner] scope bounds what it may keep between streams: a
+     * platform may keep its output open across a reply's sentences and must release it by the time
+     * [owner] ends. The plain [speaker] by default.
+     */
+    fun speaker(owner: CoroutineScope): AudioPlayer = speaker()
 
     /**
      * The device's own speech recogniser, or null where the platform supplies none (voice mode then

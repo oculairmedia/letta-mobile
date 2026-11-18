@@ -1,5 +1,8 @@
 package com.letta.mobile.data.chat.projection
 
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.attr
+
 /**
  * The live overlay and the settled pages as the one index space a timeline list renders, built
  * from a single read of both sources.
@@ -51,7 +54,29 @@ class TimelineRowAssembly private constructor(
             val duplicates = TimelineRowKeyGuard.duplicateRows(overlay.shown.map { it.key } + settledKeys) { index ->
                 if (index < overlay.shown.size) LIVE else SETTLED
             }
+            recordLiveRunMultiplicity(overlay.shown)
             return TimelineRowAssembly(overlay.shown, settledKeys, duplicates)
+        }
+
+        // One fixed-size, opt-in event per assembly; no keys, ids, arguments or message text.
+        // A shared run id alone is not a duplicate reply: page cuts can produce disjoint blocks.
+        private fun recordLiveRunMultiplicity(shown: List<ChatRenderItem>) {
+            if (!Telemetry.isRenderDiagEnabled()) return
+            val runs = shown.filterIsInstance<ChatRenderItem.RunBlock>()
+            val groups = runs.groupBy { it.runId }.values
+            val repeatedRecords = groups.sumOf { blocks ->
+                val seen = HashSet<String>()
+                blocks.sumOf { block ->
+                    val names = block.messages.mapTo(HashSet()) { it.first.stableListKey() }
+                    names.count { !seen.add(it) }
+                }
+            }
+            Telemetry.event(
+                "Timeline", "timeline.liveRunMultiplicity",
+                "liveRuns" attr runs.size,
+                "repeatedRunGroups" attr groups.count { it.size > 1 },
+                "repeatedRecords" attr repeatedRecords,
+            )
         }
 
         /**
