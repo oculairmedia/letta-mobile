@@ -238,6 +238,13 @@ internal class TimelineFrameRecorder private constructor(
         repeat(SETTLE_YIELDS) { yield(); kotlinx.coroutines.delay(1) }
     }
 
+    suspend fun awaitFrameContaining(message: String): Frame {
+        awaitCondition({ "message $message never appeared: ${frames.lastOrNull()}" }) {
+            frames.lastOrNull()?.rows?.any { message in it.messages } == true
+        }
+        return lastFrame()
+    }
+
     fun lastFrame(): Frame = frames.last()
 
     suspend fun close() {
