@@ -8,6 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.captureToImage
@@ -43,7 +45,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
  */
 class SendFlightChatSurfaceTest {
     /** An owner that, like the real ones, appends the prompt (oldest first) and clears the draft on send. */
-    private class SendingPort(private val promptId: String = "u1", private val clientMessageId: String? = null) : ChatSessionPort {
+    private class SendingPort(
+        private val promptId: String = "u1",
+        private val clientMessageId: String? = null,
+        /** Like the real owner's composer state (re-emitted on its own dispatcher): the test clears the draft later. */
+        private val clearsDraftLate: Boolean = false,
+    ) : ChatSessionPort {
         override val uiState = MutableStateFlow(
             ChatUiState(
                 conversationState = ConversationState.Ready("conv-1"),
@@ -69,7 +76,7 @@ class SendFlightChatSurfaceTest {
                     clientMessageId = clientMessageId,
                 )
                 uiState.value = uiState.value.copy(messages = (uiState.value.messages + prompt).toPersistentList())
-                composer.value = composer.value.copy(text = "")
+                if (!clearsDraftLate) composer.value = composer.value.copy(text = "")
             }
         }
     }
@@ -154,6 +161,47 @@ class SendFlightChatSurfaceTest {
         assertEquals(0, ghosts(), "the ghost hands off to the row")
     }
 
+    @Test
+    fun aSentPromptShowsOnceAtEveryFrameOfItsHandOff() = runComposeUiTest {
+        val port = SendingPort(clearsDraftLate = true)
+        mainClock.autoAdvance = false
+        setPointerContent {
+            MaterialTheme {
+                ChatSurface(
+                    port = port,
+                    presentation = ChatSurfacePresentation.ChatFirst,
+                    onIntent = {},
+                    host = ChatSurfaceHost(),
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        frames(SETTLE_FRAMES)
+        onNodeWithTag(ComposerTestTags.SEND).performClick()
+        val prompts = hasTestTag(ChatRowTestTags.USER_PROMPT) and hasText(SENT, substring = true)
+        val log = mutableListOf<String>()
+        val flightMillis = ChatMotionTokens.SendFlight.FLIGHT_MILLIS + ChatMotionTokens.SendFlight.HANDOFF_MILLIS
+        val total = (flightMillis / FRAME_MILLIS).toInt() + FRAME_SLACK_FRAMES
+        for (frame in 0 until total) {
+            mainClock.advanceTimeByFrame()
+            // The owner's cleared draft lands a couple of frames after the send, as the real one does.
+            if (frame == LATE_CLEAR_FRAME) port.composer.value = port.composer.value.copy(text = "")
+            val field = fieldText()
+            val ghost = ghosts()
+            val bubbles = onAllNodes(prompts).fetchSemanticsNodes().size
+            log += "frame $frame: ghost=$ghost field=\"$field\" bubbles=$bubbles"
+            val doubled = ghost > 0 && field.trim() == SENT
+            assertTrue(!doubled, "the prompt shows in the field and as the ghost at once:\n${log.joinToString("\n")}")
+            assertTrue(bubbles <= 1, "more than one bubble for one send:\n${log.joinToString("\n")}")
+        }
+        println(log.joinToString("\n"))
+    }
+
+    /** What the prompt field shows (its editable text), the primary field's. */
+    private fun ComposeUiTest.fieldText(): String =
+        onAllNodes(hasTestTag(ComposerTestTags.INPUT)).fetchSemanticsNodes().firstOrNull()
+            ?.config?.getOrNull(SemanticsProperties.EditableText)?.text.orEmpty()
+
     private fun ComposeUiTest.frames(count: Int) = repeat(count) { mainClock.advanceTimeByFrame() }
 
     private fun ComposeUiTest.ghosts(): Int = onAllNodes(hasTestTag(SendFlightTestTags.GHOST)).fetchSemanticsNodes().size
@@ -193,5 +241,8 @@ class SendFlightChatSurfaceTest {
         const val FRAME_SLACK = 64L
         const val PIXEL_TOLERANCE = 1.5f
         const val COLOR_TOLERANCE = 0.02f
+        const val FRAME_MILLIS = 16L
+        const val FRAME_SLACK_FRAMES = 8
+        const val LATE_CLEAR_FRAME = 2
     }
 }
