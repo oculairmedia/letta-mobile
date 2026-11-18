@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.MaterialTheme
@@ -211,16 +212,12 @@ private fun SkillLoadCard(toolCall: UiToolCall, detail: LineDisclosure) {
     val instructions = toolCall.skillInstructions
     val body = remember(result, instructions) { instructions?.let { skillBody(skillEnvelopeText(it)) } ?: skillBody(result) }
     val pages = toolCall.toolCallId?.let(LocalSkillInstructionPages.current)
-    val facts = listOfNotNull(
-        remember(result) { skillDirectory(result) }
-            ?.let { LettaToolCardFact(stringResource(Res.string.rows_tool_card_fact_directory), it, monospace = true) },
-        body.first?.let(::skillDescription)
-            ?.let { LettaToolCardFact(stringResource(Res.string.rows_tool_card_fact_description), it) },
-    )
-    val contents = body.second
     val contentsTitle = stringResource(Res.string.rows_tool_card_section_contents)
     val instructionsTitle = stringResource(Res.string.rows_tool_card_section_instructions)
-    val failedLabel = stringResource(Res.string.rows_tool_card_failed)
+    val sections = listOfNotNull(
+        body.second?.let { text -> @Composable { LettaToolCardSection(contentsTitle) { CardMarkdown(text) } } },
+        pages?.let { stored -> @Composable { LettaToolCardSection(instructionsTitle) { stored() } } },
+    )
     LettaToolCard(
         header = LettaToolCardHeader(
             label = stringResource(if (running) Res.string.rows_tool_card_loading_skill else Res.string.rows_tool_card_loaded_skill),
@@ -231,21 +228,32 @@ private fun SkillLoadCard(toolCall: UiToolCall, detail: LineDisclosure) {
         modifier = Modifier.testTag(ChatRowTestTags.SKILL_LOAD_CARD),
         parts = LettaToolCardParts(
             style = LettaToolCardStyle.Line,
-            trailing = failureTrailing(state.isFailure(), failedLabel),
+            trailing = failureTrailing(state.isFailure(), stringResource(Res.string.rows_tool_card_failed)),
             expansion = detail,
         ),
-        body = if (facts.isEmpty() && contents == null && pages == null) null else ({
-            LettaToolCardFacts(facts)
-            contents?.let { text ->
-                if (facts.isNotEmpty()) LettaToolCardDivider()
-                LettaToolCardSection(contentsTitle) { CardMarkdown(text) }
-            }
-            pages?.let { stored ->
-                if (facts.isNotEmpty() || contents != null) LettaToolCardDivider()
-                LettaToolCardSection(instructionsTitle) { stored() }
-            }
-        }),
+        body = cardBody(skillFacts(result, body.first), sections),
     )
+}
+
+/** A skill's directory (from its result) and description (from its frontmatter), where they are known. */
+@Composable
+private fun skillFacts(result: String, frontmatter: String?): List<LettaToolCardFact> = listOfNotNull(
+    remember(result) { skillDirectory(result) }
+        ?.let { LettaToolCardFact(stringResource(Res.string.rows_tool_card_fact_directory), it, monospace = true) },
+    frontmatter?.let(::skillDescription)
+        ?.let { LettaToolCardFact(stringResource(Res.string.rows_tool_card_fact_description), it) },
+)
+
+/** A card's facts, then its sections with a divider before each one that follows anything; null when it has neither. */
+private fun cardBody(facts: List<LettaToolCardFact>, sections: List<@Composable () -> Unit>): (@Composable ColumnScope.() -> Unit)? {
+    if (facts.isEmpty() && sections.isEmpty()) return null
+    return {
+        LettaToolCardFacts(facts)
+        sections.forEachIndexed { index, section ->
+            if (index > 0 || facts.isNotEmpty()) LettaToolCardDivider()
+            section()
+        }
+    }
 }
 
 /** A card's "Failed" status at its header's end when [failed]; nothing otherwise. */

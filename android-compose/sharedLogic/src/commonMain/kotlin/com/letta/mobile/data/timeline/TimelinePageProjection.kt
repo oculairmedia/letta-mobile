@@ -274,6 +274,30 @@ internal suspend fun TimelineStoreReader.runEnvelope(
 internal const val MAX_BOUNDARY_BODY_BYTES: Long = 16L * 1024
 
 /**
+ * [record] with its decoded [event] (null when undecoded), and whether the page hides it: an opaque
+ * body, a skill's instructions (decoded, or recognised by the head of a body too large to decode), or
+ * an event [isSuppressed] says is drawn elsewhere.
+ */
+internal suspend fun TimelineStoreReader.projectionRecord(
+    record: TimelineSettledRecord,
+    event: TimelineEvent.Confirmed?,
+    isSuppressed: suspend (TimelineEvent.Confirmed) -> Boolean,
+): TimelineProjectionRecord {
+    if (record.contentType != TIMELINE_EVENT_CONTENT_TYPE) return TimelineProjectionRecord(record, event, excluded = true)
+    if (event == null) {
+        val skillEnvelope = isSkillEnvelopePreview(record)
+        return TimelineProjectionRecord(record, null, excluded = skillEnvelope, skillEnvelopePreview = skillEnvelope)
+    }
+    return TimelineProjectionRecord(record, event, excluded = event.isSyntheticSkillEnvelope() || isSuppressed(event))
+}
+
+/** Whether an undecoded event body is a skill's instructions: still hidden model context, which only its head can say. */
+private suspend fun TimelineStoreReader.isSkillEnvelopePreview(record: TimelineSettledRecord): Boolean {
+    val pointer = record.pointer ?: return false
+    return opensSkillEnvelope(body(pointer, 0, minOf(pointer.encodedBytes, SKILL_ENVELOPE_HEAD_BYTES.toLong()).toInt()))
+}
+
+/**
  * Hands each skill's instructions to the call that loaded them. The runtime sends a skill's
  * instructions as their own hidden message just after its `Skill` call, and the page drops that
  * message (model context, not a turn); the nearest earlier skill call on the page that holds no

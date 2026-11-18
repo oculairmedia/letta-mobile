@@ -613,15 +613,7 @@ class CanonicalTimelineEngine(
                         ) else decoded
                     } else decoded
                 } else null
-                // A skill's instructions too large to decode are still hidden model context: their head says so.
-                val skillEnvelopePreview = event == null && record.contentType == TIMELINE_EVENT_CONTENT_TYPE &&
-                    record.pointer?.let { pointer ->
-                        opensSkillEnvelope(body(pointer, 0, minOf(pointer.encodedBytes, SKILL_ENVELOPE_HEAD_BYTES.toLong()).toInt()))
-                    } == true
-                val excluded = record.contentType != TIMELINE_EVENT_CONTENT_TYPE || skillEnvelopePreview ||
-                    (event != null && (event.isSyntheticSkillEnvelope() ||
-                        isSuppressed(record.key.identity, record.revision, event)))
-                TimelineProjectionRecord(record, event, excluded, skillEnvelopePreview)
+                projectionRecord(record, event) { isSuppressed(record.key.identity, record.revision, it) }
             }
             val remaining = minOf(budget.maxDecodedBodyBytes, TimelineBoundedReader.MAX_PAGE_BODY_BYTES) -
                 page.bodies.sumOf { it.size.toLong() }
@@ -630,11 +622,8 @@ class CanonicalTimelineEngine(
                 runEnvelope(page.metadata, records, remaining, adapter),
             )
             val prepared = input.project(adapter)
-            TimelinePreparedPage(
-                page.metadata,
-                input.attachSkillInstructions(input.aggregatePreparedRuns(foldMonitorEventsOnPage(prepared))),
-                input,
-            )
+            val runs = input.aggregatePreparedRuns(foldMonitorEventsOnPage(prepared))
+            TimelinePreparedPage(page.metadata, input.attachSkillInstructions(runs), input)
         }
     }
 
