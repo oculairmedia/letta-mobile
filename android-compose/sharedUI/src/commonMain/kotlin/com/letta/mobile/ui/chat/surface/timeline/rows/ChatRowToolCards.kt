@@ -85,6 +85,10 @@ internal fun ToolCallCard(toolCall: UiToolCall, callbacks: ChatRowCallbacks, det
 internal fun isToolCallCard(toolCall: UiToolCall): Boolean =
     sendsAgentMessage(toolCall) || loadsSkill(toolCall) || createsSubagent(toolCall)
 
+/** Whether [toolCall]'s card is a quiet line (a loaded skill) rather than a boxed card. */
+@Composable
+internal fun isLineToolCallCard(toolCall: UiToolCall): Boolean = loadsSkill(toolCall)
+
 private fun sendsAgentMessage(toolCall: UiToolCall): Boolean =
     toolCall.agentMessageProvenance?.direction == AgentMessageDirection.OUTBOUND
 

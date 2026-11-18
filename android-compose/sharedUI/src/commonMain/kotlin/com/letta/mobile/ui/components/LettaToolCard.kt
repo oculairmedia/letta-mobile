@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -176,15 +178,15 @@ private fun ToolCardSurface(modifier: Modifier, content: @Composable ColumnScope
     Surface(
         modifier = modifier,
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        // One tonal step above an open run's raised header and the page, an outline at full strength
+        // and the hairline lift a floating control takes, so the card reads apart in Dark and Light.
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(
-            LettaDimens.Stroke.hairline,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline),
-        ),
+        border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = LettaDimens.Space.hair,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
+            modifier = Modifier.padding(LettaDimens.Space.md),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             content = content,
         )
@@ -193,10 +195,10 @@ private fun ToolCardSurface(modifier: Modifier, content: @Composable ColumnScope
 
 @Composable
 private fun CardHeader(header: LettaToolCardHeader, parts: LettaToolCardParts) {
-    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             HeaderLead(header)
@@ -209,7 +211,11 @@ private fun CardHeader(header: LettaToolCardHeader, parts: LettaToolCardParts) {
             header.title?.takeUnless { header.stacked }?.let { LettaToolCardTitle(it, Modifier.weight(1f)) }
                 ?: Spacer(Modifier.weight(1f))
             parts.trailing?.invoke(this)
-            parts.expansion?.let { DetailLink(it) }
+            parts.expansion?.let { expansion ->
+                // A hairline between what the card reports (a badge, a status) and its Detail action.
+                if (parts.trailing != null) TrailingSeparator()
+                DetailLink(expansion)
+            }
         }
         header.title?.takeIf { header.stacked }?.let { LettaToolCardTitle(it, maxLines = 2) }
     }
@@ -241,6 +247,15 @@ private fun LettaToolCardTitle(text: String, modifier: Modifier = Modifier, maxL
         maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier,
+    )
+}
+
+@Composable
+private fun TrailingSeparator() {
+    VerticalDivider(
+        modifier = Modifier.height(LettaDimens.Control.iconSm),
+        thickness = LettaDimens.Stroke.hairline,
+        color = MaterialTheme.colorScheme.outlineVariant,
     )
 }
 

@@ -126,6 +126,12 @@ object ChatRowSpacing {
     internal val lineGap: Dp = LettaDimens.Space.sm
 
     /**
+     * Where a step row's words start (its inset, its glyph slot and the gap after it): a tool card
+     * among the steps starts here too, so it lines up with the "Ran …" and "Used skill …" text.
+     */
+    internal val stepTextStart: Dp = stepHorizontal + runGlyphSize + lineGap
+
+    /**
      * An expanded run's work steps (reasoning, the tool line) sit indented
      * under its summary line, flush with the summary's label (past its inset and glyph).
      */

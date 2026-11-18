@@ -29,12 +29,15 @@ import androidx.compose.ui.text.TextLayoutResult
 import com.letta.mobile.data.messaging.AgentMessageDeliveryState
 import com.letta.mobile.data.messaging.AgentMessageDirection
 import com.letta.mobile.data.messaging.AgentMessageProvenance
+import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.components.LETTA_TOOL_CARD_LINE_TAG
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LocalLettaHost
+import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.SharedMaterialTheme
@@ -106,6 +109,14 @@ class ChatRowToolCardsUiTest {
         ),
     )
 
+    private val openRun = ChatRenderItem.RunBlock(
+        runId = RUN_ID,
+        messages = listOf(
+            created.copy(id = "in-run", content = "", runId = RUN_ID),
+            UiMessage(id = "after", role = "assistant", content = "It is reviewing them now.", timestamp = T0, runId = RUN_ID),
+        ).map { it to GroupPosition.None },
+    )
+
     private fun ComposeUiTest.show(message: UiMessage, callbacks: ChatRowCallbacks = rowCallbacks(resolveAgentName = { "Scout" })) {
         setContent {
             CompositionLocalProvider(LocalReducedMotion provides true) {
@@ -174,10 +185,12 @@ class ChatRowToolCardsUiTest {
 
     @Test
     fun theCardsTakeThreeFifthsOfAWideColumnAndAllOfAPhones() {
+        // The card sits on the step rows' text column: its share is of the room after that inset.
+        val inset = (ChatRowSpacing.stepTextStart + ChatRowSpacing.lineEnd).value.toInt()
         val (wideCard, wideColumn) = cardAndColumn(WIDE)
-        assertTrue(kotlin.math.abs(wideCard - wideColumn * 3 / 5) <= 1, "a wide column's card is $wideCard of $wideColumn")
+        assertTrue(kotlin.math.abs(wideCard - (wideColumn - inset) * 3 / 5) <= 1, "a wide column's card is $wideCard of $wideColumn")
         val (phoneCard, phoneColumn) = cardAndColumn(PHONE)
-        assertEquals(phoneColumn, phoneCard, "a phone column's card spans it")
+        assertTrue(kotlin.math.abs(phoneCard - (phoneColumn - inset)) <= 1, "a phone column's card ($phoneCard of $phoneColumn) spans it")
     }
 
     /** The sent-message card's width and its prose column's, in whole dp, in a frame [width] wide. */
@@ -218,6 +231,9 @@ class ChatRowToolCardsUiTest {
                                 RenderRow(single(sent), rowContext(), rowCallbacks(resolveAgentName = { "Scout" }))
                                 RenderRow(single(created), rowContext(), rowCallbacks(openSubagent = {}))
                                 RenderRow(single(skill), rowContext(), rowCallbacks())
+                                // The same card as an open run's step: inside the run's body, on its text column.
+                                val opened = renderState(collapsedRunIds = setOf(RUN_ID))
+                                RenderRow(openRun, rowContext(itemState = opened, newestMessageId = "after"))
                             }
                         }
                     }
@@ -235,11 +251,12 @@ class ChatRowToolCardsUiTest {
 
     private companion object {
         const val T0 = "2026-11-17T09:00:00Z"
+        const val RUN_ID = "run-cards"
         const val TASK = "Review this week's open pull requests"
         const val BODY = "Please recheck the nightly build logs for the flaky upload step and tell me which runs failed and why."
         const val WIDE = 1000
         const val PHONE = 360
-        const val FRAME_HEIGHT = 760
+        const val FRAME_HEIGHT = 1000
         val SKILL_RESULT = listOf(
             "Launching skill: writing-guide",
             "Base directory for this skill: /skills/writing-guide",

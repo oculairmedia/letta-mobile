@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -96,7 +97,17 @@ internal fun ToolStep(
     Column(modifier = Modifier.fillMaxWidth().mascotAttention(AttentionKey("tool:$disclosureKey"), AttentionKind.TOOL, enabled = running)) {
         // A message to another agent, a created subagent and a loaded skill are events of their own: a tool card.
         if (isToolCallCard(toolCall)) {
-            ToolCallCard(toolCall, callbacks, LineDisclosure(isExpanded) { expansions.toggle(disclosureKey) })
+            // A boxed card starts on the step rows' text column; a line card's icon takes their glyph slot.
+            Box(
+                Modifier.padding(
+                    start = if (isLineToolCallCard(toolCall)) ChatRowSpacing.stepHorizontal else ChatRowSpacing.stepTextStart,
+                    end = ChatRowSpacing.lineEnd,
+                    top = ChatRowSpacing.stepVertical,
+                    bottom = ChatRowSpacing.stepVertical,
+                ),
+            ) {
+                ToolCallCard(toolCall, callbacks, LineDisclosure(isExpanded) { expansions.toggle(disclosureKey) })
+            }
             return@Column
         }
         val opens = stepOpens(toolCall, resolved)
