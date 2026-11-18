@@ -62,16 +62,14 @@ class ExactToolTurnsTest {
             assertEquals(listOf(expectedCalls), counts(live))
             val block = items.filterIsInstance<ChatRenderItem.RunBlock>().single()
             val liveBlock = live.filterIsInstance<ChatRenderItem.RunBlock>().single()
-            // Concurrent calls from one source row share a timestamp; durable keys break ties by ID.
-            // The settled reader derives clientMessageId from the stored row until the ledger persists the logical id (C3, letta-mobile-hrrb2).
-            fun comparable(block: ChatRenderItem.RunBlock) = block.messages.map { it.first.copy(clientMessageId = null) }
-                .sortedWith(compareBy({ it.timestamp }, { it.id }))
             assertEquals(comparable(liveBlock), comparable(block))
             assertTrue(page.projectionInput.records.mapNotNull { it.event }.all { it.runId == null })
             if (expectedCalls == 7) {
                 assertEquals("completed", block.messages.mapNotNull { it.first.subagentNotification }.single().status)
                 assertEquals(setOf("Skill", "Agent", "TaskOutput", "exec_command"),
                     block.messages.flatMap { it.first.toolCalls.orEmpty() }.map { it.name }.toSet())
+                val skill = block.messages.flatMap { it.first.toolCalls.orEmpty() }.single { it.name == "Skill" }
+                assertTrue(skill.skillInstructions.orEmpty().startsWith("<skill_content name=\"review-gate\">"))
             } else {
                 assertTrue(items.filterIsInstance<ChatRenderItem.Single>().any {
                     it.message.id == "ui-msg-9171098" && it.message.role == "user" &&
@@ -81,3 +79,14 @@ class ExactToolTurnsTest {
         }
     }
 }
+
+/**
+ * A run block's messages in a fixed order, for comparing the live and settled reads of one turn.
+ * Concurrent calls from one source row share a timestamp; durable keys break ties by ID. The settled
+ * reader derives clientMessageId from the stored row until the ledger persists the logical id, and
+ * the settled page also hands each skill its instructions (attachSkillInstructions), which the live
+ * overlay drops.
+ */
+private fun comparable(block: ChatRenderItem.RunBlock) = block.messages.map { (message, _) ->
+    message.copy(clientMessageId = null, toolCalls = message.toolCalls?.map { it.copy(skillInstructions = null) })
+}.sortedWith(compareBy({ it.timestamp }, { it.id }))
