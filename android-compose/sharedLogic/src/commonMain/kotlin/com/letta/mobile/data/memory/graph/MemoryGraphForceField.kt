@@ -240,8 +240,12 @@ class MemoryGraphForceField(
             val indexById = view.nodes.withIndex().associate { (index, node) -> node.id to index }
             val pairs = ArrayList<Int>(view.edges.size * 2)
             view.edges.forEach { edge ->
-                val ends = listOfNotNull(indexById[edge.fromId], indexById[edge.toId]).distinct()
-                if (ends.size == 2) pairs += ends
+                val from = indexById[edge.fromId]
+                val to = indexById[edge.toId]
+                if (from != null && to != null && from != to) {
+                    pairs += from
+                    pairs += to
+                }
             }
             return pairs.toIntArray()
         }
@@ -251,8 +255,9 @@ class MemoryGraphForceField(
             val indexById = view.nodes.withIndex().associate { (index, node) -> node.id to index }
             val kinds = ArrayList<Int>(view.edges.size)
             view.edges.forEach { edge ->
-                val ends = listOfNotNull(indexById[edge.fromId], indexById[edge.toId]).distinct()
-                if (ends.size == 2) kinds += edge.kind.ordinal
+                val from = indexById[edge.fromId]
+                val to = indexById[edge.toId]
+                if (from != null && to != null && from != to) kinds += edge.kind.ordinal
             }
             return kinds.toIntArray()
         }
