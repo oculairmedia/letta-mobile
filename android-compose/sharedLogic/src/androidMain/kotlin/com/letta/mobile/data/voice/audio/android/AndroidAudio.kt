@@ -17,10 +17,12 @@ import com.letta.mobile.data.voice.audio.device.AudioDeviceOption
 import com.letta.mobile.data.voice.audio.device.AudioDeviceSelection
 import com.letta.mobile.data.voice.audio.device.FrameAudioCapture
 import com.letta.mobile.data.voice.audio.device.MeteredFrameSource
+import com.letta.mobile.data.voice.audio.line.HeldOutputDevice
 import com.letta.mobile.data.voice.audio.line.LineFrameSource
 import com.letta.mobile.data.voice.audio.line.LinePcmPlayer
 import com.letta.mobile.data.voice.audio.line.PlayerOptions
 import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
@@ -108,6 +110,13 @@ class AndroidAudio(private val context: Context) {
     fun player(device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault): AudioPlayer =
         FocusedPlayer(LinePcmPlayer(AudioTrackOutputDevice(context, device), PlayerOptions()), manager)
 
+    /**
+     * Like [player], but consecutive streams (one reply's sentences) share one `AudioTrack`, released
+     * shortly after the last one, and at the latest when [owner] ends.
+     */
+    fun heldPlayer(owner: CoroutineScope, device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault): AudioPlayer =
+        FocusedPlayer(LinePcmPlayer(HeldOutputDevice(AudioTrackOutputDevice(context, device), owner), PlayerOptions()), manager)
+
     /** Input devices, identified by their `AudioDeviceInfo` id. */
     fun inputs(): List<AudioDeviceOption> = manager.getDevices(AudioManager.GET_DEVICES_INPUTS)
         .map { info -> AudioDeviceOption(AudioDeviceId(info.id.toString()), info.productName.toString()) }
@@ -156,6 +165,8 @@ internal class FocusedPlayer(private val delegate: AudioPlayer, private val mana
         }
         if (lost.get()) throw VoiceAudioException(VoiceErrorCode.PLAYBACK_FAILED)
     }
+
+    override fun setMuted(muted: Boolean) = delegate.setMuted(muted)
 
     private companion object {
         val stoppingChanges = setOf(AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)

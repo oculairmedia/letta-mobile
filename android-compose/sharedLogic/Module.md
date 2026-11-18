@@ -787,6 +787,10 @@ The voice loop driver: idle, listening, thinking, speaking and failed, continuou
 
 The voice loop's internal transition table: a pure function from model and input to model and effects, split into control, ear, reply and mouth rules. It reads no clock, suspends nowhere and touches no engine, so every row is tested directly.
 
+# Package com.letta.mobile.data.voice.output
+
+What a voice session exposes about its spoken output and the person's controls: the spoken progress of the current reply (one entry per segment once it starts playing, with its start time and an estimated then exact audio duration), the turn clock (who is speaking and since when), and the microphone mute, speaker mute and speech speed settings. Times use one monotonic clock so a caller can work out how much of a segment has been spoken; nothing here carries audio or transcript text beyond the reply segments already shown in the chat.
+
 # Package com.letta.mobile.data.voice.responder
 
 The responder for the conversation's agent, over its own port, [VoiceChatSession](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.responder/-voice-chat-session/index.html): sending returns the message's client id, and the state publishes the run each sent message started. Replies are attributed by that identity only, never by text, position or timing; without it nothing is spoken and the reply ends unattributed. The app's chat session is adapted to this port in `data.voice.responder.chat`.

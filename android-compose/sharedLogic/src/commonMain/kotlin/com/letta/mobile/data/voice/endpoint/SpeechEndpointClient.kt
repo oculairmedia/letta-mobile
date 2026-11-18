@@ -192,6 +192,7 @@ class SpeechEndpointClient(
         put("voice", request.voice.value)
         put("input", request.text.value)
         put("response_format", request.encoding.wireName)
+        if (request.speed != SpeechSpeed.Normal) put("speed", request.speed.value)
     }.toString()
 
     private suspend fun stream(response: HttpResponse, onChunk: suspend (AudioChunk) -> Unit) {
