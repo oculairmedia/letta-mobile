@@ -19,7 +19,8 @@ import kotlin.test.assertTrue
 /** Each node's and link's constants vary by its own seed: stably, within bounds, independently, off at naturalness 0. */
 class ForceElementsTest {
     private val view = MemoryGraphViews.build(star(LEAVES), emptySet())
-    private val tuning = MemoryGraphTuning(degreeScaling = 0f, linkLengthDegreeBias = 0f)
+    /** The shipped spreads (and naturalness) with every node kind alike and no degree effects, so each value's base is plain. */
+    private val tuning = MemoryGraphTuning(degreeScaling = 0f, linkLengthDegreeBias = 0f, nodeCharge = emptyMap())
 
     @Test
     fun theSameGraphGetsTheSameValues() {
@@ -35,11 +36,12 @@ class ForceElementsTest {
     @Test
     fun everyValueStaysWithinItsSpread() {
         val elements = applied(view, tuning)
-        within(elements.charge, 1f, tuning.chargeSpread)
-        within(elements.gravity, 1f, tuning.gravitySpread)
-        within(elements.cluster, 1f, tuning.clusterSpread)
-        within(elements.stiffness, tuning.stiffnessOf(MemoryGraphEdgeKind.Remembers), tuning.linkStiffnessSpread)
-        val lengthSpread = tuning.linkLengthSpread.getValue(MemoryGraphEdgeKind.Remembers)
+        val spreads = tuning.spreads
+        within(elements.charge, 1f, spreads.charge)
+        within(elements.gravity, 1f, spreads.gravity)
+        within(elements.cluster, 1f, spreads.cluster)
+        within(elements.stiffness, tuning.stiffnessOf(MemoryGraphEdgeKind.Remembers), spreads.stiffness)
+        val lengthSpread = tuning.lengthSpreadOfKind(MemoryGraphEdgeKind.Remembers.ordinal)
         within(elements.restLength, tuning.lengthOf(MemoryGraphEdgeKind.Remembers), lengthSpread)
         assertTrue(elements.charge.toSet().size > 1 && elements.stiffness.toSet().size > 1, "values vary")
     }

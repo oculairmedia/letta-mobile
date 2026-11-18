@@ -32,7 +32,7 @@ class MemoryGraphPhysicsTest {
         view = view,
         target = target,
         radiusOf = { MemoryNodeLooks.SMALL_RADIUS },
-        start = MemoryGraphPhysicsStart(previous = previous, bloom = true, motion = motion),
+        start = MemoryGraphPhysicsStart(previous, bloom = true, motion = motion, tuning = MemoryGraphTestTunings.classic),
     )
 
     @Test

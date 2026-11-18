@@ -187,57 +187,45 @@ class MemoryGraphTuningTest {
     }
 
     @Test
-    fun theDefaultsAreTheShippedConstants() {
+    fun theDefaultsAreTheDevWindowsTunedPreset() {
         val tuning = MemoryGraphTuning()
-        assertEquals(config.repulsion, tuning.repulsion)
-        assertEquals(config.gravity, tuning.gravity)
-        // Damping is raised from the layout's 0.82 so nodes stop vibrating; every force is unchanged.
-        assertEquals(0.75f, tuning.sparseDamping)
-        assertEquals(config.maxStep, tuning.sparseMaxSpeed)
-        assertEquals(0f, tuning.repulsionCutoff)
-        MemoryGraphNodeKind.entries.forEach { kind ->
-            assertEquals(1f, tuning.chargeOf(kind))
-            assertEquals(1f, tuning.radiusScaleOf(kind))
-        }
-        MemoryGraphEdgeKind.entries.forEach { kind ->
-            assertEquals(config.idealEdgeLength, tuning.lengthOf(kind))
-            assertEquals(config.attraction, tuning.stiffnessOf(kind))
-        }
-        assertEquals(listOf(10f, 0.6f, 0.45f, 12f, 40f, 240f), listOf(
-            tuning.collisionPadding, tuning.collisionStrength, tuning.crowdedDamping,
-            tuning.crowdedMaxSpeed, tuning.sparseCrowding, tuning.crowdedCrowding,
+        assertEquals(3258.427f, tuning.repulsion)
+        assertEquals(2.30476f, tuning.chargeOf(MemoryGraphNodeKind.Agent))
+        assertEquals(2.469569f, tuning.chargeOf(MemoryGraphNodeKind.Channel))
+        assertEquals(319.5302f, tuning.lengthOf(MemoryGraphEdgeKind.Remembers))
+        assertEquals(400f, tuning.lengthOf(MemoryGraphEdgeKind.Runs))
+        assertEquals(0.009868421f, tuning.stiffnessOf(MemoryGraphEdgeKind.Remembers))
+        assertEquals(0.9636452f, tuning.stiffnessOf(MemoryGraphEdgeKind.Runs))
+        assertEquals(2.532479f, tuning.naturalness)
+        assertEquals(listOf(0.1143593f, 0.2659934f, 9.738071f, 17.76639f), listOf(
+            tuning.sparseDamping, tuning.crowdedDamping, tuning.sparseMaxSpeed, tuning.crowdedMaxSpeed,
         ))
-        assertEquals(listOf(1f, 150f, 0.001f, 0.04f, 360f), listOf(
-            tuning.alphaStart, tuning.coolingFrames, tuning.alphaMin, tuning.settleSpeed, tuning.maxFramesPerHeat,
+        assertEquals(listOf(133.427f, 2.6f, 0.1674255f, 0.197184f), listOf(
+            tuning.repulsionCutoff, tuning.collisionPadding, tuning.collisionStrength, tuning.collisionMaxShare,
         ))
-        // The force-model improvements ship switched on.
-        val improvements = listOf(tuning.degreeScaling, tuning.clusterStrength, tuning.seedSpacing, tuning.seedJitter)
-        assertEquals(listOf(1f, 0.05f, 60f, 30f), improvements)
-        val fleet = listOf(tuning.hubSpokeStrength, tuning.crowdedRepulsionScale, tuning.crowdedCollisionStrength, tuning.barnesHutAbove)
-        assertEquals(listOf(0.02f, 3f, 3f, 300f), fleet)
-        assertEquals(0.9f, tuning.barnesHutTheta)
-        assertEquals(0.1f, tuning.linkLengthDegreeBias)
-        assertEquals(1f, tuning.naturalness)
-        assertEquals(
-            mapOf(
-                MemoryGraphEdgeKind.Runs to 0.2f,
-                MemoryGraphEdgeKind.Remembers to 0.3f,
-                MemoryGraphEdgeKind.Uses to 0.25f,
-                MemoryGraphEdgeKind.Delivers to 0.15f,
-            ),
-            tuning.linkLengthSpread,
+        assertEquals(0.4892225f, tuning.radiusScaleOf(MemoryGraphNodeKind.Memory))
+        val springs = listOf(tuning.degreeScaling, tuning.hubSpokeStrength, tuning.clusterStrength)
+        assertEquals(listOf(0.4314984f, 0.1675245f, 0.07654494f), springs)
+        val labels = listOf(tuning.labelZoomThreshold, tuning.labelFontScale, tuning.settleSpeed)
+        assertEquals(listOf(4.605883f, 0.8976716f, 0.1170412f), labels)
+        // Knobs that count frames, nodes or links are whole numbers.
+        val whole = listOf(
+            tuning.barnesHutAbove, tuning.barnesHutRebuildFrames, tuning.coolingFrames, tuning.maxFramesPerHeat,
+            tuning.labelMinDegree, tuning.labelAllUnderNodes, tuning.labelHysteresisCount, tuning.labelCullInterval,
         )
-        val spreads = listOf(
-            tuning.linkStiffnessSpread, tuning.chargeSpread, tuning.collisionRadiusSpread, tuning.gravitySpread, tuning.clusterSpread,
-        )
-        assertEquals(listOf(0.3f, 0.2f, 0.15f, 0.2f, 0.2f), spreads)
-        assertEquals(listOf(10f, 0.35f, 0.1f), listOf(tuning.barnesHutRebuildFrames, tuning.collisionMaxShare, tuning.collisionFadeAlpha))
-        assertTrue(tuning.pinBackend)
-        assertTrue(tuning.clusterEnabled && tuning.seededLayout)
-        val labels = listOf(tuning.labelMinDegree, tuning.labelZoomThreshold, tuning.labelAllUnderNodes, tuning.labelFontScale)
-        assertEquals(listOf(3f, 1.6f, 60f, 1f), labels)
-        assertTrue(tuning.labelCulling && tuning.labelNeighboursOnFocus)
-        assertEquals(listOf(3f, 6f, 8f), listOf(tuning.labelHysteresisCount, tuning.labelHysteresisMargin, tuning.labelCullInterval))
+        assertEquals(listOf(300f, 19f, 437f, 830f, 11f, 21f, 3f, 8f), whole)
+        assertTrue(tuning.pinBackend && tuning.clusterEnabled && tuning.seededLayout && tuning.labelCulling)
+    }
+
+    @Test
+    fun theCopiedKotlinBuildsTheSameTuning() {
+        // Every field the copy names, back through the same JSON a dev store keeps.
+        val tuned = MemoryGraphTuning()
+        assertEquals(tuned, MemoryGraphTunings.decode(MemoryGraphTunings.encode(tuned)))
+        val source = MemoryGraphTunings.kotlinSource(tuned)
+        assertTrue("    repulsion = 3258.427f," in source)
+        assertTrue("    coolingFrames = 437.0f," in source)
+        assertTrue("MemoryGraphEdgeKind.Remembers to 0.009868421f" in source)
     }
 
     @Test
@@ -245,7 +233,7 @@ class MemoryGraphTuningTest {
         val view = MemoryGraphViews.build(star(), emptySet())
         val seed = MemoryGraphLayoutEngine.layout(view, MemoryGraphLayoutMode.Radial)
         val plain = field(view, seed)
-        val off = MemoryGraphTuning(
+        val off = pinnedTuning.copy(
             degreeScaling = 0f,
             clusterEnabled = false,
             sparseDamping = config.damping,
@@ -265,15 +253,15 @@ class MemoryGraphTuningTest {
 
     @Test
     fun aKindsChargeScalesHowHardItRepels() {
-        val baseline = pairPush(MemoryGraphTuning(repulsion = WEAK))
-        val charged = pairPush(MemoryGraphTuning(repulsion = WEAK, nodeCharge = mapOf(MemoryGraphNodeKind.Agent to 2f)))
+        val baseline = pairPush(pinnedTuning.copy(repulsion = WEAK))
+        val charged = pairPush(pinnedTuning.copy(repulsion = WEAK, nodeCharge = mapOf(MemoryGraphNodeKind.Agent to 2f)))
         assertTrue(abs(charged / baseline - 2f) < 0.05f, "charge 2 doubled the push: $baseline -> $charged")
     }
 
     @Test
     fun nodesBeyondTheCutOffDoNotRepel() {
-        val unlimited = pairPush(MemoryGraphTuning(repulsion = WEAK, gravity = 0f))
-        val cut = pairPush(MemoryGraphTuning(repulsion = WEAK, gravity = 0f, repulsionCutoff = PAIR_DISTANCE / 2))
+        val unlimited = pairPush(pinnedTuning.copy(repulsion = WEAK, gravity = 0f))
+        val cut = pairPush(pinnedTuning.copy(repulsion = WEAK, gravity = 0f, repulsionCutoff = PAIR_DISTANCE / 2))
         assertTrue(unlimited > 0f)
         assertEquals(0f, cut)
     }
@@ -281,7 +269,7 @@ class MemoryGraphTuningTest {
     @Test
     fun aSpringKindsLengthIsWhereItRests() {
         val view = MemoryGraphViews.build(pair(), emptySet())
-        val tuning = MemoryGraphTuning(repulsion = 0f, gravity = 0f, springLength = mapOf(MemoryGraphEdgeKind.Runs to PAIR_DISTANCE))
+        val tuning = pinnedTuning.copy(repulsion = 0f, gravity = 0f, springLength = mapOf(MemoryGraphEdgeKind.Runs to PAIR_DISTANCE))
         val field = MemoryGraphForceField(2, MemoryGraphForceField.springsOf(view))
         field.applyTuning(tuning, GraphElements(nodeKinds(view), MemoryGraphForceField.springKindsOf(view)))
         field.place(0, MemoryGraphPoint(0f, 0f))
@@ -293,7 +281,7 @@ class MemoryGraphTuningTest {
     @Test
     fun degreeScalingSoftensASpringBetweenHubsAgainstOneBetweenLeaves() {
         val view = MemoryGraphViews.build(hubsAndPair(), emptySet())
-        val tuning = MemoryGraphTuning(repulsion = 0f, gravity = 0f, clusterEnabled = false)
+        val tuning = pinnedTuning.copy(repulsion = 0f, gravity = 0f, clusterEnabled = false)
         val field = MemoryGraphForceField(view.nodes.size, MemoryGraphForceField.springsOf(view))
         field.applyTuning(tuning, GraphElements(nodeKinds(view), MemoryGraphForceField.springKindsOf(view)))
         val start = hubsAndPairPositions()
@@ -308,7 +296,7 @@ class MemoryGraphTuningTest {
     @Test
     fun theClusterForcePullsASharedNodeTowardItsAgents() {
         val view = MemoryGraphViews.build(sharedBlock(), emptySet())
-        val tuning = MemoryGraphTuning(
+        val tuning = pinnedTuning.copy(
             repulsion = 0f,
             gravity = 0f,
             springStiffness = MemoryGraphEdgeKind.entries.associateWith { 0f },
@@ -333,7 +321,7 @@ class MemoryGraphTuningTest {
     fun aFleetPinsItsBackendAndKeepsItsSpokesWeak() {
         val view = MemoryGraphViews.build(sharedBlock(), emptySet())
         // Only the spokes pull: every other spring is slack, so the agent moves by its spoke alone.
-        val tuning = MemoryGraphTuning(
+        val tuning = pinnedTuning.copy(
             repulsion = 0f,
             gravity = 0f,
             clusterEnabled = false,
@@ -369,7 +357,7 @@ class MemoryGraphTuningTest {
             field.step(MemoryGraphForceField.FREE, MemoryGraphMotion.forGraph(count, 0, tuning), 1f)
             return List(count) { i -> MemoryGraphPoint(field.point(i).x - points[i].x, field.point(i).y - points[i].y) }
         }
-        val base = MemoryGraphTuning(repulsion = WEAK, gravity = 0f)
+        val base = pinnedTuning.copy(repulsion = WEAK, gravity = 0f)
         val exact = moves(base.copy(barnesHutAbove = 100_000f))
         val approximate = moves(base.copy(barnesHutAbove = 0f, barnesHutTheta = 0.5f))
         val error = exact.indices.sumOf { i -> hypot(exact[i].x - approximate[i].x, exact[i].y - approximate[i].y).toDouble() }
@@ -392,7 +380,7 @@ class MemoryGraphTuningTest {
     @Test
     fun eachLinkGetsItsOwnStableLengthWithinTheSpread() {
         val view = MemoryGraphViews.build(star(), emptySet())
-        val tuning = MemoryGraphTuning(linkLengthDegreeBias = 0f)
+        val tuning = pinnedTuning.copy(linkLengthDegreeBias = 0f)
         val lengths = restLengths(view, tuning)
         assertEquals(lengths, restLengths(view, tuning), "the same edge always gets the same length")
         val base = tuning.lengthOf(MemoryGraphEdgeKind.Remembers)
@@ -420,16 +408,16 @@ class MemoryGraphTuningTest {
             )
         }
         val after = MemoryGraphViews.build(grown, emptySet())
-        val lengthsBefore = restLengths(before, MemoryGraphTuning())
-        val lengthsAfter = restLengths(after, MemoryGraphTuning())
+        val lengthsBefore = restLengths(before, pinnedTuning)
+        val lengthsAfter = restLengths(after, pinnedTuning)
         lengthsBefore.forEach { (edge, length) -> assertEquals(length, lengthsAfter[edge], edge) }
     }
 
     @Test
     fun theDegreeBiasLengthensLinksToHubs() {
         val view = MemoryGraphViews.build(star(), emptySet())
-        val plain = restLengths(view, MemoryGraphTuning(linkLengthSpread = emptyMap(), linkLengthDegreeBias = 0f))
-        val biased = restLengths(view, MemoryGraphTuning(linkLengthSpread = emptyMap(), linkLengthDegreeBias = 0.2f))
+        val plain = restLengths(view, pinnedTuning.copy(linkLengthSpread = emptyMap(), linkLengthDegreeBias = 0f))
+        val biased = restLengths(view, pinnedTuning.copy(linkLengthSpread = emptyMap(), linkLengthDegreeBias = 0.2f))
         plain.forEach { (edge, length) -> assertTrue(biased.getValue(edge) > length, "$edge to the hub is longer") }
     }
 
@@ -481,7 +469,7 @@ class MemoryGraphTuningTest {
 
     @Test
     fun theKotlinSourceNamesEveryKnob() {
-        val source = MemoryGraphTunings.kotlinSource(MemoryGraphTuning(repulsion = 4200f))
+        val source = MemoryGraphTunings.kotlinSource(pinnedTuning.copy(repulsion = 4200f))
         assertTrue(source.startsWith("MemoryGraphTuning(\n"))
         assertTrue("    repulsion = 4200.0f," in source)
         assertTrue("MemoryGraphNodeKind.Agent to 1.0f" in source)

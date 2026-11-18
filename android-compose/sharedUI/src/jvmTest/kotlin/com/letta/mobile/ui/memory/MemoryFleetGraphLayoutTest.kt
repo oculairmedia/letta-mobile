@@ -5,7 +5,6 @@ import com.letta.mobile.data.memory.MemoryFleetMapper
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.MemoryParityState
 import com.letta.mobile.data.memory.graph.MemoryGraphLayout
-import com.letta.mobile.data.memory.graph.MemoryGraphLayoutConfig
 import com.letta.mobile.data.memory.graph.MemoryGraphLayoutEngine
 import com.letta.mobile.data.memory.graph.MemoryGraphMotion
 import com.letta.mobile.data.memory.graph.MemoryGraphTuning
@@ -51,15 +50,16 @@ class MemoryFleetGraphLayoutTest {
     }
 
     @Test
-    fun oneAgentsStarKeepsItsOwnMotion() {
+    fun aStarMovesWithTheSparseMotionAndAFleetCoolsWithTheCrowdedOne() {
         val tuning = MemoryGraphTuning()
         assertEquals(
             MemoryGraphMotion(tuning.sparseDamping, tuning.sparseMaxSpeed, alphaDecay = 0f, clampVelocity = false),
             MemoryGraphMotion.forGraph(nodes = 12, edges = 11),
         )
         val crowded = MemoryGraphMotion.forGraph(nodes = 300, edges = 600)
-        assertTrue(crowded.damping < tuning.sparseDamping && crowded.maxSpeed < tuning.sparseMaxSpeed && crowded.alphaDecay > 0f)
-        assertEquals(MemoryGraphLayoutConfig().maxStep, tuning.sparseMaxSpeed)
+        assertEquals(tuning.crowdedDamping, crowded.damping)
+        assertEquals(tuning.crowdedMaxSpeed, crowded.maxSpeed)
+        assertTrue(crowded.alphaDecay > 0f && crowded.clampVelocity, "a fleet cools and clamps: $crowded")
     }
 
     @Test
@@ -80,12 +80,13 @@ class MemoryFleetGraphLayoutTest {
     }
 
     /**
-     * Opens [memory] live and checks it comes to rest within [REST_WITHIN_FRAMES] frames, slower
+     * Opens [memory] live and checks it comes to rest within the tuning's frames per heat, slower
      * than [REST_SPEED] per frame, stays still, and rests round and centred: the backend at the
      * centre, every node's centroid within [CENTRED] of the layout's radius of it, and at least
      * [FILLED] of the nodes inside half that radius (a ring with an empty middle has almost none).
      */
     private fun assertRestsRoundAndCentred(memory: MemoryParityState) {
+        val restWithinFrames = MemoryGraphTuning().maxFramesPerHeat.toInt()
         val view = MemoryGraphViews.build(memory.graph, emptySet())
         val sim = physics(view, memory)
         assertTrue(sim.isHot, "the fleet graph opens out like one agent's")
@@ -96,7 +97,7 @@ class MemoryFleetGraphLayoutTest {
             lastSpeeds.addLast(sim.lastSpeed)
             if (lastSpeeds.size > TAIL_FRAMES) lastSpeeds.removeFirst()
         }
-        assertTrue(frames <= REST_WITHIN_FRAMES, "came to rest in $frames frames")
+        assertTrue(frames <= restWithinFrames, "came to rest in $frames frames, over $restWithinFrames")
         assertTrue(sim.lastSpeed < REST_SPEED, "still moving at ${sim.lastSpeed} per frame when it stopped")
         assertTrue(lastSpeeds.all { it < TAIL_SPEED }, "still buzzing as it came to rest: $lastSpeeds")
         val rested = sim.snapshot()
@@ -190,8 +191,6 @@ class MemoryFleetGraphLayoutTest {
         const val SHARED_LABELS = 8
         const val FLEET_SEED = 1
 
-        /** About three seconds at 60 frames per second. */
-        const val REST_WITHIN_FRAMES = 180
         const val REST_SPEED = 1f
         const val STAY_FRAMES = 120
         const val REST_DRIFT = 0.1f

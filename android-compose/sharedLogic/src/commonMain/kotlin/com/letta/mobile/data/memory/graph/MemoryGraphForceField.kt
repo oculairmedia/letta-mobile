@@ -107,7 +107,8 @@ class MemoryGraphForceField(
     /**
      * One live step under [motion]: the forces scaled by the cooling [alpha] (1 when hot, decaying
      * toward [MemoryGraphTuning.alphaMin]), [MemoryGraphMotion.damping] friction and a speed cap.
-     * At [MemoryGraphMotion.forGraph]'s small-graph tuning and alpha 1 it is exactly [step].
+     * Under a motion with [MemoryGraphLayoutConfig]'s damping and step cap, no cooling and alpha 1,
+     * it is exactly [step].
      */
     fun step(pinned: Int, motion: MemoryGraphMotion, alpha: Float): Float {
         applyForces()

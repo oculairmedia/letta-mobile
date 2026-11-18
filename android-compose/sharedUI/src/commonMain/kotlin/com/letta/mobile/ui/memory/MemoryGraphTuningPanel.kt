@@ -26,6 +26,7 @@ import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.graph.MemoryGraphTuning
 import com.letta.mobile.ui.components.foundation.LettaSectionLabel
 import com.letta.mobile.ui.theme.LettaDimens
+import kotlin.math.roundToInt
 
 /** What the tuning panel asks its host to do: apply a tuning, reset it, reheat the graph, copy it as Kotlin. */
 internal class MemoryGraphTuningActions(
@@ -74,7 +75,7 @@ private fun KnobRow(knob: MemoryGraphKnob, tuning: MemoryGraphTuning, onChange: 
             valueRange = knob.range,
             modifier = Modifier.weight(KNOB_SLIDER_WEIGHT),
         )
-        KnobField(value, knob.range, { onChange(knob.write(tuning, it)) }, Modifier.weight(KNOB_FIELD_WEIGHT))
+        KnobField(KnobValue(value, knob.range, knob.whole), { onChange(knob.write(tuning, it)) }, Modifier.weight(KNOB_FIELD_WEIGHT))
     }
 }
 
@@ -92,8 +93,9 @@ private fun ToggleRow(toggle: MemoryGraphToggle, tuning: MemoryGraphTuning, onCh
 
 /** The knob's exact value, typed; a number that does not parse is kept as text until it does. */
 @Composable
-private fun KnobField(value: Float, range: ClosedFloatingPointRange<Float>, onValue: (Float) -> Unit, modifier: Modifier) {
-    var text by remember(value) { mutableStateOf(value.toString()) }
+private fun KnobField(knob: KnobValue, onValue: (Float) -> Unit, modifier: Modifier) {
+    val (value, range) = knob
+    var text by remember(knob) { mutableStateOf(if (knob.whole) value.roundToInt().toString() else value.toString()) }
     OutlinedTextField(
         value = text,
         onValueChange = { typed ->
@@ -106,13 +108,20 @@ private fun KnobField(value: Float, range: ClosedFloatingPointRange<Float>, onVa
     )
 }
 
-/** One tunable number: its [label], its slider's [range], and how it reads and writes a tuning. */
+/**
+ * One tunable number: its [label], its slider's [range], and how it reads and writes a tuning. A
+ * [whole] knob (a count of frames, nodes or decisions) writes only whole numbers.
+ */
 internal class MemoryGraphKnob(
     val label: String,
     val range: ClosedFloatingPointRange<Float>,
     val read: (MemoryGraphTuning) -> Float,
-    val write: (MemoryGraphTuning, Float) -> MemoryGraphTuning,
-)
+    set: (MemoryGraphTuning, Float) -> MemoryGraphTuning,
+    val whole: Boolean = false,
+) {
+    val write: (MemoryGraphTuning, Float) -> MemoryGraphTuning =
+        if (whole) { t, v -> set(t, v.roundToInt().toFloat()) } else set
+}
 
 /** One on/off knob: its [label], and how it reads and writes a tuning. */
 internal class MemoryGraphToggle(
@@ -150,13 +159,14 @@ internal object MemoryGraphKnobs {
         MemoryGraphKnob("Strength", 0f..20_000f, { it.repulsion }, { t, v -> t.copy(repulsion = v) }),
         MemoryGraphKnob("Cut-off distance (0 = none)", 0f..1_000f, { it.repulsionCutoff }, { t, v -> t.copy(repulsionCutoff = v) }),
         MemoryGraphKnob("Strength scale (crowded)", 0.5f..6f, { it.crowdedRepulsionScale }, { t, v -> t.copy(crowdedRepulsionScale = v) }),
-        MemoryGraphKnob("Barnes–Hut above nodes", 0f..2_000f, { it.barnesHutAbove }, { t, v -> t.copy(barnesHutAbove = v) }),
+        MemoryGraphKnob("Barnes–Hut above nodes", 0f..2_000f, { it.barnesHutAbove }, { t, v -> t.copy(barnesHutAbove = v) }, whole = true),
         MemoryGraphKnob("Barnes–Hut theta", 0.1f..1.5f, { it.barnesHutTheta }, { t, v -> t.copy(barnesHutTheta = v) }),
         MemoryGraphKnob(
             "Barnes–Hut rebuild every N frames",
             1f..60f,
             { it.barnesHutRebuildFrames },
             { t, v -> t.copy(barnesHutRebuildFrames = v) },
+            whole = true,
         ),
         MemoryGraphKnob("Charge spread (±, per node)", 0f..0.8f, { it.chargeSpread }, { t, v -> t.copy(chargeSpread = v) }),
     ) + MemoryGraphNodeKind.entries.map { kind ->
@@ -173,18 +183,31 @@ internal object MemoryGraphKnobs {
     )
 
     private fun labels(): List<MemoryGraphKnob> = listOf(
-        MemoryGraphKnob("Label at or over degree", 0f..20f, { it.labelMinDegree }, { t, v -> t.copy(labelMinDegree = v) }),
+        MemoryGraphKnob("Label at or over degree", 0f..20f, { it.labelMinDegree }, { t, v -> t.copy(labelMinDegree = v) }, whole = true),
         MemoryGraphKnob("Label everything from zoom", 0.2f..5f, { it.labelZoomThreshold }, { t, v -> t.copy(labelZoomThreshold = v) }),
         MemoryGraphKnob(
             "Label everything at or under nodes",
             0f..400f,
             { it.labelAllUnderNodes },
             { t, v -> t.copy(labelAllUnderNodes = v) },
+            whole = true,
         ),
         MemoryGraphKnob("Label font scale", 0.5f..2f, { it.labelFontScale }, { t, v -> t.copy(labelFontScale = v) }),
-        MemoryGraphKnob("Hysteresis (decisions)", 1f..10f, { it.labelHysteresisCount }, { t, v -> t.copy(labelHysteresisCount = v) }),
+        MemoryGraphKnob(
+            "Hysteresis (decisions)",
+            1f..10f,
+            { it.labelHysteresisCount },
+            { t, v -> t.copy(labelHysteresisCount = v) },
+            whole = true,
+        ),
         MemoryGraphKnob("Hysteresis margin (px)", 0f..30f, { it.labelHysteresisMargin }, { t, v -> t.copy(labelHysteresisMargin = v) }),
-        MemoryGraphKnob("Cull every N frames while moving", 1f..30f, { it.labelCullInterval }, { t, v -> t.copy(labelCullInterval = v) }),
+        MemoryGraphKnob(
+            "Cull every N frames while moving",
+            1f..30f,
+            { it.labelCullInterval },
+            { t, v -> t.copy(labelCullInterval = v) },
+            whole = true,
+        ),
     )
 
     private fun clusterAndSeedToggles(): List<MemoryGraphToggle> = listOf(
@@ -282,10 +305,16 @@ internal object MemoryGraphKnobs {
 
     private fun cooling(): List<MemoryGraphKnob> = listOf(
         MemoryGraphKnob("Alpha start", 0.1f..2f, { it.alphaStart }, { t, v -> t.copy(alphaStart = v) }),
-        MemoryGraphKnob("Cooling frames", 10f..600f, { it.coolingFrames }, { t, v -> t.copy(coolingFrames = v) }),
+        MemoryGraphKnob("Cooling frames", 10f..600f, { it.coolingFrames }, { t, v -> t.copy(coolingFrames = v) }, whole = true),
         MemoryGraphKnob("Alpha minimum", 0.0001f..0.05f, { it.alphaMin }, { t, v -> t.copy(alphaMin = v) }),
         MemoryGraphKnob("Stop below speed", 0f..1f, { it.settleSpeed }, { t, v -> t.copy(settleSpeed = v) }),
-        MemoryGraphKnob("Most frames per heat", 30f..1_200f, { it.maxFramesPerHeat }, { t, v -> t.copy(maxFramesPerHeat = v) }),
+        MemoryGraphKnob(
+            "Most frames per heat",
+            30f..1_200f,
+            { it.maxFramesPerHeat },
+            { t, v -> t.copy(maxFramesPerHeat = v) },
+            whole = true,
+        ),
     )
 }
 

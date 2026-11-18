@@ -25,26 +25,38 @@ import kotlinx.serialization.Serializable
 @Immutable
 data class MemoryGraphTuning(
     /** Many-body repulsion between every pair of nodes, falling off with the square of distance. */
-    val repulsion: Float = 3200f,
+    val repulsion: Float = 3258.427f,
     /** Each node kind's charge; a pair repels with [repulsion] times both charges. */
-    val nodeCharge: Map<MemoryGraphNodeKind, Float> = MemoryGraphNodeKind.entries.associateWith { 1f },
+    val nodeCharge: Map<MemoryGraphNodeKind, Float> = mapOf(
+        MemoryGraphNodeKind.Agent to 2.30476f,
+        MemoryGraphNodeKind.Backend to 1f,
+        MemoryGraphNodeKind.Skill to 1.392284f,
+        MemoryGraphNodeKind.Memory to 1f,
+        MemoryGraphNodeKind.Schedule to 1f,
+        MemoryGraphNodeKind.Channel to 2.469569f,
+    ),
     /** Beyond this distance two nodes stop repelling; 0 repels at any distance. */
-    val repulsionCutoff: Float = 0f,
+    val repulsionCutoff: Float = 133.427f,
     /** Repulsion on a fully crowded graph, as a multiple of [repulsion] (blended in by crowding). */
-    val crowdedRepulsionScale: Float = 3f,
+    val crowdedRepulsionScale: Float = 1.432116f,
     /** Above this many nodes repulsion uses a Barnes–Hut quadtree instead of every pair. */
     val barnesHutAbove: Float = 300f,
     /** Barnes–Hut's opening angle: a cell this small against its distance counts as one body. */
-    val barnesHutTheta: Float = 0.9f,
+    val barnesHutTheta: Float = 1.176873f,
     /** Frames between rebuilding the Barnes–Hut tree (in between its cells follow their bodies), so its forces do not jump each frame. */
-    val barnesHutRebuildFrames: Float = 10f,
+    val barnesHutRebuildFrames: Float = 19f,
     /** Each edge kind's rest length. */
-    val springLength: Map<MemoryGraphEdgeKind, Float> = MemoryGraphEdgeKind.entries.associateWith { 110f },
+    val springLength: Map<MemoryGraphEdgeKind, Float> = mapOf(
+        MemoryGraphEdgeKind.Uses to 400f,
+        MemoryGraphEdgeKind.Remembers to 319.5302f,
+        MemoryGraphEdgeKind.Runs to 400f,
+        MemoryGraphEdgeKind.Delivers to 400f,
+    ),
     /**
      * The master of every per-element spread below: 1 applies them as set, 0 turns all variation
      * off (every element of a kind exactly alike, as before variation existed).
      */
-    val naturalness: Float = 1f,
+    val naturalness: Float = 2.532479f,
     /**
      * How far each edge's rest length strays from its kind's, by kind, as a fraction either way:
      * drawn from a stable hash of the edge's ends, so the same graph always looks the same and adding
@@ -59,7 +71,7 @@ data class MemoryGraphTuning(
     /** How far each edge's stiffness strays from its kind's, as a fraction either way. */
     val linkStiffnessSpread: Float = 0.3f,
     /** How far each node's repulsion charge strays from its kind's, as a fraction either way. */
-    val chargeSpread: Float = 0.2f,
+    val chargeSpread: Float = 0.1486891f,
     /** How far each node's collision radius strays from its drawn one, as a fraction either way. */
     val collisionRadiusSpread: Float = 0.15f,
     /** How far each node's pull to the centre strays, as a fraction either way. */
@@ -69,12 +81,17 @@ data class MemoryGraphTuning(
     /** How much longer an edge to a hub is (up to this fraction, for a node of 64 links or more); 0 is off. */
     val linkLengthDegreeBias: Float = 0.1f,
     /** Each edge kind's stiffness: force per unit stretched past its rest length. */
-    val springStiffness: Map<MemoryGraphEdgeKind, Float> = MemoryGraphEdgeKind.entries.associateWith { 0.14f },
+    val springStiffness: Map<MemoryGraphEdgeKind, Float> = mapOf(
+        MemoryGraphEdgeKind.Uses to 0.3077863f,
+        MemoryGraphEdgeKind.Remembers to 0.009868421f,
+        MemoryGraphEdgeKind.Runs to 0.9636452f,
+        MemoryGraphEdgeKind.Delivers to 0.7511727f,
+    ),
     /**
      * In a graph with several agents, the stiffness of every spoke from the backend: weak, so the
      * backend's hundreds of spokes do not drag the agents into a ring around it.
      */
-    val hubSpokeStrength: Float = 0.02f,
+    val hubSpokeStrength: Float = 0.1675245f,
     /** In a graph with several agents, whether the backend stays fixed at the centre. */
     val pinBackend: Boolean = true,
     /**
@@ -82,11 +99,11 @@ data class MemoryGraphTuning(
      * divided by the smaller of its ends' degrees, and its pull split toward the lower-degree end so
      * hubs move less.
      */
-    val degreeScaling: Float = 1f,
+    val degreeScaling: Float = 0.4314984f,
     /** Whether shared label groups are pulled toward their agents' centroid (and blocks toward their agent). */
     val clusterEnabled: Boolean = true,
     /** The cluster pull per unit of distance from the owners' centroid, scaled by the cooling alpha. */
-    val clusterStrength: Float = 0.05f,
+    val clusterStrength: Float = 0.07654494f,
     /**
      * Whether a graph with several agents opens from a seeded layout: agents on a sunflower spiral
      * around the backend at the centre, each other node near its agents' centroid.
@@ -97,56 +114,63 @@ data class MemoryGraphTuning(
     /** How far from its agents' centroid a seeded node may start (deterministic, by node id). */
     val seedJitter: Float = 30f,
     /** The pull of every node toward the centre, per unit of distance. */
-    val gravity: Float = 0.01f,
+    val gravity: Float = 0.01072097f,
     /** How far apart two drawn circles are pushed beyond touching. */
-    val collisionPadding: Float = 10f,
+    val collisionPadding: Float = 2.6f,
     /** How hard overlapping circles push apart, per unit of overlap. */
-    val collisionStrength: Float = 0.6f,
+    val collisionStrength: Float = 0.1674255f,
     /** Collision strength on a fully crowded graph (blended in by crowding). */
-    val crowdedCollisionStrength: Float = 3f,
+    val crowdedCollisionStrength: Float = 1.082368f,
     /**
      * The most of an overlap a node is pushed per frame (with its partner, twice this): stronger
      * collision overshoots, so overlapping nodes bounce off each other instead of settling.
      */
-    val collisionMaxShare: Float = 0.35f,
+    val collisionMaxShare: Float = 0.197184f,
     /** Collision cools with the other forces only once alpha falls below this, so overlaps keep resolving. */
     val collisionFadeAlpha: Float = 0.1f,
     /** Each node kind's collision radius, as a multiple of its drawn radius. */
-    val collisionRadiusScale: Map<MemoryGraphNodeKind, Float> = MemoryGraphNodeKind.entries.associateWith { 1f },
+    val collisionRadiusScale: Map<MemoryGraphNodeKind, Float> = mapOf(
+        MemoryGraphNodeKind.Agent to 0.4527235f,
+        MemoryGraphNodeKind.Backend to 0.345447f,
+        MemoryGraphNodeKind.Skill to 0.4887693f,
+        MemoryGraphNodeKind.Memory to 0.4892225f,
+        MemoryGraphNodeKind.Schedule to 0.7812151f,
+        MemoryGraphNodeKind.Channel to 0.4344739f,
+    ),
     /** Velocity kept per frame on a sparse graph (one agent's star). */
-    val sparseDamping: Float = 0.75f,
+    val sparseDamping: Float = 0.1143593f,
     /** Velocity kept per frame on a crowded graph (the fleet view). */
-    val crowdedDamping: Float = 0.45f,
+    val crowdedDamping: Float = 0.2659934f,
     /** The fastest a node moves per frame on a sparse graph. */
-    val sparseMaxSpeed: Float = 30f,
+    val sparseMaxSpeed: Float = 9.738071f,
     /** The fastest a node moves per frame on a crowded graph. */
-    val crowdedMaxSpeed: Float = 12f,
+    val crowdedMaxSpeed: Float = 17.76639f,
     /** Crowding (nodes plus twice each edge beyond a tree's) at or under which a graph is sparse. */
-    val sparseCrowding: Float = 40f,
+    val sparseCrowding: Float = 74.90636f,
     /** Crowding at or over which a graph is fully crowded. */
-    val crowdedCrowding: Float = 240f,
+    val crowdedCrowding: Float = 120.3184f,
     /** The cooling's starting alpha, which the forces are scaled by. */
     val alphaStart: Float = 1f,
     /** Frames a crowded graph takes to cool from [alphaStart] to [alphaMin]. */
-    val coolingFrames: Float = 150f,
+    val coolingFrames: Float = 437f,
     /** Below this alpha a cooling simulation stops. */
-    val alphaMin: Float = 0.001f,
+    val alphaMin: Float = 0.005940356f,
     /** Once every node moves slower than this per frame, the simulation stops. */
-    val settleSpeed: Float = 0.04f,
+    val settleSpeed: Float = 0.1170412f,
     /** The most frames one heat runs for, cooled or not. */
-    val maxFramesPerHeat: Float = 360f,
+    val maxFramesPerHeat: Float = 830f,
     /** A node with at least this many links keeps its label (shared hubs such as "persona"). */
-    val labelMinDegree: Float = 3f,
+    val labelMinDegree: Float = 11f,
     /** From this zoom on every node may be labelled. */
-    val labelZoomThreshold: Float = 1.6f,
+    val labelZoomThreshold: Float = 4.605883f,
     /** A graph with at most this many nodes labels every node (one agent's star). */
-    val labelAllUnderNodes: Float = 60f,
+    val labelAllUnderNodes: Float = 21f,
     /** Whether a label that would overlap a higher-priority one is skipped. */
     val labelCulling: Boolean = true,
     /** Whether hovering or selecting a node also labels its neighbours. */
     val labelNeighboursOnFocus: Boolean = true,
     /** Label text size, as a multiple of the graph's label styles. */
-    val labelFontScale: Float = 1f,
+    val labelFontScale: Float = 0.8976716f,
     /** Decisions running a label must overlap (or be clear) before culling hides (or shows) it. */
     val labelHysteresisCount: Float = 3f,
     /** Pixels a shown label's chip is shrunk (and a hidden one's grown) by when culling tests it. */

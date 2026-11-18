@@ -8,7 +8,6 @@ import com.letta.mobile.data.memory.MemoryGraphEdgeKind
 import com.letta.mobile.data.memory.MemoryGraphNode
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.MemoryParityGraph
-import com.letta.mobile.data.memory.graph.MemoryGraphTuning
 import com.letta.mobile.data.memory.graph.MemoryGraphViews
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,8 +19,8 @@ class MemoryGraphLabelerTest {
     private val view = MemoryGraphViews.build(graph(), emptySet())
     private val labeler = MemoryGraphLabeler(view, view.adjacency())
 
-    /** Declutter as a fleet does: no small-graph exception. */
-    private val tuning = MemoryGraphTuning(labelAllUnderNodes = 0f)
+    /** Declutter as a fleet does, with no small-graph exception, at degree 3 and zoom 1.6. */
+    private val tuning = MemoryGraphTestTunings.classic.copy(labelAllUnderNodes = 0f)
 
     @Test
     fun thePriorityOrderIsBackendThenAgentsThenTheRestEachByDegreeThenTitle() {

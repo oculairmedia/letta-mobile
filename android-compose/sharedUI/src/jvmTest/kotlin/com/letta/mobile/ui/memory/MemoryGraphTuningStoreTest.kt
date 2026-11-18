@@ -52,4 +52,19 @@ class MemoryGraphTuningStoreTest {
             assertEquals(knob.range.endInclusive, knob.read(moved), knob.label)
         }
     }
+
+    @Test
+    fun countKnobsWriteOnlyWholeNumbers() {
+        val knobs = MemoryGraphKnobs.sections.flatMap { it.knobs }.filter { it.whole }
+        assertEquals(WHOLE_KNOBS, knobs.size)
+        knobs.forEach { knob ->
+            val value = knob.read(knob.write(MemoryGraphTuning(), knob.range.start + 1.4f))
+            assertEquals(knob.range.start + 1f, value, knob.label)
+        }
+    }
+
+    private companion object {
+        /** Barnes–Hut threshold and rebuild, cooling and heat frames, label degree, node count, hysteresis and interval. */
+        const val WHOLE_KNOBS = 8
+    }
 }
