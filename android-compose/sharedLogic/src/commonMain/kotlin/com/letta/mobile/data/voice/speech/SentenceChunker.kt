@@ -11,18 +11,28 @@ import com.letta.mobile.data.voice.VoiceText
  * links, URLs and HTML are stripped by [SpeakableText]. A segment never exceeds [maxSegmentLength]:
  * longer text is cut at the last clause break or space. [flush] releases whatever is left.
  *
+ * With [firstClauseMinLength] set, the chunker's first segment is released early, at the first
+ * clause break (a comma, semicolon, colon or dash followed by whitespace) once that clause is at
+ * least that long, or at the first sentence end, whichever comes first; speech then starts before
+ * the first sentence is complete. Every later segment is sentence-sized as usual. The sentence-end
+ * guards (abbreviations, initials, list numbers) still apply, and a clause break never splits a
+ * number (`1,000`, `10:30`) or follows an abbreviation (`e.g.,`).
+ *
  * Not thread-safe: one chunker serves one reply.
  */
 class SentenceChunker(
     private val maxSegmentLength: Int = DEFAULT_MAX_SEGMENT_LENGTH,
+    private val firstClauseMinLength: Int? = null,
 ) {
     private val pending = StringBuilder()
     private var inCodeBlock = false
     private var dropUntil: Char? = null
     private val softCut = SoftCut(maxSegmentLength)
+    private var released = false
 
     init {
         require(maxSegmentLength >= MIN_SEGMENT_LENGTH) { "maxSegmentLength too small" }
+        require(firstClauseMinLength == null || firstClauseMinLength > 0) { "firstClauseMinLength must be positive" }
     }
 
     /** Appends [delta] and returns every segment that is now complete. */
@@ -38,7 +48,7 @@ class SentenceChunker(
         return segments
     }
 
-    /** Drops everything buffered. */
+    /** Drops everything buffered; the first segment, once released, stays released. */
     fun reset() {
         pending.clear()
         inCodeBlock = false
@@ -92,15 +102,24 @@ class SentenceChunker(
         private fun splitProse(): Boolean {
             val fence = pending.indexOf(FENCE)
             val limit = if (fence < 0) pending.length else fence
-            val end = SentenceScan(pending, limit, mode).firstEnd()
+            val scan = SentenceScan(pending, limit, mode)
+            val end = scan.firstEnd()
+            val clause = earlyClause(scan)
             val overflow = overflowCut()
             return when {
+                clause != null && (end == null || clause.value < end.value) -> release(Cut(clause.value))
                 end != null -> release(Cut(end.value))
                 fence >= 0 -> openCodeBlock(Cut(fence, FENCE.length))
                 overflow != null -> releaseOverflow(overflow)
                 mode == ScanMode.FINAL -> emitAll()
                 else -> false
             }
+        }
+
+        /** Where the first segment may end early, while nothing has been released yet. */
+        private fun earlyClause(scan: SentenceScan): TextIndex? {
+            val minimum = firstClauseMinLength ?: return null
+            return if (released) null else scan.firstClauseEnd(minimum)
         }
 
         /**
@@ -164,7 +183,10 @@ class SentenceChunker(
             val raw = pending.substring(0, cut.length)
             pending.deleteRange(0, cut.length + cut.skip)
             val spoken = SpeakableText.clean(raw)
-            if (spoken.isNotEmpty()) out += splitLong(spoken).map(::VoiceText)
+            if (spoken.isNotEmpty()) {
+                out += splitLong(spoken).map(::VoiceText)
+                released = true
+            }
             return true
         }
 

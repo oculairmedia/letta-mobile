@@ -13,11 +13,23 @@ import com.letta.mobile.data.voice.endpoint.SpeechEndpointAddress
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointClient
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointConfig
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointException
+import com.letta.mobile.data.voice.endpoint.SpeechSpeed
 import com.letta.mobile.data.voice.endpoint.SpeechTransportPolicy
+import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
 import io.ktor.client.engine.HttpClientEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+
+/** The person's voice-mode tuning: how fast replies are spoken and how long a pause ends their turn. */
+data class VoiceTuning(
+    /** The speed replies are spoken at, sent to the speech endpoint. */
+    val speechSpeed: SpeechSpeed = SpeechSpeed.Normal,
+    /** The silence that ends a turn for the server ear (the device's recogniser decides its own). */
+    val endOfTurnSilence: Duration = EndOfTurnPolicy.DEFAULT_TRAILING_SILENCE,
+)
 
 /** What the person configured for voice mode, as stored. Never carries the API key itself. */
 data class VoiceSetup(
@@ -34,6 +46,8 @@ data class VoiceSetup(
     val interruptBySpeaking: Boolean = false,
     /** Which ear voice mode listens with. */
     val listening: VoiceListening = VoiceListening.AUTOMATIC,
+    /** Speech speed and end-of-turn silence. */
+    val tuning: VoiceTuning = VoiceTuning(),
 ) {
     /** Whether speaking over a reply interrupts it, on a microphone path that is [echoCancelled] or not. */
     fun bargeInByVoice(echoCancelled: Boolean): Boolean = echoCancelled || interruptBySpeaking
@@ -162,6 +176,19 @@ class VoiceSetupStore(
         state.value = read()
     }
 
+    /** Stores the speed replies are spoken at; takes effect from the next segment. */
+    fun setSpeechSpeed(speed: SpeechSpeed) {
+        settings.putString(KEY_SPEECH_SPEED, speed.value.toString())
+        state.value = read()
+    }
+
+    /** Stores the silence that ends a turn, clamped to the allowed range; takes effect from the next start. */
+    fun setEndOfTurnSilence(silence: Duration) {
+        val clamped = silence.coerceIn(EndOfTurnPolicy.MIN_TRAILING_SILENCE, EndOfTurnPolicy.MAX_TRAILING_SILENCE)
+        settings.putString(KEY_END_OF_TURN_SILENCE_MS, clamped.inWholeMilliseconds.toString())
+        state.value = read()
+    }
+
     /** The key a [draft] would leave stored: the typed one, none when blanked, else the stored one. */
     fun keyAfter(draft: VoiceSetupDraft): String? = when {
         secrets == null -> null
@@ -184,7 +211,15 @@ class VoiceSetupStore(
         hasApiKey = storedKey() != null,
         interruptBySpeaking = settings.getString(KEY_INTERRUPT_BY_SPEAKING) == true.toString(),
         listening = VoiceListening.entries.firstOrNull { it.name == settings.getString(KEY_LISTENING) } ?: VoiceListening.AUTOMATIC,
+        tuning = readTuning(),
     )
+
+    private fun readTuning(): VoiceTuning {
+        val speed = settings.getString(KEY_SPEECH_SPEED)?.toFloatOrNull()?.let(SpeechSpeed::coerce) ?: SpeechSpeed.Normal
+        val silence = settings.getString(KEY_END_OF_TURN_SILENCE_MS)?.toLongOrNull()?.milliseconds
+            ?.coerceIn(EndOfTurnPolicy.MIN_TRAILING_SILENCE, EndOfTurnPolicy.MAX_TRAILING_SILENCE)
+        return VoiceTuning(speed, silence ?: EndOfTurnPolicy.DEFAULT_TRAILING_SILENCE)
+    }
 
     private fun parseGrants(text: String): Set<VoiceEndpointGrant> = text.split(GRANT_SEPARATOR).mapNotNull { entry ->
         val payload = VoiceEndpointPayload.entries.firstOrNull { entry.startsWith("${it.name}$FIELD_SEPARATOR") }
@@ -207,6 +242,12 @@ class VoiceSetupStore(
 
         /** Which ear voice mode listens with ([VoiceListening]). */
         const val KEY_LISTENING: String = "voice.listening"
+
+        /** The speech speed multiplier ([SpeechSpeed]). */
+        const val KEY_SPEECH_SPEED: String = "voice.speechSpeed"
+
+        /** The server ear's end-of-turn silence, in milliseconds. */
+        const val KEY_END_OF_TURN_SILENCE_MS: String = "voice.endOfTurnSilenceMs"
 
         private const val GRANT_SEPARATOR = "\n"
         private const val FIELD_SEPARATOR = " "

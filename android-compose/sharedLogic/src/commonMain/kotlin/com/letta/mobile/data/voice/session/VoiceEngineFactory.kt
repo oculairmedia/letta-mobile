@@ -7,10 +7,12 @@ import com.letta.mobile.data.voice.consent.VoiceEndpointGrantSource
 import com.letta.mobile.data.voice.endpoint.EndpointSpeechSynthesizer
 import com.letta.mobile.data.voice.endpoint.EndpointTranscriber
 import com.letta.mobile.data.voice.endpoint.EndpointVoiceMouth
+import com.letta.mobile.data.voice.endpoint.MouthOptions
 import com.letta.mobile.data.voice.endpoint.SpeechApiKey
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointClient
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointConfig
 import com.letta.mobile.data.voice.loop.VoiceEngines
+import com.letta.mobile.data.voice.output.VoiceSessionControls
 import com.letta.mobile.data.voice.responder.VoiceChatResponder
 import com.letta.mobile.data.voice.responder.VoiceChatSession
 import com.letta.mobile.data.voice.session.telemetry.TelemetryMouth
@@ -19,6 +21,7 @@ import com.letta.mobile.data.voice.session.telemetry.TelemetryTranscriber
 import com.letta.mobile.data.voice.session.telemetry.TelemetryVoiceChatSession
 import com.letta.mobile.data.voice.session.telemetry.VoiceEarTelemetry
 import com.letta.mobile.data.voice.session.telemetry.VoiceTelemetry
+import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
 import com.letta.mobile.data.voice.vad.ear.SpeechTranscriber
 import com.letta.mobile.data.voice.vad.ear.VadEarConfig
 import com.letta.mobile.data.voice.vad.ear.VadVoiceEar
@@ -36,6 +39,7 @@ import com.letta.mobile.data.voice.session.telemetry.attr
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlin.time.TimeSource
 
 /** What one voice session's engines are built from. Its [toString] carries no address or key. */
 class VoiceEngineRequest internal constructor(
@@ -49,17 +53,26 @@ class VoiceEngineRequest internal constructor(
     val grants: VoiceEndpointGrantSource,
     /** The session's scope; the mouth's workers run in it. */
     val scope: CoroutineScope,
-    /** Where the engines report their decisions, timed from the session's start. */
-    internal val telemetry: VoiceTelemetry,
+    /** Where the engines report their decisions, and the controls they follow. */
+    internal val services: VoiceSessionServices,
 ) {
-    /** A request whose engines report with their own clock (it starts at the first `mode.started`). */
+    /**
+     * A request whose engines report with their own clock (it starts at the first `mode.started`)
+     * and follow controls of their own (unmuted, at the setup's speed).
+     */
     constructor(
         session: VoiceChatSession,
         setup: VoiceSetup,
         apiKey: SpeechApiKey?,
         grants: VoiceEndpointGrantSource,
         scope: CoroutineScope,
-    ) : this(session, setup, apiKey, grants, scope, VoiceTelemetry())
+    ) : this(session, setup, apiKey, grants, scope, VoiceSessionServices.standalone(setup))
+
+    /** Where the engines report their decisions, timed from the session's start. */
+    internal val telemetry: VoiceTelemetry get() = services.telemetry
+
+    /** The mutes, speed, warm-up and audio meter the engines follow. */
+    internal val controls: VoiceSessionControls get() = services.controls
 
     override fun toString(): String = "VoiceEngineRequest(keySet=${apiKey != null})"
 }
@@ -85,6 +98,23 @@ class VoiceEngineSet(
     fun release() = onRelease()
 }
 
+/** What a controller hands every session's engines: its telemetry and its live controls. */
+internal class VoiceSessionServices(
+    /** Where the engines report their decisions. */
+    val telemetry: VoiceTelemetry,
+    /** The controls the engines follow. */
+    val controls: VoiceSessionControls,
+) {
+    /** Factories. */
+    companion object {
+        /** Services of their own, for a request built outside a controller. */
+        fun standalone(setup: VoiceSetup): VoiceSessionServices {
+            val speed = MutableStateFlow(setup.tuning.speechSpeed)
+            return VoiceSessionServices(VoiceTelemetry(), VoiceSessionControls(TimeSource.Monotonic, speed) { speed.value = it })
+        }
+    }
+}
+
 /** Builds the engines for one voice session. */
 fun interface VoiceEngineFactory {
     /** The engines for [request]. */
@@ -99,7 +129,10 @@ fun interface VoiceEngineFactory {
  * when a device goes away) that transcribes each turn through the endpoint, half-duplex where the
  * microphone is not echo-cancelled and the person has not asked to interrupt by speaking. The
  * agent's chat is the responder, and the mouth streams WAVE audio from the endpoint and plays it on
- * the speaker. Each session gets its own HTTP client on a fresh engine from [httpEngine], closed on
+ * the speaker, two requests in flight and up to three sentences ahead, at the stored speed. The
+ * request's controls mute the microphone (its frames go silent) and the speaker, get each
+ * segment's audio length, and warm the speech connection when the person starts speaking; the
+ * server ear ends a turn after the stored end-of-turn silence. Each session gets its own HTTP client on a fresh engine from [httpEngine], closed on
  * release. Every engine reports its decisions as `VoiceMode` telemetry (states, reasons, ids,
  * counts and levels; never audio, text, the key or the address).
  */
@@ -116,7 +149,11 @@ class EndpointVoiceEngineFactory(
         val telemetry = request.telemetry
         val hearing = hearing(request, client)
         val synthesizer = EndpointSpeechSynthesizer(client, request.grants, endpoint, AudioEncoding.WAV)
-        val mouth = TelemetryMouth(EndpointVoiceMouth(synthesizer, audio.speaker(), request.scope), telemetry)
+        val controls = request.controls
+        controls.warmUpWith { synthesizer.warm() }
+        val options = MouthOptions(speed = controls::speed, meter = controls.meter)
+        val speaker = controls.speaker(audio.speaker())
+        val mouth = TelemetryMouth(EndpointVoiceMouth(synthesizer, speaker, request.scope, options), telemetry)
         val session = TelemetryVoiceChatSession(request.session, telemetry)
         val responder = TelemetryResponder(VoiceChatResponder(session), telemetry, session)
         val engines = VoiceEngines(ear = hearing.ear, responder = responder, mouth = mouth)
@@ -143,7 +180,7 @@ class EndpointVoiceEngineFactory(
     }
 
     private fun serverHearing(request: VoiceEngineRequest, client: SpeechEndpointClient): Hearing {
-        val microphone = RecoveringFrameSource(audio.microphone(format), deviceChanges = audio.deviceChanges())
+        val microphone = microphone(request)
         val echoCancelled = microphone.echoCancelled
         val bargeInByVoice = request.setup.bargeInByVoice(echoCancelled)
         val ear = serverEar(request, client, microphone, halfDuplex = !bargeInByVoice)
@@ -163,10 +200,7 @@ class EndpointVoiceEngineFactory(
     ): Hearing {
         val echoCancelled = local.echoCancelled
         val fallback = if (route == ListeningRoute.LOCAL_WITH_FALLBACK) {
-            VoiceEarFallback {
-                val microphone = RecoveringFrameSource(audio.microphone(format), deviceChanges = audio.deviceChanges())
-                serverEar(request, client, microphone, halfDuplex = !echoCancelled)
-            }
+            VoiceEarFallback { serverEar(request, client, microphone(request), halfDuplex = !echoCancelled) }
         } else {
             null
         }
@@ -174,6 +208,10 @@ class EndpointVoiceEngineFactory(
         val ear = LocalVoiceEar(local, fallback, config)
         return Hearing(ear, echoCancelled, echoCancelled, ear.handover)
     }
+
+    /** The microphone, reopened when a device goes away and silent while muted. */
+    private fun microphone(request: VoiceEngineRequest): RecoveringFrameSource =
+        RecoveringFrameSource(request.controls.microphone(audio.microphone(format)), deviceChanges = audio.deviceChanges())
 
     private fun serverEar(
         request: VoiceEngineRequest,
@@ -184,7 +222,8 @@ class EndpointVoiceEngineFactory(
         val endpoint = request.setup.endpoint
         val telemetry = request.telemetry
         val transcriber = TelemetryTranscriber(SpeechTranscriber.endpoint(EndpointTranscriber(client, request.grants, endpoint)), telemetry)
-        val earConfig = VadEarConfig(format, observer = VoiceEarTelemetry(telemetry), halfDuplex = halfDuplex)
+        val policy = EndOfTurnPolicy(trailingSilence = request.setup.tuning.endOfTurnSilence)
+        val earConfig = VadEarConfig(format, policy, observer = VoiceEarTelemetry(telemetry), halfDuplex = halfDuplex)
         return VadVoiceEar(microphone, transcriber, earConfig)
     }
 

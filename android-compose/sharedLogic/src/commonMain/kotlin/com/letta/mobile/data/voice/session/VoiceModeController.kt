@@ -1,5 +1,6 @@
 package com.letta.mobile.data.voice.session
 
+import com.letta.mobile.data.flow.DerivedStateFlow
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoiceLoopConfig
 import com.letta.mobile.data.voice.VoicePhase
@@ -9,6 +10,7 @@ import com.letta.mobile.data.voice.audio.pcm.VoiceLevelMeter
 import com.letta.mobile.data.voice.local.LocalHandoverReason
 import com.letta.mobile.data.voice.loop.VoiceLoop
 import com.letta.mobile.data.voice.loop.VoiceLoopRuntime
+import com.letta.mobile.data.voice.output.VoiceSessionControls
 import com.letta.mobile.data.voice.responder.VoiceChatSession
 import com.letta.mobile.data.voice.session.telemetry.VoiceTelemetry
 import com.letta.mobile.data.voice.session.telemetry.VoiceTelemetrySink
@@ -93,6 +95,17 @@ class VoiceModeController(
     telemetrySink: VoiceTelemetrySink = VoiceTelemetrySink.None,
 ) {
     private val telemetry = VoiceTelemetry(timeSource, telemetrySink)
+
+    /**
+     * The voice card's controls and what voice mode is saying: the current reply's spoken
+     * segments, the current turn and its clock, microphone and speaker mute, and the speech speed
+     * (stored in the setup). Mutes are cleared when a session ends.
+     */
+    val controls: VoiceSessionControls = VoiceSessionControls(
+        timeSource,
+        DerivedStateFlow(store.setup.map { it.tuning.speechSpeed }) { store.setup.value.tuning.speechSpeed },
+        store::setSpeechSpeed,
+    )
     // overflow: one consumer applying presses in order; dropping one could lose a stop.
     private val commands = Channel<Command>(Channel.UNLIMITED)
     private val mutableState = MutableStateFlow<VoiceModeState>(VoiceModeState.Off)
@@ -277,7 +290,8 @@ class VoiceModeController(
     private fun launchLoop(session: BoundVoiceChatSession, setup: VoiceSetup): LiveVoice? {
         val job = SupervisorJob(runtime.scope.coroutineContext[Job])
         val scope = runtime.scope + job + runtime.dispatcher
-        val request = VoiceEngineRequest(session, setup, store.apiKey(), { store.setup.value.grants }, scope, telemetry)
+        val services = VoiceSessionServices(telemetry, controls)
+        val request = VoiceEngineRequest(session, setup, store.apiKey(), { store.setup.value.grants }, scope, services)
         val built = runCatching { engines.create(request) }
         val error = built.exceptionOrNull()
         if (error is CancellationException) throw error
@@ -288,7 +302,8 @@ class VoiceModeController(
             return null
         }
         val loopConfig = config.copy(voiceInterrupts = config.voiceInterrupts && set.bargeInByVoice)
-        val loop = VoiceLoop(set.engines, loopConfig, runtime.copy(scope = scope, observer = telemetry.loop))
+        val (ear, mouth) = controls.engines(set.engines.ear, set.engines.mouth)
+        val loop = VoiceLoop(set.engines.copy(ear = ear, mouth = mouth), loopConfig, runtime.copy(scope = scope, observer = telemetry.loop))
         val follower = scope.launch { loop.state.collect { mutableState.value = VoiceModeProjection.of(it, store.setup.value.gap) } }
         val tracer = scope.launch { loop.state.distinctUntilChangedBy { it.diagnosticKey() }.collect(telemetry::loopState) }
         val watcher = scope.launch { session.awaitMove { commands.send(Command.Stop(CONVERSATION_CHANGED)) } }
@@ -308,7 +323,8 @@ class VoiceModeController(
             loop.state.map { it.partialTranscript }.distinctUntilChanged().collect { mutablePartialTranscript.value = it }
         }
         val handedOver = scope.launch { set.handover.collect { reason -> if (reason != null) mutableHandover.value = reason } }
-        return LiveVoice(loop, set, job, listOf(follower, tracer, watcher, hearing, playing, words, handedOver))
+        val controlled = scope.launch { controls.follow(loop.state) }
+        return LiveVoice(loop, set, job, listOf(follower, tracer, watcher, hearing, playing, words, handedOver, controlled))
     }
 
     /** Releases the live session, if any (reporting [reason]), and then publishes [next]. Completes even when cancelled. */
@@ -326,6 +342,7 @@ class VoiceModeController(
         mutablePlaybackLevel.value = 0f
         mutablePartialTranscript.value = null
         mutableHandover.value = null
+        controls.endSession()
         mutableState.value = next
     }
 

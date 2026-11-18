@@ -48,6 +48,34 @@ internal class SentenceScan(
         return null
     }
 
+    /**
+     * The end (exclusive) of the first clause that is at least [minLength] characters long and ends
+     * before [limit], or null. A clause ends at a comma, semicolon or colon followed by whitespace
+     * (so `1,000` and `10:30` never count) and not right after a period (`e.g.,`), or at a dash set
+     * off by whitespace (` - `, ` – `) or an em dash followed by whitespace. Markup is skipped as in
+     * [firstEnd].
+     */
+    fun firstClauseEnd(minLength: Int): TextIndex? {
+        val markup = MarkupRegions()
+        for (index in 0 until limit) {
+            if (markup.covers(text, index)) continue
+            if (index + 1 >= minLength && isClauseBreak(index)) return TextIndex(index + 1)
+        }
+        return null
+    }
+
+    private fun isClauseBreak(index: Int): Boolean {
+        val next = text.getOrNull(index + 1)
+        if (index + 1 >= limit || next == null || !next.isWhitespace()) return false
+        // "e.g., i.e., etc.," keep their comma with the abbreviation.
+        if (text.getOrNull(index - 1) == '.') return false
+        return when (text[index]) {
+            in ClauseMarks, EM_DASH -> true
+            in Dashes -> text.getOrNull(index - 1)?.isWhitespace() == true
+            else -> false
+        }
+    }
+
     private fun endAt(index: TextIndex): TextIndex? {
         val char = text[index.value]
         if (char == '\n') return index + 1
@@ -102,6 +130,9 @@ internal class SentenceScan(
 
     private companion object {
         val Terminators = setOf('.', '!', '?', '…')
+        val ClauseMarks = setOf(',', ';', ':')
+        val Dashes = setOf('-', '–')
+        const val EM_DASH = '—'
         val Closers = setOf('"', '\'', ')', ']', '*', '_', '”', '’', '`')
         val Abbreviations = setOf(
             "mr", "mrs", "ms", "dr", "prof", "sr", "jr", "st", "vs", "etc", "inc", "ltd", "co", "no",

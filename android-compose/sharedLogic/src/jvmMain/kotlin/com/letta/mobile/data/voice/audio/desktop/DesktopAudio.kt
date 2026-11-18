@@ -8,6 +8,7 @@ import com.letta.mobile.data.voice.audio.device.AudioDeviceOption
 import com.letta.mobile.data.voice.audio.device.AudioDeviceSelection
 import com.letta.mobile.data.voice.audio.device.FrameAudioCapture
 import com.letta.mobile.data.voice.audio.device.MeteredFrameSource
+import com.letta.mobile.data.voice.audio.line.HeldOutputDevice
 import com.letta.mobile.data.voice.audio.line.LineFrameSource
 import com.letta.mobile.data.voice.audio.line.LinePcmPlayer
 import com.letta.mobile.data.voice.audio.line.PlayerOptions
@@ -51,10 +52,11 @@ object DesktopAudio {
 
     /**
      * A speaker on `SourceDataLine`, playing PCM as it arrives. Opens the line at the stream's
-     * rate, or at 48 kHz with resampling when the device refuses it.
+     * rate, or at 48 kHz with resampling when the device refuses it. Consecutive streams (one
+     * reply's sentences) share one line, closed shortly after the last one.
      */
     fun player(device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault): AudioPlayer =
-        LinePcmPlayer(JavaSoundOutputDevice(device), PlayerOptions())
+        LinePcmPlayer(HeldOutputDevice(JavaSoundOutputDevice(device)), PlayerOptions())
 
     /** Mixers that can capture. */
     fun inputs(): List<AudioDeviceOption> = devicesWith(TargetDataLine::class.java)
