@@ -1,10 +1,8 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.CompositionLocalProvider
+import com.letta.mobile.ui.components.disclosure.LocalDisclosureHighlightFloor
 import com.letta.mobile.data.chat.projection.RunActivityProjection
 import com.letta.mobile.data.chat.projection.RunActivityState
 import com.letta.mobile.sharedui.resources.Res
@@ -41,12 +39,10 @@ import org.jetbrains.compose.resources.stringResource
 internal fun RunSummaryLine(state: RunHeaderState) {
     val fold = state.fold
     val tone = runSummaryTone(state)
-    // The header keeps its floor (the run's body lifts into it), but as plain space under the line:
-    // the line itself, its hover and press, ends at its label, so the lifted body (the steps' group
-    // label, the first step) is never drawn across the line's highlight.
+    // The run's body lifts into the header's floor (its first step right under the label), so the line's
+    // hover and press stop above that floor: drawn over the whole row, they ran across the lifted step.
     val floor = if (state.tall) ChatRowSpacing.runHeaderToggleFloor else ChatRowSpacing.runHeaderFloor
-    val height = if (state.tall) ChatRowSpacing.runHeaderToggleMinHeight else ChatRowSpacing.runHeaderMinHeight
-    Column {
+    CompositionLocalProvider(LocalDisclosureHighlightFloor provides floor) {
         SummaryLine(
             spec = LineSpec(
                 title = runSummaryTitle(state.activity, tone),
@@ -56,9 +52,9 @@ internal fun RunSummaryLine(state: RunHeaderState) {
             disclosure = fold?.let { LineDisclosure(expanded = !it.collapsed, labels = RunDisclosureLabels, onToggle = it.toggle) },
             rail = LineRail.Header,
             stateDescription = if (state.activity.isActive) stringResource(Res.string.rows_run_state_working) else null,
-            minHeight = height - floor,
+            // The run's body lifts by this floor (runHeaderFloor), so the header keeps its own.
+            minHeight = if (state.tall) ChatRowSpacing.runHeaderToggleMinHeight else ChatRowSpacing.runHeaderMinHeight,
         )
-        Spacer(Modifier.height(floor))
     }
 }
 

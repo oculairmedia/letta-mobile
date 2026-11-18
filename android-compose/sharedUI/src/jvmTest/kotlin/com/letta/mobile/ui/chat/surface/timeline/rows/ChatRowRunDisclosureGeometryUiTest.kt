@@ -28,6 +28,8 @@ import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.disclosure.DisclosureChevronDefaults
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.semantics.SemanticsProperties
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.theme.ChatRowSpacing
@@ -212,11 +214,24 @@ class ChatRowRunDisclosureGeometryUiTest {
         }
     }
 
+    /** Every disclosure line's chevron follows its words (one line gap after them), not the line's far edge. */
     private fun ComposeUiTest.assertChevronColumn() {
-        val header = chevronRight(ChatRowTestTags.RUN_HEADER)
-        assertNear(header, chevronRight(ChatRowTestTags.TOOL_CARD_TOGGLE))
-        assertNear(header, chevronRight(ChatRowTestTags.REASONING_TOGGLE))
+        for (tag in listOf(ChatRowTestTags.RUN_HEADER, ChatRowTestTags.TOOL_CARD_TOGGLE, ChatRowTestTags.REASONING_TOGGLE)) {
+            val chevron = chevronBounds(tag)
+            val words = SemanticsMatcher.keyIsDefined(SemanticsProperties.Text) and hasAnyAncestor(hasTestTag(tag))
+            val wordsEnd = onAllNodes(words, useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .map { it.boundsInRoot.right / density.density }
+                .filter { it <= chevron.left.value + 0.5f }
+                .maxOrNull() ?: error("no words before the chevron in $tag")
+            assertNear(ChatRowSpacing.lineGap, chevron.left - wordsEnd.dp)
+        }
     }
+
+    private fun ComposeUiTest.chevronBounds(rowTag: String): DpRect = onAllNodes(
+        hasTestTag(DisclosureChevronDefaults.TestTag) and hasAnyAncestor(hasTestTag(rowTag)),
+        useUnmergedTree = true,
+    )[0].getUnclippedBoundsInRoot()
 
     private fun ComposeUiTest.assertWorkIndent(expected: Dp) {
         val header = bounds(ChatRowTestTags.RUN_HEADER)
@@ -226,10 +241,6 @@ class ChatRowRunDisclosureGeometryUiTest {
         }
     }
 
-    private fun ComposeUiTest.chevronRight(rowTag: String): Dp = onAllNodes(
-        hasTestTag(DisclosureChevronDefaults.TestTag) and hasAnyAncestor(hasTestTag(rowTag)),
-        useUnmergedTree = true,
-    ).also { assertEquals(1, it.fetchSemanticsNodes().size, "one chevron in $rowTag") }[0].getUnclippedBoundsInRoot().right
 
     private fun ComposeUiTest.bounds(tag: String): DpRect = onNodeWithTag(tag).getUnclippedBoundsInRoot()
 

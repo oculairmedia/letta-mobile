@@ -203,7 +203,7 @@ internal fun LineRail.minHeight(): Dp = when (this) {
 }
 
 /** The rail's insets: a header's glyph sits at the header inset, a step's at the step inset, a nested line at its parent's. */
-private fun LineRail.insets(): PaddingValues = when (this) {
+internal fun LineRail.insets(): PaddingValues = when (this) {
     LineRail.Header -> PaddingValues(
         start = ChatRowSpacing.runHeaderHorizontal,
         end = ChatRowSpacing.lineEnd,

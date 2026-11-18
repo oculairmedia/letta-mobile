@@ -10,6 +10,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,9 +66,33 @@ internal fun Modifier.disclosureToggle(disclosure: LineDisclosure, stateDescript
         haptics.play(LettaHapticCue.SegmentTick)
         disclosure.onToggle()
     }
+    val target = highlightTarget(LocalDisclosureHighlightFloor.current)
     return onPreviewKeyEvent { event -> event.type == KeyEventType.KeyDown && disclosureKey(event.key, disclosure.expanded, flip, focus) }
-        .lettaClickable(role = Role.Button, onClickLabel = action, target = lettaRowTarget(), onClick = flip)
+        .lettaClickable(role = Role.Button, onClickLabel = action, target = target, onClick = flip)
         .semantics { this.stateDescription = spoken }
+}
+
+/**
+ * Space at the bottom of a disclosure row that its hover and press leave out: a run header's floor,
+ * where the run's body lifts so its first step sits right under the label. Drawn over the whole row,
+ * the highlight ran across that lifted step.
+ */
+internal val LocalDisclosureHighlightFloor = staticCompositionLocalOf { 0.dp }
+
+/** The shared rounded row target, its highlight ending [floor] above the row's bottom. */
+@Composable
+private fun highlightTarget(floor: Dp): LettaClickTarget {
+    if (floor == 0.dp) return lettaRowTarget()
+    return remember(floor) { LettaClickTarget(highlightAbove(floor), minimumTouchTarget = false) }
+}
+
+/** The small shape token's rounded rectangle, ending [floor] above the bottom of what it clips. */
+private fun highlightAbove(floor: Dp): Shape = object : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val bottom = (size.height - with(density) { floor.toPx() }).coerceAtLeast(0f)
+        val radius = with(density) { LettaDimens.Radius.sm.toPx() }
+        return Outline.Rounded(RoundRect(0f, 0f, size.width, bottom, CornerRadius(radius)))
+    }
 }
 
 /** What a key does on a focused disclosure; false when it is not the disclosure's to handle. */

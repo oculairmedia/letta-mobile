@@ -29,6 +29,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import com.letta.mobile.ui.theme.ChatRowSpacing
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.components.disclosure.DisclosureRowStyle
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawBehind
@@ -173,10 +176,13 @@ private fun LineStyle(
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         // The words take only their width, so the chevron (and a badge or status before it) follows
         // the title; a long title still ellipsizes and the whole line stays the toggle.
+        // On its rail's metrics (insets, gap, height floor), so a card among a run's steps is a step line
+        // and a report between runs sits like a run header.
+        val rail = LocalLineRail.current
         DisclosureRow(
             disclosure = parts.expansion.takeIf { body != null },
-            modifier = Modifier.testTag(LETTA_TOOL_CARD_LINE_TAG),
-            style = DisclosureRowStyle(gap = LettaDimens.Space.sm),
+            modifier = Modifier.heightIn(min = rail.minHeight()).testTag(LETTA_TOOL_CARD_LINE_TAG),
+            style = DisclosureRowStyle(gap = ChatRowSpacing.lineGap, contentPadding = rail.insets()),
         ) {
             HeaderLead(header)
             Text(
@@ -189,7 +195,7 @@ private fun LineStyle(
             parts.trailing?.invoke(this)
         }
         if (body != null) {
-            ToolCardAnimated(parts.expansion?.expanded == true) { LineBody(body) }
+            ToolCardAnimated(parts.expansion?.expanded == true) { LineBody(rail.insets().calculateLeftPadding(LayoutDirection.Ltr), body) }
         }
     }
 }
@@ -200,8 +206,8 @@ private fun LineStyle(
  * fill (the lowest container role) in the medium shape.
  */
 @Composable
-private fun LineBody(body: @Composable ColumnScope.() -> Unit) {
-    val indent = Modifier.fillMaxWidth().padding(start = LettaDimens.Control.iconSm + LettaDimens.Space.sm)
+private fun LineBody(railStart: Dp, body: @Composable ColumnScope.() -> Unit) {
+    val indent = Modifier.fillMaxWidth().padding(start = railStart + ChatRowSpacing.runGlyphSize + ChatRowSpacing.lineGap)
     if (LocalToolCardBodyFill.current) {
         Surface(modifier = indent, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
             Column(Modifier.padding(LettaDimens.Space.md), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), content = body)

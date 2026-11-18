@@ -22,6 +22,7 @@ import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LocalLettaHost
+import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.math.abs
 import kotlin.test.Test
@@ -85,7 +86,9 @@ class ChatRowToolCardRunGeometryUiTest {
         showOpen(run(agent))
         val header = bounds(ChatRowTestTags.RUN_HEADER)
         val card = bounds(ChatRowTestTags.CREATED_SUBAGENT_CARD)
-        assertTrue(card.top >= header.bottom - TOLERANCE.dp, "the card $card overlaps the run header $header")
+        // A card is a line among the steps: it rises into the header's floor like them, below the line's highlight.
+        val highlightBottom = header.bottom - ChatRowSpacing.runHeaderToggleFloor
+        assertTrue(card.top >= highlightBottom - TOLERANCE.dp, "the card $card overlaps the run header's line $header")
         assertTrue(card.bottom <= bounds(ChatRowTestTags.RUN_BLOCK).bottom + TOLERANCE.dp, "the card stays inside the run block")
     }
 
