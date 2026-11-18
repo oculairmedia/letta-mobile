@@ -182,7 +182,7 @@ class EndpointEnginesTest {
     fun aSynthesisFailureStopsPlaybackOfPrefetchedSegmentsAndFurtherRequests() = runTest {
         failingRequest = 2
         val player = GatedPlayer()
-        val mouth = mouth(player)
+        val mouth = EndpointVoiceMouth(synthesizer(), player, backgroundScope + Dispatchers.Default, MouthOptions.SEQUENTIAL)
         val failed = async { mouth.events.first { it is VoiceMouthEvent.Failed } }
         val later = async { mouth.events.first { it == VoiceMouthEvent.Started(SpeechSegmentId(2)) } }
         testScheduler.runCurrent()
@@ -253,7 +253,8 @@ class EndpointEnginesTest {
             },
             SpeechEndpointConfig(base),
         )
-        private val mouth = EndpointVoiceMouth(EndpointSpeechSynthesizer(client, { granted }, settings), player, scope)
+        private val synthesizer = EndpointSpeechSynthesizer(client, { granted }, settings)
+        private val mouth = EndpointVoiceMouth(synthesizer, player, scope, MouthOptions.SEQUENTIAL)
 
         /** Runs the scenario once; true when every step held. */
         suspend fun prove(attempt: Int): Boolean {

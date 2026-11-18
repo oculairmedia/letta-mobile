@@ -49,6 +49,8 @@ internal data class PlayerOptions(
  * not waiting for input fails PLAYBACK_FAILED, also while a write or the end-of-stream call is
  * still blocked on it (the line is then aborted and released).
  *
+ * [setMuted] writes silence in place of the audio from the next chunk on, keeping its timing.
+ *
  * Cancelling stops at once and never drains: the cancelling coroutine aborts the line (stop and
  * discard queued audio) whatever the writer was doing (writing, waiting for input, or waiting for
  * queued audio to play out), stops collecting the stream, waits for the writer to exit and
@@ -58,6 +60,13 @@ internal class LinePcmPlayer(
     private val device: PcmOutputDevice,
     private val options: PlayerOptions = PlayerOptions(),
 ) : AudioPlayer {
+    @Volatile
+    private var muted = false
+
+    override fun setMuted(muted: Boolean) {
+        this.muted = muted
+    }
+
     override suspend fun play(chunks: Flow<PcmChunk>, onLevel: (AudioLevel) -> Unit) {
         coroutineScope {
             // overflow: the source is one sentence's audio, already held in memory by its producer.
@@ -71,7 +80,8 @@ internal class LinePcmPlayer(
         try {
             coroutineScope {
                 val progress = WriteProgress()
-                val writer = launch(options.dispatcher) { LineWriter(line, options, onLevel, progress).playAll(first, source) }
+                val sink = WriteSink(onLevel) { muted }
+                val writer = launch(options.dispatcher) { LineWriter(line, options, sink, progress).playAll(first, source) }
                 val watchdog = launch { watchWrites(line, progress, options) }
                 var ended = false
                 try {
@@ -172,11 +182,14 @@ private suspend fun watchWrites(line: PcmOutputLine, progress: WriteProgress, op
     }
 }
 
+/** Where a writer reports each chunk's level, and whether it writes silence instead (muted). */
+private class WriteSink(val onLevel: (AudioLevel) -> Unit, val muted: () -> Boolean)
+
 /** Writes one stream to one line as it arrives, then waits for it to be played. */
 private class LineWriter(
     private val line: PcmOutputLine,
     private val options: PlayerOptions,
-    private val onLevel: (AudioLevel) -> Unit,
+    private val sink: WriteSink,
     private val progress: WriteProgress,
 ) {
     private var written = 0L
@@ -200,9 +213,10 @@ private class LineWriter(
 
     private suspend fun writeSteps(samples: ShortArray, step: Int, resampler: StreamingResampler?) {
         for (start in samples.indices step step) {
-            val chunk = samples.copyOfRange(start, minOf(start + step, samples.size))
+            val audible = samples.copyOfRange(start, minOf(start + step, samples.size))
+            val chunk = if (sink.muted()) ShortArray(audible.size) else audible
             writeFully(resampler?.process(chunk) ?: chunk)
-            onLevel(PcmLevels.level(chunk))
+            sink.onLevel(PcmLevels.level(chunk))
         }
     }
 
