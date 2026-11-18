@@ -13,6 +13,16 @@ MODULES = ['sharedLogic', 'sharedUI', 'desktop', 'web', 'app', 'feature-*', 'des
 STATE = re.compile(r'\bandroidx\.compose\.runtime\.(?:\*|(?:snapshots\.)?(?:Snapshot\w*|(?:mutable|derived)\w*State\w*|State|MutableState|remember)\b)')
 
 
+def ui_findings(text):
+    for token in tokens(text):
+        if token.kind == 'string' and text[token.start:token.end] in ('"agent_task"', '"""agent_task"""'):
+            yield 'task-wire-tag', token.start
+    if 'AppServerBackgroundProcess' in text:
+        code = blank_literals(text, frozenset({'comment', 'char', 'string'}))
+        for match in re.finditer(r'\bprocess\s*\??\.\s*type\b', code):
+            yield 'raw-process-type', match.start()
+
+
 def findings(path, text):
     if '/sharedLogic/' in path:
         if not any(part in path.lower() for part in ('/repository/', '/transport/', 'reducer')):
@@ -21,14 +31,7 @@ def findings(path, text):
         for match in STATE.finditer(code):
             yield 'compose-state', match.start()
     else:
-        # Match literal protocol tags (including constants), not rendered prose or comments.
-        for token in tokens(text):
-            if token.kind == 'string' and text[token.start:token.end] in ('"agent_task"', '"""agent_task"""'):
-                yield 'task-wire-tag', token.start
-        if 'AppServerBackgroundProcess' in text:
-            code = blank_literals(text, frozenset({'comment', 'char', 'string'}))
-            for match in re.finditer(r'\bprocess\s*\??\.\s*type\b', code):
-                yield 'raw-process-type', match.start()
+        yield from ui_findings(text)
 
 
 def git(*args):
@@ -47,26 +50,36 @@ def review_changes(base):
         print('Review desktop stack/rail selection: keep membership and archive policy shared.')
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--base', help='git revision for advisory PR deltas')
-    args = parser.parse_args()
+def inventory(files):
     counts = Counter()
     locations = {}
-    files = production_files(Path('.'), MODULES)
     for file in files:
         text = file.read_text()
         for rule, offset in findings(file.as_posix(), text):
             key = f'{rule}:{file}'
             counts[key] += 1
             locations[key] = text.count('\n', 0, offset) + 1
-    caps = {key: int(n) for key, n in (line.split() for line in BASELINE.read_text().splitlines() if line and not line.startswith('#'))}
+    return counts, locations
+
+
+def compare(counts, locations, caps):
     errors = 0
     for key in sorted(counts.keys() | caps.keys()):
         if counts[key] != caps.get(key, 0):
             remedy = 'fix new violation' if counts[key] > caps.get(key, 0) else 'lower stale baseline'
             print(f'{key}:{locations.get(key, 1)}: {remedy} ({counts[key]} vs {caps.get(key, 0)})')
             errors += 1
+    return errors
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--base', help='git revision for advisory PR deltas')
+    args = parser.parse_args()
+    files = production_files(Path('.'), MODULES)
+    counts, locations = inventory(files)
+    rows = (line.split() for line in BASELINE.read_text().splitlines() if line and not line.startswith('#'))
+    errors = compare(counts, locations, {key: int(n) for key, n in rows})
     if args.base:
         review_changes(args.base)
     print(f'Clean architecture: {len(files)} production files; {sum(counts.values())} existing findings; {errors} differences')
