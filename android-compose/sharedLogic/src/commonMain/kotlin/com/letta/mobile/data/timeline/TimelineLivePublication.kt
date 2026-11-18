@@ -91,6 +91,11 @@ sealed interface TimelineSettledPresentation {
         val event: TimelineEvent.Confirmed,
         val item: com.letta.mobile.data.chat.projection.ChatRenderItem,
         val residentEvents: List<TimelineResidentEvent> = emptyList(),
+        /**
+         * By tool call id, the stored bodies of skill instructions too large to decode inline that
+         * this item's skill calls own (attachSkillInstructions); read a page at a time.
+         */
+        val skillInstructionBodies: Map<String, TimelineBodyReference> = emptyMap(),
     ) : TimelineSettledPresentation
 }
 

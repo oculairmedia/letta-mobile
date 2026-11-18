@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import com.letta.mobile.ui.chat.surface.collectForChatSurface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +43,10 @@ import androidx.paging.compose.LazyPagingItems
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
+import com.letta.mobile.data.timeline.TimelineBodyReference
+import com.letta.mobile.ui.chat.surface.timeline.rows.LocalSkillInstructionPages
+import com.letta.mobile.sharedui.resources.rows_tool_card_show_instructions
+import androidx.compose.runtime.CompositionLocalProvider
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_history_error
 import com.letta.mobile.sharedui.resources.timeline_missing_target
@@ -94,10 +99,9 @@ internal fun PagedTimelineList(params: PagedTimelineParams, modifier: Modifier =
 private fun PagedTimelineContent(params: PagedTimelineParams, modifier: Modifier) {
     val presentation = params.presentation
     val queued = remember(params.state.sendQueue) { params.state.queuedPromptIdentities() }
-    // One page flow (and presenter) per presentation: queued prompts leave the rows at assembly, so a
-    // send while the agent works neither empties the list nor remounts its settled rows.
+    // Keep the page flow stable while filtering queued prompts during row assembly.
     val settled = presentation.settled.collectAsPagedTimelineItems()
-    val live by presentation.live.collectAsState()
+    val live by presentation.live.collectForChatSurface()
     val visibleLive = remember(live, queued) { live.filterNot(queued::containsQueuedPrompt) }
     val rows = rememberPagedRows(visibleLive, settled, if (params.thinking) 1 else 0, queued)
     ObserveResidentRows(presentation, settled) {
@@ -291,7 +295,9 @@ private fun LazyItemScope.RenderPagedSlot(scope: PagedRowsScope, index: Int) {
         when {
             item == null -> Box(modifier.height(ChatTimelineDimens.placeholderRowHeight))
             deferred != null -> DeferredSettledRow(scope, deferred, index, modifier)
-            else -> PagedRow(item, scope.rows.itemAt(index + 1) to scope.rows.itemAt(index - 1), scope, modifier)
+            else -> ProvideSkillInstructions(row?.skillInstructionBodies.orEmpty(), scope.params.presentation) {
+                PagedRow(item, scope.rows.itemAt(index + 1) to scope.rows.itemAt(index - 1), scope, modifier)
+            }
         }
     }
 }
@@ -317,6 +323,33 @@ private fun DeferredSettledRow(scope: PagedRowsScope, row: CanonicalTimelinePres
                 .padding(top = leading),
         )
     }
+}
+
+/**
+ * A settled row's skill calls read their instructions too large to hold inline from the stored body
+ * the row points at: their cards ask [LocalSkillInstructionPages] by call id, and get a pager over it.
+ */
+@Composable
+private fun ProvideSkillInstructions(
+    bodies: Map<String, TimelineBodyReference>,
+    presentation: CanonicalTimelinePresentation,
+    content: @Composable () -> Unit,
+) {
+    if (bodies.isEmpty()) return content()
+    val pages: (String) -> (@Composable () -> Unit)? = remember(bodies, presentation) {
+        { callId ->
+            bodies[callId]?.let { reference ->
+                @Composable {
+                    DeferredBodyPages(
+                        rowKey = "skill-instructions-$callId-${reference.key.identity.value}",
+                        read = { field, offset -> presentation.readTextWindow(reference, field, offset, Dispatchers.Default) },
+                        openLabel = stringResource(Res.string.rows_tool_card_show_instructions),
+                    )
+                }
+            }
+        }
+    }
+    CompositionLocalProvider(LocalSkillInstructionPages provides pages, content = content)
 }
 
 /**
