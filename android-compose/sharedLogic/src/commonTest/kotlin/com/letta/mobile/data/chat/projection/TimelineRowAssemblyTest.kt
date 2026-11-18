@@ -63,14 +63,23 @@ class TimelineRowAssemblyTest {
         rows.live.flatMap { it.messagesInOrder() }.map { it.id } + settled.flatMap { it.item.messagesInOrder() }.map { it.id }
 
     @Test
-    fun aLiveRowStaysListedBesideTheSettledRowThatHoldsOnlyPartOfIt() {
+    fun aLiveRowKeepsItsKeyBesideTheSettledRowThatHoldsOnlyPartOfIt() {
         // A mid-turn catch-up settled a and b under the key the live run shows; c is not durable yet.
+        // The live row is the one still streaming: it keeps its key (and its composition).
         val live = listOf(run("run-r-from-a", "a", "b", "c"))
         val settled = listOf(settledRow(run("run-r-from-a", "a", "b"), "a", "b"))
         val rows = CanonicalTimelinePresentation.assemble(live, settled)
         assertEquals(emptyMap(), rows.duplicates)
-        assertEquals(listOf("run-r-from-a~live", "run-r-from-a"), (0 until rows.size).map(rows::key))
+        assertEquals(listOf("run-r-from-a", "run-r-from-a~part"), (0 until rows.size).map(rows::key))
         assertEquals(listOf("c", "a", "b"), drawn(rows, settled), "every record drawn once")
+    }
+
+    @Test
+    fun theWholeSettledRowTakesTheKeyOnceTheRestIsResident() {
+        val live = listOf(run("run-r-from-a", "a", "b", "c"))
+        val settled = listOf(settledRow(run("run-r-from-a", "a", "b", "c"), "a", "b", "c"))
+        val rows = CanonicalTimelinePresentation.assemble(live, settled)
+        assertEquals(listOf("run-r-from-a"), (0 until rows.size).map(rows::key))
     }
 
     @Test

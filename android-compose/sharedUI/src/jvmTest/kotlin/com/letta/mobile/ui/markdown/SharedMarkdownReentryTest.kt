@@ -46,7 +46,7 @@ class SharedMarkdownReentryTest {
         }
         waitForIdle()
         val settled = onNodeWithTag(TAG).getUnclippedBoundsInRoot()
-        assertTrue(SETTLED in parses, "the timeline keeps the settled parse")
+        assertTrue(MarkdownSource(SETTLED) in parses, "the timeline keeps the settled parse")
 
         shown = false
         waitForIdle()
@@ -64,12 +64,12 @@ class SharedMarkdownReentryTest {
     @Test
     fun aTextNeverShownBeforeStillParses() = runComposeUiTest {
         val parses = SettledMarkdownParses()
-        assertTrue(NEW !in parses, "a new text has no kept parse to start from")
+        assertTrue(MarkdownSource(NEW) !in parses, "a new text has no kept parse to start from")
         setContent {
             MaterialTheme { CompositionLocalProvider(LocalSettledMarkdownParses provides parses) { SharedMarkdownText(text = NEW) } }
         }
         waitUntil(timeoutMillis = PARSE_TIMEOUT_MILLIS) {
-            NEW in parses && onAllNodes(hasText(NEW, substring = true)).fetchSemanticsNodes().isNotEmpty()
+            MarkdownSource(NEW) in parses && onAllNodes(hasText(NEW, substring = true)).fetchSemanticsNodes().isNotEmpty()
         }
     }
 

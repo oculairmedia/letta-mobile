@@ -3,7 +3,9 @@ package com.letta.mobile.ui.components
 import com.letta.mobile.ui.markdown.ParsedMarkdownTable
 import com.letta.mobile.ui.markdown.ParsedTableColumnAlignment
 import com.letta.mobile.ui.markdown.looksLikeMarkdownTable
-import com.letta.mobile.ui.markdown.parseMarkdownTable
+import com.letta.mobile.ui.markdown.MarkdownSource
+import com.letta.mobile.ui.markdown.rememberMarkdownTable
+import com.letta.mobile.ui.markdown.rememberStreamingMarkdownDocument
 import com.letta.mobile.ui.markdown.tailHasOpenBlockFence
 import com.letta.mobile.ui.markdown.StreamingMarkdownBlockKind
 import com.letta.mobile.ui.markdown.StreamingMarkdownDocumentBlock
@@ -213,7 +215,8 @@ fun StreamingMarkdownText(
     // When the real closer arrives, the synthetic closer disappears on the next
     // paint tick inside the same block key.
     val documentState = remember { StreamingMarkdownDocumentState() }
-    val document = remember(displayed) { documentState.update(displayed) }
+    // A settled text reuses the page's kept document (its row scrolled away and back), not a parse here.
+    val document = rememberStreamingMarkdownDocument(MarkdownSource(displayed), documentState, isStreaming)
     val blocksForRender = document.blocks
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
@@ -382,7 +385,8 @@ private fun StreamingMarkdownDocumentBlocks(
             block.kind == StreamingMarkdownBlockKind.Table &&
             renderSource.looksLikeMarkdownTable()
         ) {
-            parseMarkdownTable(renderSource)
+            // Parsed once per source (kept with the page's settled parses), not on every recomposition.
+            rememberMarkdownTable(MarkdownSource(renderSource), settled = !(isStreaming && isActiveBlock))
         } else {
             null
         }

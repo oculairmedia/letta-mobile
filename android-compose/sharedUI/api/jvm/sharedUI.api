@@ -4891,6 +4891,20 @@ public final class com/letta/mobile/ui/markdown/MarkdownPaint {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/markdown/MarkdownSource {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/ui/markdown/MarkdownSource;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
 public abstract interface class com/letta/mobile/ui/markdown/MermaidDiagramRenderer {
 	public abstract fun Render (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;I)V
 }
@@ -4952,6 +4966,11 @@ public final class com/letta/mobile/ui/markdown/ParsedTableRow {
 	public final fun getKey ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/markdown/SettledMarkdownDocumentsKt {
+	public static final fun rememberMarkdownTable-3Ra96k4 (Ljava/lang/String;ZLandroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/markdown/ParsedMarkdownTable;
+	public static final fun rememberStreamingMarkdownDocument-H1JjXxc (Ljava/lang/String;Lcom/letta/mobile/ui/markdown/StreamingMarkdownDocumentState;ZLandroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/markdown/StreamingMarkdownDocument;
 }
 
 public final class com/letta/mobile/ui/markdown/SharedMarkdownCodeFenceKt {

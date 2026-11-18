@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
+import com.letta.mobile.ui.chat.surface.timeline.days.TimelineDays
+import com.letta.mobile.ui.chat.surface.timeline.days.rememberCurrentDate
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -60,17 +62,7 @@ internal const val LOADING_OLDER_KEY = "__loading_older__"
 @Composable
 internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier = Modifier) {
     val state = params.state
-    val queued = remember(state.sendQueue) { state.queuedPromptIdentities() }
-    val displayOptions = params.appearance.displayOptions
-    // A new set of options starts a fresh cache: its incremental tail assumes the same filter.
-    val cache = remember(displayOptions) { IncrementalChatRenderItemsCache() }
-    val items = remember(state.messages, state.messageListChange, queued, params.appearance, state.agentId) {
-        // letta-mobile-zxk2n.5: hidden rows leave the list (and its spacing), not just their content.
-        val shown = displayOptions.visible(state.messages).let { if (queued.isEmpty()) it else it.filterNot(queued::containsQueuedPrompt) }
-        val change = if (shown === state.messages) state.messageListChange else ChatMessageListChange.Full
-        cache.renderItems(shown, params.appearance.displayMode, change, state.agentId)
-    }
-    val rows = remember(items) { timelineRowsNewestFirst(items) }
+    val rows = rememberLegacyRows(state, params.appearance)
     val conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId
     val listState = params.listState
     val thinking = state.isAgentTyping && params.showThinkingRow
@@ -123,6 +115,27 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
 }
 
 /**
+ * The list's rows, newest first, over [state]'s messages as [appearance] shows them: queued prompts
+ * left out (they belong to the composer), tools folded, day dividers in place.
+ */
+@Composable
+private fun rememberLegacyRows(state: ChatUiState, appearance: ChatSurfaceAppearance): List<TimelineRow> {
+    val queued = remember(state.sendQueue) { state.queuedPromptIdentities() }
+    val displayOptions = appearance.displayOptions
+    // A new set of options starts a fresh cache: its incremental tail assumes the same filter.
+    val cache = remember(displayOptions) { IncrementalChatRenderItemsCache() }
+    val items = remember(state.messages, state.messageListChange, queued, appearance, state.agentId) {
+        // letta-mobile-zxk2n.5: hidden rows leave the list (and its spacing), not just their content.
+        val shown = displayOptions.visible(state.messages).let { if (queued.isEmpty()) it else it.filterNot(queued::containsQueuedPrompt) }
+        val change = if (shown === state.messages) state.messageListChange else ChatMessageListChange.Full
+        cache.renderItems(shown, appearance.displayMode, change, state.agentId)
+    }
+    // Each timestamp's local date is parsed once for the list, not again on every message emission.
+    val days = remember { TimelineDays() }
+    return remember(items) { timelineRowsNewestFirst(items, days = days) }
+}
+
+/**
  * The rows at the list's two ends: the thinking row at the newest (over [messages]) and the
  * older-history spinner at the oldest (for [agentId]).
  */
@@ -149,8 +162,9 @@ private data class LegacyTail(
 internal fun timelineRowsNewestFirst(
     newestFirstItems: List<ChatRenderItem>,
     zone: TimeZone = TimeZone.currentSystemDefault(),
+    days: TimelineDays = TimelineDays(zone),
 ): List<TimelineRow> =
-    withDayDividers(groupToolCallRows(newestFirstItems.asReversed()), zone).asReversed()
+    withDayDividers(groupToolCallRows(newestFirstItems.asReversed()), zone, days).asReversed()
 
 private fun LazyListScope.legacyRows(
     rows: List<TimelineRow>,
@@ -159,29 +173,23 @@ private fun LazyListScope.legacyRows(
     edges: LegacyEdgeRows,
 ) {
     if (edges.thinking) item(key = THINKING_KEY) { ThinkingRow(edges.messages) }
-    items(count = rows.size, key = { rows[it].key }, contentType = { rows[it]::class.simpleName }) { index ->
+    items(count = rows.size, key = { rows[it].key }, contentType = { rows[it].contentType() }) { index ->
         val row = rows[index]
         val motion = timelineRowMotion(fadesIn = !row.isUserPrompt())
-        if (row is TimelineRow.Item) {
+        // A message, a run and a tool group all draw through the one row call: a lone tool row that
+        // grows into a group keeps its key, and with the one call site its composition too.
+        val item = row.drawnItem()
+        if (item != null) {
             // Newest first: the row above this one is the next index, the row below it the previous.
-            val older = (rows.getOrNull(index + 1) as? TimelineRow.Item)?.item
-            val newer = (rows.getOrNull(index - 1) as? TimelineRow.Item)?.item
-            TimelineItemRow(row.item, bindings, motion, rememberRowSpacing(row.item, older, newer))
-        } else {
-            TimelineRowContent(row, bindings, today, motion)
+            val older = rows.getOrNull(index + 1)?.drawnItem()
+            val newer = rows.getOrNull(index - 1)?.drawnItem()
+            TimelineItemRow(item, bindings, motion, rememberRowSpacing(item, older, newer))
+        } else if (row is TimelineRow.DayDivider) {
+            DayDividerRow(row.date, today, motion)
         }
     }
     if (edges.loadingOlder) {
         item(key = LOADING_OLDER_KEY) { TimelineOlderHistoryLoading(edges.agentId) }
-    }
-}
-
-@Composable
-private fun TimelineRowContent(row: TimelineRow, bindings: TimelineRowBindings, today: LocalDate, modifier: Modifier) {
-    when (row) {
-        is TimelineRow.Item -> TimelineItemRow(row.item, bindings, modifier)
-        is TimelineRow.ToolGroup -> ToolGroupRow(row, bindings.contexts, bindings.callbacks, modifier)
-        is TimelineRow.DayDivider -> DayDividerRow(row.date, today, modifier)
     }
 }
 

@@ -15,8 +15,9 @@ package com.letta.mobile.data.chat.projection
  * A settled row stands in for a live row only when it holds every record of it. A turn that is
  * durable only in part (a mid-turn catch-up, or a page edge that cut a run while it streams) can
  * leave a live row under a key a settled part already holds; hiding it would take the records that
- * are not durable yet off the screen, and renaming the settled part would remount a row that did
- * not change. That live row stays listed as `<key>~live` until the rest of it is resident.
+ * are not durable yet off the screen. The live row keeps its key (it is the one still streaming, and
+ * renaming it remounted it: its text parsed again mid-stream), and the settled part is listed as
+ * `<key>~part` until the rest of it is resident, when the whole settled row takes the key over.
  */
 class TimelineRowAssembly private constructor(
     /** Live rows still shown: those whose settled twin is not yet resident. */
@@ -36,36 +37,47 @@ class TimelineRowAssembly private constructor(
         const val LIVE = "live"
         const val SETTLED = "settled"
 
-        /** Suffix of a live row listed beside a settled row that holds only part of it. */
-        const val PARTLY_SETTLED_SUFFIX = "~live"
+        /** Suffix of a settled row listed beside the live row it holds only part of. */
+        const val PARTLY_SETTLED_SUFFIX = "~part"
 
         /** Assembles [live] ahead of the presented [settled] slots, as one read of both. */
         fun assemble(live: List<ChatRenderItem>, settled: Settled): TimelineRowAssembly {
-            val shown = displayedLive(live, settled)
-            val duplicates = TimelineRowKeyGuard.duplicateRows(shown.map { it.key } + settled.keys) { index ->
-                if (index < shown.size) LIVE else SETTLED
+            val overlay = LiveOverlay.of(live, settled)
+            val settledKeys = if (overlay.partlySettled.isEmpty()) {
+                settled.keys
+            } else {
+                settled.keys.mapIndexed { slot, key -> if (slot in overlay.partlySettled) key + PARTLY_SETTLED_SUFFIX else key }
             }
-            return TimelineRowAssembly(shown, settled.keys, duplicates)
+            val duplicates = TimelineRowKeyGuard.duplicateRows(overlay.shown.map { it.key } + settledKeys) { index ->
+                if (index < overlay.shown.size) LIVE else SETTLED
+            }
+            return TimelineRowAssembly(overlay.shown, settledKeys, duplicates)
         }
 
         /**
          * The live rows no resident settled row has taken over yet: a live row whose key a settled
-         * row holds is hidden when that row holds all of it ([Settled.holds]), and listed as
-         * `<key>~live` when not.
+         * row holds is hidden when that row holds all of it ([Settled.holds]), and keeps its key when
+         * not (the settled part is then listed as `<key>~part`).
          */
-        fun displayedLive(live: List<ChatRenderItem>, settled: Settled): List<ChatRenderItem> {
-            if (live.isEmpty() || settled.keys.isEmpty()) return live
-            val slotByKey = HashMap<String, Int>(settled.keys.size)
-            settled.keys.forEachIndexed { index, key -> if (key != null) slotByKey.getOrPut(key) { index } }
-            return live.mapNotNull { item ->
-                val slot = slotByKey[item.key] ?: return@mapNotNull item
-                if (settled.holds(slot, item)) null else item.withKey(item.key + PARTLY_SETTLED_SUFFIX)
-            }
-        }
+        fun displayedLive(live: List<ChatRenderItem>, settled: Settled): List<ChatRenderItem> = LiveOverlay.of(live, settled).shown
+    }
 
-        private fun ChatRenderItem.withKey(key: String): ChatRenderItem = when (this) {
-            is ChatRenderItem.Single -> copy(keyOverride = key)
-            is ChatRenderItem.RunBlock -> copy(keyOverride = key)
+    /** The live rows still shown, and the settled slots holding only part of a live row under its key. */
+    private class LiveOverlay(val shown: List<ChatRenderItem>, val partlySettled: Set<Int>) {
+        companion object {
+            fun of(live: List<ChatRenderItem>, settled: Settled): LiveOverlay {
+                if (live.isEmpty() || settled.keys.isEmpty()) return LiveOverlay(live, emptySet())
+                val slotByKey = HashMap<String, Int>(settled.keys.size)
+                settled.keys.forEachIndexed { index, key -> if (key != null) slotByKey.getOrPut(key) { index } }
+                val partly = HashSet<Int>()
+                val shown = live.filter { item ->
+                    val slot = slotByKey[item.key] ?: return@filter true
+                    val held = settled.holds(slot, item)
+                    if (!held) partly += slot
+                    !held
+                }
+                return LiveOverlay(shown, partly)
+            }
         }
     }
 
