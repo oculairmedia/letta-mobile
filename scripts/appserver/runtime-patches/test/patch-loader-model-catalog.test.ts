@@ -46,6 +46,29 @@ test("lcp-model-catalog adds verified native models and corrects GPT-6 windows",
   assert.equal(result.anthropic[haiku.id]?.maxTokens, 64000);
 });
 
+test("lcp-model-catalog adds GPT-6.2 Sol and Astra from the Sol template without renaming it", () => {
+  const { source } = patchLettaCodeSourceResultForTest(fixture);
+  const result = evaluate(source, { [haiku.id]: haiku }, { [sol.id]: sol });
+  for (const [id, name] of [["gpt-6.2-sol", "GPT-6.2 Sol"], ["gpt-6.2-astra", "GPT-6.2 Astra"]]) {
+    const entry = result.openai[id];
+    assert.equal(entry?.id, id);
+    assert.equal(entry?.name, name);
+    assert.equal(entry?.contextWindow, 872000, id);
+    assert.equal(entry?.maxTokens, 128000, id);
+    assert.equal(entry?.api, "openai-responses", id);
+  }
+  assert.equal(result.openai[sol.id]?.id, sol.id);
+  assert.equal(result.openai[sol.id]?.name, sol.name);
+});
+
+test("lcp-model-catalog keeps an upstream GPT-6.2 entry when a future bundle ships one", () => {
+  const { source } = patchLettaCodeSourceResultForTest(fixture);
+  const upstream = { ...sol, id: "gpt-6.2-sol", name: "Upstream Sol", contextWindow: 999000 };
+  const result = evaluate(source, { [haiku.id]: haiku }, { [sol.id]: sol, [upstream.id]: upstream });
+  assert.equal(result.openai[upstream.id]?.name, "Upstream Sol");
+  assert.equal(result.openai[upstream.id]?.contextWindow, 999000);
+});
+
 test("lcp-model-catalog skips both sites when either anchor drifts or duplicates", () => {
   for (const input of [anthropicAnchor, openaiAnchor, `${fixture}\n${anthropicAnchor}`, `${fixture}\n${openaiAnchor}`]) {
     const result = patchLettaCodeSourceResultForTest(input);
