@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -279,26 +278,32 @@ fun SubagentTodoSheet(
                 ),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
-            Crossfade(
-                targetState = state,
-                animationSpec = tween(durationMillis = if (reducedMotion) 0 else STATE_FADE_MS),
-                label = "subagentTodoSheetState",
-            ) { current ->
-                when (current) {
-                    SubagentTodoSheetState.Loading -> SubagentTodoLoading()
-                    is SubagentTodoSheetState.Error -> SubagentTodoMessage(
-                        text = current.message,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    SubagentTodoSheetState.Empty -> SubagentTodoMessage(
-                        text = "No todos yet",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    is SubagentTodoSheetState.Content -> SubagentTodoContent(current)
+            // With the roster under it, the todo section only exists once there is something to say
+            // (a checklist, or why it could not load): no spinner and no empty band while a run has
+            // no plan. Alone, it keeps one quiet line for loading and for no todos.
+            val todosShown = roster == null || state is SubagentTodoSheetState.Content || state is SubagentTodoSheetState.Error
+            if (todosShown) {
+                Crossfade(
+                    targetState = state,
+                    animationSpec = tween(durationMillis = if (reducedMotion) 0 else STATE_FADE_MS),
+                    label = "subagentTodoSheetState",
+                ) { current ->
+                    when (current) {
+                        SubagentTodoSheetState.Loading -> SubagentTodoLoading()
+                        is SubagentTodoSheetState.Error -> SubagentTodoMessage(
+                            text = current.message,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        SubagentTodoSheetState.Empty -> SubagentTodoMessage(
+                            text = "No todos yet",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        is SubagentTodoSheetState.Content -> SubagentTodoContent(current)
+                    }
                 }
             }
             roster?.let { section ->
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                if (todosShown) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 // The roster takes all the height the todos leave and scrolls only past it; the
                 // checklist above is the bounded part, so it can never push the roster out.
                 Box(Modifier.fillMaxWidth().weight(1f, fill = false).testTag(SubagentTodoSheetTags.ROSTER)) { section() }
@@ -310,6 +315,9 @@ fun SubagentTodoSheet(
 /** Test tags of the todo sheet. */
 object SubagentTodoSheetTags {
     const val SHEET = "subagent-todo-sheet"
+
+    /** The one-line loading state (only without a roster under it). */
+    const val LOADING = "subagent-todo-sheet-loading"
 
     /** The roster's slot under the todos: it fills the height the sheet has left. */
     const val ROSTER = "subagent-todo-sheet-roster"
@@ -344,36 +352,28 @@ private fun ViewConversationButton(
     }
 }
 
+/** Loading, as one quiet line: the shared working glyph and its words, no spinner block. */
 @Composable
 private fun SubagentTodoLoading() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = LettaDimens.Space.xl),
-        contentAlignment = Alignment.Center,
+    Row(
+        modifier = Modifier.fillMaxWidth().testTag(SubagentTodoSheetTags.LOADING),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(LettaDimens.Space.xl),
-            strokeWidth = LettaDimens.Space.hair,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        StatusGlyph(StatusTone.Working)
+        Text(text = "Loading todos…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
+/** A state in words, one line: no todos yet, or why they could not load. */
 @Composable
 private fun SubagentTodoMessage(text: String, color: Color) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = LettaDimens.Space.xl),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = color,
-        )
-    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = color,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
