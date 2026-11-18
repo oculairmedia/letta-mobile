@@ -18,14 +18,22 @@ value class MarkdownSource(val text: String)
  */
 internal class SettledMarkdownParses(private val capacity: Int = SETTLED_MARKDOWN_PARSES) {
     private val parses = KeptBySource<State.Success>(capacity)
+    private val linkMaps = KeptBySource<Map<String, String>>(capacity)
     private val documents = KeptBySource<StreamingMarkdownDocument>(capacity)
     private val tables = KeptBySource<ParsedMarkdownTable>(capacity)
 
     operator fun get(source: MarkdownSource): State.Success? = parses[source]
 
-    operator fun contains(source: MarkdownSource): Boolean = parses[source] != null
+    operator fun contains(source: MarkdownSource): Boolean = source in parses
 
-    fun keep(parsed: State.Success) = parses.keep(MarkdownSource(parsed.content), parsed)
+    /** The reference-style link targets parsed with [source], or empty when it carried none. */
+    fun links(source: MarkdownSource): Map<String, String> = linkMaps[source].orEmpty()
+
+    fun keep(parsed: State.Success, links: Map<String, String> = emptyMap()) {
+        val source = MarkdownSource(parsed.content)
+        parses.keep(source, parsed)
+        if (links.isNotEmpty()) linkMaps.keep(source, links) else linkMaps.remove(source)
+    }
 
     /** The rich renderer's block document of [source], when it was kept. */
     fun document(source: MarkdownSource): StreamingMarkdownDocument? = documents[source]
@@ -38,11 +46,21 @@ internal class SettledMarkdownParses(private val capacity: Int = SETTLED_MARKDOW
     fun keepTable(source: MarkdownSource, table: ParsedMarkdownTable) = tables.keep(source, table)
 }
 
-/** Values by their source, newest last, the oldest dropped past [capacity]. */
+/** Values by their source, least-recently-used first, the oldest dropped past [capacity]. */
 private class KeptBySource<V : Any>(private val capacity: Int) {
     private val kept = LinkedHashMap<MarkdownSource, V>()
 
-    operator fun get(source: MarkdownSource): V? = kept[source]
+    operator fun get(source: MarkdownSource): V? {
+        val value = kept.remove(source) ?: return null
+        kept[source] = value
+        return value
+    }
+
+    operator fun contains(source: MarkdownSource): Boolean = source in kept
+
+    fun remove(source: MarkdownSource) {
+        kept.remove(source)
+    }
 
     fun keep(source: MarkdownSource, value: V) {
         kept.remove(source)

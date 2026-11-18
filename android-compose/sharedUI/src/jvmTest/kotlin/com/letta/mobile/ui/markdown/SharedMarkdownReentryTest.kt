@@ -73,6 +73,22 @@ class SharedMarkdownReentryTest {
         }
     }
 
+    @Test
+    fun readingAnOlderParsePromotesItPastCapacityEviction() {
+        val parses = SettledMarkdownParses(capacity = 2)
+        val first = MarkdownSource("first")
+        val second = MarkdownSource("second")
+        val third = MarkdownSource("third")
+        parses.keepDocument(first, StreamingMarkdownDocument(emptyList()))
+        parses.keepDocument(second, StreamingMarkdownDocument(emptyList()))
+        // Accessing `first` marks it most-recently-used, so inserting `third` evicts `second`.
+        checkNotNull(parses.document(first))
+        parses.keepDocument(third, StreamingMarkdownDocument(emptyList()))
+        assertTrue(parses.document(first) != null, "recently read entry survives eviction")
+        assertTrue(parses.document(second) == null, "least-recently-used entry is evicted")
+        assertTrue(parses.document(third) != null, "newly inserted entry is kept")
+    }
+
     private companion object {
         const val TAG = "reentry-markdown"
         const val FIRST_LINE = "Scrolled away and back"

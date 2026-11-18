@@ -163,7 +163,10 @@ internal fun rememberSharedMarkdownState(text: String, retainState: Boolean): Ma
     val parses = LocalSettledMarkdownParses.current?.takeIf { retainState }
     val source = MarkdownSource(text)
     val settled = parses?.let { kept -> remember(kept, source) { kept[source] } }
-    if (settled != null) return remember(settled) { SettledMarkdownState(settled) }
+    if (settled != null) {
+        val settledLinks = remember(parses, source) { parses.links(source) }
+        return remember(settled, settledLinks) { SettledMarkdownState(settled, settledLinks) }
+    }
     val flavour = remember { GFMFlavourDescriptor() }
     val parser = remember(flavour) { MarkdownParser(flavour) }
     val links = remember { ReferenceLinkHandlerImpl() }
@@ -183,14 +186,17 @@ internal fun rememberSharedMarkdownState(text: String, retainState: Boolean): Ma
 private fun KeepSettledParse(parses: SettledMarkdownParses, state: MarkdownState, source: MarkdownSource) {
     LaunchedEffect(parses, state, source) {
         val parsed = state.state.first { it !is State.Loading }
-        if (parsed is State.Success && parsed.content == source.text) parses.keep(parsed)
+        if (parsed is State.Success && parsed.content == source.text) parses.keep(parsed, state.links.value)
     }
 }
 
 /** A state that is already [parsed]: the renderer draws it on its first frame. */
-private class SettledMarkdownState(private val parsed: State.Success) : MarkdownState {
+private class SettledMarkdownState(
+    private val parsed: State.Success,
+    links: Map<String, String>,
+) : MarkdownState {
     override val state: StateFlow<State> = MutableStateFlow(parsed)
-    override val links: StateFlow<Map<String, String>> = MutableStateFlow(emptyMap())
+    override val links: StateFlow<Map<String, String>> = MutableStateFlow(links)
 
     override suspend fun parse(): State = parsed
 }
