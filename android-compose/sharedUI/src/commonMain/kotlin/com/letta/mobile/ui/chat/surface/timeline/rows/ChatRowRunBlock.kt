@@ -271,32 +271,23 @@ private fun isRunStreaming(messages: List<UiMessage>, context: ChatRowContext): 
 @NonRestartableComposable
 private fun RunHeader(state: RunHeaderState) {
     val reducedMotion = LocalReducedMotion.current
-    // A live run keeps its header composed from its first step, hidden (no height, no semantics) until
-    // it shows: shown inside an AnimatedVisibility, a run whose first step hid it composed the whole
-    // line for the first time, and started its grow, in the very frame its second step landed.
-    if (state.activity.isActive) {
-        LiveRunHeader(state, reducedMotion)
-        return
-    }
-    AnimatedVisibility(
-        visible = state.visible,
-        enter = ChatRowMotion(reducedMotion).expansionEnter(),
-        // The steps below ease up into the header's place (legacy settled-run body lift).
-        exit = ChatRowMotion(reducedMotion).runLabelFoldExit(),
-        label = "runHeader",
-    ) {
-        RunSummaryLine(state)
-    }
-}
-
-/** A live run's header, always composed; it grows in and fades in from its top (snapping under reduced motion). */
-@Composable
-private fun LiveRunHeader(state: RunHeaderState, reducedMotion: Boolean) {
+    // One structure for every state, live or settled: a live run keeps its header composed from its
+    // first step, hidden (no height, no semantics) until it shows. Shown inside an AnimatedVisibility,
+    // a run whose first step hid it composed the whole line for the first time, and started its grow,
+    // in the very frame its second step landed; and switching structure at settle lost the label's
+    // cross-fade from "Working…" to its settled copy.
     val shown by animateFloatAsState(
         targetValue = if (state.visible) 1f else 0f,
         animationSpec = if (reducedMotion) snap() else tween(LettaMotionTokens.CONTENT_SIZE_MILLIS),
-        label = "liveRunHeader",
+        label = "runHeader",
     )
+    if (!state.visible && !state.activity.isActive && shown == 0f) return
+    RevealedHeader(state, shown)
+}
+
+/** The header at [shown] of its height and opacity, its semantics only while it shows. */
+@Composable
+private fun RevealedHeader(state: RunHeaderState, shown: Float) {
     Box(
         Modifier
             .clipToBounds()
