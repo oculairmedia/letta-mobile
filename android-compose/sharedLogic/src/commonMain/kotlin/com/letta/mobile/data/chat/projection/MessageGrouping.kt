@@ -263,7 +263,9 @@ fun groupMessagesForRender(
             // Single or RunBlock will use `run-$runId`). This keeps the
             // LazyColumn slot stable when a sibling message later arrives and
             // promotes this Single into a RunBlock mid-stream.
-            val isUniqueRun = (runIdCounts[runId] ?: 0) == 1
+            // Counted before echo compaction: a run whose messages are all here keeps `run-$runId`
+            // even when compaction drops one (an echo of older text), so its key never changes.
+            val isUniqueRun = (runIdCounts[runId] ?: 0) == acc.size
             val stableKey = if (isUniqueRun) runKey(runId) else null
             out.add(
                 ChatRenderItem.Single(
@@ -281,7 +283,7 @@ fun groupMessagesForRender(
                     stableKey = runBlockKey(
                         runId = runId,
                         runIdCounts = runIdCounts,
-                        accumulator = compactedAcc,
+                        accumulator = acc,
                     ),
                 )
             )
@@ -543,15 +545,12 @@ private fun runBlockKey(
     runIdCounts: Map<String, Int>,
     accumulator: List<Pair<UiMessage, GroupPosition>>,
 ): String {
-    val matchingMessagesInThisBlock = accumulator.count { (message, _) ->
-        message.role == "assistant" && message.runId == runId
-    }
-    val allMatchingMessagesAreInThisBlock = runIdCounts[runId] == matchingMessagesInThisBlock
-    return if (allMatchingMessagesAreInThisBlock) {
-        runKey(runId)
-    } else {
-        "${runKey(runId)}-${accumulator.first().first.id}"
-    }
+    // [accumulator] is the block before echo compaction and newest first. A block holding all of its
+    // run's messages is the run: `run-$runId`, whatever compaction leaves of it. A run split over
+    // several blocks names each by its OLDEST message, which new steps never change (named by its
+    // newest, the live block's key changed with every step and the list rebuilt its row each time).
+    if (runIdCounts[runId] == accumulator.size) return runKey(runId)
+    return "${runKey(runId)}-${accumulator.last().first.id}"
 }
 
 /**

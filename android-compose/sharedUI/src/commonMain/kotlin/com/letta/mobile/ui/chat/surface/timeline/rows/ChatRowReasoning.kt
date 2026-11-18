@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
@@ -124,18 +123,21 @@ private fun reasoningTitle(message: UiMessage, isActive: Boolean): String {
     return stringResource(Res.string.rows_run_for_duration, thought, formatRunDuration(latency))
 }
 
+/**
+ * The reasoning's text, through the one markdown renderer whether it still streams or has settled,
+ * so settling (while the body folds away) neither swaps renderers nor parses it from empty. Seeded
+ * with what it shows, so a body composed again mid-stream does not type out again.
+ */
 @Composable
 private fun ReasoningBody(message: UiMessage, isActive: Boolean) {
-    if (isActive) {
-        val shown = if (message.content.isBlank()) stringResource(Res.string.rows_thinking) else message.content
-        val text = rememberSmoothedStreamingText(rawText = shown, isStreaming = true)
-        Text(text = text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        return
-    }
+    val thinking = stringResource(Res.string.rows_thinking)
+    val shown = if (isActive && message.content.isBlank()) thinking else message.content.trim()
+    val text = rememberSmoothedStreamingText(rawText = shown, isStreaming = isActive, seedText = shown)
     SelectionContainer {
         SharedMarkdownText(
-            text = message.content.trim(),
+            text = text,
             textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            isStreaming = isActive,
         )
     }
 }

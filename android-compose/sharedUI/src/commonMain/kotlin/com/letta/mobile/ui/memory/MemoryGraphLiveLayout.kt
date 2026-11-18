@@ -5,17 +5,21 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.data.memory.MemoryGraphNode
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.MemoryParityItem
 import com.letta.mobile.data.memory.MemoryParityState
 import com.letta.mobile.data.memory.graph.MemoryGraphLayout
 import com.letta.mobile.data.memory.graph.MemoryGraphPoint
+import com.letta.mobile.data.memory.graph.MemoryGraphTuning
+import com.letta.mobile.data.memory.graph.MemoryGraphTunings
 import com.letta.mobile.data.memory.graph.MemoryGraphView
 import kotlin.math.sqrt
 import kotlinx.coroutines.channels.Channel
@@ -36,14 +40,46 @@ internal class MemoryGraphLiveLayout {
     val isSettled: Boolean get() = physics?.isHot != true
     private val wakes = Channel<Unit>(Channel.CONFLATED)
 
+    // What the simulation was last built over, so a new tuning can rebuild it in place.
+    private var view: MemoryGraphView? = null
+    private var target = MemoryGraphLayout()
+    private var looks: Map<String, MemoryNodeLook> = emptyMap()
+    private var motion = true
+    private var tuning = MemoryGraphTuning()
+    private var reheatRequest: Int? = null
+
     /** Rebuild the simulation for a new view/target, keeping positions of nodes already shown. */
     fun retarget(view: MemoryGraphView, target: MemoryGraphLayout, looks: Map<String, MemoryNodeLook>, motion: Boolean) {
+        this.view = view
+        this.target = target
+        this.looks = looks
+        this.motion = motion
+        rebuild(reheat = false)
+    }
+
+    /**
+     * Apply [next] (a dev tuning window's change) or a new [request] to reheat: the simulation is
+     * rebuilt from where every node is and set moving. The first call records unchanged defaults
+     * without reheating; changed tuning takes effect immediately.
+     */
+    fun retune(next: MemoryGraphTuning, request: Int) {
+        val first = reheatRequest == null
+        val changed = next != tuning
+        val requested = request != reheatRequest
+        if (!changed && !requested) return
+        tuning = next
+        reheatRequest = request
+        if (!first || changed) rebuild(reheat = true)
+    }
+
+    private fun rebuild(reheat: Boolean) {
+        val shown = view ?: return
         val previous = layout.takeUnless { it.isEmpty }
         val next = MemoryGraphPhysics.create(
-            view = view,
+            view = shown,
             target = target,
             radiusOf = { id -> looks[id]?.radius ?: MemoryNodeLooks.SMALL_RADIUS },
-            start = MemoryGraphPhysicsStart(previous = previous, bloom = true, motion = motion),
+            start = MemoryGraphPhysicsStart(previous = previous, bloom = true, motion = motion, tuning = tuning, reheat = reheat),
         )
         physics = next
         layout = next.snapshot()
@@ -81,6 +117,8 @@ internal class MemoryGraphLiveLayout {
     }
 }
 
+val LocalMemoryGraphTunings = staticCompositionLocalOf<MemoryGraphTunings?> { null }
+
 /** Keeps a [MemoryGraphLiveLayout] retargeted (before the next draw) whenever the graph changes. */
 @Composable
 internal fun rememberMemoryGraphLiveLayout(
@@ -90,10 +128,15 @@ internal fun rememberMemoryGraphLiveLayout(
     motion: Boolean,
 ): MemoryGraphLiveLayout {
     val live = remember { MemoryGraphLiveLayout() }
+    val localTunings = LocalMemoryGraphTunings.current
+    val tunings = remember(localTunings) { localTunings ?: MemoryGraphTunings() }
+    val tuning by tunings.current.collectAsState()
+    val reheats by tunings.reheatRequests.collectAsState()
     DisposableEffect(view, target, looks, motion) {
         live.retarget(view, target, looks, motion)
         onDispose { }
     }
+    LaunchedEffect(live, tuning, reheats) { live.retune(tuning, reheats) }
     LaunchedEffect(live) { live.run() }
     return live
 }

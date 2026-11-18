@@ -51,7 +51,7 @@ class ExternalAgentRowBadgeUiTest {
         )
         setContent { MaterialTheme { RenderRow(single(msg), rowContext()) } }
 
-        awaitText("to claude-code · \"Refactor the parser\"")
+        awaitText("Refactor the parser")
         onNodeWithTag(EXTERNAL_AGENT_BADGE_TAG, useUnmergedTree = true).assertTextEquals("Claude Code")
     }
 

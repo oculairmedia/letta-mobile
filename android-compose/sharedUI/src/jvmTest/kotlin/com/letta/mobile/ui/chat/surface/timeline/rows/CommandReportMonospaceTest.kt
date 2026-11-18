@@ -10,6 +10,8 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import com.letta.mobile.ui.components.LETTA_TOOL_CARD_LINE_TAG
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
@@ -98,7 +100,8 @@ class CommandReportMonospaceTest {
                 }
             }
         }
-        onNodeWithTag(ChatRowTestTags.COMPLETED_ACTIVITY_SUMMARY).performClick()
+        // A command's report opens from its summary line; a subagent's from its tool card line.
+        onAllNodes(hasTestTag(ChatRowTestTags.COMPLETED_ACTIVITY_SUMMARY) or hasTestTag(LETTA_TOOL_CARD_LINE_TAG))[0].performClick()
         waitForIdle()
     }
 

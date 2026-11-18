@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.surface
 
+import com.letta.mobile.ui.markdown.LocalSettledMarkdownParses
+import com.letta.mobile.ui.markdown.SettledMarkdownParses
 import com.letta.mobile.data.voice.session.VoiceChatSessions
 import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.chat.voice.VoiceSetupPaneHost
@@ -153,11 +155,7 @@ fun ChatSurface(
     val stableHost = rememberStableHost(host)
     val stablePlatform = rememberStablePlatform(platform)
     val canvasActions = rememberChatCanvasActions(viewedPort.actions, stableOnIntent, shareFailed)
-    // With a canvas in hand, "open canvas" is a mode change, not the host's navigation, and
-    // "show on canvas" also frames the artifact on this page's own board (letta-mobile-bglj6.13).
-    val effectiveHost = remember(stableHost, canvas != null, canvasActions) {
-        pageHost(stableHost, canvas != null, canvasActions, stableOnIntent)
-    }
+    val effectiveHost = rememberPageHost(stableHost, canvas != null, canvasActions, stableOnIntent)
     // One scroll position per conversation (and paged presentation), kept across mode changes.
     val conversationId by remember(uiState) {
         derivedStateOf { (uiState.value.conversationState as? ConversationState.Ready)?.conversationId }
@@ -165,6 +163,9 @@ fun ChatSurface(
     AcknowledgeLaneTranscript(uiState)
     ReleaseImagesOnConversationChange(conversationId)
     val listState = remember(conversationId, pagedTimeline) { LazyListState() }
+    // Settled markdown parses live as long as the scroll position does: the full page, the docked
+    // panel and its collapsed bubble all draw the same rows, so expanding or docking reuses them.
+    val markdownParses = remember(conversationId, pagedTimeline) { SettledMarkdownParses() }
     val dock = rememberChatDockState(dockGeometry ?: ChatDockGeometry.Default, onDockGeometryChange)
     // Picked images encode in the page's scope: a mode switch composes a different composer
     // panel, and the encode must outlive the one that started it.
@@ -203,6 +204,7 @@ fun ChatSurface(
             LocalChatImageActions provides stablePlatform.imageActions,
             LocalVoiceMode provides voiceMode,
             LocalAmbientVoice provides rememberAmbientVoice(voiceMode),
+            LocalSettledMarkdownParses provides markdownParses,
         ) {
             // letta-mobile-ckmub.1 (S4): the page's insets are owned once, by its LettaPageScaffold.
             ChatSurfacePageFrame(modifier) {
@@ -239,6 +241,19 @@ private fun ChatSurfaceLayers(frame: ChatSurfaceFrame, canvas: (@Composable () -
         }
     }
 }
+
+/**
+ * [host] as the page binds it, kept while its inputs hold. With a canvas in hand, "open canvas" is a
+ * mode change, not the host's navigation, and "show on canvas" also frames the artifact on this page's
+ * own board.
+ */
+@Composable
+private fun rememberPageHost(
+    host: ChatSurfaceHost,
+    hasCanvas: Boolean,
+    canvasActions: ChatCanvasActions,
+    onIntent: (ChatSurfaceIntent) -> Unit,
+): ChatSurfaceHost = remember(host, hasCanvas, canvasActions) { pageHost(host, hasCanvas, canvasActions, onIntent) }
 
 /**
  * [host] as the page binds it. With a canvas in hand ([hasCanvas]), "open canvas" is a mode

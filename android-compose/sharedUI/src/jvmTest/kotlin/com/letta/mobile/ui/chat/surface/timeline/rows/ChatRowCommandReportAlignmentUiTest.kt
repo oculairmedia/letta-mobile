@@ -25,7 +25,6 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiSubagentNotification
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
-import com.letta.mobile.ui.components.disclosure.DisclosureChevronDefaults
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -55,8 +54,6 @@ class ChatRowCommandReportAlignmentUiTest {
                     val label = "at $width on $host"
                     val header = bounds(ChatRowTestTags.RUN_HEADER)
                     val line = bounds(ChatRowTestTags.COMPLETED_ACTIVITY_SUMMARY)
-                    val headerChevron = chevronRight(ChatRowTestTags.RUN_HEADER)
-                    assertNear(headerChevron, chevronRight(ChatRowTestTags.COMPLETED_ACTIVITY_SUMMARY), "chevron $label")
                     val runGlyph = bounds(ChatRowTestTags.RUN_GLYPH)
                     val reportGlyph = bounds(ChatRowTestTags.COMPLETED_ACTIVITY_GLYPH)
                     assertNear(runGlyph.right - runGlyph.left, reportGlyph.right - reportGlyph.left, "glyph width $label")
@@ -148,10 +145,6 @@ class ChatRowCommandReportAlignmentUiTest {
         ),
     )
 
-    private fun ComposeUiTest.chevronRight(rowTag: String): Dp = onAllNodes(
-        hasTestTag(DisclosureChevronDefaults.TestTag) and hasAnyAncestor(hasTestTag(rowTag)),
-        useUnmergedTree = true,
-    ).also { assertEquals(1, it.fetchSemanticsNodes().size, "one chevron in $rowTag") }[0].getUnclippedBoundsInRoot().right
 
     private fun ComposeUiTest.labelStart(rowTag: String, text: String): Dp = onAllNodes(
         hasText(text, substring = true) and hasAnyAncestor(hasTestTag(rowTag)),

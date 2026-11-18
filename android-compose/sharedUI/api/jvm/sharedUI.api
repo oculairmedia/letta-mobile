@@ -2370,6 +2370,12 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSing
 	public final fun getLambda$-1451332564$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
+public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowSubagentReportKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowSubagentReportKt;
+	public fun <init> ()V
+	public final fun getLambda$509840535$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
 public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowToolPreviewKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowToolPreviewKt;
 	public fun <init> ()V
@@ -4891,6 +4897,20 @@ public final class com/letta/mobile/ui/markdown/MarkdownPaint {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/markdown/MarkdownSource {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/ui/markdown/MarkdownSource;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
 public abstract interface class com/letta/mobile/ui/markdown/MermaidDiagramRenderer {
 	public abstract fun Render (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;I)V
 }
@@ -4952,6 +4972,11 @@ public final class com/letta/mobile/ui/markdown/ParsedTableRow {
 	public final fun getKey ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/markdown/SettledMarkdownDocumentsKt {
+	public static final fun rememberMarkdownTable-3Ra96k4 (Ljava/lang/String;ZLandroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/markdown/ParsedMarkdownTable;
+	public static final fun rememberStreamingMarkdownDocument-H1JjXxc (Ljava/lang/String;Lcom/letta/mobile/ui/markdown/StreamingMarkdownDocumentState;ZLandroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/markdown/StreamingMarkdownDocument;
 }
 
 public final class com/letta/mobile/ui/markdown/SharedMarkdownCodeFenceKt {
@@ -5491,6 +5516,14 @@ public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphOv
 	public final fun getLambda$284266688$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
+public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphTuningPanelKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphTuningPanelKt;
+	public fun <init> ()V
+	public final fun getLambda$-1757374442$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-2015450785$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1536536983$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
 public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeCardKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeCardKt;
 	public fun <init> ()V
@@ -5502,6 +5535,10 @@ public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeEdi
 	public static final field INSTANCE Lcom/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeEditorPaneKt;
 	public fun <init> ()V
 	public final fun getLambda$1277442814$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
+public final class com/letta/mobile/ui/memory/MemoryGraphLiveLayoutKt {
+	public static final fun getLocalMemoryGraphTunings ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public final class com/letta/mobile/ui/memory/MemoryGraphPalette {
@@ -5538,6 +5575,10 @@ public final class com/letta/mobile/ui/memory/MemoryGraphPalette {
 public final class com/letta/mobile/ui/memory/MemoryGraphPaletteKt {
 	public static final fun memoryNodeKindLabel (Lcom/letta/mobile/data/memory/MemoryGraphNodeKind;)Ljava/lang/String;
 	public static final fun rememberMemoryGraphPalette (Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/memory/MemoryGraphPalette;
+}
+
+public final class com/letta/mobile/ui/memory/MemoryGraphTuningWindow_jvmKt {
+	public static final fun MemoryGraphTuningWindow (Ljava/nio/file/Path;Lcom/letta/mobile/data/memory/graph/MemoryGraphTunings;Landroidx/compose/runtime/Composer;I)V
 }
 
 public final class com/letta/mobile/ui/memory/MemoryGraphViewportState {
@@ -8725,11 +8766,12 @@ public final class com/letta/mobile/ui/shell/pages/ShellHostPages {
 
 public final class com/letta/mobile/ui/shell/pages/ShellLibraryControllers {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/memory/graph/MemoryPageController;Lcom/letta/mobile/data/schedules/ScheduleLibraryController;Lcom/letta/mobile/data/channel/ChannelsPageController;Lcom/letta/mobile/data/tools/ToolLibraryController;Lcom/letta/mobile/data/skills/SkillsCatalogController;Lcom/letta/mobile/data/home/HomePageController;Lcom/letta/mobile/data/memory/memfs/MemfsPageController;)V
+	public fun <init> (Lcom/letta/mobile/data/memory/graph/MemoryPageController;Lcom/letta/mobile/data/schedules/ScheduleLibraryController;Lcom/letta/mobile/data/channel/ChannelsPageController;Lcom/letta/mobile/data/tools/ToolLibraryController;Lcom/letta/mobile/data/skills/SkillsCatalogController;Lcom/letta/mobile/data/home/HomePageController;Lcom/letta/mobile/data/memory/memfs/MemfsPageController;Lcom/letta/mobile/data/schedules/fleet/ScheduleFleetController;)V
 	public final fun getChannels ()Lcom/letta/mobile/data/channel/ChannelsPageController;
 	public final fun getHome ()Lcom/letta/mobile/data/home/HomePageController;
 	public final fun getMemfs ()Lcom/letta/mobile/data/memory/memfs/MemfsPageController;
 	public final fun getMemory ()Lcom/letta/mobile/data/memory/graph/MemoryPageController;
+	public final fun getScheduleFleet ()Lcom/letta/mobile/data/schedules/fleet/ScheduleFleetController;
 	public final fun getSchedules ()Lcom/letta/mobile/data/schedules/ScheduleLibraryController;
 	public final fun getSkills ()Lcom/letta/mobile/data/skills/SkillsCatalogController;
 	public final fun getTools ()Lcom/letta/mobile/data/tools/ToolLibraryController;
@@ -8746,6 +8788,7 @@ public final class com/letta/mobile/ui/shell/pages/ShellLibraryFactory {
 	public final fun channels (Lcom/letta/mobile/data/session/SessionRepositoryGraphProvider;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/channel/ChannelsPageController;
 	public final fun home (Lcom/letta/mobile/data/session/SessionRepositoryGraphProvider;Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/home/HomePageController;
 	public final fun memory (Lcom/letta/mobile/data/session/SessionRepositoryGraphProvider;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/memory/graph/MemoryPageController;
+	public final fun scheduleFleet (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/schedules/fleet/ScheduleFleetController;
 	public final fun schedules (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/schedules/ScheduleLibraryController;
 	public final fun skills (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/skills/SkillsCatalogController;
 	public final fun tools (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/tools/ToolLibraryController;
@@ -9617,14 +9660,14 @@ public final class com/letta/mobile/ui/shell/pages/runs/RunsPageTags {
 public final class com/letta/mobile/ui/shell/pages/schedules/ComposableSingletons$ScheduleFormPaneKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/schedules/ComposableSingletons$ScheduleFormPaneKt;
 	public fun <init> ()V
-	public final fun getLambda$-1111039225$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-532217994$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1139151756$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-1108773294$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-1687594525$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-237951695$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-436650218$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1221662537$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$1273364922$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$139905082$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1666363867$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1798217837$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$338603605$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$562596456$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/shell/pages/schedules/CronTaskId {
@@ -9672,8 +9715,8 @@ public final class com/letta/mobile/ui/shell/pages/schedules/SchedulesPageAction
 	public final fun getOnCreate ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnDeleteCron ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnDeleteSchedule ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnFilterAgent ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnRefresh ()Lkotlin/jvm/functions/Function0;
-	public final fun getOnSelectAgent ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnTogglePause ()Lkotlin/jvm/functions/Function2;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -9719,7 +9762,9 @@ public final class com/letta/mobile/ui/shell/pages/schedules/SchedulesPageState 
 	public final fun getCrons ()Ljava/util/List;
 	public final fun getFocusedAgentId ()Ljava/lang/String;
 	public final fun getLibrary ()Lcom/letta/mobile/data/schedules/ScheduleLibraryState;
+	public final fun getScopeAgentId ()Ljava/lang/String;
 	public final fun getShowsAgentChips ()Z
+	public final fun getShowsFleet ()Z
 	public final fun getTargetAgentId ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -9727,10 +9772,12 @@ public final class com/letta/mobile/ui/shell/pages/schedules/SchedulesPageState 
 
 public final class com/letta/mobile/ui/shell/pages/schedules/SchedulesPageTags {
 	public static final field $stable I
+	public static final field ALL_AGENTS Ljava/lang/String;
 	public static final field DETAIL_SHEET Ljava/lang/String;
 	public static final field EMPTY Ljava/lang/String;
 	public static final field ERROR Ljava/lang/String;
 	public static final field FORM Ljava/lang/String;
+	public static final field FORM_AGENTS Ljava/lang/String;
 	public static final field FORM_NAME Ljava/lang/String;
 	public static final field FORM_PREVIEW Ljava/lang/String;
 	public static final field FORM_PROMPT Ljava/lang/String;
@@ -12180,6 +12227,7 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Pane {
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaDimens$Pane;
 	public final fun getAgentPanelWidth-D9Ej5fM ()F
 	public final fun getAlertWidth-D9Ej5fM ()F
+	public final fun getCompactCardMinWidth-D9Ej5fM ()F
 	public final fun getContentMaxWidth-D9Ej5fM ()F
 	public final fun getDualViewBreakpoint-D9Ej5fM ()F
 	public final fun getEditorMinHeight-D9Ej5fM ()F
@@ -12200,6 +12248,8 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Pane {
 	public final fun getSettingsMediumBreakpoint-D9Ej5fM ()F
 	public final fun getSettingsWideBreakpoint-D9Ej5fM ()F
 	public final fun getSidePanelWidth-D9Ej5fM ()F
+	public final fun getToolCardFactLabelWidth-D9Ej5fM ()F
+	public final fun getToolCardSectionMaxHeight-D9Ej5fM ()F
 	public final fun getWideBreakpoint-D9Ej5fM ()F
 }
 
