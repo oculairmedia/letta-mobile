@@ -17,6 +17,7 @@ import com.letta.mobile.data.voice.audio.device.AudioDeviceOption
 import com.letta.mobile.data.voice.audio.device.AudioDeviceSelection
 import com.letta.mobile.data.voice.audio.device.FrameAudioCapture
 import com.letta.mobile.data.voice.audio.device.MeteredFrameSource
+import com.letta.mobile.data.voice.audio.line.HeldOutputDevice
 import com.letta.mobile.data.voice.audio.line.LineFrameSource
 import com.letta.mobile.data.voice.audio.line.LinePcmPlayer
 import com.letta.mobile.data.voice.audio.line.PlayerOptions
@@ -103,10 +104,11 @@ class AndroidAudio(private val context: Context) {
     /**
      * A speaker on a streaming `AudioTrack` with assistant usage, playing PCM as it arrives. Each
      * stream holds transient audio focus that lets other apps duck, abandoned when it has played
-     * out; losing focus stops it with PLAYBACK_FAILED.
+     * out; losing focus stops it with PLAYBACK_FAILED. Consecutive streams (one reply's sentences) share
+     * one `AudioTrack`, released shortly after the last one.
      */
     fun player(device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault): AudioPlayer =
-        FocusedPlayer(LinePcmPlayer(AudioTrackOutputDevice(context, device), PlayerOptions()), manager)
+        FocusedPlayer(LinePcmPlayer(HeldOutputDevice(AudioTrackOutputDevice(context, device)), PlayerOptions()), manager)
 
     /** Input devices, identified by their `AudioDeviceInfo` id. */
     fun inputs(): List<AudioDeviceOption> = manager.getDevices(AudioManager.GET_DEVICES_INPUTS)
@@ -156,6 +158,8 @@ internal class FocusedPlayer(private val delegate: AudioPlayer, private val mana
         }
         if (lost.get()) throw VoiceAudioException(VoiceErrorCode.PLAYBACK_FAILED)
     }
+
+    override fun setMuted(muted: Boolean) = delegate.setMuted(muted)
 
     private companion object {
         val stoppingChanges = setOf(AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
