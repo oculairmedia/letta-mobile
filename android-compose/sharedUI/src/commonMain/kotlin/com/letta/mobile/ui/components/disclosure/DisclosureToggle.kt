@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.components.foundation.LettaClickTarget
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -18,8 +18,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.Immutable
@@ -83,15 +81,15 @@ internal val LocalDisclosureHighlightFloor = staticCompositionLocalOf { 0.dp }
 @Composable
 private fun highlightTarget(floor: Dp): LettaClickTarget {
     if (floor == 0.dp) return lettaRowTarget()
-    return remember(floor) { LettaClickTarget(highlightAbove(floor), minimumTouchTarget = false) }
+    val small = MaterialTheme.shapes.small
+    return remember(floor, small) { LettaClickTarget(highlightAbove(floor, small), minimumTouchTarget = false) }
 }
 
-/** The small shape token's rounded rectangle, ending [floor] above the bottom of what it clips. */
-private fun highlightAbove(floor: Dp): Shape = object : Shape {
+/** [shape] (the small shape token) drawn [floor] shorter: the same rounded rectangle, ending that far above the bottom. */
+private fun highlightAbove(floor: Dp, shape: Shape): Shape = object : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val bottom = (size.height - with(density) { floor.toPx() }).coerceAtLeast(0f)
-        val radius = with(density) { LettaDimens.Radius.sm.toPx() }
-        return Outline.Rounded(RoundRect(0f, 0f, size.width, bottom, CornerRadius(radius)))
+        val height = (size.height - with(density) { floor.toPx() }).coerceAtLeast(0f)
+        return shape.createOutline(Size(size.width, height), layoutDirection, density)
     }
 }
 
