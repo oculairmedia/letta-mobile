@@ -155,11 +155,7 @@ fun ChatSurface(
     val stableHost = rememberStableHost(host)
     val stablePlatform = rememberStablePlatform(platform)
     val canvasActions = rememberChatCanvasActions(viewedPort.actions, stableOnIntent, shareFailed)
-    // With a canvas in hand, "open canvas" is a mode change, not the host's navigation, and
-    // "show on canvas" also frames the artifact on this page's own board (letta-mobile-bglj6.13).
-    val effectiveHost = remember(stableHost, canvas != null, canvasActions) {
-        pageHost(stableHost, canvas != null, canvasActions, stableOnIntent)
-    }
+    val effectiveHost = rememberPageHost(stableHost, canvas != null, canvasActions, stableOnIntent)
     // One scroll position per conversation (and paged presentation), kept across mode changes.
     val conversationId by remember(uiState) {
         derivedStateOf { (uiState.value.conversationState as? ConversationState.Ready)?.conversationId }
@@ -245,6 +241,19 @@ private fun ChatSurfaceLayers(frame: ChatSurfaceFrame, canvas: (@Composable () -
         }
     }
 }
+
+/**
+ * [host] as the page binds it, kept while its inputs hold. With a canvas in hand, "open canvas" is a
+ * mode change, not the host's navigation, and "show on canvas" also frames the artifact on this page's
+ * own board.
+ */
+@Composable
+private fun rememberPageHost(
+    host: ChatSurfaceHost,
+    hasCanvas: Boolean,
+    canvasActions: ChatCanvasActions,
+    onIntent: (ChatSurfaceIntent) -> Unit,
+): ChatSurfaceHost = remember(host, hasCanvas, canvasActions) { pageHost(host, hasCanvas, canvasActions, onIntent) }
 
 /**
  * [host] as the page binds it. With a canvas in hand ([hasCanvas]), "open canvas" is a mode
