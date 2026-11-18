@@ -93,6 +93,65 @@ class TimelineRowAssemblyTest {
     }
 
     @Test
+    fun cancellationReplayDistinguishesSharedRunIdentityFromRepeatedRecords() {
+        // S3-2 order: error, reasoning block, second key, settlement.
+        // Membership is synthetic: the capture has keys/ids but no block members.
+        val error = row("cancel-error").copy(message = UiMessage(
+            "cancel-error", "error", "Previous response cancelled.", timestamp = "", runId = "r",
+        ))
+        val reasoning = run("run-r-from-reasoning", "reasoning")
+        val reply = run("run-r-from-reply", "reply")
+        val repeated = run("run-r-from-other-key", "reply")
+        Telemetry.renderDiagEnabled.set(true)
+        try {
+            val snapshots = listOf(
+                listOf(error, reasoning),
+                listOf(error, reasoning, reply),
+                listOf(error, reasoning, reply, repeated),
+            )
+            val expected = listOf(0 to 0, 1 to 0, 1 to 1)
+            snapshots.zip(expected).forEach { (live, counts) ->
+                val rows = TimelineRowAssembly.assemble(live, TimelineRowAssembly.Settled(emptyList()))
+                assertEquals(live, rows.live, "diagnostics preserve every row")
+                assertEquals(emptyMap(), rows.duplicates, "different keys do not trip the key guard")
+                val event = Telemetry.snapshot().firstOrNull { it.name == "timeline.liveRunMultiplicity" }
+                assertEquals(counts.first, event?.attrs?.get("repeatedRunGroups")?.numberOrNull)
+                assertEquals(counts.second, event?.attrs?.get("repeatedRecords")?.numberOrNull)
+                assertEquals(setOf("liveRuns", "repeatedRunGroups", "repeatedRecords"), event?.attrs?.keys)
+            }
+            val handedOff = TimelineRowAssembly.assemble(
+                listOf(error, reasoning, reply), TimelineRowAssembly.Settled(listOf(reply.key)),
+            )
+            assertEquals(listOf(error, reasoning), handedOff.live)
+            val event = Telemetry.snapshot().first { it.name == "timeline.liveRunMultiplicity" }
+            assertEquals(0, event.attrs["repeatedRunGroups"]?.numberOrNull)
+        } finally {
+            Telemetry.renderDiagEnabled.set(false)
+        }
+    }
+
+    @Test
+    fun runMultiplicityDiagnosticsAreOptInAndEmptySnapshotsClearCounts() {
+        val repeated = listOf(run("first", "reply"), run("second", "reply"))
+        Telemetry.renderDiagEnabled.set(false)
+        TimelineRowAssembly.assemble(repeated, TimelineRowAssembly.Settled(emptyList()))
+        assertEquals(emptyList(), Telemetry.snapshot().filter { it.name == "timeline.liveRunMultiplicity" })
+        Telemetry.renderDiagEnabled.set(true)
+        try {
+            TimelineRowAssembly.assemble(repeated, TimelineRowAssembly.Settled(emptyList()))
+            TimelineRowAssembly.assemble(emptyList(), TimelineRowAssembly.Settled(emptyList()))
+            val events = Telemetry.snapshot().filter { it.name == "timeline.liveRunMultiplicity" }.asReversed()
+            assertEquals(2, events.size, "one bounded event per assembly")
+            assertEquals(1, events.first().attrs["repeatedRecords"]?.numberOrNull)
+            assertEquals(0, events.last().attrs["liveRuns"]?.numberOrNull)
+            assertEquals(0, events.last().attrs["repeatedRunGroups"]?.numberOrNull)
+            assertEquals(0, events.last().attrs["repeatedRecords"]?.numberOrNull)
+        } finally {
+            Telemetry.renderDiagEnabled.set(false)
+        }
+    }
+
+    @Test
     fun guardNamesTheSourceItDropped() {
         TimelineRowKeyGuard.duplicateRows(listOf("guard-probe-key", "guard-probe-key")) { if (it == 0) "live" else "settled" }
         val event = Telemetry.snapshot().last {
