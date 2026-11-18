@@ -36,6 +36,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import com.letta.mobile.ui.components.LETTA_TOOL_CARD_LINE_TAG
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
@@ -517,12 +518,12 @@ class ChatRowInteractionUiTest {
             }
         }
 
-        // The call reads as its "Created subagent" card: Detail shows the prompt it gave, the card opens the subagent.
+        // The call reads as its "Created subagent" line: opened, it shows the prompt it gave and opens the subagent.
         onNodeWithText("Created subagent", useUnmergedTree = true).assertExists()
         onNodeWithText("Audit the build", useUnmergedTree = true).assertExists()
-        onNodeWithTag(ChatRowTestTags.TOOL_CARD_DETAIL).performClick()
+        onNodeWithTag(LETTA_TOOL_CARD_LINE_TAG).performClick()
         awaitText("Look at gradle")
-        onNodeWithTag(ChatRowTestTags.CREATED_SUBAGENT_CARD).performClick()
+        onNodeWithTag(ChatRowTestTags.CREATED_SUBAGENT_OPEN).performClick()
         runOnIdle { assertEquals(ChatSubagentTarget("agent-call-1", "Audit the build", "agent-sub"), opened) }
     }
 

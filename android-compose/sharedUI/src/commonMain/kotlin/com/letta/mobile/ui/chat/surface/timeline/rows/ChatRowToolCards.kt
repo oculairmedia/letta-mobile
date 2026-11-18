@@ -12,6 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.composables.icons.lucide.BookOpen
 import com.composables.icons.lucide.Lucide
+import com.letta.mobile.sharedui.resources.rows_tool_card_section_message
+import com.letta.mobile.ui.components.LettaToolCardAction
+import com.composables.icons.lucide.GitBranch
+import com.composables.icons.lucide.Send
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.chat.projection.classifyToolCallState
 import com.letta.mobile.data.chat.tools.ToolArguments
@@ -26,10 +30,8 @@ import com.letta.mobile.data.model.extractSubagentNotification
 import com.letta.mobile.data.subagents.subagentIdentityOf
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.sharedui.resources.Res
-import com.letta.mobile.sharedui.resources.rows_tool_card_collapse_message
 import com.letta.mobile.sharedui.resources.rows_tool_card_created_subagent
 import com.letta.mobile.sharedui.resources.rows_tool_card_done
-import com.letta.mobile.sharedui.resources.rows_tool_card_expand_message
 import com.letta.mobile.sharedui.resources.rows_tool_card_fact_agent_type
 import com.letta.mobile.sharedui.resources.rows_tool_card_fact_delivery
 import com.letta.mobile.sharedui.resources.rows_tool_card_fact_description
@@ -53,14 +55,12 @@ import com.letta.mobile.ui.components.LettaToolCardFact
 import com.letta.mobile.ui.components.LettaToolCardFacts
 import com.letta.mobile.ui.components.LettaToolCardHeader
 import com.letta.mobile.ui.components.LettaToolCardParts
-import com.letta.mobile.ui.components.LettaToolCardPreview
 import com.letta.mobile.ui.components.LettaToolCardSection
 import com.letta.mobile.ui.components.LettaToolCardStyle
 import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.foundation.StatusGlyph
 import com.letta.mobile.ui.components.line.DefaultDisclosureLabels
 import com.letta.mobile.ui.components.line.LineDisclosure
-import com.letta.mobile.ui.components.line.LineDisclosureLabels
 import com.letta.mobile.ui.components.line.StatusTone
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
@@ -84,10 +84,6 @@ internal fun ToolCallCard(toolCall: UiToolCall, callbacks: ChatRowCallbacks, det
 @Composable
 internal fun isToolCallCard(toolCall: UiToolCall): Boolean =
     sendsAgentMessage(toolCall) || loadsSkill(toolCall) || createsSubagent(toolCall)
-
-/** Whether [toolCall]'s card is a quiet line (a loaded skill) rather than a boxed card. */
-@Composable
-internal fun isLineToolCallCard(toolCall: UiToolCall): Boolean = loadsSkill(toolCall)
 
 private fun sendsAgentMessage(toolCall: UiToolCall): Boolean =
     toolCall.agentMessageProvenance?.direction == AgentMessageDirection.OUTBOUND
@@ -115,18 +111,29 @@ private fun SentMessageCard(toolCall: UiToolCall, callbacks: ChatRowCallbacks, d
         provenance.failureReason?.let { LettaToolCardFact(stringResource(Res.string.rows_tool_card_fact_failure), it) },
     )
     val failedLabel = stringResource(Res.string.rows_tool_card_failed)
+    val messageTitle = stringResource(Res.string.rows_tool_card_section_message)
     LettaToolCard(
         header = LettaToolCardHeader(
             label = stringResource(Res.string.rows_tool_card_sent_message_to),
             title = agentMessageDisplayLabel(provenance.toAgentId, name),
+            icon = Lucide.Send,
         ),
         modifier = Modifier.testTag(ChatRowTestTags.SENT_MESSAGE_CARD),
-        parts = LettaToolCardParts(
-            trailing = failureTrailing(failed, failedLabel),
-            preview = message?.let { LettaToolCardPreview(it, MessageDisclosureLabels, ChatRowTestTags.SENT_MESSAGE_TEXT) },
-            expansion = detail,
-        ),
-    ) { LettaToolCardFacts(facts) }
+        parts = LettaToolCardParts(style = LettaToolCardStyle.Line, trailing = failureTrailing(failed, failedLabel), expansion = detail),
+    ) {
+        message?.let { text ->
+            LettaToolCardSection(messageTitle) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.testTag(ChatRowTestTags.SENT_MESSAGE_TEXT),
+                )
+            }
+            LettaToolCardDivider()
+        }
+        LettaToolCardFacts(facts)
+    }
 }
 
 /**
@@ -152,18 +159,21 @@ private fun CreatedSubagentCard(toolCall: UiToolCall, callbacks: ChatRowCallback
     val openLabel = stringResource(Res.string.rows_tool_open_subagent)
     val open = callbacks.openSubagent?.takeIf { callId != null }
     LettaToolCard(
-        header = LettaToolCardHeader(label = stringResource(Res.string.rows_tool_card_created_subagent), title = title, stacked = true),
-        modifier = Modifier.testTag(ChatRowTestTags.CREATED_SUBAGENT_CARD),
-        parts = LettaToolCardParts(
-            trailing = { SubagentTrailing(toolCall) },
-            expansion = detail,
-            action = open?.let { opener ->
-                LettaMenuItem(label = openLabel) {
-                    opener(ChatSubagentTarget(callId.orEmpty(), title, dispatch?.subagentAgentId))
-                }
-            },
+        header = LettaToolCardHeader(
+            label = stringResource(Res.string.rows_tool_card_created_subagent),
+            title = title,
+            icon = Lucide.GitBranch,
         ),
+        modifier = Modifier.testTag(ChatRowTestTags.CREATED_SUBAGENT_CARD),
+        parts = LettaToolCardParts(style = LettaToolCardStyle.Line, trailing = { SubagentTrailing(toolCall) }, expansion = detail),
     ) {
+        open?.let { opener ->
+            LettaToolCardAction(
+                LettaMenuItem(label = openLabel, tag = ChatRowTestTags.CREATED_SUBAGENT_OPEN) {
+                    opener(ChatSubagentTarget(callId.orEmpty(), title, dispatch?.subagentAgentId))
+                },
+            )
+        }
         LettaToolCardFacts(facts)
         prompt?.let { text ->
             if (facts.isNotEmpty()) LettaToolCardDivider()
@@ -202,7 +212,7 @@ private fun SkillLoadCard(toolCall: UiToolCall, detail: LineDisclosure) {
     LettaToolCard(
         header = LettaToolCardHeader(
             label = stringResource(if (running) Res.string.rows_tool_card_loading_skill else Res.string.rows_tool_card_loaded_skill),
-            title = SKILL_KEYS.firstNotNullOfOrNull { toolCall.facts().string(it) },
+            title = SKILL_KEYS.firstNotNullOfOrNull { toolCall.facts().string(it) } ?: skillNameIn(result),
             icon = Lucide.BookOpen,
             working = running,
         ),
@@ -257,6 +267,12 @@ private fun CardMarkdown(text: String) {
     SharedMarkdownText(text = text, textColor = MaterialTheme.colorScheme.onSurface)
 }
 
+/** The skill's name from its result when the call's arguments do not name it: "Launching skill: pdf", else its directory's name. */
+private fun skillNameIn(result: String): String? {
+    LAUNCHING_NAME.find(result)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    return skillDirectory(result)?.trimEnd('/', '\\')?.substringAfterLast('/')?.substringAfterLast('\\')?.ifEmpty { null }
+}
+
 /** The skill's directory, from its result's "Base directory for this skill: …" (or "Directory: …") line. */
 private fun skillDirectory(result: String): String? =
     SKILL_DIRECTORY.find(result)?.groupValues?.get(1)?.trim()?.ifEmpty { null }
@@ -281,15 +297,9 @@ private fun skillBody(result: String): Pair<String?, String?> {
 private fun skillDescription(frontmatter: String): String? =
     SKILL_DESCRIPTION.find(frontmatter)?.groupValues?.get(1)?.trim()?.trim('"', '\'')?.ifEmpty { null }
 
-/** The message preview's chevron: "Show full message" / "Show message preview", spoken open / closed. */
-private val MessageDisclosureLabels = LineDisclosureLabels(
-    Res.string.rows_tool_card_expand_message,
-    Res.string.rows_tool_card_collapse_message,
-    DefaultDisclosureLabels.expandedState,
-    DefaultDisclosureLabels.collapsedState,
-)
 
-private val SKILL_KEYS = listOf("skill", "command", "name")
+private val SKILL_KEYS = listOf("skill", "command", "name", "skill_name", "skillName")
+private val LAUNCHING_NAME = Regex("""Launching skill:\s*(\S+)""", RegexOption.IGNORE_CASE)
 private const val FENCE = "---"
 private const val LAUNCHING_SKILL = "Launching skill"
 // Flags as options, not an inline (?im) prefix: JavaScript RegExp (web/wasm) rejects inline flags.

@@ -106,9 +106,9 @@ private data class NotificationModel(
     }
 }
 
-private val NOTIFICATION_FAILURE_STATUSES = setOf("failed", "error")
-private val NOTIFICATION_SUCCESS_STATUSES = setOf("completed", "success")
-private val NOTIFICATION_RUNNING_STATUSES = setOf("running", "pending", "queued", "started", "in_progress")
+internal val NOTIFICATION_FAILURE_STATUSES = setOf("failed", "error")
+internal val NOTIFICATION_SUCCESS_STATUSES = setOf("completed", "success")
+internal val NOTIFICATION_RUNNING_STATUSES = setOf("running", "pending", "queued", "started", "in_progress")
 
 /**
  * The protocol names `completed` as its successful terminal state; older producers said `success`.
@@ -155,7 +155,11 @@ internal fun SubagentNotificationCard(
             .then(if (continued) Modifier.dropBottom(ChatRowSpacing.runHeaderToggleFloor) else Modifier),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        if (model.isSuccessfulCompletion) {
+        if (isSubagent) {
+            // A subagent's report is the shared tool card line; command and task reports keep theirs.
+            val expansion = LineDisclosure(expanded = detailsExpanded, labels = detailsLabels(model), onToggle = actions.onToggleDetails)
+            SubagentReportCard(notification, actions.onOpen, expansion)
+        } else if (model.isSuccessfulCompletion) {
             CompletedSummaryRow(model, detailsExpanded, actions.onToggleDetails)
             if (detailsExpanded) NotificationBody(model, detailsExpanded, actions)
         } else {

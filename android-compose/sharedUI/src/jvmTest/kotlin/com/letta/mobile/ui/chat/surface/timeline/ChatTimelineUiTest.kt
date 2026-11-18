@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
+import com.letta.mobile.ui.components.LETTA_TOOL_CARD_LINE_TAG
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
@@ -362,8 +363,9 @@ class ChatTimelineUiTest {
             }
         }
 
-        // The dispatch reads as its "Created subagent" card, which opens the subagent.
-        onNodeWithTag(ChatRowTestTags.CREATED_SUBAGENT_CARD).performClick()
+        // The dispatch reads as its "Created subagent" line; opened, it opens the subagent.
+        onNodeWithTag(LETTA_TOOL_CARD_LINE_TAG).performClick()
+        onNodeWithTag(ChatRowTestTags.CREATED_SUBAGENT_OPEN).performClick()
         runOnIdle { assertEquals(listOf<Triple<String, String?, String>>(Triple("agent-call-1", "agent-sub", "Audit the build")), opened) }
     }
 

@@ -20,6 +20,12 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import com.letta.mobile.ui.components.LocalToolCardBodyFill
+import com.letta.mobile.data.model.UiSubagentNotification
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -126,41 +132,45 @@ class ChatRowToolCardsUiTest {
         waitForIdle()
     }
 
-    @Test
-    fun aSentMessageShowsItsRecipientAndAOneLinePreviewItsChevronOpens() = runComposeUiTest {
-        show(sent)
-        onNodeWithTag(ChatRowTestTags.SENT_MESSAGE_CARD).assertExists()
-        assertEquals(1, lineCount(), "the message previews as one line")
-        onNodeWithContentDescription("Show full message").performClick()
-        waitForIdle()
-        assertTrue(lineCount() > 1, "opened, the whole message shows")
-        onNodeWithContentDescription("Show message preview").performClick()
-        waitForIdle()
-        assertEquals(1, lineCount(), "closed again, it previews as one line")
-    }
+    private val report = UiMessage(
+        id = "report", role = "assistant", content = "", timestamp = T0,
+        subagentNotification = UiSubagentNotification(
+            status = "completed",
+            summary = "Render and compare the demo clips",
+            result = REPORT_RESULT,
+            usage = "tool_uses: 9\nduration_ms: 61000",
+            transcriptUri = "/tmp/demo/task_1.log",
+            taskId = "task_1",
+            subagentAgentId = "codex_demo",
+        ),
+    )
 
-    @Test
-    fun detailIsAButtonThatOpensTheCallsDetails() = runComposeUiTest {
-        show(sent)
-        onNodeWithTag(ChatRowTestTags.TOOL_CARD_DETAIL)
+    /** Every card is a quiet line: its words, then the chevron right after them; opening it is the line's own toggle. */
+    private fun ComposeUiTest.openTheLine(tag: String) {
+        onNode(hasTestTag(LETTA_TOOL_CARD_LINE_TAG) and hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-            .assert(SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Collapsed"))
             .performClick()
         waitForIdle()
-        // Opened, Detail shows the delivery facts: the recipient's id in monospace among them.
-        onNodeWithText("agent-scout", useUnmergedTree = true).assertExists()
-        onNodeWithTag(ChatRowTestTags.TOOL_CARD_DETAIL)
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Expanded"))
     }
 
     @Test
-    fun aCreatedSubagentShowsItsTaskAndStatusAndOpensTheSubagent() = runComposeUiTest {
+    fun aSentMessageIsALineThatOpensToTheMessageAndItsDelivery() = runComposeUiTest {
+        show(sent)
+        onNodeWithText("Sent message to", useUnmergedTree = true).assertExists()
+        onNodeWithTag(ChatRowTestTags.SENT_MESSAGE_TEXT, useUnmergedTree = true).assertDoesNotExist()
+        openTheLine(ChatRowTestTags.SENT_MESSAGE_CARD)
+        onNodeWithTag(ChatRowTestTags.SENT_MESSAGE_TEXT, useUnmergedTree = true).assertTextEquals(BODY)
+        onNodeWithText("agent-scout", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun aCreatedSubagentIsALineWhoseBodyOpensTheSubagent() = runComposeUiTest {
         var opened: ChatSubagentTarget? = null
         show(created, rowCallbacks(openSubagent = { opened = it }))
-        onNodeWithTag(ChatRowTestTags.CREATED_SUBAGENT_CARD).assertExists()
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_STATUS, useUnmergedTree = true).assertExists()
-        onNodeWithTag(ChatRowTestTags.CREATED_SUBAGENT_CARD)
+        openTheLine(ChatRowTestTags.CREATED_SUBAGENT_CARD)
+        onNodeWithTag(ChatRowTestTags.CREATED_SUBAGENT_OPEN)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
             .performClick()
         runOnIdle { assertEquals(ChatSubagentTarget("agent-1", TASK, "agent-sub"), opened) }
@@ -169,14 +179,9 @@ class ChatRowToolCardsUiTest {
     @Test
     fun aLoadedSkillIsAQuietLineThatOpensItsDirectoryDescriptionAndContents() = runComposeUiTest {
         show(skill)
-        onNodeWithTag(ChatRowTestTags.SKILL_LOAD_CARD).assertExists()
         onNodeWithText("Loaded skill", useUnmergedTree = true).assertExists()
         onNodeWithText("/skills/writing-guide", useUnmergedTree = true).assertDoesNotExist()
-        onNodeWithTag(LETTA_TOOL_CARD_LINE_TAG)
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Collapsed"))
-            .performClick()
-        waitForIdle()
+        openTheLine(ChatRowTestTags.SKILL_LOAD_CARD)
         onNodeWithText("/skills/writing-guide", useUnmergedTree = true).assertExists()
         onNodeWithText("House style for release notes.", useUnmergedTree = true).assertExists()
         awaitText("Keep sentences short.")
@@ -184,56 +189,58 @@ class ChatRowToolCardsUiTest {
     }
 
     @Test
-    fun theCardsTakeThreeFifthsOfAWideColumnAndAllOfAPhones() {
-        // The card sits on the step rows' text column: its share is of the room after that inset.
-        val inset = (ChatRowSpacing.stepTextStart + ChatRowSpacing.lineEnd).value.toInt()
-        val (wideCard, wideColumn) = cardAndColumn(WIDE)
-        assertTrue(kotlin.math.abs(wideCard - (wideColumn - inset) * 3 / 5) <= 1, "a wide column's card is $wideCard of $wideColumn")
-        val (phoneCard, phoneColumn) = cardAndColumn(PHONE)
-        assertTrue(kotlin.math.abs(phoneCard - (phoneColumn - inset)) <= 1, "a phone column's card ($phoneCard of $phoneColumn) spans it")
-    }
-
-    /** The sent-message card's width and its prose column's, in whole dp, in a frame [width] wide. */
-    private fun cardAndColumn(width: Int): Pair<Int, Int> {
-        var measured = 0 to 0
-        runDesktopComposeUiTest(width = width, height = FRAME_HEIGHT) {
-            setContent { MaterialTheme { RenderRow(single(sent), rowContext(), rowCallbacks(resolveAgentName = { "Scout" })) } }
-            waitForIdle()
-            val card = onNodeWithTag(ChatRowTestTags.SENT_MESSAGE_CARD).getUnclippedBoundsInRoot()
-            val column = onNodeWithTag(ChatRowTestTags.AGENT_TEXT).getUnclippedBoundsInRoot()
-            measured = (card.right - card.left).value.toInt() to (column.right - column.left).value.toInt()
-        }
-        return measured
-    }
-
-    private fun ComposeUiTest.lineCount(): Int {
-        val layouts = mutableListOf<TextLayoutResult>()
-        onNodeWithTag(ChatRowTestTags.SENT_MESSAGE_TEXT, useUnmergedTree = true).fetchSemanticsNode()
-            .config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
-        return layouts.first().lineCount
+    fun aSkillTheArgumentsDoNotNameTakesItsNameFromItsResult() = runComposeUiTest {
+        show(skill.copy(toolCalls = skill.toolCalls.orEmpty().map { it.copy(arguments = "{}") }))
+        onNodeWithText("writing-guide", useUnmergedTree = true).assertExists()
     }
 
     @Test
-    fun bothCardsRenderAtEveryReviewWidth() {
+    fun aSubagentReportShowsNothingRawUntilItsDetailIsOpened() = runComposeUiTest {
+        show(report, rowCallbacks(openSubagent = {}))
+        onNodeWithText("Render and compare the demo clips", useUnmergedTree = true).assertExists()
+        onNodeWithText("completed", useUnmergedTree = true).assertExists()
+        openTheLine(ChatRowTestTags.SUBAGENT_REPORT_CARD)
+        awaitText("All four clips rendered.")
+        onNodeWithText("9 tools", useUnmergedTree = true).assertExists()
+        onNodeWithText("1m 1s", useUnmergedTree = true).assertExists()
+        onNodeWithText("View conversation", useUnmergedTree = true).assertExists()
+        listOf("tool_uses", "subagent_id=", "runtime_session_id", "codex_demo", "task_1").forEach { raw ->
+            onNodeWithText(raw, substring = true, useUnmergedTree = true).assertDoesNotExist()
+        }
+        onNodeWithTag(ChatRowTestTags.SUBAGENT_REPORT_DETAIL).performClick()
+        waitForIdle()
+        onNodeWithText("sess-1", useUnmergedTree = true).assertExists()
+        onNodeWithText("/tmp/demo/task_1.log", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun theCardsRenderAtEveryReviewWidth() {
         for (dark in listOf(true, false)) {
-            for (width in REVIEW_WIDTHS) render(width, dark)
+            for (width in REVIEW_WIDTHS) {
+                render(width, dark, fill = false)
+                render(width, dark, fill = true)
+            }
         }
     }
 
-    private fun render(width: Int, dark: Boolean) = runDesktopComposeUiTest(width = width, height = FRAME_HEIGHT) {
+    /** Every card opened, the body on no fill (the default) or on the subtle tonal fill. */
+    private fun render(width: Int, dark: Boolean, fill: Boolean) = runDesktopComposeUiTest(width = width, height = FRAME_HEIGHT) {
         val touch = width < LettaDimens.Pane.wideBreakpoint.value
         setContent {
             SharedMaterialTheme(darkTheme = dark) {
-                CompositionLocalProvider(LocalLettaHost provides if (touch) LettaHost.Touch else LettaHost.Pointer) {
+                CompositionLocalProvider(
+                    LocalLettaHost provides if (touch) LettaHost.Touch else LettaHost.Pointer,
+                    LocalToolCardBodyFill provides fill,
+                ) {
                     Surface(Modifier.fillMaxSize()) {
                         Box(Modifier.fillMaxSize()) {
                             androidx.compose.foundation.layout.Column {
                                 RenderRow(single(sent), rowContext(), rowCallbacks(resolveAgentName = { "Scout" }))
-                                RenderRow(single(created), rowContext(), rowCallbacks(openSubagent = {}))
                                 RenderRow(single(skill), rowContext(), rowCallbacks())
-                                // The same card as an open run's step: inside the run's body, on its text column.
+                                // The created subagent as an open run's step, and the report it sent back.
                                 val opened = renderState(collapsedRunIds = setOf(RUN_ID))
                                 RenderRow(openRun, rowContext(itemState = opened, newestMessageId = "after"))
+                                RenderRow(single(report), rowContext(), rowCallbacks(openSubagent = {}))
                             }
                         }
                     }
@@ -241,12 +248,13 @@ class ChatRowToolCardsUiTest {
             }
         }
         waitForIdle()
-        // The skill opened, so its panel (directory, description, contents) is in the frame too.
-        onNodeWithTag(LETTA_TOOL_CARD_LINE_TAG).performClick()
+        val lines = onAllNodesWithTag(LETTA_TOOL_CARD_LINE_TAG, useUnmergedTree = true)
+        repeat(lines.fetchSemanticsNodes().size) { lines[it].performClick() }
         waitForIdle()
         awaitText("Keep sentences short.")
-        val file = File("build/agent-tool-cards").apply { mkdirs() }.resolve("cards-$width-${if (dark) "dark" else "light"}.png")
-        ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", file)
+        awaitText("All four clips rendered.")
+        val name = "cards-$width-${if (dark) "dark" else "light"}-${if (fill) "fill" else "nofill"}.png"
+        ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File("build/agent-tool-cards").apply { mkdirs() }.resolve(name))
     }
 
     private companion object {
@@ -256,7 +264,12 @@ class ChatRowToolCardsUiTest {
         const val BODY = "Please recheck the nightly build logs for the flaky upload step and tell me which runs failed and why."
         const val WIDE = 1000
         const val PHONE = 360
-        const val FRAME_HEIGHT = 1000
+        const val FRAME_HEIGHT = 1600
+        val REPORT_RESULT = listOf(
+            "subagent_type=codex subagent_id=sub-1 subagent_status=success agent_id=codex_demo runtime_session_id=sess-1",
+            "",
+            "All four clips rendered. **Pick: clip B**, the steadiest lettering.",
+        ).joinToString("\n")
         val SKILL_RESULT = listOf(
             "Launching skill: writing-guide",
             "Base directory for this skill: /skills/writing-guide",

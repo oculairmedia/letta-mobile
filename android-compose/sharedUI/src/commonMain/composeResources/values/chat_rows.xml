@@ -258,6 +258,23 @@
     <string name="rows_tool_card_fact_description">Description</string>
     <string name="rows_tool_card_section_prompt">Prompt</string>
     <string name="rows_tool_card_section_contents">Contents</string>
+    <string name="rows_tool_card_section_message">Message</string>
+    <string name="rows_report_agent">Agent</string>
+    <string name="rows_report_completed">completed</string>
+    <string name="rows_report_failed">failed</string>
+    <string name="rows_report_running">running</string>
+    <string name="rows_report_tokens">%1$s tokens</string>
+    <string name="rows_tool_card_fact_type">Type</string>
+    <string name="rows_tool_card_fact_status">Status</string>
+    <string name="rows_tool_card_fact_agent_id">Agent id</string>
+    <string name="rows_tool_card_fact_session_id">Session id</string>
+    <string name="rows_tool_card_fact_task_id">Task id</string>
+    <string name="rows_tool_card_fact_transcript">Transcript</string>
+    <string name="rows_tool_card_section_report">Report</string>
+    <plurals name="rows_report_tools">
+        <item quantity="one">%1$d tool</item>
+        <item quantity="other">%1$d tools</item>
+    </plurals>
     <plurals name="rows_monitor_events">
         <item quantity="one">%1$d event</item>
         <item quantity="other">%1$d events</item>

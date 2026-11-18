@@ -29,6 +29,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import com.letta.mobile.ui.components.disclosure.DisclosureRowStyle
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.layout
@@ -59,14 +63,26 @@ import com.letta.mobile.ui.theme.ChatRowMotion
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
-/** How a [LettaToolCard] sits in the timeline. */
+/** How a [LettaToolCard] sits. */
 internal enum class LettaToolCardStyle {
-    /** A compact raised card about three fifths of the column wide, its header inside it (a sent message, a created subagent). */
+    /**
+     * A compact raised card about three fifths of the column wide, its header inside it. Kept for a
+     * card standing on its own outside a run; nothing in the timeline uses it by default.
+     */
     Card,
 
-    /** A quiet line (icon, label, title, chevron) that opens a raised panel the column's width under it (a loaded skill). */
+    /**
+     * A quiet line (icon or status glyph, label, title, its badge or status, then the chevron right
+     * after them) whose body opens under it: the timeline's default for every tool card.
+     */
     Line,
 }
+
+/**
+ * Whether an open line's body sits on a subtle tonal fill (true) or on nothing but its indent and a
+ * hairline rule (false, the default). A page-level choice, so every card in a timeline agrees.
+ */
+internal val LocalToolCardBodyFill = staticCompositionLocalOf { false }
 
 /**
  * A tool card's header: its [icon] (a small spinner instead while [working]), its muted [label]
@@ -80,6 +96,8 @@ internal class LettaToolCardHeader(
     val icon: ImageVector? = null,
     val stacked: Boolean = false,
     val working: Boolean = false,
+    /** A state to show as the shared status glyph in the icon's slot (a report: done, failed). */
+    val tone: StatusTone? = null,
 )
 
 /** A card's one-line [text] preview, which its own chevron (labelled by [labels]) opens in full. */
@@ -153,7 +171,13 @@ private fun LineStyle(
     body: (@Composable ColumnScope.() -> Unit)?,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-        DisclosureRow(disclosure = parts.expansion.takeIf { body != null }, modifier = Modifier.testTag(LETTA_TOOL_CARD_LINE_TAG)) {
+        // The words take only their width, so the chevron (and a badge or status before it) follows
+        // the title; a long title still ellipsizes and the whole line stays the toggle.
+        DisclosureRow(
+            disclosure = parts.expansion.takeIf { body != null },
+            modifier = Modifier.testTag(LETTA_TOOL_CARD_LINE_TAG),
+            style = DisclosureRowStyle(gap = LettaDimens.Space.sm),
+        ) {
             HeaderLead(header)
             Text(
                 text = header.label,
@@ -161,15 +185,41 @@ private fun LineStyle(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
-            header.title?.let { LettaToolCardTitle(it, Modifier.weight(1f)) } ?: Spacer(Modifier.weight(1f))
+            header.title?.let { LettaToolCardTitle(it, Modifier.weight(1f, fill = false)) }
             parts.trailing?.invoke(this)
         }
         if (body != null) {
-            ToolCardAnimated(parts.expansion?.expanded == true) {
-                ToolCardSurface(Modifier.fillMaxWidth()) { body() }
-            }
+            ToolCardAnimated(parts.expansion?.expanded == true) { LineBody(body) }
         }
     }
+}
+
+/**
+ * An open line's body, under the title's text (past the icon slot): on no surface, a hairline rule
+ * down its start edge giving it its structure; or, with [LocalToolCardBodyFill], on the subtle tonal
+ * fill (the lowest container role) in the medium shape.
+ */
+@Composable
+private fun LineBody(body: @Composable ColumnScope.() -> Unit) {
+    val indent = Modifier.fillMaxWidth().padding(start = LettaDimens.Control.iconSm + LettaDimens.Space.sm)
+    if (LocalToolCardBodyFill.current) {
+        Surface(modifier = indent, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+            Column(Modifier.padding(LettaDimens.Space.md), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), content = body)
+        }
+        return
+    }
+    val rule = MaterialTheme.colorScheme.outlineVariant
+    Column(
+        modifier = indent
+            .drawBehind {
+                val x = LettaDimens.Stroke.hairline.toPx() / 2
+                drawLine(rule, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = LettaDimens.Stroke.hairline.toPx())
+            }
+            .padding(start = LettaDimens.Space.md, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs)
+            .testTag(LETTA_TOOL_CARD_BODY_TAG),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        content = body,
+    )
 }
 
 /** The raised rounded surface every tool card draws on. */
@@ -221,11 +271,12 @@ private fun CardHeader(header: LettaToolCardHeader, parts: LettaToolCardParts) {
     }
 }
 
-/** The header's icon, or the working spinner in its place. */
+/** The header's icon, or the working spinner (or its state's glyph) in its place. */
 @Composable
 private fun HeaderLead(header: LettaToolCardHeader) {
-    if (header.working) {
-        StatusGlyph(StatusTone.Working)
+    val tone = if (header.working) StatusTone.Working else header.tone
+    if (tone != null) {
+        StatusGlyph(tone)
     } else {
         header.icon?.let {
             Icon(
@@ -341,6 +392,24 @@ internal fun LettaToolCardFacts(facts: List<LettaToolCardFact>) {
     }
 }
 
+/**
+ * A body's action ("View conversation", "Open subagent"): a quiet text button in the primary ink, a
+ * button to assistive technology the keyboard reaches, with the shared rounded row hover.
+ */
+@Composable
+internal fun LettaToolCardAction(action: LettaMenuItem) {
+    Text(
+        text = action.label,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        maxLines = 1,
+        modifier = Modifier
+            .lettaClickable(role = Role.Button, target = lettaRowTarget(), onClick = action.onClick)
+            .then(if (action.tag.isEmpty()) Modifier else Modifier.testTag(action.tag))
+            .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.hair),
+    )
+}
+
 /** A hairline between a body's blocks. */
 @Composable
 internal fun LettaToolCardDivider() {
@@ -384,6 +453,9 @@ private const val COMPACT_CARD_FRACTION = 0.6f
 
 /** A tool card's "Detail" link. */
 internal const val LETTA_TOOL_CARD_DETAIL_TAG = "tool-card-detail"
+
+/** An open line's body (no fill). */
+internal const val LETTA_TOOL_CARD_BODY_TAG = "tool-card-body"
 
 /** A line-style tool card's header line (its toggle). */
 internal const val LETTA_TOOL_CARD_LINE_TAG = "tool-card-line"

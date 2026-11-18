@@ -29,8 +29,8 @@ import kotlin.test.assertTrue
 
 /**
  * A tool card among an open run's steps lives in the run's body: it starts below the run's header
- * (never over the header's floor, where the body rises for its transparent step lines), and its
- * left edge is the step rows' text column, the same as the "Ran …" beside it.
+ * (never over the header's line), and it is a line among the steps: its words start on the step rows'
+ * text column, the same as the "Ran …" beside it.
  */
 class ChatRowToolCardRunGeometryUiTest {
     private val agent = UiToolCall(
@@ -93,8 +93,9 @@ class ChatRowToolCardRunGeometryUiTest {
     fun aCardAmongStepsStartsOnTheirTextColumn() = runComposeUiTest {
         showOpen(run(bash, agent))
         val ran = onAllNodesWithText("Ran", useUnmergedTree = true)[0].getUnclippedBoundsInRoot()
+        val label = onAllNodesWithText("Created subagent", useUnmergedTree = true)[0].getUnclippedBoundsInRoot()
         val card = bounds(ChatRowTestTags.CREATED_SUBAGENT_CARD)
-        assertTrue(abs((card.left - ran.left).value) <= TOLERANCE, "the card starts at ${card.left}, the step text at ${ran.left}")
+        assertTrue(abs((label.left - ran.left).value) <= TOLERANCE, "the card's words start at ${label.left}, the step text at ${ran.left}")
         assertTrue(card.top >= ran.bottom, "the card sits under the step before it")
     }
 

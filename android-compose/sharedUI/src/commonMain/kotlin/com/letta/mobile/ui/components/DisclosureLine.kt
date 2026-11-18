@@ -49,8 +49,8 @@ internal val LocalLineRail = staticCompositionLocalOf { LineRail.Header }
 /**
  * The frame every disclosure and notice line in the timeline draws in: one row on [rail]'s column
  * (its start and end inset and its height floor), a fixed glyph slot when [glyph] is set, the
- * caller's [content], and, when [disclosure] is set, the one trailing chevron with the whole line as
- * its toggle: the shared DisclosureRow, on the rail's insets. Lines on one rail therefore share their glyph start, glyph
+ * caller's [content], and, when [disclosure] is set, the one chevron right after the words with the
+ * whole line as its toggle: the shared DisclosureRow, on the rail's insets. Lines on one rail therefore share their glyph start, glyph
  * size, label start, chevron edge, chevron size and height floor. [minHeight] raises or lowers the
  * floor for a line whose height its parent depends on (a run's header). [stateDescription] is the
  * line's spoken state when the disclosure's open / closed is not what it should say.
@@ -117,16 +117,16 @@ internal fun SummaryLine(
         stateDescription = stateDescription,
         minHeight = minHeight,
     ) {
-        // The words share one weighted slot, so however long they run the glyph, the badge and the
-        // chevron keep their size and the chevron stays on the rail's edge.
+        // The words share one weighted slot that takes only their width, so the badge and the chevron
+        // follow right after them (never pinned to the far edge); however long the words run they
+        // ellipsize first, and the glyph, the badge and the chevron keep their size.
         Row(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f, fill = false),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(ChatRowSpacing.lineGap),
         ) {
-            val titleWeight = if (detail != null) Modifier.weight(1f, fill = false) else Modifier.weight(1f)
-            LineTitle(spec.title, style, spec.tone.titleColor(), titleWeight)
-            detail?.let { LineText(it, style, muted, Modifier.weight(1f)) }
+            LineTitle(spec.title, style, spec.tone.titleColor(), Modifier.weight(1f, fill = false))
+            detail?.let { LineText(it, style, muted, Modifier.weight(1f, fill = false)) }
             meta?.let { LineText(it, style, muted, Modifier) }
         }
         trailing?.invoke(this)
@@ -147,7 +147,8 @@ internal fun StepLine(spec: LineSpec, disclosure: LineDisclosure?, modifier: Mod
         modifier = modifier,
         glyph = { StatusGlyph(spec.tone, Modifier.testTag(spec.tags.glyph), spec.glyphLabel) },
     ) {
-        Column(Modifier.weight(1f)) {
+        // Its own width only, so the chevron sits right after the step's words.
+        Column(Modifier.weight(1f, fill = false)) {
             LineText(spec.title, LineRail.Step.titleStyle(), MaterialTheme.colorScheme.onSurface, Modifier)
             spec.subtitle?.let { LineText(it, MaterialTheme.typography.labelSmall, muted, Modifier) }
         }

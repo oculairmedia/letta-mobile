@@ -7,6 +7,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import com.letta.mobile.ui.components.LETTA_TOOL_CARD_LINE_TAG
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -175,11 +176,11 @@ class ChatRowProvenanceUiTest {
             }
         }
 
-        // The send reads as its "Sent message to" card: the recipient, the message's preview and Detail.
+        // The send reads as its "Sent message to" line; opened, it shows the message.
         onNodeWithTag(ChatRowTestTags.SENT_MESSAGE_CARD).assertExists()
         onNodeWithText("Sent message to", useUnmergedTree = true).assertExists()
         onNodeWithText("Meridian", useUnmergedTree = true).assertExists()
+        onNodeWithTag(LETTA_TOOL_CARD_LINE_TAG).performClick()
         onNodeWithTag(ChatRowTestTags.SENT_MESSAGE_TEXT, useUnmergedTree = true).assertTextEquals("status update")
-        onNodeWithTag(ChatRowTestTags.TOOL_CARD_DETAIL).assertExists()
     }
 }

@@ -97,10 +97,10 @@ internal fun ToolStep(
     Column(modifier = Modifier.fillMaxWidth().mascotAttention(AttentionKey("tool:$disclosureKey"), AttentionKind.TOOL, enabled = running)) {
         // A message to another agent, a created subagent and a loaded skill are events of their own: a tool card.
         if (isToolCallCard(toolCall)) {
-            // A boxed card starts on the step rows' text column; a line card's icon takes their glyph slot.
+            // A tool card is a line among the steps: its icon takes their glyph slot, its words their text column.
             Box(
                 Modifier.padding(
-                    start = if (isLineToolCallCard(toolCall)) ChatRowSpacing.stepHorizontal else ChatRowSpacing.stepTextStart,
+                    start = ChatRowSpacing.stepHorizontal,
                     end = ChatRowSpacing.lineEnd,
                     top = ChatRowSpacing.stepVertical,
                     bottom = ChatRowSpacing.stepVertical,
@@ -218,7 +218,8 @@ private fun RowScope.StepLineWords(spec: StepLineSpec) {
         color = muted.copy(alpha = TARGET_ALPHA),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.weight(1f),
+        // Its own width only: the badge, the note and the chevron follow the words, not the far edge.
+        modifier = Modifier.weight(1f, fill = false),
     )
     spec.agent?.let { ExternalAgentBadge(it) }
     spec.note?.let { note ->

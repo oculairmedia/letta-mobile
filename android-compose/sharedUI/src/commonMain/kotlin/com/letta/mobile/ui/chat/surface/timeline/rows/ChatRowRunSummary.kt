@@ -1,6 +1,10 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Column
 import com.letta.mobile.data.chat.projection.RunActivityProjection
 import com.letta.mobile.data.chat.projection.RunActivityState
 import com.letta.mobile.sharedui.resources.Res
@@ -37,18 +41,25 @@ import org.jetbrains.compose.resources.stringResource
 internal fun RunSummaryLine(state: RunHeaderState) {
     val fold = state.fold
     val tone = runSummaryTone(state)
-    SummaryLine(
-        spec = LineSpec(
-            title = runSummaryTitle(state.activity, tone),
-            tone = tone,
-            tags = LineTags(row = ChatRowTestTags.RUN_HEADER, glyph = ChatRowTestTags.RUN_GLYPH),
-        ),
-        disclosure = fold?.let { LineDisclosure(expanded = !it.collapsed, labels = RunDisclosureLabels, onToggle = it.toggle) },
-        rail = LineRail.Header,
-        stateDescription = if (state.activity.isActive) stringResource(Res.string.rows_run_state_working) else null,
-        // The run's body lifts by this floor (runHeaderFloor), so the header keeps its own.
-        minHeight = if (state.tall) ChatRowSpacing.runHeaderToggleMinHeight else ChatRowSpacing.runHeaderMinHeight,
-    )
+    // The header keeps its floor (the run's body lifts into it), but as plain space under the line:
+    // the line itself, its hover and press, ends at its label, so the lifted body (the steps' group
+    // label, the first step) is never drawn across the line's highlight.
+    val floor = if (state.tall) ChatRowSpacing.runHeaderToggleFloor else ChatRowSpacing.runHeaderFloor
+    val height = if (state.tall) ChatRowSpacing.runHeaderToggleMinHeight else ChatRowSpacing.runHeaderMinHeight
+    Column {
+        SummaryLine(
+            spec = LineSpec(
+                title = runSummaryTitle(state.activity, tone),
+                tone = tone,
+                tags = LineTags(row = ChatRowTestTags.RUN_HEADER, glyph = ChatRowTestTags.RUN_GLYPH),
+            ),
+            disclosure = fold?.let { LineDisclosure(expanded = !it.collapsed, labels = RunDisclosureLabels, onToggle = it.toggle) },
+            rail = LineRail.Header,
+            stateDescription = if (state.activity.isActive) stringResource(Res.string.rows_run_state_working) else null,
+            minHeight = height - floor,
+        )
+        Spacer(Modifier.height(floor))
+    }
 }
 
 internal fun runSummaryTone(state: RunHeaderState): StatusTone = when {

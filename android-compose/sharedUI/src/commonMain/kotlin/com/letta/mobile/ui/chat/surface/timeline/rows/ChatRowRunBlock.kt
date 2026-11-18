@@ -302,20 +302,11 @@ private fun RunBody(body: RunBodyState, header: RunHeaderState, row: RunRowScope
     val steps = remember(body.messages) { compactRunSteps(body.messages) }
     // Images stay visible when work folds away. Keep their top beat below the header's full bounds,
     // using the same lift open and folded so settling does not introduce another geometry change.
-    // A tool card opening the open run is opaque too: it starts below the header, not over its floor.
-    val opaqueFirst = steps.any { it.hasImages() } || (!body.collapsed && startsWithCard(steps))
-    val floor = if (opaqueFirst) 0.dp else runHeaderFloor(header)
+    val floor = if (steps.any { it.hasImages() }) 0.dp else runHeaderFloor(header)
     val lift by animateRunBodyLift(if (body.lifted) floor + firstStepTop(steps) else 0.dp)
     Box(Modifier.fillMaxWidth().pullUp { lift }) {
         RunSteps(steps, body, row)
     }
-}
-
-/** Whether the run's first step is a lone tool call that draws as a tool card. */
-@Composable
-private fun startsWithCard(steps: List<RunStep>): Boolean {
-    val calls = (steps.firstOrNull() as? RunStep.ToolCalls)?.calls?.toolCalls ?: return false
-    return calls.size == 1 && isToolCallCard(calls.single())
 }
 
 /** The beat above the run's first step; a hidden (folded) work step takes the grouped one, as the prose after it does. */
