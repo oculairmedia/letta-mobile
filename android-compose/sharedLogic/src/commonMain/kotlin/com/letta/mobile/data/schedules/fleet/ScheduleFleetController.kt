@@ -115,10 +115,11 @@ class ScheduleFleetController(
         val (agents, rosterError) = operations.loadAgentRoster { stateFlow.value.agents }
         val read = AgentFleetReads.read(agents.map { it.id }) { agent -> readAgent(agent) }
         if (sources.crons != null && read.nativeRouteUnserved()) nativeUnserved = true
-        val published = stateFlow.value.fleetTarget(agents).withFleetRead(read, policy.errorMessage)
-        stateFlow.value = published.copy(
-            errorMessage = published.errorMessage ?: rosterError?.let { policy.errorMessage(it, "Failed to load agents") },
-        )
+        val rosterMessage = rosterError?.let { policy.errorMessage(it, "Failed to load agents") }
+        stateFlow.update { current ->
+            val published = current.fleetTarget(agents).withFleetRead(read, policy.errorMessage)
+            published.copy(errorMessage = published.errorMessage ?: rosterMessage)
+        }
         loadRunHistory()
     }
 
