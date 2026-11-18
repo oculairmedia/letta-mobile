@@ -109,6 +109,7 @@ jobs:
   test:
     name: test-workload
     runs-on: ubuntu-latest
+    timeout-minutes: 75
     # pull-requests: read lets the shared-search check read the PR's current description.
     permissions:
       contents: read
@@ -270,6 +271,10 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: python3 -m unittest discover -s scripts/ci -p 'test_gate_hygiene.py' -v
 
+      - name: Test hang diagnostics omit process argv
+        working-directory: ${{ github.workspace }}
+        run: python3 -m unittest discover -s scripts/ci -p 'test_gradle_hang_watchdog.py' -v
+
       - name: Enforce tree hygiene
         if: github.event_name == 'pull_request'
         working-directory: ${{ github.workspace }}
@@ -369,9 +374,13 @@ jobs:
           bash "$GITHUB_WORKSPACE/scripts/ci/apt-install-retry.sh" gcc pkg-config patch libx11-dev libglib2.0-dev xvfb xauth
 
       - name: Run Android verification task graph
+        timeout-minutes: 55
         env:
           ADDITIVE_TASKS: ${{ steps.additive_modules.outputs.tasks }}
         run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/gradle-hang-watchdog.sh" 3120 "$RUNNER_TEMP/gradle-hang/diagnostics.txt" &
+          watchdog=$!
+          trap 'pkill -P "$watchdog" || true; kill "$watchdog" 2>/dev/null || true' EXIT
           tasks=(
             :app:compileSideloadDebugKotlin
             :core:android-data:testDebugUnitTest
@@ -390,6 +399,15 @@ jobs:
             tasks+=("${additive_tasks[@]}")
           fi
           ./gradlew "${tasks[@]}"
+
+      - name: Upload Gradle hang diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-workload-hang-diagnostics
+          path: ${{ runner.temp }}/gradle-hang/diagnostics.txt
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload actual API signatures for review
         if: always()
@@ -760,6 +778,7 @@ jobs:
   web-wasm:
     name: web-wasm
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     permissions:
       contents: read
     defaults:
@@ -807,9 +826,22 @@ jobs:
       - name: Build and test Compose web client
         # The wasm test executable links all of sharedUI; at the repo-wide
         # 4 GiB Kotlin daemon heap it thrashes GC for ~50 min, then OOMs.
-        run: >-
-          ./gradlew :web:wasmJsBrowserDistribution :web:wasmJsBrowserTest
-          "-Pkotlin.daemon.jvmargs=-Xmx8g -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
+        timeout-minutes: 25
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/gradle-hang-watchdog.sh" 1320 "$RUNNER_TEMP/gradle-hang/diagnostics.txt" &
+          watchdog=$!
+          trap 'pkill -P "$watchdog" || true; kill "$watchdog" 2>/dev/null || true' EXIT
+          ./gradlew :web:wasmJsBrowserDistribution :web:wasmJsBrowserTest \
+            "-Pkotlin.daemon.jvmargs=-Xmx8g -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
+
+      - name: Upload Gradle hang diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-wasm-hang-diagnostics
+          path: ${{ runner.temp }}/gradle-hang/diagnostics.txt
+          if-no-files-found: ignore
+          retention-days: 7
 
       # letta-mobile-hv54v: what a visitor downloads, per group, against
       # android-compose/web/bundle-budget.json (ceilings only come down).
