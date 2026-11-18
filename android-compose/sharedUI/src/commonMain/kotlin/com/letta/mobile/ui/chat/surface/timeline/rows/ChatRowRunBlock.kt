@@ -349,9 +349,10 @@ private fun RunSteps(steps: List<RunStep>, body: RunBodyState, row: RunRowScope,
         steps.forEachIndexed { index, step ->
             key(step.key) {
                 val positioned = PositionedRunStep(step, single?.first ?: stepPosition(index, steps.size))
-                // A run's only message draws as its own row (a lone reasoning too), not as a folding work step.
-                if (step.isWork() && single == null) {
-                    RunWorkStep(positioned, body, row)
+                // A work step always draws through the one folding call site, so a run's lone reasoning keeps its
+                // composition when the run's second step lands; while alone it shows as the run's own row.
+                if (step.isWork()) {
+                    RunWorkStep(positioned, body, row, single)
                 } else {
                     val message = (step as RunStep.Message).message
                     RunStepImages(imageCallsBeforeMessage[message.id].orEmpty(), positioned, body, row)
@@ -417,23 +418,30 @@ private fun runImageCallsBeforeMessages(messages: List<UiMessage>): Map<String?,
     return images
 }
 
+/**
+ * A work step, folding with the run's summary line. While it is the run's [lone] step it always shows,
+ * on the row's own rail and beat, as the run's message would; the call site is the same either way.
+ */
 @Composable
 @NonRestartableComposable
-private fun RunWorkStep(positioned: PositionedRunStep, body: RunBodyState, row: RunRowScope) {
+private fun RunWorkStep(positioned: PositionedRunStep, body: RunBodyState, row: RunRowScope, lone: LoneStep?) {
     val motion = ChatRowMotion(LocalReducedMotion.current)
+    val rail = if (lone != null) LocalLineRail.current else LineRail.Step
+    val replyLine = lone != null || LocalReplyActionsLine.current
+    val modifier = if (lone != null) {
+        Modifier.padding(top = lone.topOf(positioned))
+    } else {
+        Modifier.testTag(ChatRowTestTags.RUN_WORK_STEP).then(positioned.workPadding(body, row.context.runWidthPx))
+    }
     AnimatedVisibility(
-        visible = !body.collapsed,
+        visible = lone != null || !body.collapsed,
         enter = motion.expansionEnter(),
         exit = motion.expansionExit(),
         label = "runWorkStep",
     ) {
         // A work step's lines (a folded command report among them) sit on the step rail, under the header.
-        CompositionLocalProvider(LocalLineRail provides LineRail.Step) {
-            RunStepRow(
-                positioned,
-                row,
-                Modifier.testTag(ChatRowTestTags.RUN_WORK_STEP).then(positioned.workPadding(body, row.context.runWidthPx)),
-            )
+        CompositionLocalProvider(LocalLineRail provides rail, LocalReplyActionsLine provides replyLine) {
+            RunStepRow(positioned, row, modifier)
         }
     }
 }
