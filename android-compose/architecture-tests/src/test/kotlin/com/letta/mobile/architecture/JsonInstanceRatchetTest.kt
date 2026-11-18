@@ -58,6 +58,8 @@ class JsonInstanceRatchetTest {
         assertFalse(JsonInstanceScan.isProductionSource("android-compose/app/src/testFixtures/kotlin/A.kt"))
         assertFalse(JsonInstanceScan.isProductionSource("android-compose/app/build/generated/src/main/A.kt"))
         assertFalse(JsonInstanceScan.isProductionSource("android-compose/build-logic/Root.kt"))
+        assertFalse(JsonInstanceScan.isProductionSource("android-compose/web/node_modules/pkg/src/main/A.kt"))
+        assertFalse(JsonInstanceScan.isProductionSource("android-compose/app/.kotlin/src/main/A.kt"))
     }
 
     private companion object {

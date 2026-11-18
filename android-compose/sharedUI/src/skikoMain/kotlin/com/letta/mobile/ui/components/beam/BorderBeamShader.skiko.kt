@@ -46,6 +46,7 @@ private class SkiaBorderBeam(private val builder: RuntimeShaderBuilder) : Border
         builder.uniform("mode", uniforms.mode)
         builder.uniform("arc", uniforms.arc)
         builder.uniform("glow", uniforms.glow)
+        builder.uniform("widthScale", uniforms.widthScale)
         builder.uniform("intensity", uniforms.intensity)
         builder.uniform("count", uniforms.count)
         builder.uniform("colors", uniforms.colors)

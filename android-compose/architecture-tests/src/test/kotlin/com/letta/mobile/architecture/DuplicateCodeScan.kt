@@ -4,12 +4,9 @@ import net.sourceforge.pmd.cpd.CPDConfiguration
 import net.sourceforge.pmd.cpd.CpdAnalysis
 import net.sourceforge.pmd.cpd.Match
 import net.sourceforge.pmd.lang.LanguageRegistry
-import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.exists
-import kotlin.io.path.extension
 import kotlin.io.path.invariantSeparatorsPathString
-import kotlin.io.path.isRegularFile
 
 /**
  * Duplicate Kotlin found by PMD CPD over every production source set. Cross-module copies should
@@ -26,14 +23,10 @@ internal object DuplicateCodeScan {
     private val excludedModules = setOf("android-compose/architecture-tests", "android-compose/build-logic")
 
     fun productionSources(repositoryRoot: Path): List<Path> {
-        val compose = repositoryRoot.resolve("android-compose")
-        return Files.walk(compose).use { paths ->
-            paths.filter { it.isRegularFile() && it.extension == "kt" }
-                .filter { JsonInstanceScan.isProductionSource(repositoryRoot.relativize(it).invariantSeparatorsPathString) }
-                .filter { path -> excludedModules.none { repositoryRoot.relativize(path).invariantSeparatorsPathString.startsWith("$it/") } }
-                .sorted()
-                .toList()
-        }
+        return JsonInstanceScan.kotlinSources(repositoryRoot)
+            .filter { JsonInstanceScan.isProductionSource(repositoryRoot.relativize(it).invariantSeparatorsPathString) }
+            .filter { path -> excludedModules.none { repositoryRoot.relativize(path).invariantSeparatorsPathString.startsWith("$it/") } }
+            .sorted()
     }
 
     /** The Gradle module directory holding [file]: its nearest ancestor with a build script. */

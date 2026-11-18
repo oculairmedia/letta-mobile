@@ -8345,6 +8345,51 @@ sealed interface com.letta.mobile.data.agenteditor/AgentStarter { // com.letta.m
     }
 }
 
+sealed interface com.letta.mobile.data.attachment/ImageUnavailableReason { // com.letta.mobile.data.attachment/ImageUnavailableReason|null[0]
+    abstract val wireValue // com.letta.mobile.data.attachment/ImageUnavailableReason.wireValue|{}wireValue[0]
+        abstract fun <get-wireValue>(): kotlin/String // com.letta.mobile.data.attachment/ImageUnavailableReason.wireValue.<get-wireValue>|<get-wireValue>(){}[0]
+
+    final object Companion { // com.letta.mobile.data.attachment/ImageUnavailableReason.Companion|null[0]
+        final fun fromWire(kotlin/String?): com.letta.mobile.data.attachment/ImageUnavailableReason? // com.letta.mobile.data.attachment/ImageUnavailableReason.Companion.fromWire|fromWire(kotlin.String?){}[0]
+    }
+
+    final object Invalid : com.letta.mobile.data.attachment/ImageUnavailableReason { // com.letta.mobile.data.attachment/ImageUnavailableReason.Invalid|null[0]
+        final val wireValue // com.letta.mobile.data.attachment/ImageUnavailableReason.Invalid.wireValue|{}wireValue[0]
+            final fun <get-wireValue>(): kotlin/String // com.letta.mobile.data.attachment/ImageUnavailableReason.Invalid.wireValue.<get-wireValue>|<get-wireValue>(){}[0]
+
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.attachment/ImageUnavailableReason.Invalid.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.attachment/ImageUnavailableReason.Invalid.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.attachment/ImageUnavailableReason.Invalid.toString|toString(){}[0]
+    }
+
+    final object Missing : com.letta.mobile.data.attachment/ImageUnavailableReason { // com.letta.mobile.data.attachment/ImageUnavailableReason.Missing|null[0]
+        final val wireValue // com.letta.mobile.data.attachment/ImageUnavailableReason.Missing.wireValue|{}wireValue[0]
+            final fun <get-wireValue>(): kotlin/String // com.letta.mobile.data.attachment/ImageUnavailableReason.Missing.wireValue.<get-wireValue>|<get-wireValue>(){}[0]
+
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.attachment/ImageUnavailableReason.Missing.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.attachment/ImageUnavailableReason.Missing.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.attachment/ImageUnavailableReason.Missing.toString|toString(){}[0]
+    }
+
+    final object TooLarge : com.letta.mobile.data.attachment/ImageUnavailableReason { // com.letta.mobile.data.attachment/ImageUnavailableReason.TooLarge|null[0]
+        final val wireValue // com.letta.mobile.data.attachment/ImageUnavailableReason.TooLarge.wireValue|{}wireValue[0]
+            final fun <get-wireValue>(): kotlin/String // com.letta.mobile.data.attachment/ImageUnavailableReason.TooLarge.wireValue.<get-wireValue>|<get-wireValue>(){}[0]
+
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.attachment/ImageUnavailableReason.TooLarge.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.attachment/ImageUnavailableReason.TooLarge.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.attachment/ImageUnavailableReason.TooLarge.toString|toString(){}[0]
+    }
+
+    final object UnsupportedSource : com.letta.mobile.data.attachment/ImageUnavailableReason { // com.letta.mobile.data.attachment/ImageUnavailableReason.UnsupportedSource|null[0]
+        final val wireValue // com.letta.mobile.data.attachment/ImageUnavailableReason.UnsupportedSource.wireValue|{}wireValue[0]
+            final fun <get-wireValue>(): kotlin/String // com.letta.mobile.data.attachment/ImageUnavailableReason.UnsupportedSource.wireValue.<get-wireValue>|<get-wireValue>(){}[0]
+
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.attachment/ImageUnavailableReason.UnsupportedSource.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.attachment/ImageUnavailableReason.UnsupportedSource.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.attachment/ImageUnavailableReason.UnsupportedSource.toString|toString(){}[0]
+    }
+}
+
 sealed interface com.letta.mobile.data.canvas.compose/ComposeCompilation { // com.letta.mobile.data.canvas.compose/ComposeCompilation|null[0]
     final class Ready : com.letta.mobile.data.canvas.compose/ComposeCompilation { // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready|null[0]
         constructor <init>(kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp>, kotlin.collections/List<kotlin/String>, kotlin/String, kotlin/String?, com.letta.mobile.data.canvas.compose/ComposeBounds?, kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeReceiptItem>, kotlin/Boolean, kotlin/Boolean = ..., kotlin/Int = ...) // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.canvas.CanvasOp>;kotlin.collections.List<kotlin.String>;kotlin.String;kotlin.String?;com.letta.mobile.data.canvas.compose.ComposeBounds?;kotlin.collections.List<com.letta.mobile.data.canvas.compose.ComposeReceiptItem>;kotlin.Boolean;kotlin.Boolean;kotlin.Int){}[0]
@@ -54131,7 +54176,7 @@ final class com.letta.mobile.data.model/UiGeneratedComponent { // com.letta.mobi
 }
 
 final class com.letta.mobile.data.model/UiImageAttachment { // com.letta.mobile.data.model/UiImageAttachment|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/Long? = ...) // com.letta.mobile.data.model/UiImageAttachment.<init>|<init>(kotlin.String;kotlin.String;kotlin.Long?){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/Long? = ..., com.letta.mobile.data.attachment/ImageUnavailableReason? = ..., kotlin/String? = ...) // com.letta.mobile.data.model/UiImageAttachment.<init>|<init>(kotlin.String;kotlin.String;kotlin.Long?;com.letta.mobile.data.attachment.ImageUnavailableReason?;kotlin.String?){}[0]
 
     final val base64 // com.letta.mobile.data.model/UiImageAttachment.base64|{}base64[0]
         final fun <get-base64>(): kotlin/String // com.letta.mobile.data.model/UiImageAttachment.base64.<get-base64>|<get-base64>(){}[0]
@@ -54139,11 +54184,17 @@ final class com.letta.mobile.data.model/UiImageAttachment { // com.letta.mobile.
         final fun <get-mediaType>(): kotlin/String // com.letta.mobile.data.model/UiImageAttachment.mediaType.<get-mediaType>|<get-mediaType>(){}[0]
     final val storedByteSize // com.letta.mobile.data.model/UiImageAttachment.storedByteSize|{}storedByteSize[0]
         final fun <get-storedByteSize>(): kotlin/Long? // com.letta.mobile.data.model/UiImageAttachment.storedByteSize.<get-storedByteSize>|<get-storedByteSize>(){}[0]
+    final val unavailableReason // com.letta.mobile.data.model/UiImageAttachment.unavailableReason|{}unavailableReason[0]
+        final fun <get-unavailableReason>(): com.letta.mobile.data.attachment/ImageUnavailableReason? // com.letta.mobile.data.model/UiImageAttachment.unavailableReason.<get-unavailableReason>|<get-unavailableReason>(){}[0]
+    final val url // com.letta.mobile.data.model/UiImageAttachment.url|{}url[0]
+        final fun <get-url>(): kotlin/String? // com.letta.mobile.data.model/UiImageAttachment.url.<get-url>|<get-url>(){}[0]
 
     final fun component1(): kotlin/String // com.letta.mobile.data.model/UiImageAttachment.component1|component1(){}[0]
     final fun component2(): kotlin/String // com.letta.mobile.data.model/UiImageAttachment.component2|component2(){}[0]
     final fun component3(): kotlin/Long? // com.letta.mobile.data.model/UiImageAttachment.component3|component3(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/Long? = ...): com.letta.mobile.data.model/UiImageAttachment // com.letta.mobile.data.model/UiImageAttachment.copy|copy(kotlin.String;kotlin.String;kotlin.Long?){}[0]
+    final fun component4(): com.letta.mobile.data.attachment/ImageUnavailableReason? // com.letta.mobile.data.model/UiImageAttachment.component4|component4(){}[0]
+    final fun component5(): kotlin/String? // com.letta.mobile.data.model/UiImageAttachment.component5|component5(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/Long? = ..., com.letta.mobile.data.attachment/ImageUnavailableReason? = ..., kotlin/String? = ...): com.letta.mobile.data.model/UiImageAttachment // com.letta.mobile.data.model/UiImageAttachment.copy|copy(kotlin.String;kotlin.String;kotlin.Long?;com.letta.mobile.data.attachment.ImageUnavailableReason?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/UiImageAttachment.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/UiImageAttachment.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.model/UiImageAttachment.toString|toString(){}[0]
@@ -66018,7 +66069,7 @@ final class com.letta.mobile.data.timeline.snapshot/SnapshotStructuralSummary { 
 }
 
 final class com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer { // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer|null[0]
-    constructor <init>(kotlin/String, kotlin/Long = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.timeline.snapshot/StoredImageBodyReference? = ..., kotlin/String? = ...) // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.<init>|<init>(kotlin.String;kotlin.Long;kotlin.String?;kotlin.String?;com.letta.mobile.data.timeline.snapshot.StoredImageBodyReference?;kotlin.String?){}[0]
+    constructor <init>(kotlin/String, kotlin/Long = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.timeline.snapshot/StoredImageBodyReference? = ..., kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.<init>|<init>(kotlin.String;kotlin.Long;kotlin.String?;kotlin.String?;com.letta.mobile.data.timeline.snapshot.StoredImageBodyReference?;kotlin.String?;kotlin.String?){}[0]
 
     final val bodyReference // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.bodyReference|{}bodyReference[0]
         final fun <get-bodyReference>(): com.letta.mobile.data.timeline.snapshot/StoredImageBodyReference? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.bodyReference.<get-bodyReference>|<get-bodyReference>(){}[0]
@@ -66030,6 +66081,8 @@ final class com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer
         final fun <get-thumbnailBase64>(): kotlin/String? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.thumbnailBase64.<get-thumbnailBase64>|<get-thumbnailBase64>(){}[0]
     final val toolCallId // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.toolCallId|{}toolCallId[0]
         final fun <get-toolCallId>(): kotlin/String? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.toolCallId.<get-toolCallId>|<get-toolCallId>(){}[0]
+    final val unavailableReason // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.unavailableReason|{}unavailableReason[0]
+        final fun <get-unavailableReason>(): kotlin/String? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.unavailableReason.<get-unavailableReason>|<get-unavailableReason>(){}[0]
     final val uriOrUrl // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.uriOrUrl|{}uriOrUrl[0]
         final fun <get-uriOrUrl>(): kotlin/String? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.uriOrUrl.<get-uriOrUrl>|<get-uriOrUrl>(){}[0]
 
@@ -66039,7 +66092,8 @@ final class com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer
     final fun component4(): kotlin/String? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.component4|component4(){}[0]
     final fun component5(): com.letta.mobile.data.timeline.snapshot/StoredImageBodyReference? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.component5|component5(){}[0]
     final fun component6(): kotlin/String? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.component6|component6(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/Long = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.timeline.snapshot/StoredImageBodyReference? = ..., kotlin/String? = ...): com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.copy|copy(kotlin.String;kotlin.Long;kotlin.String?;kotlin.String?;com.letta.mobile.data.timeline.snapshot.StoredImageBodyReference?;kotlin.String?){}[0]
+    final fun component7(): kotlin/String? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.component7|component7(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Long = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.timeline.snapshot/StoredImageBodyReference? = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.copy|copy(kotlin.String;kotlin.Long;kotlin.String?;kotlin.String?;com.letta.mobile.data.timeline.snapshot.StoredImageBodyReference?;kotlin.String?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.toString|toString(){}[0]
@@ -77443,7 +77497,7 @@ sealed class com.letta.mobile.data.controller.node/IrohRelayConfig { // com.lett
 
 sealed class com.letta.mobile.data.model/MessageContentPart { // com.letta.mobile.data.model/MessageContentPart|null[0]
     final class Image : com.letta.mobile.data.model/MessageContentPart { // com.letta.mobile.data.model/MessageContentPart.Image|null[0]
-        constructor <init>(kotlin/String, kotlin/String, kotlin/Long? = ..., kotlin/String? = ...) // com.letta.mobile.data.model/MessageContentPart.Image.<init>|<init>(kotlin.String;kotlin.String;kotlin.Long?;kotlin.String?){}[0]
+        constructor <init>(kotlin/String, kotlin/String, kotlin/Long? = ..., kotlin/String? = ..., com.letta.mobile.data.attachment/ImageUnavailableReason? = ..., kotlin/String? = ...) // com.letta.mobile.data.model/MessageContentPart.Image.<init>|<init>(kotlin.String;kotlin.String;kotlin.Long?;kotlin.String?;com.letta.mobile.data.attachment.ImageUnavailableReason?;kotlin.String?){}[0]
 
         final val base64 // com.letta.mobile.data.model/MessageContentPart.Image.base64|{}base64[0]
             final fun <get-base64>(): kotlin/String // com.letta.mobile.data.model/MessageContentPart.Image.base64.<get-base64>|<get-base64>(){}[0]
@@ -77453,12 +77507,18 @@ sealed class com.letta.mobile.data.model/MessageContentPart { // com.letta.mobil
             final fun <get-storedByteSize>(): kotlin/Long? // com.letta.mobile.data.model/MessageContentPart.Image.storedByteSize.<get-storedByteSize>|<get-storedByteSize>(){}[0]
         final val toolCallId // com.letta.mobile.data.model/MessageContentPart.Image.toolCallId|{}toolCallId[0]
             final fun <get-toolCallId>(): kotlin/String? // com.letta.mobile.data.model/MessageContentPart.Image.toolCallId.<get-toolCallId>|<get-toolCallId>(){}[0]
+        final val unavailableReason // com.letta.mobile.data.model/MessageContentPart.Image.unavailableReason|{}unavailableReason[0]
+            final fun <get-unavailableReason>(): com.letta.mobile.data.attachment/ImageUnavailableReason? // com.letta.mobile.data.model/MessageContentPart.Image.unavailableReason.<get-unavailableReason>|<get-unavailableReason>(){}[0]
+        final val url // com.letta.mobile.data.model/MessageContentPart.Image.url|{}url[0]
+            final fun <get-url>(): kotlin/String? // com.letta.mobile.data.model/MessageContentPart.Image.url.<get-url>|<get-url>(){}[0]
 
         final fun component1(): kotlin/String // com.letta.mobile.data.model/MessageContentPart.Image.component1|component1(){}[0]
         final fun component2(): kotlin/String // com.letta.mobile.data.model/MessageContentPart.Image.component2|component2(){}[0]
         final fun component3(): kotlin/Long? // com.letta.mobile.data.model/MessageContentPart.Image.component3|component3(){}[0]
         final fun component4(): kotlin/String? // com.letta.mobile.data.model/MessageContentPart.Image.component4|component4(){}[0]
-        final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/Long? = ..., kotlin/String? = ...): com.letta.mobile.data.model/MessageContentPart.Image // com.letta.mobile.data.model/MessageContentPart.Image.copy|copy(kotlin.String;kotlin.String;kotlin.Long?;kotlin.String?){}[0]
+        final fun component5(): com.letta.mobile.data.attachment/ImageUnavailableReason? // com.letta.mobile.data.model/MessageContentPart.Image.component5|component5(){}[0]
+        final fun component6(): kotlin/String? // com.letta.mobile.data.model/MessageContentPart.Image.component6|component6(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/Long? = ..., kotlin/String? = ..., com.letta.mobile.data.attachment/ImageUnavailableReason? = ..., kotlin/String? = ...): com.letta.mobile.data.model/MessageContentPart.Image // com.letta.mobile.data.model/MessageContentPart.Image.copy|copy(kotlin.String;kotlin.String;kotlin.Long?;kotlin.String?;com.letta.mobile.data.attachment.ImageUnavailableReason?;kotlin.String?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/MessageContentPart.Image.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/MessageContentPart.Image.hashCode|hashCode(){}[0]
         final fun toDataUrl(): kotlin/String // com.letta.mobile.data.model/MessageContentPart.Image.toDataUrl|toDataUrl(){}[0]

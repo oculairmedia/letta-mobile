@@ -41,7 +41,7 @@ is the protocol, not the evidence.
 1. Send a photo from the Pixel picker in conversation A; confirm model comments on it.
 2. Switch A→B→A: image message survives re-entry (lgns8.20 class).
 3. Send a second image; confirm the latest image survives the 8MB cap path
-   (`hydrate.image_dropped` must NOT fire for it).
+   (`hydrate.image_unavailable` must NOT fire for it).
 4. Evidence: `strip.parts_stripped` fires for the older image only (6ppdr now
    live on v3); provider request carries a valid `image_url` (proxy log or
    `ImagePipeline` telemetry); screenshots.

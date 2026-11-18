@@ -54,6 +54,9 @@ import com.letta.mobile.data.voice.session.VoiceSetupStore
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.chat.voice.VoiceModeHandle
+import com.letta.mobile.ui.components.beam.LettaBeamDefaults
+import com.letta.mobile.ui.components.beam.LettaBeamSpec
+import com.letta.mobile.ui.components.beam.lettaBorderBeam
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.SharedMaterialTheme
 import kotlin.test.Test
@@ -178,6 +181,29 @@ class ComposerOutlineRenderTest {
     }
 
     @Test
+    fun activeComposerLightStaysAtTopEdge() = runDesktopComposeUiTest(width = WIDTH, height = HEIGHT) {
+        var phase by mutableStateOf(RunPhase.REASONING)
+        setContent {
+            SharedMaterialTheme {
+                CompositionLocalProvider(LocalReducedMotion provides true) {
+                    Box(Modifier.fillMaxSize().background(Color.Black).composerOutline(SHAPE, ChatUiState(runPhase = phase)))
+                }
+            }
+        }
+        for (value in listOf(RunPhase.REASONING, RunPhase.WORKING)) {
+            phase = value
+            waitForIdle()
+            val pixels = onRoot().captureToImage().toPixelMap()
+            var outside = 0f
+            for (y in 16 until HEIGHT) for (x in 0 until WIDTH) {
+                val color = pixels[x, y]
+                outside += color.red + color.green + color.blue
+            }
+            assertTrue(outside < 1f, "$value light below top band: $outside")
+        }
+    }
+
+    @Test
     fun changingModeFadesInsteadOfSnapping() = runDesktopComposeUiTest(width = WIDTH, height = HEIGHT) {
         mainClock.autoAdvance = false
         var phase by mutableStateOf(RunPhase.REASONING)
@@ -258,7 +284,7 @@ class ComposerOutlineRenderTest {
                 CompositionLocalProvider(LocalReducedMotion provides true) {
                     Box(
                         Modifier.fillMaxSize().background(Color.Black)
-                            .composerOutline(shape, ChatUiState(runPhase = RunPhase.WORKING)),
+                            .lettaBorderBeam(LettaBeamSpec(LettaBeamDefaults.colors(), shape)),
                     )
                 }
             }

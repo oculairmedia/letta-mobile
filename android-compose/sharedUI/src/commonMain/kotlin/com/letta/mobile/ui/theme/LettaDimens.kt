@@ -245,7 +245,7 @@ object LettaDimens {
      */
     object Alpha {
         /** Opacity of the quiet thinking edge on the composer. */
-        const val composerThinking: Float = 0.35f
+        const val composerThinking: Float = 0.06f
 
         const val disabled: Float = LettaRowDimens.disabledAlpha
 

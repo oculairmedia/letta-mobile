@@ -252,6 +252,7 @@ final enum class com.letta.mobile.ui.components.beam/LettaBeamStyle : kotlin/Enu
     enum entry Orbit // com.letta.mobile.ui.components.beam/LettaBeamStyle.Orbit|null[0]
     enum entry OrbitCompact // com.letta.mobile.ui.components.beam/LettaBeamStyle.OrbitCompact|null[0]
     enum entry Sweep // com.letta.mobile.ui.components.beam/LettaBeamStyle.Sweep|null[0]
+    enum entry SweepTop // com.letta.mobile.ui.components.beam/LettaBeamStyle.SweepTop|null[0]
 
     final val entries // com.letta.mobile.ui.components.beam/LettaBeamStyle.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.ui.components.beam/LettaBeamStyle> // com.letta.mobile.ui.components.beam/LettaBeamStyle.entries.<get-entries>|<get-entries>#static(){}[0]

@@ -29,6 +29,7 @@ private class AgslBorderBeam(private val shader: RuntimeShader) : BorderBeamRend
         shader.setFloatUniform("mode", uniforms.mode)
         shader.setFloatUniform("arc", uniforms.arc)
         shader.setFloatUniform("glow", uniforms.glow)
+        shader.setFloatUniform("widthScale", uniforms.widthScale)
         shader.setFloatUniform("intensity", uniforms.intensity)
         shader.setFloatUniform("count", uniforms.count)
         shader.setFloatUniform("colors", uniforms.colors)

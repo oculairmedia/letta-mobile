@@ -1415,6 +1415,47 @@ public final class com/letta/mobile/data/attachment/ImageIngressPolicy {
 	public final fun supportedFormatsLabel ()Ljava/lang/String;
 }
 
+public abstract interface class com/letta/mobile/data/attachment/ImageUnavailableReason {
+	public static final field Companion Lcom/letta/mobile/data/attachment/ImageUnavailableReason$Companion;
+	public abstract fun getWireValue ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/attachment/ImageUnavailableReason$Companion {
+	public final fun fromWire (Ljava/lang/String;)Lcom/letta/mobile/data/attachment/ImageUnavailableReason;
+}
+
+public final class com/letta/mobile/data/attachment/ImageUnavailableReason$Invalid : com/letta/mobile/data/attachment/ImageUnavailableReason {
+	public static final field INSTANCE Lcom/letta/mobile/data/attachment/ImageUnavailableReason$Invalid;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getWireValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/attachment/ImageUnavailableReason$Missing : com/letta/mobile/data/attachment/ImageUnavailableReason {
+	public static final field INSTANCE Lcom/letta/mobile/data/attachment/ImageUnavailableReason$Missing;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getWireValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/attachment/ImageUnavailableReason$TooLarge : com/letta/mobile/data/attachment/ImageUnavailableReason {
+	public static final field INSTANCE Lcom/letta/mobile/data/attachment/ImageUnavailableReason$TooLarge;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getWireValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/attachment/ImageUnavailableReason$UnsupportedSource : com/letta/mobile/data/attachment/ImageUnavailableReason {
+	public static final field INSTANCE Lcom/letta/mobile/data/attachment/ImageUnavailableReason$UnsupportedSource;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getWireValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/backend/AppServerRouteUnavailable : java/lang/UnsupportedOperationException {
 	public fun <init> (Lcom/letta/mobile/data/backend/SessionRoute;Ljava/lang/String;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/backend/SessionRoute;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -19568,17 +19609,18 @@ public final class com/letta/mobile/data/controller/node/iroh/AdminRpcRegistry {
 
 public final class com/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext {
 	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext$Companion;
-	public fun <init> (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ZLjava/util/Set;)V
-	public synthetic fun <init> (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ZLjava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ZZLjava/util/Set;)V
+	public synthetic fun <init> (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ZZLjava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun canAccessConversation (Ljava/lang/String;)Z
 	public final fun component1 ()Z
 	public final fun component2 ()Ljava/util/Set;
 	public final fun component3 ()Ljava/util/Set;
 	public final fun component4 ()Ljava/lang/String;
 	public final fun component5 ()Z
-	public final fun component6 ()Ljava/util/Set;
-	public final fun copy (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ZLjava/util/Set;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ZLjava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
+	public final fun component6 ()Z
+	public final fun component7 ()Ljava/util/Set;
+	public final fun copy (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ZZLjava/util/Set;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ZZLjava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAuthenticated ()Z
 	public final fun getAuthenticatedEndpointId ()Ljava/lang/String;
@@ -19586,6 +19628,7 @@ public final class com/letta/mobile/data/controller/node/iroh/AdminRpcRequestCon
 	public final fun getAuthorizedConversationIds ()Ljava/util/Set;
 	public final fun getGrantedCapabilities ()Ljava/util/Set;
 	public final fun getPairedDevice ()Z
+	public final fun getSupportsFrameParts ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -20393,8 +20436,8 @@ public final class com/letta/mobile/data/controller/node/iroh/MessageListPageGua
 	public static final field DEFAULT_PAGE_LIMIT I
 	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/MessageListPageGuard;
 	public static final field MAX_PAGE_BYTES I
-	public final fun bound (Lkotlinx/serialization/json/JsonElement;IZ)Lkotlinx/serialization/json/JsonElement;
-	public static synthetic fun bound$default (Lcom/letta/mobile/data/controller/node/iroh/MessageListPageGuard;Lkotlinx/serialization/json/JsonElement;IZILjava/lang/Object;)Lkotlinx/serialization/json/JsonElement;
+	public final fun bound (Lkotlinx/serialization/json/JsonElement;IZI)Lkotlinx/serialization/json/JsonElement;
+	public static synthetic fun bound$default (Lcom/letta/mobile/data/controller/node/iroh/MessageListPageGuard;Lkotlinx/serialization/json/JsonElement;IZIILjava/lang/Object;)Lkotlinx/serialization/json/JsonElement;
 	public final fun boundObjectStringFields (Lkotlinx/serialization/json/JsonElement;II)Lkotlinx/serialization/json/JsonElement;
 	public static synthetic fun boundObjectStringFields$default (Lcom/letta/mobile/data/controller/node/iroh/MessageListPageGuard;Lkotlinx/serialization/json/JsonElement;IIILjava/lang/Object;)Lkotlinx/serialization/json/JsonElement;
 	public final fun dropField (Lkotlinx/serialization/json/JsonElement;Ljava/lang/String;)Lkotlinx/serialization/json/JsonElement;
@@ -31281,19 +31324,23 @@ public abstract class com/letta/mobile/data/model/MessageContentPart {
 }
 
 public final class com/letta/mobile/data/model/MessageContentPart$Image : com/letta/mobile/data/model/MessageContentPart {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/Long;
 	public final fun component4 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;)Lcom/letta/mobile/data/model/MessageContentPart$Image;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/MessageContentPart$Image;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/model/MessageContentPart$Image;
+	public final fun component5 ()Lcom/letta/mobile/data/attachment/ImageUnavailableReason;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;)Lcom/letta/mobile/data/model/MessageContentPart$Image;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/MessageContentPart$Image;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/model/MessageContentPart$Image;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBase64 ()Ljava/lang/String;
 	public final fun getMediaType ()Ljava/lang/String;
 	public final fun getStoredByteSize ()Ljava/lang/Long;
 	public final fun getToolCallId ()Ljava/lang/String;
+	public final fun getUnavailableReason ()Lcom/letta/mobile/data/attachment/ImageUnavailableReason;
+	public final fun getUrl ()Ljava/lang/String;
 	public fun hashCode ()I
 	public final fun toDataUrl ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
@@ -34956,17 +35003,21 @@ public final class com/letta/mobile/data/model/UiGeneratedComponent {
 }
 
 public final class com/letta/mobile/data/model/UiImageAttachment {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/Long;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;)Lcom/letta/mobile/data/model/UiImageAttachment;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/UiImageAttachment;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;ILjava/lang/Object;)Lcom/letta/mobile/data/model/UiImageAttachment;
+	public final fun component4 ()Lcom/letta/mobile/data/attachment/ImageUnavailableReason;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;)Lcom/letta/mobile/data/model/UiImageAttachment;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/UiImageAttachment;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/model/UiImageAttachment;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBase64 ()Ljava/lang/String;
 	public final fun getMediaType ()Ljava/lang/String;
 	public final fun getStoredByteSize ()Ljava/lang/Long;
+	public final fun getUnavailableReason ()Lcom/letta/mobile/data/attachment/ImageUnavailableReason;
+	public final fun getUrl ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -60078,22 +60129,24 @@ public final class com/letta/mobile/data/timeline/snapshot/SnapshotStructuralSum
 
 public final class com/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer {
 	public static final field Companion Lcom/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer$Companion;
-	public fun <init> (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()J
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
 	public final fun component5 ()Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;
 	public final fun component6 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;Ljava/lang/String;)Lcom/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBodyReference ()Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;
 	public final fun getByteSize ()J
 	public final fun getMediaType ()Ljava/lang/String;
 	public final fun getThumbnailBase64 ()Ljava/lang/String;
 	public final fun getToolCallId ()Ljava/lang/String;
+	public final fun getUnavailableReason ()Ljava/lang/String;
 	public final fun getUriOrUrl ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;

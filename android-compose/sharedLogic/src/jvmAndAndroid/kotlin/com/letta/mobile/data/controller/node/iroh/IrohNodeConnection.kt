@@ -365,6 +365,7 @@ class IrohNodeConnection(
             authorizedAgentIds = sessionAuth.agentScope(),
             pairedDevice = isAuthenticated && sessionAuth.isPairedDevice(),
             grantedCapabilities = capabilities,
+            supportsFrameParts = peerSupportsFrameParts(),
         )
     }
 

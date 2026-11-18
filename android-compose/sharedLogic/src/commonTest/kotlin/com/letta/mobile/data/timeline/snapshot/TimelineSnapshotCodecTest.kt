@@ -8,6 +8,7 @@ import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.data.timeline.ToolReturnTruncation
 import com.letta.mobile.data.timeline.parseTimelineInstant
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import kotlin.test.Test
@@ -18,6 +19,35 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TimelineSnapshotCodecTest {
+
+    @Test
+    fun remotePointerSizeSurvivesSnapshotRoundTrip() {
+        val stored = userEvent().toStoredTimelineEvent().copy(
+            attachments = listOf(StoredImageAttachmentPointer("image/png", 128L, "https://example.invalid/image")),
+        )
+        val encoded = TimelineSnapshotCodec.encode(roundTripEnvelope().copy(events = listOf(stored)))
+        val restored = assertNotNull(TimelineSnapshotCodec.decode(encoded)).events.single().toConfirmedTimelineEvent()
+        assertEquals(128L, restored.attachments.single().storedByteSize)
+    }
+
+    @Test
+    fun unavailableReasonAndLoadableUrlSurviveSnapshotRoundTrip() {
+        val returned = com.letta.mobile.data.model.ToolReturnMessage(
+            id = "unavailable-return", toolReturnRaw = kotlinx.serialization.json.Json.parseToJsonElement(
+                """[
+                    {"type":"image","unavailable_reason":"too_large"},
+                    {"type":"image","source":{"type":"url","url":"https://example.com/image.png"}}
+                ]""",
+            ),
+        )
+        val event = userEvent().copy(attachments = returned.attachments.toPersistentList())
+        val stored = event.toStoredTimelineEvent()
+        assertEquals(2, stored.attachments.size, "snapshot must retain unavailable images and URLs")
+        val encoded = TimelineSnapshotCodec.encode(roundTripEnvelope().copy(events = listOf(stored)))
+        val decoded = assertNotNull(TimelineSnapshotCodec.decode(encoded))
+        val restored = decoded.events.single().toConfirmedTimelineEvent().attachments
+        assertEquals(returned.attachments, restored, "reason and URL must survive independently of empty base64")
+    }
 
     @Test
     fun roundTripFidelityPreservesDomainFacts() {

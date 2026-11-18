@@ -1,0 +1,4 @@
+# Existing hits only. Lower or remove each count when its code is migrated.
+compose-state:android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/modelcontrol/ModelPickerBinding.kt 2
+raw-process-type:android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/composer/BackgroundProcessShelf.kt 2
+task-wire-tag:android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/composer/BackgroundProcessShelf.kt 1
