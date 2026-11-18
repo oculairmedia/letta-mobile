@@ -72,6 +72,12 @@ internal class CaptureRecorder(preRoll: Long, private val limit: Long) {
         }
     }
 
+    /** A copy of the last [max] samples of the turn so far (all of it when shorter); the caller wipes it. */
+    fun tail(max: Long): ShortArray {
+        val start = (turnLength - max).coerceAtLeast(0).toInt()
+        return turn.copyOfRange(start, turnLength)
+    }
+
     /** The finished turn; the recorder forgets it (the caller owns and later wipes the copy). */
     fun finish(): ShortArray {
         val result = turn.copyOf(turnLength)

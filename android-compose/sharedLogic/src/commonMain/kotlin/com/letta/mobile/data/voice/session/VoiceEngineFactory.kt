@@ -22,6 +22,7 @@ import com.letta.mobile.data.voice.session.telemetry.TelemetryVoiceChatSession
 import com.letta.mobile.data.voice.session.telemetry.VoiceEarTelemetry
 import com.letta.mobile.data.voice.session.telemetry.VoiceTelemetry
 import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
+import com.letta.mobile.data.voice.vad.ear.LivePartials
 import com.letta.mobile.data.voice.vad.ear.SpeechTranscriber
 import com.letta.mobile.data.voice.vad.ear.VadEarConfig
 import com.letta.mobile.data.voice.vad.ear.VadVoiceEar
@@ -132,7 +133,8 @@ fun interface VoiceEngineFactory {
  * the speaker, two requests in flight and up to three sentences ahead, at the stored speed. The
  * request's controls mute the microphone (its frames go silent) and the speaker, get each
  * segment's audio length, and warm the speech connection when the person starts speaking; the
- * server ear ends a turn after the stored end-of-turn silence. Each session gets its own HTTP client on a fresh engine from [httpEngine], closed on
+ * server ear ends a turn after the stored end-of-turn silence and, when [VoiceSetup.livePartials],
+ * reports the person's words live. Each session gets its own HTTP client on a fresh engine from [httpEngine], closed on
  * release. Every engine reports its decisions as `VoiceMode` telemetry (states, reasons, ids,
  * counts and levels; never audio, text, the key or the address).
  */
@@ -223,7 +225,8 @@ class EndpointVoiceEngineFactory(
         val telemetry = request.telemetry
         val transcriber = TelemetryTranscriber(SpeechTranscriber.endpoint(EndpointTranscriber(client, request.grants, endpoint)), telemetry)
         val policy = EndOfTurnPolicy(trailingSilence = request.setup.tuning.endOfTurnSilence)
-        val earConfig = VadEarConfig(format, policy, observer = VoiceEarTelemetry(telemetry), halfDuplex = halfDuplex)
+        val partials = LivePartials(enabled = request.setup.livePartials)
+        val earConfig = VadEarConfig(format, policy, observer = VoiceEarTelemetry(telemetry), halfDuplex = halfDuplex, partials = partials)
         return VadVoiceEar(microphone, transcriber, earConfig)
     }
 

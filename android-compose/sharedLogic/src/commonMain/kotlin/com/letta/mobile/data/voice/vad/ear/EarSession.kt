@@ -198,6 +198,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
     private val observer = parts.config.observer
     private val halfDuplex = parts.config.halfDuplex
     private val gate = OutputGate(samplesOf(parts.config.outputTail, format), limit())
+    private val partials = PartialTranscripts(parts.config.partials, format, parts.transcriber, out)
     private var started = false
     private var peakDb = SILENT_DB
 
@@ -220,6 +221,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
                 if (ended != null) return fail(ended)
             }
         } finally {
+            partials.turnEnded()
             recorder.wipe()
             splitter.wipe()
             pending.discard()
@@ -267,6 +269,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
         if (signal == TurnSignal.Candidate) peakDb = SILENT_DB
         if (tracker.recording || signal is TurnSignal.Ended) peakDb = maxOf(peakDb, PcmLevels.dbfs(hop.samples))
         apply(signal, hop)
+        if (tracker.recording && tracker.confirmed) partials.heard(hop.end.value, recorder::tail)
         recorder.remember(hop.samples)
     }
 
@@ -279,6 +282,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
             }
             TurnSignal.Confirmed -> speechStarted(hop)
             is TurnSignal.Abandoned -> {
+                partials.turnEnded()
                 recorder.discard()
                 observer.turnDiscarded(turnReport(tracker, peakDb, detector, format.sampleRateHz), signal.reason)
             }
@@ -293,6 +297,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
     private suspend fun speechStarted(hop: Hop?) {
         record(hop)
         memory.speechStarted()
+        partials.turnStarted(hop?.end?.value ?: gate.position)
         observer.turnOpened()
         out.send(VoiceEarEvent.SpeechStarted)
     }
@@ -304,6 +309,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
      */
     private suspend fun endTurn(hop: Hop?, reason: TurnEndReason) {
         record(hop)
+        partials.turnEnded()
         val report = turnReport(tracker, peakDb, detector, format.sampleRateHz)
         observer.turnClosed(report, reason)
         out.send(VoiceEarEvent.SpeechEnded)
@@ -324,6 +330,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
      * empty utterance, so the loop is not left waiting for it) and the pre-roll is wiped.
      */
     private suspend fun muteForOutput() {
+        partials.turnEnded()
         if (tracker.recording) {
             val confirmed = tracker.confirmed
             tracker.drop()
