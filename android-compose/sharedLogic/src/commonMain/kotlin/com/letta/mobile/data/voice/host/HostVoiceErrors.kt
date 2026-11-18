@@ -1,6 +1,6 @@
 package com.letta.mobile.data.voice.host
 
-import com.letta.mobile.data.transport.iroh.AdminRpcErrors
+import com.letta.mobile.data.rpcwire.AdminRpcErrors
 import com.letta.mobile.data.voice.VoiceErrorCode
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

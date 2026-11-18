@@ -2,6 +2,7 @@ package com.letta.mobile.ui.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -15,6 +16,7 @@ import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.data.voice.VoiceErrorCode
+import com.letta.mobile.data.voice.host.client.HostVoiceState
 import com.letta.mobile.data.voice.session.VoiceEndpointRules
 import com.letta.mobile.data.voice.session.VoiceListening
 import com.letta.mobile.data.voice.session.VoiceSetupDraft
@@ -51,13 +53,15 @@ import com.letta.mobile.ui.chat.voice.voiceErrorText
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /** The last save's or test's outcome, resolved to words when drawn. */
 @Immutable
-private class VoiceOutcome(val message: StringResource, val tone: SettingsTone)
+internal class VoiceOutcome(val message: StringResource, val tone: SettingsTone)
 
 private fun outcomeOf(code: VoiceErrorCode?, success: StringResource): VoiceOutcome =
     code?.let { VoiceOutcome(voiceErrorText(it), SettingsTone.Error) } ?: VoiceOutcome(success, SettingsTone.Positive)
@@ -105,15 +109,25 @@ private class VoiceForm(private val access: VoiceSetupAccess, url: String, conse
 }
 
 /**
- * The Voice section: the speech server's URL (validated by the endpoint client's own rules, its
- * problem shown under the field), an optional API key where the platform keeps keys in its secure
- * store (typed keys live only in memory until saved, never in saved UI state), the plain-language
- * consent to send audio and reply text to that server, whether speaking over a reply interrupts it,
- * Save, and a Test that only checks the server answers. [onSaved] hears each successful save, with whether voice mode can now start.
+ * The Voice section. Where the connected host shares a speech server, it shows that server as the
+ * host reports it (address, whether a key is kept, models, reachability), an admin device's editor
+ * for it and this device's own choices (its one-time audio acknowledgement, using its own server
+ * instead); nothing asks for a server here then. An admin device whose host has none sets one up for
+ * every device. Otherwise it is this device's own server: its URL (validated by the endpoint
+ * client's own rules, its problem shown under the field), an optional API key where the platform
+ * keeps keys in its secure store (typed keys live only in memory until saved, never in saved UI
+ * state), the plain-language consent to send audio and reply text to that server, Save, a Test that
+ * only checks the server answers, and the offer to share it with every device. Which ear listens
+ * and whether speaking interrupts are this device's settings either way. [onSaved] hears each
+ * successful save, with whether voice mode can now start.
  */
 @Composable
 fun VoiceSettingsSection(access: VoiceSetupAccess, modifier: Modifier = Modifier, onSaved: ((ready: Boolean) -> Unit)? = null) {
     val stored by access.store.setup.collectAsState()
+    val shared = access.shared
+    val host by (shared?.state ?: noHost).collectAsState()
+    // Reads the shared setup and learns whether this device may change it (a check that sends no audio or text).
+    LaunchedEffect(shared) { shared?.learnAdmin() }
     val scope = rememberCoroutineScope()
     val form = remember(access) { VoiceForm(access, stored.endpoint.baseUrl?.value.orEmpty(), stored.consented, scope) }
     val keySaved = stored.hasApiKey && access.store.keepsApiKey
@@ -123,14 +137,27 @@ fun VoiceSettingsSection(access: VoiceSetupAccess, modifier: Modifier = Modifier
         stringResource(Res.string.voice_settings_supporting),
     )
     SettingsSection(header, modifier) {
-        VoiceAddressRows(form, keepsKey = access.store.keepsApiKey, keySaved = keySaved)
-        VoiceConsentRow(form)
+        val mode = voiceSettingsMode(stored, host)
+        when (mode) {
+            VoiceSettingsMode.SHARED -> SharedVoiceRows(access, host, stored, onSaved)
+            VoiceSettingsMode.HOST_SETUP -> shared?.let { HostVoiceSetupRows(it, onSaved) }
+            VoiceSettingsMode.LOCAL -> {
+                VoiceAddressRows(form, keepsKey = access.store.keepsApiKey, keySaved = keySaved)
+                VoiceConsentRow(form)
+            }
+        }
         VoiceListeningRow(access, stored.listening)
         VoiceInterruptRow(access, stored.interruptBySpeaking)
-        VoiceActionRow(form, keySaved, onSaved)
-        form.outcome?.let { NoteRow(SettingsRow.Note(VoiceSettingsKeys.STATUS, SettingsStatus(stringResource(it.message), it.tone))) }
+        if (mode == VoiceSettingsMode.LOCAL) {
+            VoiceActionRow(form, keySaved, onSaved)
+            form.outcome?.let { NoteRow(SettingsRow.Note(VoiceSettingsKeys.STATUS, SettingsStatus(stringResource(it.message), it.tone))) }
+            VoiceShareRows(access, host, stored)
+        }
     }
 }
+
+/** What a section without a host connection knows of the host: nothing. */
+private val noHost: StateFlow<HostVoiceState> = MutableStateFlow(HostVoiceState())
 
 @Composable
 private fun SettingsScope.VoiceAddressRows(form: VoiceForm, keepsKey: Boolean, keySaved: Boolean) {

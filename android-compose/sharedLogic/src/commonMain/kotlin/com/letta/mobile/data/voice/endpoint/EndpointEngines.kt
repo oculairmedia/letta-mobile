@@ -52,7 +52,7 @@ class EndpointSpeechSynthesizer(
     private val grants: VoiceEndpointGrantSource,
     private val settings: VoiceEndpointSettings,
     private val encoding: AudioEncoding = AudioEncoding.MP3,
-) {
+) : StreamingSpeechSynthesizer {
     /** [text] as audio. */
     suspend fun synthesize(text: VoiceText): AudioClip {
         client.requireGrant(grants, VoiceEndpointPayload.TEXT_FOR_SYNTHESIS, SpeechOperation.SPEECH)
@@ -67,7 +67,7 @@ class EndpointSpeechSynthesizer(
      * closes it. A response that is not 16-bit PCM WAVE fails with a [SpeechEndpointException]
      * carrying BAD_RESPONSE or UNSUPPORTED_FORMAT.
      */
-    fun stream(text: VoiceText, speed: SpeechSpeed = SpeechSpeed.Normal): Flow<PcmChunk> = channelFlow {
+    override fun stream(text: VoiceText, speed: SpeechSpeed): Flow<PcmChunk> = channelFlow {
         client.requireGrant(grants, VoiceEndpointPayload.TEXT_FOR_SYNTHESIS, SpeechOperation.SPEECH)
         val decoder = WavStreamDecoder()
         val request = SpeechRequest(text, settings.speechModel, settings.voice, AudioEncoding.WAV, speed)
@@ -81,7 +81,7 @@ class EndpointSpeechSynthesizer(
      * text or audio. Only sent where the person granted text for synthesis to that endpoint; fails
      * like any request (the caller ignores the outcome).
      */
-    suspend fun warm() {
+    override suspend fun warm() {
         client.requireGrant(grants, VoiceEndpointPayload.TEXT_FOR_SYNTHESIS, SpeechOperation.REACHABILITY)
         client.checkReachable()
     }

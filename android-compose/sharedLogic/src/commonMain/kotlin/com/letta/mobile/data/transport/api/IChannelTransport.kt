@@ -7,10 +7,13 @@ import com.letta.mobile.data.transport.ChannelTransportDefaults
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Cross-platform transport surface used by repositories, chat bridges, and
@@ -91,6 +94,16 @@ interface IChannelTransport {
 
     suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
         error("admin_rpc is not supported by this transport")
+
+    /**
+     * A streamed `admin_rpc` on a request stream of its own: every frame the host writes on it, as
+     * JSON objects in order (`admin_rpc_stream` frames, then the final `admin_rpc_response`), ending
+     * after the final response. The request's send half stays open while collecting; stopping the
+     * collection before the final response cancels the request on the host (an `admin_rpc_cancel`
+     * frame, then the send half is finished). A transport without streamed requests fails at once.
+     */
+    fun adminRpcStream(method: String, params: JsonObject): Flow<JsonObject> =
+        flow { error("streamed admin_rpc is not supported by this transport") }
 
     suspend fun sendCronList(
         agentId: String? = null,

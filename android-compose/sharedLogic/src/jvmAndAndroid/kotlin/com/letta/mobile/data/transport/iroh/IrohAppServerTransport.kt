@@ -17,6 +17,7 @@ import computer.iroh.EndpointAddr
 import computer.iroh.PathChangeCallback
 import computer.iroh.PathEventCallback
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -27,11 +28,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.util.UUID
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryValue
@@ -281,6 +285,50 @@ class IrohAppServerTransport(
         }
     } ?: error("admin_rpc timed out for method=$method path=$path")
 
+    /**
+     * A streamed admin_rpc ([com.letta.mobile.data.transport.api.IChannelTransport.adminRpcStream]):
+     * its own bi-stream, one request frame, and the send half kept open as the cancel channel. Every
+     * frame read is emitted as it is decoded, and collection ends after the `admin_rpc_response`.
+     * Stopped early, it writes `admin_rpc_cancel` and finishes the send half; the host then closes
+     * its upstream call. Telemetry names the method and request only, never the frames.
+     */
+    fun adminRpcStream(method: String, params: JsonObject): Flow<JsonObject> = channelFlow {
+        connectionReady.await()
+        val requestId = "admin-${UUID.randomUUID()}"
+        val biStream = connection.openBi()
+        val sendStream = biStream.send()
+        var answered = false
+        Telemetry.event("IrohTransport", "admin_rpc.streamed.open", "method" attr method, "requestId" attr requestId)
+        try {
+            val request = protocol.encodeCommand(AppServerCommand.AdminRpc(requestId = requestId, method = method, params = params))
+            IrohFrameCodec.write(sendStream, request, MAX_FRAME_BYTES, allowFrameParts = true)
+            val decoder = IrohFrameCodec.Decoder(MAX_FRAME_BYTES, IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES)
+            val recv = biStream.recv()
+            while (!answered) {
+                val chunk = recv.read(READ_CHUNK_SIZE.toUInt())
+                if (chunk.isEmpty()) break
+                for (raw in decoder.feed(chunk)) {
+                    val frame = protocol.json.parseToJsonElement(raw) as? JsonObject ?: continue
+                    send(frame)
+                    if ((frame["type"] as? JsonPrimitive)?.content == ADMIN_RPC_RESPONSE_TYPE) {
+                        answered = true
+                        break
+                    }
+                }
+            }
+            Telemetry.event("IrohTransport", "admin_rpc.streamed.end", "method" attr method, "answered" attr answered.toString())
+        } finally {
+            withContext(NonCancellable) {
+                if (!answered) {
+                    val cancel = "{\"type\":\"admin_rpc_cancel\",\"request_id\":\"$requestId\"}"
+                    runCatching { withTimeoutOrNull(STREAM_CANCEL_WRITE_MS.milliseconds) { IrohFrameCodec.write(sendStream, cancel) } }
+                    Telemetry.event("IrohTransport", "admin_rpc.streamed.cancelled", "method" attr method, "requestId" attr requestId)
+                }
+                runCatching { sendStream.finish() }
+            }
+        }
+    }
+
     suspend fun close() {
         // letta-mobile-wxy4s: a closed transport is NOT connected. Without this,
         // `connected` stayed true for the whole life of a closed transport and
@@ -523,6 +571,9 @@ class IrohAppServerTransport(
         // IrohAdminRpcChatGateway.AGENT_LIST_PAGE_SIZE) so it no longer relies on
         // this. Kept bounded so a genuinely dead request still fails, not hangs.
         const val ADMIN_RPC_TIMEOUT_MS = 30_000L
+        // A streamed request's cancel frame is best effort: finishing the send half cancels too.
+        const val STREAM_CANCEL_WRITE_MS = 1_000L
+        const val ADMIN_RPC_RESPONSE_TYPE = "admin_rpc_response"
         val KEEPALIVE_PAYLOAD = byteArrayOf(0)
     }
 }

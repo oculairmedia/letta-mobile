@@ -76,7 +76,7 @@ class MouthOptions(
  * Call [speak], [flush] and [stop] from one coroutine at a time (the loop's).
  */
 class EndpointVoiceMouth(
-    private val synthesizer: EndpointSpeechSynthesizer,
+    private val synthesizer: StreamingSpeechSynthesizer,
     private val player: AudioPlayer,
     private val scope: CoroutineScope,
     private val options: MouthOptions = MouthOptions(),
