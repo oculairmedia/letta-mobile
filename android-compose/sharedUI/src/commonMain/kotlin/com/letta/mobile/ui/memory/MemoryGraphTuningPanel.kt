@@ -131,6 +131,7 @@ internal class MemoryGraphKnobSection(
 /** Every knob of [MemoryGraphTuning], by section. */
 internal object MemoryGraphKnobs {
     val sections: List<MemoryGraphKnobSection> = listOf(
+        MemoryGraphKnobSection("Naturalness", naturalness()),
         MemoryGraphKnobSection("Repulsion", repulsion()),
         MemoryGraphKnobSection("Springs", springs()),
         MemoryGraphKnobSection("Clusters and seeding", clustersAndSeeding(), clusterAndSeedToggles()),
@@ -138,6 +139,11 @@ internal object MemoryGraphKnobs {
         MemoryGraphKnobSection("Motion", motion()),
         MemoryGraphKnobSection("Cooling", cooling()),
         MemoryGraphKnobSection("Labels", labels(), labelToggles()),
+    )
+
+    /** The master of every per-element spread: 0 makes every element of a kind alike. */
+    private fun naturalness(): List<MemoryGraphKnob> = listOf(
+        MemoryGraphKnob("Naturalness (scales every spread; 0 = off)", 0f..3f, { it.naturalness }, { t, v -> t.copy(naturalness = v) }),
     )
 
     private fun repulsion(): List<MemoryGraphKnob> = listOf(
@@ -152,6 +158,7 @@ internal object MemoryGraphKnobs {
             { it.barnesHutRebuildFrames },
             { t, v -> t.copy(barnesHutRebuildFrames = v) },
         ),
+        MemoryGraphKnob("Charge spread (±, per node)", 0f..0.8f, { it.chargeSpread }, { t, v -> t.copy(chargeSpread = v) }),
     ) + MemoryGraphNodeKind.entries.map { kind ->
         MemoryGraphKnob("Charge: ${kind.name}", 0f..5f, { it.chargeOf(kind) }, { t, v -> t.copy(nodeCharge = t.nodeCharge + (kind to v)) })
     }
@@ -188,6 +195,7 @@ internal object MemoryGraphKnobs {
 
     private fun clustersAndSeeding(): List<MemoryGraphKnob> = listOf(
         MemoryGraphKnob("Cluster strength", 0f..0.5f, { it.clusterStrength }, { t, v -> t.copy(clusterStrength = v) }),
+        MemoryGraphKnob("Cluster pull spread (±, per node)", 0f..0.8f, { it.clusterSpread }, { t, v -> t.copy(clusterSpread = v) }),
         MemoryGraphKnob("Seed spacing (per sqrt of rank)", 10f..200f, { it.seedSpacing }, { t, v -> t.copy(seedSpacing = v) }),
         MemoryGraphKnob("Seed jitter", 0f..100f, { it.seedJitter }, { t, v -> t.copy(seedJitter = v) }),
     )
@@ -195,10 +203,10 @@ internal object MemoryGraphKnobs {
     private fun springs(): List<MemoryGraphKnob> = listOf(
         MemoryGraphKnob("Degree scaling (0 off, 1 d3)", 0f..1f, { it.degreeScaling }, { t, v -> t.copy(degreeScaling = v) }),
         MemoryGraphKnob(
-            "Link length spread (fraction)",
+            "Stiffness spread (±, per link)",
             0f..0.8f,
-            { it.linkLengthSpread },
-            { t, v -> t.copy(linkLengthSpread = v) },
+            { it.linkStiffnessSpread },
+            { t, v -> t.copy(linkStiffnessSpread = v) },
         ),
         MemoryGraphKnob(
             "Link length degree bias (fraction)",
@@ -216,6 +224,12 @@ internal object MemoryGraphKnobs {
                 { t, v -> t.copy(springLength = t.springLength + (kind to v)) },
             ),
             MemoryGraphKnob(
+                "Length spread (±, per link): ${kind.name}",
+                0f..0.8f,
+                { it.linkLengthSpread[kind] ?: 0f },
+                { t, v -> t.copy(linkLengthSpread = t.linkLengthSpread + (kind to v)) },
+            ),
+            MemoryGraphKnob(
                 "Stiffness: ${kind.name}",
                 0f..1f,
                 { it.stiffnessOf(kind) },
@@ -226,6 +240,7 @@ internal object MemoryGraphKnobs {
 
     private fun gravityAndCollision(): List<MemoryGraphKnob> = listOf(
         MemoryGraphKnob("Centre gravity", 0f..0.1f, { it.gravity }, { t, v -> t.copy(gravity = v) }),
+        MemoryGraphKnob("Centre gravity spread (±, per node)", 0f..0.8f, { it.gravitySpread }, { t, v -> t.copy(gravitySpread = v) }),
         MemoryGraphKnob("Collision padding", 0f..40f, { it.collisionPadding }, { t, v -> t.copy(collisionPadding = v) }),
         MemoryGraphKnob("Collision strength", 0f..3f, { it.collisionStrength }, { t, v -> t.copy(collisionStrength = v) }),
         MemoryGraphKnob(
@@ -234,8 +249,19 @@ internal object MemoryGraphKnobs {
             { it.crowdedCollisionStrength },
             { t, v -> t.copy(crowdedCollisionStrength = v) },
         ),
-        MemoryGraphKnob("Collision push cap (share of overlap)", 0.05f..1f, { it.collisionMaxShare }, { t, v -> t.copy(collisionMaxShare = v) }),
+        MemoryGraphKnob(
+            "Collision push cap (share of overlap)",
+            0.05f..1f,
+            { it.collisionMaxShare },
+            { t, v -> t.copy(collisionMaxShare = v) },
+        ),
         MemoryGraphKnob("Collision fades below alpha", 0f..1f, { it.collisionFadeAlpha }, { t, v -> t.copy(collisionFadeAlpha = v) }),
+        MemoryGraphKnob(
+            "Collision radius spread (±, per node)",
+            0f..0.6f,
+            { it.collisionRadiusSpread },
+            { t, v -> t.copy(collisionRadiusSpread = v) },
+        ),
     ) + MemoryGraphNodeKind.entries.map { kind ->
         MemoryGraphKnob(
             "Collision radius: ${kind.name}",

@@ -3,6 +3,8 @@ package com.letta.mobile.data.memory.graph
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.memory.MemoryGraphEdgeKind
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
+import com.letta.mobile.data.memory.graph.forces.ElementSpreads
+import com.letta.mobile.data.memory.graph.forces.ForceElementTuning
 import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,11 +41,31 @@ data class MemoryGraphTuning(
     /** Each edge kind's rest length. */
     val springLength: Map<MemoryGraphEdgeKind, Float> = MemoryGraphEdgeKind.entries.associateWith { 110f },
     /**
-     * How far each edge's rest length strays from its kind's, as a fraction either way: drawn from a
-     * stable hash of the edge's ends, so the same graph always looks the same and adding a node
-     * leaves every other edge as it was. 0 gives every edge of a kind the same length.
+     * The master of every per-element spread below: 1 applies them as set, 0 turns all variation
+     * off (every element of a kind exactly alike, as before variation existed).
      */
-    val linkLengthSpread: Float = 0.25f,
+    val naturalness: Float = 1f,
+    /**
+     * How far each edge's rest length strays from its kind's, by kind, as a fraction either way:
+     * drawn from a stable hash of the edge's ends, so the same graph always looks the same and adding
+     * a node leaves every other edge as it was.
+     */
+    val linkLengthSpread: Map<MemoryGraphEdgeKind, Float> = mapOf(
+        MemoryGraphEdgeKind.Runs to 0.2f,
+        MemoryGraphEdgeKind.Remembers to 0.3f,
+        MemoryGraphEdgeKind.Uses to 0.25f,
+        MemoryGraphEdgeKind.Delivers to 0.15f,
+    ),
+    /** How far each edge's stiffness strays from its kind's, as a fraction either way. */
+    val linkStiffnessSpread: Float = 0.3f,
+    /** How far each node's repulsion charge strays from its kind's, as a fraction either way. */
+    val chargeSpread: Float = 0.2f,
+    /** How far each node's collision radius strays from its drawn one, as a fraction either way. */
+    val collisionRadiusSpread: Float = 0.15f,
+    /** How far each node's pull to the centre strays, as a fraction either way. */
+    val gravitySpread: Float = 0.2f,
+    /** How far each node's cluster pull strays, as a fraction either way. */
+    val clusterSpread: Float = 0.2f,
     /** How much longer an edge to a hub is (up to this fraction, for a node of 64 links or more); 0 is off. */
     val linkLengthDegreeBias: Float = 0.1f,
     /** Each edge kind's stiffness: force per unit stretched past its rest length. */
@@ -131,7 +153,7 @@ data class MemoryGraphTuning(
     val labelHysteresisMargin: Float = 6f,
     /** While the graph moves, frames between culling decisions; at rest the labels hold until focus or zoom changes. */
     val labelCullInterval: Float = 8f,
-) {
+) : ForceElementTuning {
     /** [kind]'s charge (1 when unset). */
     fun chargeOf(kind: MemoryGraphNodeKind): Float = nodeCharge[kind] ?: 1f
 
@@ -143,6 +165,39 @@ data class MemoryGraphTuning(
 
     /** [kind]'s collision radius multiple (1 when unset). */
     fun radiusScaleOf(kind: MemoryGraphNodeKind): Float = collisionRadiusScale[kind] ?: 1f
+
+    /** The collision radius spread in force (scaled by [naturalness]). */
+    val radiusSpread: Float get() = collisionRadiusSpread * naturalness
+
+    override fun chargeOfKind(kind: Int): Float = chargeOf(MemoryGraphNodeKind.entries[kind])
+
+    override fun lengthOfKind(kind: Int): Float = lengthOf(MemoryGraphEdgeKind.entries[kind])
+
+    override fun stiffnessOfKind(kind: Int): Float = stiffnessOf(MemoryGraphEdgeKind.entries[kind])
+
+    override fun lengthSpreadOfKind(kind: Int): Float = (linkLengthSpread[MemoryGraphEdgeKind.entries[kind]] ?: 0f) * naturalness
+
+    override fun isAgentKind(kind: Int): Boolean = kind == MemoryGraphNodeKind.Agent.ordinal
+
+    override fun isBackendKind(kind: Int): Boolean = kind == MemoryGraphNodeKind.Backend.ordinal
+
+    override val spreads: ElementSpreads
+        get() = ElementSpreads(
+            charge = chargeSpread * naturalness,
+            gravity = gravitySpread * naturalness,
+            cluster = clusterSpread * naturalness,
+            stiffness = linkStiffnessSpread * naturalness,
+        )
+
+    override val degreeBlend: Float get() = degreeScaling
+
+    override val spokeStiffness: Float get() = hubSpokeStrength
+
+    override val pinsBackend: Boolean get() = pinBackend
+
+    override val clusterPull: Float get() = if (clusterEnabled) clusterStrength else 0f
+
+    override val hubLengthBias: Float get() = linkLengthDegreeBias
 
     /**
      * How crowded a graph of [nodes] nodes and [edges] edges is, 0 (sparse: one agent's star) to 1
@@ -201,7 +256,13 @@ class MemoryGraphTunings {
                 "barnesHutTheta" to tuning.barnesHutTheta.literal(),
                 "barnesHutRebuildFrames" to tuning.barnesHutRebuildFrames.literal(),
                 "springLength" to tuning.springLength.literal("MemoryGraphEdgeKind"),
-                "linkLengthSpread" to tuning.linkLengthSpread.literal(),
+                "naturalness" to tuning.naturalness.literal(),
+                "linkLengthSpread" to tuning.linkLengthSpread.literal("MemoryGraphEdgeKind"),
+                "linkStiffnessSpread" to tuning.linkStiffnessSpread.literal(),
+                "chargeSpread" to tuning.chargeSpread.literal(),
+                "collisionRadiusSpread" to tuning.collisionRadiusSpread.literal(),
+                "gravitySpread" to tuning.gravitySpread.literal(),
+                "clusterSpread" to tuning.clusterSpread.literal(),
                 "linkLengthDegreeBias" to tuning.linkLengthDegreeBias.literal(),
                 "springStiffness" to tuning.springStiffness.literal("MemoryGraphEdgeKind"),
                 "hubSpokeStrength" to tuning.hubSpokeStrength.literal(),

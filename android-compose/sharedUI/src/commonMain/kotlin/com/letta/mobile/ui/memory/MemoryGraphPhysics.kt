@@ -6,6 +6,7 @@ import com.letta.mobile.data.memory.graph.MemoryGraphMotion
 import com.letta.mobile.data.memory.graph.MemoryGraphForceField
 import com.letta.mobile.data.memory.graph.MemoryGraphPoint
 import com.letta.mobile.data.memory.graph.MemoryGraphTuning
+import com.letta.mobile.data.memory.graph.forces.Variation
 import com.letta.mobile.data.memory.graph.MemoryGraphView
 
 /**
@@ -114,11 +115,15 @@ internal class MemoryGraphPhysics private constructor(
         ): MemoryGraphPhysics {
             val tuning = start.tuning
             val ids = view.nodes.map { it.id }
-            val radii = FloatArray(ids.size) { radiusOf(ids[it]) * tuning.radiusScaleOf(view.nodes[it].kind) }
+            val elements = MemoryGraphForceField.elementsOf(view)
+            // Each node's collision radius: its drawn one, its kind's scale, and its own seeded variation.
+            val radii = FloatArray(ids.size) {
+                val variation = Variation.factor(elements.nodeSeeds[it], Variation.RADIUS, tuning.radiusSpread)
+                radiusOf(ids[it]) * tuning.radiusScaleOf(view.nodes[it].kind) * variation
+            }
             val springs = MemoryGraphForceField.springsOf(view)
             val field = MemoryGraphForceField(ids.size, springs, radii = radii)
-            val kinds = IntArray(ids.size) { view.nodes[it].kind.ordinal }
-            field.applyTuning(tuning, kinds, MemoryGraphForceField.springKindsOf(view), MemoryGraphForceField.springSeedsOf(view))
+            field.applyTuning(tuning, elements)
             val physics = MemoryGraphPhysics(ids, field, start, MemoryGraphMotion.forGraph(ids.size, springs.size / 2, tuning))
             val moved = if (physics.motion && MemoryGraphSeeds.applies(view, tuning)) {
                 physics.seedFleet(view, target, start.previous)

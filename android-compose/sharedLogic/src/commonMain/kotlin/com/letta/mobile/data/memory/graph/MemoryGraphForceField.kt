@@ -5,10 +5,10 @@ import com.letta.mobile.data.memory.graph.barneshut.CollisionTerms
 import com.letta.mobile.data.memory.graph.barneshut.ForceBodies
 import com.letta.mobile.data.memory.graph.barneshut.ForceSums
 import com.letta.mobile.data.memory.graph.barneshut.RepulsionTerms
-import com.letta.mobile.data.memory.graph.forces.SpringEnds
+import com.letta.mobile.data.memory.graph.forces.ForceElements
+import com.letta.mobile.data.memory.graph.forces.GraphElements
+import com.letta.mobile.data.memory.graph.forces.Variation
 import com.letta.mobile.data.memory.MemoryGraphEdgeKind
-import com.letta.mobile.data.memory.MemoryGraphNodeKind
-import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -47,51 +47,32 @@ class MemoryGraphForceField(
     private var collisionFadeAlpha = 0f
 
     // What [applyTuning] can change; the defaults are [config]'s, so an untuned field (the
-    // controller's layout) steps exactly as it always has.
+    // controller's layout) steps exactly as it always has. Per-element constants (charges, springs,
+    // cluster owners, the pinned node) live in [elements], precomputed per tuning.
     private var repulsion = config.repulsion
     private var cutoffSq = 0f
-    private val charge = FloatArray(size) { 1f }
-    private val restLength = FloatArray(springs.size / 2) { config.idealEdgeLength }
-    private val stiffness = FloatArray(springs.size / 2) { config.attraction }
-
-    // Each spring's share of its pull on its source (a) and target (b): 1 and 1 untuned, split
-    // toward the lower-degree end under degree scaling so hubs move less.
-    private val sourceWeight = FloatArray(springs.size / 2) { 1f }
-    private val targetWeight = FloatArray(springs.size / 2) { 1f }
-
-    // Cluster force: each node's owning agents as a compressed list ([ownerStart] indexes
-    // [owners]); none untuned.
-    private var clusterStrength = 0f
-    private var ownerStart = IntArray(size + 1)
-    private var owners = IntArray(0)
+    private val elements = ForceElements(size, springs, config.idealEdgeLength, config.attraction)
+    private var clusterOn = false
     private var gravity = config.gravity
 
-    // A node the live step never moves (the fleet's pinned backend), and the Barnes–Hut tree a big
-    // graph's repulsion walks instead of every pair (null: every pair).
-    private var anchor = FREE
+    // The Barnes–Hut tree a big graph's repulsion walks instead of every pair (null: every pair).
     private var quadtree: BarnesHutTree? = null
     private var quadtreeTerms: RepulsionTerms? = null
-    private val bodies = ForceBodies(x, y, charge, radii)
+    private val bodies = ForceBodies(x, y, elements.charge, radii)
     private val sums = ForceSums(fx, fy, ox, oy)
     private var collisionPadding = COLLISION_PADDING
     private var collisionStrength = COLLISION_STRENGTH
-    private var springSeeds = IntArray(0)
 
     /**
-     * Applies [tuning]'s forces: [nodeKinds] holds each node's [MemoryGraphNodeKind] ordinal (its
-     * charge), [springKinds] each spring's [MemoryGraphEdgeKind] ordinal (its rest length and
-     * stiffness) and [springSeeds] each spring's stable hash of its ends (see [springSeedsOf]; empty:
-     * no length variation), in the orders the field was built with (see [springKindsOf]).
+     * Applies [tuning]'s forces to [graph]'s elements (see [elementsOf]): the field-wide ones here,
+     * the per-element ones (each varied by its own seed) into [elements].
      */
-    fun applyTuning(tuning: MemoryGraphTuning, nodeKinds: IntArray, springKinds: IntArray, springSeeds: IntArray = IntArray(0)) {
-        this.springSeeds = springSeeds
+    fun applyTuning(tuning: MemoryGraphTuning, graph: GraphElements) {
         val crowded = tuning.crowdednessOf(size, springs.size / 2)
         repulsion = tuning.repulsion * lerp(1f, tuning.crowdedRepulsionScale, crowded)
         cutoffSq = tuning.repulsionCutoff * tuning.repulsionCutoff
-        val nodeKindValues = MemoryGraphNodeKind.entries
-        for (i in 0 until min(size, nodeKinds.size)) charge[i] = tuning.chargeOf(nodeKindValues[nodeKinds[i]])
-        applySpringTuning(tuning, nodeKinds, springKinds)
-        applyClusterTuning(tuning, nodeKinds)
+        elements.apply(tuning, graph)
+        clusterOn = elements.clusterStrength != 0f
         gravity = tuning.gravity
         collisionPadding = tuning.collisionPadding
         collisionStrength = min(lerp(tuning.collisionStrength, tuning.crowdedCollisionStrength, crowded), tuning.collisionMaxShare)
@@ -99,80 +80,6 @@ class MemoryGraphForceField(
         quadtree = if (size > tuning.barnesHutAbove) (quadtree ?: BarnesHutTree(size)) else null
         quadtree?.rebuildEvery = tuning.barnesHutRebuildFrames.toInt().coerceAtLeast(1)
         quadtreeTerms = RepulsionTerms(repulsion, cutoffSq, CollisionTerms(collisionPadding, collisionStrength), tuning.barnesHutTheta)
-    }
-
-    /**
-     * Each spring's rest length and stiffness for its kind, the stiffness scaled by
-     * 1 / min(degree of its ends) and its pull split by degree (d3-force's forceLink), blended in by
-     * [MemoryGraphTuning.degreeScaling]. Degrees are counted here, once per graph.
-     */
-    private fun applySpringTuning(tuning: MemoryGraphTuning, nodeKinds: IntArray, springKinds: IntArray) {
-        // In a graph with several agents (the fleet view) every spoke from the backend is weak and
-        // unsplit, and the backend may be pinned at the centre.
-        val backend = nodeKinds.indexOfFirst { it == MemoryGraphNodeKind.Backend.ordinal }
-        val fleet = backend >= 0 && nodeKinds.count { it == MemoryGraphNodeKind.Agent.ordinal } >= 2
-        anchor = if (fleet && tuning.pinBackend) backend else FREE
-        val degree = IntArray(size)
-        springs.forEach { degree[it]++ }
-        val tune = springTuner(tuning, degree, if (fleet) backend else FREE)
-        val edgeKindValues = MemoryGraphEdgeKind.entries
-        for (spring in 0 until min(restLength.size, springKinds.size)) {
-            tune(spring, edgeKindValues[springKinds[spring]])
-        }
-    }
-
-    private fun springTuner(tuning: MemoryGraphTuning, degree: IntArray, backend: Int): (Int, MemoryGraphEdgeKind) -> Unit {
-        val blend = tuning.degreeScaling.coerceIn(0f, 1f)
-        return { spring, kind ->
-            val ends = SpringEnds.at(springs, spring)
-            val a = degree[ends.source].coerceAtLeast(1)
-            val b = degree[ends.target].coerceAtLeast(1)
-            val bias = a.toFloat() / (a + b)
-            val spoke = backend != FREE && ends.contains(backend)
-            restLength[spring] = tuning.lengthOf(kind) * lengthVariation(tuning, spring) * degreeLength(tuning, maxOf(a, b))
-            stiffness[spring] = if (spoke) tuning.hubSpokeStrength else tuning.stiffnessOf(kind) * lerp(1f, 1f / min(a, b), blend)
-            sourceWeight[spring] = if (spoke) 1f else lerp(1f, 2f * (1f - bias), blend)
-            targetWeight[spring] = if (spoke) 1f else lerp(1f, 2f * bias, blend)
-        }
-    }
-
-    /**
-     * 1 plus this spring's share of [MemoryGraphTuning.linkLengthSpread], drawn from its ends' stable
-     * hash: the same edge always gets the same length, whatever else the graph holds.
-     */
-    private fun lengthVariation(tuning: MemoryGraphTuning, spring: Int): Float {
-        val seed = springSeeds.getOrNull(spring) ?: return 1f
-        val unit = (seed and UNIT_MASK).toFloat() / UNIT_RANGE
-        return 1f + tuning.linkLengthSpread * (2f * unit - 1f)
-    }
-
-    /** 1 plus [MemoryGraphTuning.linkLengthDegreeBias] times how much of a hub the spring's busier end is. */
-    private fun degreeLength(tuning: MemoryGraphTuning, degree: Int): Float {
-        if (tuning.linkLengthDegreeBias == 0f || degree <= 1) return 1f
-        return 1f + tuning.linkLengthDegreeBias * min(1f, ln(degree.toFloat()) / ln(HUB_DEGREE))
-    }
-
-    /**
-     * The cluster force's owners: each node linked to agents (a label group or block) is owned by
-     * them. Only a graph with two or more agents (the fleet view) clusters, so one agent's star is
-     * left as it is.
-     */
-    private fun applyClusterTuning(tuning: MemoryGraphTuning, nodeKinds: IntArray) {
-        val agent = MemoryGraphNodeKind.Agent.ordinal
-        val backend = MemoryGraphNodeKind.Backend.ordinal
-        val agents = nodeKinds.count { it == agent }
-        clusterStrength = if (tuning.clusterEnabled && agents >= 2) tuning.clusterStrength else 0f
-        val owned = Array(size) { mutableListOf<Int>() }
-        var s = 0
-        while (s < springs.size) {
-            val ends = SpringEnds.at(springs, s / 2)
-            addOwner(owned, nodeKinds, ends)
-            addOwner(owned, nodeKinds, SpringEnds(ends.target, ends.source))
-            s += 2
-        }
-        ownerStart = IntArray(size + 1)
-        for (i in 0 until size) ownerStart[i + 1] = ownerStart[i] + owned[i].size
-        owners = owned.flatMap { it }.toIntArray()
     }
 
     /** Node [index]'s position. */
@@ -205,12 +112,15 @@ class MemoryGraphForceField(
     fun step(pinned: Int, motion: MemoryGraphMotion, alpha: Float): Float {
         applyForces()
         applyCluster()
-        return integrate(ForceStep(pinned, anchor, motion, alpha))
+        return integrate(ForceStep(pinned, elements.anchor, motion, alpha))
     }
 
     /** Pulls each owned node toward its owners' centroid ([MemoryGraphTuning.clusterStrength]). */
     private fun applyCluster() {
-        if (clusterStrength == 0f) return
+        if (!clusterOn) return
+        val ownerStart = elements.ownerStart
+        val owners = elements.owners
+        val strength = elements.clusterStrength
         for (i in 0 until size) {
             val from = ownerStart[i]
             val to = ownerStart[i + 1]
@@ -222,8 +132,9 @@ class MemoryGraphForceField(
                 cy += y[owners[k]]
             }
             val count = (to - from).toFloat()
-            fx[i] += (cx / count - x[i]) * clusterStrength
-            fy[i] += (cy / count - y[i]) * clusterStrength
+            val pull = strength * elements.cluster[i]
+            fx[i] += (cx / count - x[i]) * pull
+            fy[i] += (cy / count - y[i]) * pull
         }
     }
 
@@ -259,7 +170,7 @@ class MemoryGraphForceField(
                 // Drawn circles that overlap push apart harder; point masses have no radii.
                 val overlap = radii?.let { r -> max(0f, r[i] + r[j] + collisionPadding - distance) * collisionStrength } ?: 0f
                 val repels = cutoffSq == 0f || distanceSq <= cutoffSq
-                val force = if (repels) repulsion * (charge[i] * charge[j]) / distanceSq else 0f
+                val force = if (repels) repulsion * (elements.charge[i] * elements.charge[j]) / distanceSq else 0f
                 val px = dx / distance * force
                 val py = dy / distance * force
                 fx[i] += px
@@ -283,13 +194,13 @@ class MemoryGraphForceField(
             val dy = y[b] - y[a]
             val distance = max(sqrt(dx * dx + dy * dy), MIN_DISTANCE)
             val spring = s / 2
-            val force = stiffness[spring] * (distance - restLength[spring])
+            val force = elements.stiffness[spring] * (distance - elements.restLength[spring])
             val px = dx / distance * force
             val py = dy / distance * force
-            fx[a] += px * sourceWeight[spring]
-            fy[a] += py * sourceWeight[spring]
-            fx[b] -= px * targetWeight[spring]
-            fy[b] -= py * targetWeight[spring]
+            fx[a] += px * elements.sourceWeight[spring]
+            fy[a] += py * elements.sourceWeight[spring]
+            fx[b] -= px * elements.targetWeight[spring]
+            fy[b] -= py * elements.targetWeight[spring]
             s += 2
         }
     }
@@ -302,8 +213,9 @@ class MemoryGraphForceField(
         val collision = if (collisionFadeAlpha > 0f) min(1f, step.alpha / collisionFadeAlpha) else step.alpha
         for (i in 0 until size) {
             if (step.holds(i)) continue
-            vx[i] = (vx[i] + fx[i] * step.alpha - x[i] * gravity * step.alpha + ox[i] * collision) * step.motion.damping
-            vy[i] = (vy[i] + fy[i] * step.alpha - y[i] * gravity * step.alpha + oy[i] * collision) * step.motion.damping
+            val pull = gravity * elements.gravity[i]
+            vx[i] = (vx[i] + fx[i] * step.alpha - x[i] * pull * step.alpha + ox[i] * collision) * step.motion.damping
+            vy[i] = (vy[i] + fy[i] * step.alpha - y[i] * pull * step.alpha + oy[i] * collision) * step.motion.damping
             val speed = sqrt(vx[i] * vx[i] + vy[i] * vy[i])
             val scale = if (speed > step.motion.maxSpeed) step.motion.maxSpeed / speed else 1f
             if (step.motion.clampVelocity) {
@@ -345,31 +257,20 @@ class MemoryGraphForceField(
         }
 
         /**
-         * Each of [springsOf]'s springs' stable hash of its two ends' ids, in either order (FNV-1a),
-         * so an edge's length variation never depends on what else is in the graph.
+         * [view]'s elements for [applyTuning]: each node's kind and seed (a hash of its id) and each
+         * of [springsOf]'s springs' kind and seed (a hash of its two ends' ids, in either order), so
+         * an element's variation never depends on what else is in the graph.
          */
-        fun springSeedsOf(view: MemoryGraphView): IntArray {
+        fun elementsOf(view: MemoryGraphView): GraphElements {
             val ids = view.nodes.mapTo(HashSet()) { it.id }
-            return view.edges
-                .filter { it.fromId != it.toId && it.fromId in ids && it.toId in ids }
-                .map { edge -> stableHash(minOf(edge.fromId, edge.toId) + SEPARATOR + maxOf(edge.fromId, edge.toId)) }
-                .toIntArray()
+            val springEdges = view.edges.filter { it.fromId != it.toId && it.fromId in ids && it.toId in ids }
+            return GraphElements(
+                nodeKinds = IntArray(view.nodes.size) { view.nodes[it].kind.ordinal },
+                springKinds = springKindsOf(view),
+                nodeSeeds = IntArray(view.nodes.size) { Variation.hash(view.nodes[it].id) },
+                springSeeds = springEdges.map { Variation.hashPair(it.fromId, it.toId) }.toIntArray(),
+            )
         }
-
-        private fun stableHash(text: String): Int {
-            var hash = FNV_OFFSET
-            text.forEach { char -> hash = (hash xor char.code) * FNV_PRIME }
-            return hash
-        }
-
-        private const val SEPARATOR = '\u0000'
-        private const val FNV_OFFSET = -2128831035
-        private const val FNV_PRIME = 16777619
-        private const val UNIT_MASK = 0xFFFFFF
-        private const val UNIT_RANGE = 16777216f
-
-        /** A node with this many links counts as a full hub for the degree length bias. */
-        private const val HUB_DEGREE = 64f
 
         private const val MIN_DISTANCE = 0.01f
         private const val MIN_DISTANCE_SQ = 1f
@@ -380,9 +281,3 @@ class MemoryGraphForceField(
 }
 
 internal fun lerp(from: Float, to: Float, t: Float): Float = from + (to - from) * t
-
-private fun addOwner(owned: Array<MutableList<Int>>, kinds: IntArray, ends: SpringEnds) {
-    val kind = kinds.getOrNull(ends.source) ?: return
-    if (kind == MemoryGraphNodeKind.Agent.ordinal || kind == MemoryGraphNodeKind.Backend.ordinal) return
-    if (kinds.getOrNull(ends.target) == MemoryGraphNodeKind.Agent.ordinal) owned[ends.source] += ends.target
-}
