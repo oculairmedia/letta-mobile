@@ -196,7 +196,7 @@ jobs:
           set -euo pipefail
           status=0
           python3 scripts/ci/parity_gates.py || status=1
-          python3 scripts/ci/clean_arch.py --base "${CLEAN_ARCH_BASE:-HEAD^}" || status=1
+          python3 scripts/ci/clean_arch.py --base "${CLEAN_ARCH_BASE:-$(git rev-parse HEAD^)}" || status=1
           bash scripts/ci/platform-ui-gate.sh --enforce > /tmp/platform-ui.txt || status=1
           cat /tmp/platform-ui.txt
           grep -E '^ERROR\|' /tmp/platform-ui.txt | while IFS='|' read -r _ rule path msg; do

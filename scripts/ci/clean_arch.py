@@ -1,5 +1,6 @@
 """Source-level architecture ratchets. Run from the repository root; no Gradle required."""
 import argparse
+import re
 from collections import Counter
 from pathlib import Path
 import subprocess
@@ -12,16 +13,14 @@ ALLOWLIST = 'scripts/ci/platform-ui-allowlist.txt'
 MODULES = ['sharedLogic', 'sharedUI', 'desktop', 'web', 'app', 'feature-*', 'designsystem']
 
 
-def git(*args):
-    return subprocess.check_output(['git', *args], text=True)
-
-
 def review_changes(base):
-    changes = git('diff', '--unified=0', base, '--', ALLOWLIST)
+    if not re.fullmatch(r'[0-9a-f]{40}', base):
+        raise ValueError('expected full base commit SHA')
+    changes = subprocess.check_output(['git', 'diff', '--unified=0', base, '--', ALLOWLIST], text=True)
     for line in changes.splitlines():
         if line.startswith(('+android-compose/', '-android-compose/')) and 'legacy-pending(' in line:
             print('Legacy UI exception delta:', line)
-    diff = git('diff', '--function-context', base, '--', ':(glob)**/DesktopChatShellHelpers.kt')
+    diff = subprocess.check_output(['git', 'diff', '--name-only', base, '--', ':(glob)**/DesktopChatShellHelpers.kt'], text=True)
     # Kotlin function boundaries are not always recognized by Git. Flag the known
     # policy owner conservatively rather than claiming the change is a violation.
     if diff:
