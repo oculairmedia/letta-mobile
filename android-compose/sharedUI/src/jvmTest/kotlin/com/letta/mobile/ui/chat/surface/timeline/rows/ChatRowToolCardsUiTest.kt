@@ -10,15 +10,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import com.letta.mobile.ui.components.LocalToolCardBodyFill
 import com.letta.mobile.data.model.UiSubagentNotification

@@ -59,7 +59,6 @@ import com.letta.mobile.ui.components.LettaToolCardSection
 import com.letta.mobile.ui.components.LettaToolCardStyle
 import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.foundation.StatusGlyph
-import com.letta.mobile.ui.components.line.DefaultDisclosureLabels
 import com.letta.mobile.ui.components.line.LineDisclosure
 import com.letta.mobile.ui.components.line.StatusTone
 import com.letta.mobile.ui.theme.LettaDimens
