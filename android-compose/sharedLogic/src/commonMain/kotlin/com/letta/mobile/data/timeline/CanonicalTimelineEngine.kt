@@ -613,10 +613,7 @@ class CanonicalTimelineEngine(
                         ) else decoded
                     } else decoded
                 } else null
-                val excluded = record.contentType != TIMELINE_EVENT_CONTENT_TYPE ||
-                    (event != null && (event.isSyntheticSkillEnvelope() ||
-                        isSuppressed(record.key.identity, record.revision, event)))
-                TimelineProjectionRecord(record, event, excluded)
+                projectionRecord(record, event) { isSuppressed(record.key.identity, record.revision, it) }
             }
             val remaining = minOf(budget.maxDecodedBodyBytes, TimelineBoundedReader.MAX_PAGE_BODY_BYTES) -
                 page.bodies.sumOf { it.size.toLong() }
@@ -625,7 +622,8 @@ class CanonicalTimelineEngine(
                 runEnvelope(page.metadata, records, remaining, adapter),
             )
             val prepared = input.project(adapter)
-            TimelinePreparedPage(page.metadata, input.aggregatePreparedRuns(foldMonitorEventsOnPage(prepared)), input)
+            val runs = input.aggregatePreparedRuns(foldMonitorEventsOnPage(prepared))
+            TimelinePreparedPage(page.metadata, input.attachSkillInstructions(runs), input)
         }
     }
 

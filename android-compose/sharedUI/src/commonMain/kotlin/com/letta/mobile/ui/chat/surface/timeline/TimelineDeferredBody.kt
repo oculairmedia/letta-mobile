@@ -145,10 +145,6 @@ internal class DeferredPageReader(
 /** A settled row whose body was too large to decode inline: "View content", then a pager over it. */
 @Composable
 fun TimelineDeferredBody(rowKey: String, read: DeferredBodyRead, modifier: Modifier = Modifier) {
-    val scope = rememberCoroutineScope()
-    val currentRead by rememberUpdatedState(read)
-    val reader = remember(rowKey) { DeferredPageReader(scope) { currentRead } }
-    DisposableEffect(rowKey) { onDispose { reader.cancel() } }
     // letta-mobile-ivsx0: a labelled card, so the row reads as a message held back rather than a
     // stray link on the page.
     Surface(
@@ -162,13 +158,27 @@ fun TimelineDeferredBody(rowKey: String, read: DeferredBodyRead, modifier: Modif
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            DeferredBodyContent(reader)
+            DeferredBodyPages(rowKey, read)
         }
     }
 }
 
+/**
+ * A stored body read on demand, a page at a time: one [openLabel] action until asked, then the page
+ * and a pager over the rest. The deferred row's card holds it, and so does a skill's card for
+ * instructions too large to hold inline.
+ */
 @Composable
-private fun DeferredBodyContent(reader: DeferredPageReader) {
+internal fun DeferredBodyPages(rowKey: String, read: DeferredBodyRead, openLabel: String = "View content") {
+    val scope = rememberCoroutineScope()
+    val currentRead by rememberUpdatedState(read)
+    val reader = remember(rowKey) { DeferredPageReader(scope) { currentRead } }
+    DisposableEffect(rowKey) { onDispose { reader.cancel() } }
+    DeferredBodyContent(reader, openLabel)
+}
+
+@Composable
+private fun DeferredBodyContent(reader: DeferredPageReader, openLabel: String) {
     Column {
         reader.text?.let { Text(it) }
         if (reader.busy) Text("Loading…", style = MaterialTheme.typography.bodySmall)
@@ -177,7 +187,7 @@ private fun DeferredBodyContent(reader: DeferredPageReader) {
         }
         when {
             // Nothing read yet: one plain action, not a pager over an empty body.
-            !reader.started && !reader.busy -> TextButton(onClick = reader::first) { Text("View content") }
+            !reader.started && !reader.busy -> TextButton(onClick = reader::first) { Text(openLabel) }
             reader.failure != null && !reader.busy -> TextButton(onClick = reader::retry) { Text("Retry") }
             else -> DeferredPageBar(reader)
         }
