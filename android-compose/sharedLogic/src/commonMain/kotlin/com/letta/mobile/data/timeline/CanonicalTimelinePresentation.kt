@@ -5,6 +5,7 @@ import androidx.paging.cachedIn
 import androidx.paging.map
 import androidx.paging.filter
 import com.letta.mobile.data.model.MessageId
+import com.letta.mobile.data.chat.projection.CanvasArtifactReceipts
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.chat.projection.TimelineRowAssembly
@@ -94,6 +95,8 @@ class CanonicalTimelinePresentation private constructor(
          * stream ids aliased to them when the row was projected.
          */
         val liveNames: Set<String> = emptySet(),
+        /** By tool call id, the stored bodies of skill instructions this row's skill calls own; read with [readTextWindow]. */
+        val skillInstructionBodies: Map<String, TimelineBodyReference> = emptyMap(),
     ) {
         /**
          * Whether this row holds every record [live] draws, so it can take [live]'s place in the
@@ -199,20 +202,12 @@ class CanonicalTimelinePresentation private constructor(
         updateEchoedOtids(publications, pending)
         val optimistic = pending.filterNot { it.otid in echoedOtids || it.otid in residentState.otids }
             .map { it.toRenderItem(owner.selection.scope.agentId) }
-        // letta-mobile-bglj6.13: compose receipts land on the narrating message of the overlay.
-        val receipts = com.letta.mobile.data.chat.projection.CanvasArtifactReceipts.attach(events)
-        val activeMessages = events.mapNotNull { event ->
-            timelineEventToUiMessage(
-                event,
-                owner.selection.scope.agentId,
-                receipts[com.letta.mobile.data.chat.projection.CanvasArtifactReceipts.eventKey(event)].orEmpty(),
-            )
-        }
+        val activeMessages = projectLiveMessages(publications, events)
         val active = buildChatRenderModel(
             // A run-less reply settles as its prompt's run (aggregatePreparedRuns); the live render
             // takes the same shape, or the settled row could not take the live row's place and the
             // reply would be drawn twice and then jump at settle (letta-mobile-bglj6.1.12).
-            messages = activeMessages.withPromptOwnedRunIds(),
+            messages = activeMessages,
             mode = ChatDisplayMode.Interactive,
             activeAgentId = owner.selection.scope.agentId,
         // A live run is keyed by its own records, as its settled copy is: never `run-<id>` because the
@@ -222,10 +217,30 @@ class CanonicalTimelinePresentation private constructor(
         return positionPendingInLive(active, optimistic.asReversed())
     }
 
+    /** Derive run ownership before resident prompts leave the overlay, within each turn's fence. */
+    private fun projectLiveMessages(
+        publications: List<TimelineLivePublication>,
+        events: List<TimelineEvent.Confirmed>,
+    ): List<UiMessage> {
+        val receipts = CanvasArtifactReceipts.attach(events)
+        val activeKeys = events.mapTo(hashSetOf()) { it.serverId to it.messageType }
+        return publications.flatMap { publication ->
+            val messages = publication.block.events.mapNotNull { event ->
+                timelineEventToUiMessage(
+                    event, owner.selection.scope.agentId,
+                    receipts[CanvasArtifactReceipts.eventKey(event)].orEmpty(),
+                )?.let { (event.serverId to event.messageType) to it }
+            }
+            messages.map { it.second }.withPromptOwnedRunIds().filterIndexed { index, _ ->
+                messages[index].first in activeKeys
+            }
+        }
+    }
+
     private fun filterUnsettledEvents(
         publications: List<TimelineLivePublication>,
         residentState: ResidentState,
-    ): List<TimelineEvent> = publications.flatMap { it.overlayEvents(residentState.presented) }
+    ): List<TimelineEvent.Confirmed> = publications.flatMap { it.overlayEvents(residentState.presented) }
         .filterNot { event ->
             (event.otid.isNotBlank() && event.otid in residentState.otids) || event.serverId in residentState.serverIds
         }
@@ -277,9 +292,11 @@ class CanonicalTimelinePresentation private constructor(
         }
     }
 
-    suspend fun readChunk(row: Row, offset: Long, maxBytes: Int): TimelineBodyChunk {
+    suspend fun readChunk(row: Row, offset: Long, maxBytes: Int): TimelineBodyChunk =
+        readChunk(requireNotNull(row.deferred) { "Row has no deferred body" }, offset, maxBytes)
+
+    private suspend fun readChunk(reference: TimelineBodyReference, offset: Long, maxBytes: Int): TimelineBodyChunk {
         check(job.isActive) { "Presentation closed" }
-        val reference = requireNotNull(row.deferred) { "Row has no deferred body" }
         return owner.session.engine.resolveBodyChunk(owner.selection, reference, offset, maxBytes)
     }
 
@@ -288,12 +305,21 @@ class CanonicalTimelinePresentation private constructor(
         field: TimelineSemanticField,
         scalarOffset: Long,
         decodeDispatcher: kotlinx.coroutines.CoroutineDispatcher,
+    ): TimelineSemanticWindowResult =
+        readTextWindow(requireNotNull(row.deferred) { "Row has no deferred body" }, field, scalarOffset, decodeDispatcher)
+
+    /** One window of a stored body this presentation's rows point at: a deferred row's, or a skill's instructions. */
+    suspend fun readTextWindow(
+        reference: TimelineBodyReference,
+        field: TimelineSemanticField,
+        scalarOffset: Long,
+        decodeDispatcher: kotlinx.coroutines.CoroutineDispatcher,
     ): TimelineSemanticWindowResult = withContext(decodeDispatcher) {
         check(job.isActive) { "Presentation closed" }
         val result = TimelineSemanticBodyWindow.read(
-            reference = requireNotNull(row.deferred), field = field, scalarOffset = scalarOffset,
+            reference = reference, field = field, scalarOffset = scalarOffset,
             budget = TimelineSemanticBudget(maxInputBytes = 2L * 1024 * 1024),
-        ) { offset, size -> readChunk(row, offset, size) }
+        ) { offset, size -> readChunk(reference, offset, size) }
         check(job.isActive) { "Presentation closed" }
         result
     }
@@ -377,14 +403,16 @@ class CanonicalTimelinePresentation private constructor(
             val residents = presentation.residentEvents.ifEmpty {
                 listOf(TimelineResidentEvent(record.key.identity, record.revision, presentation.event.otid, presentation.event.serverId))
             }
+            val item = presentation.item.settledToolCalls().withSettledKey(record.key.identity, residents)
             Row(
                 record.key.identity,
                 record.revision,
-                presentation.item.settledToolCalls().withSettledKey(record.key.identity, residents),
+                item,
                 otid = presentation.event.otid,
                 serverId = presentation.event.serverId,
                 residentEvents = residents,
-                liveNames = residents.liveNames(),
+                liveNames = residents.liveNames() + item.messagesInOrder().mapNotNull { it.clientMessageId },
+                skillInstructionBodies = presentation.skillInstructionBodies,
             )
         }
         is TimelineSettledPresentation.Defer -> deferredRow(record)

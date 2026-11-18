@@ -165,6 +165,13 @@ data class UiToolCall(
      * Null for every other tool call.
      */
     val agentMessageProvenance: AgentMessageProvenance? = null,
+    /**
+     * The instructions a loaded skill brought into the conversation, when the runtime sent them as
+     * their own hidden message rather than in this call's result (whose text is then only
+     * "Launching skill: …"). Null for every other tool call, and for a skill whose instructions
+     * were too large to hold inline: the settled row keeps a pointer to those instead.
+     */
+    val skillInstructions: String? = null,
 )
 
 /**
