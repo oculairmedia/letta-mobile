@@ -46,6 +46,8 @@ internal data class LiveRowPresentation(
     val key: String,
     val runId: String?,
     val latencyMs: Long?,
+    /** Already-painted member identities, indexed by their durable UI ids. */
+    val messageKeys: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -71,8 +73,26 @@ internal fun ChatRenderItem.livePresentationFor(
     if (names.isEmpty()) return null
     val named = live.filter { item -> item.messagesInOrder().any { it.isNamedBy(names) } }
     val match = named.firstOrNull(::sharesShapeWith) ?: named.firstOrNull { isRunItem && !it.isRunItem } ?: return null
-    return LiveRowPresentation(match.key, match.runIdentity(), match.messagesInOrder().firstNotNullOfOrNull { it.latencyMs })
+    return LiveRowPresentation(
+        match.key, match.runIdentity(), match.messagesInOrder().firstNotNullOfOrNull { it.latencyMs },
+        memberPresentations(events, match.messagesInOrder(), aliases),
+    )
 }
+
+/** Carry the child identities through the same presentation cache as their owning row. */
+private fun ChatRenderItem.memberPresentations(
+    events: List<TimelineResidentEvent>,
+    live: List<UiMessage>,
+    aliases: Map<String, TimelineMessageId>,
+): Map<String, String> = events.mapNotNull { event ->
+    val durableNames = setOf(event.identity.value, event.serverId)
+    val durable = messagesInOrder().singleOrNull {
+        it.id in durableNames || it.id.removeSuffix(":REASONING") in durableNames
+    } ?: return@mapNotNull null
+    val names = event.namesKnownTo(aliases).toSet()
+    val source = live.singleOrNull { it.sameKindAs(durable) && it.isNamedBy(names) } ?: return@mapNotNull null
+    durable.id to (source.clientMessageId?.takeIf(String::isNotBlank) ?: source.id)
+}.toMap()
 
 /** Whether no live row under this key shows a record that [events] do not hold. */
 internal fun LiveRowPresentation.isOnlyHeldWithin(
@@ -89,14 +109,18 @@ internal fun ChatRenderItem.adopt(live: LiveRowPresentation): ChatRenderItem = w
     is ChatRenderItem.RunBlock -> copy(
         runId = live.runId ?: runId,
         keyOverride = live.key,
-        messages = messages.map { (message, position) -> message.withLatencyOf(live) to position },
+        messages = messages.map { (message, position) -> message.withLatencyOf(live).withPresentationIdentityOf(live) to position },
     )
     is ChatRenderItem.Single -> copy(
         stableRunId = if (stableRunKey != null) live.runId ?: stableRunId else stableRunId,
         keyOverride = live.key,
-        message = message.withLatencyOf(live),
+        message = message.withLatencyOf(live).withPresentationIdentityOf(live),
     )
 }
+
+/** This is UI identity only; [UiMessage.id] remains the canonical action/lookup target. */
+private fun UiMessage.withPresentationIdentityOf(live: LiveRowPresentation): UiMessage =
+    live.messageKeys[id]?.let { copy(clientMessageId = it) } ?: this
 
 private fun ChatRenderItem.sharesShapeWith(other: ChatRenderItem): Boolean = when {
     isRunItem || other.isRunItem -> isRunItem && other.isRunItem

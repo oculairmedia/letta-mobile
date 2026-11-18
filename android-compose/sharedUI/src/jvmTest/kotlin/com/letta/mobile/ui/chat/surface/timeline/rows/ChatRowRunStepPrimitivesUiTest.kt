@@ -41,6 +41,21 @@ import kotlin.test.assertTrue
  * size only while it runs, one DisclosureChevron only when it has details, its details in one inset.
  */
 class ChatRowRunStepPrimitivesUiTest {
+    @Test
+    fun logicalIdsKeepProseReasoningAndToolGroupKeysThroughCanonicalization() {
+        val live = listOf(
+            UiMessage("stream-thought", "assistant", "Checking", "", isReasoning = true, clientMessageId = "logical-thought"),
+            UiMessage("stream-tool", "assistant", "", "", clientMessageId = "logical-tool", toolCalls = listOf(call("call"))),
+            UiMessage("stream-reply", "assistant", "Done", "", clientMessageId = "logical-reply"),
+        )
+        val durable = live.map { it.copy(id = "stored-${it.id}") }
+        assertEquals(
+            listOf("reasoning:logical-thought", "tool-group-logical-tool", "logical-reply"),
+            compactRunSteps(live).map { it.key },
+        )
+        assertEquals(compactRunSteps(live).map { it.key }, compactRunSteps(durable).map { it.key })
+    }
+
     /** A call that ran (its output "ok"), failed (its output "boom") or, with a null [status], still runs. */
     private fun call(id: String, name: String = "Bash", command: String = "ls", status: String? = "success") =
         UiToolCall(name = name, arguments = """{"command":"$command"}""", result = outputOf(status), status = status, toolCallId = id)

@@ -14012,6 +14012,7 @@ public final class com/letta/mobile/data/chat/projection/MessageGroupingKt {
 	public static final fun deduplicateRenderKeys (Ljava/util/List;)Ljava/util/List;
 	public static final fun groupMessagesForRender (Ljava/util/List;)Ljava/util/List;
 	public static final fun runKey (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun stableListKey (Lcom/letta/mobile/data/model/UiMessage;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/chat/projection/MonitorDisplayKt {
@@ -34477,6 +34478,7 @@ public final class com/letta/mobile/data/model/SyntheticSkillEnvelopeDetector {
 	public static final field INSTANCE Lcom/letta/mobile/data/model/SyntheticSkillEnvelopeDetector;
 	public final fun isSyntheticSkillEnvelope (Lcom/letta/mobile/data/model/LettaMessage;)Z
 	public final fun isSyntheticSkillEnvelope (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun opensSkillEnvelope (Ljava/lang/String;)Z
 }
 
 public final class com/letta/mobile/data/model/SyntheticSkillEnvelopeDetectorKt {
@@ -35206,13 +35208,14 @@ public final class com/letta/mobile/data/model/UiToolApprovalDecision : java/lan
 }
 
 public final class com/letta/mobile/data/model/UiToolCall {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Long;Ljava/lang/String;ZLcom/letta/mobile/data/model/UiToolApprovalDecision;Lcom/letta/mobile/data/model/UiSubagentDispatch;Lcom/letta/mobile/data/model/UiToolResultTruncation;Lcom/letta/mobile/data/messaging/AgentMessageProvenance;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Long;Ljava/lang/String;ZLcom/letta/mobile/data/model/UiToolApprovalDecision;Lcom/letta/mobile/data/model/UiSubagentDispatch;Lcom/letta/mobile/data/model/UiToolResultTruncation;Lcom/letta/mobile/data/messaging/AgentMessageProvenance;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Long;Ljava/lang/String;ZLcom/letta/mobile/data/model/UiToolApprovalDecision;Lcom/letta/mobile/data/model/UiSubagentDispatch;Lcom/letta/mobile/data/model/UiToolResultTruncation;Lcom/letta/mobile/data/messaging/AgentMessageProvenance;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Long;Ljava/lang/String;ZLcom/letta/mobile/data/model/UiToolApprovalDecision;Lcom/letta/mobile/data/model/UiSubagentDispatch;Lcom/letta/mobile/data/model/UiToolResultTruncation;Lcom/letta/mobile/data/messaging/AgentMessageProvenance;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Lcom/letta/mobile/data/model/UiToolApprovalDecision;
 	public final fun component11 ()Lcom/letta/mobile/data/model/UiSubagentDispatch;
 	public final fun component12 ()Lcom/letta/mobile/data/model/UiToolResultTruncation;
 	public final fun component13 ()Lcom/letta/mobile/data/messaging/AgentMessageProvenance;
+	public final fun component14 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
@@ -35221,8 +35224,8 @@ public final class com/letta/mobile/data/model/UiToolCall {
 	public final fun component7 ()Ljava/lang/Long;
 	public final fun component8 ()Ljava/lang/String;
 	public final fun component9 ()Z
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Long;Ljava/lang/String;ZLcom/letta/mobile/data/model/UiToolApprovalDecision;Lcom/letta/mobile/data/model/UiSubagentDispatch;Lcom/letta/mobile/data/model/UiToolResultTruncation;Lcom/letta/mobile/data/messaging/AgentMessageProvenance;)Lcom/letta/mobile/data/model/UiToolCall;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/UiToolCall;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Long;Ljava/lang/String;ZLcom/letta/mobile/data/model/UiToolApprovalDecision;Lcom/letta/mobile/data/model/UiSubagentDispatch;Lcom/letta/mobile/data/model/UiToolResultTruncation;Lcom/letta/mobile/data/messaging/AgentMessageProvenance;ILjava/lang/Object;)Lcom/letta/mobile/data/model/UiToolCall;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Long;Ljava/lang/String;ZLcom/letta/mobile/data/model/UiToolApprovalDecision;Lcom/letta/mobile/data/model/UiSubagentDispatch;Lcom/letta/mobile/data/model/UiToolResultTruncation;Lcom/letta/mobile/data/messaging/AgentMessageProvenance;Ljava/lang/String;)Lcom/letta/mobile/data/model/UiToolCall;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/UiToolCall;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Long;Ljava/lang/String;ZLcom/letta/mobile/data/model/UiToolApprovalDecision;Lcom/letta/mobile/data/model/UiSubagentDispatch;Lcom/letta/mobile/data/model/UiToolResultTruncation;Lcom/letta/mobile/data/messaging/AgentMessageProvenance;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/model/UiToolCall;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAgentMessageProvenance ()Lcom/letta/mobile/data/messaging/AgentMessageProvenance;
 	public final fun getApprovalDecision ()Lcom/letta/mobile/data/model/UiToolApprovalDecision;
@@ -35234,6 +35237,7 @@ public final class com/letta/mobile/data/model/UiToolCall {
 	public final fun getResult ()Ljava/lang/String;
 	public final fun getResultTruncation ()Lcom/letta/mobile/data/model/UiToolResultTruncation;
 	public final fun getSettled ()Z
+	public final fun getSkillInstructions ()Ljava/lang/String;
 	public final fun getStatus ()Ljava/lang/String;
 	public final fun getSubagentDispatch ()Lcom/letta/mobile/data/model/UiSubagentDispatch;
 	public final fun getToolCallId ()Ljava/lang/String;
@@ -57607,6 +57611,7 @@ public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation 
 	public final fun onResidentRows (Ljava/util/List;)V
 	public final fun readChunk (Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;JILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun readTextWindow (Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;Lcom/letta/mobile/data/timeline/TimelineSemanticField;JLkotlinx/coroutines/CoroutineDispatcher;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun readTextWindow (Lcom/letta/mobile/data/timeline/TimelineBodyReference;Lcom/letta/mobile/data/timeline/TimelineSemanticField;JLkotlinx/coroutines/CoroutineDispatcher;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun retry-jmYxp0c (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun setViewport (Lkotlin/Pair;)V
 }
@@ -57618,8 +57623,8 @@ public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation$
 }
 
 public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row {
-	public synthetic fun <init> (Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Set;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Set;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Set;Ljava/util/Map;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-P88pw2U ()Ljava/lang/String;
 	public final fun component2 ()J
 	public final fun component3 ()Lcom/letta/mobile/data/chat/projection/ChatRenderItem;
@@ -57628,8 +57633,9 @@ public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation$
 	public final fun component6 ()Ljava/lang/String;
 	public final fun component7 ()Ljava/util/List;
 	public final fun component8 ()Ljava/util/Set;
-	public final fun copy-E7VDhUw (Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Set;)Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;
-	public static synthetic fun copy-E7VDhUw$default (Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;
+	public final fun component9 ()Ljava/util/Map;
+	public final fun copy-kZ7BZFs (Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Set;Ljava/util/Map;)Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;
+	public static synthetic fun copy-kZ7BZFs$default (Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;Ljava/lang/String;JLcom/letta/mobile/data/chat/projection/ChatRenderItem;Lcom/letta/mobile/data/timeline/TimelineBodyReference;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Set;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDeferred ()Lcom/letta/mobile/data/timeline/TimelineBodyReference;
 	public final fun getIdentity-P88pw2U ()Ljava/lang/String;
@@ -57639,6 +57645,7 @@ public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation$
 	public final fun getResidentEvents ()Ljava/util/List;
 	public final fun getRevision ()J
 	public final fun getServerId ()Ljava/lang/String;
+	public final fun getSkillInstructionBodies ()Ljava/util/Map;
 	public fun hashCode ()I
 	public final fun holdsAll (Lcom/letta/mobile/data/chat/projection/ChatRenderItem;)Z
 	public fun toString ()Ljava/lang/String;
@@ -59706,16 +59713,19 @@ public final class com/letta/mobile/data/timeline/TimelineProjectionContext {
 }
 
 public final class com/letta/mobile/data/timeline/TimelineProjectionRecord {
-	public fun <init> (Lcom/letta/mobile/data/timeline/TimelineSettledRecord;Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;Z)V
+	public fun <init> (Lcom/letta/mobile/data/timeline/TimelineSettledRecord;Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;ZZ)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/timeline/TimelineSettledRecord;Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/timeline/TimelineSettledRecord;
 	public final fun component2 ()Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;
 	public final fun component3 ()Z
-	public final fun copy (Lcom/letta/mobile/data/timeline/TimelineSettledRecord;Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;Z)Lcom/letta/mobile/data/timeline/TimelineProjectionRecord;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/timeline/TimelineProjectionRecord;Lcom/letta/mobile/data/timeline/TimelineSettledRecord;Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;ZILjava/lang/Object;)Lcom/letta/mobile/data/timeline/TimelineProjectionRecord;
+	public final fun component4 ()Z
+	public final fun copy (Lcom/letta/mobile/data/timeline/TimelineSettledRecord;Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;ZZ)Lcom/letta/mobile/data/timeline/TimelineProjectionRecord;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/timeline/TimelineProjectionRecord;Lcom/letta/mobile/data/timeline/TimelineSettledRecord;Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;ZZILjava/lang/Object;)Lcom/letta/mobile/data/timeline/TimelineProjectionRecord;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getEvent ()Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;
 	public final fun getExcluded ()Z
 	public final fun getRecord ()Lcom/letta/mobile/data/timeline/TimelineSettledRecord;
+	public final fun getSkillEnvelopePreview ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -60535,17 +60545,19 @@ public final class com/letta/mobile/data/timeline/TimelineSettledPresentation$Dr
 }
 
 public final class com/letta/mobile/data/timeline/TimelineSettledPresentation$Render : com/letta/mobile/data/timeline/TimelineSettledPresentation {
-	public fun <init> (Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;Lcom/letta/mobile/data/chat/projection/ChatRenderItem;Ljava/util/List;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;Lcom/letta/mobile/data/chat/projection/ChatRenderItem;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;Lcom/letta/mobile/data/chat/projection/ChatRenderItem;Ljava/util/List;Ljava/util/Map;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;Lcom/letta/mobile/data/chat/projection/ChatRenderItem;Ljava/util/List;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;
 	public final fun component2 ()Lcom/letta/mobile/data/chat/projection/ChatRenderItem;
 	public final fun component3 ()Ljava/util/List;
-	public final fun copy (Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;Lcom/letta/mobile/data/chat/projection/ChatRenderItem;Ljava/util/List;)Lcom/letta/mobile/data/timeline/TimelineSettledPresentation$Render;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/timeline/TimelineSettledPresentation$Render;Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;Lcom/letta/mobile/data/chat/projection/ChatRenderItem;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/timeline/TimelineSettledPresentation$Render;
+	public final fun component4 ()Ljava/util/Map;
+	public final fun copy (Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;Lcom/letta/mobile/data/chat/projection/ChatRenderItem;Ljava/util/List;Ljava/util/Map;)Lcom/letta/mobile/data/timeline/TimelineSettledPresentation$Render;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/timeline/TimelineSettledPresentation$Render;Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;Lcom/letta/mobile/data/chat/projection/ChatRenderItem;Ljava/util/List;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/timeline/TimelineSettledPresentation$Render;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getEvent ()Lcom/letta/mobile/data/timeline/TimelineEvent$Confirmed;
 	public final fun getItem ()Lcom/letta/mobile/data/chat/projection/ChatRenderItem;
 	public final fun getResidentEvents ()Ljava/util/List;
+	public final fun getSkillInstructionBodies ()Ljava/util/Map;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }

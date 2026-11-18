@@ -33,6 +33,8 @@ data class TimelineProjectionRecord(
     val record: TimelineSettledRecord,
     val event: TimelineEvent.Confirmed?,
     val excluded: Boolean,
+    /** An undecoded body (too large to decode inline) whose head opens as a skill's instructions. */
+    val skillEnvelopePreview: Boolean = false,
 )
 
 data class TimelinePageProjectionInput(
@@ -204,7 +206,8 @@ private fun TimelinePageProjectionInput.spansVisibleGap(sources: List<IndexedRen
     }
 
 private fun TimelinePageProjectionInput.isRunInterior(record: TimelineProjectionRecord): Boolean =
-    record.event?.isSyntheticSkillEnvelope() == true || record.isRunMetadata() || isContentlessSegment(record.event)
+    record.event?.isSyntheticSkillEnvelope() == true || record.skillEnvelopePreview || record.isRunMetadata() ||
+        isContentlessSegment(record.event)
 
 private fun TimelinePageProjectionInput.isContentlessSegment(event: TimelineEvent.Confirmed?): Boolean =
     event != null && timelineEventToUiMessage(event, context.ownAgentId)?.hasNoRenderableContent() == true
