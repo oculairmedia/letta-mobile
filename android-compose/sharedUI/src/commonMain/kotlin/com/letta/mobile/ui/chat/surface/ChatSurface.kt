@@ -147,8 +147,8 @@ fun ChatSurface(
     // Held as a State and read only where a value is used: the page itself never reads it, so a
     // streaming token recomposes the timeline and the few readers of run state, not every layer.
     val uiState = viewedPort.uiState.collectForChatSurface()
-    val composer by viewedPort.composer.collectForChatSurface()
-    val capabilities by viewedPort.capabilities.collectForChatSurface()
+    val composer = viewedPort.composer.collectForChatSurface()
+    val capabilities = viewedPort.capabilities.collectForChatSurface()
     val shareFailed = stringResource(Res.string.chat_surface_canvas_share_failed)
     // Hosts pass fresh lambdas per recomposition; these keep one instance so rows stay skippable.
     val stableOnIntent = rememberLatestIntent(onIntent)
@@ -302,8 +302,8 @@ internal object ChatSurfaceTags {
 internal class ChatSurfaceSession(
     val port: ChatSessionPort,
     private val uiStateSource: State<ChatUiState>,
-    val composer: ChatComposerUiState,
-    val capabilities: ChatSurfaceCapabilities,
+    private val composerSource: State<ChatComposerUiState>,
+    private val capabilitiesSource: State<ChatSurfaceCapabilities>,
     val pagedTimeline: CanonicalTimelinePresentation?,
     /** One scroll position per conversation/paged timeline, preserved across presentation changes. */
     val listState: LazyListState,
@@ -313,6 +313,12 @@ internal class ChatSurfaceSession(
 
     /** The current chat state; reading it subscribes the reading composable to every update. */
     val uiState: ChatUiState get() = uiStateSource.value
+
+    /** The current composer state; reading it subscribes only the composer layer to keystrokes. */
+    val composer: ChatComposerUiState get() = composerSource.value
+
+    /** The current surface capabilities; reading it subscribes only capability consumers. */
+    val capabilities: ChatSurfaceCapabilities get() = capabilitiesSource.value
 
     // The slices the page's chrome reads: each invalidates its readers only when it changes, not on
     // every streamed token.

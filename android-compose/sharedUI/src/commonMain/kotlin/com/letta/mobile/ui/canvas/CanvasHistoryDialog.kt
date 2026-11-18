@@ -60,8 +60,14 @@ private fun CanvasHistoryContent(
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             if (deletedElements.isNotEmpty()) {
-                item { Text("Deleted drawing items", style = MaterialTheme.typography.titleSmall) }
-                items(deletedElements, key = { "deleted-${it.elementId}" }) { element ->
+                item(key = "deleted-heading", contentType = "deleted-heading") {
+                    Text("Deleted drawing items", style = MaterialTheme.typography.titleSmall)
+                }
+                items(
+                    items = deletedElements,
+                    key = { "deleted-${it.elementId}" },
+                    contentType = { "deleted-element" },
+                ) { element ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -72,7 +78,11 @@ private fun CanvasHistoryContent(
                     }
                 }
             }
-            items(checkpoints) { cp -> CanvasHistoryCard(cp = cp, onRestore = { onRestore(cp) }) }
+            items(
+                items = checkpoints,
+                key = { "checkpoint-${it.revision}" },
+                contentType = { "checkpoint" },
+            ) { cp -> CanvasHistoryCard(cp = cp, onRestore = { onRestore(cp) }) }
         }
     }
 }
