@@ -1,5 +1,9 @@
 package com.letta.mobile.quality
 
+import com.letta.mobile.quality.guardrails.NoDeprecatedBrowserUnloadEvent
+import com.letta.mobile.quality.guardrails.NoHardcodedPaddingDirection
+import com.letta.mobile.quality.guardrails.NoNonAtomicStateFlowSelfCopy
+import com.letta.mobile.quality.guardrails.NoUnrememberedToolFactsInComposable
 import io.gitlab.arturbosch.detekt.api.CodeSmell
 import io.gitlab.arturbosch.detekt.api.Config
 import io.gitlab.arturbosch.detekt.api.Debt
