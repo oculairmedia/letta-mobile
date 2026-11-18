@@ -22,7 +22,9 @@ class MemoryGraphTuningStoreTest {
                 MemoryGraphTuningPanel(MemoryGraphTuning(), MemoryGraphTuningActions(changes::add, {}, {}, {}))
             }
         }
-        val field = onAllNodes(hasSetTextAction())[0]
+        val knobs = MemoryGraphKnobs.sections.flatMap { it.knobs }
+        val strength = knobs.indexOfFirst { it.read(MemoryGraphTuning(repulsion = 1234f)) == 1234f }
+        val field = onAllNodes(hasSetTextAction())[strength]
         listOf("NaN", "Infinity", "-1", "20001").forEach { value ->
             field.performTextReplacement(value)
             runOnIdle { assertEquals(emptyList(), changes, value) }
