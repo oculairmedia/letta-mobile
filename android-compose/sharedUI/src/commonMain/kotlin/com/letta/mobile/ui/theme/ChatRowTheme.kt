@@ -79,6 +79,13 @@ object ChatRowSpacing {
     /** Above the newest and below the oldest row. */
     val listEdge: Dp = LettaSpacingTokens.CARD_GAP.dp
 
+    /**
+     * The line a pointer host reserves under the prose that ends a turn, for its hover actions (Fork,
+     * Copy) beside the delivery time: [messagePart] above an action button's height. The row after it
+     * counts it toward its own section break rather than adding the break below it.
+     */
+    internal val replyActionsLine: Dp get() = messagePart + LettaDimens.Control.actionButton
+
     /** Above the newest reply's delivery time, on top of [messagePart]. */
     val deliveryTimeGap: Dp = LettaSpacingTokens.XXXS.dp
 
