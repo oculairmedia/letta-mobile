@@ -95,6 +95,8 @@ class CanonicalTimelinePresentation private constructor(
          * stream ids aliased to them when the row was projected.
          */
         val liveNames: Set<String> = emptySet(),
+        /** By tool call id, the stored bodies of skill instructions this row's skill calls own; read with [readTextWindow]. */
+        val skillInstructionBodies: Map<String, TimelineBodyReference> = emptyMap(),
     ) {
         /**
          * Whether this row holds every record [live] draws, so it can take [live]'s place in the
@@ -290,9 +292,11 @@ class CanonicalTimelinePresentation private constructor(
         }
     }
 
-    suspend fun readChunk(row: Row, offset: Long, maxBytes: Int): TimelineBodyChunk {
+    suspend fun readChunk(row: Row, offset: Long, maxBytes: Int): TimelineBodyChunk =
+        readChunk(requireNotNull(row.deferred) { "Row has no deferred body" }, offset, maxBytes)
+
+    private suspend fun readChunk(reference: TimelineBodyReference, offset: Long, maxBytes: Int): TimelineBodyChunk {
         check(job.isActive) { "Presentation closed" }
-        val reference = requireNotNull(row.deferred) { "Row has no deferred body" }
         return owner.session.engine.resolveBodyChunk(owner.selection, reference, offset, maxBytes)
     }
 
@@ -301,12 +305,21 @@ class CanonicalTimelinePresentation private constructor(
         field: TimelineSemanticField,
         scalarOffset: Long,
         decodeDispatcher: kotlinx.coroutines.CoroutineDispatcher,
+    ): TimelineSemanticWindowResult =
+        readTextWindow(requireNotNull(row.deferred) { "Row has no deferred body" }, field, scalarOffset, decodeDispatcher)
+
+    /** One window of a stored body this presentation's rows point at: a deferred row's, or a skill's instructions. */
+    suspend fun readTextWindow(
+        reference: TimelineBodyReference,
+        field: TimelineSemanticField,
+        scalarOffset: Long,
+        decodeDispatcher: kotlinx.coroutines.CoroutineDispatcher,
     ): TimelineSemanticWindowResult = withContext(decodeDispatcher) {
         check(job.isActive) { "Presentation closed" }
         val result = TimelineSemanticBodyWindow.read(
-            reference = requireNotNull(row.deferred), field = field, scalarOffset = scalarOffset,
+            reference = reference, field = field, scalarOffset = scalarOffset,
             budget = TimelineSemanticBudget(maxInputBytes = 2L * 1024 * 1024),
-        ) { offset, size -> readChunk(row, offset, size) }
+        ) { offset, size -> readChunk(reference, offset, size) }
         check(job.isActive) { "Presentation closed" }
         result
     }
@@ -399,6 +412,7 @@ class CanonicalTimelinePresentation private constructor(
                 serverId = presentation.event.serverId,
                 residentEvents = residents,
                 liveNames = residents.liveNames() + item.messagesInOrder().mapNotNull { it.clientMessageId },
+                skillInstructionBodies = presentation.skillInstructionBodies,
             )
         }
         is TimelineSettledPresentation.Defer -> deferredRow(record)

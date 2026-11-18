@@ -18,6 +18,15 @@ import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.engine.VoiceMouth
 import com.letta.mobile.data.voice.engine.VoiceMouthEvent
 import com.letta.mobile.data.voice.loop.VoiceLoopState
+import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
+import com.letta.mobile.data.voice.vad.SpeechDetectorFactory
+import com.letta.mobile.data.voice.vad.ear.ScriptedSource
+import com.letta.mobile.data.voice.vad.ear.ScriptedTranscriber
+import com.letta.mobile.data.voice.vad.ear.VadEarConfig
+import com.letta.mobile.data.voice.vad.ear.VadVoiceEar
+import com.letta.mobile.data.voice.vad.ear.ValueDetector
+import com.letta.mobile.data.voice.vad.ear.heard
+import com.letta.mobile.data.voice.vad.ear.turn
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -25,6 +34,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -211,8 +221,41 @@ class VoiceSessionControlsTest {
                 emit(VoiceEarEvent.EndOfTurn(VoiceUtterance(VoiceText("said before"))))
             },
         )
-        val events = MutedEar(inner, muted).listen().toList()
+        val events = MutedEar(inner, muted) {}.listen().toList()
         assertEquals(3, events.size, "the loop is never left waiting for a turn that cannot end")
+    }
+
+    @Test
+    fun theServerEarStartingTheNextTurnClearsTheLastReply() = runTest {
+        val (inner, mouth) = mouthOf()
+        backgroundScope.launch { mouth.events.collect {} }
+        runCurrent()
+        mouth.speak(segment(1, "The last answer."))
+        inner.emitted.emit(VoiceMouthEvent.Started(SpeechSegmentId(1)))
+        inner.emitted.emit(VoiceMouthEvent.Finished(SpeechSegmentId(1)))
+        runCurrent()
+        assertEquals(1, controls.spokenProgress.value.size)
+        // The server ear over a scripted microphone, with no loop at all: a half-duplex loop still
+        // finishing its reply would not count this speech, so the ear itself must start the new reply.
+        val config = VadEarConfig(policy = EndOfTurnPolicy(), detectors = SpeechDetectorFactory { ValueDetector() })
+        val serverEar = VadVoiceEar(ScriptedSource(turn()), ScriptedTranscriber(heard("next question")), config)
+        val ear = controls.engines(serverEar, ScriptedMouth()).first
+        val heard = ear.listen().takeWhile { it !is VoiceEarEvent.SpeechStarted }.toList()
+        assertTrue(heard.none { it is VoiceEarEvent.EndOfTurn })
+        assertEquals(emptyList(), controls.spokenProgress.value, "the person's next turn started: the last reply is cleared")
+    }
+
+    @Test
+    fun anEarThatReportsOnlyWordsStartsTheTurnWithItsFirstPartial() = runTest {
+        var starts = 0
+        val heard = listOf(
+            VoiceEarEvent.PartialTranscript(VoiceText("next")),
+            VoiceEarEvent.PartialTranscript(VoiceText("next question")),
+            VoiceEarEvent.EndOfTurn(VoiceUtterance(VoiceText("next question"))),
+            VoiceEarEvent.PartialTranscript(VoiceText("and")),
+        )
+        MutedEar(ScriptedEar(heard), MutableStateFlow(false)) { starts++ }.listen().toList()
+        assertEquals(2, starts, "one start per turn, not per partial")
     }
 
     @Test

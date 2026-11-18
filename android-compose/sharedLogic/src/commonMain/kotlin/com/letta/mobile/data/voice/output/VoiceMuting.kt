@@ -52,8 +52,16 @@ internal class MutedFrameSource(private val source: AudioFrameSource, private va
  * An ear that ignores the person while [muted]: a turn that starts while muted is dropped whole
  * (its partial words, its end and its utterance), and the input level reads silent. A turn that
  * started before the mute goes through, so the loop never waits on a turn that cannot end.
+ *
+ * Every turn that goes through calls [turnStarted] when it starts (its speech start, or its first
+ * partial words from an ear that reports no start), whatever the loop makes of it: a loop still
+ * finishing a reply may not count speech that its half-duplex ear heard after the audio ended.
  */
-internal class MutedEar(private val ear: VoiceEar, private val muted: StateFlow<Boolean>) : VoiceEar by ear {
+internal class MutedEar(
+    private val ear: VoiceEar,
+    private val muted: StateFlow<Boolean>,
+    private val turnStarted: () -> Unit,
+) : VoiceEar by ear {
     override fun listen(): Flow<VoiceEarEvent> = flow {
         val filter = TurnFilter()
         ear.listen().collect { event -> filter.pass(event)?.let { emit(it) } }
@@ -62,14 +70,26 @@ internal class MutedEar(private val ear: VoiceEar, private val muted: StateFlow<
     /** Decides, event by event, what of one listen goes through. */
     private inner class TurnFilter {
         private var dropping = false
+        private var inTurn = false
 
         /** What to emit for [event], or null to drop it. */
         fun pass(event: VoiceEarEvent): VoiceEarEvent? {
             if (event == VoiceEarEvent.SpeechStarted) dropping = muted.value
             if (event is VoiceEarEvent.InputLevel) return if (muted.value) VoiceEarEvent.InputLevel(AudioLevel.Silent) else event
             val suppressed = dropping && event.belongsToTurn()
-            if (event.endsTurn()) dropping = false
+            if (!suppressed) noteStart(event)
+            if (event.endsTurn()) {
+                dropping = false
+                inTurn = false
+            }
             return event.takeUnless { suppressed }
+        }
+
+        private fun noteStart(event: VoiceEarEvent) {
+            val starts = event == VoiceEarEvent.SpeechStarted || event is VoiceEarEvent.PartialTranscript
+            if (!starts || inTurn) return
+            inTurn = true
+            turnStarted()
         }
     }
 

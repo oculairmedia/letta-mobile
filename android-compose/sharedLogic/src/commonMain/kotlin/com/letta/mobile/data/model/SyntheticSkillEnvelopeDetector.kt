@@ -18,6 +18,18 @@ object SyntheticSkillEnvelopeDetector {
         return hasFrontmatterSignal(text) || hasArgumentsClosingSignal(text) || hasLiteralSkillSignal(text)
     }
 
+    /**
+     * Whether [head], the opening of a message's text whose end may be cut off, opens as a skill
+     * envelope: an opening tag on its first line (`<skill_content …>`, `<skill …>` or a bare slug tag)
+     * and then `name:` and `description:` frontmatter. Stricter than [isSyntheticSkillEnvelope],
+     * which also reads the text's end: a head alone must not hide an ordinary message.
+     */
+    fun opensSkillEnvelope(head: String): Boolean {
+        val first = head.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() } ?: return false
+        val tagged = openingSlugTag.matches(first) || literalSkillOpening.find(first)?.range?.first == 0
+        return tagged && hasFrontmatterSignal(head.trim())
+    }
+
     fun isSyntheticSkillEnvelope(message: LettaMessage): Boolean =
         isSyntheticSkillEnvelope(role = "user", content = message.textContentOrNull())
 
