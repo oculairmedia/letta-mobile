@@ -108,6 +108,9 @@ private fun KnobField(knob: KnobValue, onValue: (Float) -> Unit, modifier: Modif
     )
 }
 
+/** A knob's current [value], its [range], and whether it is [whole]. */
+private data class KnobValue(val value: Float, val range: ClosedFloatingPointRange<Float>, val whole: Boolean)
+
 /**
  * One tunable number: its [label], its slider's [range], and how it reads and writes a tuning. A
  * [whole] knob (a count of frames, nodes or decisions) writes only whole numbers.
