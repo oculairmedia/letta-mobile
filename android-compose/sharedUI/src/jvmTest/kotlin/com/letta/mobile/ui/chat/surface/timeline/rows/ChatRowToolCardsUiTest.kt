@@ -28,7 +28,6 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.runDesktopComposeUiTest
-import androidx.compose.ui.text.TextLayoutResult
 import com.letta.mobile.data.messaging.AgentMessageDeliveryState
 import com.letta.mobile.data.messaging.AgentMessageDirection
 import com.letta.mobile.data.messaging.AgentMessageProvenance
@@ -40,7 +39,6 @@ import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.components.LETTA_TOOL_CARD_LINE_TAG
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LocalLettaHost
-import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.SharedMaterialTheme
@@ -48,7 +46,6 @@ import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * A message sent to another agent and a created subagent draw as the shared compact card: the

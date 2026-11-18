@@ -36,7 +36,6 @@ import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.math.abs
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** Run disclosure geometry follows the row's available width on either host idiom (letta-mobile-m5frz). */
