@@ -271,6 +271,10 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: python3 -m unittest discover -s scripts/ci -p 'test_gate_hygiene.py' -v
 
+      - name: Test hang diagnostics omit process argv
+        working-directory: ${{ github.workspace }}
+        run: python3 -m unittest discover -s scripts/ci -p 'test_gradle_hang_watchdog.py' -v
+
       - name: Enforce tree hygiene
         if: github.event_name == 'pull_request'
         working-directory: ${{ github.workspace }}
