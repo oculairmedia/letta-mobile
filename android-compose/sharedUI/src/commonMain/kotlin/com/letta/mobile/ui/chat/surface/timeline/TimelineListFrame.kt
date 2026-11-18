@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.theme.ChatRowSpacing
+import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.surface.touchStyle
@@ -286,7 +287,7 @@ internal fun TimelineItemRow(
  */
 @Composable
 internal fun rememberRowSpacing(item: ChatRenderItem, older: ChatRenderItem?, newer: ChatRenderItem?): Pair<Dp, Boolean> {
-    val leading = timelineLeadingSpace(item, older)
+    val leading = timelineLeadingSpace(item, older, pointer = !touchStyle())
     val continued = newer != null && continuesNotice(item, newer)
     return remember(leading, continued) { leading to continued }
 }
@@ -300,7 +301,37 @@ private fun continuesNotice(notice: ChatRenderItem, next: ChatRenderItem): Boole
  * lone reasoning or tool row, or the continuation of one speaker's group, takes the tight beat;
  * anything that starts a new speaker or a new run takes the section break.
  */
-internal fun timelineLeadingSpace(item: ChatRenderItem, older: ChatRenderItem? = null): Dp = when {
+internal fun timelineLeadingSpace(item: ChatRenderItem, older: ChatRenderItem? = null, pointer: Boolean = false): Dp {
+    val space = ownLeadingSpace(item, older)
+    // On a pointer host the prose above already reserves its hover-actions line: that line is part
+    // of this row's break, not something the break is added under.
+    if (!pointer || older?.endsWithReplyActionsLine() != true) return space
+    return (space - ChatRowSpacing.replyActionsLine).coerceAtLeast(0.dp)
+}
+
+/**
+ * Whether [this] row ends with prose (an assistant reply with nothing under its words), the one
+ * place a pointer host reserves the hover-actions line ([ChatRowSpacing.replyActionsLine]).
+ */
+private fun ChatRenderItem.endsWithReplyActionsLine(): Boolean {
+    val last = when (this) {
+        is ChatRenderItem.Single -> message
+        is ChatRenderItem.RunBlock -> messages.lastOrNull()?.first
+    } ?: return false
+    return last.isReply() && last.content.isNotBlank() && last.endsAtItsWords()
+}
+
+/** An assistant's own words: not a reasoning, not an error. */
+private fun UiMessage.isReply(): Boolean = role == "assistant" && !isReasoning && !isError
+
+/** Nothing drawn under the message's words: no calls, cards, images, artifacts or notification. */
+private fun UiMessage.endsAtItsWords(): Boolean {
+    val noCards = listOf(subagentNotification, generatedUi, approvalRequest, approvalResponse).all { it == null }
+    val noMedia = attachments.isEmpty() && artifacts.isEmpty()
+    return toolCalls.isNullOrEmpty() && noCards && noMedia
+}
+
+private fun ownLeadingSpace(item: ChatRenderItem, older: ChatRenderItem?): Dp = when {
     // The work a completed report woke sits under the report's label as a run's first step sits under
     // its header: the report already gave up its floor, so no leading space either.
     older != null && continuesNotice(older, item) -> 0.dp

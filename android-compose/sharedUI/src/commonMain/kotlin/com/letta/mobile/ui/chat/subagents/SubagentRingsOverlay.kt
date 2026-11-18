@@ -55,7 +55,9 @@ private fun nowMillis(): Long = Clock.System.now().toEpochMilliseconds()
 
 /**
  * The active-subagent rings over a chat page's timeline, for a host that
- * supplies active [entries] (desktop): a ring opens its todo sheet (todos through [loader]) with
+ * supplies active [entries] (desktop): one ring per run that has a plan (its TodoWrite progress is
+ * the ring's fill; a run without a plan has no ring, as the chips and the roster already list it),
+ * and a ring opens its todo sheet (todos through [loader]) with
  * the conversation's separate full-history [rosterEntries] under it. [onViewConversation] null hides "view
  * conversation" (a host that cannot open a subagent's conversation).
  */
@@ -67,7 +69,11 @@ fun SubagentRingsOverlay(
     modifier: Modifier = Modifier,
     onViewConversation: ((agentId: String, conversationId: String) -> Unit)? = null,
 ) {
-    val snapshot = remember(entries) { entries.map { it.toActiveSubagent() }.toImmutableList() }
+    // A ring only for a run with a plan: its fill is the plan's progress, which nothing else shows.
+    // A run without one would be a bare spinner repeating the agent-task chip and the roster.
+    val snapshot = remember(entries) {
+        entries.map { it.toActiveSubagent() }.filter { it.hasDeterminateProgress }.toImmutableList()
+    }
     val rings = rememberSubagentRingsState(snapshot)
     var target by remember { mutableStateOf<SubagentTodoSheetTarget?>(null) }
     Box(modifier.fillMaxSize()) {

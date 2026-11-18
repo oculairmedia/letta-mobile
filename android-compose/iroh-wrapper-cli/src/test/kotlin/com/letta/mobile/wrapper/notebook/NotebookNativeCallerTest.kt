@@ -100,25 +100,32 @@ class NotebookNativeCallerTest {
             bob.connect(host, IrohNodeEndpoint.DEFAULT_ALPN).use { bobConnection ->
                 val aliceControl = authenticate(aliceConnection)
                 val bobControl = authenticate(bobConnection)
-                val args = listOf("--file", root.resolve("grants.json").toString(),
-                    "--principal", aliceId, "--document", id)
-                assertEquals("denied", call(aliceControl, "notebook.reference.resolve", id, bobId).status())
-                NotebookGrantCommand().parse(args + listOf("--read", "--reference"))
-                assertEquals("denied", call(bobControl, "notebook.reference.resolve", id, aliceId).status())
-                assertEquals("found", call(aliceControl, "notebook.reference.resolve", id, bobId).status())
-                assertEquals("denied", call(aliceControl, "notebook.reference.resolve", otherId, aliceId).status())
-                assertEquals("denied", call(aliceControl, "notebook.note.save", id, aliceId).status())
-                assertEquals("", notebooks.read(storageId)?.markdown)
-                NotebookGrantCommand().parse(args + listOf("--read", "--edit", "--reference"))
-                assertEquals("found", call(aliceControl, "notebook.note.open", id, bobId).status())
-                assertEquals("saved", streamCall(aliceConnection, "notebook.note.save", id, bobId).status())
-                assertEquals("native edit", notebooks.read(storageId)?.markdown)
-                NotebookGrantCommand().parse(args + "--revoke")
-                assertEquals("denied", streamCall(aliceConnection, "notebook.note.save", id, aliceId).status())
-                assertEquals("denied", call(aliceControl, "notebook.reference.resolve", id, aliceId).status())
-                assertEquals("native edit", notebooks.read(storageId)?.markdown)
-                Files.writeString(root.resolve("grants.json"), "{corrupt")
-                assertEquals("unavailable", streamCall(aliceConnection, "notebook.reference.resolve", id, aliceId).status())
+                // The host ends the connection when its control stream ends. Keep both native
+                // streams reachable through the last RPC, including calls on separate streams.
+                try {
+                    val args = listOf("--file", root.resolve("grants.json").toString(),
+                        "--principal", aliceId, "--document", id)
+                    assertEquals("denied", call(aliceControl, "notebook.reference.resolve", id, bobId).status())
+                    NotebookGrantCommand().parse(args + listOf("--read", "--reference"))
+                    assertEquals("denied", call(bobControl, "notebook.reference.resolve", id, aliceId).status())
+                    assertEquals("found", call(aliceControl, "notebook.reference.resolve", id, bobId).status())
+                    assertEquals("denied", call(aliceControl, "notebook.reference.resolve", otherId, aliceId).status())
+                    assertEquals("denied", call(aliceControl, "notebook.note.save", id, aliceId).status())
+                    assertEquals("", notebooks.read(storageId)?.markdown)
+                    NotebookGrantCommand().parse(args + listOf("--read", "--edit", "--reference"))
+                    assertEquals("found", call(aliceControl, "notebook.note.open", id, bobId).status())
+                    assertEquals("saved", streamCall(aliceConnection, "notebook.note.save", id, bobId).status())
+                    assertEquals("native edit", notebooks.read(storageId)?.markdown)
+                    NotebookGrantCommand().parse(args + "--revoke")
+                    assertEquals("denied", streamCall(aliceConnection, "notebook.note.save", id, aliceId).status())
+                    assertEquals("denied", call(aliceControl, "notebook.reference.resolve", id, aliceId).status())
+                    assertEquals("native edit", notebooks.read(storageId)?.markdown)
+                    Files.writeString(root.resolve("grants.json"), "{corrupt")
+                    assertEquals("unavailable", streamCall(aliceConnection, "notebook.reference.resolve", id, aliceId).status())
+                } finally {
+                    aliceControl.close()
+                    bobControl.close()
+                }
             }
         }
     }
