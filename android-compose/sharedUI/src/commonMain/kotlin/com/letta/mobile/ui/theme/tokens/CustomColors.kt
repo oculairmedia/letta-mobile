@@ -50,6 +50,12 @@ data class CustomColors(
     val agentBColor: Color = Color.Unspecified,
     val agentCColor: Color = Color.Unspecified,
 
+    // Voice mode's two voices: the person (cool) and the agent (warm), for the voice card's speaker
+    // glyph, the prompt's outline and the ambient glow. Each is strong enough for a hairline on its
+    // theme's surface.
+    val voiceYouColor: Color = Color.Unspecified,
+    val voiceAgentColor: Color = Color.Unspecified,
+
     // Muted section captions (darker than onSurfaceVariant — Phase 6).
     val onSurfaceMutedColor: Color = Color.Unspecified,
 

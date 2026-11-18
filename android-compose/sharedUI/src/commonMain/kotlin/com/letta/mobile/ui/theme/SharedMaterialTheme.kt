@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -136,6 +137,8 @@ fun lettaCustomColors(scheme: ColorScheme): CustomColors =
         onSuccessColor = Color(0xFF06302B),
         runningColor = Color(0xFFE0A458),
         onRunningColor = Color(0xFF2B1B00),
+        voiceYouColor = Color(if (scheme.isLight()) LettaColorTokens.LIGHT_VOICE_YOU else LettaColorTokens.DARK_VOICE_YOU),
+        voiceAgentColor = Color(if (scheme.isLight()) LettaColorTokens.LIGHT_VOICE_AGENT else LettaColorTokens.DARK_VOICE_AGENT),
         agentAColor = Color(0xFF8B7CF0),
         agentBColor = Color(0xFF4C9AFF),
         agentCColor = Color(0xFFE36FB3),
@@ -205,6 +208,11 @@ val SharedShapes: Shapes = Shapes(
  * (the user's bubble, a selected row), not content, so it sits far below the content alpha floor.
  */
 private const val LIGHT_PRIMARY_CONTAINER_TINT = 0.16f
+
+/** Whether [this] is a light scheme: its surface is light. */
+private fun ColorScheme.isLight(): Boolean = surface.luminance() > LIGHT_SURFACE_LUMINANCE
+
+private const val LIGHT_SURFACE_LUMINANCE = 0.5f
 
 /** How strongly disabled text keeps `onSurface` (customColors.textDisabled). */
 private const val TEXT_DISABLED_ALPHA = 0.5f

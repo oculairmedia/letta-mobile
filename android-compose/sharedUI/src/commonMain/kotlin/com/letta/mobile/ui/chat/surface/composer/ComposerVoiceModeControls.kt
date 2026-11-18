@@ -17,6 +17,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +39,8 @@ import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoiceUserAction
 import com.letta.mobile.data.voice.session.VoiceModeState
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.voice.VoiceCardConversation
 import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.chat.voice.VoiceModeHandle
 import com.letta.mobile.ui.components.LettaInlineNotice
@@ -61,13 +64,8 @@ import com.letta.mobile.sharedui.resources.voice_mode_state_thinking
 import com.letta.mobile.sharedui.resources.voice_mode_interrupt
 import com.letta.mobile.sharedui.resources.voice_mode_stop
 import com.letta.mobile.sharedui.resources.voice_notice_handover
-import com.letta.mobile.sharedui.resources.voice_status_hearing
-import com.letta.mobile.sharedui.resources.voice_status_listening
 import com.letta.mobile.sharedui.resources.voice_status_permission
 import com.letta.mobile.sharedui.resources.voice_status_setup
-import com.letta.mobile.sharedui.resources.voice_status_speaking
-import com.letta.mobile.sharedui.resources.voice_status_speaking_press
-import com.letta.mobile.sharedui.resources.voice_status_thinking
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.StringResource
@@ -106,47 +104,38 @@ internal fun VoiceModeButton(handle: VoiceModeHandle, size: Dp, iconSize: Dp, mo
 }
 
 /**
- * What voice mode is doing, as the prompt field's placeholder while voice mode is on and the field is
- * empty ("Listening…", "Hearing you…", "Thinking…", "Speaking… — press to interrupt"); null while it
- * is off or waits on something (the notice above the card says what), so the field keeps its own
- * placeholder. The prompt's outline carries the state when the person has typed.
+ * Voice mode's place above the prompt: while it runs, the voice card (whose turn it is, the person's
+ * words, the reply as it is spoken, a failed utterance with Retry or Set up) under the hand-over
+ * notice when there is one; otherwise its notice when something needs the person.
  */
 @Composable
-internal fun voicePlaceholder(): String? {
-    val handle = LocalVoiceMode.current ?: return null
+internal fun ComposerVoiceSlot(uiState: ChatUiState) {
+    val handle = LocalVoiceMode.current ?: return
     val state by handle.state.collectAsState()
-    val byVoice by handle.controller.bargeInByVoice.collectAsState()
-    val text = when (state) {
-        VoiceModeState.Listening, is VoiceModeState.TurnFailed -> Res.string.voice_status_listening
-        VoiceModeState.Hearing -> Res.string.voice_status_hearing
-        VoiceModeState.WaitingForReply -> Res.string.voice_status_thinking
-        VoiceModeState.Speaking -> speakingHint(byVoice)
-        else -> null
-    } ?: return null
-    return stringResource(text)
+    if (!state.active) return ComposerVoiceNotice()
+    HandoverNotice(handle)
+    val reply = remember(uiState.messages) { latestReplyText(uiState) }
+    VoiceModeCard(
+        handle = handle,
+        conversation = VoiceCardConversation(uiState.agentName, reply),
+        modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
+    )
 }
 
-/**
- * The words the person is saying, as voice mode recognises them, while it listens or hears them;
- * null otherwise (and with an ear that does not recognise as it hears), so the status shows.
- */
-@Composable
-internal fun voicePartial(): String? {
-    val handle = LocalVoiceMode.current ?: return null
-    val state by handle.state.collectAsState()
-    val words by handle.partialTranscript.collectAsState()
-    val hearing = state == VoiceModeState.Hearing || state == VoiceModeState.Listening
-    return words?.value?.takeIf { hearing && it.isNotBlank() }
-}
+/** The newest reply's text: what voice mode speaks while the controller publishes no spoken pieces. */
+private fun latestReplyText(state: ChatUiState): String? =
+    state.messages.lastOrNull { it.role == ASSISTANT && !it.isReasoning && it.content.isNotBlank() }?.content
+
+private const val ASSISTANT = "assistant"
 
 /**
- * Voice mode's notice in the composer's notice slot above the prompt card, when something needs the
- * person: the failure or the missing setup, permission or conversation, with the action that helps
- * (Retry, Set up) and, where voice mode has stopped, a dismiss that turns it off. The page's own
- * inline notice ([LettaInlineNotice]); nothing while voice mode is off or simply running.
+ * Voice mode's notice in the composer's notice slot above the prompt card, when voice mode has stopped
+ * on something that needs the person: the failure or the missing setup, permission or conversation,
+ * with the action that helps (Retry, Set up) and a dismiss that turns it off. The page's own inline
+ * notice ([LettaInlineNotice]); nothing while voice mode is off or running (the voice card shows then).
  */
 @Composable
-internal fun ComposerVoiceNotice() {
+private fun ComposerVoiceNotice() {
     val handle = LocalVoiceMode.current ?: return
     val state by handle.state.collectAsState()
     val notice = voiceNotice(state) ?: return HandoverNotice(handle)
@@ -207,20 +196,12 @@ private enum class NoticeAction(val label: StringResource) {
 @Immutable
 private class VoiceNotice(val text: StringResource, val action: NoticeAction?, val dismissible: Boolean)
 
-/** The notice for [state], or null where there is nothing to act on. */
+/** The notice for [state], or null where there is nothing to act on (a failed utterance shows in the voice card). */
 private fun voiceNotice(state: VoiceModeState): VoiceNotice? = when (state) {
-    is VoiceModeState.TurnFailed -> VoiceNotice(voiceErrorText(state.code), turnFailureAction(state), dismissible = false)
     is VoiceModeState.Error -> VoiceNotice(voiceErrorText(state.code), errorAction(state.code), dismissible = true)
     is VoiceModeState.NeedsSetup -> VoiceNotice(Res.string.voice_status_setup, NoticeAction.SETUP, dismissible = true)
     VoiceModeState.NeedsMicPermission -> VoiceNotice(Res.string.voice_status_permission, NoticeAction.PRESS_AGAIN, dismissible = true)
     VoiceModeState.NeedsConversation -> VoiceNotice(Res.string.voice_error_no_conversation, null, dismissible = true)
-    else -> null
-}
-
-/** Voice mode listens on after a failed utterance: Retry sends it again; pressing the button would stop voice mode. */
-private fun turnFailureAction(state: VoiceModeState.TurnFailed): NoticeAction? = when {
-    state.retryable -> NoticeAction.RETRY
-    state.code.action == VoiceUserAction.OPEN_SETTINGS -> NoticeAction.SETUP
     else -> null
 }
 
@@ -229,10 +210,6 @@ private fun errorAction(code: VoiceErrorCode): NoticeAction = when (code.action)
     VoiceUserAction.OPEN_SETTINGS -> NoticeAction.SETUP
     VoiceUserAction.NONE -> NoticeAction.PRESS_AGAIN
 }
-
-/** The speaking hint: talking interrupts only where the microphone path allows it; elsewhere a press does. */
-private fun speakingHint(byVoice: Boolean): StringResource =
-    if (byVoice) Res.string.voice_status_speaking else Res.string.voice_status_speaking_press
 
 /** What a press of the button does now: stop the reply and listen while speaking, else start or stop. */
 private fun buttonDescription(state: VoiceModeState): StringResource = when {

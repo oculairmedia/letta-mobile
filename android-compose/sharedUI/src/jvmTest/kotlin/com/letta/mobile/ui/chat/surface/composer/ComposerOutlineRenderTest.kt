@@ -109,10 +109,10 @@ class ComposerOutlineRenderTest {
         waitForIdle()
         val workingEnergy = onRoot().captureToImage().toPixelMap().energy()
         listOf(
-            Triple(VoiceModeState.Listening, ComposerOutlineMode.Listening, VoiceGlowRole.You),
-            Triple(VoiceModeState.Hearing, ComposerOutlineMode.Listening, VoiceGlowRole.You),
+            Triple(VoiceModeState.Listening, ComposerOutlineMode.Voice, VoiceGlowRole.You),
+            Triple(VoiceModeState.Hearing, ComposerOutlineMode.Voice, VoiceGlowRole.You),
             Triple(VoiceModeState.WaitingForReply, ComposerOutlineMode.Working, VoiceGlowRole.Agent),
-            Triple(VoiceModeState.Speaking, ComposerOutlineMode.Working, VoiceGlowRole.Agent),
+            Triple(VoiceModeState.Speaking, ComposerOutlineMode.Voice, VoiceGlowRole.Agent),
             Triple(VoiceModeState.Error(VoiceErrorCode.ENGINE_FAILED), ComposerOutlineMode.Error, VoiceGlowRole.Error),
         ).forEach { (state, mode, role) ->
             voice.value = state
@@ -122,7 +122,7 @@ class ComposerOutlineRenderTest {
             assertEquals(role, semantics[VoiceOutlineRoleKey])
             val energy = onRoot().captureToImage().toPixelMap().energy()
             assertTrue(energy > 0f, "$mode draws an outline")
-            if (role == VoiceGlowRole.Agent) assertEquals(workingEnergy, energy, "working never stacks voice strokes on the beam")
+            if (mode == ComposerOutlineMode.Working) assertEquals(workingEnergy, energy, "working never stacks voice strokes on the beam")
         }
     }
 

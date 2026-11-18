@@ -77,6 +77,7 @@ private class SkiaAmbientGlowShader(private val builder: RuntimeShaderBuilder) :
         builder.uniform("uBandTop", uniforms.band.top)
         builder.uniform("uBandPeak", uniforms.band.peak)
         builder.uniform("uColor", tint.red, tint.green, tint.blue, tint.alpha * uniforms.gain)
+        builder.uniform("uDotGrid", uniforms.dotGrid)
         // Uniforms bake in at makeShader time, so one native Shader per frame; released as soon
         // as the draw that used it returns rather than left to the cleaner.
         val frameShader = builder.makeShader(null)

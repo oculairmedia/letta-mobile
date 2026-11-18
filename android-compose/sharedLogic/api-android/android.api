@@ -75419,12 +75419,17 @@ public final class com/letta/mobile/ui/ambient/AmbientShaderStylesKt {
 public final class com/letta/mobile/ui/ambient/AmbientVoice {
 	public static final field Companion Lcom/letta/mobile/ui/ambient/AmbientVoice$Companion;
 	public static final field RESTING_SHARE F
-	public fun <init> (Lcom/letta/mobile/ui/ambient/AmbientVoiceRole;ILkotlin/jvm/functions/Function0;)V
+	public static final field VOICE_DOT_GRID F
+	public fun <init> (Lcom/letta/mobile/ui/ambient/AmbientVoiceRole;ILkotlin/jvm/functions/Function0;Ljava/lang/Integer;F)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/ambient/AmbientVoiceRole;ILkotlin/jvm/functions/Function0;Ljava/lang/Integer;FILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun envelope (F)F
+	public final fun getAgentTintArgb ()Ljava/lang/Integer;
+	public final fun getDotGrid ()F
 	public final fun getLevel ()Lkotlin/jvm/functions/Function0;
 	public final fun getRole ()Lcom/letta/mobile/ui/ambient/AmbientVoiceRole;
 	public final fun getYouTintArgb ()I
 	public final fun streamEnergy (F)F
+	public final fun tintArgb ()Ljava/lang/Integer;
 }
 
 public final class com/letta/mobile/ui/ambient/AmbientVoice$Companion {
@@ -77960,6 +77965,8 @@ public final class com/letta/mobile/ui/theme/LettaColorTokens {
 	public static final field DARK_SURFACE_CONTAINER_LOW J
 	public static final field DARK_SURFACE_CONTAINER_LOWEST J
 	public static final field DARK_SURFACE_VARIANT J
+	public static final field DARK_VOICE_AGENT J
+	public static final field DARK_VOICE_YOU J
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaColorTokens;
 	public static final field LIGHT_BACKGROUND J
 	public static final field LIGHT_ERROR J
@@ -77971,6 +77978,8 @@ public final class com/letta/mobile/ui/theme/LettaColorTokens {
 	public static final field LIGHT_SURFACE J
 	public static final field LIGHT_SURFACE_CONTAINER J
 	public static final field LIGHT_SURFACE_VARIANT J
+	public static final field LIGHT_VOICE_AGENT J
+	public static final field LIGHT_VOICE_YOU J
 	public static final field TEAL_ACCENT J
 }
 

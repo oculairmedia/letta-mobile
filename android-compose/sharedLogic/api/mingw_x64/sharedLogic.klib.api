@@ -73033,8 +73033,12 @@ final class com.letta.mobile.ui.ambient/AmbientMotionSpec { // com.letta.mobile.
 }
 
 final class com.letta.mobile.ui.ambient/AmbientVoice { // com.letta.mobile.ui.ambient/AmbientVoice|null[0]
-    constructor <init>(com.letta.mobile.ui.ambient/AmbientVoiceRole, kotlin/Int, kotlin/Function0<kotlin/Float>) // com.letta.mobile.ui.ambient/AmbientVoice.<init>|<init>(com.letta.mobile.ui.ambient.AmbientVoiceRole;kotlin.Int;kotlin.Function0<kotlin.Float>){}[0]
+    constructor <init>(com.letta.mobile.ui.ambient/AmbientVoiceRole, kotlin/Int, kotlin/Function0<kotlin/Float>, kotlin/Int? = ..., kotlin/Float = ...) // com.letta.mobile.ui.ambient/AmbientVoice.<init>|<init>(com.letta.mobile.ui.ambient.AmbientVoiceRole;kotlin.Int;kotlin.Function0<kotlin.Float>;kotlin.Int?;kotlin.Float){}[0]
 
+    final val agentTintArgb // com.letta.mobile.ui.ambient/AmbientVoice.agentTintArgb|{}agentTintArgb[0]
+        final fun <get-agentTintArgb>(): kotlin/Int? // com.letta.mobile.ui.ambient/AmbientVoice.agentTintArgb.<get-agentTintArgb>|<get-agentTintArgb>(){}[0]
+    final val dotGrid // com.letta.mobile.ui.ambient/AmbientVoice.dotGrid|{}dotGrid[0]
+        final fun <get-dotGrid>(): kotlin/Float // com.letta.mobile.ui.ambient/AmbientVoice.dotGrid.<get-dotGrid>|<get-dotGrid>(){}[0]
     final val level // com.letta.mobile.ui.ambient/AmbientVoice.level|{}level[0]
         final fun <get-level>(): kotlin/Function0<kotlin/Float> // com.letta.mobile.ui.ambient/AmbientVoice.level.<get-level>|<get-level>(){}[0]
     final val role // com.letta.mobile.ui.ambient/AmbientVoice.role|{}role[0]
@@ -73044,10 +73048,13 @@ final class com.letta.mobile.ui.ambient/AmbientVoice { // com.letta.mobile.ui.am
 
     final fun envelope(kotlin/Float): kotlin/Float // com.letta.mobile.ui.ambient/AmbientVoice.envelope|envelope(kotlin.Float){}[0]
     final fun streamEnergy(kotlin/Float): kotlin/Float // com.letta.mobile.ui.ambient/AmbientVoice.streamEnergy|streamEnergy(kotlin.Float){}[0]
+    final fun tintArgb(): kotlin/Int? // com.letta.mobile.ui.ambient/AmbientVoice.tintArgb|tintArgb(){}[0]
 
     final object Companion { // com.letta.mobile.ui.ambient/AmbientVoice.Companion|null[0]
         final const val RESTING_SHARE // com.letta.mobile.ui.ambient/AmbientVoice.Companion.RESTING_SHARE|{}RESTING_SHARE[0]
             final fun <get-RESTING_SHARE>(): kotlin/Float // com.letta.mobile.ui.ambient/AmbientVoice.Companion.RESTING_SHARE.<get-RESTING_SHARE>|<get-RESTING_SHARE>(){}[0]
+        final const val VOICE_DOT_GRID // com.letta.mobile.ui.ambient/AmbientVoice.Companion.VOICE_DOT_GRID|{}VOICE_DOT_GRID[0]
+            final fun <get-VOICE_DOT_GRID>(): kotlin/Float // com.letta.mobile.ui.ambient/AmbientVoice.Companion.VOICE_DOT_GRID.<get-VOICE_DOT_GRID>|<get-VOICE_DOT_GRID>(){}[0]
     }
 }
 
@@ -82030,6 +82037,10 @@ final object com.letta.mobile.ui.theme/LettaColorTokens { // com.letta.mobile.ui
         final fun <get-DARK_SURFACE_CONTAINER_LOWEST>(): kotlin/Long // com.letta.mobile.ui.theme/LettaColorTokens.DARK_SURFACE_CONTAINER_LOWEST.<get-DARK_SURFACE_CONTAINER_LOWEST>|<get-DARK_SURFACE_CONTAINER_LOWEST>(){}[0]
     final const val DARK_SURFACE_VARIANT // com.letta.mobile.ui.theme/LettaColorTokens.DARK_SURFACE_VARIANT|{}DARK_SURFACE_VARIANT[0]
         final fun <get-DARK_SURFACE_VARIANT>(): kotlin/Long // com.letta.mobile.ui.theme/LettaColorTokens.DARK_SURFACE_VARIANT.<get-DARK_SURFACE_VARIANT>|<get-DARK_SURFACE_VARIANT>(){}[0]
+    final const val DARK_VOICE_AGENT // com.letta.mobile.ui.theme/LettaColorTokens.DARK_VOICE_AGENT|{}DARK_VOICE_AGENT[0]
+        final fun <get-DARK_VOICE_AGENT>(): kotlin/Long // com.letta.mobile.ui.theme/LettaColorTokens.DARK_VOICE_AGENT.<get-DARK_VOICE_AGENT>|<get-DARK_VOICE_AGENT>(){}[0]
+    final const val DARK_VOICE_YOU // com.letta.mobile.ui.theme/LettaColorTokens.DARK_VOICE_YOU|{}DARK_VOICE_YOU[0]
+        final fun <get-DARK_VOICE_YOU>(): kotlin/Long // com.letta.mobile.ui.theme/LettaColorTokens.DARK_VOICE_YOU.<get-DARK_VOICE_YOU>|<get-DARK_VOICE_YOU>(){}[0]
     final const val LIGHT_BACKGROUND // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_BACKGROUND|{}LIGHT_BACKGROUND[0]
         final fun <get-LIGHT_BACKGROUND>(): kotlin/Long // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_BACKGROUND.<get-LIGHT_BACKGROUND>|<get-LIGHT_BACKGROUND>(){}[0]
     final const val LIGHT_ERROR // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_ERROR|{}LIGHT_ERROR[0]
@@ -82050,6 +82061,10 @@ final object com.letta.mobile.ui.theme/LettaColorTokens { // com.letta.mobile.ui
         final fun <get-LIGHT_SURFACE_CONTAINER>(): kotlin/Long // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_SURFACE_CONTAINER.<get-LIGHT_SURFACE_CONTAINER>|<get-LIGHT_SURFACE_CONTAINER>(){}[0]
     final const val LIGHT_SURFACE_VARIANT // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_SURFACE_VARIANT|{}LIGHT_SURFACE_VARIANT[0]
         final fun <get-LIGHT_SURFACE_VARIANT>(): kotlin/Long // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_SURFACE_VARIANT.<get-LIGHT_SURFACE_VARIANT>|<get-LIGHT_SURFACE_VARIANT>(){}[0]
+    final const val LIGHT_VOICE_AGENT // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_VOICE_AGENT|{}LIGHT_VOICE_AGENT[0]
+        final fun <get-LIGHT_VOICE_AGENT>(): kotlin/Long // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_VOICE_AGENT.<get-LIGHT_VOICE_AGENT>|<get-LIGHT_VOICE_AGENT>(){}[0]
+    final const val LIGHT_VOICE_YOU // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_VOICE_YOU|{}LIGHT_VOICE_YOU[0]
+        final fun <get-LIGHT_VOICE_YOU>(): kotlin/Long // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_VOICE_YOU.<get-LIGHT_VOICE_YOU>|<get-LIGHT_VOICE_YOU>(){}[0]
     final const val TEAL_ACCENT // com.letta.mobile.ui.theme/LettaColorTokens.TEAL_ACCENT|{}TEAL_ACCENT[0]
         final fun <get-TEAL_ACCENT>(): kotlin/Long // com.letta.mobile.ui.theme/LettaColorTokens.TEAL_ACCENT.<get-TEAL_ACCENT>|<get-TEAL_ACCENT>(){}[0]
 }

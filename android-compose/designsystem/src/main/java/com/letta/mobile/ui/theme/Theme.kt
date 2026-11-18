@@ -375,6 +375,8 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
         harmonizedSuccessContainer = harmonizedSuccessContainer,
         runningColor = Color(if (isLightTheme) 0xFFB26A00 else 0xFFE0A458),
         onRunningColor = Color(if (isLightTheme) 0xFFFFFFFF else 0xFF2B1B00),
+        voiceYouColor = Color(if (isLightTheme) LettaColorTokens.LIGHT_VOICE_YOU else LettaColorTokens.DARK_VOICE_YOU),
+        voiceAgentColor = Color(if (isLightTheme) LettaColorTokens.LIGHT_VOICE_AGENT else LettaColorTokens.DARK_VOICE_AGENT),
         onSuccessColor = Color(if (isLightTheme) 0xFFFFFFFF else 0xFF06302B),
         agentAColor = Color(if (isLightTheme) 0xFF6B4EE6 else 0xFF8B7CF0),
         agentBColor = Color(if (isLightTheme) 0xFF1A73E8 else 0xFF4C9AFF),

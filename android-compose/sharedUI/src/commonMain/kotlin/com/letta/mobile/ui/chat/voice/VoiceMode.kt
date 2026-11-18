@@ -65,8 +65,9 @@ fun rememberVoiceSetupAccess(settings: SecureSettingsStore): VoiceSetupAccess? {
 
 /**
  * A page's voice mode: its controller, what the chat bar shows of it (its state, the smoothed
- * microphone and playback levels, the words heard so far and a hand-over to the server; the
- * controller's own unless a test pins them) and whether the Voice settings pane is open over the chat.
+ * microphone and playback levels, the words heard so far, the voice card's feed and a hand-over to
+ * the server; the controller's own unless a test pins them) and whether the Voice settings pane is
+ * open over the chat.
  */
 @Stable
 class VoiceModeHandle internal constructor(
@@ -76,8 +77,13 @@ class VoiceModeHandle internal constructor(
     internal val microphoneLevel: StateFlow<Float> = controller.microphoneLevel,
     internal val playbackLevel: StateFlow<Float> = controller.playbackLevel,
     internal val partialTranscript: StateFlow<VoiceText?> = controller.partialTranscript,
+    /** What the voice card reads beyond the state: the reply's spoken pieces and the controls it offers. */
+    internal val cardFeed: VoiceCardFeed = controllerVoiceCardFeed(controller),
 ) {
     internal val handover: StateFlow<LocalHandoverReason?> = controller.handover
+
+    /** Whether the person folded the voice card down to its header line; kept across voice sessions. */
+    internal var cardCollapsed: Boolean by mutableStateOf(false)
 
     /** Whether the person closed this session's hand-over notice; reset when the session ends. */
     internal var handoverClosed: Boolean by mutableStateOf(false)

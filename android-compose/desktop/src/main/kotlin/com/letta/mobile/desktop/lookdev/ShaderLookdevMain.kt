@@ -384,6 +384,9 @@ private fun PreviewPane(
             if (compiled.declares("uStreamEnergy")) {
                 active.uniform("uStreamEnergy", 0f)
             }
+            if (compiled.declares("uDotGrid")) {
+                active.uniform("uDotGrid", 0f)
+            }
             active.uniform("uColor", state.tint.red, state.tint.green, state.tint.blue, state.alpha)
             if (compiled.declares("uInvert")) {
                 active.uniform("uInvert", state.invert)

@@ -20,6 +20,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
@@ -333,6 +334,26 @@ class VoiceModeComposerUiTest {
         waitForIdle()
         onNodeWithText("Voice conversation").assertExists().performClick()
         waitForState({ handle }, VoiceModeState.Listening)
+    }
+
+    @Test
+    fun theVoiceCardDocksWhileVoiceModeRunsAndItsEndTurnsItOff() = runComposeUiTest {
+        var handle: VoiceModeHandle? = null
+        showComposer(360.dp, LettaInput.Touch, voice = VoiceOptions(onHandle = { handle = it }))
+        onNodeWithTag(VoiceModeTags.CARD).assertDoesNotExist()
+
+        onNodeWithTag(VoiceModeTags.BUTTON).performClick()
+        waitForState({ handle }, VoiceModeState.Listening)
+        waitForIdle()
+        onNodeWithTag(VoiceModeTags.CARD).assertExists()
+        assertTrue(bounds(VoiceModeTags.CARD).bottom <= bounds(ComposerTestTags.TOUCH_BAR).top, "the card docks above the bar")
+        onNodeWithTag(VoiceModeTags.CARD_END)
+            .assertContentDescriptionEquals("End voice conversation")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .performClick()
+        waitForState({ handle }, VoiceModeState.Off)
+        waitForIdle()
+        onNodeWithTag(VoiceModeTags.CARD).assertDoesNotExist()
     }
 
     @Test

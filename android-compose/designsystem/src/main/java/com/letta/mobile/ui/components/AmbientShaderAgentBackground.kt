@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_UNPREMULTIPLIED
 import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
 import com.letta.mobile.ui.ambient.AmbientVoice
-import com.letta.mobile.ui.ambient.AmbientVoiceRole
 import com.letta.mobile.ui.ambient.LocalAmbientVoice
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
@@ -229,6 +228,7 @@ private fun AmbientCanvas(
             shader.setFloatUniform("uBandTop", band.top)
             shader.setFloatUniform("uBandPeak", band.peak)
             shader.setFloatUniform("uColor", tint.red, tint.green, tint.blue, tint.alpha)
+            shader.setFloatUniform("uDotGrid", voice?.dotGrid ?: 0f)
             drawRect(brush = shaderBrush)
         }
     } else {
@@ -333,8 +333,10 @@ private fun DrawScope.drawAmbientFallback(
     )
 }
 
-private fun statusHue(status: AmbientAgentStatus, voice: AmbientVoice?, scheme: ColorScheme, identitySeed: Color?): Color = when {
-    voice?.role == AmbientVoiceRole.You -> Color(voice.youTintArgb)
+private fun statusHue(status: AmbientAgentStatus, voice: AmbientVoice?, scheme: ColorScheme, identitySeed: Color?): Color =
+    voice?.tintArgb()?.let(::Color) ?: runStatusHue(status, scheme, identitySeed)
+
+private fun runStatusHue(status: AmbientAgentStatus, scheme: ColorScheme, identitySeed: Color?): Color = when {
     status == AmbientAgentStatus.Idle -> Color.Transparent
     status == AmbientAgentStatus.Running || status == AmbientAgentStatus.Active -> identitySeed ?: scheme.primary
     status == AmbientAgentStatus.Failed -> scheme.error

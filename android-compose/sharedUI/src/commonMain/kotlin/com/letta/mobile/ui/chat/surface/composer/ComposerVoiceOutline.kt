@@ -52,8 +52,9 @@ internal val ComposerOutlineModeKey = SemanticsPropertyKey<ComposerOutlineMode>(
 internal var SemanticsPropertyReceiver.composerOutlineMode by ComposerOutlineModeKey
 
 /**
- * Draws the conversation's current outline on its prompt surface. Listening and errors use
- * the voice glow, thinking uses a thin still edge, and working uses the animated beam.
+ * Draws the conversation's current outline on its prompt surface. A voice (the person talking, the
+ * reply being spoken) and errors use the voice glow, thinking uses a thin still edge, and working
+ * uses the animated beam.
  * Colours glide between states and reduced motion holds the outline still.
  */
 @Composable
@@ -65,8 +66,8 @@ internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modif
     val mode = composerOutlineMode(state, uiState.runPhase, companionWorking(uiState, presence))
     val reducedMotion = LocalReducedMotion.current
     val targetColor = when (mode) {
-        ComposerOutlineMode.Listening, ComposerOutlineMode.Error -> outlineColor(role)
-        ComposerOutlineMode.Thinking -> voiceAgentColor().copy(alpha = LettaDimens.Alpha.composerThinking)
+        ComposerOutlineMode.Voice, ComposerOutlineMode.Error -> outlineColor(role)
+        ComposerOutlineMode.Thinking -> MaterialTheme.colorScheme.tertiary.copy(alpha = LettaDimens.Alpha.composerThinking)
         ComposerOutlineMode.Idle, ComposerOutlineMode.Working -> Color.Transparent
     }
     val color = animateColorAsState(
@@ -74,7 +75,8 @@ internal fun Modifier.composerOutline(shape: Shape, uiState: ChatUiState): Modif
         animationSpec = if (reducedMotion) snap() else tween(ChatMotionTokens.AmbientGlow.GLIDE_MILLIS),
         label = "composerOutlineColor",
     )
-    val level = state?.let { handle?.glowLevel(it) }.takeIf { mode == ComposerOutlineMode.Listening && !reducedMotion }
+    // The microphone while the person talks, the playback while the reply is spoken (glowLevel).
+    val level = state?.let { handle?.glowLevel(it) }.takeIf { mode == ComposerOutlineMode.Voice && !reducedMotion }
     val brightness = rememberOutlineBrightness(level)
     val colors = LettaBeamDefaults.colors()
     val beam = remember(colors, shape) { LettaBeamSpec(colors, shape, LettaBeamStyle.SweepTop) }
@@ -116,7 +118,7 @@ private fun DrawScope.drawComposerOutline(
 /** The outline's colour for [role]: the person's, the agent's, the error colour, or none. */
 @Composable
 private fun outlineColor(role: VoiceGlowRole): Color = when (role) {
-    VoiceGlowRole.You -> voiceYouEdgeColor()
+    VoiceGlowRole.You -> voiceYouColor()
     VoiceGlowRole.Agent -> voiceAgentColor()
     VoiceGlowRole.Error -> MaterialTheme.colorScheme.error
     VoiceGlowRole.Idle -> Color.Transparent

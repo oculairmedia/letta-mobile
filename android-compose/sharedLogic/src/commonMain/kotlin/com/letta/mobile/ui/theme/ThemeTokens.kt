@@ -30,6 +30,14 @@ object LettaColorTokens {
     const val LIGHT_BACKGROUND = 0xFFFBFCFD
     const val LIGHT_OUTLINE = 0xFFB4BCC8
 
+    // Voice mode's two voices: the person in a cool blue, the agent in a warm rose, far apart in hue
+    // from each other and from the teal the run's thinking glow uses. The light values are deepened
+    // so a hairline of either still reads on a light surface.
+    const val DARK_VOICE_YOU = 0xFF6AA6FF
+    const val DARK_VOICE_AGENT = 0xFFF08FA8
+    const val LIGHT_VOICE_YOU = 0xFF2F6BD9
+    const val LIGHT_VOICE_AGENT = 0xFFC0436B
+
     const val TEAL_ACCENT = 0xFF1DE9B6
     const val CYAN_ACCENT = 0xFF00E5FF
 

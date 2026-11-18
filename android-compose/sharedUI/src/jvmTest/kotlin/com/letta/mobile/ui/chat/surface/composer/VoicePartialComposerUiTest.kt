@@ -11,13 +11,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
@@ -78,10 +78,10 @@ private object QuietEngines : VoiceEar, VoiceMouth, VoiceResponder {
 }
 
 /**
- * The person's words so far, in the empty prompt field while voice mode hears them: in place of the
- * status placeholder, on one line, never resizing the composer or moving its controls, never typed
- * into the draft, and read to a screen reader as the status only. At the phone, tablet and desktop
- * widths, on touch and with a pointer.
+ * The person's words so far, in the voice card docked above the prompt while voice mode hears them:
+ * in place of the "Hearing you…" status, kept in view however long they get (the card holds at most a
+ * few lines and scrolls), never resizing the prompt or moving its controls and never typed into the
+ * draft. At the phone, tablet and desktop widths, on touch and with a pointer.
  */
 class VoicePartialComposerUiTest {
     private val empty = ChatComposerUiState(
@@ -116,6 +116,9 @@ class VoicePartialComposerUiTest {
 
     private fun ComposeUiTest.bounds(tag: String): DpRect = onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
 
+    private fun ComposeUiTest.inCard(text: String) =
+        onNode(hasText(text) and hasAnyAncestor(hasTestTag(VoiceModeTags.CARD)), useUnmergedTree = true)
+
     private fun showsWordsInPlace(width: Dp, style: LettaInput, bar: String) = runComposeUiTest {
         showComposer(width, style)
         waitForIdle()
@@ -124,29 +127,31 @@ class VoicePartialComposerUiTest {
         val buttonBefore = bounds(VoiceModeTags.BUTTON)
         val slotBefore = bounds(ComposerTestTags.TRAILING_ACTIONS)
         val fieldBefore = bounds(ComposerTestTags.INPUT)
-        onNodeWithTag(ComposerTestTags.VOICE_WORDS, useUnmergedTree = true).assertDoesNotExist()
+        inCard("Hearing you…").assertExists()
 
         words.value = VoiceText("what time")
         waitForIdle()
-        val shortWords = bounds(ComposerTestTags.VOICE_WORDS)
+        inCard("what time").assertExists()
+        inCard("Hearing you…").assertDoesNotExist()
+        val shortCard = bounds(VoiceModeTags.CARD)
         words.value = VoiceText(LONG_WORDS)
         waitForIdle()
 
-        val shown = bounds(ComposerTestTags.VOICE_WORDS)
-        assertEquals(barBefore, bounds(bar), "the composer keeps its size $where")
+        val card = bounds(VoiceModeTags.CARD)
+        assertEquals(barBefore, bounds(bar), "the prompt keeps its size $where")
         assertEquals(buttonBefore, bounds(VoiceModeTags.BUTTON), "the voice button stays put $where")
         assertEquals(slotBefore, bounds(ComposerTestTags.TRAILING_ACTIONS), "the trailing controls stay put $where")
         assertEquals(fieldBefore, bounds(ComposerTestTags.INPUT), "the field keeps its size $where")
-        assertEquals(shortWords.height, shown.height, "long words stay on one line $where")
-        assertTrue(shown.right <= bounds(ComposerTestTags.INPUT).right + 1.dp, "the words stay inside the field $where")
+        assertTrue(card.bottom <= barBefore.top, "the card sits above the prompt $where")
+        assertTrue(card.right <= width + 1.dp && card.left >= (-1).dp, "the card stays inside the page $where")
+        assertTrue(card.height < shortCard.height * MAX_GROWTH, "long words scroll in the card rather than growing it without end $where")
+        inCard(LONG_WORDS).assertExists()
         assertTrue(actions.texts.isEmpty(), "the words never become draft text $where")
-        onNodeWithTag(ComposerTestTags.VOICE_WORDS, useUnmergedTree = true)
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Hearing you…")))
 
         words.value = null
         waitForIdle()
-        onNodeWithTag(ComposerTestTags.VOICE_WORDS, useUnmergedTree = true).assertDoesNotExist()
-        assertEquals(barBefore, bounds(bar), "the composer is unchanged once the words clear $where")
+        inCard("Hearing you…").assertExists()
+        assertEquals(barBefore, bounds(bar), "the prompt is unchanged once the words clear $where")
     }
 
     @Test
@@ -176,5 +181,8 @@ class VoicePartialComposerUiTest {
     private companion object {
         val PageHeight = 900.dp
         val LONG_WORDS = "so what I was thinking is that we could " + "keep talking for a very long time ".repeat(12)
+
+        /** The card may grow to its few lines of words, but no further. */
+        const val MAX_GROWTH = 4
     }
 }
