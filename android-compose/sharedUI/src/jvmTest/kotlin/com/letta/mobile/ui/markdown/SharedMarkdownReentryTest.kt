@@ -63,13 +63,14 @@ class SharedMarkdownReentryTest {
 
     @Test
     fun aTextNeverShownBeforeStillParses() = runComposeUiTest {
-        mainClock.autoAdvance = false
         val parses = SettledMarkdownParses()
+        assertTrue(NEW !in parses, "a new text has no kept parse to start from")
         setContent {
             MaterialTheme { CompositionLocalProvider(LocalSettledMarkdownParses provides parses) { SharedMarkdownText(text = NEW) } }
         }
-        mainClock.advanceTimeByFrame()
-        assertTrue(NEW !in parses, "a new text has no kept parse to start from")
+        waitUntil(timeoutMillis = PARSE_TIMEOUT_MILLIS) {
+            NEW in parses && onAllNodes(hasText(NEW, substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     private companion object {
