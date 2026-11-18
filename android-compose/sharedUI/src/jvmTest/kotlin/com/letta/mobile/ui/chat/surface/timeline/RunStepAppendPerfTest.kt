@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
@@ -36,10 +37,11 @@ import kotlin.test.assertTrue
 /**
  * A live run's steps append without restructuring its row: when a run's first step is followed by
  * its second (the lone first message becoming a run block), the row keeps its composition (no
- * dispose and remount of the run's row), and the frame that lands the second step costs at most 1.3x
- * the median of the later steps' frames: for a run of bare tool calls, and for a run that opens with prose (whose message
- * was drawn through a separate lone-message branch and rebuilt when the second step landed); a run that
- * opens with reasoning keeps that reasoning's own composition too.
+ * dispose and remount of the run's row), and the frame that lands the second step stays within 1.5x
+ * the median of the later steps' frames plus a few milliseconds of runner jitter: for a run of bare tool
+ * calls, and for a run that opens with prose (whose message was drawn through a separate lone-message
+ * branch and rebuilt when the second step landed). A run that opens with prose or reasoning keeps that
+ * message's own composition too, checked by layout-node identity (deterministic on any runner).
  */
 class RunStepAppendPerfTest {
     private val events = mutableListOf<String>()
@@ -96,6 +98,29 @@ class RunStepAppendPerfTest {
         }
     }
 
+    /**
+     * The opening prose's own subtree survives the run's second step: its text is the same layout node
+     * before and after. This is the deterministic half of the prose-first case; the frame time is the other.
+     */
+    @Test
+    fun aRunsOpeningProseKeepsItsCompositionAtTheSecondStep() {
+        messages = history()
+        runComposeUiTest {
+            mainClock.autoAdvance = false
+            show()
+            settle()
+            messages = messages + prose(RunStepId(RUN_ID, 1))
+            settle()
+            val before = proseNode()
+            messages = messages + step(RunStepId(RUN_ID, 2))
+            settle()
+            assertEquals(before, proseNode(), "the run's opening prose was rebuilt when its second step landed")
+        }
+    }
+
+    private fun ComposeUiTest.proseNode(): Int =
+        onAllNodes(hasText(LIVE_PROSE_FIRST_LINE, substring = true), useUnmergedTree = true).fetchSemanticsNodes().single().id
+
     private fun ComposeUiTest.reasoningGlyphNode(): Int =
         onAllNodesWithTag(ChatRowTestTags.REASONING_GLYPH, useUnmergedTree = true).fetchSemanticsNodes().single().id
 
@@ -119,8 +144,11 @@ class RunStepAppendPerfTest {
         val later = median((3..LAST_STEP).map { frame.getValue(it) })
         println("medians: $frame, later steps: $later ms")
         if (!timed) return
+        // A shared runner's frames jitter by a few milliseconds whatever the code does: the bound is the
+        // later steps' median with relative headroom plus a small absolute slack, so only a real rebuild
+        // (a step-2 frame several times the others) can exceed it.
         assertTrue(
-            frame.getValue(2) <= later * RELATIVE_BUDGET,
+            frame.getValue(2) <= later * RELATIVE_BUDGET + JITTER_SLACK_MILLIS,
             "landing the second step took ${frame.getValue(2)} ms against the later steps' median of $later ms",
         )
     }
@@ -232,13 +260,15 @@ class RunStepAppendPerfTest {
 
     private companion object {
         const val RUN_ID = "live-run"
-        const val LIVE_PROSE = "Checking the build first, then the tests.\n\nI'll report what fails."
+        const val LIVE_PROSE_FIRST_LINE = "Checking the build first, then the tests."
+        const val LIVE_PROSE = "$LIVE_PROSE_FIRST_LINE\n\nI'll report what fails."
         const val RUN_KEY = "run-$RUN_ID"
         const val LAST_STEP = 5
         const val SETTLE_FRAMES = 30
         const val NANOS_PER_MILLI = 1_000_000.0
-        const val RELATIVE_BUDGET = 1.3
-        const val PASSES = 3
+        const val RELATIVE_BUDGET = 1.5
+        const val JITTER_SLACK_MILLIS = 5.0
+        const val PASSES = 5
         val PROSE = (1..12).joinToString("\n\n") { "Paragraph $it of the earlier reply, with **bold** and `code`." }
     }
 }
