@@ -258,6 +258,8 @@
     <string name="rows_tool_card_fact_description">Description</string>
     <string name="rows_tool_card_section_prompt">Prompt</string>
     <string name="rows_tool_card_section_contents">Contents</string>
+    <string name="rows_tool_card_section_instructions">Instructions</string>
+    <string name="rows_tool_card_show_instructions">Show instructions</string>
     <string name="rows_tool_card_section_message">Message</string>
     <string name="rows_report_agent">Agent</string>
     <string name="rows_report_completed">completed</string>
