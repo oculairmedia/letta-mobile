@@ -43,7 +43,8 @@ class ChatRowSkillInstructionsUiTest {
         settled = true,
     )
 
-    private fun message(call: UiToolCall) = UiMessage(id = "skill", role = "assistant", content = "", timestamp = T0, toolCalls = listOf(call))
+    private fun message(call: UiToolCall) =
+        UiMessage(id = "skill", role = "assistant", content = "", timestamp = T0, toolCalls = listOf(call))
 
     private fun ComposeUiTest.show(call: UiToolCall, pages: (String) -> (@Composable () -> Unit)? = { null }) {
         setContent {

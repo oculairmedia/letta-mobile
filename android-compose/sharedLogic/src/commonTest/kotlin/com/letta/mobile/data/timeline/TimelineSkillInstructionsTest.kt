@@ -62,7 +62,8 @@ class TimelineSkillInstructionsTest {
         put(store, toolCall(1, StoredToolCall(SKILL_CALL, "Skill", """{"skill":"release-notes"}""")))
         put(store, message(2, "user_message", instructions))
         put(store, toolCall(3, StoredToolCall("call-bash", "Bash", """{"command":"ls"}""")))
-        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 64 * 1024), TimelinePageBudget(32, 64 * 1024), enabled = true)
+        val writer = TimelineExactCanonicalWriter(scope, 64 * 1024)
+        val engine = CanonicalTimelineEngine(store, writer, TimelinePageBudget(32, 64 * 1024), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         return engine.preparePage(selection, TimelineReadPosition.Tail, 32, "own-agent", DefaultTimelineSettledProjectionAdapter)
     }

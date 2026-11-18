@@ -15,7 +15,8 @@ class SkillEnvelopeHeadTest {
     }
 
     @Test fun anOrdinaryHeadDoesNot() {
-        assertFalse(opensSkillEnvelope(encoded(message(2, "assistant_message", "Plain reply. ".repeat(300))).copyOf(SKILL_ENVELOPE_HEAD_BYTES)))
+        val plain = encoded(message(2, "assistant_message", "Plain reply. ".repeat(300)))
+        assertFalse(opensSkillEnvelope(plain.copyOf(SKILL_ENVELOPE_HEAD_BYTES)))
         // Frontmatter without the envelope's opening tag is not enough to hide a message read by its head.
         val frontmatter = "name: notes\ndescription: a pasted file\n" + "Line.\n".repeat(400)
         assertFalse(opensSkillEnvelope(encoded(message(2, "user_message", frontmatter)).copyOf(SKILL_ENVELOPE_HEAD_BYTES)))
