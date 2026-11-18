@@ -24,6 +24,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.timeline.TimelineDays
 import com.letta.mobile.ui.chat.surface.timeline.parseTimelineLocalDate
 import com.letta.mobile.ui.markdown.LocalSettledMarkdownParses
+import com.letta.mobile.ui.markdown.MarkdownSource
 import com.letta.mobile.ui.markdown.SettledMarkdownParses
 import com.letta.mobile.ui.markdown.StreamingMarkdownDocument
 import com.letta.mobile.ui.markdown.StreamingMarkdownDocumentState
@@ -94,8 +95,8 @@ class TimelineRemountTest {
                 if (shown) {
                     // A row composed afresh: its own (empty) document state, as after a scroll back.
                     val state = remember { StreamingMarkdownDocumentState() }
-                    documents += rememberStreamingMarkdownDocument(TABLE_REPLY, state, isStreaming = false)
-                    rememberMarkdownTable(TABLE, settled = true)
+                    documents += rememberStreamingMarkdownDocument(MarkdownSource(TABLE_REPLY), state, isStreaming = false)
+                    rememberMarkdownTable(MarkdownSource(TABLE), settled = true)
                 }
             }
         }
@@ -106,8 +107,8 @@ class TimelineRemountTest {
         waitForIdle()
         assertTrue(documents.size >= 2, "the row composed twice")
         assertSame(documents.first(), documents.last(), "the row composed again started from the kept document")
-        assertNotNull(parses.table(TABLE), "the settled table is kept by its source")
-        assertSame(parses.document(TABLE_REPLY), documents.last())
+        assertNotNull(parses.table(MarkdownSource(TABLE)), "the settled table is kept by its source")
+        assertSame(parses.document(MarkdownSource(TABLE_REPLY)), documents.last())
     }
 
     /** The list's day of a timestamp is the parsed one, kept: the same answers, invalid stamps included. */

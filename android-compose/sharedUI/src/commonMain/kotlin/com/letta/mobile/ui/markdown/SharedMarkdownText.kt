@@ -161,7 +161,8 @@ internal fun rememberSharedMarkdownState(text: String, retainState: Boolean): Ma
     // its first frame is its final layout. Parsing it again started from the empty loading box and
     // the renderer grew the text in from the top, so every row replayed an entrance on scroll back.
     val parses = LocalSettledMarkdownParses.current?.takeIf { retainState }
-    val settled = parses?.let { kept -> remember(kept, text) { kept[text] } }
+    val source = MarkdownSource(text)
+    val settled = parses?.let { kept -> remember(kept, source) { kept[source] } }
     if (settled != null) return remember(settled) { SettledMarkdownState(settled) }
     val flavour = remember { GFMFlavourDescriptor() }
     val parser = remember(flavour) { MarkdownParser(flavour) }
@@ -173,64 +174,18 @@ internal fun rememberSharedMarkdownState(text: String, retainState: Boolean): Ma
         parser = parser,
         referenceLinkHandler = links,
     )
-    parses?.let { KeepSettledParse(it, state, text) }
+    parses?.let { KeepSettledParse(it, state, source) }
     return state
 }
 
-/** Keeps [state]'s parse of [text] in [parses] once it lands, for the row's next time in composition. */
+/** Keeps [state]'s parse of [source] in [parses] once it lands, for the row's next time in composition. */
 @Composable
-private fun KeepSettledParse(parses: SettledMarkdownParses, state: MarkdownState, text: String) {
-    LaunchedEffect(parses, state, text) {
+private fun KeepSettledParse(parses: SettledMarkdownParses, state: MarkdownState, source: MarkdownSource) {
+    LaunchedEffect(parses, state, source) {
         val parsed = state.state.first { it !is State.Loading }
-        if (parsed is State.Success && parsed.content == text) parses.keep(parsed)
+        if (parsed is State.Success && parsed.content == source.text) parses.keep(parsed)
     }
 }
-
-/**
- * The parses of settled texts, kept outside the rows (rows leave composition as they scroll away),
- * newest last and at most [capacity] of each kind: the shared renderer's parse, the rich renderer's
- * block document, and its tables. One per chat page, created by the page with its scroll position
- * and provided through [LocalSettledMarkdownParses]; it lives as long as that page's conversation.
- * Composition reads and writes it on the UI thread only. A streaming text is never kept: it changes
- * every token.
- */
-internal class SettledMarkdownParses(private val capacity: Int = SETTLED_MARKDOWN_PARSES) {
-    private val parses = KeptByText<State.Success>(capacity)
-    private val documents = KeptByText<StreamingMarkdownDocument>(capacity)
-    private val tables = KeptByText<ParsedMarkdownTable>(capacity)
-
-    operator fun get(text: String): State.Success? = parses[text]
-
-    operator fun contains(text: String): Boolean = parses[text] != null
-
-    fun keep(parsed: State.Success) = parses.keep(parsed.content, parsed)
-
-    /** The rich renderer's block document of [text], when it was kept. */
-    fun document(text: String): StreamingMarkdownDocument? = documents[text]
-
-    fun keepDocument(text: String, document: StreamingMarkdownDocument) = documents.keep(text, document)
-
-    /** A table block's parse, by its source, when it was kept. */
-    fun table(source: String): ParsedMarkdownTable? = tables[source]
-
-    fun keepTable(source: String, table: ParsedMarkdownTable) = tables.keep(source, table)
-}
-
-/** Values by their text, newest last, the oldest dropped past [capacity]. */
-private class KeptByText<V : Any>(private val capacity: Int) {
-    private val kept = LinkedHashMap<String, V>()
-
-    operator fun get(text: String): V? = kept[text]
-
-    fun keep(text: String, value: V) {
-        kept.remove(text)
-        kept[text] = value
-        while (kept.size > capacity) kept.remove(kept.keys.first())
-    }
-}
-
-/** The chat page's [SettledMarkdownParses]; null (outside a chat page) parses every time, as before. */
-internal val LocalSettledMarkdownParses = staticCompositionLocalOf<SettledMarkdownParses?> { null }
 
 /** A state that is already [parsed]: the renderer draws it on its first frame. */
 private class SettledMarkdownState(private val parsed: State.Success) : MarkdownState {
@@ -239,9 +194,6 @@ private class SettledMarkdownState(private val parsed: State.Success) : Markdown
 
     override suspend fun parse(): State = parsed
 }
-
-/** How many settled parses of each kind a page keeps: a long conversation's worth of rows to scroll back through. */
-private const val SETTLED_MARKDOWN_PARSES = 512
 
 /**
  * Tracks when retained parser state can safely survive a content update.
