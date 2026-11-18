@@ -28,28 +28,28 @@ test("agent task status transitions notify listeners with the task scope", (t) =
   const notifier = source.match(/function notifyBackgroundProcessStateChanged\(scope\) \{[\s\S]*?\n\}/);
   assert.ok(notifier);
   const notify = new Function("backgroundProcessStateListeners", `${notifier[0]}; return notifyBackgroundProcessStateChanged;`)(listeners);
-  const run = (start: string, end: string, args: string[], values: unknown[]) => {
+  const run = ({ start, end, args, values }: { start: string; end: string; args: string[]; values: unknown[] }) => {
     const from = patched.indexOf(start);
     assert.notEqual(from, -1);
     const to = patched.indexOf(end, from);
     assert.notEqual(to, -1);
     new Function(...args, patched.slice(from, to))(...values);
   };
-  run('backgroundTasks.set(taskId, bgTask);', 'registerSubagentAbortHook',
-    ['backgroundTasks', 'taskId', 'bgTask', 'notifyBackgroundProcessStateChanged'],
-    [new Map(), 'id', task, notify]);
+  run({ start: 'backgroundTasks.set(taskId, bgTask);', end: 'registerSubagentAbortHook',
+    args: ['backgroundTasks', 'taskId', 'bgTask', 'notifyBackgroundProcessStateChanged'],
+    values: [new Map(), 'id', task, notify] });
   for (const success of [true, false]) {
     task.status = 'running';
-    run('bgTask.status = result3.success ?', 'if (result3.error)',
-      ['bgTask', 'result3', 'notifyBackgroundProcessStateChanged'], [task, { success }, notify]);
+    run({ start: 'bgTask.status = result3.success ?', end: 'if (result3.error)',
+      args: ['bgTask', 'result3', 'notifyBackgroundProcessStateChanged'], values: [task, { success }, notify] });
     assert.equal(task.status, success ? 'completed' : 'failed');
   }
   task.status = 'running';
-  run('bgTask.status = "failed";', 'bgTask.error = errorMessage5;',
-    ['bgTask', 'notifyBackgroundProcessStateChanged'], [task, notify]);
+  run({ start: 'bgTask.status = "failed";', end: 'bgTask.error = errorMessage5;',
+    args: ['bgTask', 'notifyBackgroundProcessStateChanged'], values: [task, notify] });
   task.status = 'running';
-  run('task.status = "failed";', 'scheduleBackgroundTaskCleanup(task_id);',
-    ['task', 'notifyBackgroundProcessStateChanged'], [task, notify]);
+  run({ start: 'task.status = "failed";', end: 'scheduleBackgroundTaskCleanup(task_id);',
+    args: ['task', 'notifyBackgroundProcessStateChanged'], values: [task, notify] });
   assert.deepEqual(events, [scope, scope, scope, scope, scope]);
 });
 

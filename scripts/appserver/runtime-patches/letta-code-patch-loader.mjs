@@ -1994,20 +1994,20 @@ function agentTaskStatus(state) {
     ['      task.status = "failed";\n      scheduleBackgroundTaskCleanup(task_id);', 'task'],
   ];
   const counts = sites.map(([anchor]) => countOccurrences(state.patched, anchor));
-  if (counts.every((count) => count === 1)) {
-    for (const [anchor, task] of sites) {
-      const newline = anchor.indexOf("\n");
-      const indent = anchor.match(/^ */)[0];
-      const replacement = anchor.slice(0, newline) + `\n${indent}notifyBackgroundProcessStateChanged(${task}.runtimeScope); ${token}` + anchor.slice(newline);
-      state.patched = state.patched.replace(anchor, replacement);
-    }
-    state.appliedPatches += 1;
-  } else {
+  if (!counts.every((count) => count === 1)) {
     state.skippedPatches += 1;
     if (state.warn) process.stderr.write(
       `[letta-code-patch] WARN: lcp-agent-task-status anchors matched ${counts.join(",")} (expected 1 each) in ${state.path} — running without agent task status notifications\n`,
     );
+    return;
   }
+  for (const [anchor, task] of sites) {
+    const newline = anchor.indexOf("\n");
+    const indent = anchor.match(/^ */)[0];
+    const replacement = anchor.slice(0, newline) + `\n${indent}notifyBackgroundProcessStateChanged(${task}.runtimeScope); ${token}` + anchor.slice(newline);
+    state.patched = state.patched.replace(anchor, replacement);
+  }
+  state.appliedPatches += 1;
 }
 
 // Patch order is significant: each step receives the previous step's output.
