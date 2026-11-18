@@ -102,18 +102,22 @@ class TimelineStickyPromptShadingUiTest {
         waitForIdle()
     }
 
-    /** The bubble of the list row (not the sticky copy) with [text], in root px; null when off screen. */
+    /**
+     * The bubble of the list row (not the sticky copy) with [text], in root px; null when off screen. Only
+     * a row on screen counts: the list composes rows ahead of the viewport (prefetch) without laying them
+     * out where they show, and such a row reads as an empty rect at the origin.
+     */
     private fun ComposeUiTest.rowBubble(text: String): Rect? = onAllNodes(
         hasTestTag(ChatRowTestTags.USER_PROMPT) and hasAnyDescendant(hasText(text)) and
             !hasAnyAncestor(hasTestTag(ChatTimelineTags.PINNED_PROMPT)),
         useUnmergedTree = true,
-    ).fetchSemanticsNodes().firstOrNull()?.boundsInRoot
+    ).fetchSemanticsNodes().map { it.boundsInRoot }.firstOrNull { !it.isEmpty }
 
     /** The sticky copy's bubble, in root px; null while nothing is pinned. */
     private fun ComposeUiTest.copyBubble(): Rect? = onAllNodes(
         hasTestTag(ChatRowTestTags.USER_PROMPT) and hasAnyAncestor(hasTestTag(ChatTimelineTags.PINNED_PROMPT)),
         useUnmergedTree = true,
-    ).fetchSemanticsNodes().firstOrNull()?.boundsInRoot
+    ).fetchSemanticsNodes().map { it.boundsInRoot }.firstOrNull { !it.isEmpty }
 
     /** The colour just inside a bubble's top edge, at its middle (above its text). */
     private fun ComposeUiTest.topColour(bubble: Rect): Int {
@@ -142,8 +146,10 @@ class TimelineStickyPromptShadingUiTest {
         val firstPrompt = { copyBubble() ?: rowBubble("First question") }
         val reference = topColour(checkNotNull(firstPrompt()) { "the first prompt rests in view" })
 
-        // Held at the line, with the rows scrolling (the top fade on) under it.
-        scrollUntil(listState, -STEP_PX) { listState.canScrollForward && copyBubble() != null }
+        // Held at the line, with the rows scrolling (the top fade on) under it. The copy can already ride its
+        // row at rest (the answer under the prompt has its full height from its first frame), so wait for it
+        // to reach the line rather than merely to exist.
+        scrollUntil(listState, -STEP_PX) { listState.canScrollForward && copyBubble()?.let { it.top <= line + TOLERANCE_PX } == true }
         val held = checkNotNull(copyBubble())
         assertTrue(abs(held.top - line) <= TOLERANCE_PX, "the first prompt holds at the line: ${held.top} vs $line")
         assertUnshaded(reference, topColour(held), "held at the line")
