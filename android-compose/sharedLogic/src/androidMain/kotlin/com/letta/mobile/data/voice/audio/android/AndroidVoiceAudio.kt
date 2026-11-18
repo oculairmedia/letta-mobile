@@ -7,6 +7,7 @@ import com.letta.mobile.data.voice.audio.AudioPlayer
 import com.letta.mobile.data.voice.local.LocalSpeechRecognizer
 import com.letta.mobile.data.voice.local.android.AndroidLocalSpeechRecognizer
 import com.letta.mobile.data.voice.session.VoiceAudio
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -26,6 +27,8 @@ class AndroidVoiceAudio(context: Context) : VoiceAudio {
     override fun deviceChanges(): Flow<Unit> = audio.deviceChanges()
 
     override fun speaker(): AudioPlayer = audio.player()
+
+    override fun speaker(owner: CoroutineScope): AudioPlayer = audio.heldPlayer(owner)
 
     override fun localRecognizer(): LocalSpeechRecognizer = recognizer
 }

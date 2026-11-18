@@ -91,4 +91,12 @@ interface AudioPlayer {
      * returns only after the output is released.
      */
     suspend fun play(chunks: Flow<PcmChunk>, onLevel: (AudioLevel) -> Unit)
+
+    /**
+     * Silences (or restores) the sound from the next write on without changing its timing: muted
+     * audio plays out as silence at its own pace, so a stream ends when it would have, and its
+     * levels read silent. Applies to the stream playing now and to later ones; safe from any
+     * thread. A player that cannot mute ignores it.
+     */
+    fun setMuted(muted: Boolean) = Unit
 }
