@@ -94,6 +94,14 @@ internal fun ToolStep(
     val running = resolved == ToolTimelineState.Running
     // A running step is where a working mascot looks (te3n1.2).
     Column(modifier = Modifier.fillMaxWidth().mascotAttention(AttentionKey("tool:$disclosureKey"), AttentionKind.TOOL, enabled = running)) {
+        // A message to another agent, a created subagent and a loaded skill are events of their own: a tool card.
+        if (isToolCallCard(toolCall)) {
+            // A tool card is a line among the steps, on the step rail like the step lines around it.
+            CompositionLocalProvider(LocalLineRail provides LineRail.Step) {
+                ToolCallCard(toolCall, callbacks, LineDisclosure(isExpanded) { expansions.toggle(disclosureKey) })
+            }
+            return@Column
+        }
         val opens = stepOpens(toolCall, resolved)
         val disclosure = if (!opens) null else LineDisclosure(isExpanded) { expansions.toggle(disclosureKey) }
         ToolStepHeader(toolCall, resolved, callbacks, disclosure)
@@ -202,7 +210,8 @@ private fun RowScope.StepLineWords(spec: StepLineSpec) {
         color = muted.copy(alpha = TARGET_ALPHA),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.weight(1f),
+        // Its own width only: the badge, the note and the chevron follow the words, not the far edge.
+        modifier = Modifier.weight(1f, fill = false),
     )
     spec.agent?.let { ExternalAgentBadge(it) }
     spec.note?.let { note ->

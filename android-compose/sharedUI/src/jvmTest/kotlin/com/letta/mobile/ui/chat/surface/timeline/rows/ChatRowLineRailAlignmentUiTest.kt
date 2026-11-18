@@ -105,7 +105,7 @@ class ChatRowLineRailAlignmentUiTest {
             val labelStart = if (wide) step.labelStart else detailsStart
             val expected = listOf(detailsStart, labelStart, ChatRowSpacing.runGlyphSize, ChatRowSpacing.runGlyphSize)
             assertNearAll(expected, listOf(glyph.left, glyph.left, glyph.right - glyph.left, glyph.bottom - glyph.top), environment)
-            assertMatches(step, nested, setOf(Measure.ChevronEdge, Measure.ChevronSize, Measure.Height), environment)
+            assertMatches(step, nested, setOf(Measure.ChevronAfterWords, Measure.ChevronSize, Measure.Height), environment)
         }
     }
 
@@ -127,15 +127,16 @@ class ChatRowLineRailAlignmentUiTest {
         GlyphSize({ it.glyph!!.right - it.glyph.left }),
         LabelStart({ it.labelStart - it.bounds.left }),
         LabelHeight({ it.labelHeight }),
-        ChevronEdge({ it.chevron.right }),
         ChevronSize({ it.chevron.right - it.chevron.left }),
+        /** The chevron follows the line's words (its own width after them), never pinned to the line's end. */
+        ChevronAfterWords({ it.chevron.left - it.wordsEnd }),
         Height({ it.bounds.bottom - it.bounds.top }),
     }
 
     /** What every line on a rail shares. */
     private enum class Rail(val measures: Set<Measure>) {
         Header(Measure.entries.toSet()),
-        Step(setOf(Measure.LineStart, Measure.LabelStart, Measure.LabelHeight, Measure.ChevronEdge, Measure.ChevronSize)),
+        Step(setOf(Measure.LineStart, Measure.LabelStart, Measure.LabelHeight, Measure.ChevronAfterWords, Measure.ChevronSize)),
     }
 
     private class Environment(val width: Dp, val host: LettaHost) {
@@ -149,6 +150,8 @@ class ChatRowLineRailAlignmentUiTest {
         val labelStart: Dp,
         val labelHeight: Dp,
         val chevron: DpRect,
+        /** Where the line's words end: the last text before its chevron. */
+        val wordsEnd: Dp,
     )
 
     private fun ComposeUiTest.measure(line: Line, index: Int = 0): LineGeometry {
@@ -156,8 +159,10 @@ class ChatRowLineRailAlignmentUiTest {
         val under = hasAnyAncestor(hasTestTag(line.row))
         val glyph = line.glyph?.let { inside(hasTestTag(it) and under, bounds).single() }
         val chevron = inside(hasTestTag(DisclosureChevronDefaults.TestTag) and under, bounds).single()
-        val label = inside(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text) and under, bounds).minBy { it.left }
-        return LineGeometry(line, bounds, glyph, label.left, label.bottom - label.top, chevron)
+        val texts = inside(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text) and under, bounds)
+        val label = texts.minBy { it.left }
+        val wordsEnd = texts.filter { it.right <= chevron.left + TOLERANCE }.maxOf { it.right }
+        return LineGeometry(line, bounds, glyph, label.left, label.bottom - label.top, chevron, wordsEnd)
     }
 
     /** The bounds of the nodes [matcher] finds that lie within [row] (one row of several with the same tag). */
