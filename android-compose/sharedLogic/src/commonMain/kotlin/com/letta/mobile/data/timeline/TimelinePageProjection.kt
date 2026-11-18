@@ -309,18 +309,18 @@ internal fun TimelinePageProjectionInput.attachSkillInstructions(
     prepared: List<TimelineSettledRecord>,
 ): List<TimelineSettledRecord> {
     val output = prepared.toMutableList()
-    val claimed = HashSet<String>()
+    val claimed = mutableListOf<UiToolCall>()
     records.forEachIndexed { index, source ->
         val text = source.event?.takeIf { it.isSyntheticSkillEnvelope() }?.content
         val stored = source.record.takeIf { source.skillEnvelopePreview }?.bodyReference(context.scope)
         if (text == null && stored == null) return@forEachIndexed
         val owner = (index - 1 downTo 0).firstNotNullOfOrNull { at ->
             val render = output[at].preparedPresentation as? TimelineSettledPresentation.Render
-            render?.item?.unclaimedSkillCallId(claimed)?.let { callId -> Triple(at, render, callId) }
+            render?.item?.unclaimedSkillCall(claimed)?.let { call -> Triple(at, render, call) }
         } ?: return@forEachIndexed
-        val (at, render, callId) = owner
-        claimed += callId
-        output[at] = output[at].copy(preparedPresentation = render.withSkillInstructions(callId, text, stored))
+        val (at, render, call) = owner
+        claimed += call
+        output[at] = output[at].copy(preparedPresentation = render.withSkillInstructions(call, text, stored))
     }
     return output
 }
@@ -328,29 +328,34 @@ internal fun TimelinePageProjectionInput.attachSkillInstructions(
 private fun TimelineSettledRecord.bodyReference(scope: TimelineScope): TimelineBodyReference? =
     pointer?.let { TimelineBodyReference(scope, key, it, contentType, revision) }
 
-/** The newest skill call in this item that has an id and no instructions yet. */
-private fun ChatRenderItem.unclaimedSkillCallId(claimed: Set<String>): String? {
+/** The newest skill call in this item that has an id, no instructions yet, and is not already [claimed] on this page. */
+private fun ChatRenderItem.unclaimedSkillCall(claimed: List<UiToolCall>): UiToolCall? {
     val messages = when (this) {
         is ChatRenderItem.Single -> listOf(message)
         is ChatRenderItem.RunBlock -> messages.map { it.first }
     }
     return messages.asReversed().asSequence().flatMap { it.toolCalls.orEmpty().asReversed() }.firstOrNull { call ->
-        call.loadsSkill() && call.skillInstructions == null && call.toolCallId != null && call.toolCallId !in claimed
-    }?.toolCallId
+        call.loadsSkill() && call.skillInstructions == null && !call.toolCallId.isNullOrBlank() &&
+            claimed.none { it.toolCallId == call.toolCallId }
+    }
 }
 
 private fun UiToolCall.loadsSkill(): Boolean = SkillToolPresenter.matcher.names.any { it.equals(name, ignoreCase = true) }
 
+/** This item with [owner] (a skill call it holds, with an id) holding the instructions: their [text], or the [stored] body's pointer. */
 private fun TimelineSettledPresentation.Render.withSkillInstructions(
-    callId: String,
+    owner: UiToolCall,
     text: String?,
     stored: TimelineBodyReference?,
-): TimelineSettledPresentation.Render = copy(
-    item = if (text == null) item else item.mapToolCalls { call ->
-        if (call.toolCallId == callId) call.copy(skillInstructions = text) else call
-    },
-    skillInstructionBodies = stored?.let { skillInstructionBodies + (callId to it) } ?: skillInstructionBodies,
-)
+): TimelineSettledPresentation.Render {
+    val key = requireNotNull(owner.toolCallId)
+    return copy(
+        item = if (text == null) item else item.mapToolCalls { call ->
+            if (call.toolCallId == key) call.copy(skillInstructions = text) else call
+        },
+        skillInstructionBodies = stored?.let { skillInstructionBodies + (key to it) } ?: skillInstructionBodies,
+    )
+}
 
 private fun ChatRenderItem.mapToolCalls(transform: (UiToolCall) -> UiToolCall): ChatRenderItem = when (this) {
     is ChatRenderItem.Single -> copy(message = message.copy(toolCalls = message.toolCalls?.map(transform)))
