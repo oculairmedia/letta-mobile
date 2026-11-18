@@ -49,49 +49,69 @@ class SpokenProgressSpeedTest {
         override fun commitTurn() = Unit
     }
 
-    /** One reply of [SEGMENTS] segments at [speed]; returns the worst gap seen while streaming (after the first segment) and after. */
-    private fun TestScope.worstGaps(speed: SpeechSpeed): Pair<Double, Double> {
-        val clock = TestTimeSource()
+    /** The worst gap between the lit share and playback, while audio still streams and once it has all arrived. */
+    private class Gaps(var streaming: Double = 0.0, var arrived: Double = 0.0)
+
+    /** Plays one reply of [SEGMENTS] segments at [speed] through the controls on a fake clock. */
+    private class Reply(private val speed: SpeechSpeed, private val clock: TestTimeSource) {
         val controls = VoiceSessionControls(clock, MutableStateFlow(speed)) {}
         val inner = Mouth()
         val mouth = controls.engines(Ear, inner).second
-        backgroundScope.launch { mouth.events.collect {} }
-        runCurrent()
-        var streaming = 0.0
-        var arrived = 0.0
-        repeat(SEGMENTS) { number ->
-            val id = SpeechSegmentId(number.toLong())
-            val text = VoiceText("A".repeat(CHARACTERS))
-            val totalMs = CHARACTERS * MILLIS / (VOICE_RATE * speed.value)
-            mouth.speak(SpeechSegment(id, text))
-            var receivedMs = 0.0
+        val gaps = Gaps()
+
+        /** Segment [number] from its first audio to its end. */
+        fun play(number: Int, settle: () -> Unit) {
+            val stream = Stream(SpeechSegmentId(number.toLong()), CHARACTERS * MILLIS / (VOICE_RATE * speed.value))
+            mouth.speak(SpeechSegment(stream.id, VoiceText("A".repeat(CHARACTERS))))
+            stream.receive(controls)
+            inner.emitted.tryEmit(VoiceMouthEvent.Started(stream.id))
+            settle()
             var elapsedMs = 0L
-            fun receive() {
-                receivedMs = minOf(totalMs, receivedMs + CHUNK_MS)
-                controls.meter.measured(id, receivedMs.toLong().milliseconds, complete = receivedMs >= totalMs)
-            }
-            receive()
-            inner.emitted.tryEmit(VoiceMouthEvent.Started(id))
-            runCurrent()
-            while (elapsedMs + STEP_MS <= totalMs) {
+            while (elapsedMs + STEP_MS <= stream.totalMs) {
                 clock += STEP_MS.milliseconds
                 elapsedMs += STEP_MS
-                if (elapsedMs % ARRIVAL_EVERY_MS == 0L && receivedMs < totalMs) receive()
-                val segment = controls.spokenProgress.value.last()
-                val playedMs = (controls.nowMs() - segment.startedAtMs).toDouble()
-                val shown = (playedMs / checkNotNull(segment.audioDurationMs)).coerceIn(0.0, 1.0)
-                val gap = abs(shown - elapsedMs / totalMs)
-                if (receivedMs < totalMs) {
-                    if (number > 0) streaming = maxOf(streaming, gap)
-                } else {
-                    arrived = maxOf(arrived, gap)
-                }
+                if (elapsedMs % ARRIVAL_EVERY_MS == 0L) stream.receive(controls)
+                record(number, stream, gap(elapsedMs / stream.totalMs))
             }
-            clock += (totalMs - elapsedMs).toLong().milliseconds
-            inner.emitted.tryEmit(VoiceMouthEvent.Finished(id))
-            runCurrent()
+            clock += (stream.totalMs - elapsedMs).toLong().milliseconds
+            inner.emitted.tryEmit(VoiceMouthEvent.Finished(stream.id))
+            settle()
         }
-        return streaming to arrived
+
+        private fun gap(played: Double): Double {
+            val segment = controls.spokenProgress.value.last()
+            val playedMs = (controls.nowMs() - segment.startedAtMs).toDouble()
+            val shown = (playedMs / checkNotNull(segment.audioDurationMs)).coerceIn(0.0, 1.0)
+            return abs(shown - played)
+        }
+
+        /** The first segment has nothing to learn the voice's rate from while it streams: it is not judged then. */
+        private fun record(number: Int, stream: Stream, gap: Double) {
+            when {
+                stream.complete -> gaps.arrived = maxOf(gaps.arrived, gap)
+                number > 0 -> gaps.streaming = maxOf(gaps.streaming, gap)
+            }
+        }
+    }
+
+    /** One segment's audio arriving: [CHUNK_MS] at a time, [totalMs] in all. */
+    private class Stream(val id: SpeechSegmentId, val totalMs: Double) {
+        private var receivedMs = 0.0
+        val complete: Boolean get() = receivedMs >= totalMs
+
+        fun receive(controls: VoiceSessionControls) {
+            if (complete) return
+            receivedMs = minOf(totalMs, receivedMs + CHUNK_MS)
+            controls.meter.measured(id, receivedMs.toLong().milliseconds, complete = complete)
+        }
+    }
+
+    private fun TestScope.worstGaps(speed: SpeechSpeed): Gaps {
+        val reply = Reply(speed, TestTimeSource())
+        backgroundScope.launch { reply.mouth.events.collect {} }
+        runCurrent()
+        repeat(SEGMENTS) { reply.play(it) { runCurrent() } }
+        return reply.gaps
     }
 
     @Test
@@ -104,9 +124,9 @@ class SpokenProgressSpeedTest {
     fun theLitShareTracksPlaybackAtThreeQuarters() = runTest { assertTracks(SpeechSpeed(0.75f)) }
 
     private fun TestScope.assertTracks(speed: SpeechSpeed) {
-        val (streaming, arrived) = worstGaps(speed)
-        assertTrue(streaming <= TOLERANCE, "at ${speed.value}x the light is off by up to $streaming while audio still arrives")
-        assertTrue(arrived <= TOLERANCE, "at ${speed.value}x the light is off by up to $arrived once all audio arrived")
+        val gaps = worstGaps(speed)
+        assertTrue(gaps.streaming <= TOLERANCE, "at ${speed.value}x the light is off by up to ${gaps.streaming} while audio still arrives")
+        assertTrue(gaps.arrived <= TOLERANCE, "at ${speed.value}x the light is off by up to ${gaps.arrived} once all audio arrived")
     }
 
     private companion object {
