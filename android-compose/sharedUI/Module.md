@@ -120,6 +120,10 @@ Live run status and retry-line presentation. Consume RunStatusLine with supplied
 
 Chat timeline, paged/resident lists, viewport behavior and page overlays. Supply timeline/session state, row bindings and deferred-body readers; persistence, paging authority and history reconciliation remain in sharedLogic.
 
+# Package com.letta.mobile.ui.chat.surface.timeline.days
+
+Day labels and the timeline's per-list date cache. Each message timestamp is parsed to a local date once, and day dividers and paged boundaries read the cached dates; formatting only, no time-zone or clock authority beyond the supplied current date.
+
 # Package com.letta.mobile.ui.chat.surface.timeline.rows
 
 User/assistant, tool-step, approval, reasoning, error and canvas-receipt renderers. Row context and action callbacks connect interactions to the session; rows must not issue independent transport requests or reinterpret approval authority.
