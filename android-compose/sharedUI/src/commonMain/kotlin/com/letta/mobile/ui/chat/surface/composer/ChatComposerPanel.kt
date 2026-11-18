@@ -210,17 +210,6 @@ private fun ComposerUnderCardLine(model: ComposerModel) {
 @Composable
 private fun ComposerAboveCard(model: ComposerModel, parts: SnapshotStateMap<String, Rect>) {
     val actions = model.actions
-    QueuedSendsPanel(
-        queue = model.uiState.sendQueue,
-        actions = remember(actions) {
-            QueuedSendActions(
-                onCancel = actions::cancelQueuedSend,
-                onSendNow = actions::sendQueuedNow,
-                onResume = { actions.resumeSendQueue() },
-            )
-        },
-        modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
-    )
     model.composer.error?.let { message -> ComposerErrorRow(message = message, onDismiss = actions::clearComposerError) }
     // Voice mode's failures and missing setup, with Retry or Set up, in the same notice slot.
     ComposerVoiceNotice()
@@ -246,6 +235,25 @@ private fun ComposerAboveCard(model: ComposerModel, parts: SnapshotStateMap<Stri
         )
     }
     ComposerSuggestions(model.composer, model.decisions.autocomplete, actions)
+    // The queue last: one row docked just above the prompt bar (and the voice card behind it).
+    QueuedSendsPanel(
+        queue = model.uiState.sendQueue,
+        actions = remember(actions, model.composer.text) {
+            QueuedSendActions(
+                onCancel = actions::cancelQueuedSend,
+                onSendNow = actions::sendQueuedNow,
+                onResume = { actions.resumeSendQueue() },
+                // Edit: out of the queue, its words into the draft (after what is typed), its images back on it.
+                onEdit = { item ->
+                    val draft = model.composer.text
+                    actions.cancelQueuedSend(item.id)
+                    actions.updateComposerText(if (draft.isBlank()) item.text else "$draft\n${item.text}")
+                    item.attachments.forEach(actions::attachImage)
+                },
+            )
+        },
+        modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
+    )
 }
 
 private const val PART_COMPOSER = "composer"

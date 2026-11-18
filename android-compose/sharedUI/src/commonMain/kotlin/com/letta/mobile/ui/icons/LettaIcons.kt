@@ -53,6 +53,7 @@ import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Package
 import com.composables.icons.lucide.PanelLeftClose
 import com.composables.icons.lucide.PanelLeftOpen
+import com.composables.icons.lucide.CornerDownLeft
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Pin
 import com.composables.icons.lucide.PinOff
@@ -172,6 +173,9 @@ object LettaIcons {
     val Add: ImageVector get() = Lucide.Plus
     val Remove: ImageVector get() = Lucide.Minus
     val Edit: ImageVector get() = Lucide.Pencil
+
+    /** Send a queued message now (a return arrow). */
+    val SendNow: ImageVector get() = Lucide.CornerDownLeft
     val Delete: ImageVector get() = Lucide.Trash2
     val Save: ImageVector get() = Lucide.Save
 
