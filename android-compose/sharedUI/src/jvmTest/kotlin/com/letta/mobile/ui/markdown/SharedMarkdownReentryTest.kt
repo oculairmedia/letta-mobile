@@ -5,6 +5,7 @@ package com.letta.mobile.ui.markdown
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -30,10 +31,13 @@ class SharedMarkdownReentryTest {
     @Test
     fun aSettledTextBackInCompositionIsAtItsFinalHeightOnItsFirstFrame() = runComposeUiTest {
         var shown by mutableStateOf(true)
+        val parses = SettledMarkdownParses()
         setContent {
             MaterialTheme {
-                Column(Modifier.width(WIDTH.dp)) {
-                    if (shown) SharedMarkdownText(text = SETTLED, modifier = Modifier.testTag(TAG))
+                CompositionLocalProvider(LocalSettledMarkdownParses provides parses) {
+                    Column(Modifier.width(WIDTH.dp)) {
+                        if (shown) SharedMarkdownText(text = SETTLED, modifier = Modifier.testTag(TAG))
+                    }
                 }
             }
         }
@@ -42,7 +46,7 @@ class SharedMarkdownReentryTest {
         }
         waitForIdle()
         val settled = onNodeWithTag(TAG).getUnclippedBoundsInRoot()
-        assertTrue(hasSettledMarkdownParse(SETTLED.trim()) || hasSettledMarkdownParse(SETTLED), "the settled parse is kept")
+        assertTrue(SETTLED in parses, "the timeline keeps the settled parse")
 
         shown = false
         waitForIdle()
@@ -60,9 +64,12 @@ class SharedMarkdownReentryTest {
     @Test
     fun aTextNeverShownBeforeStillParses() = runComposeUiTest {
         mainClock.autoAdvance = false
-        setContent { MaterialTheme { SharedMarkdownText(text = NEW) } }
+        val parses = SettledMarkdownParses()
+        setContent {
+            MaterialTheme { CompositionLocalProvider(LocalSettledMarkdownParses provides parses) { SharedMarkdownText(text = NEW) } }
+        }
         mainClock.advanceTimeByFrame()
-        assertTrue(!hasSettledMarkdownParse(NEW), "a new text has no kept parse to start from")
+        assertTrue(NEW !in parses, "a new text has no kept parse to start from")
     }
 
     private companion object {
