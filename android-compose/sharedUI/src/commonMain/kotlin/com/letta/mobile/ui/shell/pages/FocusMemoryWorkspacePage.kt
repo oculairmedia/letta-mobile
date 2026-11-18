@@ -19,7 +19,10 @@ internal fun FocusMemoryWorkspacePage(
     // The focus owner switches agents, so the page's own picker gives way to one that reports here;
     // it keeps the header's context place beside the title.
     val picker: (@Composable () -> Unit)? = if (agents.isNotEmpty()) {
-        { MemoryAgentPicker(agents, memory.parity.memory.selectedAgentId) { onSelectAgent(AgentId(it)) } }
+        {
+            val unselected = ALL_AGENTS.takeIf { memory.parity.memory.fleet }
+            MemoryAgentPicker(agents, memory.parity.memory.selectedAgentId, { onSelectAgent(AgentId(it)) }, unselected)
+        }
     } else {
         null
     }
@@ -36,3 +39,5 @@ internal fun FocusMemoryWorkspacePage(
     )
     MemoryWorkspacePage(page, modifier)
 }
+
+private const val ALL_AGENTS = "All agents"

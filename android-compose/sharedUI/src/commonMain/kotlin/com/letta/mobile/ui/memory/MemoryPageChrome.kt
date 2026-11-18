@@ -81,13 +81,15 @@ internal fun MemoryAgentPicker(
     agents: List<MemoryParityAgentOption>,
     selectedAgentId: String?,
     onAgentSelected: (String) -> Unit,
+    /** What the button reads with no agent selected ("All agents" over the fleet view). */
+    unselectedLabel: String? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val selected = agents.firstOrNull { it.id == selectedAgentId }
     Box {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.widthIn(max = LettaDimens.Pane.sidePanelWidth)) {
             Text(
-                selected?.name ?: CHOOSE_AGENT,
+                selected?.name ?: unselectedLabel ?: CHOOSE_AGENT,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),

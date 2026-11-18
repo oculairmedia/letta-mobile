@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.schedules.CronTask
+import com.letta.mobile.data.schedules.RunRecord
 import com.letta.mobile.data.schedules.ScheduleClock
 import com.letta.mobile.data.schedules.ScheduleCreateRequest
 import com.letta.mobile.data.schedules.ScheduleLibraryState
@@ -64,11 +65,17 @@ data class SchedulesPageState(
     /** False hides "New schedule" (no backend route, or no agent to schedule for). */
     val canCreate: Boolean = false,
 ) {
-    /** The agent a new schedule is for: the focused one, else the library's selection. */
-    val targetAgentId: String? get() = focusedAgentId ?: library.selectedAgentId
+    /** The agent a new schedule is for: the focused one, else the library's selection or fleet filter. */
+    val targetAgentId: String? get() = focusedAgentId ?: library.scopeAgentId
 
-    /** The agent chips show only when the host has no focused agent and there is a choice. */
+    /** The agent whose schedules show: the focused one, else the fleet's filter; null shows every agent's. */
+    val scopeAgentId: String? get() = focusedAgentId ?: library.scopeAgentId
+
+    /** The agent chips (a filter over the fleet) show only when the host has no focused agent and there is a choice. */
     val showsAgentChips: Boolean get() = focusedAgentId == null && library.agents.size > 1
+
+    /** Every agent's schedules show together, so each row names its agent and "New schedule" asks for one. */
+    val showsFleet: Boolean get() = focusedAgentId == null && library.fleet
 }
 
 /**
@@ -81,7 +88,8 @@ data class SchedulesPageState(
 @Immutable
 data class SchedulesPageActions(
     val onRefresh: () -> Unit = {},
-    val onSelectAgent: (String) -> Unit = {},
+    /** Narrows an unfocused page to one agent's schedules; null shows every agent's. */
+    val onFilterAgent: (String?) -> Unit = {},
     val onCreate: (ScheduleCreateRequest) -> Unit = {},
     val onDeleteSchedule: (NativeScheduleRef) -> Unit = {},
     val onDeleteCron: (CronTaskId) -> Unit = {},
@@ -108,20 +116,45 @@ internal sealed interface ScheduleDeleteTarget {
  * agent wins over a native schedule with the same id, exactly as the merged list shows it.
  */
 internal fun SchedulesPageState.deleteTarget(id: String): ScheduleDeleteTarget? {
-    val cron = (crons + library.crons).firstOrNull {
-        it.id == id && (focusedAgentId == null || it.agentId == null || it.agentId == focusedAgentId)
-    }
+    val cron = (crons + library.crons).firstOrNull { it.id == id && inFocus(it) }
     if (cron != null) return ScheduleDeleteTarget.Cron(CronTaskId(cron.id))
     val native = library.schedules.firstOrNull { it.id == id } ?: return null
     return ScheduleDeleteTarget.Native(NativeScheduleRef(native.agentId, native.id))
 }
 
 /** Only live cron tasks have pause/resume operations; native schedule IDs use a different API. */
-internal fun SchedulesPageState.canTogglePause(id: CronTaskId): Boolean =
-    (crons + library.crons).any {
-        it.id == id.value && (it.status == null || it.status == "active" || it.status == "paused") &&
-            (focusedAgentId == null || it.agentId == null || it.agentId == focusedAgentId)
-    } && id.value !in library.pendingCronIds
+internal fun SchedulesPageState.canTogglePause(id: CronTaskId): Boolean {
+    if (id.value in library.pendingCronIds) return false
+    return (crons + library.crons).any { it.id == id.value && it.controllable && inFocus(it) && hasWriter(it) }
+}
+
+/**
+ * Whether [cron] is in the rows on screen: with no agent in scope every cron is, and a cron with no
+ * agent belongs to all.
+ */
+private fun SchedulesPageState.inFocus(cron: CronTask): Boolean = scopeAgentId == null || cron.agentId in setOf(null, scopeAgentId)
+
+/** The fleet view controls a cron through its own agent, so a cron with none has no writer there. */
+private fun SchedulesPageState.hasWriter(cron: CronTask): Boolean = !showsFleet || cron.agentId != null
+
+/**
+ * The run history the page shows: in the fleet view narrowed to one agent, only that agent's
+ * schedules' runs (a cron with no agent belongs to all).
+ */
+internal fun SchedulesPageState.scopedRunHistory(): Map<String, List<RunRecord>> {
+    val scope = scopeAgentId?.takeIf { showsFleet } ?: return library.runHistory
+    val tasks = crons + library.crons
+    val knownIds = (library.schedules.map { it.id } + tasks.map { it.id }).toSet()
+    val nativeIds = library.schedules.filter { it.agentId == scope }.map { it.id }
+    val cronIds = tasks.filter { inFocus(it) }.map { it.id }
+    val visibleIds = (nativeIds + cronIds).toSet()
+    return library.runHistory.filterKeys { id -> id in visibleIds || id !in knownIds }
+}
+
+/** Only an active or paused cron (or one whose host reports no status) can be paused or resumed. */
+private val CronTask.controllable: Boolean get() = status in CONTROLLABLE_CRON_STATUSES
+
+private val CONTROLLABLE_CRON_STATUSES = setOf(null, "active", "paused")
 
 internal fun SchedulesPageActions.delete(target: ScheduleDeleteTarget?) {
     when (target) {
@@ -174,6 +207,12 @@ object SchedulesPageTags {
     internal const val RULES_SECTION = "rules"
 
     fun agent(agentId: String): String = "schedules_agent_$agentId"
+
+    /** The agent filter chip that shows every agent's schedules. */
+    const val ALL_AGENTS = "schedules_agent_all"
+
+    /** The agent choices in the New-schedule form of an unfocused page. */
+    const val FORM_AGENTS = "schedules_form_agents"
 
     fun cadence(label: String): String = "schedules_cadence_${label.lowercase().replace(' ', '_')}"
 }

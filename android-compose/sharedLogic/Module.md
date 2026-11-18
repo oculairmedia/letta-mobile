@@ -921,6 +921,14 @@ The host side of the voice-endpoint v1 contract: one speech server setup shared 
 
 The one exception type whose message the admin RPC router returns to a remote client. Handlers raise it for deliberate, safe refusals built from the caller's own request; every other exception answers a fixed internal-error text so host paths and state never cross the wire. This leaf package imports nothing from the handlers or the router.
 
+# Package com.letta.mobile.data.memory.graph.barneshut
+
+Barnes–Hut many-body repulsion for the memory graph's live view: bodies go into a quadtree whose cells carry their total charge and charge-weighted centre, so a big graph (the fleet view, hundreds of agents and blocks) repels in about n log n. Near bodies are still counted pair by pair, collision included; every buffer is allocated once and reused.
+
+# Package com.letta.mobile.data.schedules.fleet
+
+The Schedules page with no agent focused: every agent's native schedules and cron tasks, read a few agents at a time and merged in roster order. One agent's failed read leaves the others listed; only every read failing is an error. Rows keep their own agent, so deletes, pause/resume and run history go through it, and a new schedule is made for the agent the form names. The state is a `ScheduleLibraryState` with `fleet` set, so the page renders it like one agent's library.
+
 # Package com.letta.mobile.data.schedules.leases
 
 Read-only lease records and their per-day calendar spans. Lease producers and transport remain outside this model.
@@ -977,3 +985,7 @@ Internal query-generation tokens for schedule controller work. A captured revisi
 
 Host-confirmed toolset choices and preference selection. ToolsetControl sends one request and waits
 for the runtime's device-status echo; hosts bind their shared channel state and admin RPC.
+
+# Package com.letta.mobile.data.memory.graph.forces
+
+Internal spring endpoints shared by force tuning and cluster ownership collection. The force field owns the buffers and applies these values without changing arithmetic or visit order.

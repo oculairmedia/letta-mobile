@@ -24098,6 +24098,31 @@ public final class com/letta/mobile/data/memory/MemoryChannelStatus$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/letta/mobile/data/memory/MemoryFleetInput {
+	public fun <init> (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/runtime/BackendDescriptor;Lcom/letta/mobile/data/transport/ChannelTransportState;Z)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/runtime/BackendDescriptor;Lcom/letta/mobile/data/transport/ChannelTransportState;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Lcom/letta/mobile/runtime/BackendDescriptor;
+	public final fun component4 ()Lcom/letta/mobile/data/transport/ChannelTransportState;
+	public final fun component5 ()Z
+	public final fun copy (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/runtime/BackendDescriptor;Lcom/letta/mobile/data/transport/ChannelTransportState;Z)Lcom/letta/mobile/data/memory/MemoryFleetInput;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/memory/MemoryFleetInput;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/runtime/BackendDescriptor;Lcom/letta/mobile/data/transport/ChannelTransportState;ZILjava/lang/Object;)Lcom/letta/mobile/data/memory/MemoryFleetInput;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgents ()Ljava/util/List;
+	public final fun getBackendDescriptor ()Lcom/letta/mobile/runtime/BackendDescriptor;
+	public final fun getBlocks ()Ljava/util/List;
+	public final fun getBlocksLoaded ()Z
+	public final fun getChannelTransportState ()Lcom/letta/mobile/data/transport/ChannelTransportState;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/memory/MemoryFleetMapper {
+	public static final field INSTANCE Lcom/letta/mobile/data/memory/MemoryFleetMapper;
+	public final fun build (Lcom/letta/mobile/data/memory/MemoryFleetInput;)Lcom/letta/mobile/data/memory/MemoryParityState;
+}
+
 public final class com/letta/mobile/data/memory/MemoryGraphEdge {
 	public static final field Companion Lcom/letta/mobile/data/memory/MemoryGraphEdge$Companion;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/memory/MemoryGraphEdgeKind;)V
@@ -24204,6 +24229,7 @@ public final class com/letta/mobile/data/memory/MemoryGraphNodeKind$Companion {
 }
 
 public final class com/letta/mobile/data/memory/MemoryParityAgentOption {
+	public static final field Companion Lcom/letta/mobile/data/memory/MemoryParityAgentOption$Companion;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
@@ -24214,6 +24240,21 @@ public final class com/letta/mobile/data/memory/MemoryParityAgentOption {
 	public final fun getName ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/memory/MemoryParityAgentOption$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/memory/MemoryParityAgentOption$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/memory/MemoryParityAgentOption;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/memory/MemoryParityAgentOption;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/memory/MemoryParityAgentOption$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class com/letta/mobile/data/memory/MemoryParityAvailability {
@@ -24258,6 +24299,7 @@ public final class com/letta/mobile/data/memory/MemoryParityController : com/let
 	public fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun reload ()V
 	public fun selectAgent (Ljava/lang/String;)V
+	public fun selectFleet ()V
 	public fun start ()V
 }
 
@@ -24368,11 +24410,13 @@ public final class com/letta/mobile/data/memory/MemoryParityItem$Companion {
 
 public final class com/letta/mobile/data/memory/MemoryParityItem$MemoryBlock : com/letta/mobile/data/memory/MemoryParityItem {
 	public static final field Companion Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;I)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;ILjava/util/List;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;ILjava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Ljava/lang/String;
 	public final fun component11 ()I
+	public final fun component12 ()Ljava/util/List;
+	public final fun component13 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
@@ -24381,8 +24425,8 @@ public final class com/letta/mobile/data/memory/MemoryParityItem$MemoryBlock : c
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Ljava/lang/Integer;
 	public final fun component9 ()Z
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;I)Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;IILjava/lang/Object;)Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;ILjava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;ILjava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getDetailText ()Ljava/lang/String;
 	public fun getId ()Ljava/lang/String;
@@ -24391,8 +24435,10 @@ public final class com/letta/mobile/data/memory/MemoryParityItem$MemoryBlock : c
 	public final fun getLimit ()Ljava/lang/Integer;
 	public fun getLinks ()Ljava/util/List;
 	public fun getMetadataLabels ()Ljava/util/List;
+	public final fun getOwners ()Ljava/util/List;
 	public final fun getPreview ()Ljava/lang/String;
 	public final fun getReadOnly ()Z
+	public final fun getSharedBlockId ()Ljava/lang/String;
 	public fun getSubtitle ()Ljava/lang/String;
 	public fun getTitle ()Ljava/lang/String;
 	public fun hashCode ()I
@@ -24624,22 +24670,25 @@ public abstract interface class com/letta/mobile/data/memory/MemoryParitySource 
 	public abstract fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun reload ()V
 	public abstract fun selectAgent (Ljava/lang/String;)V
+	public abstract fun selectFleet ()V
 	public abstract fun start ()V
 }
 
 public final class com/letta/mobile/data/memory/MemoryParityState {
 	public static final field Companion Lcom/letta/mobile/data/memory/MemoryParityState$Companion;
 	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/memory/MemoryParitySummary;Lcom/letta/mobile/data/memory/MemoryParityGraph;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/memory/MemoryParitySummary;Lcom/letta/mobile/data/memory/MemoryParityGraph;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/memory/MemoryParitySummary;Lcom/letta/mobile/data/memory/MemoryParityGraph;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/memory/MemoryParitySummary;Lcom/letta/mobile/data/memory/MemoryParityGraph;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/util/List;
 	public final fun component4 ()Lcom/letta/mobile/data/memory/MemoryParitySummary;
 	public final fun component5 ()Lcom/letta/mobile/data/memory/MemoryParityGraph;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/memory/MemoryParitySummary;Lcom/letta/mobile/data/memory/MemoryParityGraph;)Lcom/letta/mobile/data/memory/MemoryParityState;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/memory/MemoryParityState;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/memory/MemoryParitySummary;Lcom/letta/mobile/data/memory/MemoryParityGraph;ILjava/lang/Object;)Lcom/letta/mobile/data/memory/MemoryParityState;
+	public final fun component6 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/memory/MemoryParitySummary;Lcom/letta/mobile/data/memory/MemoryParityGraph;Z)Lcom/letta/mobile/data/memory/MemoryParityState;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/memory/MemoryParityState;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/memory/MemoryParitySummary;Lcom/letta/mobile/data/memory/MemoryParityGraph;ZILjava/lang/Object;)Lcom/letta/mobile/data/memory/MemoryParityState;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFleet ()Z
 	public final fun getGraph ()Lcom/letta/mobile/data/memory/MemoryParityGraph;
 	public final fun getScopeSubtitle ()Ljava/lang/String;
 	public final fun getSections ()Ljava/util/List;
@@ -24951,15 +25000,20 @@ public final class com/letta/mobile/data/memory/graph/MemoryGraphForceField {
 	public static final field FREE I
 	public fun <init> (I[ILcom/letta/mobile/data/memory/graph/MemoryGraphLayoutConfig;[F)V
 	public synthetic fun <init> (I[ILcom/letta/mobile/data/memory/graph/MemoryGraphLayoutConfig;[FILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun applyTuning (Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;Lcom/letta/mobile/data/memory/graph/forces/GraphElements;)V
 	public final fun getSize ()I
 	public final fun hold (ILcom/letta/mobile/data/memory/graph/MemoryGraphPoint;)V
 	public final fun place (ILcom/letta/mobile/data/memory/graph/MemoryGraphPoint;)V
 	public final fun point (I)Lcom/letta/mobile/data/memory/graph/MemoryGraphPoint;
+	public final fun rest ()V
 	public final fun step (I)F
+	public final fun step (ILcom/letta/mobile/data/memory/graph/MemoryGraphMotion;F)F
 	public static synthetic fun step$default (Lcom/letta/mobile/data/memory/graph/MemoryGraphForceField;IILjava/lang/Object;)F
 }
 
 public final class com/letta/mobile/data/memory/graph/MemoryGraphForceField$Companion {
+	public final fun elementsOf (Lcom/letta/mobile/data/memory/graph/MemoryGraphView;)Lcom/letta/mobile/data/memory/graph/forces/GraphElements;
+	public final fun springKindsOf (Lcom/letta/mobile/data/memory/graph/MemoryGraphView;)[I
 	public final fun springsOf (Lcom/letta/mobile/data/memory/graph/MemoryGraphView;)[I
 }
 
@@ -25049,6 +25103,30 @@ public final class com/letta/mobile/data/memory/graph/MemoryGraphLayoutMode : ja
 	public static fun values ()[Lcom/letta/mobile/data/memory/graph/MemoryGraphLayoutMode;
 }
 
+public final class com/letta/mobile/data/memory/graph/MemoryGraphMotion {
+	public static final field Companion Lcom/letta/mobile/data/memory/graph/MemoryGraphMotion$Companion;
+	public fun <init> (FFFZ)V
+	public final fun component1 ()F
+	public final fun component2 ()F
+	public final fun component3 ()F
+	public final fun component4 ()Z
+	public final fun cool (F)F
+	public final fun copy (FFFZ)Lcom/letta/mobile/data/memory/graph/MemoryGraphMotion;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/memory/graph/MemoryGraphMotion;FFFZILjava/lang/Object;)Lcom/letta/mobile/data/memory/graph/MemoryGraphMotion;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlphaDecay ()F
+	public final fun getClampVelocity ()Z
+	public final fun getDamping ()F
+	public final fun getMaxSpeed ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/memory/graph/MemoryGraphMotion$Companion {
+	public final fun forGraph (IILcom/letta/mobile/data/memory/graph/MemoryGraphTuning;)Lcom/letta/mobile/data/memory/graph/MemoryGraphMotion;
+	public static synthetic fun forGraph$default (Lcom/letta/mobile/data/memory/graph/MemoryGraphMotion$Companion;IILcom/letta/mobile/data/memory/graph/MemoryGraphTuning;ILjava/lang/Object;)Lcom/letta/mobile/data/memory/graph/MemoryGraphMotion;
+}
+
 public final class com/letta/mobile/data/memory/graph/MemoryGraphNodeMetrics {
 	public static final field INSTANCE Lcom/letta/mobile/data/memory/graph/MemoryGraphNodeMetrics;
 	public static final field MIN_TOUCH_RADIUS F
@@ -25079,6 +25157,171 @@ public final class com/letta/mobile/data/memory/graph/MemoryGraphSize {
 	public final fun getWidth ()F
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/memory/graph/MemoryGraphTuning : com/letta/mobile/data/memory/graph/forces/ForceElementTuning {
+	public static final field Companion Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning$Companion;
+	public fun <init> ()V
+	public fun <init> (FLjava/util/Map;FFFFFLjava/util/Map;FLjava/util/Map;FFFFFFLjava/util/Map;FZFZFZFFFFFFFFLjava/util/Map;FFFFFFFFFFFFFFZZFFFF)V
+	public synthetic fun <init> (FLjava/util/Map;FFFFFLjava/util/Map;FLjava/util/Map;FFFFFFLjava/util/Map;FZFZFZFFFFFFFFLjava/util/Map;FFFFFFFFFFFFFFZZFFFFIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun chargeOf (Lcom/letta/mobile/data/memory/MemoryGraphNodeKind;)F
+	public fun chargeOfKind (I)F
+	public final fun component1 ()F
+	public final fun component10 ()Ljava/util/Map;
+	public final fun component11 ()F
+	public final fun component12 ()F
+	public final fun component13 ()F
+	public final fun component14 ()F
+	public final fun component15 ()F
+	public final fun component16 ()F
+	public final fun component17 ()Ljava/util/Map;
+	public final fun component18 ()F
+	public final fun component19 ()Z
+	public final fun component2 ()Ljava/util/Map;
+	public final fun component20 ()F
+	public final fun component21 ()Z
+	public final fun component22 ()F
+	public final fun component23 ()Z
+	public final fun component24 ()F
+	public final fun component25 ()F
+	public final fun component26 ()F
+	public final fun component27 ()F
+	public final fun component28 ()F
+	public final fun component29 ()F
+	public final fun component3 ()F
+	public final fun component30 ()F
+	public final fun component31 ()F
+	public final fun component32 ()Ljava/util/Map;
+	public final fun component33 ()F
+	public final fun component34 ()F
+	public final fun component35 ()F
+	public final fun component36 ()F
+	public final fun component37 ()F
+	public final fun component38 ()F
+	public final fun component39 ()F
+	public final fun component4 ()F
+	public final fun component40 ()F
+	public final fun component41 ()F
+	public final fun component42 ()F
+	public final fun component43 ()F
+	public final fun component44 ()F
+	public final fun component45 ()F
+	public final fun component46 ()F
+	public final fun component47 ()Z
+	public final fun component48 ()Z
+	public final fun component49 ()F
+	public final fun component5 ()F
+	public final fun component50 ()F
+	public final fun component51 ()F
+	public final fun component52 ()F
+	public final fun component6 ()F
+	public final fun component7 ()F
+	public final fun component8 ()Ljava/util/Map;
+	public final fun component9 ()F
+	public final fun copy (FLjava/util/Map;FFFFFLjava/util/Map;FLjava/util/Map;FFFFFFLjava/util/Map;FZFZFZFFFFFFFFLjava/util/Map;FFFFFFFFFFFFFFZZFFFF)Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;FLjava/util/Map;FFFFFLjava/util/Map;FLjava/util/Map;FFFFFFLjava/util/Map;FZFZFZFFFFFFFFLjava/util/Map;FFFFFFFFFFFFFFZZFFFFIILjava/lang/Object;)Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;
+	public final fun crowdednessOf (II)F
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlphaMin ()F
+	public final fun getAlphaStart ()F
+	public final fun getBarnesHutAbove ()F
+	public final fun getBarnesHutRebuildFrames ()F
+	public final fun getBarnesHutTheta ()F
+	public final fun getChargeSpread ()F
+	public final fun getClusterEnabled ()Z
+	public fun getClusterPull ()F
+	public final fun getClusterSpread ()F
+	public final fun getClusterStrength ()F
+	public final fun getCollisionFadeAlpha ()F
+	public final fun getCollisionMaxShare ()F
+	public final fun getCollisionPadding ()F
+	public final fun getCollisionRadiusScale ()Ljava/util/Map;
+	public final fun getCollisionRadiusSpread ()F
+	public final fun getCollisionStrength ()F
+	public final fun getCoolingFrames ()F
+	public final fun getCrowdedCollisionStrength ()F
+	public final fun getCrowdedCrowding ()F
+	public final fun getCrowdedDamping ()F
+	public final fun getCrowdedMaxSpeed ()F
+	public final fun getCrowdedRepulsionScale ()F
+	public fun getDegreeBlend ()F
+	public final fun getDegreeScaling ()F
+	public final fun getGravity ()F
+	public final fun getGravitySpread ()F
+	public fun getHubLengthBias ()F
+	public final fun getHubSpokeStrength ()F
+	public final fun getLabelAllUnderNodes ()F
+	public final fun getLabelCullInterval ()F
+	public final fun getLabelCulling ()Z
+	public final fun getLabelFontScale ()F
+	public final fun getLabelHysteresisCount ()F
+	public final fun getLabelHysteresisMargin ()F
+	public final fun getLabelMinDegree ()F
+	public final fun getLabelNeighboursOnFocus ()Z
+	public final fun getLabelZoomThreshold ()F
+	public final fun getLinkLengthDegreeBias ()F
+	public final fun getLinkLengthSpread ()Ljava/util/Map;
+	public final fun getLinkStiffnessSpread ()F
+	public final fun getMaxFramesPerHeat ()F
+	public final fun getNaturalness ()F
+	public final fun getNodeCharge ()Ljava/util/Map;
+	public final fun getPinBackend ()Z
+	public fun getPinsBackend ()Z
+	public final fun getRadiusSpread ()F
+	public final fun getRepulsion ()F
+	public final fun getRepulsionCutoff ()F
+	public final fun getSeedJitter ()F
+	public final fun getSeedSpacing ()F
+	public final fun getSeededLayout ()Z
+	public final fun getSettleSpeed ()F
+	public final fun getSparseCrowding ()F
+	public final fun getSparseDamping ()F
+	public final fun getSparseMaxSpeed ()F
+	public fun getSpokeStiffness ()F
+	public fun getSpreads ()Lcom/letta/mobile/data/memory/graph/forces/ElementSpreads;
+	public final fun getSpringLength ()Ljava/util/Map;
+	public final fun getSpringStiffness ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun isAgentKind (I)Z
+	public fun isBackendKind (I)Z
+	public final fun lengthOf (Lcom/letta/mobile/data/memory/MemoryGraphEdgeKind;)F
+	public fun lengthOfKind (I)F
+	public fun lengthSpreadOfKind (I)F
+	public final fun radiusScaleOf (Lcom/letta/mobile/data/memory/MemoryGraphNodeKind;)F
+	public final fun stiffnessOf (Lcom/letta/mobile/data/memory/MemoryGraphEdgeKind;)F
+	public fun stiffnessOfKind (I)F
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/memory/graph/MemoryGraphTuning$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/memory/graph/MemoryGraphTuning$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/memory/graph/MemoryGraphTunings {
+	public static final field Companion Lcom/letta/mobile/data/memory/graph/MemoryGraphTunings$Companion;
+	public fun <init> ()V
+	public final fun getCurrent ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getReheatRequests ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun reheat ()V
+	public final fun reset ()V
+	public final fun set (Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;)V
+}
+
+public final class com/letta/mobile/data/memory/graph/MemoryGraphTunings$Companion {
+	public final fun decode (Ljava/lang/String;)Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;
+	public final fun encode (Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;)Ljava/lang/String;
+	public final fun kotlinSource (Lcom/letta/mobile/data/memory/graph/MemoryGraphTuning;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/memory/graph/MemoryGraphView {
@@ -25310,6 +25553,7 @@ public final class com/letta/mobile/data/memory/graph/MemoryPageController : com
 	public fun retryContent ()V
 	public fun saveEdit ()V
 	public fun selectAgent (Ljava/lang/String;)V
+	public final fun selectFleet ()V
 	public fun selectNode (Ljava/lang/String;)V
 	public final fun start ()V
 	public fun submitCreate ()V
@@ -25356,6 +25600,105 @@ public final class com/letta/mobile/data/memory/graph/SessionGraphMemoryBlockPor
 	public fun delete (Lcom/letta/mobile/data/memory/graph/MemoryBlockRef;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun load (Lcom/letta/mobile/data/memory/graph/MemoryBlockRef;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun save (Lcom/letta/mobile/data/memory/graph/MemoryBlockRef;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/memory/graph/barneshut/BarnesHutTree {
+	public fun <init> (I)V
+	public final fun getRebuildEvery ()I
+	public final fun repel (Lcom/letta/mobile/data/memory/graph/barneshut/ForceBodies;Lcom/letta/mobile/data/memory/graph/barneshut/RepulsionTerms;Lcom/letta/mobile/data/memory/graph/barneshut/ForceSums;)V
+	public final fun setRebuildEvery (I)V
+}
+
+public final class com/letta/mobile/data/memory/graph/barneshut/CollisionTerms {
+	public fun <init> (FF)V
+	public final fun getPadding ()F
+	public final fun getStrength ()F
+}
+
+public final class com/letta/mobile/data/memory/graph/barneshut/ForceBodies {
+	public fun <init> ([F[F[F[F)V
+	public final fun getCharge ()[F
+	public final fun getRadii ()[F
+	public final fun getX ()[F
+	public final fun getY ()[F
+}
+
+public final class com/letta/mobile/data/memory/graph/barneshut/ForceSums {
+	public fun <init> ([F[F[F[F)V
+	public synthetic fun <init> ([F[F[F[FILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getFx ()[F
+	public final fun getFy ()[F
+	public final fun getOx ()[F
+	public final fun getOy ()[F
+}
+
+public final class com/letta/mobile/data/memory/graph/barneshut/RepulsionTerms {
+	public fun <init> (FFLcom/letta/mobile/data/memory/graph/barneshut/CollisionTerms;F)V
+	public final fun getCollision ()Lcom/letta/mobile/data/memory/graph/barneshut/CollisionTerms;
+	public final fun getCutoffSq ()F
+	public final fun getStrength ()F
+	public final fun getTheta ()F
+}
+
+public final class com/letta/mobile/data/memory/graph/forces/ElementSpreads {
+	public fun <init> (FFFF)V
+	public final fun getCharge ()F
+	public final fun getCluster ()F
+	public final fun getGravity ()F
+	public final fun getStiffness ()F
+}
+
+public abstract interface class com/letta/mobile/data/memory/graph/forces/ForceElementTuning {
+	public abstract fun chargeOfKind (I)F
+	public abstract fun getClusterPull ()F
+	public abstract fun getDegreeBlend ()F
+	public abstract fun getHubLengthBias ()F
+	public abstract fun getPinsBackend ()Z
+	public abstract fun getSpokeStiffness ()F
+	public abstract fun getSpreads ()Lcom/letta/mobile/data/memory/graph/forces/ElementSpreads;
+	public abstract fun isAgentKind (I)Z
+	public abstract fun isBackendKind (I)Z
+	public abstract fun lengthOfKind (I)F
+	public abstract fun lengthSpreadOfKind (I)F
+	public abstract fun stiffnessOfKind (I)F
+}
+
+public final class com/letta/mobile/data/memory/graph/forces/ForceElements {
+	public fun <init> (I[IFF)V
+	public final fun apply (Lcom/letta/mobile/data/memory/graph/forces/ForceElementTuning;Lcom/letta/mobile/data/memory/graph/forces/GraphElements;)V
+	public final fun getAnchor ()I
+	public final fun getCharge ()[F
+	public final fun getCluster ()[F
+	public final fun getClusterStrength ()F
+	public final fun getGravity ()[F
+	public final fun getOwnerStart ()[I
+	public final fun getOwners ()[I
+	public final fun getRestLength ()[F
+	public final fun getSourceWeight ()[F
+	public final fun getStiffness ()[F
+	public final fun getTargetWeight ()[F
+}
+
+public final class com/letta/mobile/data/memory/graph/forces/GraphElements {
+	public fun <init> ([I[I[I[I)V
+	public synthetic fun <init> ([I[I[I[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getNodeKinds ()[I
+	public final fun getNodeSeeds ()[I
+	public final fun getSpringKinds ()[I
+	public final fun getSpringSeeds ()[I
+}
+
+public final class com/letta/mobile/data/memory/graph/forces/Variation {
+	public static final field CHARGE I
+	public static final field CLUSTER I
+	public static final field GRAVITY I
+	public static final field INSTANCE Lcom/letta/mobile/data/memory/graph/forces/Variation;
+	public static final field LENGTH I
+	public static final field RADIUS I
+	public static final field STIFFNESS I
+	public final fun factor (IIF)F
+	public final fun hash (Ljava/lang/String;)I
+	public final fun hashPair (Ljava/lang/String;Ljava/lang/String;)I
 }
 
 public final class com/letta/mobile/data/memory/memfs/AppServerMemfsSource : com/letta/mobile/data/memory/memfs/MemfsSource {
@@ -50380,14 +50723,16 @@ public final class com/letta/mobile/data/schedules/ScheduleDef {
 
 public final class com/letta/mobile/data/schedules/ScheduleFormDraft {
 	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/schedules/CronBuilderState;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/schedules/CronBuilderState;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/schedules/CronBuilderState;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/schedules/CronBuilderState;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Lcom/letta/mobile/data/schedules/CronBuilderState;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/schedules/CronBuilderState;)Lcom/letta/mobile/data/schedules/ScheduleFormDraft;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/ScheduleFormDraft;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/schedules/CronBuilderState;ILjava/lang/Object;)Lcom/letta/mobile/data/schedules/ScheduleFormDraft;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/schedules/CronBuilderState;Ljava/lang/String;)Lcom/letta/mobile/data/schedules/ScheduleFormDraft;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/ScheduleFormDraft;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/schedules/CronBuilderState;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/schedules/ScheduleFormDraft;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
 	public final fun getCadence ()Lcom/letta/mobile/data/schedules/CronBuilderState;
 	public final fun getExpression ()Ljava/lang/String;
 	public final fun getName ()Ljava/lang/String;
@@ -50447,12 +50792,14 @@ public final class com/letta/mobile/data/schedules/ScheduleLibraryItem {
 
 public final class com/letta/mobile/data/schedules/ScheduleLibraryState {
 	public fun <init> ()V
-	public fun <init> (Ljava/util/List;Ljava/lang/String;Ljava/util/List;ZLjava/lang/String;ZLjava/lang/String;Ljava/util/List;ZLjava/util/Map;Ljava/util/List;Ljava/util/Set;)V
-	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;Ljava/util/List;ZLjava/lang/String;ZLjava/lang/String;Ljava/util/List;ZLjava/util/Map;Ljava/util/List;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Ljava/lang/String;Ljava/util/List;ZLjava/lang/String;ZLjava/lang/String;Ljava/util/List;ZLjava/util/Map;Ljava/util/List;Ljava/util/Set;ZLjava/lang/String;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;Ljava/util/List;ZLjava/lang/String;ZLjava/lang/String;Ljava/util/List;ZLjava/util/Map;Ljava/util/List;Ljava/util/Set;ZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
 	public final fun component10 ()Ljava/util/Map;
 	public final fun component11 ()Ljava/util/List;
 	public final fun component12 ()Ljava/util/Set;
+	public final fun component13 ()Z
+	public final fun component14 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/util/List;
 	public final fun component4 ()Z
@@ -50461,9 +50808,10 @@ public final class com/letta/mobile/data/schedules/ScheduleLibraryState {
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Ljava/util/List;
 	public final fun component9 ()Z
-	public final fun copy (Ljava/util/List;Ljava/lang/String;Ljava/util/List;ZLjava/lang/String;ZLjava/lang/String;Ljava/util/List;ZLjava/util/Map;Ljava/util/List;Ljava/util/Set;)Lcom/letta/mobile/data/schedules/ScheduleLibraryState;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/ScheduleLibraryState;Ljava/util/List;Ljava/lang/String;Ljava/util/List;ZLjava/lang/String;ZLjava/lang/String;Ljava/util/List;ZLjava/util/Map;Ljava/util/List;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/schedules/ScheduleLibraryState;
+	public final fun copy (Ljava/util/List;Ljava/lang/String;Ljava/util/List;ZLjava/lang/String;ZLjava/lang/String;Ljava/util/List;ZLjava/util/Map;Ljava/util/List;Ljava/util/Set;ZLjava/lang/String;)Lcom/letta/mobile/data/schedules/ScheduleLibraryState;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/ScheduleLibraryState;Ljava/util/List;Ljava/lang/String;Ljava/util/List;ZLjava/lang/String;ZLjava/lang/String;Ljava/util/List;ZLjava/util/Map;Ljava/util/List;Ljava/util/Set;ZLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/schedules/ScheduleLibraryState;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentFilter ()Ljava/lang/String;
 	public final fun getAgents ()Ljava/util/List;
 	public final fun getCronMode ()Z
 	public final fun getCrons ()Ljava/util/List;
@@ -50471,12 +50819,14 @@ public final class com/letta/mobile/data/schedules/ScheduleLibraryState {
 	public final fun getDisplayItems ()Ljava/util/List;
 	public final fun getEmptyMessage ()Ljava/lang/String;
 	public final fun getErrorMessage ()Ljava/lang/String;
+	public final fun getFleet ()Z
 	public final fun getLeases ()Ljava/util/List;
 	public final fun getPendingCronIds ()Ljava/util/Set;
 	public final fun getRunHistory ()Ljava/util/Map;
 	public final fun getScheduleAdminAvailable ()Z
 	public final fun getScheduleAdminMessage ()Ljava/lang/String;
 	public final fun getSchedules ()Ljava/util/List;
+	public final fun getScopeAgentId ()Ljava/lang/String;
 	public final fun getSelectedAgentId ()Ljava/lang/String;
 	public fun hashCode ()I
 	public final fun isLoading ()Z
@@ -50690,6 +51040,36 @@ public final class com/letta/mobile/data/schedules/WeekRun {
 	public final fun getRun ()Lcom/letta/mobile/data/schedules/ScheduleRun;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/schedules/fleet/ScheduleFleetController : java/lang/AutoCloseable {
+	public fun <init> (Lcom/letta/mobile/data/schedules/fleet/ScheduleFleetSources;Lcom/letta/mobile/data/schedules/fleet/ScheduleFleetPolicy;Lkotlinx/coroutines/CoroutineScope;)V
+	public fun close ()V
+	public final fun createSchedule (Lcom/letta/mobile/data/schedules/ScheduleCreateRequest;)V
+	public final fun deleteCron (Lcom/letta/mobile/data/schedules/CronTask;)V
+	public final fun deleteNative (Lcom/letta/mobile/data/model/ScheduledMessage;)V
+	public final fun filterAgent-XmxTwY8 (Ljava/lang/String;)V
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun refresh ()V
+	public final fun toggleCronPause (Lcom/letta/mobile/data/schedules/CronTask;Z)V
+}
+
+public final class com/letta/mobile/data/schedules/fleet/ScheduleFleetPolicy {
+	public fun <init> ()V
+	public fun <init> (Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Z)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getErrorMessage ()Lkotlin/jvm/functions/Function2;
+	public final fun getNativeRoute ()Z
+	public final fun getNativeUnavailable ()Lkotlin/jvm/functions/Function1;
+}
+
+public final class com/letta/mobile/data/schedules/fleet/ScheduleFleetSources {
+	public fun <init> (Lcom/letta/mobile/data/repository/api/IAgentRepository;Lcom/letta/mobile/data/repository/api/IScheduleRepository;Lcom/letta/mobile/data/schedules/CronScheduleSource;Lkotlin/jvm/functions/Function3;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/repository/api/IAgentRepository;Lcom/letta/mobile/data/repository/api/IScheduleRepository;Lcom/letta/mobile/data/schedules/CronScheduleSource;Lkotlin/jvm/functions/Function3;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAgents ()Lcom/letta/mobile/data/repository/api/IAgentRepository;
+	public final fun getCrons ()Lcom/letta/mobile/data/schedules/CronScheduleSource;
+	public final fun getRunHistory ()Lkotlin/jvm/functions/Function3;
+	public final fun getSchedules ()Lcom/letta/mobile/data/repository/api/IScheduleRepository;
 }
 
 public final class com/letta/mobile/data/schedules/leases/Lease {
@@ -79466,6 +79846,28 @@ public final class com/letta/mobile/util/AgentConversationFleetPaging {
 
 public abstract interface class com/letta/mobile/util/AgentConversationReader {
 	public abstract fun read-a2BnSRI (Ljava/lang/String;Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/util/AgentFleetRead {
+	public fun <init> (Ljava/util/List;Ljava/util/Map;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/Map;
+	public final fun copy (Ljava/util/List;Ljava/util/Map;)Lcom/letta/mobile/util/AgentFleetRead;
+	public static synthetic fun copy$default (Lcom/letta/mobile/util/AgentFleetRead;Ljava/util/List;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/util/AgentFleetRead;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAllFailed ()Z
+	public final fun getFailures ()Ljava/util/Map;
+	public final fun getFirstFailure ()Ljava/lang/Throwable;
+	public final fun getValues ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/util/AgentFleetReads {
+	public static final field DEFAULT_PARALLELISM I
+	public static final field INSTANCE Lcom/letta/mobile/util/AgentFleetReads;
+	public final fun read (Ljava/util/List;ILkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun read$default (Lcom/letta/mobile/util/AgentFleetReads;Ljava/util/List;ILkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/util/BackendUrlTelemetryKt {

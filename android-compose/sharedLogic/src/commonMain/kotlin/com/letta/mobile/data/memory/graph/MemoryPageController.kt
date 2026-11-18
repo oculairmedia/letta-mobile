@@ -66,6 +66,13 @@ class MemoryPageController private constructor(
         source.selectAgent(agentId)
     }
 
+    /** Shows every agent's memory, grouped by label (no agent focused). */
+    fun selectFleet() {
+        ensureProjecting()
+        clearSelection()
+        source.selectFleet()
+    }
+
     override fun toggleKind(kind: MemoryGraphNodeKind) {
         disabledKinds.update { MemoryGraphViews.toggle(it, stateFlow.value.view.kindsPresent, kind) }
     }
@@ -173,7 +180,9 @@ class MemoryPageController private constructor(
     ): MemoryNodeSelection? {
         val nodeId = selection.detail.nodeId
         val refreshed = MemoryNodeDetails.resolve(parity.memory, nodeId)?.takeIf { view.node(nodeId) != null }
-        return MemoryNodeSelections.reconcile(selection, refreshed)
+        val reconciled = MemoryNodeSelections.reconcile(selection, refreshed)
+        if (reconciled == null) cancelNodeJobs()
+        return reconciled
     }
 
     private fun updateOpenSelection(transform: (MemoryNodeSelection) -> MemoryNodeSelection) {

@@ -602,9 +602,9 @@ class ScheduleLibraryControllerTest {
         initialAgentId = initialAgentId,
     )
 
-    private class RouteUnavailableException : RuntimeException("route unavailable")
+    internal class RouteUnavailableException : RuntimeException("route unavailable")
 
-    private class FakeAgentRepository : InMemoryAgentRepository() {
+    internal class FakeAgentRepository : InMemoryAgentRepository() {
         private val agentsFlow = MutableStateFlow(
             listOf(
                 Agent(id = AgentId("a1"), name = "Agent One"),
@@ -642,12 +642,13 @@ class ScheduleLibraryControllerTest {
         override suspend fun detachArchive(agentId: AgentId, archiveId: String) = Unit
     }
 
-    private class FakeScheduleRepository : IScheduleRepository {
+    internal class FakeScheduleRepository : IScheduleRepository {
         private val schedulesByAgent = mutableMapOf(
             "a1" to mutableListOf(sampleSchedule("s1", "a1")),
             "a2" to mutableListOf(sampleSchedule("s2", "a2")),
         )
         var error: Throwable? = null
+        val failingAgents = mutableSetOf<String>()
         var createGate: CompletableDeferred<Unit>? = null
         val createdSchedules = mutableListOf<ScheduleCreateParams>()
         val deletedScheduleIds = mutableListOf<String>()
@@ -674,6 +675,7 @@ class ScheduleLibraryControllerTest {
             refreshScheduleCallCount++
             refreshedAgents += agentId
             error?.let { throw it }
+            check(agentId !in failingAgents) { "$agentId down" }
         }
 
         override suspend fun getSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage =
