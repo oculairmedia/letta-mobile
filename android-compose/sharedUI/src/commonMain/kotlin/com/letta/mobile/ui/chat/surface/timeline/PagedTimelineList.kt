@@ -28,6 +28,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.chat.surface.timeline.rows.TimelineRenderProbe
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.Alignment
@@ -303,17 +304,17 @@ private fun LazyItemScope.RenderPagedSlot(scope: PagedRowsScope, index: Int) {
 @Composable
 private fun DeferredSettledRow(scope: PagedRowsScope, row: CanonicalTimelinePresentation.Row, index: Int, modifier: Modifier) {
     val presentation = scope.params.presentation
+    val older = scope.rows.itemAt(index + 1)
+    val leading = timelineLeadingSpace(row.item, older, pointer = !touchStyle())
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        pagedBoundaryDate(row.item, scope.rows.itemAt(index + 1), days = scope.calendar.days)?.let { date ->
-            DayDividerRow(date, scope.calendar.today)
-        }
+        pagedBoundaryDate(row.item, older, days = scope.calendar.days)?.let { date -> DayDividerRow(date, scope.calendar.today) }
         TimelineDeferredBody(
             rowKey = row.identity.value,
             read = { field, offset -> presentation.readTextWindow(row, field, offset, Dispatchers.Default) },
             modifier = Modifier
                 .widthIn(max = ChatColumnMaxWidth)
                 .fillMaxWidth()
-                .padding(top = timelineLeadingSpace(row.item)),
+                .padding(top = leading),
         )
     }
 }
