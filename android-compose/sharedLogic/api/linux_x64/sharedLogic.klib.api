@@ -7562,6 +7562,7 @@ abstract interface com.letta.mobile.data.voice.session/VoiceAudio { // com.letta
     abstract fun microphone(com.letta.mobile.data.voice.audio/AudioFrameFormat): com.letta.mobile.data.voice.audio/AudioFrameSource // com.letta.mobile.data.voice.session/VoiceAudio.microphone|microphone(com.letta.mobile.data.voice.audio.AudioFrameFormat){}[0]
     abstract fun speaker(): com.letta.mobile.data.voice.audio/AudioPlayer // com.letta.mobile.data.voice.session/VoiceAudio.speaker|speaker(){}[0]
     open fun localRecognizer(): com.letta.mobile.data.voice.local/LocalSpeechRecognizer? // com.letta.mobile.data.voice.session/VoiceAudio.localRecognizer|localRecognizer(){}[0]
+    open fun speaker(kotlinx.coroutines/CoroutineScope): com.letta.mobile.data.voice.audio/AudioPlayer // com.letta.mobile.data.voice.session/VoiceAudio.speaker|speaker(kotlinx.coroutines.CoroutineScope){}[0]
 }
 
 abstract interface com.letta.mobile.data.voice.vad.ear/EarObserver { // com.letta.mobile.data.voice.vad.ear/EarObserver|null[0]
@@ -72122,19 +72123,22 @@ final class com.letta.mobile.data.voice.vad.ear/EarTurnReport { // com.letta.mob
 }
 
 final class com.letta.mobile.data.voice.vad.ear/LivePartials { // com.letta.mobile.data.voice.vad.ear/LivePartials|null[0]
-    constructor <init>(kotlin/Boolean = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ...) // com.letta.mobile.data.voice.vad.ear/LivePartials.<init>|<init>(kotlin.Boolean;kotlin.time.Duration;kotlin.time.Duration){}[0]
+    constructor <init>(kotlin/Boolean = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ...) // com.letta.mobile.data.voice.vad.ear/LivePartials.<init>|<init>(kotlin.Boolean;kotlin.time.Duration;kotlin.time.Duration;kotlin.time.Duration){}[0]
 
     final val enabled // com.letta.mobile.data.voice.vad.ear/LivePartials.enabled|{}enabled[0]
         final fun <get-enabled>(): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/LivePartials.enabled.<get-enabled>|<get-enabled>(){}[0]
     final val interval // com.letta.mobile.data.voice.vad.ear/LivePartials.interval|{}interval[0]
         final fun <get-interval>(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/LivePartials.interval.<get-interval>|<get-interval>(){}[0]
+    final val quietCutoff // com.letta.mobile.data.voice.vad.ear/LivePartials.quietCutoff|{}quietCutoff[0]
+        final fun <get-quietCutoff>(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/LivePartials.quietCutoff.<get-quietCutoff>|<get-quietCutoff>(){}[0]
     final val window // com.letta.mobile.data.voice.vad.ear/LivePartials.window|{}window[0]
         final fun <get-window>(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/LivePartials.window.<get-window>|<get-window>(){}[0]
 
     final fun component1(): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/LivePartials.component1|component1(){}[0]
     final fun component2(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/LivePartials.component2|component2(){}[0]
     final fun component3(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/LivePartials.component3|component3(){}[0]
-    final fun copy(kotlin/Boolean = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ...): com.letta.mobile.data.voice.vad.ear/LivePartials // com.letta.mobile.data.voice.vad.ear/LivePartials.copy|copy(kotlin.Boolean;kotlin.time.Duration;kotlin.time.Duration){}[0]
+    final fun component4(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/LivePartials.component4|component4(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ...): com.letta.mobile.data.voice.vad.ear/LivePartials // com.letta.mobile.data.voice.vad.ear/LivePartials.copy|copy(kotlin.Boolean;kotlin.time.Duration;kotlin.time.Duration;kotlin.time.Duration){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/LivePartials.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.vad.ear/LivePartials.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.vad.ear/LivePartials.toString|toString(){}[0]

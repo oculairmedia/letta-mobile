@@ -3,7 +3,10 @@ package com.letta.mobile.data.voice.vad.ear
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.VoiceUtterance
 import com.letta.mobile.data.voice.audio.AudioClip
+import com.letta.mobile.data.voice.audio.AudioFrame
 import com.letta.mobile.data.voice.audio.AudioFrameFormat
+import com.letta.mobile.data.voice.audio.AudioFrameSource
+import com.letta.mobile.data.voice.audio.SamplePosition
 import com.letta.mobile.data.voice.audio.pcm.WavCodec
 import com.letta.mobile.data.voice.audio.pcm.WavParse
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
@@ -12,12 +15,16 @@ import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
 import com.letta.mobile.data.voice.vad.SpeechDetectorFactory
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
@@ -56,7 +63,7 @@ class LivePartialsTest {
         suspend fun hear(from: Long, to: Long) {
             var position = from
             while (position <= to) {
-                partials.heard(position) { max -> ShortArray(minOf(position, max).toInt()) { 1 } }
+                partials.heard(position, voiced = position) { max -> ShortArray(minOf(position, max).toInt()) { 1 } }
                 yield()
                 position += FRAME
             }
@@ -179,6 +186,79 @@ class LivePartialsTest {
     }
 
     @Test
+    fun noPartialIsRequestedOnceThePersonHasBeenQuietForTheCutoff() = runTest {
+        val transcriber = FakeTranscriber { call, _ -> "words $call" }
+        partials(transcriber) {
+            partials.turnStarted(0)
+            // Voice stops at 18 frames; the first tick (19 frames) is 32 ms into silence, the next ones far past 300 ms.
+            var position = FRAME
+            while (position <= 80 * FRAME) {
+                partials.heard(position, voiced = minOf(position, 18 * FRAME)) { max -> ShortArray(minOf(position, max).toInt()) }
+                yield()
+                position += FRAME
+            }
+            partials.turnEnded()
+        }
+        assertEquals(1, transcriber.lengths.size, "only the tick inside the cutoff sends")
+    }
+
+    @Test
+    fun theFinalRequestNeverWaitsBehindAPartialOnASingleWorkerServer() = runTest {
+        val server = SingleWorkerServer(this)
+        pacedEar(server, settings.copy(interval = 600.milliseconds)).listen().untilEnd()
+        val final = server.requests.last()
+        assertTrue(server.requests.size > 1, "partials were requested")
+        assertEquals(final.arrivedMs, final.startedMs, "the server was idle when the final request arrived")
+    }
+
+    @Test
+    fun withoutTheCutoffTheFinalWouldWaitBehindAPartial() = runTest {
+        val server = SingleWorkerServer(this)
+        pacedEar(server, settings.copy(interval = 600.milliseconds, quietCutoff = 10.seconds)).listen().untilEnd()
+        val final = server.requests.last()
+        assertTrue(final.startedMs > final.arrivedMs, "the rig detects a final queued behind a partial")
+    }
+
+    /**
+     * A transcription server with one worker taking [WORK_MS] per request, in arrival order. A
+     * request the client cancels still occupies the worker, as on a real server.
+     */
+    private class SingleWorkerServer(private val scope: TestScope) : SpeechTranscriber {
+        class Request(val arrivedMs: Long, val startedMs: Long)
+
+        val requests = mutableListOf<Request>()
+        private var freeAtMs = 0L
+
+        override suspend fun transcribe(audio: AudioClip): SpeechTranscript {
+            val now = scope.testScheduler.currentTime
+            val start = maxOf(now, freeAtMs)
+            freeAtMs = start + WORK_MS
+            requests += Request(now, start)
+            delay(freeAtMs - now)
+            return SpeechTranscript(VoiceText("words"))
+        }
+    }
+
+    /** The ear over [SCRIPT] delivered in real time (32 ms per frame, on the test clock). */
+    private fun pacedEar(transcriber: SpeechTranscriber, partials: LivePartials): VadVoiceEar {
+        val source = object : AudioFrameSource {
+            override val format = AudioFrameFormat()
+
+            override fun frames() = flow {
+                var position = 0L
+                SCRIPT.forEach { samples ->
+                    delay(FRAME_MS)
+                    emit(AudioFrame(samples.copyOf(), SamplePosition(position)))
+                    position += samples.size
+                }
+                awaitCancellation()
+            }
+        }
+        val config = VadEarConfig(policy = EndOfTurnPolicy(), detectors = SpeechDetectorFactory { ValueDetector() }, partials = partials)
+        return VadVoiceEar(source, transcriber, config)
+    }
+
+    @Test
     fun settingsRejectEmptyDurations() {
         assertFailsWith<IllegalArgumentException> { LivePartials(interval = 0.milliseconds) }
         assertFailsWith<IllegalArgumentException> { LivePartials(window = 0.milliseconds) }
@@ -208,6 +288,8 @@ class LivePartialsTest {
 
     private companion object {
         const val FRAME = 512L
+        const val FRAME_MS = 32L
+        const val WORK_MS = 450L
 
         /** Pre-roll, about two seconds of speech, then the silence that ends the turn. */
         val SCRIPT = frames(PRE_ROLL_VALUE, 4) + frames(SPEECH_VALUE, 60) + frames(0, 32)
