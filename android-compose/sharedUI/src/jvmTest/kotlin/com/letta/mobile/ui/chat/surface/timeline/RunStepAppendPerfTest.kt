@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiMessage
@@ -22,12 +23,14 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
+import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
 import com.letta.mobile.ui.chat.surface.timeline.rows.LocalRowComposed
 import com.letta.mobile.ui.chat.surface.timeline.rows.TimelineRenderProbe
 import com.letta.mobile.ui.chat.surface.timeline.rows.TimelineRenderSink
 import kotlinx.collections.immutable.toPersistentList
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -35,7 +38,8 @@ import kotlin.test.assertTrue
  * its second (the lone first message becoming a run block), the row keeps its composition (no
  * dispose and remount of the run's row), and the frame that lands the second step costs at most 1.3x
  * the median of the later steps' frames: for a run of bare tool calls, and for a run that opens with prose (whose message
- * was drawn through a separate lone-message branch and rebuilt when the second step landed).
+ * was drawn through a separate lone-message branch and rebuilt when the second step landed); a run that
+ * opens with reasoning keeps that reasoning's own composition too.
  */
 class RunStepAppendPerfTest {
     private val events = mutableListOf<String>()
@@ -66,6 +70,34 @@ class RunStepAppendPerfTest {
     /** A run that opens with prose (drawn as a lone step) and then works. */
     @Test
     fun aRunOpeningWithProseAppendsItsFirstToolWithoutRebuilding() = appendSteps(firstStep = { run, _ -> prose(run) })
+
+    /** A run that opens with reasoning (drawn as the run's lone row) and then works: its row is never rebuilt. */
+    @Test
+    fun aRunOpeningWithReasoningAppendsItsFirstToolWithoutRebuilding() =
+        appendSteps(timed = false, firstStep = { run, _ -> reasoning(run) })
+
+    /**
+     * The lone reasoning's own subtree survives the run's second step: its glyph is the same layout node
+     * before and after (a step drawn through another call site at step two would be a new node).
+     */
+    @Test
+    fun aRunsLoneReasoningKeepsItsCompositionAtTheSecondStep() {
+        messages = history()
+        runComposeUiTest {
+            mainClock.autoAdvance = false
+            show()
+            settle()
+            messages = messages + reasoning(RUN_ID)
+            settle()
+            val before = reasoningGlyphNode()
+            messages = messages + step(RUN_ID, 2)
+            settle()
+            assertEquals(before, reasoningGlyphNode(), "the run's lone reasoning was rebuilt when its second step landed")
+        }
+    }
+
+    private fun ComposeUiTest.reasoningGlyphNode(): Int =
+        onAllNodesWithTag(ChatRowTestTags.REASONING_GLYPH, useUnmergedTree = true).fetchSemanticsNodes().single().id
 
     /**
      * Plays the run once to warm the JIT and class loading (a first use of the live run's code would
@@ -165,6 +197,15 @@ class RunStepAppendPerfTest {
 
     private fun prose(run: String) =
         UiMessage(id = "$run-step-1", role = "assistant", content = LIVE_PROSE, timestamp = ts(11), runId = run)
+
+    private fun reasoning(run: String) = UiMessage(
+        id = "$run-step-1",
+        role = "assistant",
+        content = "Looking at which module fails first.",
+        timestamp = ts(11),
+        runId = run,
+        isReasoning = true,
+    )
 
     private fun tool(id: String, runId: String, index: Int) = UiMessage(
         id = id,
