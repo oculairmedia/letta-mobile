@@ -99,7 +99,8 @@ internal class ReplyFollower(private val wiring: LoopWiring) {
     }
 
     private suspend fun follow(turn: TurnKey, reply: VoiceReply) {
-        val forwarder = ReplyForwarder(turn, SentenceChunker(wiring.config.maxSegmentLength), wiring.inputs)
+        val chunker = SentenceChunker(wiring.config.maxSegmentLength, wiring.config.firstClauseMinLength)
+        val forwarder = ReplyForwarder(turn, chunker, wiring.inputs)
         val outcome = runCatching { reply.events.collect(forwarder::forward) }
         val error = outcome.exceptionOrNull()
         if (error is CancellationException) throw error

@@ -62,6 +62,8 @@ data class VadEarConfig(
      * ignores the microphone for this long, otherwise the echo guard stays up for this long.
      */
     val outputTail: Duration = DEFAULT_OUTPUT_TAIL,
+    /** Live partial transcripts while the person speaks; off by default. */
+    val partials: LivePartials = LivePartials(),
 ) {
     init {
         require(format.channels == 1) { "The voice-activity ear listens to mono audio" }
@@ -89,8 +91,9 @@ data class VadEarConfig(
  *
  * Events: [VoiceEarEvent.ListeningStarted] with the first frame, [VoiceEarEvent.InputLevel] per
  * frame, [VoiceEarEvent.SpeechStarted] once speech has lasted the policy's minimum (the barge-in
- * signal; raised thresholds while [setOutputActive] is true), [VoiceEarEvent.SpeechEnded] when the
- * turn closes, [VoiceEarEvent.EndOfTurn] after transcription, and [VoiceEarEvent.Failed].
+ * signal; raised thresholds while [setOutputActive] is true), [VoiceEarEvent.PartialTranscript]
+ * while the turn is heard when [VadEarConfig.partials] is on (see [LivePartials]; never the
+ * utterance), [VoiceEarEvent.SpeechEnded] when the turn closes, [VoiceEarEvent.EndOfTurn] after transcription, and [VoiceEarEvent.Failed].
  *
  * Half-duplex ([VadEarConfig.halfDuplex]): while output is active and for the tail after it, input
  * is ignored (levels report silent) and a turn that was open when output started is dropped, ending

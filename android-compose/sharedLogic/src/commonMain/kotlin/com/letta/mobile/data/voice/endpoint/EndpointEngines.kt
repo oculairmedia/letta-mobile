@@ -44,7 +44,7 @@ class EndpointTranscriber(
 /**
  * The synthesis half of [EndpointVoiceMouth]: one text segment to audio through the client's speech
  * endpoint (for example a Qwen3-TTS server with a cloned voice), as one clip ([synthesize]) or as
- * PCM while it streams in ([stream]). Checks for a grant naming that endpoint for
+ * PCM while it streams in ([stream]), at an optional [SpeechSpeed]. Checks for a grant naming that endpoint for
  * [VoiceEndpointPayload.TEXT_FOR_SYNTHESIS] before every request.
  */
 class EndpointSpeechSynthesizer(
@@ -67,11 +67,22 @@ class EndpointSpeechSynthesizer(
      * closes it. A response that is not 16-bit PCM WAVE fails with a [SpeechEndpointException]
      * carrying BAD_RESPONSE or UNSUPPORTED_FORMAT.
      */
-    fun stream(text: VoiceText): Flow<PcmChunk> = channelFlow {
+    fun stream(text: VoiceText, speed: SpeechSpeed = SpeechSpeed.Normal): Flow<PcmChunk> = channelFlow {
         client.requireGrant(grants, VoiceEndpointPayload.TEXT_FOR_SYNTHESIS, SpeechOperation.SPEECH)
         val decoder = WavStreamDecoder()
-        val request = SpeechRequest(text, settings.speechModel, settings.voice, AudioEncoding.WAV)
+        val request = SpeechRequest(text, settings.speechModel, settings.voice, AudioEncoding.WAV, speed)
         client.synthesize(request) { chunk -> decoder.push(chunk.bytes)?.let { send(it) } }
         if (!decoder.started) throw SpeechEndpointException(SpeechOperation.SPEECH, VoiceErrorCode.BAD_RESPONSE)
+    }
+
+    /**
+     * Opens (or reuses) the connection to the speech endpoint ahead of the first segment, so the
+     * reply's first request skips the connection set-up: a reachability request that carries no
+     * text or audio. Only sent where the person granted text for synthesis to that endpoint; fails
+     * like any request (the caller ignores the outcome).
+     */
+    suspend fun warm() {
+        client.requireGrant(grants, VoiceEndpointPayload.TEXT_FOR_SYNTHESIS, SpeechOperation.REACHABILITY)
+        client.checkReachable()
     }
 }
