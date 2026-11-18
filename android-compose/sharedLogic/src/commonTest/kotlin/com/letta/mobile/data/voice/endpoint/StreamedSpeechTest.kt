@@ -151,7 +151,7 @@ class StreamedSpeechTest {
     @Test
     fun prefetchedSentencesPlayInOrderOneAhead() = streamTest { scope ->
         val player = StreamingPlayer()
-        val mouth = EndpointVoiceMouth(synthesizer, player, scope)
+        val mouth = EndpointVoiceMouth(synthesizer, player, scope, MouthOptions.SEQUENTIAL)
         // overflow: test-only.
         val events = Channel<VoiceMouthEvent>(Channel.UNLIMITED)
         val subscribed = CompletableDeferred<Unit>()
