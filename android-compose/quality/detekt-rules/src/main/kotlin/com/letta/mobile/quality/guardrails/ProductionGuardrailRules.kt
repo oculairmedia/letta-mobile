@@ -1,8 +1,8 @@
 package com.letta.mobile.quality.guardrails
 
-import com.letta.mobile.quality.MobileRule
-import com.letta.mobile.quality.isGenerated
-import com.letta.mobile.quality.isTestSource
+import com.letta.mobile.quality.core.MobileRule
+import com.letta.mobile.quality.core.isGenerated
+import com.letta.mobile.quality.core.isTestSource
 import io.gitlab.arturbosch.detekt.api.Config
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtBinaryExpression
