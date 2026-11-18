@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +45,7 @@ import com.letta.mobile.sharedui.resources.rows_tool_card_failed
 import com.letta.mobile.sharedui.resources.rows_tool_card_loaded_skill
 import com.letta.mobile.sharedui.resources.rows_tool_card_loading_skill
 import com.letta.mobile.sharedui.resources.rows_tool_card_section_contents
+import com.letta.mobile.sharedui.resources.rows_tool_card_section_instructions
 import com.letta.mobile.sharedui.resources.rows_tool_card_section_prompt
 import com.letta.mobile.sharedui.resources.rows_tool_card_sent_message_to
 import com.letta.mobile.sharedui.resources.rows_tool_open_subagent
@@ -189,16 +191,26 @@ private fun RowScope.SubagentTrailing(toolCall: UiToolCall) {
 }
 
 /**
+ * By tool call id, the instructions a loaded skill brought in that were too large to hold inline:
+ * a pager over their stored body, which the settled timeline provides. Null for any other call.
+ */
+internal val LocalSkillInstructionPages = compositionLocalOf<(String) -> (@Composable () -> Unit)?> { { null } }
+
+/**
  * "Loaded skill pdf" as a quiet line whose chevron opens a panel: the skill's directory and
  * description, then its contents, rendered and scrolling in a capped height. "Loading skill" with
- * a spinner while the call runs.
+ * a spinner while the call runs. The contents are the skill's instructions when the runtime sent
+ * them apart from the result (which then only says "Launching skill: pdf"); instructions too large
+ * to hold inline open on demand, a page at a time, under the same chevron.
  */
 @Composable
 private fun SkillLoadCard(toolCall: UiToolCall, detail: LineDisclosure) {
     val state = remember(toolCall) { classifyToolCallState(toolCall) }
     val running = state == ToolTimelineState.Running
     val result = toolCall.result.orEmpty()
-    val body = remember(result) { skillBody(result) }
+    val instructions = toolCall.skillInstructions
+    val body = remember(result, instructions) { instructions?.let { skillBody(skillEnvelopeText(it)) } ?: skillBody(result) }
+    val pages = toolCall.toolCallId?.let(LocalSkillInstructionPages.current)
     val facts = listOfNotNull(
         remember(result) { skillDirectory(result) }
             ?.let { LettaToolCardFact(stringResource(Res.string.rows_tool_card_fact_directory), it, monospace = true) },
@@ -207,6 +219,7 @@ private fun SkillLoadCard(toolCall: UiToolCall, detail: LineDisclosure) {
     )
     val contents = body.second
     val contentsTitle = stringResource(Res.string.rows_tool_card_section_contents)
+    val instructionsTitle = stringResource(Res.string.rows_tool_card_section_instructions)
     val failedLabel = stringResource(Res.string.rows_tool_card_failed)
     LettaToolCard(
         header = LettaToolCardHeader(
@@ -221,11 +234,15 @@ private fun SkillLoadCard(toolCall: UiToolCall, detail: LineDisclosure) {
             trailing = failureTrailing(state.isFailure(), failedLabel),
             expansion = detail,
         ),
-        body = if (facts.isEmpty() && contents == null) null else ({
+        body = if (facts.isEmpty() && contents == null && pages == null) null else ({
             LettaToolCardFacts(facts)
             contents?.let { text ->
                 if (facts.isNotEmpty()) LettaToolCardDivider()
                 LettaToolCardSection(contentsTitle) { CardMarkdown(text) }
+            }
+            pages?.let { stored ->
+                if (facts.isNotEmpty() || contents != null) LettaToolCardDivider()
+                LettaToolCardSection(instructionsTitle) { stored() }
             }
         }),
     )
@@ -292,6 +309,14 @@ private fun skillBody(result: String): Pair<String?, String?> {
     return body.substring(FENCE.length, end) to body.substring(end + FENCE.length + 1).trim().ifBlank { null }
 }
 
+/** A skill envelope's text without its wrapping tags (`<skill_content name="pdf">` … `</skill_content>`, or a bare slug tag). */
+private fun skillEnvelopeText(envelope: String): String {
+    val lines = envelope.trim().lines()
+    val opens = lines.firstOrNull()?.trim()?.let(ENVELOPE_OPENING::matches) == true
+    val closes = lines.size > 1 && lines.last().trim().let(ENVELOPE_CLOSING::matches)
+    return lines.subList(if (opens) 1 else 0, if (closes) lines.size - 1 else lines.size).joinToString("\n")
+}
+
 /** The frontmatter's `description:` value, unquoted. */
 private fun skillDescription(frontmatter: String): String? =
     SKILL_DESCRIPTION.find(frontmatter)?.groupValues?.get(1)?.trim()?.trim('"', '\'')?.ifEmpty { null }
@@ -307,6 +332,8 @@ private val SKILL_DIRECTORY = Regex(
     """^\s*(?:base directory(?: for this skill)?|skill directory|directory)\s*:\s*(.+)$""",
     SKILL_LINE_OPTIONS,
 )
+private val ENVELOPE_OPENING = Regex("""^<[a-z0-9_-]+(?:\s[^>]*)?>$""", RegexOption.IGNORE_CASE)
+private val ENVELOPE_CLOSING = Regex("""^</[a-z0-9_-]+>$""", RegexOption.IGNORE_CASE)
 private val SKILL_DESCRIPTION = Regex("""^description\s*:\s*(.+)$""", SKILL_LINE_OPTIONS)
 private val DONE_WORDS = setOf("completed", "complete", "success", "succeeded", "done")
 private val FAILED_WORDS = setOf("failed", "error", "errored", "cancelled", "canceled", "killed")
