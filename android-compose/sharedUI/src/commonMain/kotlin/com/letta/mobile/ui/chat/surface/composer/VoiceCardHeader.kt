@@ -26,7 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -133,15 +133,7 @@ private fun RowScope.VoiceCardSpeakerLine(turn: VoiceCardTurn) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false).testTag(VoiceModeTags.CARD_SPEAKER),
         )
-        val elapsed by rememberElapsedText(turn.elapsedMs)
-        val spoken = stringResource(Res.string.voice_card_elapsed, elapsed)
-        Text(
-            text = elapsed,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.customColors.onSurfaceMutedColor,
-            maxLines = 1,
-            modifier = Modifier.testTag(VoiceModeTags.CARD_TIMER).clearAndSetSemantics { contentDescription = spoken },
-        )
+        TurnTimer(turn.elapsedMs)
         Text(
             text = turn.status,
             style = MaterialTheme.typography.labelMedium,
@@ -151,6 +143,21 @@ private fun RowScope.VoiceCardSpeakerLine(turn: VoiceCardTurn) {
             modifier = Modifier.weight(1f, fill = false).testTag(VoiceModeTags.CARD_STATUS),
         )
     }
+}
+
+/** The turn's timer, muted: its own scope, recomposed once a second as the text changes and by nothing else. */
+@Composable
+private fun TurnTimer(elapsedMs: () -> Long) {
+    LocalRecompositionProbe.current?.invoke(PROBE_TIMER)
+    val elapsed by rememberElapsedText(elapsedMs)
+    val spoken = stringResource(Res.string.voice_card_elapsed, elapsed)
+    Text(
+        text = elapsed,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.customColors.onSurfaceMutedColor,
+        maxLines = 1,
+        modifier = Modifier.testTag(VoiceModeTags.CARD_TIMER).clearAndSetSemantics { contentDescription = spoken },
+    )
 }
 
 /** A microphone for the person, sound bars for the agent speaking, three pulsing dots while it thinks. */
@@ -188,7 +195,8 @@ private fun ThinkingDots(tint: Color) {
                     label = "voiceCardDot$dot",
                 )
             }
-            Box(Modifier.size(LettaDimens.Space.xs).alpha(pulse?.value ?: 1f).background(tint, CircleShape))
+            // The pulse is read at draw time: the dots fade without recomposing the header.
+            Box(Modifier.size(LettaDimens.Space.xs).graphicsLayer { alpha = pulse?.value ?: 1f }.background(tint, CircleShape))
         }
     }
 }

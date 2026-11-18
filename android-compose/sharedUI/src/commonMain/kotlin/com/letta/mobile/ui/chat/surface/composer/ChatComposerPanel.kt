@@ -73,6 +73,7 @@ internal data class ComposerInputs(
  */
 @Composable
 internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modifier) {
+    LocalRecompositionProbe.current?.invoke(PROBE_COMPOSER)
     val composer = inputs.composer
     val uiState = inputs.uiState
     val actions = inputs.actions

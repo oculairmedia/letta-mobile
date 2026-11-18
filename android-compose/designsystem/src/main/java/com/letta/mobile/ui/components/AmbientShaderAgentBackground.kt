@@ -233,8 +233,7 @@ private fun AmbientCanvas(
         }
     } else {
         Canvas(modifier = modifier.fillMaxSize()) {
-            // Same phase / agitation / envelope floats as the shader path, so
-            // the two paths stay in step by construction.
+            // Same phase / agitation / envelope floats as the shader path: the two stay in step by construction.
             drawAmbientFallback(
                 tint = tint,
                 phase = motion.phase.floatValue,
@@ -277,8 +276,7 @@ private fun rememberAmbientMotion(
                 if (pulse != observed) energy = (energy + StreamImpulse).coerceAtMost(1f)
                 observed = pulse
                 energy *= kotlin.math.exp(-dt / StreamEnergyDecaySeconds)
-                // Turns, not radians, and wrapped: see AmbientMotion.PHASE_WRAP_TURNS for
-                // why an unbounded phase eventually judders.
+                // Turns, not radians, and wrapped: AmbientMotion.PHASE_WRAP_TURNS says why (an unbounded phase judders).
                 phase = (phase + dt * speed()) % AmbientMotion.PHASE_WRAP_TURNS
             }
             last = now
@@ -312,12 +310,9 @@ private fun DrawScope.drawAmbientFallback(
     streamEnergy: Float,
 ) {
     val breath = 0.5f + 0.5f * sin(TwoPi * 0.0146f * phase)
-    // No noise field here; a second sine at an unrelated frequency scaled by agitation approximates the shader's drift so the fallback
-    // still gets livelier when the shader would.
+    // No noise field: a second sine scaled by agitation stands in for the shader's drift, so the fallback still livens.
     val wobble = sin(TwoPi * 0.0394f * phase) * 0.03f * agitation
-    // letta-mobile-shader-position-2026-08-06: anchor pushed from 0.92 to 0.985 so the bright zone sits at the very bottom edge; radius
-    // tightened (0.56 -> 0.46) so the band is short and subtle rather than broad — pairs with shader-side alpha narrowing for a thin
-    // under-composer glow.
+    // Anchored at the very bottom edge (0.985) with a tight radius (0.46): a thin, short under-composer glow.
     val radius = size.maxDimension * (0.46f + 0.12f * breath + wobble)
     val center = Offset(size.width * 0.5f, size.height * 0.985f)
     drawRect(
@@ -334,9 +329,7 @@ private fun DrawScope.drawAmbientFallback(
 }
 
 private fun statusHue(status: AmbientAgentStatus, voice: AmbientVoice?, scheme: ColorScheme, identitySeed: Color?): Color =
-    voice?.tintArgb()?.let(::Color) ?: runStatusHue(status, scheme, identitySeed)
-
-private fun runStatusHue(status: AmbientAgentStatus, scheme: ColorScheme, identitySeed: Color?): Color = when {
+    voice?.tintArgb()?.let(::Color) ?: when {
     status == AmbientAgentStatus.Idle -> Color.Transparent
     status == AmbientAgentStatus.Running || status == AmbientAgentStatus.Active -> identitySeed ?: scheme.primary
     status == AmbientAgentStatus.Failed -> scheme.error

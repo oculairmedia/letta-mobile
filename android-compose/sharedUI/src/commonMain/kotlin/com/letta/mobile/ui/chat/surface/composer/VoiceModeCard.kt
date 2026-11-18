@@ -42,6 +42,7 @@ import com.letta.mobile.sharedui.resources.voice_card_you
 import com.letta.mobile.ui.chat.voice.VoiceCardConversation
 import com.letta.mobile.ui.chat.voice.VoiceCardFeed
 import com.letta.mobile.ui.chat.voice.VoiceCardSpeaker
+import com.letta.mobile.ui.chat.voice.VoiceCardTiming
 import com.letta.mobile.ui.chat.voice.VoiceCardTurn
 import com.letta.mobile.ui.chat.voice.VoiceModeHandle
 import com.letta.mobile.ui.chat.voice.VoiceModeTags
@@ -80,6 +81,7 @@ internal fun VoiceModeCard(
     seamGlow: () -> Color,
     modifier: Modifier = Modifier,
 ) {
+    LocalRecompositionProbe.current?.invoke(PROBE_CARD)
     val state by handle.state.collectAsState()
     if (!state.active) return
     val reducedMotion = LocalReducedMotion.current
@@ -124,7 +126,9 @@ internal fun VoiceModeCard(
                 BoxWithConstraints {
                     VoiceCardHeader(handle, turn, oneLine = maxWidth >= LettaDimens.Pane.voiceCardOneLine)
                 }
-                if (!handle.cardCollapsed) VoiceCardBody(handle, state, conversation.reply, now)
+                if (!handle.cardCollapsed) {
+                    VoiceCardBody(handle, state, conversation.reply, remember(now, turnStart) { VoiceCardTiming(now, turnStart) })
+                }
             }
         }
     }

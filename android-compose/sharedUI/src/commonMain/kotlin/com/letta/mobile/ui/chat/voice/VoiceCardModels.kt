@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.chat.voice
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.State
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -20,7 +21,7 @@ internal enum class VoiceCardSpeaker {
 
 /** What the voice card shows of the conversation: the agent's [name], and the [reply] it speaks while no pieces are published. */
 @Immutable
-internal class VoiceCardConversation(val name: String, val reply: String?)
+internal data class VoiceCardConversation(val name: String, val reply: String?)
 
 /**
  * The header's turn: whose it is, their [name] and [tint], what voice mode is doing ([status]:
@@ -41,3 +42,11 @@ internal class VoiceCardTurn(
 /** A mute switch's test [tag], its [label] ("Mute microphone"), and its [glyph] and [mutedGlyph]. */
 @Immutable
 internal class VoiceCardMuteLook(val tag: String, val label: String, val glyph: ImageVector, val mutedGlyph: ImageVector)
+
+/**
+ * The card's clock: [now] on the feed's clock (read at draw time and in derived state, never directly
+ * in composition) and when the current speaker's turn started ([turnStartMs]), which also tells the
+ * current reply's spoken pieces from an earlier reply's.
+ */
+@Immutable
+internal class VoiceCardTiming(val now: State<Long>, val turnStartMs: Long)

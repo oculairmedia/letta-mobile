@@ -75,7 +75,8 @@ class VoiceModeCardRenderTest {
     }
 
     private fun render(scene: Scene, width: Int, dark: Boolean) = runDesktopComposeUiTest(width = width, height = HEIGHT) {
-        val feed = FakeVoiceCardFeed(clock = SPOKEN_AT)
+        // The agent's turn starts at 0 (the card shows from there); its pieces play from then on.
+        val feed = FakeVoiceCardFeed(clock = 0)
         feed.spokenSegments.value = REPLY
         val state = MutableStateFlow(
             when (scene) {
@@ -109,6 +110,7 @@ class VoiceModeCardRenderTest {
             }
             ScenePage(handle, touch, dark)
         }
+        feed.clock = SPOKEN_AT
         // Twice: string resources load off the frame clock, and their first frame may show the last scene's words.
         repeat(2) {
             repeat(FRAMES) { mainClock.advanceTimeByFrame() }

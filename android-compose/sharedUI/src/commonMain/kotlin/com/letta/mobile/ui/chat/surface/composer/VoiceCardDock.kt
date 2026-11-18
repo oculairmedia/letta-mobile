@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -26,6 +27,22 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /**
+ * Counts compositions by name where a test asks to ([recompositions while voice mode runs are measured
+ * by VoiceRecompositionTest]); null, and free, otherwise.
+ */
+internal val LocalRecompositionProbe = staticCompositionLocalOf<((String) -> Unit)?> { null }
+
+internal const val PROBE_COMPOSER = "composer"
+internal const val PROBE_DOCK = "dock"
+internal const val PROBE_CARD = "card"
+internal const val PROBE_SPOKEN = "card-spoken"
+internal const val PROBE_TIMER = "card-timer"
+internal const val PROBE_BODY = "card-body"
+
+/** Hears the reply's lit edge (in characters) each time it is drawn, where a test asks to; null otherwise. */
+internal val LocalSpokenEdgeProbe = staticCompositionLocalOf<((Int) -> Unit)?> { null }
+
+/**
  * A prompt bar ([bar]) with the voice card extending from it while voice mode runs: the card sits
  * behind the bar, a little narrower ([LettaDimens.Space.lg] in from each side) and anchored to its top
  * edge, its bottom tucked [LettaDimens.Radius.lg] (the bar's corner) under it, so the two read as one
@@ -35,6 +52,7 @@ import com.letta.mobile.ui.theme.LocalReducedMotion
  */
 @Composable
 internal fun VoiceCardDock(uiState: ChatUiState, modifier: Modifier = Modifier, bar: @Composable () -> Unit) {
+    LocalRecompositionProbe.current?.invoke(PROBE_DOCK)
     val handle = LocalVoiceMode.current
     val state = handle?.state?.collectAsState()?.value
     val running = handle != null && state?.active == true

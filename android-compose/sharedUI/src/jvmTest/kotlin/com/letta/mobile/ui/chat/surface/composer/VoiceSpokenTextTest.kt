@@ -3,9 +3,11 @@ package com.letta.mobile.ui.chat.surface.composer
 import androidx.compose.ui.graphics.Color
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.output.SpokenSegment
+import com.letta.mobile.data.voice.speech.SentenceChunker
 import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 /**
  * How much of the reply the voice card lights: finished pieces whole, the playing piece in proportion
@@ -76,6 +78,27 @@ class VoiceSpokenTextTest {
         assertEquals(reply, replyToShow("I can help refactor code,", reply))
         assertEquals("I can help", replyToShow("I can help", null))
         assertEquals("Longer spoken text than the reply", replyToShow("Longer spoken text than the reply", "Short"))
+    }
+
+    /**
+     * A formatted reply lights by the same words that are spoken: the card shows it as the speech path
+     * speaks it (no markdown, link target or code block), so the spoken pieces' character count ends
+     * exactly where the spoken words end, at any speed.
+     */
+    @Test
+    fun aFormattedReplyLightsAtTheSpokenPosition() {
+        val reply = "Use **bold** words and see [the guide](https://example.org/guide) first.\n\n" +
+            "```kotlin\nval answer = 42\n```\n\nThen run it again."
+        // What the speech path speaks of it, piece by piece: the chunker the mouth is fed by.
+        val chunker = SentenceChunker()
+        val pieces = chunker.push(VoiceText(reply)) + chunker.flush()
+        val spoken = listOf(piece(0, pieces[0].value, startedAtMs = 0, durationMs = 1_000, finishedAtMs = 1_000))
+        val shown = replyToShow(spokenReply(spoken), reply)
+        val lit = spokenCharacters(spoken, nowMs = 1_000, interpolate = true)
+
+        assertEquals("Use bold words and see the guide first. Then run it again.", shown)
+        assertEquals("Use bold words and see the guide first.", shown.substring(0, lit), "the light ends where the speech is")
+        listOf("**", "https://", "```", "answer").forEach { assertFalse(it in shown, "$it is not shown") }
     }
 
     @Test

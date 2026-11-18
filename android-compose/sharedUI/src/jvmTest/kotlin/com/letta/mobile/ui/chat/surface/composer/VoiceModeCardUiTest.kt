@@ -115,6 +115,9 @@ class VoiceModeCardUiTest {
     private val words = MutableStateFlow<VoiceText?>(null)
     private var reply by mutableStateOf<String?>(null)
 
+    /** The reply's lit edge as last drawn (LocalSpokenEdgeProbe). */
+    private var litEdge = -1
+
     @Composable
     private fun rememberHandle(feed: VoiceCardFeed): VoiceModeHandle {
         val scope = rememberCoroutineScope()
@@ -136,7 +139,7 @@ class VoiceModeCardUiTest {
     private fun ComposeUiTest.showCard(feed: VoiceCardFeed, width: Dp = 760.dp, reducedMotion: Boolean = false) = setContent {
         val handle = rememberHandle(feed)
         MaterialTheme {
-            CompositionLocalProvider(LocalReducedMotion provides reducedMotion) {
+            CompositionLocalProvider(LocalReducedMotion provides reducedMotion, LocalSpokenEdgeProbe provides { litEdge = it }) {
                 Box(Modifier.width(width)) {
                     VoiceModeCard(handle, VoiceCardConversation("Scout", reply), seamGlow = { Color.Transparent })
                 }
@@ -249,10 +252,51 @@ class VoiceModeCardUiTest {
     }
 
     /** How many characters of the card's body are in the bright ink (the body's first span). */
-    private fun ComposeUiTest.litCharacters(): Int = bodyText().spanStyles.minByOrNull { it.start }?.end ?: 0
+    @Suppress("UnusedReceiverParameter")
+    private fun ComposeUiTest.litCharacters(): Int = litEdge
 
     private fun ComposeUiTest.bodyText() =
         onNodeWithTag(VoiceModeTags.CARD_BODY, useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text].single()
+
+    /**
+     * The card shows only the reply being spoken: an earlier reply's pieces still in the feed (they
+     * started before the agent's turn) are left out, and a chat reply that is not the one being spoken
+     * (the newest reply has not reached the chat yet) is never shown in its place.
+     */
+    @Test
+    fun theBodyShowsOnlyTheReplyBeingSpokenNow() = runComposeUiTest {
+        val feed = FakeVoiceCardFeed(clock = 1_000)
+        state.value = VoiceModeState.Speaking
+        mainClock.autoAdvance = false
+        showCard(feed)
+        val first = "That one is about the first question."
+        reply = first
+        feed.spokenSegments.value = listOf(
+            SpokenSegment(0, VoiceText(first), startedAtMs = 1_200, audioDurationMs = 800, finishedAtMs = 2_000),
+        )
+        feed.clock = 2_000
+        frame()
+        assertEquals(first, bodyText().text)
+
+        // The person speaks, then the agent's next turn: its earlier pieces are still in the feed.
+        feed.clock = 3_000
+        state.value = VoiceModeState.Hearing
+        frame()
+        feed.clock = 4_000
+        state.value = VoiceModeState.WaitingForReply
+        frame()
+        val second = "And this answers the second one."
+        feed.spokenSegments.value = feed.spokenSegments.value +
+            SpokenSegment(1, VoiceText(second), startedAtMs = 4_500, audioDurationMs = 1_000, finishedAtMs = null)
+        feed.clock = 5_000
+        state.value = VoiceModeState.Speaking
+        frame()
+        assertEquals(second, bodyText().text, "only the second reply, though the chat still holds the first")
+
+        reply = "$second Shall I go on?"
+        frame()
+        assertEquals("$second Shall I go on?", bodyText().text, "the second reply's rest, dimmed")
+    }
 
     @Test
     fun theMutesAndTheSpeedAreLabelledControlsThatSetTheFeed() = runComposeUiTest {

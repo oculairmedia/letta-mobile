@@ -5,7 +5,9 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.output.SpokenSegment
+import com.letta.mobile.data.voice.speech.SentenceChunker
 import kotlin.math.roundToInt
 
 /** The reply's spoken pieces as one text: in order, trimmed, one space between them. */
@@ -39,13 +41,25 @@ private fun playedShare(segment: SpokenSegment, nowMs: Long, interpolate: Boolea
 }
 
 /**
- * The text to light while the reply is spoken: the chat's [reply] when it holds at least what has
- * been spoken (pieces arrive only as they start playing, so the reply supplies the words still to
- * come, shown dimmed), else the [spoken] pieces themselves.
+ * The text to light while the reply is spoken: the chat's [reply] as voice mode speaks it (markdown,
+ * links, URLs and code blocks left out, through the speech path's own chunker), so the spoken
+ * pieces' character offsets fall on the same words, when it opens with what has been [spoken]
+ * (pieces arrive only as they start playing, so the reply supplies the words still to come, shown
+ * dimmed); else the spoken pieces themselves.
  */
 internal fun replyToShow(spoken: String, reply: String?): String {
-    val full = reply?.trim()?.takeIf { it.isNotEmpty() } ?: return spoken
-    return if (full.length >= spoken.length) full else spoken
+    val full = reply?.let(::speakableReply)?.takeIf { it.isNotEmpty() } ?: return spoken
+    // Only the reply being spoken: a chat reply that does not open with the spoken words is another one
+    // (the person's newest message not yet in the chat, say), so it is never shown in its place.
+    return if (full.length >= spoken.length && full.startsWith(spoken)) full else spoken
+}
+
+/** [reply] as the speech path speaks it: chunked and cleaned as one whole reply, pieces joined as [spokenReply] joins them. */
+internal fun speakableReply(reply: String): String {
+    if (reply.isBlank()) return ""
+    val chunker = SentenceChunker()
+    val pieces = chunker.push(VoiceText(reply)) + chunker.flush()
+    return pieces.map { it.value.trim() }.filter { it.isNotEmpty() }.joinToString(SEPARATOR)
 }
 
 /** [text] with its first [spoken] characters in [bright] and the rest in [dim]. */
