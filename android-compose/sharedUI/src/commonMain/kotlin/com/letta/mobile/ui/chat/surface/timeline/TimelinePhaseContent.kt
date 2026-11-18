@@ -26,11 +26,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
@@ -71,7 +70,7 @@ internal fun TimelineLoadingSkeleton(modifier: Modifier = Modifier) {
 @Composable
 private fun SkeletonBubble(isUser: Boolean, index: Int) {
     val transition = rememberInfiniteTransition(label = "timelineSkeleton")
-    val pulse by transition.animateFloat(
+    val pulse = transition.animateFloat(
         initialValue = ChatTimelineDimens.Alpha.skeletonPulseLow,
         targetValue = ChatTimelineDimens.Alpha.skeletonPulseHigh,
         animationSpec = infiniteRepeatable(
@@ -94,7 +93,7 @@ private fun SkeletonBubble(isUser: Boolean, index: Int) {
                 .widthIn(max = maxWidth)
                 .clip(ChatRowCardShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .alpha(pulse)
+                .graphicsLayer { alpha = pulse.value }
                 .padding(LettaDimens.Space.md),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
