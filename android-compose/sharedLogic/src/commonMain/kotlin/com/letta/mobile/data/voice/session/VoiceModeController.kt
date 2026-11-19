@@ -7,6 +7,9 @@ import com.letta.mobile.data.voice.VoicePhase
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.activation.VoiceActivationKind
 import com.letta.mobile.data.voice.audio.pcm.VoiceLevelMeter
+import com.letta.mobile.data.voice.consent.VoiceEndpointGrantSource
+import com.letta.mobile.data.voice.host.client.SharedVoiceSetup
+import com.letta.mobile.data.voice.host.client.VoiceRoute
 import com.letta.mobile.data.voice.local.LocalHandoverReason
 import com.letta.mobile.data.voice.loop.VoiceLoop
 import com.letta.mobile.data.voice.loop.VoiceLoopRuntime
@@ -17,6 +20,7 @@ import com.letta.mobile.data.voice.session.telemetry.VoiceTelemetrySink
 import com.letta.mobile.data.voice.session.telemetry.diagnosticKey
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -79,6 +83,13 @@ enum class VoicePress {
  * failure ([VoiceModeState.TurnFailed]) until the person says something new. Only the microphone or
  * its permission going away, a missing setup, an engine that ends or will not let go, or a stop end it.
  *
+ * Where the connected host shares a speech server ([shared], over the host connection), sessions go
+ * through it: whether setup is missing is then decided from the shared setup (and, where the session
+ * listens through the server, this device's one-time audio acknowledgement), never from this
+ * device's own server, which is used only when the host does not serve the voice-endpoint contract,
+ * has no setup, or the person chose this device's own server. A failed read of the shared setup keeps
+ * the last one known, so a host setup in force never silently gives way to this device's own.
+ *
  * Commands are applied in order by one coroutine in [runtime]'s scope and dispatcher; [sessions] is
  * opened on the thread that presses (the UI thread), so a host may read its own UI state there.
  * Nothing here logs audio, transcripts, addresses or keys; every `VoiceMode` event is timed on
@@ -93,8 +104,10 @@ class VoiceModeController(
     private val config: VoiceLoopConfig = VoiceLoopConfig(),
     timeSource: TimeSource = TimeSource.Monotonic,
     telemetrySink: VoiceTelemetrySink = VoiceTelemetrySink.None,
+    private val shared: SharedVoiceSetup? = null,
 ) {
     private val telemetry = VoiceTelemetry(timeSource, telemetrySink)
+    private val routing = SessionRouting(store, engines, shared)
 
     /**
      * The voice card's controls and what voice mode is saying: the current reply's spoken
@@ -167,6 +180,11 @@ class VoiceModeController(
 
     init {
         runtime.scope.launch(runtime.dispatcher) { store.setup.collect { offer(Command.SetupChanged) } }
+        shared?.let { host ->
+            runtime.scope.launch(runtime.dispatcher) { host.state.collect { offer(Command.SetupChanged) } }
+            // Learn the shared setup up front, so the first press already knows whether the host has one.
+            runtime.scope.launch(runtime.dispatcher) { host.refresh() }
+        }
     }
 
     /**
@@ -185,8 +203,11 @@ class VoiceModeController(
 
     /** Setup first, then the microphone permission, then start. */
     private fun pressToStart(): VoicePress {
-        store.setup.value.gap?.let { gap ->
-            offer(Command.Idle(VoiceModeState.NeedsSetup(gap)))
+        val setup = store.setup.value
+        // While the host's shared setup is still being read, starting decides once it is known.
+        val gap = if (routing.pending) null else routing.gapNow(setup)
+        gap?.let {
+            offer(Command.Idle(VoiceModeState.NeedsSetup(it)))
             return VoicePress.OPEN_SETUP
         }
         if (microphone.granted()) return VoicePress.STARTED.also { start() }
@@ -241,7 +262,8 @@ class VoiceModeController(
     private fun applyQuick(command: Command) {
         when (command) {
             Command.Interrupt -> live?.interruptSpeech()
-            Command.SetupChanged -> clearResolvedSetup()
+            // A prompt for a setup that is now complete clears, unless a session started meanwhile.
+            Command.SetupChanged -> if (live == null && routing.completes(mutableState.value)) mutableState.value = VoiceModeState.Off
             // Shows why nothing started, unless a session started meanwhile.
             is Command.Idle -> if (live == null) mutableState.value = command.state
             else -> Unit
@@ -249,10 +271,6 @@ class VoiceModeController(
     }
 
 
-    private fun clearResolvedSetup() {
-        val waitingForSetup = mutableState.value is VoiceModeState.NeedsSetup && live == null
-        if (waitingForSetup && store.setup.value.gap == null) mutableState.value = VoiceModeState.Off
-    }
 
     private suspend fun retryOrBegin(session: VoiceChatSession?) {
         val current = live ?: return begin(session)
@@ -270,7 +288,8 @@ class VoiceModeController(
         if (running != null && running.loop.state.value.failure == null) return
         end(VoiceModeState.Off, RESTARTED)
         val setup = store.setup.value
-        setup.gap?.let { gap ->
+        val route = routing.resolve(setup)
+        routing.gap(setup, route)?.let { gap ->
             mutableState.value = VoiceModeState.NeedsSetup(gap)
             return
         }
@@ -279,7 +298,7 @@ class VoiceModeController(
             mutableState.value = VoiceModeState.NeedsConversation
             return
         }
-        val started = launchLoop(session, setup) ?: return
+        val started = launchLoop(session, setup, route) ?: return
         live = started
         mutableBargeInByVoice.value = started.set.bargeInByVoice
         telemetry.started(echoCancelled = started.set.echoCancelled, bargeInByVoice = started.set.bargeInByVoice)
@@ -287,11 +306,10 @@ class VoiceModeController(
         started.loop.activate(VoiceActivationKind.TAP)
     }
 
-    private fun launchLoop(session: BoundVoiceChatSession, setup: VoiceSetup): LiveVoice? {
+    private fun launchLoop(session: BoundVoiceChatSession, setup: VoiceSetup, route: VoiceRoute): LiveVoice? {
         val job = SupervisorJob(runtime.scope.coroutineContext[Job])
         val scope = runtime.scope + job + runtime.dispatcher
-        val services = VoiceSessionServices(telemetry, controls)
-        val request = VoiceEngineRequest(session, setup, store.apiKey(), { store.setup.value.grants }, scope, services)
+        val request = engineRequest(session, setup, route, scope)
         val built = runCatching { engines.create(request) }
         val error = built.exceptionOrNull()
         if (error is CancellationException) throw error
@@ -304,7 +322,9 @@ class VoiceModeController(
         val loopConfig = config.copy(voiceInterrupts = config.voiceInterrupts && set.bargeInByVoice)
         val (ear, mouth) = controls.engines(set.engines.ear, set.engines.mouth)
         val loop = VoiceLoop(set.engines.copy(ear = ear, mouth = mouth), loopConfig, runtime.copy(scope = scope, observer = telemetry.loop))
-        val follower = scope.launch { loop.state.collect { mutableState.value = VoiceModeProjection.of(it, store.setup.value.gap) } }
+        val follower = scope.launch {
+            loop.state.collect { mutableState.value = VoiceModeProjection.of(it, routing.failureGap(setup, route, set)) }
+        }
         val tracer = scope.launch { loop.state.distinctUntilChangedBy { it.diagnosticKey() }.collect(telemetry::loopState) }
         val watcher = scope.launch { session.awaitMove { commands.send(Command.Stop(CONVERSATION_CHANGED)) } }
         // Half-duplex, the ear ignores the microphone while the reply plays: the level reads 0 at
@@ -325,6 +345,21 @@ class VoiceModeController(
         val handedOver = scope.launch { set.handover.collect { reason -> if (reason != null) mutableHandover.value = reason } }
         val controlled = scope.launch { controls.follow(loop.state) }
         return LiveVoice(loop, set, job, listOf(follower, tracer, watcher, hearing, playing, words, handedOver, controlled))
+    }
+
+    /**
+     * The request for one session's engines on [route]. Through the host this device's own key is
+     * never handed to the engines; the grants are read live, with this device's audio acknowledgement.
+     */
+    private fun engineRequest(
+        session: VoiceChatSession,
+        setup: VoiceSetup,
+        route: VoiceRoute,
+        scope: CoroutineScope,
+    ): VoiceEngineRequest {
+        val apiKey = if (route is VoiceRoute.Host) null else store.apiKey()
+        val grants = VoiceEndpointGrantSource { store.setup.value.effectiveGrants }
+        return VoiceEngineRequest(session, setup, apiKey, grants, scope, VoiceSessionServices(telemetry, controls), route)
     }
 
     /** Releases the live session, if any (reporting [reason]), and then publishes [next]. Completes even when cancelled. */
@@ -393,6 +428,43 @@ private suspend fun publishLevel(readings: Flow<Float>, out: MutableStateFlow<Fl
     }
 }
 
+
+/**
+ * Where a [VoiceModeController]'s sessions go and what they still lack: through [shared] (the host's
+ * shared speech setup) when it is in force, else this device's own server.
+ */
+private class SessionRouting(
+    private val store: VoiceSetupStore,
+    private val engines: VoiceEngineFactory,
+    private val shared: SharedVoiceSetup?,
+) {
+    /** Whether a press cannot yet tell the route: the host's shared setup is still being read. */
+    val pending: Boolean get() = shared?.pending == true
+
+    /** Where a session would go now, by what is known without waiting. */
+    fun now(setup: VoiceSetup): VoiceRoute = shared?.route(setup.prefersDevice) ?: VoiceRoute.Direct
+
+    /** Where a session goes, after reading the shared setup again. */
+    suspend fun resolve(setup: VoiceSetup): VoiceRoute = shared?.resolveRoute(setup.prefersDevice) ?: VoiceRoute.Direct
+
+    /** What a session on [route] still lacks, given whether these engines would listen through the server. */
+    fun gap(setup: VoiceSetup, route: VoiceRoute): VoiceSetupGap? = setup.gapFor(route, engines.listensOnServer(setup))
+
+    /** What a session started now would still lack. */
+    fun gapNow(setup: VoiceSetup): VoiceSetupGap? = gap(setup, now(setup))
+
+    /** Whether [state] asks for a setup that the stored and shared setup now complete. */
+    fun completes(state: VoiceModeState): Boolean = state is VoiceModeState.NeedsSetup && gapNow(store.setup.value) == null
+
+    /**
+     * The setup gap a loop failure points to: a refused permission is a missing acknowledgement only
+     * where this session listens through the server (its own ear, or the ear it handed over to).
+     */
+    fun failureGap(setup: VoiceSetup, route: VoiceRoute, set: VoiceEngineSet): VoiceSetupGap? {
+        val serverEar = engines.listensOnServer(setup) || set.handover.value != null
+        return store.setup.value.gapFor(route, serverEar)
+    }
+}
 
 /**
  * A chat session bound to the conversation it was first seen in. Once the session has moved to

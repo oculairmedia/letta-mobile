@@ -11,6 +11,14 @@ import com.letta.mobile.data.voice.endpoint.MouthOptions
 import com.letta.mobile.data.voice.endpoint.SpeechApiKey
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointClient
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointConfig
+import com.letta.mobile.data.voice.endpoint.SpeechEndpointLocality
+import com.letta.mobile.data.voice.endpoint.StreamingSpeechSynthesizer
+import com.letta.mobile.data.voice.SpeechEndpointUrl
+import com.letta.mobile.data.voice.consent.VoiceEndpointGrant
+import com.letta.mobile.data.voice.consent.VoiceEndpointPayload
+import com.letta.mobile.data.voice.host.client.HostSpeechSynthesizer
+import com.letta.mobile.data.voice.host.client.HostSpeechTranscriber
+import com.letta.mobile.data.voice.host.client.VoiceRoute
 import com.letta.mobile.data.voice.loop.VoiceEngines
 import com.letta.mobile.data.voice.output.VoiceSessionControls
 import com.letta.mobile.data.voice.responder.VoiceChatResponder
@@ -56,6 +64,8 @@ class VoiceEngineRequest internal constructor(
     val scope: CoroutineScope,
     /** Where the engines report their decisions, and the controls they follow. */
     internal val services: VoiceSessionServices,
+    /** Where speech goes: through the host's shared server, or straight to this device's own. */
+    val route: VoiceRoute = VoiceRoute.Direct,
 ) {
     /**
      * A request whose engines report with their own clock (it starts at the first `mode.started`)
@@ -67,7 +77,7 @@ class VoiceEngineRequest internal constructor(
         apiKey: SpeechApiKey?,
         grants: VoiceEndpointGrantSource,
         scope: CoroutineScope,
-    ) : this(session, setup, apiKey, grants, scope, VoiceSessionServices.standalone(setup))
+    ) : this(session, setup, apiKey, grants, scope, VoiceSessionServices.standalone(setup), VoiceRoute.Direct)
 
     /** Where the engines report their decisions, timed from the session's start. */
     internal val telemetry: VoiceTelemetry get() = services.telemetry
@@ -75,7 +85,7 @@ class VoiceEngineRequest internal constructor(
     /** The mutes, speed, warm-up and audio meter the engines follow. */
     internal val controls: VoiceSessionControls get() = services.controls
 
-    override fun toString(): String = "VoiceEngineRequest(keySet=${apiKey != null})"
+    override fun toString(): String = "VoiceEngineRequest(keySet=${apiKey != null}, route=$route)"
 }
 
 /**
@@ -120,23 +130,39 @@ internal class VoiceSessionServices(
 fun interface VoiceEngineFactory {
     /** The engines for [request]. */
     fun create(request: VoiceEngineRequest): VoiceEngineSet
+
+    /**
+     * Whether a session for [setup] would listen through the speech server rather than the device's
+     * own recogniser; the default assumes it does.
+     */
+    fun listensOnServer(setup: VoiceSetup): Boolean = true
 }
 
 /**
- * The endpoint engines over a platform's [audio]. The ear follows the person's [VoiceListening]
- * setting ([ListeningChoice]): the device's own recogniser ([VoiceAudio.localRecognizer]) through a
- * [LocalVoiceEar], paused while the app speaks unless the recogniser is echo-cancelled, with the
- * server ear as its fallback under Automatic; or a voice-activity ear on the microphone (reopened
- * when a device goes away) that transcribes each turn through the endpoint, half-duplex where the
- * microphone is not echo-cancelled and the person has not asked to interrupt by speaking. The
- * agent's chat is the responder, and the mouth streams WAVE audio from the endpoint and plays it on
- * the speaker, two requests in flight and up to three sentences ahead, at the stored speed. The
- * request's controls mute the microphone (its frames go silent) and the speaker, get each
- * segment's audio length, and warm the speech connection when the person starts speaking; the
- * server ear ends a turn after the stored end-of-turn silence and, when [VoiceSetup.livePartials],
- * reports the person's words live. Each session gets its own HTTP client on a fresh engine from [httpEngine], closed on
- * release. Every engine reports its decisions as `VoiceMode` telemetry (states, reasons, ids,
- * counts and levels; never audio, text, the key or the address).
+ * The voice engines over a platform's [audio], speaking and listening through the route the request
+ * names ([VoiceEngineRequest.route]).
+ *
+ * - **Through the host** ([VoiceRoute.Host]): the speech server the host shares with every device,
+ *   reached over the host connection. The server ear transcribes each turn (and its live partials)
+ *   with `voice.transcribe` after checking this device's own audio acknowledgement; the mouth
+ *   streams PCM with `voice.speech`, one request at a time (the host serves one per connection), at
+ *   the server's normal speed. This device's key and HTTP client are never used.
+ * - **Directly** ([VoiceRoute.Direct]): this device's own speech server through a fresh HTTP client on
+ *   an engine from [httpEngine], closed on release; the mouth keeps two requests in flight and asks
+ *   for the stored speed.
+ *
+ * Either way the ear follows the person's [VoiceListening] setting ([ListeningChoice]): the device's
+ * own recogniser ([VoiceAudio.localRecognizer]) through a [LocalVoiceEar], paused while the app
+ * speaks unless the recogniser is echo-cancelled, with the server ear as its fallback under
+ * Automatic; or a voice-activity ear on the microphone (reopened when a device goes away) that
+ * transcribes each turn through the speech server, half-duplex where the microphone is not
+ * echo-cancelled and the person has not asked to interrupt by speaking. The agent's chat is the
+ * responder, and the mouth plays each segment while it streams in, up to three sentences ahead. The
+ * request's controls mute the microphone and the speaker, get each segment's audio length, and warm
+ * the speech connection when the person starts speaking; the server ear ends a turn after the stored
+ * end-of-turn silence and, when live partials are on, reports the person's words live. Every engine
+ * reports its decisions as `VoiceMode` telemetry (states, reasons, ids, counts and levels; never
+ * audio, text, the key or the address).
  */
 class EndpointVoiceEngineFactory(
     private val audio: VoiceAudio,
@@ -144,30 +170,63 @@ class EndpointVoiceEngineFactory(
     private val format: AudioFrameFormat = AudioFrameFormat(),
 ) : VoiceEngineFactory {
     override fun create(request: VoiceEngineRequest): VoiceEngineSet {
-        val endpoint = request.setup.endpoint
-        val url = checkNotNull(endpoint.baseUrl) { "Voice mode started without an endpoint" }
-        val engine = httpEngine()
-        val client = SpeechEndpointClient(engine, SpeechEndpointConfig(url, request.apiKey))
+        val speech = speechFor(request)
+        val throughHost = request.route is VoiceRoute.Host
         val telemetry = request.telemetry
-        val hearing = hearing(request, client)
-        val synthesizer = EndpointSpeechSynthesizer(client, request.grants, endpoint, AudioEncoding.WAV)
+        telemetry.event("speech.route", "route" attr if (throughHost) "host" else "direct")
+        val hearing = hearing(request, speech)
         val controls = request.controls
-        controls.warmUpWith { synthesizer.warm() }
-        val options = MouthOptions(speed = controls::speed, meter = controls.meter)
+        controls.warmUpWith { speech.synthesizer.warm() }
+        val inFlight = if (throughHost) HOST_IN_FLIGHT else DIRECT_IN_FLIGHT
+        val options = MouthOptions(maxInFlight = inFlight, speed = controls::speed, meter = controls.meter)
         val speaker = controls.speaker(audio.speaker(request.scope))
-        val mouth = TelemetryMouth(EndpointVoiceMouth(synthesizer, speaker, request.scope, options), telemetry)
+        val mouth = TelemetryMouth(EndpointVoiceMouth(speech.synthesizer, speaker, request.scope, options), telemetry)
         val session = TelemetryVoiceChatSession(request.session, telemetry)
         val responder = TelemetryResponder(VoiceChatResponder(session), telemetry, session)
         val engines = VoiceEngines(ear = hearing.ear, responder = responder, mouth = mouth)
         return VoiceEngineSet(engines, hearing.echoCancelled, hearing.bargeInByVoice, hearing.handover) {
             hearing.close()
+            speech.close()
+        }
+    }
+
+    override fun listensOnServer(setup: VoiceSetup): Boolean {
+        val availability = audio.localRecognizer()?.availability(null) ?: LocalSpeechAvailability.UNAVAILABLE
+        return ListeningChoice.resolve(setup.listening, availability) == ListeningRoute.SERVER
+    }
+
+    /** The transcriber and synthesizer of the request's route. */
+    private fun speechFor(request: VoiceEngineRequest): Speech = when (val route = request.route) {
+        is VoiceRoute.Host -> hostSpeech(request, route)
+        VoiceRoute.Direct -> directSpeech(request)
+    }
+
+    private fun hostSpeech(request: VoiceEngineRequest, route: VoiceRoute.Host): Speech {
+        val origin = route.origin
+        val acknowledged = {
+            origin != null && VoiceEndpointGrant(origin, VoiceEndpointPayload.AUDIO_FOR_TRANSCRIPTION) in request.grants.current().grants
+        }
+        val transcriber = HostSpeechTranscriber(route.endpoint, acknowledged = acknowledged)
+        val local = route.status.baseUrl?.let { SpeechEndpointLocality.isLocal(SpeechEndpointUrl(it)) } == true
+        val partials = request.setup.tuning.livePartials ?: local
+        return Speech(transcriber, HostSpeechSynthesizer(route.endpoint), partials) {}
+    }
+
+    private fun directSpeech(request: VoiceEngineRequest): Speech {
+        val endpoint = request.setup.endpoint
+        val url = checkNotNull(endpoint.baseUrl) { "Voice mode started without an endpoint" }
+        val engine = httpEngine()
+        val client = SpeechEndpointClient(engine, SpeechEndpointConfig(url, request.apiKey))
+        val transcriber = SpeechTranscriber.endpoint(EndpointTranscriber(client, request.grants, endpoint))
+        val synthesizer = EndpointSpeechSynthesizer(client, request.grants, endpoint, AudioEncoding.WAV)
+        return Speech(transcriber, synthesizer, request.setup.livePartials) {
             client.close()
             engine.close()
         }
     }
 
     /** The ear the setting and the device call for. */
-    private fun hearing(request: VoiceEngineRequest, client: SpeechEndpointClient): Hearing {
+    private fun hearing(request: VoiceEngineRequest, speech: Speech): Hearing {
         val local = audio.localRecognizer()
         val availability = local?.availability(null) ?: LocalSpeechAvailability.UNAVAILABLE
         val route = ListeningChoice.resolve(request.setup.listening, availability)
@@ -177,15 +236,15 @@ class EndpointVoiceEngineFactory(
             "setting" attr request.setup.listening.name,
             "availability" attr availability.name,
         )
-        if (route == ListeningRoute.SERVER) return serverHearing(request, client)
-        return localHearing(request, client, local ?: UnavailableRecognizer, route)
+        if (route == ListeningRoute.SERVER) return serverHearing(request, speech)
+        return localHearing(request, speech, local ?: UnavailableRecognizer, route)
     }
 
-    private fun serverHearing(request: VoiceEngineRequest, client: SpeechEndpointClient): Hearing {
+    private fun serverHearing(request: VoiceEngineRequest, speech: Speech): Hearing {
         val microphone = microphone(request)
         val echoCancelled = microphone.echoCancelled
         val bargeInByVoice = request.setup.bargeInByVoice(echoCancelled)
-        val ear = serverEar(request, client, microphone, halfDuplex = !bargeInByVoice)
+        val ear = serverEar(request, speech, microphone, halfDuplex = !bargeInByVoice)
         return Hearing(ear, echoCancelled, bargeInByVoice, null)
     }
 
@@ -196,13 +255,13 @@ class EndpointVoiceEngineFactory(
      */
     private fun localHearing(
         request: VoiceEngineRequest,
-        client: SpeechEndpointClient,
+        speech: Speech,
         local: LocalSpeechRecognizer,
         route: ListeningRoute,
     ): Hearing {
         val echoCancelled = local.echoCancelled
         val fallback = if (route == ListeningRoute.LOCAL_WITH_FALLBACK) {
-            VoiceEarFallback { serverEar(request, client, microphone(request), halfDuplex = !echoCancelled) }
+            VoiceEarFallback { serverEar(request, speech, microphone(request), halfDuplex = !echoCancelled) }
         } else {
             null
         }
@@ -217,18 +276,28 @@ class EndpointVoiceEngineFactory(
 
     private fun serverEar(
         request: VoiceEngineRequest,
-        client: SpeechEndpointClient,
+        speech: Speech,
         microphone: RecoveringFrameSource,
         halfDuplex: Boolean,
     ): VadVoiceEar {
-        val endpoint = request.setup.endpoint
         val telemetry = request.telemetry
-        val transcriber = TelemetryTranscriber(SpeechTranscriber.endpoint(EndpointTranscriber(client, request.grants, endpoint)), telemetry)
+        val transcriber = TelemetryTranscriber(speech.transcriber, telemetry)
         val policy = EndOfTurnPolicy(trailingSilence = request.setup.tuning.endOfTurnSilence)
-        val partials = LivePartials(enabled = request.setup.livePartials)
+        val partials = LivePartials(enabled = speech.livePartials)
         val earConfig = VadEarConfig(format, policy, observer = VoiceEarTelemetry(telemetry), halfDuplex = halfDuplex, partials = partials)
         return VadVoiceEar(microphone, transcriber, earConfig)
     }
+
+    /**
+     * One route's speech: how the ear transcribes, how the mouth synthesises, whether live partials
+     * are on, and what to close on release.
+     */
+    private class Speech(
+        val transcriber: SpeechTranscriber,
+        val synthesizer: StreamingSpeechSynthesizer,
+        val livePartials: Boolean,
+        val close: () -> Unit,
+    )
 
     /** One session's ear and what it means for interrupting. */
     private class Hearing(
@@ -243,5 +312,11 @@ class EndpointVoiceEngineFactory(
         fun close() {
             (ear as? AutoCloseable)?.close()
         }
+    }
+
+    private companion object {
+        /** The host serves one synthesis per connection: the next request starts once the current one completes. */
+        const val HOST_IN_FLIGHT = 1
+        const val DIRECT_IN_FLIGHT = 2
     }
 }

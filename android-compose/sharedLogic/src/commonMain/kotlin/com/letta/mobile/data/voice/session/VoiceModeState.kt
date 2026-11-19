@@ -15,6 +15,18 @@ enum class VoiceSetupGap {
 
     /** The person has not agreed to send audio and text to that endpoint. */
     NO_CONSENT,
+
+    /**
+     * The host shares a speech server, but not everything this session needs is set up there (a
+     * model, a voice or a shared grant); only an admin device can finish it.
+     */
+    HOST_INCOMPLETE,
+
+    /**
+     * This device listens through the host's shared speech server and has not yet acknowledged that
+     * its microphone audio goes to that server.
+     */
+    NO_DEVICE_ACK,
 }
 
 /** What the chat bar shows for voice mode. Carries no audio, transcript or address. */

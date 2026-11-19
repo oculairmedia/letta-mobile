@@ -2452,7 +2452,7 @@ public final class com/letta/mobile/ui/chat/voice/VoiceModeKt {
 	public static final fun getLocalVoiceMode ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalVoiceSetup ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalVoiceSetupPane ()Landroidx/compose/runtime/ProvidableCompositionLocal;
-	public static final fun rememberVoiceSetupAccess (Lcom/letta/mobile/data/storage/SecureSettingsStore;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/chat/voice/VoiceSetupAccess;
+	public static final fun rememberVoiceSetupAccess (Lcom/letta/mobile/data/storage/SecureSettingsStore;Lcom/letta/mobile/data/voice/host/client/HostVoiceLink;Landroidx/compose/runtime/Composer;II)Lcom/letta/mobile/ui/chat/voice/VoiceSetupAccess;
 }
 
 public final class com/letta/mobile/ui/chat/voice/VoiceModeTags {
@@ -2481,11 +2481,13 @@ public final class com/letta/mobile/ui/chat/voice/VoiceModeTags {
 
 public final class com/letta/mobile/ui/chat/voice/VoiceSetupAccess {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lkotlin/jvm/functions/Function2;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lcom/letta/mobile/data/voice/host/client/SharedVoiceSetup;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lcom/letta/mobile/data/voice/host/client/SharedVoiceSetup;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCheck ()Lkotlin/jvm/functions/Function2;
 	public final fun getEchoCancelled ()Z
 	public final fun getLocalListening ()Lcom/letta/mobile/data/voice/local/LocalSpeechAvailability;
+	public final fun getMigration ()Lcom/letta/mobile/data/voice/session/migration/VoiceSetupMigration;
+	public final fun getShared ()Lcom/letta/mobile/data/voice/host/client/SharedVoiceSetup;
 	public final fun getStore ()Lcom/letta/mobile/data/voice/session/VoiceSetupStore;
 }
 
@@ -7808,13 +7810,38 @@ public final class com/letta/mobile/ui/settings/SettingsStandardSectionsKt {
 public final class com/letta/mobile/ui/settings/VoiceSettingsKeys {
 	public static final field $stable I
 	public static final field CONSENT Ljava/lang/String;
+	public static final field DEVICE_ONLY Ljava/lang/String;
+	public static final field HOST_ACK Ljava/lang/String;
+	public static final field HOST_CLEAR Ljava/lang/String;
+	public static final field HOST_GRANT_AUDIO Ljava/lang/String;
+	public static final field HOST_GRANT_TEXT Ljava/lang/String;
+	public static final field HOST_INCOMPLETE Ljava/lang/String;
+	public static final field HOST_KEY Ljava/lang/String;
+	public static final field HOST_KEY_FIELD Ljava/lang/String;
+	public static final field HOST_LISTENING Ljava/lang/String;
+	public static final field HOST_NOTE Ljava/lang/String;
+	public static final field HOST_REACHABILITY Ljava/lang/String;
+	public static final field HOST_READ_ONLY Ljava/lang/String;
+	public static final field HOST_SAVE Ljava/lang/String;
+	public static final field HOST_SERVER Ljava/lang/String;
+	public static final field HOST_SPEAKING Ljava/lang/String;
+	public static final field HOST_SPEECH_MODEL Ljava/lang/String;
+	public static final field HOST_STATUS Ljava/lang/String;
+	public static final field HOST_TEST Ljava/lang/String;
+	public static final field HOST_TRANSCRIPTION_MODEL Ljava/lang/String;
+	public static final field HOST_URL Ljava/lang/String;
+	public static final field HOST_VOICE Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/ui/settings/VoiceSettingsKeys;
 	public static final field INTERRUPT Ljava/lang/String;
 	public static final field KEY Ljava/lang/String;
 	public static final field LISTENING Ljava/lang/String;
 	public static final field PANE Ljava/lang/String;
+	public static final field REMOVE_LOCAL Ljava/lang/String;
 	public static final field SAVE Ljava/lang/String;
 	public static final field SECTION Ljava/lang/String;
+	public static final field SHARE Ljava/lang/String;
+	public static final field SHARE_STATUS Ljava/lang/String;
+	public static final field SHARE_WITHOUT_KEY Ljava/lang/String;
 	public static final field STATUS Ljava/lang/String;
 	public static final field TEST Ljava/lang/String;
 	public static final field URL Ljava/lang/String;

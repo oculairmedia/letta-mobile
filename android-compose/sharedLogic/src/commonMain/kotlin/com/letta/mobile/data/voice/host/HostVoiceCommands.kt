@@ -1,6 +1,6 @@
 package com.letta.mobile.data.voice.host
 
-import com.letta.mobile.data.model.provider.wire.SecretWriteValue
+import com.letta.mobile.data.rpcwire.SecretWriteValue
 import com.letta.mobile.data.voice.SpeechEndpointUrl
 import com.letta.mobile.data.voice.SpeechLanguage
 import com.letta.mobile.data.voice.SpeechModelName

@@ -44,7 +44,16 @@ internal fun rememberVoiceMode(sessions: VoiceChatSessions?): VoiceModeHandle? {
     val handle = remember(sessions, setup, audio, microphone, scope) {
         val engines = EndpointVoiceEngineFactory(audio, ::newSpeechHttpEngine)
         val runtime = VoiceLoopRuntime(scope, Dispatchers.Default)
-        VoiceModeHandle(VoiceModeController(sessions, setup.store, engines, microphone, runtime, telemetrySink = VoiceModeTelemetry))
+        val controller = VoiceModeController(
+            sessions,
+            setup.store,
+            engines,
+            microphone,
+            runtime,
+            telemetrySink = VoiceModeTelemetry,
+            shared = setup.shared,
+        )
+        VoiceModeHandle(controller)
     }
     // The page's scope is still active here (it is forgotten after this effect); the teardown is
     // bounded by the loop's release budget and must outlive the page, so it is not its child.

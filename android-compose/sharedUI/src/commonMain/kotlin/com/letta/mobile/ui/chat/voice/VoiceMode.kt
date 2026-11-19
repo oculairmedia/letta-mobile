@@ -10,6 +10,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoiceText
+import com.letta.mobile.data.voice.host.client.HostVoiceLink
+import com.letta.mobile.data.voice.host.client.SharedVoiceSetup
 import com.letta.mobile.data.voice.local.LocalHandoverReason
 import com.letta.mobile.data.voice.local.LocalSpeechAvailability
 import com.letta.mobile.data.voice.session.VoiceModeController
@@ -17,12 +19,15 @@ import com.letta.mobile.data.voice.session.VoiceModeState
 import com.letta.mobile.data.voice.session.VoicePress
 import com.letta.mobile.data.voice.session.VoiceSetupDraft
 import com.letta.mobile.data.voice.session.VoiceSetupStore
+import com.letta.mobile.data.voice.session.migration.VoiceSetupMigration
 import com.letta.mobile.data.voice.session.echoCancelled
 import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Voice mode's stored setup and its reachability check, shared by the chat (to start) and the
- * Settings page (to edit). [check] contacts the server without sending audio or text.
+ * Settings page (to edit), with the speech server the host shares with every device ([shared], null
+ * where there is no host connection). [check] contacts this device's own server without sending
+ * audio or text.
  */
 class VoiceSetupAccess(
     /** The stored setup. */
@@ -31,9 +36,14 @@ class VoiceSetupAccess(
     val echoCancelled: Boolean = false,
     /** Whether, and how, this device recognises speech itself (the Listening setting says so). */
     val localListening: LocalSpeechAvailability = LocalSpeechAvailability.UNAVAILABLE,
+    /** The host's shared speech setup, reached over the host connection; null without one. */
+    val shared: SharedVoiceSetup? = null,
     /** Whether a draft's server answers: null when it does, else why not. */
     val check: suspend (VoiceSetupDraft) -> VoiceErrorCode?,
-)
+) {
+    /** Moving this device's own server to the host; null without a host connection. */
+    val migration: VoiceSetupMigration? by lazy { shared?.let { VoiceSetupMigration(store, it) } }
+}
 
 /** The voice setup, where the platform offers voice mode; provided by the shell. */
 val LocalVoiceSetup = staticCompositionLocalOf<VoiceSetupAccess?> { null }
@@ -49,17 +59,19 @@ val LocalVoiceMode = staticCompositionLocalOf<VoiceModeHandle?> { null }
 
 /**
  * The voice setup over [settings], the store the host keeps server tokens in, so the API key lands
- * in it (desktop registers the key as one of its encrypted keys). Null where voice mode is not offered.
+ * in it (desktop registers the key as one of its encrypted keys), and the host's shared speech setup
+ * over [hostLink] (the host connection; null where there is none). Null where voice mode is not offered.
  */
 @Composable
-fun rememberVoiceSetupAccess(settings: SecureSettingsStore): VoiceSetupAccess? {
+fun rememberVoiceSetupAccess(settings: SecureSettingsStore, hostLink: HostVoiceLink? = null): VoiceSetupAccess? {
     if (!voiceModeSupported) return null
     val audio = rememberVoiceAudio()
-    return remember(settings, audio) {
+    return remember(settings, audio, hostLink) {
         val store = VoiceSetupStore(settings = settings, secrets = settings)
         val echoCancelled = audio?.echoCancelled == true
         val local = audio?.localRecognizer()?.availability(null) ?: LocalSpeechAvailability.UNAVAILABLE
-        VoiceSetupAccess(store, echoCancelled, local) { draft -> store.check(draft, newSpeechHttpEngine()) }
+        val shared = hostLink?.let(::SharedVoiceSetup)
+        VoiceSetupAccess(store, echoCancelled, local, shared) { draft -> store.check(draft, newSpeechHttpEngine()) }
     }
 }
 

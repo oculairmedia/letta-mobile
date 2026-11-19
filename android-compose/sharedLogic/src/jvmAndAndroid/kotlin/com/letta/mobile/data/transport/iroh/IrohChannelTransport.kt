@@ -42,6 +42,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -49,6 +50,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import com.letta.mobile.runtime.RuntimeEventDraft
@@ -761,6 +763,13 @@ class IrohChannelTransport(
 
     override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
         adminRpcExecutor.execute(AdminRpcRequest(method, path, body))
+
+    /** Streamed requests are never retried: they go on the ready connection's transport once. */
+    override fun adminRpcStream(method: String, params: JsonObject): Flow<JsonObject> =
+        kotlinx.coroutines.flow.flow {
+            val transport = supervisor.ready().transport ?: error("streamed admin_rpc requested without an active transport")
+            emitAll(transport.adminRpcStream(method, params))
+        }
 
     override suspend fun disconnect() {
         connectionSession.stopAndJoin()

@@ -87,7 +87,9 @@ fun rememberShellPageDeps(
     host: ShellPageHost,
 ): ShellPageDeps {
     ShellLibraryFocusEffects(controllers, host.navigator.state.page.kind, host.navigator.state.currentFocus.agentId)
-    return shellPageDeps(graph, controllers, host, rememberVoiceSetupAccess(host.settings))
+    // Voice goes through the host the session is connected to: its shared speech setup, over Iroh.
+    val voiceLink = remember(graph.channelTransport) { channelVoiceLink(graph.channelTransport) }
+    return shellPageDeps(graph, controllers, host, rememberVoiceSetupAccess(host.settings, voiceLink))
 }
 
 /**
