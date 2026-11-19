@@ -29,6 +29,7 @@ import com.letta.mobile.data.voice.session.telemetry.TelemetryVoiceChatSession
 import com.letta.mobile.data.voice.session.telemetry.VoiceEarTelemetry
 import com.letta.mobile.data.voice.session.telemetry.VoiceTelemetry
 import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
+import com.letta.mobile.data.voice.vad.ear.EarlyTurns
 import com.letta.mobile.data.voice.vad.ear.LivePartials
 import com.letta.mobile.data.voice.vad.ear.SpeechTranscriber
 import com.letta.mobile.data.voice.vad.ear.VadEarConfig
@@ -159,7 +160,9 @@ fun interface VoiceEngineFactory {
  * responder, and the mouth plays each segment while it streams in, up to three sentences ahead. The
  * request's controls mute the microphone and the speaker, get each segment's audio length, and warm
  * the speech connection when the person starts speaking; the server ear ends a turn after the stored
- * end-of-turn silence and, when live partials are on, reports the person's words live. Every engine
+ * end-of-turn silence and, when live partials are on, reports the person's words live and offers
+ * them early when they already cover a closed turn (and, with an early-turn pause stored, offers a
+ * turn's words after that pause; see [EarlyTurns]). Every engine
  * reports its decisions as `VoiceMode` telemetry (states, reasons, ids, counts and levels; never
  * audio, text, the key or the address).
  */
@@ -281,8 +284,10 @@ class EndpointVoiceEngineFactory(
         val telemetry = request.telemetry
         val transcriber = TelemetryTranscriber(speech.transcriber, telemetry)
         val policy = EndOfTurnPolicy(trailingSilence = request.setup.tuning.endOfTurnSilence)
-        val partials = LivePartials(enabled = speech.livePartials)
-        val earConfig = VadEarConfig(format, policy, observer = VoiceEarTelemetry(telemetry), halfDuplex = halfDuplex, partials = partials)
+        val partials = LivePartials(enabled = speech.livePartials, settle = LivePartials.DEFAULT_SETTLE)
+        val early = EarlyTurns(pause = request.setup.tuning.earlyTurnPause)
+        val observer = VoiceEarTelemetry(telemetry)
+        val earConfig = VadEarConfig(format, policy, observer = observer, halfDuplex = halfDuplex, partials = partials, early = early)
         return VadVoiceEar(microphone, transcriber, earConfig)
     }
 

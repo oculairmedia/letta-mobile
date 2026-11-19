@@ -55,6 +55,13 @@ internal data class TurnState(
     val interruptUnresponsive: Boolean = false,
     /** The next turn's key. */
     val nextKey: Long = 1,
+    /**
+     * The answer to words the ear offered before the turn was over: it may be sent and produce
+     * text, but nothing of it plays until the turn's end of turn confirms [tentativeWords].
+     */
+    val tentative: TurnKey? = null,
+    /** The words [tentative] answers. */
+    val tentativeWords: VoiceText? = null,
 ) {
     /** The answer spoken next, or now. */
     val head: PendingReply? get() = replies.firstOrNull()

@@ -60,6 +60,9 @@ enum class SpeechSkipReason {
 
     /** The answer produced no text in time and was stopped. */
     TIMED_OUT,
+
+    /** The answer was to words offered early, and the person went on speaking or the final words differed. */
+    REVISED,
 }
 
 /** Why the app's speech was stopped before it finished. */
