@@ -10,6 +10,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoiceText
+import com.letta.mobile.data.voice.catalog.SpeechCatalog
+import com.letta.mobile.data.voice.endpoint.EndpointSpeechCatalog
 import com.letta.mobile.data.voice.host.client.HostVoiceLink
 import com.letta.mobile.data.voice.host.client.SharedVoiceSetup
 import com.letta.mobile.data.voice.local.LocalHandoverReason
@@ -27,7 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
  * Voice mode's stored setup and its reachability check, shared by the chat (to start) and the
  * Settings page (to edit), with the speech server the host shares with every device ([shared], null
  * where there is no host connection). [check] contacts this device's own server without sending
- * audio or text.
+ * audio or text, and so does [catalog], which lists its models and voices (null where it cannot).
  */
 class VoiceSetupAccess(
     /** The stored setup. */
@@ -38,6 +40,8 @@ class VoiceSetupAccess(
     val localListening: LocalSpeechAvailability = LocalSpeechAvailability.UNAVAILABLE,
     /** The host's shared speech setup, reached over the host connection; null without one. */
     val shared: SharedVoiceSetup? = null,
+    /** A draft's server's models and voices, asked directly with the key the draft would keep; null where not offered. */
+    val catalog: (suspend (VoiceSetupDraft) -> SpeechCatalog)? = null,
     /** Whether a draft's server answers: null when it does, else why not. */
     val check: suspend (VoiceSetupDraft) -> VoiceErrorCode?,
 ) {
@@ -71,7 +75,10 @@ fun rememberVoiceSetupAccess(settings: SecureSettingsStore, hostLink: HostVoiceL
         val echoCancelled = audio?.echoCancelled == true
         val local = audio?.localRecognizer()?.availability(null) ?: LocalSpeechAvailability.UNAVAILABLE
         val shared = hostLink?.let(::SharedVoiceSetup)
-        VoiceSetupAccess(store, echoCancelled, local, shared) { draft -> store.check(draft, newSpeechHttpEngine()) }
+        val catalog: suspend (VoiceSetupDraft) -> SpeechCatalog = { draft ->
+            EndpointSpeechCatalog.list(draft.baseUrl, store.keyAfter(draft), newSpeechHttpEngine())
+        }
+        VoiceSetupAccess(store, echoCancelled, local, shared, catalog) { draft -> store.check(draft, newSpeechHttpEngine()) }
     }
 }
 

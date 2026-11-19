@@ -11,7 +11,14 @@ import argparse
 import hashlib
 import signal
 import uuid
-from .device import wait_for_pixel, adb, installed_app_hash, command
+from .device import (
+    wait_for_pixel,
+    adb,
+    installed_app_hash,
+    require_compiled_install,
+    compile_installed_app,
+    command,
+)
 from .capture import trial, rescore_captures
 
 
@@ -53,17 +60,24 @@ def install_capture(args):
     if not re.search("package: name='com\\.letta\\.mobile\\.dev'", badging):
         raise RuntimeError("refusing to install anything except com.letta.mobile.dev")
     adb("install", "-r", path_arg(args.apk, args.apk.parent))
+    # An install leaves the package at status=run-from-apk (interpreted, ~7 s cold
+    # start); compile before the first launch so every trial measures compiled code.
+    status = compile_installed_app()
+    print(f"install: dexopt status={status['dexoptStatus']}", flush=True)
+    if not status["dexoptCompiled"]:
+        print(f"install: {PACKAGE} still {status['dexoptStatus']} after compile; run {status['dexoptCompileCommands']}", flush=True)
     adb("shell", "setprop", "log.tag.LettaCoreLoop", "VERBOSE")
     adb("shell", "am", "force-stop", PACKAGE)
     adb("shell", "am", "start", "-n", PACKAGE + "/com.letta.mobile.MainActivity")
     time.sleep(5)
+    return status
 
 
 def interrupted(signum, frame):
     raise KeyboardInterrupt(f"signal {signum}")
 
 
-def prepare_capture(args, parser):
+def verify_capture_device(args, parser):
     if args.serial != SERIAL:
         parser.error("fresh captures require --serial " + SERIAL)
     wait_for_pixel()
@@ -71,11 +85,30 @@ def prepare_capture(args, parser):
         parser.error("baseline requires at least three trials")
     if adb("get-state") != "device":
         raise RuntimeError("authorized Pixel 2 XL unavailable")
+
+
+def require_capture_apk(args):
+    installed_sha256 = installed_app_hash()
+    if installed_sha256 != args.apk_sha256:
+        raise RuntimeError(
+            f"installed APK sha256 {installed_sha256} does not match the capture APK "
+            f"{args.apk} (sha256 {args.apk_sha256}); pass --apk <path to the installed build> "
+            "or install the exact capture APK before running the baseline"
+        )
+    if not args.dexopt_status["dexoptCompiled"]:
+        # The install path compiles first, so this only fires when the compile
+        # did not persist or the existing install was never compiled.
+        raise RuntimeError(
+            f"{PACKAGE} is at dexopt status={args.dexopt_status['dexoptStatus']}; refusing to measure an "
+            "uncompiled install. Run: " + args.dexopt_status["dexoptCompileCommands"][0]
+        )
+
+
+def prepare_capture(args, parser):
+    verify_capture_device(args, parser)
     args.apk_sha256 = apk_digest(args.apk)
-    if args.install:
-        install_capture(args)
-    if installed_app_hash() != args.apk_sha256:
-        raise RuntimeError("install the exact capture APK before running the baseline")
+    args.dexopt_status = install_capture(args) if args.install else require_compiled_install()
+    require_capture_apk(args)
     args.capture_id = uuid.uuid4().hex
     args.output.mkdir(parents=True, exist_ok=False)
     signal.signal(signal.SIGTERM, interrupted)

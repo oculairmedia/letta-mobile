@@ -13,6 +13,7 @@ from .device import (
     wait_for_pixel,
     adb,
     installed_app_hash,
+    require_compiled_install,
     command,
     wall_ms,
     dump,
@@ -44,8 +45,15 @@ class Capture:
         actual_apk_hash = installed_app_hash()
         if actual_apk_hash != self.args.apk_sha256:
             raise RuntimeError("installed APK changed; refusing to send from an unverified client")
+        dexopt = require_compiled_install()
         self.metadata = dict(
-            scenario=self.scenario, trial=self.index, captureId=self.args.capture_id, wifi=self.wifi, data=self.data, apkSha256=actual_apk_hash
+            scenario=self.scenario,
+            trial=self.index,
+            captureId=self.args.capture_id,
+            wifi=self.wifi,
+            data=self.data,
+            apkSha256=actual_apk_hash,
+            **dexopt,
         )
         self.scope = json.loads(
             command(["ssh", "-o", "BatchMode=yes", "graphiti", "python3", "-c", shlex.quote(REMOTE_AUDIT)])

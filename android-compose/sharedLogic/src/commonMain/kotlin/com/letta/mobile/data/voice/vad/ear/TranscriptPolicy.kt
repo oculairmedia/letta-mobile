@@ -15,6 +15,8 @@ data class EarTurnReport(
     val peakDb: Double,
     /** The detector's noise floor when the turn ended, in dBFS; null when it keeps none. */
     val floorDb: Double?,
+    /** The silence heard after the last voice when the turn closed: how long ago the person stopped speaking. */
+    val trailingSilence: Duration = Duration.ZERO,
 ) {
     /** How far the loudest hop rose above the floor, in dB; null without a floor. */
     val peakSnrDb: Double? get() = floorDb?.let { peakDb - it }
@@ -44,6 +46,12 @@ interface EarObserver {
 
     /** A transcript of [characters] characters was accepted as the person's turn. */
     fun transcriptAccepted(characters: Int) = Unit
+
+    /** The turn's words were offered before its end, from live partial words ([fromPartials]) or an early transcription. */
+    fun turnOffered(fromPartials: Boolean) = Unit
+
+    /** The person went on speaking after the turn's words were offered: the offer was withdrawn. */
+    fun offerWithdrawn() = Unit
 
     /** Shared observers. */
     companion object {

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh.voice
 
+import com.letta.mobile.data.voice.catalog.SpeechListing
 import com.letta.mobile.data.voice.host.HostVoiceErrorCode
 import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.network.sockets.SocketTimeoutException
@@ -9,10 +10,7 @@ import io.ktor.client.request.forms.formData
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -30,7 +28,6 @@ internal object VoiceUpstreamWire {
     private const val OK_LAST = 299
     private const val CLIENT_ERROR_FIRST = 400
     private const val CLIENT_ERROR_LAST = 499
-    private val ID_FIELDS = listOf("id", "name", "voice_id")
 
     /** How far down a cause chain to look for a name-resolution failure. */
     private const val MAX_CAUSE_DEPTH = 8
@@ -130,17 +127,7 @@ internal object VoiceUpstreamWire {
     /**
      * The ids in a listing: a top-level array, or the array under the first of [fields] present; each
      * entry a string or an object with an `id`, `name` or `voice_id` string. Null when the body is not
-     * such a listing.
+     * such a listing. The same reading the device uses when it lists a server directly.
      */
-    fun ids(root: JsonElement?, vararg fields: String): List<String>? {
-        val list = root as? JsonArray ?: (root as? JsonObject)?.let { obj -> fields.firstNotNullOfOrNull { obj[it] as? JsonArray } }
-        return list?.map { entry -> idOf(entry) ?: return null }
-    }
-
-    private fun idOf(entry: JsonElement): String? {
-        val primitive = (entry as? JsonPrimitive) ?: (entry as? JsonObject)?.let { obj ->
-            ID_FIELDS.firstNotNullOfOrNull { obj[it] as? JsonPrimitive }
-        }
-        return primitive?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }
-    }
+    fun ids(root: JsonElement?, vararg fields: String): List<String>? = SpeechListing.ids(root, fields.asList())
 }

@@ -69,7 +69,7 @@ sealed interface SettingsRow {
     /**
      * One of [options]: a bottom sheet on touch, an anchored list or (three options or fewer) a
      * segmented control on a pointer. [inline] keeps the segmented control on every platform (the
-     * backend mode).
+     * backend mode); [alwaysList] never draws one, for options a server fills whose count changes.
      */
     data class Choice(
         override val key: String,
@@ -79,6 +79,7 @@ sealed interface SettingsRow {
         val supporting: String? = null,
         val enabled: Boolean = true,
         val inline: Boolean = false,
+        val alwaysList: Boolean = false,
         val onSelect: (String) -> Unit,
     ) : SettingsRow
 

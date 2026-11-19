@@ -29,6 +29,24 @@ object VoiceSettingsKeys {
     /** The outcome of the last save or test. */
     const val STATUS: String = "voice-status"
 
+    /** This device's own server's transcription model picker. */
+    const val TRANSCRIPTION_MODEL: String = "voice-transcription-model"
+
+    /** This device's own server's speech model picker. */
+    const val SPEECH_MODEL: String = "voice-speech-model"
+
+    /** This device's own server's voice picker. */
+    const val VOICE: String = "voice-voice"
+
+    /** Appended to a model or voice picker's key: its custom-name field. */
+    const val CUSTOM_SUFFIX: String = "-custom"
+
+    /** Appended to the first picker's key: the server list's loading, failure or not-yet-saved note. */
+    const val CATALOG_SUFFIX: String = "-catalog"
+
+    /** Appended to the first picker's key: listing the server again after a failure. */
+    const val CATALOG_RETRY_SUFFIX: String = "-catalog-retry"
+
     /** The pane that shows the section over the chat. */
     const val PANE: String = "voice-setup-pane"
 

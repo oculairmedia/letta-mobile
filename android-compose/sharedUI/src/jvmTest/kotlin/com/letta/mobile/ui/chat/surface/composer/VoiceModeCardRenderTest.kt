@@ -97,7 +97,8 @@ class VoiceModeCardRenderTest {
                     VoiceSetupStore(InMemorySecureSettingsStore(), null),
                     engines,
                     MicrophoneAccess.Granted,
-                    VoiceLoopRuntime(scope, Dispatchers.Default),
+                    // Never driven (the state is the test's): no coroutines on other threads to outlive the scene.
+                    VoiceLoopRuntime(scope, Dispatchers.Unconfined),
                 )
                 VoiceModeHandle(
                     controller,
@@ -112,6 +113,8 @@ class VoiceModeCardRenderTest {
         }
         feed.clock = SPOKEN_AT
         // Twice: string resources load off the frame clock, and their first frame may show the last scene's words.
+        // A few frames each, no more: while the voice glows follow a level every frame redraws the whole
+        // page (shader glow included), so a long run of frames made a scene take tens of seconds.
         repeat(2) {
             repeat(FRAMES) { mainClock.advanceTimeByFrame() }
             waitForIdle()
@@ -155,7 +158,8 @@ class VoiceModeCardRenderTest {
     private companion object {
         val WIDTHS = listOf(360, 700, 760, 1200)
         const val HEIGHT = 520
-        const val FRAMES = 30
+        /** Enough for the card's clock to read the feed and what it shows to recompose and draw. */
+        const val FRAMES = 3
         const val COMPOSER_HEIGHT = 140
         const val LEVEL = 0.6f
         const val AGENT = "Scout"

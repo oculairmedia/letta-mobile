@@ -488,9 +488,10 @@ private const val SEARCHABLE_CHOICE_COUNT = 8
 /** A pointer shows a choice of this many options or fewer as a segmented control. */
 private const val SEGMENTED_CHOICE_COUNT = 3
 
-/** Whether this choice draws as a segmented control on [input]: always when inline, else a short choice on a pointer. */
+/** Whether this choice draws as a segmented control on [input]: always when inline, never when always a list, else a short choice on a pointer. */
 internal fun SettingsRow.Choice.segmentedOn(input: LettaInput): Boolean {
     if (inline) return true
+    if (alwaysList) return false
     val short = options.size <= SEGMENTED_CHOICE_COUNT
     return short && input == LettaInput.Pointer
 }

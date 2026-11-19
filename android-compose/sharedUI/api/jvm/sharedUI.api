@@ -2485,8 +2485,9 @@ public final class com/letta/mobile/ui/chat/voice/VoiceModeTags {
 
 public final class com/letta/mobile/ui/chat/voice/VoiceSetupAccess {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lcom/letta/mobile/data/voice/host/client/SharedVoiceSetup;Lkotlin/jvm/functions/Function2;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lcom/letta/mobile/data/voice/host/client/SharedVoiceSetup;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lcom/letta/mobile/data/voice/host/client/SharedVoiceSetup;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lcom/letta/mobile/data/voice/host/client/SharedVoiceSetup;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCatalog ()Lkotlin/jvm/functions/Function2;
 	public final fun getCheck ()Lkotlin/jvm/functions/Function2;
 	public final fun getEchoCancelled ()Z
 	public final fun getLocalListening ()Lcom/letta/mobile/data/voice/local/LocalSpeechAvailability;
@@ -2955,7 +2956,7 @@ public final class com/letta/mobile/ui/components/foundation/LettaPanelKt {
 }
 
 public final class com/letta/mobile/ui/components/foundation/LettaPillsKt {
-	public static final fun LettaChip (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/foundation/LettaChipSlots;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaChip (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/foundation/LettaChipSlots;Lcom/letta/mobile/ui/components/foundation/LettaClickTarget;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaOutlinedPill (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaPill-sW7UJKQ (Ljava/lang/String;JLandroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaTonalPill (Ljava/lang/String;Lcom/letta/mobile/ui/theme/pill/LettaPillColors;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
@@ -3271,6 +3272,28 @@ public final class com/letta/mobile/ui/components/list/RosterSpec {
 	public final fun getOptions ()Lcom/letta/mobile/ui/components/list/RosterOptions;
 	public final fun getSections ()Ljava/util/List;
 	public final fun getSelection ()Lcom/letta/mobile/ui/components/list/RosterSelection;
+}
+
+public final class com/letta/mobile/ui/components/motion/LettaPanelMotion {
+	public static final field $stable I
+	public static final field ENTER_MILLIS I
+	public static final field EXIT_MILLIS I
+	public static final field FADE_IN_MILLIS I
+	public static final field FADE_OUT_MILLIS I
+	public static final field INSTANCE Lcom/letta/mobile/ui/components/motion/LettaPanelMotion;
+	public static final field REDUCED_FADE_MILLIS I
+	public static final field SCALE_DAMPING_RATIO F
+	public static final field SCALE_FROM F
+	public static final field SETTLE_GLOW_GAIN F
+	public static final field SETTLE_MILLIS I
+	public final fun enter (ZLandroidx/compose/ui/Alignment$Vertical;)Landroidx/compose/animation/EnterTransition;
+	public final fun exit (ZLandroidx/compose/ui/Alignment$Vertical;)Landroidx/compose/animation/ExitTransition;
+	public final fun getEnterEasing ()Landroidx/compose/animation/core/Easing;
+	public final fun getExitEasing ()Landroidx/compose/animation/core/Easing;
+}
+
+public final class com/letta/mobile/ui/components/motion/LettaPanelMotionKt {
+	public static final fun rememberPanelSettle (ZLandroidx/compose/runtime/Composer;I)Lkotlin/jvm/functions/Function0;
 }
 
 public final class com/letta/mobile/ui/components/picker/ComposableSingletons$LettaPickerKt {
@@ -7958,7 +7981,10 @@ public final class com/letta/mobile/ui/settings/SettingsStandardSectionsKt {
 
 public final class com/letta/mobile/ui/settings/VoiceSettingsKeys {
 	public static final field $stable I
+	public static final field CATALOG_RETRY_SUFFIX Ljava/lang/String;
+	public static final field CATALOG_SUFFIX Ljava/lang/String;
 	public static final field CONSENT Ljava/lang/String;
+	public static final field CUSTOM_SUFFIX Ljava/lang/String;
 	public static final field DEVICE_ONLY Ljava/lang/String;
 	public static final field HOST_ACK Ljava/lang/String;
 	public static final field HOST_CLEAR Ljava/lang/String;
@@ -7991,9 +8017,12 @@ public final class com/letta/mobile/ui/settings/VoiceSettingsKeys {
 	public static final field SHARE Ljava/lang/String;
 	public static final field SHARE_STATUS Ljava/lang/String;
 	public static final field SHARE_WITHOUT_KEY Ljava/lang/String;
+	public static final field SPEECH_MODEL Ljava/lang/String;
 	public static final field STATUS Ljava/lang/String;
 	public static final field TEST Ljava/lang/String;
+	public static final field TRANSCRIPTION_MODEL Ljava/lang/String;
 	public static final field URL Ljava/lang/String;
+	public static final field VOICE Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/settings/VoiceSettingsSectionKt {

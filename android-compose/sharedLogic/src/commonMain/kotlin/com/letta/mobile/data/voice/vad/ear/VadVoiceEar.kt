@@ -64,6 +64,8 @@ data class VadEarConfig(
     val outputTail: Duration = DEFAULT_OUTPUT_TAIL,
     /** Live partial transcripts while the person speaks; off by default. */
     val partials: LivePartials = LivePartials(),
+    /** Offering a turn's words before its end (see [EarlyTurns]); by default only live partial words that already cover a closed turn. */
+    val early: EarlyTurns = EarlyTurns(),
 ) {
     init {
         require(format.channels == 1) { "The voice-activity ear listens to mono audio" }
@@ -94,6 +96,10 @@ data class VadEarConfig(
  * signal; raised thresholds while [setOutputActive] is true), [VoiceEarEvent.PartialTranscript]
  * while the turn is heard when [VadEarConfig.partials] is on (see [LivePartials]; never the
  * utterance), [VoiceEarEvent.SpeechEnded] when the turn closes, [VoiceEarEvent.EndOfTurn] after transcription, and [VoiceEarEvent.Failed].
+ * With [VadEarConfig.early], [VoiceEarEvent.TentativeEndOfTurn] offers the turn's words before its
+ * end (after a pause, or right after [VoiceEarEvent.SpeechEnded] from partial words that cover it),
+ * and [VoiceEarEvent.TentativeWithdrawn] voids the offer when voice follows; the turn's
+ * [VoiceEarEvent.EndOfTurn] still carries the authoritative words.
  *
  * Half-duplex ([VadEarConfig.halfDuplex]): while output is active and for the tail after it, input
  * is ignored (levels report silent) and a turn that was open when output started is dropped, ending

@@ -135,4 +135,12 @@
     <string name="voice_share_ask_admin">An admin device can share this speech server with every device.</string>
     <string name="voice_share_remove_local">Remove this device's own speech server</string>
     <string name="voice_share_remove_local_help">Your host's shared server is in use; this device's own address and key are no longer needed.</string>
+    <!-- Models and voice, picked from what the speech server lists, with a custom name for any server. -->
+    <string name="voice_name_custom">Custom…</string>
+    <string name="voice_name_custom_field">Custom name</string>
+    <string name="voice_name_custom_placeholder">As the speech server names it</string>
+    <string name="voice_catalog_loading">Loading the server's list…</string>
+    <string name="voice_catalog_failed">Couldn't load the server's list. You can still type the names.</string>
+    <string name="voice_catalog_retry">Try again</string>
+    <string name="voice_catalog_idle">Save the server to choose from its list. You can type the names now.</string>
 </resources>

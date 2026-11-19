@@ -13,10 +13,12 @@ import androidx.compose.ui.graphics.Color
 import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.model.MarkdownAnimations
 import com.mikepenz.markdown.model.MarkdownColors
 import com.mikepenz.markdown.model.MarkdownState
 import com.mikepenz.markdown.model.MarkdownTypography
 import com.mikepenz.markdown.model.ReferenceLinkHandlerImpl
+import com.mikepenz.markdown.model.markdownAnimations
 import com.mikepenz.markdown.model.rememberMarkdownState
 import com.mikepenz.markdown.model.State
 import androidx.compose.runtime.LaunchedEffect
@@ -114,9 +116,19 @@ fun SharedMarkdownText(
             components = components,
             colors = sharedMarkdownColors(paint.textColor),
             typography = sharedMarkdownTypography(paint.textStyle),
+            animations = sharedMarkdownAnimations(isStreaming),
         )
     }
 }
+
+/**
+ * The renderer grows its text in from the top when a parse lands. Only a streaming text is new
+ * content arriving; a settled text parsing for the first time is a row scrolling into view (or back
+ * into view after its kept parse was dropped), and lands at its height without an entrance.
+ */
+@Composable
+private fun sharedMarkdownAnimations(isStreaming: Boolean): MarkdownAnimations =
+    if (isStreaming) markdownAnimations() else markdownAnimations(animateTextSize = { this })
 
 @Composable
 private fun sharedMarkdownColors(textColor: Color): MarkdownColors {
