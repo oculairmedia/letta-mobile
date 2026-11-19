@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertContentDescriptionEquals
@@ -151,9 +152,22 @@ private fun SemanticsNodeInteraction.rotationZ(): Float {
         .map { it.modifier }
         .filter { it.javaClass.name.endsWith("GraphicsLayerElement") }
     if (layers.isEmpty()) return 0f
-    return layers.maxOf { layer ->
-        layer.javaClass.getMethod("getRotationZ").accessible().invoke(layer) as Float
-    }
+    return layers.maxOf { layer -> layer.layerRotationZ() }
+}
+
+/**
+ * The rotation a graphics-layer element applies: read directly from the parameter form, or by
+ * running the block form against a fresh [GraphicsLayerScope] (the chevron reads its rotation in
+ * the block so the animation only invalidates the draw phase).
+ */
+private fun Any.layerRotationZ(): Float {
+    javaClass.methods.firstOrNull { it.parameterCount == 0 && it.name == "getRotationZ" }
+        ?.let { return it.accessible().invoke(this) as Float }
+    val blockField = javaClass.declaredFields.first { Function1::class.java.isAssignableFrom(it.type) }
+    blockField.isAccessible = true
+    @Suppress("UNCHECKED_CAST")
+    val block = blockField.get(this) as GraphicsLayerScope.() -> Unit
+    return GraphicsLayerScope().apply(block).rotationZ
 }
 
 private fun SemanticsNodeInteraction.appliedTint(): Color? {
