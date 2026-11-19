@@ -32,7 +32,7 @@ import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.toBackendLabel
+import com.letta.mobile.data.model.backendConnectionStatus
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.di.pluginViewsOf
@@ -260,15 +260,7 @@ internal fun rememberAndroidConnection(shell: WorkspaceShell): BackendConnection
     val sessions = shell.drawerModel.sources.sessions
     val error by sessions.sessionError.collectAsStateWithLifecycle()
     val agents by shell.drawerModel.agents.collectAsStateWithLifecycle()
-    return androidConnection(shell.config, error, agentsLoaded = agents.isNotEmpty())
-}
-
-/** The one rule behind [rememberAndroidConnection], for callers that already hold the inputs. */
-internal fun androidConnection(config: LettaConfig?, error: Throwable?, agentsLoaded: Boolean): BackendConnectionStatus = when {
-    config == null -> BackendConnectionStatus.Unconfigured
-    error != null -> BackendConnectionStatus.Failed(error.message ?: "Couldn't reach the backend")
-    !agentsLoaded -> BackendConnectionStatus.Connecting
-    else -> BackendConnectionStatus.Connected(config.toBackendLabel().orEmpty())
+    return backendConnectionStatus(shell.config, error, agentsLoaded = agents.isNotEmpty())
 }
 
 /** Home's connection hero until the backend is there; null once it is. */

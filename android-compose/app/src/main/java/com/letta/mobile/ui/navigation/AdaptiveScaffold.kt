@@ -29,14 +29,13 @@ import com.letta.mobile.feature.chat.screen.WorkspaceChatPanel
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.shell.ShellDrawerConversations
 import com.letta.mobile.ui.shell.ShellDrawerLibrary
+import com.letta.mobile.ui.shell.ReportShellFirstUsable
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.attr
 import com.letta.mobile.ui.shell.pages.ShellHomeBackendFleetEffect
 import com.letta.mobile.ui.shell.pages.ShellLibraryControllers
 import com.letta.mobile.ui.shell.pages.rememberShellLibraryControllers
-import com.letta.mobile.ui.shell.ReportFirstUsableContent
-import com.letta.mobile.util.Telemetry
-import com.letta.mobile.util.attr
 import com.letta.mobile.ui.shell.rememberShellWorkspaceState
-import com.letta.mobile.ui.shell.shellFirstScreenUsable
 import com.letta.mobile.ui.shell.shortcuts.ShellShortcutBinding
 import com.letta.mobile.ui.shell.shortcuts.ShellShortcutId
 import com.letta.mobile.ui.shell.shortcuts.ShortcutActions
@@ -93,7 +92,6 @@ internal fun AndroidShellWorkspace(start: ShellDestination, config: LettaConfig?
     val observedAgents by drawerModel.agents.collectAsStateWithLifecycle()
     val observedFleet by drawerModel.fleet.collectAsStateWithLifecycle()
     val graph by drawerModel.sources.sessions.currentGraph.collectAsStateWithLifecycle()
-    val sessionError by drawerModel.sources.sessions.sessionError.collectAsStateWithLifecycle()
     val source = remember(graph, config) { AndroidShellChatPort.sourceKey(graph, config) }
     val bound = source == AndroidShellChatPort.sourceKey(graph)
     val agents = observedAgents.takeIf { bound }.orEmpty()
@@ -123,10 +121,10 @@ internal fun AndroidShellWorkspace(start: ShellDestination, config: LettaConfig?
         chatPanel = remember { mutableStateOf(null) },
         controllers = rememberShellLibraryControllers(sources.sessions, sources.library, scope),
     )
-    // letta-mobile-1hzkq: before the early return, so the one reporter outlives the waiting page's swap to the workspace.
-    val connection = androidConnection(config, sessionError, agentsLoaded = observedAgents.isNotEmpty())
-    ReportFirstUsableContent(shellFirstScreenUsable(workspace.destination, connection, shell.sourceReady)) { reason ->
-        Telemetry.event("FirstUsable", "drawn", "reason" attr reason.name)
+    // Before the early return, so the one reporter outlives the waiting page's swap to the workspace.
+    val sessions = drawerModel.sources.sessions
+    ReportShellFirstUsable(workspace.destination, config, sessions.sessionError, observedAgents.isNotEmpty(), shell.sourceReady) {
+        Telemetry.event("FirstUsable", "drawn", "reason" attr it.name)
     }
     if (!shell.sourceReady) return AndroidShellPage(shell, androidx.compose.ui.Modifier)
     LaunchedEffect(agents) { workspace.rosterChanged(agents.map { it.id }) }

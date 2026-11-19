@@ -22,9 +22,9 @@ class MainActivityFullyDrawnTest {
     @Test
     fun theWorkspaceReportsBeforeItsWaitingPageReturns() {
         val source = File(WORKSPACE).readText()
-        val report = source.indexOf("ReportFirstUsableContent(")
+        val report = source.indexOf("ReportShellFirstUsable(")
         val waitingReturn = source.indexOf("if (!shell.sourceReady) return AndroidShellPage")
-        assertTrue("AndroidShellWorkspace never calls ReportFirstUsableContent", report >= 0)
+        assertTrue("AndroidShellWorkspace never calls ReportShellFirstUsable", report >= 0)
         assertTrue("the waiting-page return precedes the report, so it would leave and re-enter the composition", report < waitingReturn)
     }
 
