@@ -148,17 +148,19 @@ class IrohHostVoiceEndpoint(
 
         private suspend fun streamFrame(raw: JsonObject) {
             val frame = decode(HostSpeechStreamFrame.serializer(), raw, HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE)
-            if (frame.seq != nextSeq++) throw HostVoiceException(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE)
+            if (frame.seq != nextSeq++) badResponse()
             when (frame.event) {
-                HostSpeechEvent.FORMAT -> format = frame.format() ?: throw HostVoiceException(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE)
+                HostSpeechEvent.FORMAT -> format = frame.format() ?: badResponse()
                 HostSpeechEvent.AUDIO -> {
-                    val announced = format ?: throw HostVoiceException(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE)
-                    val chunk = frame.chunk(announced) ?: throw HostVoiceException(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE)
+                    val chunk = format?.let(frame::chunk) ?: badResponse()
                     audioSeen = true
                     out.send(chunk)
                 }
             }
         }
+
+        /** A frame out of sequence, before its format, or not whole PCM frames. */
+        private fun badResponse(): Nothing = throw HostVoiceException(HostVoiceErrorCode.UPSTREAM_BAD_RESPONSE)
 
         private fun finalResponse(frame: JsonObject): SpeechAttempt {
             if ((frame["success"] as? JsonPrimitive)?.content == "true") return SpeechAttempt.DONE

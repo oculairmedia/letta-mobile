@@ -12,6 +12,7 @@ import com.letta.mobile.data.voice.host.HostVoiceSetupCommand
 import com.letta.mobile.data.voice.host.client.HostVoiceState
 import com.letta.mobile.data.voice.host.client.SharedVoiceSetup
 import com.letta.mobile.data.voice.session.VoiceSetup
+import com.letta.mobile.data.voice.session.VoiceSetupDraft
 import com.letta.mobile.data.voice.session.VoiceSetupStore
 
 /** What the Voice settings may offer about this device's own speech server and the host's shared one. */
@@ -55,18 +56,18 @@ class VoiceSetupMigration(
     suspend fun share(sendKey: Boolean): HostVoiceErrorCode? {
         val local = store.setup.value
         val url = local.endpoint.baseUrl ?: return HostVoiceErrorCode.INVALID_REQUEST
-        val key = if (sendKey) keyToSend() else HostVoiceKeyChange.Keep
+        val key = if (sendKey) keyToSend(url) else HostVoiceKeyChange.Keep
         val grants = grantsFor(local, url)
         val command = HostVoiceSetupCommand(choiceFor(local, url), key, grants, shared.state.value.status?.revision)
         val status = shared.write(command) ?: return failure()
-        if (key is HostVoiceKeyChange.Replace && status.hasApiKey) store.forgetApiKey()
+        if (key is HostVoiceKeyChange.Replace && status.hasApiKey) store.clearEndpoint(keyOnly = true)
         if (grants.audioForTranscription) store.acknowledgeHostAudio(EndpointOrigin.of(url))
         return null
     }
 
     /** This device's stored key, wrapped write-only for the one setup command that carries it; Keep without one. */
-    private fun keyToSend(): HostVoiceKeyChange =
-        store.apiKeyForMove()?.let { HostVoiceKeyChange.Replace(SecretWriteValue(it)) } ?: HostVoiceKeyChange.Keep
+    private fun keyToSend(url: SpeechEndpointUrl): HostVoiceKeyChange =
+        store.keyAfter(VoiceSetupDraft(url.value))?.let { HostVoiceKeyChange.Replace(SecretWriteValue(it)) } ?: HostVoiceKeyChange.Keep
 
     /** Why the write failed, as the host said. */
     private fun failure(): HostVoiceErrorCode = shared.state.value.error ?: HostVoiceErrorCode.INTERNAL

@@ -31,11 +31,7 @@ class HostSpeechTranscriber(
 ) : SpeechTranscriber {
     override suspend fun transcribe(audio: AudioClip): SpeechTranscript {
         if (!acknowledged()) throw SpeechEndpointException(SpeechOperation.TRANSCRIPTION, VoiceErrorCode.PERMISSION_REQUIRED)
-        return try {
-            endpoint.transcribe(audio, language)
-        } catch (failure: HostVoiceException) {
-            throw SpeechEndpointException(SpeechOperation.TRANSCRIPTION, failure.code.voiceCode)
-        }
+        return runCatching { endpoint.transcribe(audio, language) }.getOrElse { throw asSpeechFailure(it, SpeechOperation.TRANSCRIPTION) }
     }
 }
 
@@ -47,8 +43,10 @@ class HostSpeechTranscriber(
  * rides the host connection that is already open.
  */
 class HostSpeechSynthesizer(private val endpoint: HostVoiceEndpoint) : StreamingSpeechSynthesizer {
-    override fun stream(text: VoiceText, speed: SpeechSpeed): Flow<PcmChunk> = endpoint.synthesize(text).catch { failure ->
-        if (failure !is HostVoiceException) throw failure
-        throw SpeechEndpointException(SpeechOperation.SPEECH, failure.code.voiceCode)
-    }
+    override fun stream(text: VoiceText, speed: SpeechSpeed): Flow<PcmChunk> =
+        endpoint.synthesize(text).catch { throw asSpeechFailure(it, SpeechOperation.SPEECH) }
 }
+
+/** A host failure as the endpoint exception the voice loop reads its code from; anything else, cancellation included, as it was. */
+private fun asSpeechFailure(failure: Throwable, operation: SpeechOperation): Throwable =
+    if (failure is HostVoiceException) SpeechEndpointException(operation, failure.code.voiceCode) else failure

@@ -87,26 +87,6 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
-/** Which rows the Voice section shows. */
-internal enum class VoiceSettingsMode {
-    /** This device's own speech server (the host shares none, or the person chose this device's own). */
-    LOCAL,
-
-    /** The host's shared speech server is in force: shown as the host reports it, editable by an admin. */
-    SHARED,
-
-    /** The host shares none yet, this device is an admin and has no server of its own: set one up for every device. */
-    HOST_SETUP,
-}
-
-/** The rows for [local] against what is known of the host ([host]). */
-internal fun voiceSettingsMode(local: VoiceSetup, host: HostVoiceState): VoiceSettingsMode = when {
-    host.configured && !local.prefersDevice -> VoiceSettingsMode.SHARED
-    host.supported && host.status != null && !host.configured && host.admin == true && local.endpoint.baseUrl == null ->
-        VoiceSettingsMode.HOST_SETUP
-    else -> VoiceSettingsMode.LOCAL
-}
-
 /** A host request's failure as the words the settings show; a lost revision race says to try again. */
 private fun hostFailureText(code: HostVoiceErrorCode): StringResource =
     if (code == HostVoiceErrorCode.REVISION_CONFLICT) Res.string.voice_host_conflict else voiceErrorText(code.voiceCode)

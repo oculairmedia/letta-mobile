@@ -189,7 +189,7 @@ class VoiceSetupStore(
         val consented = if (draft.consent) origin else null
         val grants = consented?.let { granted -> VoiceEndpointPayload.entries.map { VoiceEndpointGrant(granted, it) } }.orEmpty()
         settings.putString(KEY_GRANTS, grants.joinToString(GRANT_SEPARATOR) { "${it.payload.name}$FIELD_SEPARATOR${it.origin.value}" })
-        writeKey(draft.apiKey)
+        secrets.writeApiKey(draft.apiKey)
         state.value = read()
         return null
     }
@@ -260,22 +260,18 @@ class VoiceSetupStore(
         state.value = read()
     }
 
-    /** Removes this device's own speech server: its address, grants and key. Tuning and choices stay. */
-    fun clearEndpoint() {
-        settings.remove(KEY_BASE_URL)
-        settings.remove(KEY_GRANTS)
+    /**
+     * Removes this device's own speech server: its address, grants and key; with [keyOnly], only the
+     * key (it moved to the host) and the address and grants stay. Tuning and choices stay.
+     */
+    fun clearEndpoint(keyOnly: Boolean = false) {
+        if (!keyOnly) {
+            settings.remove(KEY_BASE_URL)
+            settings.remove(KEY_GRANTS)
+        }
         secrets?.remove(KEY_API_KEY)
         state.value = read()
     }
-
-    /** Deletes the stored key only (it moved to the host); the address and grants stay. */
-    fun forgetApiKey() {
-        secrets?.remove(KEY_API_KEY)
-        state.value = read()
-    }
-
-    /** The stored key, read once to move it to the host inside a write-only setup command. */
-    internal fun apiKeyForMove(): String? = storedKey()
 
     /** Stores the silence that ends a turn, clamped to the allowed range; takes effect from the next start. */
     fun setEndOfTurnSilence(silence: Duration) {
@@ -291,12 +287,6 @@ class VoiceSetupStore(
         else -> draft.apiKey.trim().takeIf { it.isNotEmpty() }
     }
 
-    private fun writeKey(typed: String?) {
-        val store = secrets ?: return
-        if (typed == null) return
-        val key = typed.trim()
-        if (key.isEmpty()) store.remove(KEY_API_KEY) else store.putString(KEY_API_KEY, key)
-    }
 
     private fun storedKey(): String? = secrets?.getString(KEY_API_KEY)?.takeIf { it.isNotBlank() }
 
@@ -306,23 +296,10 @@ class VoiceSetupStore(
         hasApiKey = storedKey() != null,
         interruptBySpeaking = settings.getString(KEY_INTERRUPT_BY_SPEAKING) == true.toString(),
         listening = VoiceListening.entries.firstOrNull { it.name == settings.getString(KEY_LISTENING) } ?: VoiceListening.AUTOMATIC,
-        tuning = readTuning(),
+        tuning = readTuning(settings),
         deviceOnly = settings.getString(KEY_DEVICE_ONLY) == true.toString(),
         hostAudioAck = settings.getString(KEY_HOST_AUDIO_ACK)?.takeIf { it.isNotBlank() }?.let(::EndpointOrigin),
     )
-
-    private fun readTuning(): VoiceTuning {
-        val speed = settings.getString(KEY_SPEECH_SPEED)?.toFloatOrNull()?.let(SpeechSpeed::coerce) ?: SpeechSpeed.Normal
-        val silence = settings.getString(KEY_END_OF_TURN_SILENCE_MS)?.toLongOrNull()?.milliseconds
-            ?.coerceIn(EndOfTurnPolicy.MIN_TRAILING_SILENCE, EndOfTurnPolicy.MAX_TRAILING_SILENCE)
-        val partials = settings.getString(KEY_LIVE_PARTIALS)?.toBooleanStrictOrNull()
-        return VoiceTuning(speed, silence ?: EndOfTurnPolicy.DEFAULT_TRAILING_SILENCE, partials)
-    }
-
-    private fun parseGrants(text: String): Set<VoiceEndpointGrant> = text.split(GRANT_SEPARATOR).mapNotNull { entry ->
-        val payload = VoiceEndpointPayload.entries.firstOrNull { entry.startsWith("${it.name}$FIELD_SEPARATOR") }
-        payload?.let { VoiceEndpointGrant(EndpointOrigin(entry.removePrefix("${it.name}$FIELD_SEPARATOR")), it) }
-    }.toSet()
 
     /** The stored keys. */
     companion object {
@@ -356,7 +333,30 @@ class VoiceSetupStore(
         /** The shared server origin this device acknowledged sending its audio to; kept apart like the grants. */
         const val KEY_HOST_AUDIO_ACK: String = "voice.host.audioAck"
 
-        private const val GRANT_SEPARATOR = "\n"
-        private const val FIELD_SEPARATOR = " "
     }
 }
+
+private const val GRANT_SEPARATOR = "\n"
+private const val FIELD_SEPARATOR = " "
+
+/** Stores [typed] as the API key in this secure store (blank removes it, null keeps it); nothing without a store. */
+private fun SecureSettingsStore?.writeApiKey(typed: String?) {
+    val store = this ?: return
+    val key = typed?.trim() ?: return
+    if (key.isEmpty()) store.remove(VoiceSetupStore.KEY_API_KEY) else store.putString(VoiceSetupStore.KEY_API_KEY, key)
+}
+
+/** The stored speed, end-of-turn silence and live-partials choice in [settings]. */
+private fun readTuning(settings: SecureSettingsStore): VoiceTuning {
+    val speed = settings.getString(VoiceSetupStore.KEY_SPEECH_SPEED)?.toFloatOrNull()?.let(SpeechSpeed::coerce) ?: SpeechSpeed.Normal
+    val silence = settings.getString(VoiceSetupStore.KEY_END_OF_TURN_SILENCE_MS)?.toLongOrNull()?.milliseconds
+        ?.coerceIn(EndOfTurnPolicy.MIN_TRAILING_SILENCE, EndOfTurnPolicy.MAX_TRAILING_SILENCE)
+    val partials = settings.getString(VoiceSetupStore.KEY_LIVE_PARTIALS)?.toBooleanStrictOrNull()
+    return VoiceTuning(speed, silence ?: EndOfTurnPolicy.DEFAULT_TRAILING_SILENCE, partials)
+}
+
+/** The grants stored as `PAYLOAD origin` lines. */
+private fun parseGrants(text: String): Set<VoiceEndpointGrant> = text.split(GRANT_SEPARATOR).mapNotNull { entry ->
+    val payload = VoiceEndpointPayload.entries.firstOrNull { entry.startsWith("${it.name}$FIELD_SEPARATOR") }
+    payload?.let { VoiceEndpointGrant(EndpointOrigin(entry.removePrefix("${it.name}$FIELD_SEPARATOR")), it) }
+}.toSet()

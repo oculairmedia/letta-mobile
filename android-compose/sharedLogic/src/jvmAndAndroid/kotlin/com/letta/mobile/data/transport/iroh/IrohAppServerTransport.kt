@@ -23,6 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -304,17 +305,11 @@ class IrohAppServerTransport(
             IrohFrameCodec.write(sendStream, request, MAX_FRAME_BYTES, allowFrameParts = true)
             val decoder = IrohFrameCodec.Decoder(MAX_FRAME_BYTES, IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES)
             val recv = biStream.recv()
-            while (!answered) {
+            var open = true
+            while (open && !answered) {
                 val chunk = recv.read(READ_CHUNK_SIZE.toUInt())
-                if (chunk.isEmpty()) break
-                for (raw in decoder.feed(chunk)) {
-                    val frame = protocol.json.parseToJsonElement(raw) as? JsonObject ?: continue
-                    send(frame)
-                    if ((frame["type"] as? JsonPrimitive)?.content == ADMIN_RPC_RESPONSE_TYPE) {
-                        answered = true
-                        break
-                    }
-                }
+                open = chunk.isNotEmpty()
+                if (open) answered = deliverStreamFrames(this, decoder.feed(chunk))
             }
             Telemetry.event("IrohTransport", "admin_rpc.streamed.end", "method" attr method, "answered" attr answered.toString())
         } finally {
@@ -327,6 +322,21 @@ class IrohAppServerTransport(
                 runCatching { sendStream.finish() }
             }
         }
+    }
+
+    /**
+     * Sends each decoded frame of a streamed admin_rpc into [out], in order; true once the final
+     * `admin_rpc_response` was among them (frames after it are not sent).
+     */
+    private suspend fun deliverStreamFrames(out: SendChannel<JsonObject>, raws: List<String>): Boolean {
+        for (raw in raws) {
+            val frame = protocol.json.parseToJsonElement(raw) as? JsonObject
+            if (frame != null) {
+                out.send(frame)
+                if ((frame["type"] as? JsonPrimitive)?.content == ADMIN_RPC_RESPONSE_TYPE) return true
+            }
+        }
+        return false
     }
 
     suspend fun close() {

@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.settings
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
@@ -58,9 +57,6 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
-/** The last save's or test's outcome, resolved to words when drawn. */
-@Immutable
-internal class VoiceOutcome(val message: StringResource, val tone: SettingsTone)
 
 private fun outcomeOf(code: VoiceErrorCode?, success: StringResource): VoiceOutcome =
     code?.let { VoiceOutcome(voiceErrorText(it), SettingsTone.Error) } ?: VoiceOutcome(success, SettingsTone.Positive)
