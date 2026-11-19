@@ -5,12 +5,15 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.get
 import io.ktor.http.Url
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertIsNot
 import kotlin.test.assertNotNull
+import kotlin.test.fail
 
 /**
  * Proves the assumption the classifier rests on: a real engine (CIO here, OkHttp on Android)
@@ -29,8 +32,12 @@ class VoiceUpstreamUnresolvedNameRealEngineTest {
         val unresolvable = Url("http://voice-diag-e86vv.invalid/v1/models")
         val client = HttpClient(CIO)
         val thrown = try {
-            withTimeout(20_000) { client.get(unresolvable) }
+            withTimeout(DNS_BUDGET_MS) { client.get(unresolvable) }
             null
+        } catch (timedOut: TimeoutCancellationException) {
+            // The machine's resolver, not the classifier, would decide the verdict: say so rather than
+            // letting this land in the classification below.
+            fail("the resolver did not answer within ${DNS_BUDGET_MS} ms, so this test skipped its subject")
         } catch (expected: Exception) {
             expected
         } finally {
@@ -38,6 +45,7 @@ class VoiceUpstreamUnresolvedNameRealEngineTest {
         }
 
         assertNotNull(thrown, "the request did not fail, so this test proves nothing about resolution")
+        assertIsNot<TimeoutCancellationException>(thrown, "a resolver timeout says nothing about classification")
         val failure = VoiceUpstreamWire.classify(thrown)
         assertIs<VoiceUpstreamFailure>(failure)
         assertEquals(
@@ -45,5 +53,10 @@ class VoiceUpstreamUnresolvedNameRealEngineTest {
             failure.code,
             "a real resolution failure must not be reported as a plain unreachable: ${thrown::class.simpleName}",
         )
+    }
+
+    private companion object {
+        /** Long enough for a slow resolver; a test that outlives it fails loudly instead of misreporting. */
+        const val DNS_BUDGET_MS = 20_000L
     }
 }
