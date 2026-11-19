@@ -48,8 +48,8 @@ def compiled_command():
 
 
 def require_installed_app():
-    if not installed_apk_path():
-        raise RuntimeError(f"{PACKAGE} has no installed APK; install or compile one before measuring")
+    """Raise unless exactly one APK of the dev package is installed."""
+    installed_apk_path()
 
 
 def dexopt_reading():
@@ -118,9 +118,10 @@ def require_compiled_install():
     """Refuse a capture on an uncompiled install; every measured run must name its compile state."""
     status = dexopt_record()
     if not status["dexoptCompiled"]:
+        # A status that cannot be read is treated as uncompiled, not as clean.
         raise RuntimeError(
             f"{PACKAGE} is at dexopt status={status['dexoptStatus'] or 'unknown'}; refusing to measure an "
-            f"uncompiled install. Run: {compiled_command()}"
+            f"uncompiled install ({status['dexoptDetail']}). Run: {compiled_command()}"
         )
     return status
 
