@@ -9,10 +9,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.icons.LettaIcons
@@ -139,14 +138,11 @@ fun DisclosureChevron(
     val targetRot = DisclosureChevronDefaults.targetRotation(indicates, expanded)
     val spec = DisclosureChevronDefaults.animationSpec(indicates, reducedMotion)
 
-    val animatedRotation by animateFloatAsState(
+    val animatedRotation = animateFloatAsState(
         targetValue = targetRot,
         animationSpec = spec,
         label = "disclosure_chevron_rotation",
     )
-
-    val stateRotation = if (isSheet) DisclosureChevronDefaults.RotationCollapsed else animatedRotation
-    val rotation = if (opensUpward) stateRotation + DisclosureChevronDefaults.RotationExpanded else stateRotation
 
     val resolvedTint = when {
         tint == Color.Unspecified -> DisclosureChevronDefaults.tint(
@@ -173,6 +169,9 @@ fun DisclosureChevron(
         modifier = modifier
             .testTag(DisclosureChevronDefaults.TestTag)
             .size(iconSize)
-            .rotate(rotation),
+            .graphicsLayer {
+                val stateRotation = if (isSheet) DisclosureChevronDefaults.RotationCollapsed else animatedRotation.value
+                rotationZ = if (opensUpward) stateRotation + DisclosureChevronDefaults.RotationExpanded else stateRotation
+            },
     )
 }
