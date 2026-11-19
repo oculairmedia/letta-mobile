@@ -48,6 +48,7 @@ import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import org.intellij.markdown.ast.ASTNode
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.markdown.rememberMessageReferenceLinks
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.ui.text.PreparedRichInlineItem
@@ -561,6 +562,7 @@ private fun MarkdownTextRaw(
             content = linkedText,
             modifier = modifier.fillMaxWidth(),
             components = components,
+            referenceLinkHandler = rememberMessageReferenceLinks(),
             extendedSpans = extendedSpans,
             imageTransformer = Coil3ImageTransformerImpl,
             // letta-mobile: MUST stay true. retainState caches the parsed AST +
