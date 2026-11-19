@@ -75828,8 +75828,8 @@ public final class com/letta/mobile/data/voice/session/VoiceSetupStore {
 	public final fun acknowledgeHostAudio-tOAuN5g (Ljava/lang/String;)V
 	public final fun apiKey ()Lcom/letta/mobile/data/voice/endpoint/SpeechApiKey;
 	public final fun check (Lcom/letta/mobile/data/voice/session/VoiceSetupDraft;Lio/ktor/client/engine/HttpClientEngine;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun clearEndpoint ()V
-	public final fun forgetApiKey ()V
+	public final fun clearEndpoint (Z)V
+	public static synthetic fun clearEndpoint$default (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZILjava/lang/Object;)V
 	public final fun getKeepsApiKey ()Z
 	public final fun getLivePartials ()Z
 	public final fun getSetup ()Lkotlinx/coroutines/flow/StateFlow;

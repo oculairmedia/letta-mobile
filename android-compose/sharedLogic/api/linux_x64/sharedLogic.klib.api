@@ -72211,8 +72211,7 @@ final class com.letta.mobile.data.voice.session/VoiceSetupStore { // com.letta.m
 
     final fun acknowledgeHostAudio(com.letta.mobile.data.voice.consent/EndpointOrigin?) // com.letta.mobile.data.voice.session/VoiceSetupStore.acknowledgeHostAudio|acknowledgeHostAudio(com.letta.mobile.data.voice.consent.EndpointOrigin?){}[0]
     final fun apiKey(): com.letta.mobile.data.voice.endpoint/SpeechApiKey? // com.letta.mobile.data.voice.session/VoiceSetupStore.apiKey|apiKey(){}[0]
-    final fun clearEndpoint() // com.letta.mobile.data.voice.session/VoiceSetupStore.clearEndpoint|clearEndpoint(){}[0]
-    final fun forgetApiKey() // com.letta.mobile.data.voice.session/VoiceSetupStore.forgetApiKey|forgetApiKey(){}[0]
+    final fun clearEndpoint(kotlin/Boolean = ...) // com.letta.mobile.data.voice.session/VoiceSetupStore.clearEndpoint|clearEndpoint(kotlin.Boolean){}[0]
     final fun keyAfter(com.letta.mobile.data.voice.session/VoiceSetupDraft): kotlin/String? // com.letta.mobile.data.voice.session/VoiceSetupStore.keyAfter|keyAfter(com.letta.mobile.data.voice.session.VoiceSetupDraft){}[0]
     final fun save(com.letta.mobile.data.voice.session/VoiceSetupDraft): com.letta.mobile.data.voice/VoiceErrorCode? // com.letta.mobile.data.voice.session/VoiceSetupStore.save|save(com.letta.mobile.data.voice.session.VoiceSetupDraft){}[0]
     final fun setDeviceOnly(kotlin/Boolean) // com.letta.mobile.data.voice.session/VoiceSetupStore.setDeviceOnly|setDeviceOnly(kotlin.Boolean){}[0]
