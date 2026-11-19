@@ -21,7 +21,9 @@ internal class AndroidVoiceChatSessions(
     private val port: ChatSessionPort,
 ) : VoiceChatSessions {
     private val conversation = DerivedStateFlow(port.uiState.map { viewModel.conversationId }) { viewModel.conversationId }
-    private val canonical = DerivedStateFlow(viewModel.pagingPresentation.map { it?.canonical }) { viewModel.pagingPresentation.value?.canonical }
+    private val canonical = DerivedStateFlow(viewModel.pagingPresentation.map { it?.canonical }) {
+        viewModel.pagingPresentation.value?.canonical
+    }
     private val liveRows = canonicalLiveRows(canonical)
 
     override fun open(): VoiceChatSession = ChatVoiceChatSession(port, viewModel.identifiedSend, conversation, liveRows)
