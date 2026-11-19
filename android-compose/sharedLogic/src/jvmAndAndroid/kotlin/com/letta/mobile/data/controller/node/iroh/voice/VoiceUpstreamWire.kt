@@ -31,6 +31,9 @@ internal object VoiceUpstreamWire {
     private const val CLIENT_ERROR_FIRST = 400
     private const val CLIENT_ERROR_LAST = 499
     private val ID_FIELDS = listOf("id", "name", "voice_id")
+
+    /** How far down a cause chain to look for a name-resolution failure. */
+    private const val MAX_CAUSE_DEPTH = 8
     private val failureByStatus = mapOf(
         401 to HostVoiceErrorCode.UPSTREAM_UNAUTHORIZED,
         403 to HostVoiceErrorCode.UPSTREAM_UNAUTHORIZED,
@@ -80,16 +83,37 @@ internal object VoiceUpstreamWire {
     }
 
     /**
-     * A client timeout is `voice.upstream_timeout`; anything else that is not already a
-     * [VoiceUpstreamFailure] means the server could not be reached.
+     * A client timeout is `voice.upstream_timeout`, a name that did not resolve is
+     * `voice.upstream_unresolved`, and anything else that is not already a [VoiceUpstreamFailure]
+     * means the server could not be reached.
      */
     fun classify(error: Exception): Exception {
         return when (error) {
             is VoiceUpstreamFailure -> error
             is HttpRequestTimeoutException, is ConnectTimeoutException, is SocketTimeoutException ->
                 VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_TIMEOUT)
-            else -> VoiceUpstreamFailure(HostVoiceErrorCode.UPSTREAM_UNREACHABLE)
+            else -> VoiceUpstreamFailure(
+                if (isUnresolved(error)) HostVoiceErrorCode.UPSTREAM_UNRESOLVED else HostVoiceErrorCode.UPSTREAM_UNREACHABLE,
+            )
         }
+    }
+
+    /**
+     * Whether [error] is a name-resolution failure rather than a connection one, across the engines
+     * clients are built on: the JDK's [java.net.UnknownHostException], which both the CIO and the
+     * OkHttp engine surface, plus their own wrapped forms. Matching on the type of the causal chain
+     * keeps this engine-agnostic; the message is never read, so nothing a server said can steer it.
+     */
+    private fun isUnresolved(error: Throwable): Boolean {
+        var current: Throwable? = error
+        var depth = 0
+        while (current != null && depth < MAX_CAUSE_DEPTH) {
+            val name = current::class.simpleName
+            if (current is java.net.UnknownHostException || name == "UnresolvedAddressException") return true
+            current = current.cause
+            depth++
+        }
+        return false
     }
 
     /** A body read that failed after the headers: a stall is a timeout, anything else a bad response. */

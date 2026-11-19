@@ -239,6 +239,7 @@ The failure response's `error` is exactly one of these strings; nothing else is 
 | `voice.payload_too_large` | no | Over the audio or text limits | REJECTED |
 | `voice.insecure_transport` | no | Key would travel over plain http off loopback | INSECURE_TRANSPORT |
 | `voice.upstream_unreachable` | yes | Server not reachable | UNREACHABLE |
+| `voice.upstream_unresolved` | yes | Server's host name did not resolve where the request ran | UNRESOLVED |
 | `voice.upstream_unauthorized` | no | Server refused the key (401/403) | UNAUTHORIZED |
 | `voice.upstream_rejected` | no | Server refused the request (400/404/422 after fallbacks) | REJECTED |
 | `voice.upstream_bad_response` | yes | Unexpected shape, broken or non-PCM stream | BAD_RESPONSE |

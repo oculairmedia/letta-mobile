@@ -44,6 +44,13 @@ enum class HostVoiceErrorCode(
     @SerialName("voice.upstream_unreachable")
     UPSTREAM_UNREACHABLE("voice.upstream_unreachable", true, VoiceErrorCode.UNREACHABLE),
 
+    /**
+     * The speech server's host name did not resolve on the host running the request: a name or DNS
+     * problem, not a refused connection, so the person can tell the two apart in the app.
+     */
+    @SerialName("voice.upstream_unresolved")
+    UPSTREAM_UNRESOLVED("voice.upstream_unresolved", true, VoiceErrorCode.UNRESOLVED),
+
     /** The speech server refused the stored key. */
     @SerialName("voice.upstream_unauthorized")
     UPSTREAM_UNAUTHORIZED("voice.upstream_unauthorized", false, VoiceErrorCode.UNAUTHORIZED),
