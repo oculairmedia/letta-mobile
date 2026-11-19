@@ -100,17 +100,31 @@ if [[ "${DEVICE_LOOP_SKIP_DEXOPT:-0}" == "1" ]]; then
   echo "device-loop: WARNING — DEVICE_LOOP_SKIP_DEXOPT=1, skipping dexopt compile; timings are not comparable"
 else
   echo "=== device-loop: compiling $PKG (dexopt status=verify) ==="
-  if adb -s "$DEVICE_SERIAL" shell cmd package compile -m verify -f "$PKG"; then
-    status="$(dexopt_status)"
-    echo "device-loop: $PKG dexopt ${status:-status=unknown}"
-    case "$status" in
-      *"status=run-from-apk"*)
-        echo "device-loop: $PKG is still run-from-apk after compile; re-run: adb -s $DEVICE_SERIAL shell cmd package compile -m verify -f $PKG" >&2
-        ;;
-    esac
-  else
-    echo "device-loop: dexopt compile failed; re-run: adb -s $DEVICE_SERIAL shell cmd package compile -m verify -f $PKG" >&2
+  compile_cmd="adb -s $DEVICE_SERIAL shell cmd package compile -m verify -f $PKG"
+  if ! adb -s "$DEVICE_SERIAL" shell cmd package compile -m verify -f "$PKG"; then
+    echo "device-loop: dexopt compile failed; re-run: $compile_cmd (or set DEVICE_LOOP_SKIP_DEXOPT=1)" >&2
+    exit 1
   fi
+  # A finished install can restart dexopt on its own: settle, then poll and
+  # report the last reading (same policy as coreloop/device.py).
+  adb -s "$DEVICE_SERIAL" shell am force-stop "$PKG" || true
+  sleep 3
+  status=""
+  for _ in 1 2 3; do
+    status="$(dexopt_status)"
+    case "$status" in
+      *"status=verify"*|*"status=speed"*|*"status=speed-profile"*|*"status=quicken"*|*"status=everything"*) break ;;
+    esac
+    sleep 2
+  done
+  echo "device-loop: $PKG dexopt ${status:-status=unknown}"
+  case "$status" in
+    *"status=verify"*|*"status=speed"*|*"status=speed-profile"*|*"status=quicken"*|*"status=everything"*) ;;
+    *)
+      echo "device-loop: $PKG is not compiled after compile (${status:-status=unknown}); re-run: $compile_cmd (or set DEVICE_LOOP_SKIP_DEXOPT=1)" >&2
+      exit 1
+      ;;
+  esac
 fi
 
 # LocalLettaCodeService is a foreground service and refuses to start without

@@ -13,6 +13,10 @@ from .config import SERIAL, PACKAGE
 # state while a concurrent install disappears, so the status is re-read.
 UNCOMPILED_STATUS = "run-from-apk"
 COMPILED_STATUS = "verify"
+# ART compiler filters that mean the dexes are verified/compiled ahead of time.
+# Anything else (run-from-apk, run-from-apk-fallback, run-from-vdex-fallback,
+# error, or no status) is treated as uncompiled.
+COMPILED_FILTERS = frozenset({"verify", "quicken", "space-profile", "space", "speed-profile", "speed", "everything", "everything-profile"})
 DEXOPT_POLLS = 3
 DEXOPT_POLL_SECONDS = 2
 DEXOPT_SETTLE_SECONDS = 3
@@ -60,6 +64,14 @@ def require_installed_app():
     installed_apk_path()
 
 
+def dexopt_detail(status):
+    if status in COMPILED_FILTERS:
+        return f"dexopt status={status}"
+    if status == UNCOMPILED_STATUS:
+        return "uncompiled: dexes are interpreted from the APK"
+    return f"uncompiled: dexopt status={status} is not a compiled filter"
+
+
 def dexopt_reading():
     """Parsed `dumpsys package dexopt` for the dev package, or an explicit absence."""
     lines = adb("shell", "dumpsys", "package", "dexopt").splitlines()
@@ -78,12 +90,8 @@ def dexopt_reading():
     primary = statuses[0]
     return dict(
         dexoptStatus=primary,
-        dexoptCompiled=primary != UNCOMPILED_STATUS,
-        dexoptDetail=(
-            "uncompiled: dexes are interpreted from the APK"
-            if primary == UNCOMPILED_STATUS
-            else f"dexopt status={primary}"
-        ),
+        dexoptCompiled=primary in COMPILED_FILTERS,
+        dexoptDetail=dexopt_detail(primary),
         dexoptReason=reasons[0] if reasons else None,
     )
 
@@ -110,7 +118,7 @@ def compile_installed_app():
     require_installed_app()
     compile_argv = ["shell", "cmd", "package", "compile", "-m", COMPILED_STATUS, "-f", PACKAGE]
     adb(*compile_argv, timeout=DEXOPT_COMPILE_TIMEOUT_SECONDS)
-    adb(*DEXOPT_SETTLE_COMMAND)
+    adb("shell", *DEXOPT_SETTLE_COMMAND)
     time.sleep(DEXOPT_SETTLE_SECONDS)
     readings = []
     for attempt in range(DEXOPT_POLLS):

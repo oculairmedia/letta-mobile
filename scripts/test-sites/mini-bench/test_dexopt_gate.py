@@ -32,6 +32,11 @@ Dexopt state:
 """
 
 
+
+def dumpsys_with_status(status):
+    return RUN_FROM_APK_DUMPSYS.replace("status=run-from-apk", f"status={status}")
+
+
 # The gate may re-read the status (a status read, then one reading per poll).
 ALLOWED_DUMPSYS_READS = 1 + device.DEXOPT_POLLS
 
@@ -54,6 +59,8 @@ class FakeDevice:
         return self.adb(*(arg.render() if hasattr(arg, "render") else arg for arg in args), timeout=timeout)
 
     def adb(self, *args, timeout=None):
+        if args and args[0] in ("am", "pm", "cmd", "dumpsys", "settings"):
+            raise subprocess.CalledProcessError(1, ["adb", *args], stderr=b"adb: unknown command " + args[0].encode())
         self.calls.append(args)
         self.timeouts.append((args, timeout))
         if args[:2] == ("install", "-r"):
@@ -222,6 +229,7 @@ def test_hash_mismatch_names_both_hashes_and_the_apk_hint(tmp_path):
         patch.object(cli, "adb", return_value="device"),
         patch.object(cli, "apk_digest", return_value="capture-hash"),
         patch.object(cli, "installed_app_hash", return_value="installed-hash"),
+        patch.object(cli, "require_compiled_install", return_value=dict(dexoptStatus="verify", dexoptCompiled=True, dexoptCompileCommands=[device.compiled_command()])),
         patch.object(cli.signal, "signal"),
     ):
         with pytest.raises(RuntimeError) as mismatch:
@@ -267,6 +275,8 @@ def test_dexopt_status_is_written_into_every_metadata_json(tmp_path):
         patch.object(capture, "require_compiled_install", return_value=dict(dexoptStatus="verify", dexoptCompiled=True, dexoptCompileCommands=[device.compiled_command()])),
         patch.object(capture, "installed_app_hash", return_value="abc123"),
         patch.object(capture, "run_tool", return_value=subprocess.CompletedProcess([], 1)),
+        patch.object(capture, "adb", return_value="1"),
+        patch.object(capture, "command", return_value=json.dumps(dict(conversation_id="conv-fixture")).encode()),
         patch.object(capture, "select_conversation"),
         patch.object(capture, "parse_log", return_value=[dict(key="existing")]),
         patch.object(capture.time, "sleep"),
@@ -278,8 +288,8 @@ def test_dexopt_status_is_written_into_every_metadata_json(tmp_path):
     assert fake.compile_calls() == []
 
 
-def test_trial_records_dexopt_status_before_any_trial_directory(tmp_path):
-    """The gate is observable without a device: it runs inside prepare() and returns before mkdir."""
+def test_trial_refuses_an_uncompiled_install_before_the_fixture_audit(tmp_path):
+    """The real gate raises on run-from-apk; prepare() must stop before the ssh audit or any send."""
     from coreloop import capture
 
     trial = capture.Capture(SimpleNamespace(output=tmp_path, apk_sha256="abc123", capture_id="fixture"), "S1", 1)
@@ -287,17 +297,31 @@ def test_trial_records_dexopt_status_before_any_trial_directory(tmp_path):
         patch.object(capture, "wait_for_pixel"),
         patch.object(capture, "installed_app_hash", return_value="abc123"),
         patch.object(capture, "adb", return_value="1"),
-        # Patch what capture.py imported so the absence is an assertion, not an ImportError.
-        patch.object(
-            capture, "require_compiled_install", return_value=dict(dexoptStatus="run-from-apk", dexoptCompiled=False)
-        )
-        as require_compiled,
+        patch.object(capture, "require_compiled_install", side_effect=RuntimeError("com.letta.mobile.dev is at dexopt status=run-from-apk")) as require_compiled,
+        patch.object(capture, "command") as audit,
         patch.object(capture, "select_conversation") as select_conversation,
     ):
-        trial.prepare()
+        with pytest.raises(RuntimeError, match="run-from-apk"):
+            trial.prepare()
     require_compiled.assert_called_once_with()
+    audit.assert_not_called()
     select_conversation.assert_not_called()
-    assert trial.metadata["dexoptStatus"] == "run-from-apk"
+
+
+@pytest.mark.parametrize("status", ["run-from-apk", "run-from-apk-fallback", "run-from-vdex-fallback", "error"])
+def test_fallback_and_error_statuses_are_uncompiled(status):
+    fake = FakeDevice([dumpsys_with_status(status)])
+    with patch.object(device, "adb", side_effect=fake.dispatch):
+        with pytest.raises(RuntimeError, match="refusing to measure an uncompiled install"):
+            device.require_compiled_install()
+
+
+def test_compile_force_stops_through_adb_shell():
+    """Real adb rejects a top-level `am`; the settle step must go through `adb shell`."""
+    fake = verify_fake()
+    with patch.object(device, "adb", side_effect=fake.dispatch), patch.object(device.time, "sleep"):
+        device.compile_installed_app()
+    assert ("shell", "am", "force-stop", device.PACKAGE) in fake.calls
 
 
 def test_compile_gets_its_own_timeout_budget_above_the_default_adb_timeout():
