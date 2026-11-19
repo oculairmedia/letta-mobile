@@ -6,15 +6,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.theme.pill.LettaPillColors
 import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
@@ -29,6 +32,7 @@ import com.letta.mobile.ui.theme.tokens.LettaStrokeTokens
  *   LettaTonalPill     a LettaPillColors container / on-container pair (a status, a badge)
  *   LettaOutlinedPill  no colour: a neutral, read-only scope
  *   LettaChip          the tonal pill as a control: it opens something, with a 48dp touch target
+ *                      (laid out at its drawn height in a chip strip: LettaClickTarget.Inline)
  *
  * LettaStatusLabel (no container: a dot or a glyph, then the words) lives with LettaStatusDot.
  *
@@ -67,17 +71,31 @@ fun LettaOutlinedPill(text: String, modifier: Modifier = Modifier, icon: ImageVe
  * The tonal pill as a control: a neutral chip that opens something (the effort in force, then the
  * shared menu indicator as [LettaChipSlots.trailing]; a live mark such as a pulsing dot as
  * [LettaChipSlots.leading]). Its touch target is the platform minimum even though it draws small.
+ *
+ * [target] says how much room it claims: [LettaClickTarget.Standalone] (the default) lays the chip
+ * out at least the minimum touch target tall; [LettaClickTarget.Inline] (a chip strip in a stack
+ * whose gaps the stack sets) lays it out at its drawn height, and Compose still extends its touch
+ * bounds to the minimum. Only the target's minimum applies: the ripple keeps the chip's shape.
  */
 @Composable
-fun LettaChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, slots: LettaChipSlots = LettaChipSlots.None) {
-    Surface(
-        onClick = onClick,
-        // A clickable Surface reserves the platform's minimum touch target around the small pill.
-        modifier = modifier,
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    ) { PillContent(text, icon = null, slots = slots) }
+fun LettaChip(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    slots: LettaChipSlots = LettaChipSlots.None,
+    target: LettaClickTarget = LettaClickTarget.Standalone,
+) {
+    val minimum = if (target.minimumTouchTarget) LocalMinimumInteractiveComponentSize.current else Dp.Unspecified
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides minimum) {
+        Surface(
+            onClick = onClick,
+            // A clickable Surface reserves LocalMinimumInteractiveComponentSize around the small pill.
+            modifier = modifier,
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ) { PillContent(text, icon = null, slots = slots) }
+    }
 }
 
 @Composable

@@ -2955,7 +2955,7 @@ public final class com/letta/mobile/ui/components/foundation/LettaPanelKt {
 }
 
 public final class com/letta/mobile/ui/components/foundation/LettaPillsKt {
-	public static final fun LettaChip (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/foundation/LettaChipSlots;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaChip (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/foundation/LettaChipSlots;Lcom/letta/mobile/ui/components/foundation/LettaClickTarget;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaOutlinedPill (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaPill-sW7UJKQ (Ljava/lang/String;JLandroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaTonalPill (Ljava/lang/String;Lcom/letta/mobile/ui/theme/pill/LettaPillColors;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
