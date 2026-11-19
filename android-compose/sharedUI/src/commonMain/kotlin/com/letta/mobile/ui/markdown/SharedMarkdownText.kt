@@ -186,7 +186,7 @@ internal fun rememberSharedMarkdownState(text: String, retainState: Boolean): Ma
 private fun KeepSettledParse(parses: SettledMarkdownParses, state: MarkdownState, source: MarkdownSource) {
     LaunchedEffect(parses, state, source) {
         val parsed = state.state.first { it !is State.Loading }
-        if (parsed is State.Success && parsed.content == source.text) parses.keep(parsed, state.links.value)
+        if (parsed is State.Success && parsed.content == source.text) parses.keep(parsed, state.links.value.withTargets())
     }
 }
 
@@ -217,4 +217,9 @@ internal class MarkdownRetentionTracker {
         previousText = text
         return revision
     }
+}
+
+/** The reference links that resolved to a target; unresolved ones carry nothing worth keeping. */
+private fun Map<String, String?>.withTargets(): Map<String, String> = buildMap {
+    this@withTargets.forEach { (label, target) -> if (target != null) put(label, target) }
 }
