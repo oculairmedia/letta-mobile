@@ -58,27 +58,35 @@ class FakeDevice:
     def dispatch(self, *args, timeout=None):
         return self.adb(*(arg.render() if hasattr(arg, "render") else arg for arg in args), timeout=timeout)
 
+    # adb subcommands that real adb only accepts after `shell`.
+    SHELL_ONLY = ("am", "pm", "cmd", "dumpsys", "settings")
+
     def adb(self, *args, timeout=None):
-        if args and args[0] in ("am", "pm", "cmd", "dumpsys", "settings"):
+        if args and args[0] in self.SHELL_ONLY:
             raise subprocess.CalledProcessError(1, ["adb", *args], stderr=b"adb: unknown command " + args[0].encode())
         self.calls.append(args)
         self.timeouts.append((args, timeout))
-        if args[:2] == ("install", "-r"):
-            return "Success"
-        if args[:4] == ("shell", "cmd", "package", "compile"):
-            return "Success"
-        if "pm" in args and "path" in args:
+        handler = next((handle for matches, handle in self.handlers() if matches(args)), None)
+        return handler() if handler else "ok"
+
+    def handlers(self):
+        return (
+            (lambda args: args[:2] == ("install", "-r"), lambda: "Success"),
+            (lambda args: args[:4] == ("shell", "cmd", "package", "compile"), lambda: "Success"),
             # Real `pm path` exits 0 with an empty payload when nothing is installed;
             # the harness's installed_app_hash() then rejects len(paths) != 1.
-            return "package:" + self.apk_path if self.apk_path else ""
-        if "sha256sum" in args:
-            return f"{self.digest}  base.apk"
-        if "dumpsys" in args:
-            assert self.dumpsys_sequence, "dumpsys read more often than the fake was given output for"
-            return self.dumpsys_sequence.pop(0)
-        if "get-state" in args:
-            return "device"
-        return "ok"
+            (lambda args: "pm" in args and "path" in args, self.pm_path),
+            (lambda args: "sha256sum" in args, lambda: f"{self.digest}  base.apk"),
+            (lambda args: "dumpsys" in args, self.next_dumpsys),
+            (lambda args: "get-state" in args, lambda: "device"),
+        )
+
+    def pm_path(self):
+        return "package:" + self.apk_path if self.apk_path else ""
+
+    def next_dumpsys(self):
+        assert self.dumpsys_sequence, "dumpsys read more often than the fake was given output for"
+        return self.dumpsys_sequence.pop(0)
 
     def compile_calls(self):
         return [call for call in self.calls if call[:4] == ("shell", "cmd", "package", "compile")]
