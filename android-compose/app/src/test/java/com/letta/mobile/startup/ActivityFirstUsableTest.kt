@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.junit4.createComposeRule
+import com.letta.mobile.ui.shell.FirstUsableReason
 import com.letta.mobile.ui.shell.ReportFirstUsableContent
 import kotlin.time.Duration.Companion.seconds
 import org.junit.Assert.assertEquals
@@ -33,6 +34,7 @@ class ActivityFirstUsableTest {
     @get:Rule val compose = createComposeRule()
     private var usable by mutableStateOf(false)
     private var reports = 0
+    private val reasons = mutableListOf<FirstUsableReason>()
     private val reporter = FullyDrawnReporter(Runnable::run) { reports++ }
     private val owner = object : FullyDrawnReporterOwner { override val fullyDrawnReporter = reporter }
 
@@ -40,7 +42,9 @@ class ActivityFirstUsableTest {
         // waitForIdle would otherwise run the timeout's delay itself; the test drives the clock.
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            CompositionLocalProvider(LocalFullyDrawnReporterOwner provides owner) { ReportFirstUsableContent(usable, TIMEOUT) }
+            CompositionLocalProvider(LocalFullyDrawnReporterOwner provides owner) {
+                ReportFirstUsableContent(usable, TIMEOUT) { reasons += it }
+            }
         }
     }
 
@@ -63,6 +67,7 @@ class ActivityFirstUsableTest {
 
         advance(TIMEOUT.inWholeMilliseconds * 2)
         assertEquals("reported again after the timeout", 1, reports)
+        assertEquals("the host is told the content was the reason, once", listOf(FirstUsableReason.Content), reasons)
     }
 
     @Test
@@ -72,6 +77,7 @@ class ActivityFirstUsableTest {
         assertEquals("reported before the timeout", 0, reports)
         advance(2)
         assertEquals("never reported although the content never loaded", 1, reports)
+        assertEquals("the host is told the timeout was the reason, once", listOf(FirstUsableReason.Timeout), reasons)
     }
 
     @Test

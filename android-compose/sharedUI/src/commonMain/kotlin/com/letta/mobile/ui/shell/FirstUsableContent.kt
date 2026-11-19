@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.shell.ShellDestination
@@ -13,8 +14,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * letta-mobile-1hzkq: how long the shell waits for its first usable content before it tells the host
- * the first frame is as drawn as it will get (an offline backend never fills the screen).
+ * How long the shell waits for its first usable content before it tells the host the first frame is
+ * as drawn as it will get, so an offline backend that never fills the screen still reports.
  */
 val FIRST_USABLE_TIMEOUT: Duration = 10.seconds
 
@@ -41,12 +42,17 @@ fun shellFirstScreenUsable(
 }
 
 /**
- * Tells the host the app is fully drawn once [usable], or after [timeout] when it never becomes so. It
+ * Tells the host the app is fully drawn once [usable], or after [timeout] when it never becomes so, and
+ * calls [onReported] once with the reason. It
  * counts as drawn when this leaves the composition too (Android's ReportDrawn contract), so it belongs
  * at one stable place in the shell, never inside a branch that swaps.
  */
 @Composable
-fun ReportFirstUsableContent(usable: Boolean, timeout: Duration = FIRST_USABLE_TIMEOUT) {
+fun ReportFirstUsableContent(
+    usable: Boolean,
+    timeout: Duration = FIRST_USABLE_TIMEOUT,
+    onReported: (FirstUsableReason) -> Unit = {},
+) {
     var timedOut by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         delay(timeout)
@@ -57,8 +63,15 @@ fun ReportFirstUsableContent(usable: Boolean, timeout: Duration = FIRST_USABLE_T
         timedOut -> FirstUsableReason.Timeout
         else -> null
     }
-    // No app telemetry event here: ui.shell must not import util (import cycle), and the platform's
-    // own "Fully drawn" log, Kotzilla and Macrobenchmark timeToFullDisplay already record this moment.
+    // The host records why (content vs timeout) through [onReported]: ui.shell must not import util
+    // (import cycle), so the telemetry event is emitted by the caller.
+    val report by rememberUpdatedState(onReported)
+    var reported by remember { mutableStateOf(false) }
+    LaunchedEffect(reason) {
+        if (reason == null || reported) return@LaunchedEffect
+        reported = true
+        report(reason)
+    }
     ReportHostDrawnWhen(reason != null)
 }
 
