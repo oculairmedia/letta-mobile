@@ -21266,6 +21266,7 @@ public final class com/letta/mobile/data/controller/node/iroh/pins/AgentPinsPubl
 public final class com/letta/mobile/data/controller/node/iroh/pins/AgentPinsRoutes {
 	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/pins/AgentPinsRoutes;
 	public final fun forHost (Ljava/nio/file/Path;Lcom/letta/mobile/data/controller/node/iroh/pins/AgentPinsPublisher;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
+	public final fun forOnDeviceHost (Ljava/nio/file/Path;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/records/FileWrapperRecordStore : com/letta/mobile/data/controller/node/iroh/records/WrapperRecordStore {

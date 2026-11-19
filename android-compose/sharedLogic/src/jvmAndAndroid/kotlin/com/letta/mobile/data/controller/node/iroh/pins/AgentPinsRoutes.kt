@@ -11,6 +11,7 @@ import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
 import java.nio.file.Path
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -29,7 +30,16 @@ object AgentPinsRoutes {
     fun forHost(stateDirectory: Path, publisher: AgentPinsPublisher): AdminRpcRoutes =
         AgentPinsRouteSet(AgentPinsStore(FileAgentPinsPersistence(stateDirectory.resolve(STATE_FILE))), publisher)
 
+    /**
+     * The routes of the on-device runtime host, whose in-process router serves this device alone: the
+     * list lives in `host-state/` inside the runtime's [runtimeStorage], with the runtime's own state, and
+     * no push is needed with one connection. Same contract and same client as a server host.
+     */
+    fun forOnDeviceHost(runtimeStorage: Path, scope: CoroutineScope): AdminRpcRoutes =
+        forHost(runtimeStorage.resolve(ON_DEVICE_STATE_DIR), AgentPinsPublisher(scope))
+
     private const val STATE_FILE = "pinned-agents.json"
+    private const val ON_DEVICE_STATE_DIR = "host-state"
 }
 
 /**
