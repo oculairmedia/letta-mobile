@@ -5771,6 +5771,23 @@ public final class com/letta/mobile/ui/modelcontrol/ComposableSingletons$Provide
 	public final fun getLambda$371648936$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
+public final class com/letta/mobile/ui/modelcontrol/ComposableSingletons$ServiceCredentialFormKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/modelcontrol/ComposableSingletons$ServiceCredentialFormKt;
+	public fun <init> ()V
+	public final fun getLambda$-1119192834$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-5800989$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$143363990$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
+public final class com/letta/mobile/ui/modelcontrol/ComposableSingletons$ServicesPageKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/modelcontrol/ComposableSingletons$ServicesPageKt;
+	public fun <init> ()V
+	public final fun getLambda$-1656087383$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-275994904$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-684018519$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$781995953$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
 public final class com/letta/mobile/ui/modelcontrol/EffortSetting {
 	public static final field $stable I
 	public fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/ReasoningEffortStops;Ljava/lang/String;)V
@@ -5833,6 +5850,7 @@ public final class com/letta/mobile/ui/modelcontrol/ModelControlStrings {
 	public static final field PAGE_API_KEYS Ljava/lang/String;
 	public static final field PAGE_ENDPOINTS Ljava/lang/String;
 	public static final field PAGE_MODELS Ljava/lang/String;
+	public static final field PAGE_SERVICES Ljava/lang/String;
 	public static final field PROVIDERS Ljava/lang/String;
 	public static final field REFRESHING_MODELS Ljava/lang/String;
 	public static final field REFRESH_MODELS Ljava/lang/String;
@@ -6111,6 +6129,7 @@ public final class com/letta/mobile/ui/modelcontrol/ProviderSettingsPage : java/
 	public static final field API_KEYS Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsPage;
 	public static final field ENDPOINTS Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsPage;
 	public static final field MODELS Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsPage;
+	public static final field SERVICES Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsPage;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public final fun getLabel ()Ljava/lang/String;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsPage;
@@ -6118,7 +6137,7 @@ public final class com/letta/mobile/ui/modelcontrol/ProviderSettingsPage : java/
 }
 
 public final class com/letta/mobile/ui/modelcontrol/ProviderSettingsPaneKt {
-	public static final fun ProviderSettingsPane (Lcom/letta/mobile/data/repository/modelcontrol/ProviderManagementState;Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsActions;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsPage;Landroidx/compose/runtime/Composer;II)V
+	public static final fun ProviderSettingsPane (Lcom/letta/mobile/data/repository/modelcontrol/ProviderManagementState;Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsActions;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsPage;Lcom/letta/mobile/ui/modelcontrol/ServiceCredentialsBinding;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/modelcontrol/ProviderSettingsTags {
@@ -6190,6 +6209,57 @@ public final class com/letta/mobile/ui/modelcontrol/ReasoningEffortSliderTags {
 	public static final field INSTANCE Lcom/letta/mobile/ui/modelcontrol/ReasoningEffortSliderTags;
 	public static final field SLIDER Ljava/lang/String;
 	public static final field VALUE Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/modelcontrol/ServiceCredentialActions {
+	public static final field $stable I
+	public static final field Companion Lcom/letta/mobile/ui/modelcontrol/ServiceCredentialActions$Companion;
+	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)V
+	public final fun component1 ()Lkotlin/jvm/functions/Function1;
+	public final fun component2 ()Lkotlin/jvm/functions/Function0;
+	public final fun component3 ()Lkotlin/jvm/functions/Function2;
+	public final fun component4 ()Lkotlin/jvm/functions/Function1;
+	public final fun component5 ()Lkotlin/jvm/functions/Function1;
+	public final fun component6 ()Lkotlin/jvm/functions/Function0;
+	public final fun copy (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/modelcontrol/ServiceCredentialActions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/modelcontrol/ServiceCredentialActions;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/modelcontrol/ServiceCredentialActions;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOnCloseEdit ()Lkotlin/jvm/functions/Function0;
+	public final fun getOnEdit ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnRefresh ()Lkotlin/jvm/functions/Function0;
+	public final fun getOnRemove ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnSave ()Lkotlin/jvm/functions/Function2;
+	public final fun getOnTest ()Lkotlin/jvm/functions/Function1;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/modelcontrol/ServiceCredentialActions$Companion {
+	public final fun bind (Lcom/letta/mobile/data/servicecredentials/ServiceCredentialsController;)Lcom/letta/mobile/ui/modelcontrol/ServiceCredentialActions;
+}
+
+public final class com/letta/mobile/ui/modelcontrol/ServiceCredentialTags {
+	public static final field $stable I
+	public static final field CARD_PREFIX Ljava/lang/String;
+	public static final field EDIT_PREFIX Ljava/lang/String;
+	public static final field FIELD_PREFIX Ljava/lang/String;
+	public static final field FORM Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/ui/modelcontrol/ServiceCredentialTags;
+	public static final field PAGE Ljava/lang/String;
+	public static final field REMOVE Ljava/lang/String;
+	public static final field SAVE Ljava/lang/String;
+	public static final field TEST_PREFIX Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/modelcontrol/ServiceCredentialsBinding {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/data/servicecredentials/ServiceCredentialsState;Lcom/letta/mobile/ui/modelcontrol/ServiceCredentialActions;)V
+	public final fun getActions ()Lcom/letta/mobile/ui/modelcontrol/ServiceCredentialActions;
+	public final fun getState ()Lcom/letta/mobile/data/servicecredentials/ServiceCredentialsState;
+}
+
+public final class com/letta/mobile/ui/modelcontrol/ServicesPageKt {
+	public static final fun ServicesPage (Lcom/letta/mobile/ui/modelcontrol/ServiceCredentialsBinding;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/modelcontrol/StepSliderCallbacks {
@@ -8849,7 +8919,7 @@ public final class com/letta/mobile/ui/shell/pages/ComposableSingletons$ShellHom
 }
 
 public final class com/letta/mobile/ui/shell/pages/ShellAdminBindingKt {
-	public static final fun shellProvidersPage (Lcom/letta/mobile/data/repository/modelcontrol/ModelControlSession;)Lcom/letta/mobile/ui/shell/ShellPageContent;
+	public static final fun shellProvidersPage (Lcom/letta/mobile/data/repository/modelcontrol/ModelControlSession;Lcom/letta/mobile/data/transport/api/IChannelTransport;)Lcom/letta/mobile/ui/shell/ShellPageContent;
 }
 
 public final class com/letta/mobile/ui/shell/pages/ShellAgentEditorHost {

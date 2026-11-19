@@ -20,7 +20,7 @@ class ServicesPageUiTest {
 
     @Test
     fun anAdminTestsAndOpensAServiceFromItsCard() = runDesktopComposeUiTest {
-        val recorder = fixtures.Recorder()
+        val recorder = ServiceCredentialsUiFixtures.Recorder()
         setContent { MaterialTheme { ServicesPage(ServiceCredentialsBinding(fixtures.state(), recorder.actions)) } }
         onNodeWithText("Test passed").assertIsDisplayed()
         onNodeWithText("The service refused the key.").assertIsDisplayed()
@@ -32,7 +32,7 @@ class ServicesPageUiTest {
 
     @Test
     fun aNewServiceNeedsAKeyAndTheTypedKeyLeavesOnlyInTheDraft() = runDesktopComposeUiTest {
-        val recorder = fixtures.Recorder()
+        val recorder = ServiceCredentialsUiFixtures.Recorder()
         val state = fixtures.state(editing = fixtures.speech.serviceId)
         setContent { MaterialTheme { ServicesPage(ServiceCredentialsBinding(state, recorder.actions)) } }
         onNodeWithTag(ServiceCredentialTags.SAVE).assertIsNotEnabled()
@@ -47,7 +47,7 @@ class ServicesPageUiTest {
 
     @Test
     fun aDeviceWithoutAdminRightsSeesStatusButNoActions() = runDesktopComposeUiTest {
-        val recorder = fixtures.Recorder()
+        val recorder = ServiceCredentialsUiFixtures.Recorder()
         setContent { MaterialTheme { ServicesPage(ServiceCredentialsBinding(fixtures.state(canManage = false), recorder.actions)) } }
         onNodeWithText(ServiceCredentialStrings.READ_ONLY).assertIsDisplayed()
         onNodeWithTag("${ServiceCredentialTags.TEST_PREFIX}typesafe-jev").assertDoesNotExist()
