@@ -681,6 +681,10 @@ The per-conversation outbox lives here too. `OutboxEntry` records one outbound p
 
 Pending send attempts carry typed agent, conversation and message identities plus a retry generation. Canonical `acceptPendingSend` reserves the pending budget in a storage transaction before invoking its synchronous transport acceptance callback; a refused send preserves existing records. Wrappers must forward this admission along with ownership and attempt-aware outcomes. Transient disconnects allow 30 seconds for live progress or authoritative recovery; failed or timed-out recovery releases pending ownership so an unconfirmed prompt becomes Not sent.
 
+# Package com.letta.mobile.data.timeline.handover
+
+The live overlay's hold on a sent prompt between leaving the pending store and its durable copy being on screen, so the prompt never leaves the list at settle. It reads records through the accessors it is given and depends on no timeline type; the presentation owns the instance and feeds it pending records and the resident snapshot.
+
 # Package com.letta.mobile.data.timeline.headless
 
 Headless timeline storage, replay and streaming-reveal state. Semantic behavior can be exercised without a Compose viewport or platform application shell. Keep replay diagnostics from becoming a second product timeline writer; supply replay inputs and backing through [HeadlessTimelineReplaySession](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.timeline.headless/-headless-timeline-replay-session/index.html) and [HeadlessTimelineStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.timeline.headless/-headless-timeline-store/index.html) to [HeadlessTimelineReplayer](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.timeline.headless/-headless-timeline-replayer/index.html).
