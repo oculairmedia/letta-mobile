@@ -809,7 +809,7 @@ The responder for the conversation's agent, over its own port, [VoiceChatSession
 
 # Package com.letta.mobile.data.voice.responder.chat
 
-The app's chat session as a [VoiceChatSession](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.responder/-voice-chat-session/index.html). The chat page's rows become voice rows (the person's messages, the agent's plain text, errors; reasoning, tool calls, approvals and everything else are never spoken) under keys that stay put while text streams, while a pending message confirms and while a run id is promoted. Each send's otid and the runs it started come from an [IdentifiedChatSend](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.sentruns/-identified-chat-send/index.html), and stopping is the page's own Stop. A host may add the rows it streams outside the page's list (the desktop's live reply overlay) and the page's send queue is read so a queued follow-up is known. Building the adapter starts nothing; the desktop and Android chat pages build one when voice mode starts.
+The app's chat session as a [VoiceChatSession](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.responder/-voice-chat-session/index.html). The chat page's rows become voice rows (the person's messages, the agent's plain text, errors; reasoning, tool calls, approvals and everything else are never spoken) under keys that stay put while text streams, while a pending message confirms and while a run id is promoted. Each send's otid and the runs it started come from an [IdentifiedChatSend](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.sentruns/-identified-chat-send/index.html), and stopping is the page's own Stop. A host may add the rows it streams outside the page's list (the canonical presentation's live reply overlay, on desktop and Android, read with `canonicalLiveRows`), so the reply is spoken sentence by sentence while it streams, and the page's send queue is read so a queued follow-up is known. Building the adapter starts nothing; the desktop and Android chat pages build one when voice mode starts.
 
 # Package com.letta.mobile.data.voice.session
 
@@ -825,7 +825,7 @@ Voice mode's diagnostics, as `VoiceMode` events timed from the session's start: 
 
 # Package com.letta.mobile.data.voice.speech
 
-Turns streamed reply text into speakable sentences so speech starts before the reply is complete. Sentence ends respect abbreviations, initials, decimals and list numbers; fenced code is skipped; markdown, links, URLs and HTML are stripped; overlong text is cut at a clause break and the remainder is flushed when the reply completes.
+Turns streamed reply text into speakable sentences so speech starts before the reply is complete. Sentence ends respect abbreviations, initials, decimals and list numbers; fenced code is skipped; markdown, links, URLs and HTML are stripped; overlong text is cut at a clause break and the remainder is flushed when the reply completes. Sentences released together (a reply that arrives as a burst) are joined into fewer synthesis requests, except a reply's first segment, which always goes to speech alone.
 
 # Package com.letta.mobile.data.voice.vad
 
