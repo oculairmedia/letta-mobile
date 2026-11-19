@@ -29,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -338,7 +340,12 @@ private fun FoldControl(handle: VoiceModeHandle) {
     }
 }
 
-/** The red End pill, as tall as the round controls: a cross and "End"; it turns voice mode off. */
+/**
+ * The red End pill, as tall as the round controls: a cross and "End"; it turns voice mode off. The
+ * whole pill is the one target (its word as much as its cross), its hover and press drawn in the
+ * pill's shape, with the pointer's hand over it on desktop and the platform's minimum touch target
+ * around it on touch, as the round controls have.
+ */
 @Composable
 private fun EndButton(handle: VoiceModeHandle) {
     val description = stringResource(Res.string.voice_card_end_description)
@@ -349,6 +356,7 @@ private fun EndButton(handle: VoiceModeHandle) {
         contentColor = MaterialTheme.colorScheme.onError,
         modifier = Modifier
             .height(LettaControlTokens.iconButton)
+            .pointerHoverIcon(PointerIcon.Hand)
             .testTag(VoiceModeTags.CARD_END)
             .semantics(mergeDescendants = true) {
                 role = Role.Button

@@ -13,7 +13,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -82,8 +81,8 @@ internal fun VoiceModeCard(
     modifier: Modifier = Modifier,
 ) {
     LocalRecompositionProbe.current?.invoke(PROBE_CARD)
-    val state by handle.state.collectAsState()
-    if (!state.active) return
+    // While voice mode runs; held at its last running state while the card folds away (VoiceCardDock).
+    val state = rememberShownState(handle) ?: return
     val reducedMotion = LocalReducedMotion.current
     val speaker = voiceSpeaker(state)
     val now = rememberCardClock(handle.cardFeed)
