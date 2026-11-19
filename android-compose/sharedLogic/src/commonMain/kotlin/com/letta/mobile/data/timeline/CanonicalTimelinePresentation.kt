@@ -12,6 +12,7 @@ import com.letta.mobile.data.chat.projection.TimelineRowAssembly
 import com.letta.mobile.data.chat.projection.buildChatRenderModel
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.chat.projection.parseTimestampEpochMillis
+import com.letta.mobile.data.timeline.handover.HandedOverPrompts
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.platform.MemoryPressure
 import com.letta.mobile.ui.common.GroupPosition
@@ -153,6 +154,8 @@ class CanonicalTimelinePresentation private constructor(
     /** Explicitly discard only this conversation's failed prompt. */
     suspend fun dismiss(identity: MessageId): Boolean {
         check(job.isActive) { "Presentation closed" }
+        // Dismissed, the prompt is meant to leave: the overlay does not hold it past its record.
+        sentPrompts.forget(identity.value)
         return coordinator.dismissPending(owner, identity)
     }
 
@@ -161,6 +164,13 @@ class CanonicalTimelinePresentation private constructor(
     private val echoedOtids = mutableMapOf<String, TimelineLiveFence>()
 
     private val mutableLive = MutableStateFlow<List<ChatRenderItem>>(emptyList())
+
+    // Sent prompts whose durable copy has landed (so they left the pending store) but is not on
+    // screen yet. Read and written only by the live projection's collector.
+    private val sentPrompts = HandedOverPrompts<CanonicalPendingLocalStore.Record>(
+        otidOf = { it.otid },
+        sentAtMillisOf = { parseTimestampEpochMillis(it.sentAt) },
+    )
 
     /**
      * Published from this presentation's own scope and cancelled with it. Sharing eagerly through
@@ -199,8 +209,9 @@ class CanonicalTimelinePresentation private constructor(
     ): List<ChatRenderItem> {
         publications.forEach(::cacheStreamedAliases)
         val events = filterUnsettledEvents(publications, residentState)
-        updateEchoedOtids(publications, pending)
-        val optimistic = pending.filterNot { it.otid in echoedOtids || it.otid in residentState.otids }
+        val shownPending = sentPrompts.hold(pending, residentState.otids, residentState.newestTimestamp)
+        updateEchoedOtids(publications, shownPending)
+        val optimistic = shownPending.filterNot { it.otid in echoedOtids || it.otid in residentState.otids }
             .map { it.toRenderItem(owner.selection.scope.agentId) }
         val activeMessages = projectLiveMessages(publications, events)
         val active = buildChatRenderModel(

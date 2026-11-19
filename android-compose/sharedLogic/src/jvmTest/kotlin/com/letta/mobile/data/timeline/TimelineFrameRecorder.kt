@@ -112,6 +112,12 @@ internal class TimelineFrameRecorder private constructor(
         }
     }
 
+    /** The transport accepted the sent prompt [otid] (its record now reads as sent, not sending). */
+    suspend fun accept(otid: String) {
+        coordinator.markPending(owner, otid, CanonicalPendingLocalStore.Delivery.Sent, expectedAttempt = 0)
+        settleUi()
+    }
+
     /** Streams [frames] one at a time, letting each one reach the overlay before the next. */
     suspend fun stream(frames: List<LettaMessage>, finished: Boolean = true) {
         val fence = coordinator.beginLive(owner)
