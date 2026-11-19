@@ -76,7 +76,13 @@ private sealed interface NextStep {
 internal class LocalListenSession(private val parts: LocalListenParts, private val out: ProducerScope<VoiceEarEvent>) {
     private val config = parts.config
     private val memory = parts.memory
-    private val request = LocalRecognitionRequest(config.language)
+
+    /**
+     * What the recogniser is opened for. It starts on the device's own recogniser, and moves to the
+     * platform's recognition service once if the on-device one refuses the language: a device can
+     * have an on-device recogniser without the language pack, while its service still hears it.
+     */
+    private var request = LocalRecognitionRequest(config.language)
     private var announced = false
     private var failures = 0
 
@@ -138,10 +144,22 @@ internal class LocalListenSession(private val parts: LocalListenParts, private v
         failures++
         config.observer.failed(outcome.error, failures)
         return when (kind) {
-            FailureKind.LANGUAGE -> NextStep.Stop(LocalGiveUp(VoiceErrorCode.UNSUPPORTED_LOCALE, LocalHandoverReason.LANGUAGE))
+            FailureKind.LANGUAGE -> afterLanguageFailure()
             FailureKind.PERMISSION -> NextStep.Stop(LocalGiveUp(VoiceErrorCode.PERMISSION_REQUIRED, null))
             else -> retryOrStop()
         }
+    }
+
+    /**
+     * The language is refused. If that was the on-device recogniser and the device also has the
+     * platform's service, reopen on the service once; otherwise hand over.
+     */
+    private fun afterLanguageFailure(): NextStep {
+        val onDevice = request.preferOnDevice &&
+            parts.recognizer.availability(config.language) == LocalSpeechAvailability.ON_DEVICE
+        if (!onDevice) return NextStep.Stop(LocalGiveUp(VoiceErrorCode.UNSUPPORTED_LOCALE, LocalHandoverReason.LANGUAGE))
+        request = request.copy(preferOnDevice = false)
+        return NextStep.Recreate
     }
 
     private suspend fun retryOrStop(): NextStep {

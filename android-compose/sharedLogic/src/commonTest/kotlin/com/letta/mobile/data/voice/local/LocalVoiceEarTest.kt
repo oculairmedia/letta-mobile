@@ -140,14 +140,49 @@ class LocalVoiceEarTest {
     }
 
     @Test
-    fun aMissingLanguageModelHandsOverAtOnce() = runTest {
+    fun aMissingOnDeviceLanguagePackFallsBackToThePlatformServiceInsteadOfHandingOver() = runTest {
+        // en-CA on a Pixel whose on-device pack is not installed: the on-device recogniser refuses the
+        // language, the platform's recognition service can still hear it (letta-mobile, 2026-11-18).
         val heard = listen()
         recognizer.current.send(LocalRecognitionEvent.Ready, failed(LocalRecognitionError.LANGUAGE_UNAVAILABLE))
         runCurrent()
 
+        assertEquals(listOf(true, false), recognizer.requests.map { it.preferOnDevice }, "reopened on the platform service")
+        assertTrue(recognizer.sessions.first().closed, "the on-device recogniser was released")
+        assertEquals(0, fallbackEar.listens, "the server is not asked while the device can still listen")
+        assertNull(heard.ear.handover.value)
+
+        recognizer.current.send(LocalRecognitionEvent.Ready, LocalRecognitionEvent.EndOfSpeech, final("hello there"))
+        runCurrent()
+        assertEquals(listOf("hello there"), heard.turns.map { it.utterance.text.value })
+        assertTrue(heard.events.none { it is VoiceEarEvent.Failed })
+    }
+
+    @Test
+    fun aLanguageThePlatformServiceAlsoRefusesHandsOver() = runTest {
+        val heard = listen()
+        recognizer.current.send(LocalRecognitionEvent.Ready, failed(LocalRecognitionError.LANGUAGE_UNAVAILABLE))
+        runCurrent()
+        recognizer.current.send(LocalRecognitionEvent.Ready, failed(LocalRecognitionError.LANGUAGE_UNSUPPORTED))
+        runCurrent()
+
+        assertEquals(listOf(true, false), recognizer.requests.map { it.preferOnDevice }, "tried once more, not in a loop")
         assertEquals(1, fallbackEar.listens)
         assertEquals(LocalHandoverReason.LANGUAGE, heard.ear.handover.value)
         assertTrue(heard.events.none { it is VoiceEarEvent.Failed })
+    }
+
+    @Test
+    fun aLanguageFailureOnThePlatformServiceHandsOverAtOnce() = runTest {
+        // Nothing to fall back to when the device has only the platform service.
+        recognizer.availability = LocalSpeechAvailability.PLATFORM_SERVICE
+        val heard = listen()
+        recognizer.current.send(LocalRecognitionEvent.Ready, failed(LocalRecognitionError.LANGUAGE_UNAVAILABLE))
+        runCurrent()
+
+        assertEquals(1, recognizer.requests.size)
+        assertEquals(1, fallbackEar.listens)
+        assertEquals(LocalHandoverReason.LANGUAGE, heard.ear.handover.value)
     }
 
     @Test
