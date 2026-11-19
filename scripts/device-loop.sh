@@ -83,6 +83,36 @@ echo "=== device-loop: installing APKs (upgrade-in-place, data preserved) ==="
 adb -s "$DEVICE_SERIAL" install -r -t "$APP_APK" || { echo "app install failed"; exit 1; }
 adb -s "$DEVICE_SERIAL" install -r -t "$TEST_APK" || { echo "test apk install failed"; exit 1; }
 
+# An install leaves the package at status=run-from-apk: every dex is interpreted
+# and cold start measures ~7 s instead of ~1 s. Compile once here so device-loop
+# timings are not dominated by unoptimized code. Set DEVICE_LOOP_SKIP_DEXOPT=1 to
+# skip (it changes what the loop measures, so only for debugging the loop itself).
+dexopt_status() {
+  adb -s "$DEVICE_SERIAL" shell dumpsys package dexopt 2>/dev/null | tr -d '\r' |
+    awk -v pkg="$PKG" '
+      $0 ~ "^ *\\[" pkg "\\]$" { inside = 1; next }
+      inside && !/^    / { inside = 0 }
+      inside && /status=/ { print; exit }
+    '
+}
+
+if [[ "${DEVICE_LOOP_SKIP_DEXOPT:-0}" == "1" ]]; then
+  echo "device-loop: WARNING — DEVICE_LOOP_SKIP_DEXOPT=1, skipping dexopt compile; timings are not comparable"
+else
+  echo "=== device-loop: compiling $PKG (dexopt status=verify) ==="
+  if adb -s "$DEVICE_SERIAL" shell cmd package compile -m verify -f "$PKG"; then
+    status="$(dexopt_status)"
+    echo "device-loop: $PKG dexopt ${status:-status=unknown}"
+    case "$status" in
+      *"status=run-from-apk"*)
+        echo "device-loop: $PKG is still run-from-apk after compile; re-run: adb -s $DEVICE_SERIAL shell cmd package compile -m verify -f $PKG" >&2
+        ;;
+    esac
+  else
+    echo "device-loop: dexopt compile failed; re-run: adb -s $DEVICE_SERIAL shell cmd package compile -m verify -f $PKG" >&2
+  fi
+fi
+
 # LocalLettaCodeService is a foreground service and refuses to start without
 # POST_NOTIFICATIONS (tier3 fails with "foreground service could not start").
 adb -s "$DEVICE_SERIAL" shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS 2>/dev/null || true
