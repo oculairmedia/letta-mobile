@@ -65,6 +65,12 @@ enum class VoiceErrorCode(
     /** The remote endpoint could not be reached. */
     UNREACHABLE(VoiceUserAction.RETRY),
 
+    /**
+     * The endpoint's host name did not resolve where the request ran. Kept apart from
+     * [UNREACHABLE] because the fix is a name or DNS one, not a refused connection.
+     */
+    UNRESOLVED(VoiceUserAction.RETRY),
+
     /** The remote endpoint refused the credentials. */
     UNAUTHORIZED(VoiceUserAction.OPEN_SETTINGS),
 

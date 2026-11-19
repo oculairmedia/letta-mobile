@@ -10,8 +10,6 @@ internal object ComposerTestTags {
     const val STOP = "composer-stop"
     /** The trailing action slot (the voice-mode button, then Send or Stop) of every composer layout. */
     const val TRAILING_ACTIONS = "composer-trailing-actions"
-    /** The person's words so far, shown in the empty prompt field while voice mode hears them. */
-    const val VOICE_WORDS = "composer-voice-words"
     const val CARD = "composer-card"
     const val CONTROLS = "composer-controls"
     const val DOCKED_BAR = "composer-docked"

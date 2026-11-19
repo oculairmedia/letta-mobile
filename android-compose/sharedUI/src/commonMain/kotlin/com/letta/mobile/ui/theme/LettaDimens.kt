@@ -184,6 +184,12 @@ object LettaDimens {
         /** Longest line a graph node label may take before it ellipsizes. */
         val nodeLabelMaxWidth: Dp = 120.dp
 
+        /**
+         * Narrowest voice card that keeps its header and all its controls on one line; below it the
+         * audio controls move to a second line under the speaker and End.
+         */
+        val voiceCardOneLine: Dp = 520.dp
+
         /** Smallest height an in-pane multi-line editor collapses to. */
         val editorMinHeight: Dp = 160.dp
 

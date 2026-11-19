@@ -31,7 +31,6 @@ import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.ambient.ambientGlowShaderSource
 import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
-import com.letta.mobile.ui.ambient.AmbientVoiceRole
 import com.letta.mobile.ui.ambient.LocalAmbientVoice
 import com.letta.mobile.util.Telemetry
 import org.jetbrains.skia.Paint as SkiaPaint
@@ -73,7 +72,7 @@ internal fun DesktopAmbientChatBackground(
     val glowStatus = if (voice != null) AmbientMotionStatus.Running else status
     val spec = remember(glowStatus) { AmbientMotion.spec(glowStatus) }
     val targetColor = remember(glowStatus, colorScheme, identitySeed, voice) {
-        if (voice?.role == AmbientVoiceRole.You) return@remember Color(voice.youTintArgb)
+        voice?.tintArgb()?.let { return@remember Color(it) }
         when (glowStatus) {
             AmbientMotionStatus.Idle -> Color.Transparent
             AmbientMotionStatus.Running, AmbientMotionStatus.Active ->
@@ -180,6 +179,7 @@ internal fun DesktopAmbientChatBackground(
                     shaderBuilder.uniform("uBandTop", AmbientMotion.PANE_EDGE_BAND.top)
                     shaderBuilder.uniform("uBandPeak", AmbientMotion.PANE_EDGE_BAND.peak)
                     shaderBuilder.uniform("uColor", tint.red, tint.green, tint.blue, tint.alpha)
+                    shaderBuilder.uniform("uDotGrid", voice?.dotGrid ?: 0f)
                     // One native Shader per frame is unavoidable (uniforms bake in at makeShader time), but leaving it to the cleaner is
                     // not: a long turn draws ~60/s, so the handles must be released as soon as the draw that used them returns.
                     val frameShader = shaderBuilder.makeShader(null)

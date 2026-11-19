@@ -6,6 +6,7 @@ import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoicePort
 import com.letta.mobile.data.voice.audio.AudioPlayer
 import com.letta.mobile.data.voice.audio.PcmChunk
+import com.letta.mobile.data.voice.engine.SpeechAudioMeter
 import com.letta.mobile.data.voice.engine.SpeechSegment
 import com.letta.mobile.data.voice.engine.SpeechSegmentId
 import com.letta.mobile.data.voice.engine.VoiceMouth
@@ -23,13 +24,47 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+
+/**
+ * How far ahead an [EndpointVoiceMouth] works, how fast it asks the endpoint to speak, and who
+ * hears how much audio each segment has.
+ */
+class MouthOptions(
+    /** The most synthesis requests open at once. */
+    val maxInFlight: Int = DEFAULT_IN_FLIGHT,
+    /** The most segments handed to the player's queue ahead of the one playing. */
+    val prefetch: Int = DEFAULT_PREFETCH,
+    /** The speed for each request, read when its request starts. */
+    val speed: () -> SpeechSpeed = { SpeechSpeed.Normal },
+    /** Told each segment's audio length as it arrives. */
+    val meter: SpeechAudioMeter = SpeechAudioMeter.None,
+) {
+    init {
+        require(maxInFlight >= 1) { "maxInFlight must be at least 1" }
+        require(prefetch >= 1) { "prefetch must be at least 1" }
+    }
+
+    /** Presets. */
+    companion object {
+        private const val DEFAULT_IN_FLIGHT = 2
+        private const val DEFAULT_PREFETCH = 3
+
+        /** One request at a time, one segment ahead: each request starts once the previous response is complete. */
+        val SEQUENTIAL: MouthOptions = MouthOptions(maxInFlight = 1, prefetch = 1)
+    }
+}
 
 /**
  * A mouth that synthesises each segment through [synthesizer] and plays it through the platform's
  * [player] while it streams in: playback of a sentence starts with its first audio, not after its
- * whole response. The next segment's request starts as soon as the current one's response is
- * complete, so it downloads while the current one plays (one sentence ahead, requests one at a
- * time); the one after waits until that next segment starts playing. A segment is
+ * whole response. Requests start in segment order, up to [MouthOptions.maxInFlight] at once and up
+ * to [MouthOptions.prefetch] segments ahead of the one playing, so later sentences download while
+ * the current one plays; playback stays in segment order whatever order responses finish in. With
+ * [MouthOptions.SEQUENTIAL] the next request starts once the current response is complete and the
+ * one after waits until that next segment starts playing. A segment is
  * [VoiceMouthEvent.Finished] only once the player has played it out. A synthesis or playback
  * failure reports [VoiceMouthEvent.Failed] for its segment with the endpoint's code and drops the
  * rest of the queue.
@@ -41,9 +76,10 @@ import kotlinx.coroutines.launch
  * Call [speak], [flush] and [stop] from one coroutine at a time (the loop's).
  */
 class EndpointVoiceMouth(
-    private val synthesizer: EndpointSpeechSynthesizer,
+    private val synthesizer: StreamingSpeechSynthesizer,
     private val player: AudioPlayer,
     private val scope: CoroutineScope,
+    private val options: MouthOptions = MouthOptions(),
 ) : VoiceMouth {
     private val mutableEvents = MutableSharedFlow<VoiceMouthEvent>(extraBufferCapacity = EVENT_BUFFER)
     private var pipeline: MouthPipeline? = null
@@ -78,6 +114,17 @@ class EndpointVoiceMouth(
     private class SegmentAudio(val id: SpeechSegmentId) {
         // overflow: one sentence's audio (its text is capped by the chunker), consumed as it plays; dropped with the pipeline.
         val chunks = Channel<PcmChunk>(Channel.UNLIMITED)
+        private var frames = 0L
+        private var rateHz = 0
+
+        /** The playing time of the audio received so far. */
+        fun add(chunk: PcmChunk): Duration {
+            rateHz = chunk.format.sampleRateHz
+            frames += chunk.samples.size / chunk.format.channels.coerceAtLeast(1)
+            return length()
+        }
+
+        fun length(): Duration = if (rateHz == 0) Duration.ZERO else (frames.toDouble() / rateHz).seconds
     }
 
     /**
@@ -88,7 +135,8 @@ class EndpointVoiceMouth(
     private inner class MouthPipeline {
         // overflow: holds only the segments of the reply being spoken (bounded by that reply's length); stop() and failures discard it.
         val texts = Channel<SpeechSegment>(Channel.UNLIMITED)
-        private val streams = Channel<SegmentAudio>(PREFETCH)
+        private val streams = Channel<SegmentAudio>(options.prefetch)
+        private val slots = Semaphore(options.maxInFlight)
         val job: Job = scope.launch {
             coroutineScope {
                 launch { synthesizeAll(this@coroutineScope) }
@@ -97,20 +145,38 @@ class EndpointVoiceMouth(
         }
 
         /**
-         * Hands each segment to the player before its request starts, then streams the response into
-         * it. With one segment waiting in [streams], the request for the segment after the playing one
-         * runs while it plays, and the next hand-off waits until that segment starts playing.
+         * Hands each segment to the player's queue before its request starts (waiting while the
+         * queue is full), then starts its request once a request slot is free, in segment order;
+         * each request streams its response into its segment's audio.
          */
         private suspend fun synthesizeAll(workers: CoroutineScope) {
             for (segment in texts) {
                 val audio = SegmentAudio(segment.id)
                 streams.send(audio)
-                // A player that stopped taking this segment's audio has cancelled its channel; the rest is dropped.
-                val streamed = runCatching { synthesizer.stream(segment.text).collect { audio.chunks.trySend(it) } }
-                val error = streamed.exceptionOrNull()
-                if (error != null) return report(workers, PipelineFailure(error, segment.id, VoiceErrorCode.SYNTHESIS_FAILED))
-                audio.chunks.close()
+                slots.acquire()
+                workers.launch {
+                    try {
+                        synthesize(workers, segment, audio)
+                    } finally {
+                        slots.release()
+                    }
+                }
             }
+        }
+
+        private suspend fun synthesize(workers: CoroutineScope, segment: SpeechSegment, audio: SegmentAudio) {
+            // A player that stopped taking this segment's audio has cancelled its channel; the rest is dropped.
+            val streamed = runCatching {
+                synthesizer.stream(segment.text, options.speed()).collect { chunk ->
+                    // Measured first: once the chunk is queued the segment may start, and its length should be known by then.
+                    options.meter.measured(segment.id, audio.add(chunk), complete = false)
+                    audio.chunks.trySend(chunk)
+                }
+            }
+            val error = streamed.exceptionOrNull()
+            if (error != null) return report(workers, PipelineFailure(error, segment.id, VoiceErrorCode.SYNTHESIS_FAILED))
+            audio.chunks.close()
+            options.meter.measured(segment.id, audio.length(), complete = true)
         }
 
         /** Plays each segment as it streams in; it has started once its first audio is there to play. */
@@ -149,6 +215,5 @@ class EndpointVoiceMouth(
 
     private companion object {
         const val EVENT_BUFFER = 64
-        const val PREFETCH = 1
     }
 }

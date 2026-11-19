@@ -11,15 +11,8 @@ import kotlinx.serialization.descriptors.element
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-/**
- * Encoder-boundary secret input. Identity equality/hash semantics and a redacted [toString]
- * keep the value out of generated value semantics, snapshots, and diagnostics.
- */
-class SecretWriteValue(private val value: String) {
-    internal fun revealForEncoding(): String = value
-
-    override fun toString(): String = "<secret withheld>"
-}
+/** Encoder-boundary secret input, kept in a leaf package so the voice setup writes share it. */
+typealias SecretWriteValue = com.letta.mobile.data.rpcwire.SecretWriteValue
 
 /** Write-only custom-header values; only header names are safe to inspect. */
 class SecretHeadersWriteValue(headers: Map<String, String>) {

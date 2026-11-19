@@ -39,6 +39,7 @@ private class AgslAmbientGlowShader(private val shader: RuntimeShader) : Ambient
         shader.setFloatUniform("uBandTop", uniforms.band.top)
         shader.setFloatUniform("uBandPeak", uniforms.band.peak)
         shader.setFloatUniform("uColor", tint.red, tint.green, tint.blue, tint.alpha * uniforms.gain)
+        shader.setFloatUniform("uDotGrid", uniforms.dotGrid)
         drawRect(brush = brush)
     }
 

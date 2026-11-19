@@ -134,6 +134,20 @@ const MODEL_CATALOG_PATCHES = [
         tiers: [{ inputTokensAbove: 272000, input: 2, output: 7.5, cacheRead: 0.1, cacheWrite: 2.5 }] },
       contextWindow: 872000, maxTokens: 128000
     };
+  }
+  // Visible, API-supported subscription identities from codex/models 0.167.0.
+  // Metadata templates do not rewrite the requested upstream model identity.
+  for (const [id, name, contextWindow] of [
+    ["gpt-6.2-sol", "GPT-6.2 Sol", 872000],
+    ["gpt-6.2-astra", "GPT-6.2 Astra", 872000]
+  ]) {
+    if (!OPENAI_MODELS[id] && OPENAI_MODELS["gpt-6.1-sol"]) {
+      OPENAI_MODELS[id] = {
+        ...OPENAI_MODELS["gpt-6.1-sol"], id, name, contextWindow, maxTokens: 128000,
+        thinkingLevelMap: { off: null, minimal: null, low: "low", medium: "medium",
+          high: "high", xhigh: "xhigh", max: "max" }
+      };
+    }
   }`,
   },
 ];

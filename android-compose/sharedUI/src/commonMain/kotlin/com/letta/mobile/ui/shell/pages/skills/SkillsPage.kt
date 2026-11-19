@@ -266,7 +266,11 @@ private fun SkillsBody(page: SkillsPageScope, contentPadding: PaddingValues) {
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             contentPadding = contentPadding,
         ) {
-            items(page.rows, key = { it.key }) { row -> SkillsPageRowContent(row, page) }
+            items(
+                items = page.rows,
+                key = { it.key },
+                contentType = { it::class },
+            ) { row -> SkillsPageRowContent(row, page) }
         }
     }
 }

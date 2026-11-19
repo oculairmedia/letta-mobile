@@ -122,8 +122,15 @@ class TimelinePageProjectionTest {
         // The live overlay keys a run by its own oldest record, as the reopened page does.
         val liveRun = assertIs<com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock>(live)
             .copy(keyOverride = "run-hydrated-id-1-from-id-1")
-        assertEquals(listOf(liveRun), hydrated)
+        // The settled run also hands the envelope to the skill call that loaded it (attachSkillInstructions);
+        // apart from that the two are the same block.
         val block = assertIs<com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock>(hydrated.single())
+        val skill = block.messages.flatMap { it.first.toolCalls.orEmpty() }.single { it.name == "Skill" }
+        assertTrue(skill.skillInstructions.orEmpty().startsWith("<skill_content name=\"review-gate\">"))
+        val withoutInstructions = block.copy(messages = block.messages.map { (message, position) ->
+            message.copy(toolCalls = message.toolCalls?.map { it.copy(skillInstructions = null) }) to position
+        })
+        assertEquals(liveRun, withoutInstructions)
         assertEquals(6, block.messages.sumOf { it.first.toolCalls.orEmpty().size })
 
         // A real user turn or an unrelated return must still break physical ownership.

@@ -8,6 +8,7 @@ import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioEncoding
+import kotlin.jvm.JvmInline
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -107,7 +108,38 @@ data class SpeechRequest(
     val voice: SpeechVoiceName,
     /** The audio format to return. */
     val encoding: AudioEncoding = AudioEncoding.MP3,
+    /** How fast to speak; sent as `speed` unless it is [SpeechSpeed.Normal]. */
+    val speed: SpeechSpeed = SpeechSpeed.Normal,
 )
+
+/**
+ * How fast a speech endpoint speaks, as the OpenAI `speed` multiplier, from [MIN] to [MAX];
+ * [Normal] is the server's own pace.
+ */
+@JvmInline
+value class SpeechSpeed(
+    /** The multiplier. */
+    val value: Float,
+) {
+    init {
+        require(value in MIN..MAX) { "Speech speed out of range" }
+    }
+
+    /** Bounds and the default. */
+    companion object {
+        /** The slowest speed offered. */
+        const val MIN: Float = 0.75f
+
+        /** The fastest speed offered. */
+        const val MAX: Float = 1.5f
+
+        /** The server's own pace. */
+        val Normal: SpeechSpeed = SpeechSpeed(1f)
+
+        /** [value] clamped into range; a value that is not a number is [Normal]. */
+        fun coerce(value: Float): SpeechSpeed = if (value.isNaN()) Normal else SpeechSpeed(value.coerceIn(MIN, MAX))
+    }
+}
 
 /** What the recogniser itself reported about whether one segment is speech: numbers only, never text. */
 data class RecognizerConfidence(

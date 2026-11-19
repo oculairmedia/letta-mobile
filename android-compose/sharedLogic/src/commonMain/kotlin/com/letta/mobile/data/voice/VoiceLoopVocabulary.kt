@@ -100,6 +100,11 @@ data class VoiceLoopConfig(
     val releaseTimeout: Duration = 3.seconds,
     /** The chunker's longest spoken segment. */
     val maxSegmentLength: Int = DEFAULT_MAX_SEGMENT_LENGTH,
+    /**
+     * The shortest first clause released before its sentence ends, so speech starts sooner; null
+     * keeps the first segment sentence-sized too. See [com.letta.mobile.data.voice.speech.SentenceChunker].
+     */
+    val firstClauseMinLength: Int? = DEFAULT_FIRST_CLAUSE_MIN_LENGTH,
     /** The most late reply segments held while the person speaks; older ones are dropped. */
     val maxHeldLateSegments: Int = DEFAULT_MAX_HELD,
     /**
@@ -112,5 +117,6 @@ data class VoiceLoopConfig(
         const val DEFAULT_MAX_HELD = 16
         const val DEFAULT_MAX_PENDING = 4
         const val DEFAULT_MAX_SEGMENT_LENGTH = 240
+        const val DEFAULT_FIRST_CLAUSE_MIN_LENGTH = 40
     }
 }

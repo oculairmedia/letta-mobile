@@ -1,6 +1,6 @@
 package com.letta.mobile.data.voice.host
 
-import com.letta.mobile.data.transport.iroh.AdminRpcErrors
+import com.letta.mobile.data.rpcwire.AdminRpcErrors
 import com.letta.mobile.data.voice.VoiceErrorCode
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -43,6 +43,13 @@ enum class HostVoiceErrorCode(
     /** The speech server could not be reached. */
     @SerialName("voice.upstream_unreachable")
     UPSTREAM_UNREACHABLE("voice.upstream_unreachable", true, VoiceErrorCode.UNREACHABLE),
+
+    /**
+     * The speech server's host name did not resolve on the host running the request: a name or DNS
+     * problem, not a refused connection, so the person can tell the two apart in the app.
+     */
+    @SerialName("voice.upstream_unresolved")
+    UPSTREAM_UNRESOLVED("voice.upstream_unresolved", true, VoiceErrorCode.UNRESOLVED),
 
     /** The speech server refused the stored key. */
     @SerialName("voice.upstream_unauthorized")

@@ -334,6 +334,10 @@ class SessionScopedChannelTransport internal constructor(
     override fun subscribe(runId: String, cursor: Long): Boolean = current.subscribe(runId, cursor)
     override suspend fun adminRpc(method: String, path: String, body: String?): com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse =
         sessionManager.withCurrentSession { it.channelTransport.adminRpc(method, path, body) }
+    override fun adminRpcStream(
+        method: String,
+        params: kotlinx.serialization.json.JsonObject,
+    ): kotlinx.coroutines.flow.Flow<kotlinx.serialization.json.JsonObject> = current.adminRpcStream(method, params)
     override suspend fun disconnect(): Unit = sessionManager.withCurrentSession { it.channelTransport.disconnect() }
 
     override suspend fun sendCronList(

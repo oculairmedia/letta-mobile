@@ -73,6 +73,7 @@ internal data class ComposerInputs(
  */
 @Composable
 internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modifier) {
+    LocalRecompositionProbe.current?.invoke(PROBE_COMPOSER)
     val composer = inputs.composer
     val uiState = inputs.uiState
     val actions = inputs.actions
@@ -116,10 +117,10 @@ internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modi
     ) {
         ComposerAboveCard(model, parts)
         if (mode == ChatSurfaceMode.Docked) {
-            DockedComposerBar(model, images.attach)
+            VoiceCardDock(model.uiState) { DockedComposerBar(model, images.attach) }
         } else {
             Box(Modifier.measuredAs(parts, PART_CARD)) {
-                ComposerCompanionRow(model) { ComposerPromptCard(model, images.attach) }
+                ComposerCompanionRow(model) { VoiceCardDock(model.uiState) { ComposerPromptCard(model, images.attach) } }
             }
             ComposerUnderCardLine(model)
         }
@@ -170,16 +171,18 @@ private fun TouchComposerPanel(model: ComposerModel, attachImage: () -> Unit, mo
             ComposerAboveCard(model, parts)
         }
         if (model.mode != ChatSurfaceMode.Docked) TouchCompanionSlot(model)
-        TouchComposerBar(
-            model = model,
-            onAttachImage = attachImage,
-            modifier = Modifier.measuredAs(parts, PART_CARD),
-            leading = if (model.mode == ChatSurfaceMode.Docked) {
-                { TouchOpenChatButton(onOpen = { model.onIntent(ChatSurfaceIntent.Expand) }) }
-            } else {
-                null
-            },
-        )
+        VoiceCardDock(model.uiState) {
+            TouchComposerBar(
+                model = model,
+                onAttachImage = attachImage,
+                modifier = Modifier.measuredAs(parts, PART_CARD),
+                leading = if (model.mode == ChatSurfaceMode.Docked) {
+                    { TouchOpenChatButton(onOpen = { model.onIntent(ChatSurfaceIntent.Expand) }) }
+                } else {
+                    null
+                },
+            )
+        }
     }
 }
 
@@ -210,20 +213,9 @@ private fun ComposerUnderCardLine(model: ComposerModel) {
 @Composable
 private fun ComposerAboveCard(model: ComposerModel, parts: SnapshotStateMap<String, Rect>) {
     val actions = model.actions
-    QueuedSendsPanel(
-        queue = model.uiState.sendQueue,
-        actions = remember(actions) {
-            QueuedSendActions(
-                onCancel = actions::cancelQueuedSend,
-                onSendNow = actions::sendQueuedNow,
-                onResume = { actions.resumeSendQueue() },
-            )
-        },
-        modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
-    )
     model.composer.error?.let { message -> ComposerErrorRow(message = message, onDismiss = actions::clearComposerError) }
-    // Voice mode's failures and missing setup, with Retry or Set up, in the same notice slot.
-    ComposerVoiceNotice()
+    // Voice mode's failures and missing setup with Retry or Set up (its card extends from the prompt bar).
+    ComposerVoiceSlot()
     // The dock stays one compact bar; the directory is chrome of the full page.
     if (model.showWorkingDirectory && model.mode != ChatSurfaceMode.Docked) {
         model.composer.workingDirectory?.let { ComposerWorkingDirectoryRow(it, model.host.pickWorkingDirectory) }
@@ -246,6 +238,25 @@ private fun ComposerAboveCard(model: ComposerModel, parts: SnapshotStateMap<Stri
         )
     }
     ComposerSuggestions(model.composer, model.decisions.autocomplete, actions)
+    // The queue last: one row docked just above the prompt bar (and the voice card behind it).
+    QueuedSendsPanel(
+        queue = model.uiState.sendQueue,
+        actions = remember(actions, model.composer.text) {
+            QueuedSendActions(
+                onCancel = actions::cancelQueuedSend,
+                onSendNow = actions::sendQueuedNow,
+                onResume = { actions.resumeSendQueue() },
+                // Edit: out of the queue, its words into the draft (after what is typed), its images back on it.
+                onEdit = { item ->
+                    val draft = model.composer.text
+                    actions.cancelQueuedSend(item.id)
+                    actions.updateComposerText(if (draft.isBlank()) item.text else "$draft\n${item.text}")
+                    item.attachments.forEach(actions::attachImage)
+                },
+            )
+        },
+        modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
+    )
 }
 
 private const val PART_COMPOSER = "composer"

@@ -511,6 +511,10 @@ ActiveTurnCoordinator owns one trusted conversation lifecycle using active-turn-
 
 Project page state, backend ports and controller operations. Host project summaries/identifiers are separate from issue-work repository capabilities. Keep issue-work capabilities distinct from project catalog access; provide backend operations through [ProjectsBackend](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.projects/-projects-backend/index.html) and pin persistence through [ProjectPinStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.projects/-project-pin-store/index.html).
 
+# Package com.letta.mobile.data.rpcwire
+
+Small admin RPC primitives shared by clients that must not depend on a transport: the unknown-method error vocabulary (`AdminRpcErrors`) and the write-only secret wrapper (`SecretWriteValue`) whose value only an encoder reads. The provider and Iroh packages keep their old names for both as type aliases.
+
 # Package com.letta.mobile.data.repository
 
 Cached repositories, change observers and channel/admin-RPC source adapters. Refresh, cursor and cache behavior uses injected persistence/remote boundaries; source tags identify remaining platform-scoped implementations. Keep platform storage engines and UI state outside repository policy; construct shared cached repositories with the source/cache contracts from `data.repository.api`.
@@ -681,6 +685,10 @@ The per-conversation outbox lives here too. `OutboxEntry` records one outbound p
 
 Pending send attempts carry typed agent, conversation and message identities plus a retry generation. Canonical `acceptPendingSend` reserves the pending budget in a storage transaction before invoking its synchronous transport acceptance callback; a refused send preserves existing records. Wrappers must forward this admission along with ownership and attempt-aware outcomes. Transient disconnects allow 30 seconds for live progress or authoritative recovery; failed or timed-out recovery releases pending ownership so an unconfirmed prompt becomes Not sent.
 
+# Package com.letta.mobile.data.timeline.handover
+
+The live overlay's hold on a sent prompt between leaving the pending store and its durable copy being on screen, so the prompt never leaves the list at settle. It reads records through the accessors it is given and depends on no timeline type; the presentation owns the instance and feeds it pending records and the resident snapshot.
+
 # Package com.letta.mobile.data.timeline.headless
 
 Headless timeline storage, replay and streaming-reveal state. Semantic behavior can be exercised without a Compose viewport or platform application shell. Keep replay diagnostics from becoming a second product timeline writer; supply replay inputs and backing through [HeadlessTimelineReplaySession](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.timeline.headless/-headless-timeline-replay-session/index.html) and [HeadlessTimelineStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.timeline.headless/-headless-timeline-store/index.html) to [HeadlessTimelineReplayer](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.timeline.headless/-headless-timeline-replayer/index.html).
@@ -769,7 +777,11 @@ The three seams of the voice loop. A [VoiceEar](https://oculairmedia.github.io/l
 
 # Package com.letta.mobile.data.voice.host
 
-The client side of the voice-endpoint v1 contract, in which the host keeps one speech server setup for every device: [HostVoiceEndpoint](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.host/-host-voice-endpoint/index.html) reads the shared setup, writes, clears and tests it, lists the server's models and voices, and sends transcriptions and streamed syntheses through the host. The key is write-only: [HostVoiceSetupCommand](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.host/-host-voice-setup-command/index.html) can be encoded but never decoded or printed, and no status carries it. Every failure is one [HostVoiceErrorCode](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.host/-host-voice-error-code/index.html) that says whether a retry may help and never echoes the speech server's reply or address. Interface and wire types only; the transport binding comes later.
+The client side of the voice-endpoint v1 contract, in which the host keeps one speech server setup for every device: [HostVoiceEndpoint](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.host/-host-voice-endpoint/index.html) reads the shared setup, writes, clears and tests it, lists the server's models and voices, and sends transcriptions and streamed syntheses through the host. The key is write-only: [HostVoiceSetupCommand](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.host/-host-voice-setup-command/index.html) can be encoded but never decoded or printed, and no status carries it. Every failure is one [HostVoiceErrorCode](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.host/-host-voice-error-code/index.html) that says whether a retry may help and never echoes the speech server's reply or address. Interface and wire types only; the client over the host connection is in the host client package.
+
+# Package com.letta.mobile.data.voice.host.client
+
+The client of the voice-endpoint v1 contract over the host connection. `IrohHostVoiceEndpoint` implements `HostVoiceEndpoint` with one Iroh `admin_rpc` per request through `HostVoiceLink` (the app binds it to its channel transport): setup reads and admin writes, connection checks, the model list, transcription of a mono 16-bit WAVE clip (split to the 1 MiB and 30 s limits), and streamed synthesis whose format and audio frames become PCM chunks as they arrive, cancelled on the host when collection stops. `SharedVoiceSetup` keeps what this device knows of the shared setup (status, whether it is an admin) and decides each session's `VoiceRoute`: through the host while it serves the contract and has a setup, else directly to this device's own server. `HostSpeechTranscriber` and `HostSpeechSynthesizer` put the host behind the same transcriber and synthesizer seams as the direct server, so the voice loop does not know which one it talks to. The package depends on no transport. Nothing here logs audio, words, the address or a key.
 
 # Package com.letta.mobile.data.voice.local
 
@@ -787,6 +799,10 @@ The voice loop driver: idle, listening, thinking, speaking and failed, continuou
 
 The voice loop's internal transition table: a pure function from model and input to model and effects, split into control, ear, reply and mouth rules. It reads no clock, suspends nowhere and touches no engine, so every row is tested directly.
 
+# Package com.letta.mobile.data.voice.output
+
+What a voice session exposes about its spoken output and the person's controls: the spoken progress of the current reply (one entry per segment once it starts playing, with its start time and an estimated then exact audio duration), the turn clock (who is speaking and since when), and the microphone mute, speaker mute and speech speed settings. Times use one monotonic clock so a caller can work out how much of a segment has been spoken; nothing here carries audio or transcript text beyond the reply segments already shown in the chat.
+
 # Package com.letta.mobile.data.voice.responder
 
 The responder for the conversation's agent, over its own port, [VoiceChatSession](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.responder/-voice-chat-session/index.html): sending returns the message's client id, and the state publishes the run each sent message started. Replies are attributed by that identity only, never by text, position or timing; without it nothing is spoken and the reply ends unattributed. The app's chat session is adapted to this port in `data.voice.responder.chat`.
@@ -798,6 +814,10 @@ The app's chat session as a [VoiceChatSession](https://oculairmedia.github.io/le
 # Package com.letta.mobile.data.voice.session
 
 Voice mode for one chat page, assembled from the pieces below: [VoiceModeController](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.session/-voice-mode-controller/index.html) builds and owns one voice loop at a time over a platform's [VoiceAudio](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.session/-voice-audio/index.html), the stored endpoint setup and the chat session a host opens, and publishes a small [VoiceModeState](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.session/-voice-mode-state/index.html) for the chat bar. A press checks the setup, then the microphone permission, then starts; the microphone and speaker are released on stop, on a conversation change and on shutdown. [VoiceSetupStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.session/-voice-setup-store/index.html) keeps the endpoint address and the destination grants as separate values and the API key only in the host's secure store, validates addresses with the endpoint client's own rules and checks reachability without sending audio or text. Nothing here logs audio, transcripts, addresses or keys.
+
+# Package com.letta.mobile.data.voice.session.migration
+
+Moving this device's own speech server to the host so every device shares it: `VoiceSetupMigration` writes the address, names and this device's grants in one `voice.setup.set`, sends the key only when the person explicitly asks (write-only, once) and deletes it here after the host reports holding it; `shareOfferFor` says what the Voice settings may offer (share, ask an admin device, or remove this device's own server once the host's is in force).
 
 # Package com.letta.mobile.data.voice.session.telemetry
 

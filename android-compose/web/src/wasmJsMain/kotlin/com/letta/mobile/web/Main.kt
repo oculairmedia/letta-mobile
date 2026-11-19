@@ -10,7 +10,7 @@ fun main() {
     installBeamShaderTelemetry()
     val telemetryRecorder = com.letta.mobile.util.TelemetryRecorder()
     val telemetryRecording = com.letta.mobile.util.Telemetry.installRecorder(telemetryRecorder)
-    kotlinx.browser.window.addEventListener("unload", { telemetryRecording.close() })
+    kotlinx.browser.window.addEventListener("pagehide", { telemetryRecording.close() })
     val body = document.body ?: return
     ComposeViewport(body) {
         LettaWebApp()

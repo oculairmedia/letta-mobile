@@ -65,6 +65,9 @@ internal class VoiceTelemetry(
     @Volatile
     private var since: TimeMark? = null
 
+    @Volatile
+    private var turnEnd: TimeMark? = null
+
     /** Reports [name] with [attrs] and the time since the session started. */
     fun event(name: String, vararg attrs: VoiceTelemetryField) =
         sink.event(TAG, name, attrs.asList() + ("tMs" attr since?.elapsedNow()?.inWholeMilliseconds))
@@ -79,7 +82,31 @@ internal class VoiceTelemetry(
     }
 
     /** Voice mode stopped for [reason]. */
-    fun stopped(reason: String) = event("mode.stopped", "reason" attr reason)
+    fun stopped(reason: String) {
+        turnEnd = null
+        event("mode.stopped", "reason" attr reason)
+    }
+
+    /** The person's turn ended [ago] (its speech stopped then); the next audio played is its answer's first. */
+    fun turnEnded(ago: Duration = Duration.ZERO) {
+        turnEnd = timeSource.markNow() - ago
+    }
+
+    /** The turn that ended last was dropped (its transcript was not the person's words): no answer will follow. */
+    fun turnDropped() {
+        turnEnd = null
+    }
+
+    /**
+     * The mouth started playing a segment: the first one after a turn ended reports
+     * `speech.firstAudio` with `afterTurnEndMs`, the time from the end of the person's turn to the
+     * answer's first audio (time to first audio). A duration only.
+     */
+    fun audioStarted() {
+        val ended = turnEnd ?: return
+        turnEnd = null
+        event("speech.firstAudio", "afterTurnEndMs" attr ended.elapsedNow().inWholeMilliseconds)
+    }
 
     /** The loop moved to [state]'s phase (or its failure, its turn failure or its pending answers changed). */
     fun loopState(state: VoiceLoopState) = event(
@@ -139,13 +166,22 @@ internal fun VoiceLoopState.diagnosticKey(): LoopDiagnostics =
 internal class VoiceEarTelemetry(private val telemetry: VoiceTelemetry) : EarObserver {
     override fun turnOpened() = telemetry.event("turn.opened")
 
-    override fun turnClosed(report: EarTurnReport, reason: TurnEndReason) =
+    override fun turnClosed(report: EarTurnReport, reason: TurnEndReason) {
+        telemetry.turnEnded()
         telemetry.earTurn("turn.closed", reason.name, report)
+    }
 
-    override fun turnDiscarded(report: EarTurnReport, reason: TurnDiscardReason) =
+    override fun turnDiscarded(report: EarTurnReport, reason: TurnDiscardReason) {
+        if (reason !in CandidateReasons) telemetry.turnDropped()
         telemetry.earTurn("turn.discarded", reason.name, report)
+    }
 
     override fun transcriptAccepted(characters: Int) = telemetry.event("transcript.accepted", "characters" attr characters)
+
+    private companion object {
+        /** Sounds dropped before they became a turn; a turn that already closed still stands. */
+        val CandidateReasons = setOf(TurnDiscardReason.NO_ONSET, TurnDiscardReason.TOO_LITTLE_VOICE, TurnDiscardReason.OUTPUT_ACTIVE)
+    }
 }
 
 /**
@@ -154,10 +190,15 @@ internal class VoiceEarTelemetry(private val telemetry: VoiceTelemetry) : EarObs
  * platform-neutral error and the failures in a row, and `local.handover` with its reason.
  */
 internal class LocalEarTelemetry(private val telemetry: VoiceTelemetry) : LocalEarObserver {
-    override fun heard(characters: Int, sinceEndOfSpeech: Duration?) =
+    override fun heard(characters: Int, sinceEndOfSpeech: Duration?) {
+        telemetry.turnEnded(sinceEndOfSpeech ?: Duration.ZERO)
         telemetry.event("local.heard", "characters" attr characters, "endToFinalMs" attr sinceEndOfSpeech?.inWholeMilliseconds)
+    }
 
-    override fun discarded(reason: TurnDiscardReason) = telemetry.event("local.discarded", "reason" attr reason.name)
+    override fun discarded(reason: TurnDiscardReason) {
+        telemetry.turnDropped()
+        telemetry.event("local.discarded", "reason" attr reason.name)
+    }
 
     override fun failed(error: LocalRecognitionError, attempt: Int) =
         telemetry.event("local.failed", "error" attr error.name, "attempt" attr attempt)
@@ -361,7 +402,10 @@ internal class TelemetryResponder(
 internal class TelemetryMouth(private val delegate: VoiceMouth, private val telemetry: VoiceTelemetry) : VoiceMouth by delegate {
     override val events: Flow<VoiceMouthEvent> = delegate.events.onEach { event ->
         when (event) {
-            is VoiceMouthEvent.Started -> telemetry.event("speech.started", "segment" attr event.id.value)
+            is VoiceMouthEvent.Started -> {
+                telemetry.audioStarted()
+                telemetry.event("speech.started", "segment" attr event.id.value)
+            }
             is VoiceMouthEvent.Finished -> telemetry.event("speech.ended", "segment" attr event.id.value)
             is VoiceMouthEvent.Failed -> telemetry.event(
                 "speech.failed",

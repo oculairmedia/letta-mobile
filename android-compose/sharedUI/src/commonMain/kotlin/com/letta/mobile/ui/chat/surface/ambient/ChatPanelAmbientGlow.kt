@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
 import com.letta.mobile.ui.ambient.AmbientVoice
-import com.letta.mobile.ui.ambient.AmbientVoiceRole
 import com.letta.mobile.ui.ambient.LocalAmbientVoice
 import com.letta.mobile.ui.ambient.ThinkingGlowStyle
 import com.letta.mobile.ui.ambient.AmbientBand
@@ -294,6 +293,7 @@ private fun GlowLayer(
                     tint = inputs.tint.value,
                     fieldHeight = fieldHeightFor(placement),
                     gain = GLOW_GAIN,
+                    dotGrid = inputs.voice?.dotGrid ?: 0f,
                 )
                 if (shader != null) with(shader) { drawGlow(uniforms) } else drawAmbientGlowFallback(uniforms)
                 if (placement is AmbientGlowPlacement.Halo) featherEdges()
@@ -428,13 +428,11 @@ private fun glowTint(voice: AmbientVoice?, status: AmbientMotionStatus, scheme: 
     if (voice != null) voiceTint(voice, scheme) else ambientTint(status, scheme)
 
 /**
- * The glow's colour while it follows a voice: the person's own colour, or the agent's running tint
- * (the thinking colour) while its reply is spoken.
+ * The glow's colour while it follows a voice: that voice's tint (the person's, or the agent's while
+ * its reply is spoken), or the running tint (the thinking colour) for an agent given none.
  */
-internal fun voiceTint(voice: AmbientVoice, scheme: ColorScheme): Color = when (voice.role) {
-    AmbientVoiceRole.You -> Color(voice.youTintArgb)
-    AmbientVoiceRole.Agent -> ambientTint(AmbientMotionStatus.Running, scheme)
-}
+internal fun voiceTint(voice: AmbientVoice, scheme: ColorScheme): Color =
+    voice.tintArgb()?.let(::Color) ?: ambientTint(AmbientMotionStatus.Running, scheme)
 
 /** One frame's uniforms for the shared ambient shader (AMBIENT_GLOW_SHADER_SOURCE's contract). */
 @Immutable
@@ -449,6 +447,8 @@ internal data class AmbientGlowUniforms(
     val fieldHeight: Float,
     /** Multiplies the tint's alpha (the shader's uColor.a), which scales the whole effect. */
     val gain: Float,
+    /** The dot texture's strength (the shader's uDotGrid), 0 for none. */
+    val dotGrid: Float = 0f,
 )
 
 /** The platform's compiled ambient shader, drawing one frame over the whole draw scope. */

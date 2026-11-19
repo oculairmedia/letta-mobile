@@ -16,9 +16,15 @@ internal class FakeLocalRecognizer(
     val sessions = mutableListOf<FakeRecognizerSession>()
     val recognitions = mutableListOf<FakeRecognition>()
 
+    /** Every request a session was opened for, in order. */
+    val requests = mutableListOf<LocalRecognitionRequest>()
+
     override fun availability(language: String?): LocalSpeechAvailability = availability
 
-    override fun open(request: LocalRecognitionRequest): LocalRecognizerSession = FakeRecognizerSession(this).also { sessions += it }
+    override fun open(request: LocalRecognitionRequest): LocalRecognizerSession {
+        requests += request
+        return FakeRecognizerSession(this).also { sessions += it }
+    }
 
     /** The recognition started last. */
     val current: FakeRecognition get() = recognitions.last()

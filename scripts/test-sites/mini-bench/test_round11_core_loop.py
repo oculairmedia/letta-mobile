@@ -99,6 +99,14 @@ def test_failed_uiautomator_dump_cannot_read_stale_tree(tmp_path):
     assert not (tmp_path/'final.xml').exists()
 
 
+def test_dump_rejects_shell_diagnostic_before_writing_xml(tmp_path):
+    diagnostic = b'cat: /sdcard/core-loop-ui.xml: No such file or directory'
+    with patch.object(device, 'adb', return_value=''), patch.object(device, 'command', return_value=diagnostic):
+        with pytest.raises(RuntimeError, match='before: UI hierarchy not produced'):
+            device.dump(tmp_path, 'before')
+    assert not (tmp_path / 'before.xml').exists()
+
+
 def test_capture_invocations_allocate_distinct_identity_once(tmp_path):
     identities = []
     for name in ('first', 'second'):

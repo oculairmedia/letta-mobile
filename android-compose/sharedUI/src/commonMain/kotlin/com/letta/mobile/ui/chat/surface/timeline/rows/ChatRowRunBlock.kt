@@ -16,6 +16,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.NonRestartableComposable
 import androidx.compose.runtime.Stable
@@ -30,6 +31,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.chat.projection.stableListKey
 import com.letta.mobile.data.chat.projection.RunActivityProjection
 import com.letta.mobile.data.chat.projection.projectRunActivity
 import com.letta.mobile.data.model.UiMessage
@@ -354,9 +356,13 @@ private fun RunSteps(steps: List<RunStep>, body: RunBodyState, row: RunRowScope,
     Column(modifier = Modifier.fillMaxWidth()) {
         steps.forEachIndexed { index, step ->
             key(step.key) {
+                val observer = LocalRunStepLifetime.current
+                if (observer != null) DisposableEffect(step.key) {
+                    observer(step.key, true)
+                    onDispose { observer(step.key, false) }
+                }
                 val positioned = PositionedRunStep(step, single?.first ?: stepPosition(index, steps.size))
-                // A work step always draws through the one folding call site, so a run's lone reasoning keeps its
-                // composition when the run's second step lands; while alone it shows as the run's own row.
+                // Keep a lone work step's composition when a second step arrives.
                 if (step.isWork()) {
                     RunWorkStep(positioned, body, row, single)
                 } else {
@@ -540,7 +546,7 @@ internal sealed interface RunStep {
 
     @Immutable
     data class Message(val message: UiMessage) : RunStep {
-        override val key: String = message.id
+        override val key: String = message.stableListKey()
     }
 
     /** Every tool call of the run, listed as step rows at the first tool call's position. */
@@ -593,7 +599,7 @@ private fun runToolCallGroup(messages: List<UiMessage>): RunStep.ToolCalls? {
     val calls = messages.filter { it.isPlainAssistantStep() }
     if (calls.isEmpty()) return null
     return RunStep.ToolCalls(
-        firstMessageId = calls.first().id,
+        firstMessageId = calls.first().stableListKey(),
         calls = ToolRunCalls(
             toolCalls = calls.flatMap { it.toolCalls.orEmpty() }.toImmutableList(),
             approvals = calls.mapNotNull { it.approvalRequest }.distinctBy { it.requestId }.toImmutableList(),

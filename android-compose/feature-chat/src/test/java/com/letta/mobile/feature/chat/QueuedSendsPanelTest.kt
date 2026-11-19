@@ -24,7 +24,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** letta-mobile-1n5py: queued messages render in order with their controls. */
+/**
+ * letta-mobile-1n5py: queued messages render as one docked row (the next message and its controls),
+ * the rest in order under its "+N".
+ */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
 @Tag("unit")
@@ -56,7 +59,9 @@ class QueuedSendsPanelTest {
         render(ConversationSendQueue(items = listOf(send("a", "first"), send("b", "second"), send("c", "third"))))
 
         composeRule.onNodeWithText("3 messages queued").assertIsDisplayed()
-        composeRule.onNodeWithText("Queued · 1").assertIsDisplayed()
+        composeRule.onNodeWithText("first").assertIsDisplayed()
+        composeRule.onNodeWithText("Queued · 2").assertDoesNotExist()
+        composeRule.onNodeWithTag("queued_sends_more").performClick()
         composeRule.onNodeWithText("Queued · 2").assertIsDisplayed()
         composeRule.onNodeWithText("Queued · 3").assertIsDisplayed()
         composeRule.onNodeWithText("second").assertIsDisplayed()
@@ -67,6 +72,7 @@ class QueuedSendsPanelTest {
     fun `row controls cancel or push through that message only`() {
         render(ConversationSendQueue(items = listOf(send("a", "first"), send("b", "second"))))
 
+        composeRule.onNodeWithTag("queued_sends_more").performClick()
         composeRule.onNodeWithTag("queued_send_cancel_" + "b").performClick()
         composeRule.onNodeWithTag("queued_send_now_" + "a").performClick()
 
@@ -115,7 +121,7 @@ class QueuedSendsPanelTest {
         render(ConversationSendQueue(items = listOf(send("a", "first")), heldByOtherClient = true))
 
         composeRule.onNodeWithText("Waiting for another device · 1 message").assertIsDisplayed()
-        composeRule.onNodeWithText("Queued · 1").assertIsDisplayed()
+        composeRule.onNodeWithText("first").assertIsDisplayed()
     }
 
     @Test

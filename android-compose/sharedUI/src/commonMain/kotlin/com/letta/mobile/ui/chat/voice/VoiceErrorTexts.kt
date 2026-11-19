@@ -13,6 +13,7 @@ import com.letta.mobile.sharedui.resources.voice_error_timed_out
 import com.letta.mobile.sharedui.resources.voice_error_unattributed
 import com.letta.mobile.sharedui.resources.voice_error_unauthorized
 import com.letta.mobile.sharedui.resources.voice_error_unreachable
+import com.letta.mobile.sharedui.resources.voice_error_unresolved
 import org.jetbrains.compose.resources.StringResource
 
 private val audioFailures = setOf(
@@ -25,6 +26,7 @@ private val audioFailures = setOf(
 
 private val errorTexts = mapOf(
     VoiceErrorCode.UNREACHABLE to Res.string.voice_error_unreachable,
+    VoiceErrorCode.UNRESOLVED to Res.string.voice_error_unresolved,
     VoiceErrorCode.TIMED_OUT to Res.string.voice_error_timed_out,
     VoiceErrorCode.UNAUTHORIZED to Res.string.voice_error_unauthorized,
     VoiceErrorCode.INSECURE_TRANSPORT to Res.string.voice_error_insecure,

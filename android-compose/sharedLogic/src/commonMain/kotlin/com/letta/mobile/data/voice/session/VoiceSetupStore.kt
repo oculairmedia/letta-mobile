@@ -13,11 +13,30 @@ import com.letta.mobile.data.voice.endpoint.SpeechEndpointAddress
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointClient
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointConfig
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointException
+import com.letta.mobile.data.voice.endpoint.SpeechEndpointLocality
+import com.letta.mobile.data.voice.endpoint.SpeechSpeed
 import com.letta.mobile.data.voice.endpoint.SpeechTransportPolicy
+import com.letta.mobile.data.voice.host.client.VoiceRoute
+import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
 import io.ktor.client.engine.HttpClientEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+
+/**
+ * The person's voice-mode tuning: how fast replies are spoken, how long a pause ends their turn, and
+ * whether the server ear shows their words live.
+ */
+data class VoiceTuning(
+    /** The speed replies are spoken at, sent to the speech endpoint. */
+    val speechSpeed: SpeechSpeed = SpeechSpeed.Normal,
+    /** The silence that ends a turn for the server ear (the device's recogniser decides its own). */
+    val endOfTurnSilence: Duration = EndOfTurnPolicy.DEFAULT_TRAILING_SILENCE,
+    /** Whether the server ear requests live partial transcripts; null follows the endpoint ([VoiceSetup.livePartials]). */
+    val livePartials: Boolean? = null,
+)
 
 /** What the person configured for voice mode, as stored. Never carries the API key itself. */
 data class VoiceSetup(
@@ -34,7 +53,27 @@ data class VoiceSetup(
     val interruptBySpeaking: Boolean = false,
     /** Which ear voice mode listens with. */
     val listening: VoiceListening = VoiceListening.AUTOMATIC,
+    /** Speech speed and end-of-turn silence. */
+    val tuning: VoiceTuning = VoiceTuning(),
+    /**
+     * The person chose this device's own speech server even where the host shares one; ignored
+     * while this device has none.
+     */
+    val deviceOnly: Boolean = false,
+    /**
+     * The shared server origin this device acknowledged sending its microphone audio to, once, when
+     * it listens through the host; null when it has not. Never exported, like the grants.
+     */
+    val hostAudioAck: EndpointOrigin? = null,
 ) {
+    /**
+     * Whether the server ear transcribes the turn so far while the person speaks (live partial
+     * transcripts, several requests per turn): the stored choice, or by default on only when the
+     * endpoint is on this machine or a private network (no per-request cost, nothing leaves it).
+     */
+    val livePartials: Boolean
+        get() = tuning.livePartials ?: (endpoint.baseUrl?.let(SpeechEndpointLocality::isLocal) == true)
+
     /** Whether speaking over a reply interrupts it, on a microphone path that is [echoCancelled] or not. */
     fun bargeInByVoice(echoCancelled: Boolean): Boolean = echoCancelled || interruptBySpeaking
 
@@ -45,7 +84,36 @@ data class VoiceSetup(
             return VoiceEndpointPayload.entries.all { grants.allows(url, it) }
         }
 
-    /** What is still missing before voice mode can start; null when it can. */
+    /** Whether this device's own server is chosen over the host's shared one (and there is one). */
+    val prefersDevice: Boolean get() = deviceOnly && endpoint.baseUrl != null
+
+    /**
+     * The grants a request checks: the recorded ones, plus audio for transcription to the shared
+     * server's origin once this device acknowledged it ([hostAudioAck]).
+     */
+    val effectiveGrants: VoiceEndpointGrants
+        get() = hostAudioAck?.let { grants.with(VoiceEndpointGrant(it, VoiceEndpointPayload.AUDIO_FOR_TRANSCRIPTION)) } ?: grants
+
+    /**
+     * What is missing before a session on [route] can start; null when it can. [serverEar] says the
+     * session listens through the speech server (not the device's own recogniser). Through the host,
+     * speaking needs the shared setup's speech to be available, and listening through the server
+     * also needs its transcription and this device's acknowledgement for that server's origin; this
+     * device's own setup is not consulted. Directly, it is [gap].
+     */
+    fun gapFor(route: VoiceRoute, serverEar: Boolean): VoiceSetupGap? {
+        if (route !is VoiceRoute.Host) return gap
+        val status = route.status
+        return when {
+            !status.speech.available -> VoiceSetupGap.HOST_INCOMPLETE
+            !serverEar -> null
+            !status.transcription.available -> VoiceSetupGap.HOST_INCOMPLETE
+            route.origin == null || hostAudioAck != route.origin -> VoiceSetupGap.NO_DEVICE_ACK
+            else -> null
+        }
+    }
+
+    /** What is still missing before voice mode can start on this device's own server; null when it can. */
     val gap: VoiceSetupGap?
         get() {
             val url = endpoint.baseUrl ?: return VoiceSetupGap.NO_ENDPOINT
@@ -121,7 +189,7 @@ class VoiceSetupStore(
         val consented = if (draft.consent) origin else null
         val grants = consented?.let { granted -> VoiceEndpointPayload.entries.map { VoiceEndpointGrant(granted, it) } }.orEmpty()
         settings.putString(KEY_GRANTS, grants.joinToString(GRANT_SEPARATOR) { "${it.payload.name}$FIELD_SEPARATOR${it.origin.value}" })
-        writeKey(draft.apiKey)
+        secrets.writeApiKey(draft.apiKey)
         state.value = read()
         return null
     }
@@ -162,6 +230,56 @@ class VoiceSetupStore(
         state.value = read()
     }
 
+    /** Stores the speed replies are spoken at; takes effect from the next segment. */
+    fun setSpeechSpeed(speed: SpeechSpeed) {
+        settings.putString(KEY_SPEECH_SPEED, speed.value.toString())
+        state.value = read()
+    }
+
+    /** Whether the server ear shows the person's words live; see [VoiceSetup.livePartials]. */
+    val livePartials: Boolean get() = state.value.livePartials
+
+    /** Stores whether to request live partial transcripts; null returns to the endpoint-based default. Takes effect from the next start. */
+    fun setLivePartials(enabled: Boolean?) {
+        if (enabled == null) settings.remove(KEY_LIVE_PARTIALS) else settings.putString(KEY_LIVE_PARTIALS, enabled.toString())
+        state.value = read()
+    }
+
+    /** Stores whether to use this device's own speech server even where the host shares one; from the next start. */
+    fun setDeviceOnly(enabled: Boolean) {
+        settings.putString(KEY_DEVICE_ONLY, enabled.toString())
+        state.value = read()
+    }
+
+    /**
+     * Records this device's one-time acknowledgement that its microphone audio may go to the shared
+     * speech server at [origin]; null withdraws it. Takes effect at the next request.
+     */
+    fun acknowledgeHostAudio(origin: EndpointOrigin?) {
+        if (origin == null) settings.remove(KEY_HOST_AUDIO_ACK) else settings.putString(KEY_HOST_AUDIO_ACK, origin.value)
+        state.value = read()
+    }
+
+    /**
+     * Removes this device's own speech server: its address, grants and key; with [keyOnly], only the
+     * key (it moved to the host) and the address and grants stay. Tuning and choices stay.
+     */
+    fun clearEndpoint(keyOnly: Boolean = false) {
+        if (!keyOnly) {
+            settings.remove(KEY_BASE_URL)
+            settings.remove(KEY_GRANTS)
+        }
+        secrets?.remove(KEY_API_KEY)
+        state.value = read()
+    }
+
+    /** Stores the silence that ends a turn, clamped to the allowed range; takes effect from the next start. */
+    fun setEndOfTurnSilence(silence: Duration) {
+        val clamped = silence.coerceIn(EndOfTurnPolicy.MIN_TRAILING_SILENCE, EndOfTurnPolicy.MAX_TRAILING_SILENCE)
+        settings.putString(KEY_END_OF_TURN_SILENCE_MS, clamped.inWholeMilliseconds.toString())
+        state.value = read()
+    }
+
     /** The key a [draft] would leave stored: the typed one, none when blanked, else the stored one. */
     fun keyAfter(draft: VoiceSetupDraft): String? = when {
         secrets == null -> null
@@ -169,12 +287,6 @@ class VoiceSetupStore(
         else -> draft.apiKey.trim().takeIf { it.isNotEmpty() }
     }
 
-    private fun writeKey(typed: String?) {
-        val store = secrets ?: return
-        if (typed == null) return
-        val key = typed.trim()
-        if (key.isEmpty()) store.remove(KEY_API_KEY) else store.putString(KEY_API_KEY, key)
-    }
 
     private fun storedKey(): String? = secrets?.getString(KEY_API_KEY)?.takeIf { it.isNotBlank() }
 
@@ -184,12 +296,10 @@ class VoiceSetupStore(
         hasApiKey = storedKey() != null,
         interruptBySpeaking = settings.getString(KEY_INTERRUPT_BY_SPEAKING) == true.toString(),
         listening = VoiceListening.entries.firstOrNull { it.name == settings.getString(KEY_LISTENING) } ?: VoiceListening.AUTOMATIC,
+        tuning = readTuning(settings),
+        deviceOnly = settings.getString(KEY_DEVICE_ONLY) == true.toString(),
+        hostAudioAck = settings.getString(KEY_HOST_AUDIO_ACK)?.takeIf { it.isNotBlank() }?.let(::EndpointOrigin),
     )
-
-    private fun parseGrants(text: String): Set<VoiceEndpointGrant> = text.split(GRANT_SEPARATOR).mapNotNull { entry ->
-        val payload = VoiceEndpointPayload.entries.firstOrNull { entry.startsWith("${it.name}$FIELD_SEPARATOR") }
-        payload?.let { VoiceEndpointGrant(EndpointOrigin(entry.removePrefix("${it.name}$FIELD_SEPARATOR")), it) }
-    }.toSet()
 
     /** The stored keys. */
     companion object {
@@ -208,7 +318,45 @@ class VoiceSetupStore(
         /** Which ear voice mode listens with ([VoiceListening]). */
         const val KEY_LISTENING: String = "voice.listening"
 
-        private const val GRANT_SEPARATOR = "\n"
-        private const val FIELD_SEPARATOR = " "
+        /** The speech speed multiplier ([SpeechSpeed]). */
+        const val KEY_SPEECH_SPEED: String = "voice.speechSpeed"
+
+        /** The server ear's end-of-turn silence, in milliseconds. */
+        const val KEY_END_OF_TURN_SILENCE_MS: String = "voice.endOfTurnSilenceMs"
+
+        /** Whether to request live partial transcripts; absent follows the endpoint. */
+        const val KEY_LIVE_PARTIALS: String = "voice.livePartials"
+
+        /** Whether to use this device's own speech server even where the host shares one. */
+        const val KEY_DEVICE_ONLY: String = "voice.endpoint.deviceOnly"
+
+        /** The shared server origin this device acknowledged sending its audio to; kept apart like the grants. */
+        const val KEY_HOST_AUDIO_ACK: String = "voice.host.audioAck"
+
     }
 }
+
+private const val GRANT_SEPARATOR = "\n"
+private const val FIELD_SEPARATOR = " "
+
+/** Stores [typed] as the API key in this secure store (blank removes it, null keeps it); nothing without a store. */
+private fun SecureSettingsStore?.writeApiKey(typed: String?) {
+    val store = this ?: return
+    val key = typed?.trim() ?: return
+    if (key.isEmpty()) store.remove(VoiceSetupStore.KEY_API_KEY) else store.putString(VoiceSetupStore.KEY_API_KEY, key)
+}
+
+/** The stored speed, end-of-turn silence and live-partials choice in [settings]. */
+private fun readTuning(settings: SecureSettingsStore): VoiceTuning {
+    val speed = settings.getString(VoiceSetupStore.KEY_SPEECH_SPEED)?.toFloatOrNull()?.let(SpeechSpeed::coerce) ?: SpeechSpeed.Normal
+    val silence = settings.getString(VoiceSetupStore.KEY_END_OF_TURN_SILENCE_MS)?.toLongOrNull()?.milliseconds
+        ?.coerceIn(EndOfTurnPolicy.MIN_TRAILING_SILENCE, EndOfTurnPolicy.MAX_TRAILING_SILENCE)
+    val partials = settings.getString(VoiceSetupStore.KEY_LIVE_PARTIALS)?.toBooleanStrictOrNull()
+    return VoiceTuning(speed, silence ?: EndOfTurnPolicy.DEFAULT_TRAILING_SILENCE, partials)
+}
+
+/** The grants stored as `PAYLOAD origin` lines. */
+private fun parseGrants(text: String): Set<VoiceEndpointGrant> = text.split(GRANT_SEPARATOR).mapNotNull { entry ->
+    val payload = VoiceEndpointPayload.entries.firstOrNull { entry.startsWith("${it.name}$FIELD_SEPARATOR") }
+    payload?.let { VoiceEndpointGrant(EndpointOrigin(entry.removePrefix("${it.name}$FIELD_SEPARATOR")), it) }
+}.toSet()

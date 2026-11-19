@@ -1,11 +1,13 @@
 # Voice endpoint v1: host-stored speech setup and speech through the host
 
-Status: **accepted; the host side is built, the clients come next.** The owner accepted the seven
+Status: **accepted; the host side and the clients are built.** The owner accepted the seven
 recommendations below on 2026-11-15.
 
 Fixtures: one per method, `android-compose/sharedLogic/src/commonTest/resources/contracts/<method>/voice-endpoint-v1.json`,
 each paired with a short spec in `docs/reference/contracts/<method>/voice-endpoint-v1.md`.
-Client SPI and wire types: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/voice/host/`.
+Client SPI and wire types: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/voice/host/`;
+the client over the host connection (`IrohHostVoiceEndpoint`, the route decision and the host-backed
+transcriber and synthesizer): `.../data/voice/host/client/`; the migration: `.../data/voice/session/migration/`.
 Host routes, store and speech server client: `android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/voice/`.
 Contract tests: `HostVoiceContractTest` (commonTest) decodes and re-encodes every case through the
 client types; `WireContractsTest` (jvmTest) runs every case through the real stream server, capability
@@ -142,7 +144,8 @@ App Server, so they have no `NativeAdminOp` entry.
 - `expected_revision`, when present and stale, is `voice.revision_conflict`.
 - The result is the new status. The write does not contact the speech server.
 - Client type: `HostVoiceSetupCommand` (not a data class; its serializer refuses to decode; its
-  `toString` shows no key), with the key as the provider path's `SecretWriteValue`.
+  `toString` shows no key), with the key as the provider path's `SecretWriteValue` (now kept in the
+  leaf package `data.rpcwire`, with the provider package's old name as a type alias).
 
 ## Clear (`voice.setup.clear`)
 
@@ -239,6 +242,7 @@ The failure response's `error` is exactly one of these strings; nothing else is 
 | `voice.payload_too_large` | no | Over the audio or text limits | REJECTED |
 | `voice.insecure_transport` | no | Key would travel over plain http off loopback | INSECURE_TRANSPORT |
 | `voice.upstream_unreachable` | yes | Server not reachable | UNREACHABLE |
+| `voice.upstream_unresolved` | yes | Server's host name did not resolve where the request ran | UNRESOLVED |
 | `voice.upstream_unauthorized` | no | Server refused the key (401/403) | UNAUTHORIZED |
 | `voice.upstream_rejected` | no | Server refused the request (400/404/422 after fallbacks) | REJECTED |
 | `voice.upstream_bad_response` | yes | Unexpected shape, broken or non-PCM stream | BAD_RESPONSE |

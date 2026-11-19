@@ -19,6 +19,8 @@ uniform float uPalettePull;
 uniform float uBandTop;
 uniform float uBandPeak;
 uniform vec4 uColor;
+// Voice mode's faint dot texture, 0 (none: the glow is unchanged) to 1. See dotGrid.
+uniform float uDotGrid;
 
 // Every frequency below is an integer multiple of F, so the whole field is periodic
 // in uTime with period 1/F = 1024 and the host can wrap its phase there with no seam.
@@ -80,6 +82,16 @@ float dither(float2 fragCoord) {
     return (hash(fragCoord * 0.7131) - 0.5) * (1.6 / 255.0);
 }
 
+// The share of the glow's alpha kept at fragCoord under the dot texture: 1 on a dot and, between dots,
+// 1 - uDotGrid. One fract and a length per pixel, and nothing at all while uDotGrid is 0.
+const float DOT_PITCH = 7.0;
+float dotGrid(float2 fragCoord) {
+    if (uDotGrid <= 0.0) return 1.0;
+    float2 cell = fract(fragCoord / DOT_PITCH) - 0.5;
+    float onDot = 1.0 - smoothstep(0.16, 0.30, length(cell));
+    return 1.0 - uDotGrid * (1.0 - onDot);
+}
+
 // [front] over [back], both unpremultiplied: rgb and alpha of the pair.
 float4 glowOver(float3 front, float frontA, float3 back, float backA) {
     float a = frontA + backA * (1.0 - frontA);
@@ -89,7 +101,7 @@ float4 glowOver(float3 front, float frontA, float3 back, float backA) {
 
 // The style's colour and raw alpha, scaled by the envelope and tint alpha, capped and dithered.
 half4 glowFinish(float3 rgb, float a, float2 fragCoord) {
-    float alpha = clamp(a * uEnvelope * uColor.a, 0.0, 0.8);
+    float alpha = clamp(a * uEnvelope * uColor.a, 0.0, 0.8) * dotGrid(fragCoord);
     alpha = max(alpha + dither(fragCoord), 0.0);
     return half4(clamp(rgb, 0.0, 1.0), alpha);
 }
@@ -181,7 +193,7 @@ half4 ambientColor(float2 fragCoord) {
     float backA = clamp(back * backReach * 0.05 * uEnvelope * uColor.a, 0.0, 0.3);
     float3 backRgb = mix(uColor.rgb, palB(0.5 + uv.x * 0.2 - 3.0 * F * t), 0.25) * 0.85;
     float4 layered = glowOver(rgb, alpha, backRgb, backA);
-    float outA = max(clamp(layered.a, 0.0, 0.78) + dither(fragCoord), 0.0);
+    float outA = max(clamp(layered.a, 0.0, 0.78) * dotGrid(fragCoord) + dither(fragCoord), 0.0);
     return half4(clamp(layered.rgb, 0.0, 1.0), outA);
 }
 """
@@ -209,6 +221,7 @@ half4 ambientColor(float2 fragCoord) {
  * - uStreamEnergy: smoothed visible assistant-delta activity in [0,1]; amplitude only
  * - uPalettePull: how far the palette's hues rotate toward the tint, 0..1
  * - uColor: RGBA tint; alpha scales the whole effect
+ * - uDotGrid: voice mode's dot texture strength, 0..1; 0 leaves the glow exactly as it was
  *
  * Output of [ambientColor] is UNPREMULTIPLIED; the two runtimes disagree on
  * what a shader must return, so each platform appends its own one-line main
