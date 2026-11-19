@@ -5,6 +5,7 @@ import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.PcmChunk
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
+import com.letta.mobile.data.voice.tone.ToneCue
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -53,4 +54,11 @@ interface HostVoiceEndpoint {
      * the request; cancelling the collector cancels it on the host and at the speech server.
      */
     fun synthesize(text: VoiceText): Flow<PcmChunk>
+
+    /**
+     * [text] spoken as [tone] asks: the cue goes in the request as `instructions` for the host to pass
+     * to the speech server (nothing is sent for null). An endpoint that cannot carry it speaks as
+     * [synthesize] does; the default does.
+     */
+    fun synthesize(text: VoiceText, tone: ToneCue?): Flow<PcmChunk> = synthesize(text)
 }

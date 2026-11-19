@@ -9,6 +9,7 @@ import com.letta.mobile.data.voice.VoicePhase
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.engine.SpeechSegment
 import com.letta.mobile.data.voice.engine.SpeechSegmentId
+import com.letta.mobile.data.voice.tone.ToneCues
 
 /** This model with its view changed by [change]. */
 internal fun LoopModel.withView(change: LoopView.() -> LoopView): LoopModel = copy(view = view.change())
@@ -61,11 +62,15 @@ internal object Transitions {
     /** Stops everything and reports [error]: only for failures the loop cannot go on after. */
     fun fail(model: LoopModel, error: VoiceError): Step = halt(model, VoicePhase.FAILED, error)
 
-    /** Queues [text] for the mouth under a new segment id, for the speech queue's current owner. */
+    /**
+     * Queues [text] for the mouth under a new segment id, for the speech queue's current owner. A
+     * tone cue the text starts with ([ToneCues.tag]) becomes the segment's tone, not its words.
+     */
     fun speak(model: LoopModel, text: VoiceText): Step {
         val id = SpeechSegmentId(model.speech.nextId)
         val speech = model.speech.copy(outstanding = model.speech.outstanding + (id to text), nextId = model.speech.nextId + 1)
-        return Step(model.copy(speech = speech), listOf(LoopEffect.Speak(SpeechSegment(id, text))))
+        val (tone, words) = ToneCues.untag(text.value)
+        return Step(model.copy(speech = speech), listOf(LoopEffect.Speak(SpeechSegment(id, VoiceText(words), tone))))
     }
 
     /**

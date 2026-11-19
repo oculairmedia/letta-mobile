@@ -2,6 +2,7 @@ package com.letta.mobile.data.voice.endpoint
 
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.audio.PcmChunk
+import com.letta.mobile.data.voice.tone.ToneCue
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -16,6 +17,13 @@ interface StreamingSpeechSynthesizer {
      * collector cancels it. A synthesizer that cannot change speed speaks at its normal speed.
      */
     fun stream(text: VoiceText, speed: SpeechSpeed = SpeechSpeed.Normal): Flow<PcmChunk>
+
+    /**
+     * [text] as PCM at [speed], said the way [tone] asks (sent as the speech request's
+     * `instructions`; nothing is sent for null). A synthesizer that cannot follow instructions speaks
+     * as [stream] does; the default does.
+     */
+    fun stream(text: VoiceText, speed: SpeechSpeed, tone: ToneCue?): Flow<PcmChunk> = stream(text, speed)
 
     /**
      * Prepares the connection ahead of the first segment, sending no text or audio. Callers ignore

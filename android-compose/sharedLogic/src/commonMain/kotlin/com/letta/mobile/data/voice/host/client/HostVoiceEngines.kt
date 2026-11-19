@@ -12,6 +12,7 @@ import com.letta.mobile.data.voice.endpoint.SpeechTranscript
 import com.letta.mobile.data.voice.endpoint.StreamingSpeechSynthesizer
 import com.letta.mobile.data.voice.host.HostVoiceEndpoint
 import com.letta.mobile.data.voice.host.HostVoiceException
+import com.letta.mobile.data.voice.tone.ToneCue
 import com.letta.mobile.data.voice.vad.ear.SpeechTranscriber
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -43,8 +44,11 @@ class HostSpeechTranscriber(
  * rides the host connection that is already open.
  */
 class HostSpeechSynthesizer(private val endpoint: HostVoiceEndpoint) : StreamingSpeechSynthesizer {
-    override fun stream(text: VoiceText, speed: SpeechSpeed): Flow<PcmChunk> =
-        endpoint.synthesize(text).catch { throw asSpeechFailure(it, SpeechOperation.SPEECH) }
+    override fun stream(text: VoiceText, speed: SpeechSpeed): Flow<PcmChunk> = stream(text, speed, null)
+
+    /** As [stream], with [tone] passed to the host as the request's `instructions`. */
+    override fun stream(text: VoiceText, speed: SpeechSpeed, tone: ToneCue?): Flow<PcmChunk> =
+        endpoint.synthesize(text, tone).catch { throw asSpeechFailure(it, SpeechOperation.SPEECH) }
 }
 
 /** A host failure as the endpoint exception the voice loop reads its code from; anything else, cancellation included, as it was. */
