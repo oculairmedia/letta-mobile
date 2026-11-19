@@ -201,8 +201,6 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
     private val partials = PartialTranscripts(parts.config.partials, format, parts.transcriber, out)
     private var started = false
     private var peakDb = SILENT_DB
-    private var voicedSoFar = 0L
-    private var lastVoiceEnd = 0L
 
     suspend fun run() {
         memory.drainCommits()
@@ -268,10 +266,6 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
         detector.setOutputActive(guarded)
         val probability = detector.probability(hop.samples)
         val signal = tracker.onHop(HopObservation(probability, hop.end, guarded))
-        if (tracker.voicedSamples != voicedSoFar) {
-            voicedSoFar = tracker.voicedSamples
-            lastVoiceEnd = hop.end.value
-        }
         if (signal == TurnSignal.Candidate) peakDb = SILENT_DB
         if (tracker.recording || signal is TurnSignal.Ended) peakDb = maxOf(peakDb, PcmLevels.dbfs(hop.samples))
         apply(signal, hop)
@@ -317,7 +311,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
     private suspend fun endTurn(hop: Hop?, reason: TurnEndReason) {
         record(hop)
         partials.turnEnded()
-        val trailing = ((gate.position - lastVoiceEnd).coerceAtLeast(0).toDouble() / format.sampleRateHz).seconds
+        val trailing = ((gate.position - tracker.lastVoiceEnd).coerceAtLeast(0).toDouble() / format.sampleRateHz).seconds
         val report = turnReport(tracker, peakDb, detector, format.sampleRateHz).copy(trailingSilence = trailing)
         observer.turnClosed(report, reason)
         out.send(VoiceEarEvent.SpeechEnded)
