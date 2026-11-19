@@ -72,6 +72,56 @@ letta-mobile-guardrails:
       - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/secrets/**"
       - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/canvas/mount/**"
       - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/voice/**"
+  NoHardcodedPaddingDirection:
+    active: true
+    includes:
+      - "**/app/src/**"
+      - "**/core/**"
+      - "**/designsystem/src/**"
+      - "**/desktop/src/**"
+      - "**/feature-chat/src/**"
+      - "**/plugin-view/src/**"
+      - "**/web/src/**"
+      - "**/sharedUI/src/**"
+    excludes:
+      - "**/LettaToolCard.kt"
+  NoDeprecatedBrowserUnloadEvent:
+    active: true
+    includes:
+      - "**/app/src/**"
+      - "**/core/**"
+      - "**/designsystem/src/**"
+      - "**/desktop/src/**"
+      - "**/feature-chat/src/**"
+      - "**/sharedLogic/src/**"
+      - "**/sharedUI/src/**"
+      - "**/web/src/**"
+    excludes:
+      - "**/web/Main.kt"
+  NoNonAtomicStateFlowSelfCopy:
+    active: true
+    includes:
+      - "**/core/**"
+      - "**/designsystem/src/**"
+      - "**/desktop/src/**"
+      - "**/plugin-api/src/**"
+      - "**/plugin-view/src/**"
+      - "**/sharedUI/src/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/schedules/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/memory/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/secrets/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/voice/**"
+  NoUnrememberedToolFactsInComposable:
+    active: true
+    includes:
+      - "**/app/src/**"
+      - "**/designsystem/src/**"
+      - "**/desktop/src/**"
+      - "**/feature-chat/src/**"
+      - "**/web/src/**"
+      - "**/sharedUI/src/**"
+    excludes:
+      - "**/ChatRowToolCards.kt"
   WallClockInSharedLogic:
     active: true
     includes:
