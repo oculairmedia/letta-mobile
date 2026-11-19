@@ -4126,6 +4126,7 @@ final enum class com.letta.mobile.data.voice.host/HostVoiceErrorCode : kotlin/En
     enum entry UPSTREAM_TIMEOUT // com.letta.mobile.data.voice.host/HostVoiceErrorCode.UPSTREAM_TIMEOUT|null[0]
     enum entry UPSTREAM_UNAUTHORIZED // com.letta.mobile.data.voice.host/HostVoiceErrorCode.UPSTREAM_UNAUTHORIZED|null[0]
     enum entry UPSTREAM_UNREACHABLE // com.letta.mobile.data.voice.host/HostVoiceErrorCode.UPSTREAM_UNREACHABLE|null[0]
+    enum entry UPSTREAM_UNRESOLVED // com.letta.mobile.data.voice.host/HostVoiceErrorCode.UPSTREAM_UNRESOLVED|null[0]
 
     final val entries // com.letta.mobile.data.voice.host/HostVoiceErrorCode.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.voice.host/HostVoiceErrorCode> // com.letta.mobile.data.voice.host/HostVoiceErrorCode.entries.<get-entries>|<get-entries>#static(){}[0]
@@ -4503,6 +4504,7 @@ final enum class com.letta.mobile.data.voice/VoiceErrorCode : kotlin/Enum<com.le
     enum entry UNAUTHORIZED // com.letta.mobile.data.voice/VoiceErrorCode.UNAUTHORIZED|null[0]
     enum entry UNAVAILABLE // com.letta.mobile.data.voice/VoiceErrorCode.UNAVAILABLE|null[0]
     enum entry UNREACHABLE // com.letta.mobile.data.voice/VoiceErrorCode.UNREACHABLE|null[0]
+    enum entry UNRESOLVED // com.letta.mobile.data.voice/VoiceErrorCode.UNRESOLVED|null[0]
     enum entry UNRESPONSIVE // com.letta.mobile.data.voice/VoiceErrorCode.UNRESPONSIVE|null[0]
     enum entry UNSUPPORTED_FORMAT // com.letta.mobile.data.voice/VoiceErrorCode.UNSUPPORTED_FORMAT|null[0]
     enum entry UNSUPPORTED_LOCALE // com.letta.mobile.data.voice/VoiceErrorCode.UNSUPPORTED_LOCALE|null[0]
