@@ -63,11 +63,11 @@ private fun SettingsLabel.entry(group: SettingsGroup) = SettingsSearchEntry(grou
 
 private fun SettingsPageServices.backendEntries(mode: LettaConfig.Mode, hasSavedToken: Boolean): List<SettingsSearchEntry> = buildList {
     add(SettingsCopy.MODE.entry(SettingsGroup.Backend))
+    backend.onScanToConnect?.let { add(SettingsCopy.SCAN.entry(SettingsGroup.Backend)) }
     if (mode == LettaConfig.Mode.SELF_HOSTED) {
         add(SettingsCopy.ADDRESS.entry(SettingsGroup.Backend))
         add(SettingsCopy.TOKEN.entry(SettingsGroup.Backend))
         backend.testConnection?.let { add(SettingsCopy.TEST.entry(SettingsGroup.Backend)) }
-        backend.onScanToConnect?.let { add(SettingsCopy.SCAN.entry(SettingsGroup.Backend)) }
     }
     pairing?.let { add(PAIRING_ENTRY) }
     if (hasSavedToken) add(SettingsCopy.CLEAR_TOKEN.entry(SettingsGroup.Danger))

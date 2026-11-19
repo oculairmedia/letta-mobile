@@ -155,8 +155,9 @@ sealed interface ConnectionTest {
 
 /**
  * The Backend section every client's Settings page
- * shows. A segmented Local runtime | Remote host; for a remote host the connection's status, the
- * address (checked as it is typed, with Paste and Scan to connect), the access token, and Test
+ * shows. A segmented Local runtime | Remote host, then Scan to connect (where there is a camera) in
+ * either mode; for a remote host the connection's status, the
+ * address (checked as it is typed, with Paste), the access token, and Test
  * connection with its latency or the reason it failed; then an explicit Save that waits for a change.
  * The form is hoisted to the page so the sections that only apply to one mode follow the unsaved choice.
  */
@@ -176,9 +177,13 @@ fun BackendSettingsSection(state: BackendFormState, actions: BackendSettingsActi
     SettingsSection(SettingsHeader(BackendSettingsTags.SECTION, "Backend", showTitle = false), modifier) {
         state.saved?.let { SavedBackendRows(it) }
         ChoiceRow(modeRow(state))
+        // Linking a host by its pairing QR is the quickest way in, so it sits under the runtime in either mode.
+        actions.onScanToConnect?.let { scan ->
+            LinkRow(SettingsRow.Link(SettingsCopy.SCAN.key, SettingsCopy.SCAN.title, SettingsCopy.SCAN.helper, onClick = scan))
+        }
         state.connection?.let { StatusRow(SettingsRow.Status(SettingsCopy.STATUS.key, SettingsCopy.STATUS.title, it.settingsStatus(), it.settingsHelper())) }
         if (form.mode == LettaConfig.Mode.SELF_HOSTED) {
-            RemoteHostRows(state, actions)
+            RemoteHostRows(state)
             actions.testConnection?.let { tester -> TestConnectionRow(test, enabled = form.serverUrl.isNotBlank()) { onTest(tester) } }
             (test as? ConnectionTest.Done)?.let { NoteRow(SettingsRow.Note(BackendSettingsTags.TEST_RESULT, it.result)) }
         }
@@ -188,12 +193,9 @@ fun BackendSettingsSection(state: BackendFormState, actions: BackendSettingsActi
 }
 
 @Composable
-private fun SettingsScope.RemoteHostRows(state: BackendFormState, actions: BackendSettingsActions) {
+private fun SettingsScope.RemoteHostRows(state: BackendFormState) {
     val form = state.form
     TextFieldRow(addressRow(form), form.serverUrl, paste = true) { state.onFormChange(form.copy(serverUrl = it)) }
-    actions.onScanToConnect?.let { scan ->
-        LinkRow(SettingsRow.Link(SettingsCopy.SCAN.key, SettingsCopy.SCAN.title, SettingsCopy.SCAN.helper, onClick = scan))
-    }
     TextFieldRow(tokenRow(state.config), form.tokenInput, paste = true) { state.onFormChange(form.copy(tokenInput = it)) }
 }
 

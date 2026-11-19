@@ -48,6 +48,9 @@ object LettaSurfaceSizes {
     /** The glyph that heads a pairing result (paired, failed, accepted). */
     val pairingResultGlyph: Dp = 24.dp
 
+    /** The tallest the "Choose agents" match list grows before it scrolls: about five rows. */
+    val agentPickerListMaxHeight: Dp = 240.dp
+
     /** A mascot shape tile's `surfaceVariant` fill when chosen and when not. */
     const val mascotTileSelectedAlpha: Float = 0.9f
     const val mascotTileAlpha: Float = 0.4f

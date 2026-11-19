@@ -73031,6 +73031,7 @@ public final class com/letta/mobile/data/voice/SpeechSkipReason : java/lang/Enum
 	public static final field MOUTH_FAILED Lcom/letta/mobile/data/voice/SpeechSkipReason;
 	public static final field PENDING_LIMIT Lcom/letta/mobile/data/voice/SpeechSkipReason;
 	public static final field REPLY_FAILED Lcom/letta/mobile/data/voice/SpeechSkipReason;
+	public static final field REVISED Lcom/letta/mobile/data/voice/SpeechSkipReason;
 	public static final field TIMED_OUT Lcom/letta/mobile/data/voice/SpeechSkipReason;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/SpeechSkipReason;
@@ -74317,6 +74318,24 @@ public final class com/letta/mobile/data/voice/engine/VoiceEarEvent$SpeechEnded 
 
 public final class com/letta/mobile/data/voice/engine/VoiceEarEvent$SpeechStarted : com/letta/mobile/data/voice/engine/VoiceEarEvent {
 	public static final field INSTANCE Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$SpeechStarted;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceEarEvent$TentativeEndOfTurn : com/letta/mobile/data/voice/engine/VoiceEarEvent {
+	public fun <init> (Lcom/letta/mobile/data/voice/VoiceUtterance;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/VoiceUtterance;
+	public final fun copy (Lcom/letta/mobile/data/voice/VoiceUtterance;)Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$TentativeEndOfTurn;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$TentativeEndOfTurn;Lcom/letta/mobile/data/voice/VoiceUtterance;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$TentativeEndOfTurn;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getUtterance ()Lcom/letta/mobile/data/voice/VoiceUtterance;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceEarEvent$TentativeWithdrawn : com/letta/mobile/data/voice/engine/VoiceEarEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$TentativeWithdrawn;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -75823,6 +75842,7 @@ public final class com/letta/mobile/data/voice/session/VoiceSetupStore {
 	public static final field KEY_API_KEY Ljava/lang/String;
 	public static final field KEY_BASE_URL Ljava/lang/String;
 	public static final field KEY_DEVICE_ONLY Ljava/lang/String;
+	public static final field KEY_EARLY_TURN_PAUSE_MS Ljava/lang/String;
 	public static final field KEY_END_OF_TURN_SILENCE_MS Ljava/lang/String;
 	public static final field KEY_GRANTS Ljava/lang/String;
 	public static final field KEY_HOST_AUDIO_ACK Ljava/lang/String;
@@ -75842,6 +75862,7 @@ public final class com/letta/mobile/data/voice/session/VoiceSetupStore {
 	public final fun keyAfter (Lcom/letta/mobile/data/voice/session/VoiceSetupDraft;)Ljava/lang/String;
 	public final fun save (Lcom/letta/mobile/data/voice/session/VoiceSetupDraft;)Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public final fun setDeviceOnly (Z)V
+	public final fun setEarlyTurnPause-BwNAW2A (Lkotlin/time/Duration;)V
 	public final fun setEndOfTurnSilence-LRDsOJo (J)V
 	public final fun setInterruptBySpeaking (Z)V
 	public final fun setListening (Lcom/letta/mobile/data/voice/session/VoiceListening;)V
@@ -75853,14 +75874,16 @@ public final class com/letta/mobile/data/voice/session/VoiceSetupStore$Companion
 }
 
 public final class com/letta/mobile/data/voice/session/VoiceTuning {
-	public synthetic fun <init> (FJLjava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (FJLjava/lang/Boolean;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (FJLjava/lang/Boolean;Lkotlin/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (FJLjava/lang/Boolean;Lkotlin/time/Duration;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-DPQ_umU ()F
 	public final fun component2-UwyO8pc ()J
 	public final fun component3 ()Ljava/lang/Boolean;
-	public final fun copy-ZvASoRs (FJLjava/lang/Boolean;)Lcom/letta/mobile/data/voice/session/VoiceTuning;
-	public static synthetic fun copy-ZvASoRs$default (Lcom/letta/mobile/data/voice/session/VoiceTuning;FJLjava/lang/Boolean;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/session/VoiceTuning;
+	public final fun component4-FghU774 ()Lkotlin/time/Duration;
+	public final fun copy-Ma11770 (FJLjava/lang/Boolean;Lkotlin/time/Duration;)Lcom/letta/mobile/data/voice/session/VoiceTuning;
+	public static synthetic fun copy-Ma11770$default (Lcom/letta/mobile/data/voice/session/VoiceTuning;FJLjava/lang/Boolean;Lkotlin/time/Duration;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/session/VoiceTuning;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEarlyTurnPause-FghU774 ()Lkotlin/time/Duration;
 	public final fun getEndOfTurnSilence-UwyO8pc ()J
 	public final fun getLivePartials ()Ljava/lang/Boolean;
 	public final fun getSpeechSpeed-DPQ_umU ()F
@@ -76150,9 +76173,11 @@ public final class com/letta/mobile/data/voice/vad/VadSensitivity : java/lang/En
 
 public abstract interface class com/letta/mobile/data/voice/vad/ear/EarObserver {
 	public static final field Companion Lcom/letta/mobile/data/voice/vad/ear/EarObserver$Companion;
+	public fun offerWithdrawn ()V
 	public fun transcriptAccepted (I)V
 	public fun turnClosed (Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;Lcom/letta/mobile/data/voice/vad/TurnEndReason;)V
 	public fun turnDiscarded (Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;Lcom/letta/mobile/data/voice/vad/TurnDiscardReason;)V
+	public fun turnOffered (Z)V
 	public fun turnOpened ()V
 }
 
@@ -76161,24 +76186,29 @@ public final class com/letta/mobile/data/voice/vad/ear/EarObserver$Companion {
 }
 
 public final class com/letta/mobile/data/voice/vad/ear/EarObserver$DefaultImpls {
+	public static fun offerWithdrawn (Lcom/letta/mobile/data/voice/vad/ear/EarObserver;)V
 	public static fun transcriptAccepted (Lcom/letta/mobile/data/voice/vad/ear/EarObserver;I)V
 	public static fun turnClosed (Lcom/letta/mobile/data/voice/vad/ear/EarObserver;Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;Lcom/letta/mobile/data/voice/vad/TurnEndReason;)V
 	public static fun turnDiscarded (Lcom/letta/mobile/data/voice/vad/ear/EarObserver;Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;Lcom/letta/mobile/data/voice/vad/TurnDiscardReason;)V
+	public static fun turnOffered (Lcom/letta/mobile/data/voice/vad/ear/EarObserver;Z)V
 	public static fun turnOpened (Lcom/letta/mobile/data/voice/vad/ear/EarObserver;)V
 }
 
 public final class com/letta/mobile/data/voice/vad/ear/EarTurnReport {
 	public static final field Companion Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport$Companion;
-	public synthetic fun <init> (JDLjava/lang/Double;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JDLjava/lang/Double;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JDLjava/lang/Double;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-UwyO8pc ()J
 	public final fun component2 ()D
 	public final fun component3 ()Ljava/lang/Double;
-	public final fun copy-KLykuaI (JDLjava/lang/Double;)Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;
-	public static synthetic fun copy-KLykuaI$default (Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;JDLjava/lang/Double;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;
+	public final fun component4-UwyO8pc ()J
+	public final fun copy-A4u-v98 (JDLjava/lang/Double;J)Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;
+	public static synthetic fun copy-A4u-v98$default (Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;JDLjava/lang/Double;JILjava/lang/Object;)Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getFloorDb ()Ljava/lang/Double;
 	public final fun getPeakDb ()D
 	public final fun getPeakSnrDb ()Ljava/lang/Double;
+	public final fun getTrailingSilence-UwyO8pc ()J
 	public final fun getVoiced-UwyO8pc ()J
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -76188,22 +76218,49 @@ public final class com/letta/mobile/data/voice/vad/ear/EarTurnReport$Companion {
 	public final fun getUnmeasured ()Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;
 }
 
+public final class com/letta/mobile/data/voice/vad/ear/EarlyTurns {
+	public static final field Companion Lcom/letta/mobile/data/voice/vad/ear/EarlyTurns$Companion;
+	public synthetic fun <init> (Lkotlin/time/Duration;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lkotlin/time/Duration;ZLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-FghU774 ()Lkotlin/time/Duration;
+	public final fun component2 ()Z
+	public final fun copy-dnQKTGw (Lkotlin/time/Duration;Z)Lcom/letta/mobile/data/voice/vad/ear/EarlyTurns;
+	public static synthetic fun copy-dnQKTGw$default (Lcom/letta/mobile/data/voice/vad/ear/EarlyTurns;Lkotlin/time/Duration;ZILjava/lang/Object;)Lcom/letta/mobile/data/voice/vad/ear/EarlyTurns;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPause-FghU774 ()Lkotlin/time/Duration;
+	public final fun getReusePartials ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/vad/ear/EarlyTurns$Companion {
+	public final fun getDEFAULT_PAUSE-UwyO8pc ()J
+	public final fun getMIN_PAUSE-UwyO8pc ()J
+}
+
 public final class com/letta/mobile/data/voice/vad/ear/LivePartials {
-	public synthetic fun <init> (ZJJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (ZJJJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final field Companion Lcom/letta/mobile/data/voice/vad/ear/LivePartials$Companion;
+	public synthetic fun <init> (ZJJJLkotlin/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (ZJJJLkotlin/time/Duration;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
 	public final fun component2-UwyO8pc ()J
 	public final fun component3-UwyO8pc ()J
 	public final fun component4-UwyO8pc ()J
-	public final fun copy-oW5mbrw (ZJJJ)Lcom/letta/mobile/data/voice/vad/ear/LivePartials;
-	public static synthetic fun copy-oW5mbrw$default (Lcom/letta/mobile/data/voice/vad/ear/LivePartials;ZJJJILjava/lang/Object;)Lcom/letta/mobile/data/voice/vad/ear/LivePartials;
+	public final fun component5-FghU774 ()Lkotlin/time/Duration;
+	public final fun copy-n0tluF4 (ZJJJLkotlin/time/Duration;)Lcom/letta/mobile/data/voice/vad/ear/LivePartials;
+	public static synthetic fun copy-n0tluF4$default (Lcom/letta/mobile/data/voice/vad/ear/LivePartials;ZJJJLkotlin/time/Duration;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/vad/ear/LivePartials;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getEnabled ()Z
 	public final fun getInterval-UwyO8pc ()J
 	public final fun getQuietCutoff-UwyO8pc ()J
+	public final fun getSettle-FghU774 ()Lkotlin/time/Duration;
 	public final fun getWindow-UwyO8pc ()J
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/vad/ear/LivePartials$Companion {
+	public final fun getDEFAULT_SETTLE-UwyO8pc ()J
 }
 
 public final class com/letta/mobile/data/voice/vad/ear/NotSpeechThresholds {
@@ -76267,9 +76324,10 @@ public final class com/letta/mobile/data/voice/vad/ear/TranscriptPolicy$Companio
 
 public final class com/letta/mobile/data/voice/vad/ear/VadEarConfig {
 	public static final field Companion Lcom/letta/mobile/data/voice/vad/ear/VadEarConfig$Companion;
-	public synthetic fun <init> (Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;Lcom/letta/mobile/data/voice/vad/EndOfTurnPolicy;Lcom/letta/mobile/data/voice/vad/VadSensitivity;Lcom/letta/mobile/data/voice/vad/SpeechDetectorFactory;Lcom/letta/mobile/data/voice/vad/ear/TranscriptPolicy;Lcom/letta/mobile/data/voice/vad/ear/EarObserver;ZJLcom/letta/mobile/data/voice/vad/ear/LivePartials;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;Lcom/letta/mobile/data/voice/vad/EndOfTurnPolicy;Lcom/letta/mobile/data/voice/vad/VadSensitivity;Lcom/letta/mobile/data/voice/vad/SpeechDetectorFactory;Lcom/letta/mobile/data/voice/vad/ear/TranscriptPolicy;Lcom/letta/mobile/data/voice/vad/ear/EarObserver;ZJLcom/letta/mobile/data/voice/vad/ear/LivePartials;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;Lcom/letta/mobile/data/voice/vad/EndOfTurnPolicy;Lcom/letta/mobile/data/voice/vad/VadSensitivity;Lcom/letta/mobile/data/voice/vad/SpeechDetectorFactory;Lcom/letta/mobile/data/voice/vad/ear/TranscriptPolicy;Lcom/letta/mobile/data/voice/vad/ear/EarObserver;ZJLcom/letta/mobile/data/voice/vad/ear/LivePartials;Lcom/letta/mobile/data/voice/vad/ear/EarlyTurns;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;Lcom/letta/mobile/data/voice/vad/EndOfTurnPolicy;Lcom/letta/mobile/data/voice/vad/VadSensitivity;Lcom/letta/mobile/data/voice/vad/SpeechDetectorFactory;Lcom/letta/mobile/data/voice/vad/ear/TranscriptPolicy;Lcom/letta/mobile/data/voice/vad/ear/EarObserver;ZJLcom/letta/mobile/data/voice/vad/ear/LivePartials;Lcom/letta/mobile/data/voice/vad/ear/EarlyTurns;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;
+	public final fun component10 ()Lcom/letta/mobile/data/voice/vad/ear/EarlyTurns;
 	public final fun component2 ()Lcom/letta/mobile/data/voice/vad/EndOfTurnPolicy;
 	public final fun component3 ()Lcom/letta/mobile/data/voice/vad/VadSensitivity;
 	public final fun component4 ()Lcom/letta/mobile/data/voice/vad/SpeechDetectorFactory;
@@ -76278,10 +76336,11 @@ public final class com/letta/mobile/data/voice/vad/ear/VadEarConfig {
 	public final fun component7 ()Z
 	public final fun component8-UwyO8pc ()J
 	public final fun component9 ()Lcom/letta/mobile/data/voice/vad/ear/LivePartials;
-	public final fun copy-G-WJXV0 (Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;Lcom/letta/mobile/data/voice/vad/EndOfTurnPolicy;Lcom/letta/mobile/data/voice/vad/VadSensitivity;Lcom/letta/mobile/data/voice/vad/SpeechDetectorFactory;Lcom/letta/mobile/data/voice/vad/ear/TranscriptPolicy;Lcom/letta/mobile/data/voice/vad/ear/EarObserver;ZJLcom/letta/mobile/data/voice/vad/ear/LivePartials;)Lcom/letta/mobile/data/voice/vad/ear/VadEarConfig;
-	public static synthetic fun copy-G-WJXV0$default (Lcom/letta/mobile/data/voice/vad/ear/VadEarConfig;Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;Lcom/letta/mobile/data/voice/vad/EndOfTurnPolicy;Lcom/letta/mobile/data/voice/vad/VadSensitivity;Lcom/letta/mobile/data/voice/vad/SpeechDetectorFactory;Lcom/letta/mobile/data/voice/vad/ear/TranscriptPolicy;Lcom/letta/mobile/data/voice/vad/ear/EarObserver;ZJLcom/letta/mobile/data/voice/vad/ear/LivePartials;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/vad/ear/VadEarConfig;
+	public final fun copy-u4uj9nY (Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;Lcom/letta/mobile/data/voice/vad/EndOfTurnPolicy;Lcom/letta/mobile/data/voice/vad/VadSensitivity;Lcom/letta/mobile/data/voice/vad/SpeechDetectorFactory;Lcom/letta/mobile/data/voice/vad/ear/TranscriptPolicy;Lcom/letta/mobile/data/voice/vad/ear/EarObserver;ZJLcom/letta/mobile/data/voice/vad/ear/LivePartials;Lcom/letta/mobile/data/voice/vad/ear/EarlyTurns;)Lcom/letta/mobile/data/voice/vad/ear/VadEarConfig;
+	public static synthetic fun copy-u4uj9nY$default (Lcom/letta/mobile/data/voice/vad/ear/VadEarConfig;Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;Lcom/letta/mobile/data/voice/vad/EndOfTurnPolicy;Lcom/letta/mobile/data/voice/vad/VadSensitivity;Lcom/letta/mobile/data/voice/vad/SpeechDetectorFactory;Lcom/letta/mobile/data/voice/vad/ear/TranscriptPolicy;Lcom/letta/mobile/data/voice/vad/ear/EarObserver;ZJLcom/letta/mobile/data/voice/vad/ear/LivePartials;Lcom/letta/mobile/data/voice/vad/ear/EarlyTurns;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/vad/ear/VadEarConfig;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDetectors ()Lcom/letta/mobile/data/voice/vad/SpeechDetectorFactory;
+	public final fun getEarly ()Lcom/letta/mobile/data/voice/vad/ear/EarlyTurns;
 	public final fun getFormat ()Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;
 	public final fun getHalfDuplex ()Z
 	public final fun getObserver ()Lcom/letta/mobile/data/voice/vad/ear/EarObserver;
