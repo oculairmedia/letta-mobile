@@ -276,18 +276,23 @@ def test_dexopt_status_is_written_into_every_metadata_json(tmp_path):
     assert fake.compile_calls() == []
 
 
-def test_capture_trial_refuses_uncompiled_install_before_collectors_start(tmp_path):
+def test_trial_records_dexopt_status_before_any_trial_directory(tmp_path):
+    """The gate is observable without a device: it runs inside prepare() and returns before mkdir."""
     from coreloop import capture
 
     trial = capture.Capture(SimpleNamespace(output=tmp_path, apk_sha256="abc123", capture_id="fixture"), "S1", 1)
     with (
         patch.object(capture, "wait_for_pixel"),
         patch.object(capture, "installed_app_hash", return_value="abc123"),
-        patch.object(capture, "require_compiled_install", side_effect=RuntimeError("run-from-apk")),
-        patch.object(capture.Capture, "collect") as collect,
-        patch.object(capture.Capture, "close_collectors") as close,
+        patch.object(capture, "adb", return_value="1"),
+        # Patch what capture.py imported so the absence is an assertion, not an ImportError.
+        patch.object(
+            capture, "require_compiled_install", return_value=dict(dexoptStatus="run-from-apk", dexoptCompiled=False)
+        )
+        as require_compiled,
+        patch.object(capture, "select_conversation") as select_conversation,
     ):
-        with pytest.raises(RuntimeError, match="run-from-apk"):
-            trial.run()
-    collect.assert_not_called()
-    close.assert_not_called()
+        trial.prepare()
+    require_compiled.assert_called_once_with()
+    select_conversation.assert_not_called()
+    assert trial.metadata["dexoptStatus"] == "run-from-apk"
