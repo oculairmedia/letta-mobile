@@ -8,9 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -126,7 +124,7 @@ private fun InviteForm(agents: List<AgentChoice>, enabled: Boolean, onMint: (Pai
     )
     Text(PairingStrings.INVITE_ACCESS, style = MaterialTheme.typography.labelLarge)
     form.options.forEach { option -> ChoiceRow(option, selected = form.scope == option) { form.scope = option } }
-    if (form.choosing) AgentChecklist(agents, form.selected) { form.selected = it }
+    if (form.choosing) AgentScopePicker(agents, form.selected) { form.selected = it }
     SettingsToggle(form.allowSettings) { form.allowSettings = it }
     Text(PairingStrings.accessSummary(form.summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     if (!form.ready) Text(PairingStrings.INVITE_CHOOSE_AT_LEAST_ONE, style = MaterialTheme.typography.bodySmall)
@@ -145,25 +143,6 @@ private fun ChoiceRow(option: AgentScopeOption, selected: Boolean, onSelect: () 
     ) {
         RadioButton(selected = selected, onClick = null)
         Text(option.label)
-    }
-}
-
-@Composable
-private fun AgentChecklist(agents: List<AgentChoice>, selected: Set<String>, onChange: (Set<String>) -> Unit) {
-    agents.forEach { agent ->
-        val checked = agent.id in selected
-        // The whole row toggles (bigger target, one accessible checkbox node).
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = LettaDimens.Space.lg)
-                .toggleable(value = checked, role = Role.Checkbox) { on -> onChange(if (on) selected + agent.id else selected - agent.id) }
-                .testTag(PairingTags.agentOption(agent.id)),
-        ) {
-            Checkbox(checked = checked, onCheckedChange = null)
-            Text(agent.name)
-        }
     }
 }
 

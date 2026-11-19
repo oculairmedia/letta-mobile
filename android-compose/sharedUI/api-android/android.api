@@ -6121,6 +6121,12 @@ public final class com/letta/mobile/ui/pairing/CameraAccess : java/lang/Enum {
 	public static fun values ()[Lcom/letta/mobile/ui/pairing/CameraAccess;
 }
 
+public final class com/letta/mobile/ui/pairing/ComposableSingletons$AgentScopePickerKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/pairing/ComposableSingletons$AgentScopePickerKt;
+	public fun <init> ()V
+	public final fun getLambda$-459403114$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+}
+
 public final class com/letta/mobile/ui/pairing/ComposableSingletons$PairInviteCardKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/pairing/ComposableSingletons$PairInviteCardKt;
 	public fun <init> ()V
@@ -6316,6 +6322,7 @@ public final class com/letta/mobile/ui/pairing/PairingStrings {
 	public static final field INVITE_CHOOSE_AGENTS Ljava/lang/String;
 	public static final field INVITE_CHOOSE_AT_LEAST_ONE Ljava/lang/String;
 	public static final field INVITE_DEVICE_NAME Ljava/lang/String;
+	public static final field INVITE_SEARCH_AGENTS Ljava/lang/String;
 	public static final field INVITE_SETTINGS_BODY Ljava/lang/String;
 	public static final field INVITE_SETTINGS_TOGGLE Ljava/lang/String;
 	public static final field INVITE_SHOW_CODE Ljava/lang/String;
@@ -6372,9 +6379,11 @@ public final class com/letta/mobile/ui/pairing/PairingStrings {
 	public final fun error (Lcom/letta/mobile/data/pairing/PairingError;)Ljava/lang/String;
 	public final fun expiresIn-1HXy7LY (J)Ljava/lang/String;
 	public final fun lastActive (Lcom/letta/mobile/data/pairing/PairedDevice;J)Ljava/lang/String;
+	public final fun noAgentMatch (Ljava/lang/String;)Ljava/lang/String;
 	public final fun pairedDeviceLine (Lcom/letta/mobile/data/pairing/PairingState$Paired;)Ljava/lang/String;
 	public final fun pairedTitle (Lcom/letta/mobile/data/pairing/PairingState$Paired;)Ljava/lang/String;
 	public final fun qrDescription-1HXy7LY (J)Ljava/lang/String;
+	public final fun removeAgent (Ljava/lang/String;)Ljava/lang/String;
 	public final fun revokeConfirm (Lcom/letta/mobile/data/pairing/PairedDevice;)Ljava/lang/String;
 	public final fun trustExpiresLine-1HXy7LY (J)Ljava/lang/String;
 	public final fun trustHostLine (Lcom/letta/mobile/data/pairing/PairingState$ConfirmHost;)Ljava/lang/String;
@@ -6395,10 +6404,14 @@ public final class com/letta/mobile/ui/pairing/PairingTags {
 	public static final field ERROR Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/ui/pairing/PairingTags;
 	public static final field INVITE_ACCEPTED Ljava/lang/String;
+	public static final field INVITE_AGENT_LIST Ljava/lang/String;
+	public static final field INVITE_AGENT_NO_MATCH Ljava/lang/String;
+	public static final field INVITE_AGENT_SEARCH Ljava/lang/String;
 	public static final field INVITE_ALL_AGENTS Ljava/lang/String;
 	public static final field INVITE_CANCEL Ljava/lang/String;
 	public static final field INVITE_CANCELLED Ljava/lang/String;
 	public static final field INVITE_CHOOSE_AGENTS Ljava/lang/String;
+	public static final field INVITE_CHOSEN_AGENTS Ljava/lang/String;
 	public static final field INVITE_COPY Ljava/lang/String;
 	public static final field INVITE_COUNTDOWN Ljava/lang/String;
 	public static final field INVITE_ERROR Ljava/lang/String;
@@ -6429,6 +6442,7 @@ public final class com/letta/mobile/ui/pairing/PairingTags {
 	public static final field VERIFY_CANCEL Ljava/lang/String;
 	public final fun agentOption (Ljava/lang/String;)Ljava/lang/String;
 	public final fun cancelInvite (Ljava/lang/String;)Ljava/lang/String;
+	public final fun chosenAgent (Ljava/lang/String;)Ljava/lang/String;
 	public final fun deviceRow (Ljava/lang/String;)Ljava/lang/String;
 	public final fun revokeConfirm (Ljava/lang/String;)Ljava/lang/String;
 	public final fun revokeDevice (Ljava/lang/String;)Ljava/lang/String;
@@ -12582,6 +12596,7 @@ public final class com/letta/mobile/ui/theme/tokens/LettaSurfaceSizes {
 	public static final field mascotTileAlpha F
 	public static final field mascotTileSelectedAlpha F
 	public static final field resizeHandleAlpha F
+	public final fun getAgentPickerListMaxHeight-D9Ej5fM ()F
 	public final fun getBannerMaxWidth-D9Ej5fM ()F
 	public final fun getDropGlyph-D9Ej5fM ()F
 	public final fun getMascotGazeMinReach-D9Ej5fM ()F
