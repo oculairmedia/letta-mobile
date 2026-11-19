@@ -31,9 +31,10 @@
 
     <!-- Failures, shared by the status strip and the Voice settings. -->
     <string name="voice_error_unreachable">Couldn't reach the speech server.</string>
+    <string name="voice_error_unresolved">The speech server's name didn't resolve where the request ran.</string>
     <string name="voice_error_timed_out">The speech server took too long to answer.</string>
     <string name="voice_error_unauthorized">The speech server refused the API key.</string>
-    <string name="voice_error_insecure">An API key needs an https address or this device's own address.</string>
+    <string name="voice_error_insecure">An API key is only sent over https, or to a loopback address on this device (such as localhost or 127.0.0.1).</string>
     <string name="voice_error_invalid">Use a plain http or https address, without a query or a login.</string>
     <string name="voice_error_rejected">The speech server refused the request.</string>
     <string name="voice_error_no_conversation">Open a conversation to talk in it.</string>

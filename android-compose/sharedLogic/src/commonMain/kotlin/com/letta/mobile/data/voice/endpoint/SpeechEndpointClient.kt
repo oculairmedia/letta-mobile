@@ -231,7 +231,10 @@ class SpeechEndpointClient(
         is VoiceAudioException -> SpeechEndpointException(operation, error.code)
         is HttpRequestTimeoutException, is ConnectTimeoutException, is SocketTimeoutException ->
             SpeechEndpointException(operation, VoiceErrorCode.TIMED_OUT)
-        else -> SpeechEndpointException(operation, VoiceErrorCode.UNREACHABLE)
+        else -> SpeechEndpointException(
+            operation,
+            if (NameResolutionFailures.matches(error)) VoiceErrorCode.UNRESOLVED else VoiceErrorCode.UNREACHABLE,
+        )
     }
 
     private companion object {
@@ -244,6 +247,29 @@ class SpeechEndpointClient(
         const val PLAIN_JSON = "json"
         const val CHUNK_BYTES = 8 * 1024
         const val HTTP_OK = 200
+    }
+}
+
+/**
+ * Whether a failure is a host name that did not resolve rather than a refused connection, so the
+ * person is told which of the two it is. Matched anywhere in the cause chain (engines wrap the
+ * resolver failure in their own type) and never on a message. The two types are matched by simple
+ * name because this file compiles for targets that do not have both.
+ */
+internal object NameResolutionFailures {
+    private const val MAX_CAUSE_DEPTH = 8
+    private val NAMES = setOf("UnknownHostException", "UnresolvedAddressException")
+
+    /** True when [error], or anything it wraps, is a name-resolution failure. */
+    fun matches(error: Throwable): Boolean {
+        var current: Throwable? = error
+        var depth = 0
+        while (current != null && depth < MAX_CAUSE_DEPTH) {
+            if (current::class.simpleName in NAMES) return true
+            current = current.cause
+            depth++
+        }
+        return false
     }
 }
 

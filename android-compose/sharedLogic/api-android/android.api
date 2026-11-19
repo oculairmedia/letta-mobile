@@ -71425,6 +71425,7 @@ public final class com/letta/mobile/data/voice/VoiceErrorCode : java/lang/Enum {
 	public static final field UNAUTHORIZED Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field UNAVAILABLE Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field UNREACHABLE Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field UNRESOLVED Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field UNRESPONSIVE Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field UNSUPPORTED_FORMAT Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field UNSUPPORTED_LOCALE Lcom/letta/mobile/data/voice/VoiceErrorCode;
@@ -72905,6 +72906,7 @@ public final class com/letta/mobile/data/voice/host/HostVoiceErrorCode : java/la
 	public static final field UPSTREAM_TIMEOUT Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
 	public static final field UPSTREAM_UNAUTHORIZED Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
 	public static final field UPSTREAM_UNREACHABLE Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
+	public static final field UPSTREAM_UNRESOLVED Lcom/letta/mobile/data/voice/host/HostVoiceErrorCode;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public final fun getRetryable ()Z
 	public final fun getVoiceCode ()Lcom/letta/mobile/data/voice/VoiceErrorCode;
