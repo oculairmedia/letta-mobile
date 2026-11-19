@@ -28404,6 +28404,10 @@ public final class com/letta/mobile/data/model/BackendConnectionStatus$Unconfigu
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/model/BackendConnectionStatusKt {
+	public static final fun backendConnectionStatus (Lcom/letta/mobile/data/model/LettaConfig;Ljava/lang/Throwable;Z)Lcom/letta/mobile/data/model/BackendConnectionStatus;
+}
+
 public final class com/letta/mobile/data/model/BackendKind : java/lang/Enum {
 	public static final field DIRECT_WS Lcom/letta/mobile/data/model/BackendKind;
 	public static final field IROH Lcom/letta/mobile/data/model/BackendKind;
