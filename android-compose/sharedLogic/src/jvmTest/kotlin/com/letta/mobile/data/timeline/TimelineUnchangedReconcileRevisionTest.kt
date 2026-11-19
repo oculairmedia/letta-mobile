@@ -182,6 +182,9 @@ class TimelineUnchangedReconcileRevisionTest {
             """"tool_call":{"tool_call_id":"call-bash","name":"Bash","arguments":"{\"command\":\"make\"}"}"""))
         val callReturn = wire(WireRow("msg-call-return", "tool_return_message", RUN, 3,
             """"tool_call_id":"call-bash","status":"success","tool_return":"ok""""))
+        // A command that prints only whitespace: the stored return is blank, which is still a return.
+        val blankReturn = wire(WireRow("msg-call-blank-return", "tool_return_message", RUN, 3,
+            """"tool_call_id":"call-bash","status":"success","tool_return":"\n\n""""))
         val approval = wire(WireRow("msg-approval", "approval_request_message", RUN, 4,
             """"tool_call":{"tool_call_id":"call-approve","name":"Write","arguments":"{}"}"""))
         val approvalReturn = wire(WireRow("msg-approval-return", "tool_return_message", RUN, 5,
@@ -217,6 +220,8 @@ class TimelineUnchangedReconcileRevisionTest {
             RowKind("reasoning", listOf(reasoning)),
             RowKind("tool call + return", listOf(call, callReturn)),
             RowKind("tool return ahead of its call (deferred)", listOf(callReturn, call)),
+            RowKind("tool call + blank return", listOf(call, blankReturn)),
+            RowKind("tool return whose call is older than the page", listOf(callReturn)),
             RowKind("approval request + return", listOf(approval, approvalReturn)),
             readImage,
             RowKind("mid-turn follow-up prompt (#2460)", listOf(narration, followUp, reply)),
