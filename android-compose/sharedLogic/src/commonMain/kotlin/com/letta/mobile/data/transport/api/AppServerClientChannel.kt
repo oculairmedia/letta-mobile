@@ -86,8 +86,12 @@ class AppServerClientChannel(
                 .getOrNull()
                 ?.takeIf {
                     it is ServerFrame.PendingApprovalsUpdated || it is ServerFrame.PermissionModeUpdated ||
-                        it is ServerFrame.ConversationActivity || it is ServerFrame.ConversationUpdated
+                        it is ServerFrame.ConversationActivity || it is ServerFrame.ConversationUpdated ||
+                        (it is ServerFrame.Unknown && it.type == PINS_UPDATED_TYPE)
                 }
+
+        /** The host's pinned-agents push; it stays [ServerFrame.Unknown] and the shared pins decode it. */
+        const val PINS_UPDATED_TYPE = "pins_updated"
 
         val CONNECTED = ChannelTransportState.Connected(serverId = "app-server", sessionId = "app-server", deviceId = null)
         val DISCONNECTED = ChannelTransportState.Disconnected(code = 1000, reason = "App Server session closed")

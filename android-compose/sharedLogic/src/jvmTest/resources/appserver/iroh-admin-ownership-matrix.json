@@ -2987,6 +2987,36 @@
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "pins.get",
+      "handler": "AgentPinsRoutes.kt",
+      "current_backend": "host pinned-agents store (pinned-agents.json beside the model exposure state), Iroh admin_rpc only",
+      "owner": "controller_native",
+      "public_contract": "AgentPinsWire (pinned_agents_v1): pins.get / pins.set and the pins_updated push",
+      "authorization_class": "admin_read",
+      "data_store": "controller_state_file",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Pinned agents v1: registered only when the host supplies pins routes (methods omitted otherwise). The shared ordered pinned-agents list and its revision. chat.read, like agent.list.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "pins.set",
+      "handler": "AgentPinsRoutes.kt",
+      "current_backend": "host pinned-agents store (pinned-agents.json beside the model exposure state), Iroh admin_rpc only",
+      "owner": "controller_native",
+      "public_contract": "AgentPinsWire (pinned_agents_v1): pins.get / pins.set and the pins_updated push",
+      "authorization_class": "admin_write",
+      "data_store": "controller_state_file",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Pinned agents v1: registered only when the host supplies pins routes (methods omitted otherwise). Compare-and-set of the whole ordered list against expected_revision (revision_conflict otherwise); pushes pins_updated to every agent-reading connection. conversation.manage.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "deny_fail_closed"
     }
   ],
   "unsupported_native_operations": [

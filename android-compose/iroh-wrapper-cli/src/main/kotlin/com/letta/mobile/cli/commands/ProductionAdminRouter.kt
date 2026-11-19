@@ -81,6 +81,8 @@ fun buildProductionAdminRouter(
     canvasMountRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
     /** The voice endpoint routes (shared speech setup, speech through the host); null registers none. */
     voiceRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
+    /** The pinned-agents routes (one list shared by every device, pushed live); null registers none. */
+    pinsRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
 ): AdminRpcRouter {
     // Every skill.list re-reads the root (a symlink is the controllable unit and can
     // change on disk at any time); the cold-start read below also logs what the host
@@ -170,5 +172,7 @@ fun buildProductionAdminRouter(
         if (nativeSource?.changeListener != null) router.featureCapabilities += ControllerSubagentRegistrySource.PUSH_CAPABILITY
         // All seven voice endpoint routes or none; they advertise voice_endpoint_v1 themselves.
         voiceRoutes?.register(router)
+        // Both pins routes or none; they advertise pinned_agents_v1 themselves.
+        pinsRoutes?.register(router)
     }
 }

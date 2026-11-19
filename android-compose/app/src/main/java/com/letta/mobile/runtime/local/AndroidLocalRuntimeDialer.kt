@@ -1,6 +1,8 @@
 package com.letta.mobile.runtime.local
 
 import android.util.Log
+import com.letta.mobile.data.controller.node.iroh.pins.AgentPinsPublisher
+import com.letta.mobile.data.controller.node.iroh.pins.AgentPinsRoutes
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.runtime.OnDeviceModelFollowPolicy
 import com.letta.mobile.data.runtime.OnDeviceModelFollower
@@ -50,6 +52,9 @@ class AndroidLocalRuntimeDialer @Inject constructor(
             ),
             scope = scope,
             localBackendDir = backendDir.absolutePath,
+            // The phone is the host here: its pinned agents live with the runtime's own state, served
+            // through the same pins contract as a server host (one connection, so no push is needed).
+            hostRoutes = listOf(AgentPinsRoutes.forHost(backendDir.resolve(HOST_STATE_DIR).toPath(), AgentPinsPublisher(scope))),
             release = lease::close,
         )
         config?.let(EmbeddedLettaCodeModelSelection::from)?.let { followDeviceModel(dial, it) }
@@ -75,6 +80,9 @@ class AndroidLocalRuntimeDialer @Inject constructor(
 
     private companion object {
         const val TAG = "LocalAppServer"
+
+        /** Host-held shared state of the on-device host, beside the runtime's own storage. */
+        const val HOST_STATE_DIR = "host-state"
 
         /** agent_create runs memfs git on the phone: ~30–40 s on a Pixel 9 Pro. */
         const val LOCAL_REQUEST_TIMEOUT_MS = 90_000L

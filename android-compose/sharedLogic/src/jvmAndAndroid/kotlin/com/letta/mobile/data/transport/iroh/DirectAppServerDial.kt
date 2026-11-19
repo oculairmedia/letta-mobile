@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.data.controller.node.iroh.AdminRpcInvocation
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
 import com.letta.mobile.data.controller.node.iroh.NativeSlashCommandCatalog
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -56,12 +57,15 @@ fun interface DirectAppServerDialer {
 /**
  * Dials [target] over its own [directAppServerHttpClient] and serves its `admin_rpc` in process.
  * [localBackendDir] lets the router read the on-disk store the server writes (runs, context, memory
- * blocks); null for a server elsewhere. [release] runs after the socket closes.
+ * blocks); null for a server elsewhere. [hostRoutes] are the host-held shared state routes the dialer's
+ * host serves in process (the on-device runtime's pins); a server elsewhere gets none, since state kept
+ * here would be this device's, not the host's. [release] runs after the socket closes.
  */
 suspend fun openDirectAppServerDial(
     target: AppServerWebSocketDial,
     scope: CoroutineScope,
     localBackendDir: String? = null,
+    hostRoutes: List<AdminRpcRoutes> = emptyList(),
     release: () -> Unit = {},
 ): DirectAppServerDial {
     val httpClient = directAppServerHttpClient()
@@ -81,6 +85,7 @@ suspend fun openDirectAppServerDial(
             localBackendDir = localBackendDir,
         ),
     )
+    hostRoutes.forEach { it.register(router) }
     return DirectAppServerDial(
         client = connection.client,
         connectionState = connection.connectionState,

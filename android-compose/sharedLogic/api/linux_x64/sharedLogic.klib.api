@@ -2106,6 +2106,20 @@ final enum class com.letta.mobile.data.pairing/PairingError : kotlin/Enum<com.le
     final fun values(): kotlin/Array<com.letta.mobile.data.pairing/PairingError> // com.letta.mobile.data.pairing/PairingError.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.pins.shared/AgentPinsEditOutcome : kotlin/Enum<com.letta.mobile.data.pins.shared/AgentPinsEditOutcome> { // com.letta.mobile.data.pins.shared/AgentPinsEditOutcome|null[0]
+    enum entry APPLIED // com.letta.mobile.data.pins.shared/AgentPinsEditOutcome.APPLIED|null[0]
+    enum entry CONFLICT // com.letta.mobile.data.pins.shared/AgentPinsEditOutcome.CONFLICT|null[0]
+    enum entry OFFLINE // com.letta.mobile.data.pins.shared/AgentPinsEditOutcome.OFFLINE|null[0]
+    enum entry REFUSED // com.letta.mobile.data.pins.shared/AgentPinsEditOutcome.REFUSED|null[0]
+    enum entry UNSUPPORTED // com.letta.mobile.data.pins.shared/AgentPinsEditOutcome.UNSUPPORTED|null[0]
+
+    final val entries // com.letta.mobile.data.pins.shared/AgentPinsEditOutcome.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.pins.shared/AgentPinsEditOutcome> // com.letta.mobile.data.pins.shared/AgentPinsEditOutcome.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.pins.shared/AgentPinsEditOutcome // com.letta.mobile.data.pins.shared/AgentPinsEditOutcome.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.pins.shared/AgentPinsEditOutcome> // com.letta.mobile.data.pins.shared/AgentPinsEditOutcome.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.platform/MemoryPressureLevel : kotlin/Enum<com.letta.mobile.data.platform/MemoryPressureLevel> { // com.letta.mobile.data.platform/MemoryPressureLevel|null[0]
     enum entry CRITICAL // com.letta.mobile.data.platform/MemoryPressureLevel.CRITICAL|null[0]
     enum entry MODERATE // com.letta.mobile.data.platform/MemoryPressureLevel.MODERATE|null[0]
@@ -6147,6 +6161,24 @@ abstract interface com.letta.mobile.data.pairing/BackendConfigSink { // com.lett
     abstract fun currentConfigs(): kotlin.collections/List<com.letta.mobile.data.model/LettaConfig> // com.letta.mobile.data.pairing/BackendConfigSink.currentConfigs|currentConfigs(){}[0]
     abstract suspend fun activate(kotlin/String) // com.letta.mobile.data.pairing/BackendConfigSink.activate|activate(kotlin.String){}[0]
     abstract suspend fun save(com.letta.mobile.data.model/LettaConfig) // com.letta.mobile.data.pairing/BackendConfigSink.save|save(com.letta.mobile.data.model.LettaConfig){}[0]
+}
+
+abstract interface com.letta.mobile.data.pins.shared/AgentPinsCache { // com.letta.mobile.data.pins.shared/AgentPinsCache|null[0]
+    abstract fun read(): com.letta.mobile.data.pins.shared/AgentPinsSnapshot? // com.letta.mobile.data.pins.shared/AgentPinsCache.read|read(){}[0]
+    abstract fun write(com.letta.mobile.data.pins.shared/AgentPinsSnapshot) // com.letta.mobile.data.pins.shared/AgentPinsCache.write|write(com.letta.mobile.data.pins.shared.AgentPinsSnapshot){}[0]
+}
+
+abstract interface com.letta.mobile.data.pins.shared/AgentPinsLink { // com.letta.mobile.data.pins.shared/AgentPinsLink|null[0]
+    abstract val connection // com.letta.mobile.data.pins.shared/AgentPinsLink.connection|{}connection[0]
+        abstract fun <get-connection>(): kotlinx.coroutines.flow/Flow<kotlin/Boolean> // com.letta.mobile.data.pins.shared/AgentPinsLink.connection.<get-connection>|<get-connection>(){}[0]
+    abstract val hostCapabilities // com.letta.mobile.data.pins.shared/AgentPinsLink.hostCapabilities|{}hostCapabilities[0]
+        abstract fun <get-hostCapabilities>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.pins.shared/AgentPinsLink.hostCapabilities.<get-hostCapabilities>|<get-hostCapabilities>(){}[0]
+    abstract val isConnected // com.letta.mobile.data.pins.shared/AgentPinsLink.isConnected|{}isConnected[0]
+        abstract fun <get-isConnected>(): kotlin/Boolean // com.letta.mobile.data.pins.shared/AgentPinsLink.isConnected.<get-isConnected>|<get-isConnected>(){}[0]
+    abstract val pushes // com.letta.mobile.data.pins.shared/AgentPinsLink.pushes|{}pushes[0]
+        abstract fun <get-pushes>(): kotlinx.coroutines.flow/Flow<kotlinx.serialization.json/JsonObject> // com.letta.mobile.data.pins.shared/AgentPinsLink.pushes.<get-pushes>|<get-pushes>(){}[0]
+
+    abstract suspend fun call(kotlin/String, kotlinx.serialization.json/JsonObject): com.letta.mobile.data.pins.shared/AgentPinsReply // com.letta.mobile.data.pins.shared/AgentPinsLink.call|call(kotlin.String;kotlinx.serialization.json.JsonObject){}[0]
 }
 
 abstract interface com.letta.mobile.data.plugin.catalog/HostPluginCatalog : com.letta.mobile.data.plugin.catalog/PluginCatalog { // com.letta.mobile.data.plugin.catalog/HostPluginCatalog|null[0]
@@ -55700,6 +55732,95 @@ final class com.letta.mobile.data.pairing/SettingsPairedHostStore : com.letta.mo
     final suspend fun saveAndActivate(com.letta.mobile.data.pairing/PairedHost) // com.letta.mobile.data.pairing/SettingsPairedHostStore.saveAndActivate|saveAndActivate(com.letta.mobile.data.pairing.PairedHost){}[0]
 }
 
+final class com.letta.mobile.data.pins.shared/AgentPinsReply { // com.letta.mobile.data.pins.shared/AgentPinsReply|null[0]
+    constructor <init>(kotlin/Boolean, kotlinx.serialization.json/JsonElement? = ..., kotlin/String? = ...) // com.letta.mobile.data.pins.shared/AgentPinsReply.<init>|<init>(kotlin.Boolean;kotlinx.serialization.json.JsonElement?;kotlin.String?){}[0]
+
+    final val error // com.letta.mobile.data.pins.shared/AgentPinsReply.error|{}error[0]
+        final fun <get-error>(): kotlin/String? // com.letta.mobile.data.pins.shared/AgentPinsReply.error.<get-error>|<get-error>(){}[0]
+    final val result // com.letta.mobile.data.pins.shared/AgentPinsReply.result|{}result[0]
+        final fun <get-result>(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.pins.shared/AgentPinsReply.result.<get-result>|<get-result>(){}[0]
+    final val success // com.letta.mobile.data.pins.shared/AgentPinsReply.success|{}success[0]
+        final fun <get-success>(): kotlin/Boolean // com.letta.mobile.data.pins.shared/AgentPinsReply.success.<get-success>|<get-success>(){}[0]
+}
+
+final class com.letta.mobile.data.pins.shared/AgentPinsSnapshot { // com.letta.mobile.data.pins.shared/AgentPinsSnapshot|null[0]
+    constructor <init>(kotlin/Long = ..., kotlin.collections/List<com.letta.mobile.data.model/AgentId> = ...) // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.<init>|<init>(kotlin.Long;kotlin.collections.List<com.letta.mobile.data.model.AgentId>){}[0]
+
+    final val agentIds // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.agentIds|{}agentIds[0]
+        final fun <get-agentIds>(): kotlin.collections/List<com.letta.mobile.data.model/AgentId> // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.agentIds.<get-agentIds>|<get-agentIds>(){}[0]
+    final val revision // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.revision|{}revision[0]
+        final fun <get-revision>(): kotlin/Long // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.revision.<get-revision>|<get-revision>(){}[0]
+
+    final fun component1(): kotlin/Long // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<com.letta.mobile.data.model/AgentId> // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.component2|component2(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin.collections/List<com.letta.mobile.data.model/AgentId> = ...): com.letta.mobile.data.pins.shared/AgentPinsSnapshot // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.copy|copy(kotlin.Long;kotlin.collections.List<com.letta.mobile.data.model.AgentId>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.pins.shared/AgentPinsSnapshot> { // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.pins.shared/AgentPinsSnapshot // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.pins.shared/AgentPinsSnapshot) // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.pins.shared.AgentPinsSnapshot){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.pins.shared/AgentPinsSnapshot> // com.letta.mobile.data.pins.shared/AgentPinsSnapshot.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.pins.shared/AgentPinsState { // com.letta.mobile.data.pins.shared/AgentPinsState|null[0]
+    constructor <init>(kotlin/Boolean = ..., com.letta.mobile.data.pins.shared/AgentPinsSnapshot? = ..., kotlin/Boolean = ..., kotlin/String? = ...) // com.letta.mobile.data.pins.shared/AgentPinsState.<init>|<init>(kotlin.Boolean;com.letta.mobile.data.pins.shared.AgentPinsSnapshot?;kotlin.Boolean;kotlin.String?){}[0]
+
+    final val agentIds // com.letta.mobile.data.pins.shared/AgentPinsState.agentIds|{}agentIds[0]
+        final fun <get-agentIds>(): kotlin.collections/List<com.letta.mobile.data.model/AgentId> // com.letta.mobile.data.pins.shared/AgentPinsState.agentIds.<get-agentIds>|<get-agentIds>(){}[0]
+    final val editable // com.letta.mobile.data.pins.shared/AgentPinsState.editable|{}editable[0]
+        final fun <get-editable>(): kotlin/Boolean // com.letta.mobile.data.pins.shared/AgentPinsState.editable.<get-editable>|<get-editable>(){}[0]
+    final val error // com.letta.mobile.data.pins.shared/AgentPinsState.error|{}error[0]
+        final fun <get-error>(): kotlin/String? // com.letta.mobile.data.pins.shared/AgentPinsState.error.<get-error>|<get-error>(){}[0]
+    final val live // com.letta.mobile.data.pins.shared/AgentPinsState.live|{}live[0]
+        final fun <get-live>(): kotlin/Boolean // com.letta.mobile.data.pins.shared/AgentPinsState.live.<get-live>|<get-live>(){}[0]
+    final val snapshot // com.letta.mobile.data.pins.shared/AgentPinsState.snapshot|{}snapshot[0]
+        final fun <get-snapshot>(): com.letta.mobile.data.pins.shared/AgentPinsSnapshot? // com.letta.mobile.data.pins.shared/AgentPinsState.snapshot.<get-snapshot>|<get-snapshot>(){}[0]
+    final val supported // com.letta.mobile.data.pins.shared/AgentPinsState.supported|{}supported[0]
+        final fun <get-supported>(): kotlin/Boolean // com.letta.mobile.data.pins.shared/AgentPinsState.supported.<get-supported>|<get-supported>(){}[0]
+
+    final fun component1(): kotlin/Boolean // com.letta.mobile.data.pins.shared/AgentPinsState.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.pins.shared/AgentPinsSnapshot? // com.letta.mobile.data.pins.shared/AgentPinsState.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.pins.shared/AgentPinsState.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.data.pins.shared/AgentPinsState.component4|component4(){}[0]
+    final fun copy(kotlin/Boolean = ..., com.letta.mobile.data.pins.shared/AgentPinsSnapshot? = ..., kotlin/Boolean = ..., kotlin/String? = ...): com.letta.mobile.data.pins.shared/AgentPinsState // com.letta.mobile.data.pins.shared/AgentPinsState.copy|copy(kotlin.Boolean;com.letta.mobile.data.pins.shared.AgentPinsSnapshot?;kotlin.Boolean;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.pins.shared/AgentPinsState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.pins.shared/AgentPinsState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.pins.shared/AgentPinsState.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.pins.shared/SettingsAgentPinsCache : com.letta.mobile.data.pins.shared/AgentPinsCache { // com.letta.mobile.data.pins.shared/SettingsAgentPinsCache|null[0]
+    constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore, kotlin/String) // com.letta.mobile.data.pins.shared/SettingsAgentPinsCache.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore;kotlin.String){}[0]
+
+    final fun read(): com.letta.mobile.data.pins.shared/AgentPinsSnapshot? // com.letta.mobile.data.pins.shared/SettingsAgentPinsCache.read|read(){}[0]
+    final fun write(com.letta.mobile.data.pins.shared/AgentPinsSnapshot) // com.letta.mobile.data.pins.shared/SettingsAgentPinsCache.write|write(com.letta.mobile.data.pins.shared.AgentPinsSnapshot){}[0]
+}
+
+final class com.letta.mobile.data.pins.shared/SharedAgentPins { // com.letta.mobile.data.pins.shared/SharedAgentPins|null[0]
+    constructor <init>(com.letta.mobile.data.pins.shared/AgentPinsLink, com.letta.mobile.data.pins.shared/AgentPinsCache) // com.letta.mobile.data.pins.shared/SharedAgentPins.<init>|<init>(com.letta.mobile.data.pins.shared.AgentPinsLink;com.letta.mobile.data.pins.shared.AgentPinsCache){}[0]
+
+    final val state // com.letta.mobile.data.pins.shared/SharedAgentPins.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.pins.shared/AgentPinsState> // com.letta.mobile.data.pins.shared/SharedAgentPins.state.<get-state>|<get-state>(){}[0]
+    final val supported // com.letta.mobile.data.pins.shared/SharedAgentPins.supported|{}supported[0]
+        final fun <get-supported>(): kotlin/Boolean // com.letta.mobile.data.pins.shared/SharedAgentPins.supported.<get-supported>|<get-supported>(){}[0]
+
+    final suspend fun refresh(): com.letta.mobile.data.pins.shared/AgentPinsState // com.letta.mobile.data.pins.shared/SharedAgentPins.refresh|refresh(){}[0]
+    final suspend fun reorder(kotlin.collections/List<com.letta.mobile.data.model/AgentId>): com.letta.mobile.data.pins.shared/AgentPinsEditOutcome // com.letta.mobile.data.pins.shared/SharedAgentPins.reorder|reorder(kotlin.collections.List<com.letta.mobile.data.model.AgentId>){}[0]
+    final suspend fun run() // com.letta.mobile.data.pins.shared/SharedAgentPins.run|run(){}[0]
+    final suspend fun setPinned(com.letta.mobile.data.model/AgentId, kotlin/Boolean): com.letta.mobile.data.pins.shared/AgentPinsEditOutcome // com.letta.mobile.data.pins.shared/SharedAgentPins.setPinned|setPinned(com.letta.mobile.data.model.AgentId;kotlin.Boolean){}[0]
+}
+
 final class com.letta.mobile.data.pins/DevicePinStore { // com.letta.mobile.data.pins/DevicePinStore|null[0]
     constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore) // com.letta.mobile.data.pins/DevicePinStore.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore){}[0]
 
@@ -80949,6 +81070,32 @@ final object com.letta.mobile.data.pairing/ScannedInviteParser { // com.letta.mo
     final fun parse(kotlin/String): com.letta.mobile.data.pairing/ParsedInvite // com.letta.mobile.data.pairing/ScannedInviteParser.parse|parse(kotlin.String){}[0]
 }
 
+final object com.letta.mobile.data.pins.shared/AgentPinsWire { // com.letta.mobile.data.pins.shared/AgentPinsWire|null[0]
+    final const val AGENT_IDS // com.letta.mobile.data.pins.shared/AgentPinsWire.AGENT_IDS|{}AGENT_IDS[0]
+        final fun <get-AGENT_IDS>(): kotlin/String // com.letta.mobile.data.pins.shared/AgentPinsWire.AGENT_IDS.<get-AGENT_IDS>|<get-AGENT_IDS>(){}[0]
+    final const val CAPABILITY // com.letta.mobile.data.pins.shared/AgentPinsWire.CAPABILITY|{}CAPABILITY[0]
+        final fun <get-CAPABILITY>(): kotlin/String // com.letta.mobile.data.pins.shared/AgentPinsWire.CAPABILITY.<get-CAPABILITY>|<get-CAPABILITY>(){}[0]
+    final const val EXPECTED_REVISION // com.letta.mobile.data.pins.shared/AgentPinsWire.EXPECTED_REVISION|{}EXPECTED_REVISION[0]
+        final fun <get-EXPECTED_REVISION>(): kotlin/String // com.letta.mobile.data.pins.shared/AgentPinsWire.EXPECTED_REVISION.<get-EXPECTED_REVISION>|<get-EXPECTED_REVISION>(){}[0]
+    final const val FRAME_TYPE // com.letta.mobile.data.pins.shared/AgentPinsWire.FRAME_TYPE|{}FRAME_TYPE[0]
+        final fun <get-FRAME_TYPE>(): kotlin/String // com.letta.mobile.data.pins.shared/AgentPinsWire.FRAME_TYPE.<get-FRAME_TYPE>|<get-FRAME_TYPE>(){}[0]
+    final const val GET // com.letta.mobile.data.pins.shared/AgentPinsWire.GET|{}GET[0]
+        final fun <get-GET>(): kotlin/String // com.letta.mobile.data.pins.shared/AgentPinsWire.GET.<get-GET>|<get-GET>(){}[0]
+    final const val INVALID_REQUEST // com.letta.mobile.data.pins.shared/AgentPinsWire.INVALID_REQUEST|{}INVALID_REQUEST[0]
+        final fun <get-INVALID_REQUEST>(): kotlin/String // com.letta.mobile.data.pins.shared/AgentPinsWire.INVALID_REQUEST.<get-INVALID_REQUEST>|<get-INVALID_REQUEST>(){}[0]
+    final const val MAX_ID_CHARS // com.letta.mobile.data.pins.shared/AgentPinsWire.MAX_ID_CHARS|{}MAX_ID_CHARS[0]
+        final fun <get-MAX_ID_CHARS>(): kotlin/Int // com.letta.mobile.data.pins.shared/AgentPinsWire.MAX_ID_CHARS.<get-MAX_ID_CHARS>|<get-MAX_ID_CHARS>(){}[0]
+    final const val MAX_PINS // com.letta.mobile.data.pins.shared/AgentPinsWire.MAX_PINS|{}MAX_PINS[0]
+        final fun <get-MAX_PINS>(): kotlin/Int // com.letta.mobile.data.pins.shared/AgentPinsWire.MAX_PINS.<get-MAX_PINS>|<get-MAX_PINS>(){}[0]
+    final const val REVISION_CONFLICT // com.letta.mobile.data.pins.shared/AgentPinsWire.REVISION_CONFLICT|{}REVISION_CONFLICT[0]
+        final fun <get-REVISION_CONFLICT>(): kotlin/String // com.letta.mobile.data.pins.shared/AgentPinsWire.REVISION_CONFLICT.<get-REVISION_CONFLICT>|<get-REVISION_CONFLICT>(){}[0]
+    final const val SET // com.letta.mobile.data.pins.shared/AgentPinsWire.SET|{}SET[0]
+        final fun <get-SET>(): kotlin/String // com.letta.mobile.data.pins.shared/AgentPinsWire.SET.<get-SET>|<get-SET>(){}[0]
+
+    final val METHODS // com.letta.mobile.data.pins.shared/AgentPinsWire.METHODS|{}METHODS[0]
+        final fun <get-METHODS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.pins.shared/AgentPinsWire.METHODS.<get-METHODS>|<get-METHODS>(){}[0]
+}
+
 final object com.letta.mobile.data.pins/LegacyPinSources { // com.letta.mobile.data.pins/LegacyPinSources|null[0]
     final const val HOME_DEFAULT // com.letta.mobile.data.pins/LegacyPinSources.HOME_DEFAULT|{}HOME_DEFAULT[0]
         final fun <get-HOME_DEFAULT>(): kotlin/String // com.letta.mobile.data.pins/LegacyPinSources.HOME_DEFAULT.<get-HOME_DEFAULT>|<get-HOME_DEFAULT>(){}[0]
@@ -83345,6 +83492,7 @@ final fun com.letta.mobile.data.model/isIrohBackendUrl(kotlin/String?): kotlin/B
 final fun com.letta.mobile.data.model/lettaJson(kotlin/Function1<kotlinx.serialization.json/JsonBuilder, kotlin/Unit> = ...): kotlinx.serialization.json/Json // com.letta.mobile.data.model/lettaJson|lettaJson(kotlin.Function1<kotlinx.serialization.json.JsonBuilder,kotlin.Unit>){}[0]
 final fun com.letta.mobile.data.model/parseAgentTodos(kotlin/String, kotlin/String): kotlin.collections/List<com.letta.mobile.data.model/SubagentTodo>? // com.letta.mobile.data.model/parseAgentTodos|parseAgentTodos(kotlin.String;kotlin.String){}[0]
 final fun com.letta.mobile.data.model/parseSkillEnvelope(kotlin/String?): com.letta.mobile.data.model/SkillEnvelopeInfo? // com.letta.mobile.data.model/parseSkillEnvelope|parseSkillEnvelope(kotlin.String?){}[0]
+final fun com.letta.mobile.data.pins.shared/channelAgentPinsLink(com.letta.mobile.data.transport.api/IChannelTransport): com.letta.mobile.data.pins.shared/AgentPinsLink // com.letta.mobile.data.pins.shared/channelAgentPinsLink|channelAgentPinsLink(com.letta.mobile.data.transport.api.IChannelTransport){}[0]
 final fun com.letta.mobile.data.plugin.catalog/inMemoryLiveViewsSetting(kotlin/Boolean = ...): com.letta.mobile.data.settings/SettingValue<kotlin/Boolean> // com.letta.mobile.data.plugin.catalog/inMemoryLiveViewsSetting|inMemoryLiveViewsSetting(kotlin.Boolean){}[0]
 final fun com.letta.mobile.data.plugin.catalog/liveViewsSetting(com.letta.mobile.data.repository.api/ISettingsRepository, kotlinx.coroutines/CoroutineScope): com.letta.mobile.data.settings/SettingValue<kotlin/Boolean> // com.letta.mobile.data.plugin.catalog/liveViewsSetting|liveViewsSetting(com.letta.mobile.data.repository.api.ISettingsRepository;kotlinx.coroutines.CoroutineScope){}[0]
 final fun com.letta.mobile.data.plugin.catalog/pluginPackageSha256(kotlin/ByteArray): kotlin/String // com.letta.mobile.data.plugin.catalog/pluginPackageSha256|pluginPackageSha256(kotlin.ByteArray){}[0]
