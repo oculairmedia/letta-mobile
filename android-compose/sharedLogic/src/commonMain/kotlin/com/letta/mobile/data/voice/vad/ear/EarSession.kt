@@ -30,7 +30,10 @@ import com.letta.mobile.data.voice.vad.TurnEndReason
 import com.letta.mobile.data.voice.vad.TurnSignal
 import com.letta.mobile.data.voice.vad.TurnTracker
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -47,14 +50,16 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
 
 /**
- * A finished turn's audio under its handle, with what was measured about it and the speech
- * generation it belongs to; [wipe] zeroes the audio.
+ * A finished turn's audio under its handle, with what was measured about it, the speech
+ * generation it belongs to and the transcription already started for it before it ended ([early],
+ * used instead of transcribing again when it succeeded); [wipe] zeroes the audio.
  */
 internal class CapturedTurn(
     val handle: CapturedAudioHandle,
     val samples: ShortArray,
     val report: EarTurnReport = EarTurnReport.Unmeasured,
     val generation: Long = 0,
+    val early: Deferred<Result<SpeechTranscript>>? = null,
 ) {
     fun wipe() = samples.fill(0)
 }
@@ -199,8 +204,11 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
     private val halfDuplex = parts.config.halfDuplex
     private val gate = OutputGate(samplesOf(parts.config.outputTail, format), limit())
     private val partials = PartialTranscripts(parts.config.partials, format, parts.transcriber, out)
+    private val offers = EarlyOffers(parts, out, HeardSoFar())
     private var started = false
     private var peakDb = SILENT_DB
+    private var voicedSoFar = 0L
+    private var lastVoiceEnd = 0L
 
     suspend fun run() {
         memory.drainCommits()
@@ -222,6 +230,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
             }
         } finally {
             partials.turnEnded()
+            offers.discard()
             recorder.wipe()
             splitter.wipe()
             pending.discard()
@@ -266,11 +275,16 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
         detector.setOutputActive(guarded)
         val probability = detector.probability(hop.samples)
         val signal = tracker.onHop(HopObservation(probability, hop.end, guarded))
+        if (tracker.voicedSamples != voicedSoFar) {
+            voicedSoFar = tracker.voicedSamples
+            lastVoiceEnd = hop.end.value
+        }
         if (signal == TurnSignal.Candidate) peakDb = SILENT_DB
         if (tracker.recording || signal is TurnSignal.Ended) peakDb = maxOf(peakDb, PcmLevels.dbfs(hop.samples))
         apply(signal, hop)
         // Acts only between a confirmed start and the end or drop of that turn.
         partials.heard(hop.end.value, tracker.voicedSamples, recorder::tail)
+        if (tracker.confirmed) offerEarly(hop)
         recorder.remember(hop.samples)
     }
 
@@ -289,6 +303,20 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
             }
             is TurnSignal.Ended -> endTurn(hop, signal.reason)
         }
+    }
+
+    /** Within a confirmed turn: voice withdraws an early offer, a long enough pause makes one. */
+    private suspend fun offerEarly(hop: Hop) = offers.heard(hop.end.value)
+
+    /** The turn being heard, as the early offers read it. */
+    private inner class HeardSoFar : HeardTurn {
+        override val lastVoice: Long get() = lastVoiceEnd
+
+        override fun report(): EarTurnReport = turnReport(tracker, peakDb, detector, format.sampleRateHz)
+
+        override fun audio(): ShortArray = recorder.tail(Long.MAX_VALUE)
+
+        override fun covering(): VoiceText? = partials.covering(lastVoiceEnd)
     }
 
     private fun record(hop: Hop?) {
@@ -310,6 +338,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
      */
     private suspend fun endTurn(hop: Hop?, reason: TurnEndReason) {
         record(hop)
+        val covering = partials.covering(lastVoiceEnd)
         partials.turnEnded()
         val report = turnReport(tracker, peakDb, detector, format.sampleRateHz)
         observer.turnClosed(report, reason)
@@ -318,11 +347,13 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
         val end = gate.position
         if (halfDuplex && gate.overlaps(end - samples.size, end, memory.outputActive.value)) {
             samples.fill(0)
+            offers.discard()
             observer.turnDiscarded(report, TurnDiscardReason.OUTPUT_ACTIVE)
             out.send(VoiceEarEvent.EndOfTurn(VoiceUtterance(VoiceText.Empty)))
             return
         }
-        val turn = CapturedTurn(memory.nextHandle(), samples, report, memory.speechGeneration)
+        val early = offers.closed(report, covering)
+        val turn = CapturedTurn(memory.nextHandle(), samples, report, memory.speechGeneration, early)
         if (!pending.offer(turn)) out.send(VoiceEarEvent.Failed(VoiceError(VoiceErrorCode.TRANSCRIPTION_FAILED, VoicePort.EAR)))
     }
 
@@ -332,6 +363,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
      */
     private suspend fun muteForOutput() {
         partials.turnEnded()
+        offers.discard()
         if (tracker.recording) {
             val confirmed = tracker.confirmed
             tracker.drop()
@@ -445,10 +477,7 @@ private class TranscriptionWorker(
     }
 
     private suspend fun deliver(job: TranscriptionJob) {
-        val pcm = PcmAudio(job.turn.samples, PcmFormat(format.sampleRateHz, format.channels))
-        val clip = AudioClip(WavCodec.encode(pcm), AudioEncoding.WAV)
-        val outcome = runCatching { parts.transcriber.transcribe(clip) }
-        clip.bytes.fill(0)
+        val outcome = earlyOutcome(job) ?: transcribe(job.turn)
         val error = outcome.exceptionOrNull()
         if (error is CancellationException) {
             job.turn.wipe()
@@ -465,6 +494,22 @@ private class TranscriptionWorker(
         }
         val kept = memory.retain(job.turn)
         out.send(VoiceEarEvent.Failed(failure, retry = job.turn.handle.takeIf { kept }))
+    }
+
+    /** The transcription started before the turn ended, when there was one and it succeeded; null to transcribe now. */
+    private suspend fun earlyOutcome(job: TranscriptionJob): Result<SpeechTranscript>? {
+        val early = job.turn.early ?: return null
+        // A cancelled early transcription falls back to transcribing now, unless this worker itself was cancelled.
+        val outcome = runCatching { early.await() }
+        currentCoroutineContext().ensureActive()
+        return outcome.getOrNull()?.takeIf { it.isSuccess }
+    }
+
+    private suspend fun transcribe(turn: CapturedTurn): Result<SpeechTranscript> {
+        val clip = AudioClip(WavCodec.encode(PcmAudio(turn.samples, PcmFormat(format.sampleRateHz, format.channels))), AudioEncoding.WAV)
+        val outcome = runCatching { parts.transcriber.transcribe(clip) }
+        clip.bytes.fill(0)
+        return outcome
     }
 
     /** The transcript as the turn's utterance, or an empty one (the loop listens on) when the policy drops it. */

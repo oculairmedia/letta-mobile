@@ -38,11 +38,18 @@ data class LivePartials(
      * worker serves requests in order, and cancelling a request does not stop the server's work).
      */
     val quietCutoff: Duration = 300.milliseconds,
+    /**
+     * Once the person has been silent this long (and still within [quietCutoff]), one more partial
+     * is requested at once, off the interval, if none sent so far reaches their last voice: its
+     * words then cover the whole turn and can be offered as its transcript. Null never does.
+     */
+    val settle: Duration? = null,
 ) {
     init {
         require(interval.isPositive()) { "Partial interval must be positive" }
         require(window.isPositive()) { "Partial window must be positive" }
         require(!quietCutoff.isNegative()) { "Partial quiet cutoff must not be negative" }
+        require(settle == null || !settle.isNegative()) { "Partial settle must not be negative" }
     }
 }
 
@@ -51,8 +58,9 @@ data class LivePartials(
  * partial request is in flight: a tick that comes while one runs is skipped. A response is shown
  * only if its turn is still the current one and no newer response was shown; ending or dropping
  * the turn cancels the request in flight. Partials never become the turn's utterance: the
- * whole-turn transcription at its end stays authoritative. A failed partial is ignored silently.
- * Partial audio is wiped once sent; nothing about a partial is logged.
+ * whole-turn transcription at its end stays authoritative: [covering] only offers the newest
+ * partial's words when they already reach the person's last voice. A failed partial is ignored
+ * silently. Partial audio is wiped once sent; nothing about a partial is logged.
  */
 internal class PartialTranscripts(
     private val settings: LivePartials,
@@ -63,6 +71,7 @@ internal class PartialTranscripts(
     private val interval = samplesOf(settings.interval)
     private val window = samplesOf(settings.window)
     private val quietCutoff = samplesOf(settings.quietCutoff)
+    private val settle = settings.settle?.let(::samplesOf)
     private var lastVoiced = 0L
     private var voicedSoFar = 0L
     private val lock = SynchronizedObject()
@@ -71,6 +80,8 @@ internal class PartialTranscripts(
     private var turn = 0L
     private var issued = 0L
     private var shown = 0L
+    private var issuedEnd = 0L
+    private var shownCover: Cover? = null
 
     /** A turn was confirmed at sample position [position]: the first partial is due one interval on. */
     fun turnStarted(position: Long) {
@@ -92,24 +103,44 @@ internal class PartialTranscripts(
             lastVoiced = position
         }
         val due = nextTick ?: return
-        if (position < due) return
-        if (position - lastVoiced >= quietCutoff) return
+        val quiet = position - lastVoiced
+        if (quiet >= quietCutoff) return
+        val settling = settle != null && quiet >= settle && issuedEnd < lastVoiced
+        if (position < due && !settling) return
         nextTick = position + interval
         if (job?.isActive == true) return
         val samples = snapshot(window)
-        val ticket = synchronized(lock) { Ticket(turn, ++issued) }
+        issuedEnd = position
+        val ticket = synchronized(lock) { Ticket(turn, ++issued, position, whole = samples.size < window) }
         job = out.launch { request(samples, ticket) }
+    }
+
+    /**
+     * The newest partial's words, when they cover the whole turn so far: its audio started with the
+     * turn (not cut to the window) and reached [lastVoice], the end of the person's last voice.
+     * Null otherwise. Call before [turnEnded].
+     */
+    fun covering(lastVoice: Long): VoiceText? = synchronized(lock) {
+        shownCover?.takeIf { it.turn == turn && it.whole && it.end >= lastVoice }?.text
     }
 
     /** The turn ended or was dropped: no more partials for it, and the one in flight is cancelled. */
     fun turnEnded() {
         nextTick = null
-        synchronized(lock) { turn++ }
+        issuedEnd = 0
+        synchronized(lock) {
+            turn++
+            shownCover = null
+        }
         job?.cancel()
         job = null
     }
 
-    private class Ticket(val turn: Long, val sequence: Long)
+    /** One partial request: its turn, its order, where its audio ends and whether it holds the whole turn. */
+    private class Ticket(val turn: Long, val sequence: Long, val end: Long = 0, val whole: Boolean = false)
+
+    /** The words a shown partial heard, and the audio they cover. */
+    private class Cover(val turn: Long, val end: Long, val whole: Boolean, val text: VoiceText)
 
     private suspend fun request(samples: ShortArray, ticket: Ticket) {
         val clip = AudioClip(WavCodec.encode(PcmAudio(samples, PcmFormat(format.sampleRateHz, format.channels))), AudioEncoding.WAV)
@@ -119,14 +150,17 @@ internal class PartialTranscripts(
         val error = outcome.exceptionOrNull()
         if (error is CancellationException) throw error
         val text = outcome.getOrNull()?.text?.value?.trim().orEmpty()
-        if (text.isEmpty() || !claim(ticket)) return
+        if (text.isEmpty() || !claim(ticket, VoiceText(text))) return
         out.send(VoiceEarEvent.PartialTranscript(VoiceText(text)))
     }
 
-    /** True, marking [ticket] shown, when its turn is current and nothing newer was shown. */
-    private fun claim(ticket: Ticket): Boolean = synchronized(lock) {
+    /** True, marking [ticket] shown with [text], when its turn is current and nothing newer was shown. */
+    private fun claim(ticket: Ticket, text: VoiceText): Boolean = synchronized(lock) {
         val fresh = ticket.turn == turn && ticket.sequence > shown
-        if (fresh) shown = ticket.sequence
+        if (fresh) {
+            shown = ticket.sequence
+            shownCover = Cover(ticket.turn, ticket.end, ticket.whole, text)
+        }
         fresh
     }
 

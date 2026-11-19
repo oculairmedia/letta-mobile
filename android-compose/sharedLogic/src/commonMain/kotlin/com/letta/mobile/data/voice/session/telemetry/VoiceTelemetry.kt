@@ -178,6 +178,11 @@ internal class VoiceEarTelemetry(private val telemetry: VoiceTelemetry) : EarObs
 
     override fun transcriptAccepted(characters: Int) = telemetry.event("transcript.accepted", "characters" attr characters)
 
+    override fun turnOffered(fromPartials: Boolean) =
+        telemetry.event("turn.offered", "source" attr if (fromPartials) "partial" else "early")
+
+    override fun offerWithdrawn() = telemetry.event("turn.withdrawn")
+
     private companion object {
         /** Sounds dropped before they became a turn; a turn that already closed still stands. */
         val CandidateReasons = setOf(TurnDiscardReason.NO_ONSET, TurnDiscardReason.TOO_LITTLE_VOICE, TurnDiscardReason.OUTPUT_ACTIVE)

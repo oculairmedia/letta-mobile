@@ -45,6 +45,12 @@ interface EarObserver {
     /** A transcript of [characters] characters was accepted as the person's turn. */
     fun transcriptAccepted(characters: Int) = Unit
 
+    /** The turn's words were offered before its end, from live partial words ([fromPartials]) or an early transcription. */
+    fun turnOffered(fromPartials: Boolean) = Unit
+
+    /** The person went on speaking after the turn's words were offered: the offer was withdrawn. */
+    fun offerWithdrawn() = Unit
+
     /** Shared observers. */
     companion object {
         /** Observes nothing. */

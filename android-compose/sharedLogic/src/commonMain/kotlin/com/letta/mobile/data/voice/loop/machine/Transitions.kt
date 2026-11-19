@@ -99,6 +99,8 @@ internal object Transitions {
         return when {
             model.turn.userSpeaking -> Step(if (head == null) model.copy(phase = VoicePhase.LISTENING) else model)
             head == null -> afterTurn(model)
+            // An answer to words offered early waits, whatever it holds, until the turn confirms them.
+            head.key == model.turn.tentative -> Step(model.copy(phase = VoicePhase.THINKING))
             !head.open && head.held.isEmpty() -> resume(model.withTurn { without(head.key) })
             head.held.isNotEmpty() -> promote(model, head)
             else -> Step(model.copy(phase = VoicePhase.THINKING))
@@ -160,7 +162,7 @@ internal object Interrupts {
             addAll(skipped(SpeechSkipReason.INTERRUPTED, dropped))
             open.forEach { add(LoopEffect.RequestInterrupt(it.key)) }
         }
-        val turn = stopping(model.turn, open).copy(replies = emptyList())
+        val turn = stopping(model.turn, open).copy(replies = emptyList(), tentative = null)
         return Step(model.silenced().copy(phase = VoicePhase.LISTENING, turn = turn), effects)
     }
 

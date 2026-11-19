@@ -24,6 +24,8 @@ internal object EarRules {
         VoiceEarEvent.ListeningStarted -> listening(model)
         VoiceEarEvent.SpeechStarted -> speechStarted(model)
         VoiceEarEvent.SpeechEnded -> speechEnded(model)
+        is VoiceEarEvent.TentativeEndOfTurn -> tentativeOffered(model, event.utterance)
+        VoiceEarEvent.TentativeWithdrawn -> withdrawTentative(model)
         is VoiceEarEvent.EndOfTurn -> endOfTurn(model, event.utterance)
         is VoiceEarEvent.Failed -> failed(model, event)
     }
@@ -80,6 +82,7 @@ internal object EarRules {
     private fun endOfTurn(model: LoopModel, utterance: VoiceUtterance): Step {
         val unannounced = !model.turn.userSpeaking && model.turn.transcribing == 0
         val heard = model.withTurn { if (transcribing > 0) copy(transcribing = transcribing - 1) else copy(userSpeaking = false) }
+        if (heard.turn.tentativeWords != null) return settleTentative(heard, utterance)
         return when (model.phase) {
             VoicePhase.LISTENING, VoicePhase.THINKING -> Turns.start(heard, utterance)
             VoicePhase.SPEAKING -> overSpeech(heard, utterance, interrupts = model.config.voiceInterrupts && unannounced)
