@@ -2,6 +2,7 @@ package com.letta.mobile.startup
 
 import java.io.File
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -13,12 +14,23 @@ import org.junit.Test
 class MainActivityFullyDrawnTest {
     @Test
     fun mainActivityDoesNotReportFullyDrawnItself() {
-        val source = File(MAIN_ACTIVITY).readText()
+        val source = File(MAIN_ACTIVITY).readLines().joinToString("\n") { it.substringBefore("//") }
         val calls = Regex("""(?<![\w.])(this\.|this@MainActivity\.)?reportFullyDrawn\(\)""").findAll(source).map { it.value }.toList()
         assertFalse("MainActivity.kt calls reportFullyDrawn() directly: $calls", calls.isNotEmpty())
     }
 
+    @Test
+    fun theWorkspaceReportsBeforeItsWaitingPageReturns() {
+        val source = File(WORKSPACE).readText()
+        val report = source.indexOf("ReportFirstUsableContent(")
+        val waitingReturn = source.indexOf("if (!shell.sourceReady) return AndroidShellPage")
+        assertTrue("AndroidShellWorkspace never calls ReportFirstUsableContent", report >= 0)
+        assertTrue("the waiting-page early return precedes the report, which would then leave and re-enter the composition", report < waitingReturn)
+    }
+
     private companion object {
+        const val WORKSPACE = "src/main/java/com/letta/mobile/ui/navigation/AdaptiveScaffold.kt"
+
         /** Gradle runs the module's unit tests from the module directory. */
         const val MAIN_ACTIVITY = "src/main/java/com/letta/mobile/MainActivity.kt"
     }
