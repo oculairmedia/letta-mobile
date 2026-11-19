@@ -136,7 +136,7 @@ class DirectAppServerDialTest {
                     com.letta.mobile.data.storage.InMemorySecureSettingsStore(), "local",
                 ),
             )
-            assertTrue(com.letta.mobile.data.pins.shared.AgentPinsWire.CAPABILITY in transport.hostCapabilities)
+            assertTrue(com.letta.mobile.data.pins.wire.AgentPinsWire.CAPABILITY in transport.hostCapabilities)
             assertTrue(pins.refresh().editable)
             val agent = com.letta.mobile.data.model.AgentId("agent-1")
             assertEquals(com.letta.mobile.data.pins.shared.AgentPinsEditOutcome.APPLIED, pins.setPinned(agent, true))
@@ -163,7 +163,7 @@ class DirectAppServerDialTest {
                     readiness = AppServerReadinessExpectation.LocalBackend,
                 ),
                 scope = scope,
-                hostRoutes = hostRoutes,
+                router = directDialRouter(hostRoutes = hostRoutes),
                 release = { releases.incrementAndGet() },
             )
         },

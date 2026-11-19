@@ -1,5 +1,7 @@
 package com.letta.mobile.data.pins.shared
 
+import com.letta.mobile.data.pins.wire.AgentPinsError
+import com.letta.mobile.data.pins.wire.AgentPinsWire
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import kotlin.test.Test
@@ -110,6 +112,28 @@ class SharedAgentPinsTest {
     }
 
     @Test
+    fun aTransientFailureNeverLeavesThePinsReadOnly() = runTest {
+        val host = FakeHost(revision = 1, ids = listOf(a))
+        val pins = SharedAgentPins(host, cache()).also { it.refresh() }
+        host.failNextCalls = 1
+        assertEquals(AgentPinsEditOutcome.OFFLINE, pins.setPinned(b, true))
+        assertFalse(pins.state.value.editable)
+        assertEquals(AgentPinsSnapshot(1, listOf(a)), pins.state.value.snapshot)
+        assertEquals(AgentPinsEditOutcome.APPLIED, pins.setPinned(b, true))
+        assertEquals(AgentPinsSnapshot(2, listOf(a, b)), pins.state.value.snapshot)
+    }
+
+    @Test
+    fun aFailedReadIsRetriedBeforeTheNextEdit() = runTest {
+        val host = FakeHost(revision = 3, ids = listOf(a)).apply { failNextCalls = 1 }
+        val pins = SharedAgentPins(host, cache())
+        assertFalse(pins.refresh().live)
+        assertEquals(AgentPinsError.UNREACHABLE, pins.state.value.error)
+        assertEquals(AgentPinsEditOutcome.APPLIED, pins.setPinned(c, true))
+        assertEquals(AgentPinsSnapshot(4, listOf(a, c)), pins.state.value.snapshot)
+    }
+
+    @Test
     fun aHostWithNoListYetStartsEmpty() = runTest {
         val pins = SharedAgentPins(FakeHost(revision = 0, ids = emptyList()), cache())
         val state = pins.refresh()
@@ -133,6 +157,7 @@ class SharedAgentPinsTest {
         var beforeSet: () -> Unit = {}
         var refuseSetWith: String? = null
         var lastSetError: String? = null
+        var failNextCalls = 0
 
         override val hostCapabilities: Set<String> get() = capabilities
         override val isConnected: Boolean get() = connected.value
@@ -150,6 +175,10 @@ class SharedAgentPinsTest {
 
         override suspend fun call(method: String, params: JsonObject): AgentPinsReply {
             calls += method
+            if (failNextCalls > 0) {
+                failNextCalls -= 1
+                error("link timed out")
+            }
             return when (method) {
                 AgentPinsWire.GET -> AgentPinsReply(true, snapshot(revision, ids))
                 else -> set(params)

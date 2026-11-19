@@ -6,7 +6,7 @@ import com.letta.mobile.data.controller.node.iroh.AgentScopeGuard
 import com.letta.mobile.data.controller.node.iroh.adminError
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.pins.shared.AgentPinsSnapshot
-import com.letta.mobile.data.pins.shared.AgentPinsWire
+import com.letta.mobile.data.pins.wire.AgentPinsWire
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
@@ -44,8 +44,8 @@ object AgentPinsRoutes {
 
 /**
  * Registers the two methods. An [AgentPinsRefusal] answers exactly its code; any other failure is the
- * router's fixed internal error. Agent-scoped peers are refused every method. Telemetry carries the method, the outcome, the revision and a count:
- * never an agent name.
+ * router's fixed internal error. Agent-scoped peers are refused every method. Telemetry carries the
+ * method, the outcome, the revision and a count: never an agent name.
  */
 internal class AgentPinsRouteSet(
     private val store: AgentPinsStore,

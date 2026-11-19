@@ -45,7 +45,7 @@ class IrohAdminOwnershipMatrixTest {
         val allDeclared = operations.map { it.requiredString("method") }.toSet()
         val secretMethods = com.letta.mobile.data.secrets.wire.SecretRequestRouteWire.METHODS
         val voiceMethods = com.letta.mobile.data.voice.host.HostVoiceWire.METHODS
-        val pinsMethods = com.letta.mobile.data.pins.shared.AgentPinsWire.METHODS
+        val pinsMethods = com.letta.mobile.data.pins.wire.AgentPinsWire.METHODS
         val conditional = CanvasMountWire.METHODS + secretMethods + voiceMethods + pinsMethods
         val declared = allDeclared.filterNot { it.startsWith("beads.") || it in conditional }.toSet()
 

@@ -1,5 +1,7 @@
 package com.letta.mobile.data.pins.shared
 
+import com.letta.mobile.data.pins.wire.AgentPinsError
+import com.letta.mobile.data.pins.wire.AgentPinsWire
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.util.Telemetry
@@ -33,8 +35,8 @@ data class AgentPinsState(
     val snapshot: AgentPinsSnapshot? = null,
     /** Whether [snapshot] was read from the connected host on this connection. */
     val live: Boolean = false,
-    /** The last request's failure code; null after a success. */
-    val error: String? = null,
+    /** The last request's failure; null after a success. */
+    val error: AgentPinsError? = null,
 ) {
     /** The pinned agents in order, as last learned. */
     val agentIds: List<AgentId> get() = snapshot?.agentIds.orEmpty()
@@ -121,14 +123,18 @@ class SharedAgentPins(
         placed + ids.filterNot { it in placed }
     }
 
+    /**
+     * Sends one edit. While connected to a capable host whose list is not live (a read or a write failed
+     * since the connection came up), it reads the list first, so one transient failure never leaves the
+     * pins read-only until a reconnect.
+     */
     private suspend fun edit(transform: (List<AgentId>) -> List<AgentId>): AgentPinsEditOutcome = edits.withLock {
+        if (!supported) return@withLock AgentPinsEditOutcome.UNSUPPORTED
+        if (!link.isConnected) return@withLock AgentPinsEditOutcome.OFFLINE
+        if (!mutableState.value.editable) refresh()
         val known = mutableState.value
         val base = known.snapshot
-        when {
-            !supported -> AgentPinsEditOutcome.UNSUPPORTED
-            !link.isConnected || !known.editable || base == null -> AgentPinsEditOutcome.OFFLINE
-            else -> send(base, transform(base.agentIds))
-        }
+        if (!known.editable || base == null) AgentPinsEditOutcome.OFFLINE else send(base, transform(base.agentIds))
     }
 
     private suspend fun send(base: AgentPinsSnapshot, next: List<AgentId>): AgentPinsEditOutcome {
@@ -148,18 +154,18 @@ class SharedAgentPins(
                 adopt(accepted, live = true)
                 AgentPinsEditOutcome.APPLIED
             }
-            answer == null -> rollBack(base, AgentPinsEditOutcome.OFFLINE, null)
-            answer.error == AgentPinsWire.REVISION_CONFLICT -> {
-                rollBack(base, AgentPinsEditOutcome.CONFLICT, answer.error)
+            answer == null -> rollBack(base, AgentPinsEditOutcome.OFFLINE, AgentPinsError.UNREACHABLE)
+            AgentPinsError.fromWire(answer.error) == AgentPinsError.REVISION_CONFLICT -> {
+                rollBack(base, AgentPinsEditOutcome.CONFLICT, AgentPinsError.REVISION_CONFLICT)
                 refresh()
                 AgentPinsEditOutcome.CONFLICT
             }
-            else -> rollBack(base, AgentPinsEditOutcome.REFUSED, answer.error)
+            else -> rollBack(base, AgentPinsEditOutcome.REFUSED, AgentPinsError.fromWire(answer.error))
         }
     }
 
     /** Restores [base] unless a newer list arrived meanwhile. */
-    private fun rollBack(base: AgentPinsSnapshot, outcome: AgentPinsEditOutcome, code: String?): AgentPinsEditOutcome {
+    private fun rollBack(base: AgentPinsSnapshot, outcome: AgentPinsEditOutcome, code: AgentPinsError): AgentPinsEditOutcome {
         mutableState.update { current ->
             val restored = if (current.snapshot?.revision == base.revision) current.copy(snapshot = base) else current
             restored.copy(error = code, live = restored.live && outcome != AgentPinsEditOutcome.OFFLINE)
@@ -191,7 +197,7 @@ class SharedAgentPins(
         reply.exceptionOrNull()?.let { if (it is CancellationException) throw it }
         val answer = reply.getOrNull()
         val snapshot = answer?.takeIf { it.success }?.result?.let(::decode)
-        if (snapshot == null) mutableState.update { it.copy(error = answer?.error ?: UNREACHABLE) }
+        if (snapshot == null) mutableState.update { it.copy(error = AgentPinsError.fromWire(answer?.error)) }
         return snapshot
     }
 
@@ -207,6 +213,5 @@ class SharedAgentPins(
 
     private companion object {
         const val TAG = "SharedAgentPins"
-        const val UNREACHABLE = "unreachable"
     }
 }

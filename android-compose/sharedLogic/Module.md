@@ -981,9 +981,13 @@ The device settings facade owns one pin journal for its lifecycle, with no proce
 
 Device-local scoped pin membership/order, explicit-unpin tombstones and recoverable legacy import journal. Snapshot every available backing before union, retain raw/opaque entries and read/decode failures, verify persisted state before per-source checkpoints, and resume idempotently. Unfinished sources are reread with every distinct raw/parse snapshot retained; completed sources are never reread. Initialization failures preserve legacy data and expose unavailable or disabled pin actions while allowing the host to open. Only trusted ownership evidence may resolve pending domain entries; active backend alone is never evidence.
 
+# Package com.letta.mobile.data.pins.wire
+
+The dependency-free names of the pinned-agents v1 contract (`docs/reference/contracts/pins-v1.md`): `AgentPinsWire` holds the capability, method names, the `pins_updated` frame type, limits and error codes, and `AgentPinsError` maps a host's error string to a closed enum with an unknown fallback. Transport packages read the frame type from here without depending on the pins client.
+
 # Package com.letta.mobile.data.pins.shared
 
-The client of the pinned-agents v1 contract and the wire it shares with the host. `SharedAgentPins` is the one list of pinned agents every surface reads and edits: it reads the host's list over `AgentPinsLink` (bound to the channel transport by `channelAgentPinsLink`), applies edits optimistically with compare-and-set and rolls them back on a conflict, adopts newer `pins_updated` pushes, refuses edits while the host is out of reach (nothing is queued) and shows the last list learned from `AgentPinsCache` meanwhile. There is no device-local list: without the host's capability there are no pins. `AgentPinsWire` and `AgentPinsSnapshot` name the methods, limits, codes and the list with its revision. Nothing here logs an agent name.
+The client of the pinned-agents v1 contract and the wire it shares with the host. `SharedAgentPins` is the one list of pinned agents every surface reads and edits: it reads the host's list over `AgentPinsLink` (bound to the channel transport by `channelAgentPinsLink`), applies edits optimistically with compare-and-set and rolls them back on a conflict, adopts newer `pins_updated` pushes, refuses edits while the host is out of reach (nothing is queued) and shows the last list learned from `AgentPinsCache` meanwhile. There is no device-local list: without the host's capability there are no pins. `AgentPinsSnapshot` is the list with its revision, the same shape the host stores and a host-state export carries. Nothing here logs an agent name.
 
 # Package com.letta.mobile.data.objectverbs.refs
 

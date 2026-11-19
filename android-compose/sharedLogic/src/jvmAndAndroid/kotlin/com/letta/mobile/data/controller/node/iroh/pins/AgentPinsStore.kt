@@ -3,8 +3,10 @@ package com.letta.mobile.data.controller.node.iroh.pins
 import com.letta.mobile.data.controller.node.iroh.AtomicJsonFile
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.pins.shared.AgentPinsSnapshot
-import com.letta.mobile.data.pins.shared.AgentPinsWire
+import com.letta.mobile.data.pins.wire.AgentPinsWire
 import com.letta.mobile.data.serialization.LettaJson
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.attr
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.sync.Mutex
@@ -32,18 +34,29 @@ internal class InMemoryAgentPinsPersistence(private var state: AgentPinsSnapshot
     }
 }
 
-/** The list in one JSON file, replaced atomically. A missing file is an empty list at revision 0. */
+/**
+ * The list in one JSON file, replaced atomically. A missing file is an empty list at revision 0. A file
+ * that does not decode is left as it is and every request is refused with `state_unreadable` (logged),
+ * never silently reset, so no revision is ever issued twice.
+ */
 internal class FileAgentPinsPersistence(private val path: Path) : AgentPinsPersistence {
     override fun read(): AgentPinsSnapshot {
         if (!Files.exists(path)) return AgentPinsSnapshot()
-        return LettaJson.persisted.decodeFromString<AgentPinsSnapshot>(Files.readString(path))
+        return try {
+            LettaJson.persisted.decodeFromString<AgentPinsSnapshot>(Files.readString(path))
+        } catch (expectedCorruption: IllegalArgumentException) {
+            // SerializationException is an IllegalArgumentException: a truncated or hand-edited file.
+            val kind = expectedCorruption::class.simpleName
+            Telemetry.event("AgentPinsHost", "state.unreadable", "class" attr kind, level = Telemetry.Level.WARN)
+            throw AgentPinsRefusal(AgentPinsWire.STATE_UNREADABLE, expectedCorruption)
+        }
     }
 
     override fun write(state: AgentPinsSnapshot) = AtomicJsonFile.write(path, LettaJson.persisted.encodeToString(state))
 }
 
 /** A refusal with one of the contract's codes. */
-internal class AgentPinsRefusal(val code: String) : Exception(code)
+internal class AgentPinsRefusal(val code: String, cause: Throwable? = null) : Exception(code, cause)
 
 /** What a write did: the list now, and whether it changed (and so must be pushed). */
 internal class AgentPinsWrite(val snapshot: AgentPinsSnapshot, val changed: Boolean)

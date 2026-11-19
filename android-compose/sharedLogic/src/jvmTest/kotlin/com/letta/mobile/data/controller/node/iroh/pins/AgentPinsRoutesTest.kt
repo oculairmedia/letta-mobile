@@ -6,7 +6,8 @@ import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.AgentScopeGuard
 import com.letta.mobile.data.controller.node.iroh.IrohPeerCapabilities
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.pins.shared.AgentPinsWire
+import com.letta.mobile.data.pins.shared.AgentPinsSnapshot
+import com.letta.mobile.data.pins.wire.AgentPinsWire
 import java.nio.file.Files
 import java.time.Instant
 import kotlin.test.Test
@@ -111,6 +112,61 @@ class AgentPinsRoutesTest {
         assertEquals(expected, AgentPinsWire.METHODS.associateWith(IrohPeerCapabilities::forAdminMethod))
         val chatRole = IrohPeerCapabilities.CHAT_ROLE
         assertTrue(AgentPinsWire.METHODS.all { IrohPeerCapabilities.isAllowed(chatRole, IrohPeerCapabilities.forAdminMethod(it)) })
+    }
+
+    @Test
+    fun everyFixtureCaseMatchesTheRoutesAndTheirPush() = runBlocking {
+        val fixtures = listOf(
+            com.letta.mobile.data.pins.shared.pinsGetContractText,
+            com.letta.mobile.data.pins.shared.pinsSetContractText,
+        )
+        for (text in fixtures) {
+            val root = Json.parseToJsonElement(text).jsonObject
+            val method = root.getValue("method").jsonPrimitive.content
+            for (element in root.getValue("cases").jsonArray) {
+                val case = element.jsonObject
+                val name = "$method/${case.getValue("name").jsonPrimitive.content}"
+                val frames = mutableListOf<String>()
+                val replay = AdminRpcRouter().also { routerFor(case, frames).register(it) }
+                val context = case.getValue("context").jsonObject
+                val invocation = AdminRpcInvocation(
+                    "contract", method, case.getValue("params").jsonObject,
+                    AdminRpcRequestContext(
+                        authenticated = context.getValue("authenticated").jsonPrimitive.boolean,
+                        authorizedAgentIds = context["authorized_agent_ids"]?.jsonArray?.map { it.jsonPrimitive.content }?.toSet(),
+                    ),
+                )
+                assertEquals(case.getValue("expected_response"), Json.parseToJsonElement(replay.dispatch(invocation)), name)
+                val expectedFrame = case["pushed_frame"]?.jsonObject
+                assertEquals(listOfNotNull(expectedFrame), frames.map { frame -> pushFields(frame) }, "$name push")
+            }
+        }
+    }
+
+    private fun routerFor(case: JsonObject, frames: MutableList<String>): AgentPinsRouteSet {
+        val stored = case.getValue("host_state").jsonObject.getValue("pins").jsonObject["stored"]
+        val seed = stored?.takeUnless { it is kotlinx.serialization.json.JsonNull }
+            ?.let { Json.decodeFromJsonElement(AgentPinsSnapshot.serializer(), it) } ?: AgentPinsSnapshot()
+        val push = AgentPinsPublisher(CoroutineScope(Dispatchers.Unconfined)) { Instant.EPOCH }.apply { attach { frames += it } }
+        return AgentPinsRouteSet(AgentPinsStore(InMemoryAgentPinsPersistence(seed)), push)
+    }
+
+    /** The deterministic fields of a pushed frame, after checking the per-push id and ts are present. */
+    private fun pushFields(frame: String): JsonObject {
+        val parsed = Json.parseToJsonElement(frame).jsonObject
+        assertTrue(parsed.getValue("id").jsonPrimitive.content.startsWith("pins-updated-"))
+        assertTrue(parsed.getValue("ts").jsonPrimitive.content.isNotBlank())
+        return JsonObject(parsed - "id" - "ts")
+    }
+
+    @Test
+    fun anUnreadableFileIsRefusedAndKept() = runBlocking {
+        val path = Files.createTempDirectory("agent-pins").resolve("pinned-agents.json")
+        Files.writeString(path, "{not json")
+        val corrupt = AdminRpcRouter().also { AgentPinsRouteSet(AgentPinsStore(FileAgentPinsPersistence(path)), publisher).register(it) }
+        val response = Json.parseToJsonElement(corrupt.dispatch(AdminRpcInvocation("r", AgentPinsWire.GET, null))).jsonObject
+        assertEquals(AgentPinsWire.STATE_UNREADABLE, response["error"]?.jsonPrimitive?.content)
+        assertEquals("{not json", Files.readString(path))
     }
 
     private suspend fun call(method: String, params: JsonObject): JsonObject {

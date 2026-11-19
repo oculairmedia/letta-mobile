@@ -1,5 +1,6 @@
 package com.letta.mobile.data.pins.shared
 
+import com.letta.mobile.data.pins.wire.AgentPinsWire
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.ChannelTransportState

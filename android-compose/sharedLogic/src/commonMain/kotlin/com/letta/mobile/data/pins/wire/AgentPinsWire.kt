@@ -1,8 +1,4 @@
-package com.letta.mobile.data.pins.shared
-
-import com.letta.mobile.data.model.AgentId
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+package com.letta.mobile.data.pins.wire
 
 /**
  * Names, limits and codes of the pinned-agents v1 contract, shared by host and client. The host keeps
@@ -37,6 +33,9 @@ object AgentPinsWire {
     /** The refusal of a malformed request. */
     const val INVALID_REQUEST: String = "invalid_request"
 
+    /** The refusal when the host cannot read its stored list; nothing is changed. */
+    const val STATE_UNREADABLE: String = "state_unreadable"
+
     /** Param and result field holding the ordered agent ids. */
     const val AGENT_IDS: String = "agent_ids"
 
@@ -44,12 +43,40 @@ object AgentPinsWire {
     const val EXPECTED_REVISION: String = "expected_revision"
 }
 
-/**
- * The shared list at one [revision]: 0 until the first accepted write, then one more for every
- * accepted write. [agentIds] is in pin order, without duplicates.
- */
-@Serializable
-data class AgentPinsSnapshot(
-    @SerialName("revision") val revision: Long = 0,
-    @SerialName(AgentPinsWire.AGENT_IDS) val agentIds: List<AgentId> = emptyList(),
-)
+/** A pins failure as the client sees it; any code it does not know reads as [UNKNOWN]. */
+enum class AgentPinsError {
+    /** Another device changed the list first. */
+    REVISION_CONFLICT,
+
+    /** The request was malformed. */
+    INVALID_REQUEST,
+
+    /** This device may not read or change the list (not authorized, or bounded to some agents). */
+    FORBIDDEN,
+
+    /** The host cannot read its stored list. */
+    STATE_UNREADABLE,
+
+    /** The host does not serve the method. */
+    UNSUPPORTED,
+
+    /** No answer: the link failed or the reply was unreadable. */
+    UNREACHABLE,
+
+    /** A code this client does not know. */
+    UNKNOWN,
+    ;
+
+    companion object {
+        /** The error for the host's `error` string; null reads as [UNREACHABLE]. */
+        fun fromWire(code: String?): AgentPinsError = when {
+            code == null -> UNREACHABLE
+            code == AgentPinsWire.REVISION_CONFLICT -> REVISION_CONFLICT
+            code == AgentPinsWire.INVALID_REQUEST -> INVALID_REQUEST
+            code == AgentPinsWire.STATE_UNREADABLE -> STATE_UNREADABLE
+            code.startsWith("forbidden") -> FORBIDDEN
+            code.startsWith("Unknown method") -> UNSUPPORTED
+            else -> UNKNOWN
+        }
+    }
+}

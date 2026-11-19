@@ -1,7 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh.pins
 
 import com.letta.mobile.data.pins.shared.AgentPinsSnapshot
-import com.letta.mobile.data.pins.shared.AgentPinsWire
+import com.letta.mobile.data.pins.wire.AgentPinsWire
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
 import java.time.Instant

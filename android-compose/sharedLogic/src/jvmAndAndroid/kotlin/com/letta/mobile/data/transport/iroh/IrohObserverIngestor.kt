@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.pins.wire.AgentPinsWire
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.subagent.ParentContext
@@ -170,7 +171,7 @@ internal class IrohObserverIngestor(
         frame is ServerFrame.ConversationActivity || frame is ServerFrame.AgentUpdated ||
             frame is ServerFrame.ConversationUpdated || frame is ServerFrame.SubagentsUpdated ||
             frame is ServerFrame.PendingApprovalsUpdated || frame is ServerFrame.PermissionModeUpdated ||
-            (frame is ServerFrame.Unknown && frame.type == PINS_UPDATED_TYPE)
+            (frame is ServerFrame.Unknown && frame.type == AgentPinsWire.FRAME_TYPE)
 
     suspend fun ingestObserverFrame(request: ObserverFrameRequest) {
         if (request.expectedGeneration != null && connectionGeneration() != request.expectedGeneration) return
@@ -669,12 +670,6 @@ internal class IrohObserverIngestor(
         /** The host registry's push; see SubagentRegistryPublisher on the host. */
         private const val SUBAGENTS_UPDATED_TYPE = "subagents_updated"
 
-        /**
-         * The host's pinned-agents push (see AgentPinsPublisher on the host). It has no typed frame: it
-         * stays [ServerFrame.Unknown] and the shared pins decode its raw body.
-         */
-        private const val PINS_UPDATED_TYPE = "pins_updated"
-
         /** The frame type an observed turn records when it is learned from a loop status. */
         private const val LOOP_STATUS_FRAME_TYPE = "update_loop_status"
 
@@ -684,7 +679,8 @@ internal class IrohObserverIngestor(
             com.letta.mobile.data.runtime.ApprovalRelay.FRAME_TYPE,
             // letta-mobile-a4tm7: another client changed a conversation's permission mode.
             com.letta.mobile.data.runtime.PermissionModeRpc.FRAME_TYPE,
-            PINS_UPDATED_TYPE,
+            // The host's pinned-agents push: no typed frame, it stays ServerFrame.Unknown for the shared pins.
+            AgentPinsWire.FRAME_TYPE,
         )
 
         /** Longer than the engine's settle window (1.5 s), so a healthy engine always wins. */

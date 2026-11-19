@@ -142,10 +142,10 @@ class IrohNodeEndpoint(
 
     /**
      * Delivers the host's `pins_updated` frames (the whole pinned-agents list) to every live connection
-     * allowed to read agents, like `agent_updated`.
+     * allowed to read agents across the whole host ([ViewerHandle.receivesPinsEvents]); agent-scoped peers get none.
      */
     suspend fun broadcastPinsUpdated(frame: String) {
-        val result = connectionRegistry.broadcast(frame) { it.receivesAgentEvents() }
+        val result = connectionRegistry.broadcast(frame) { it.receivesPinsEvents() }
         Telemetry.event("IrohNode", "pins_updated.broadcast", "recipients" attr result.recipients, "delivered" attr result.delivered)
     }
 
