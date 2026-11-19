@@ -24,8 +24,7 @@ internal object EarRules {
         VoiceEarEvent.ListeningStarted -> listening(model)
         VoiceEarEvent.SpeechStarted -> speechStarted(model)
         VoiceEarEvent.SpeechEnded -> speechEnded(model)
-        is VoiceEarEvent.TentativeEndOfTurn -> tentativeOffered(model, event.utterance)
-        VoiceEarEvent.TentativeWithdrawn -> withdrawTentative(model)
+        is VoiceEarEvent.TentativeEndOfTurn, VoiceEarEvent.TentativeWithdrawn -> tentativeEvent(model, event)
         is VoiceEarEvent.EndOfTurn -> endOfTurn(model, event.utterance)
         is VoiceEarEvent.Failed -> failed(model, event)
     }

@@ -4451,6 +4451,7 @@ final enum class com.letta.mobile.data.voice/SpeechSkipReason : kotlin/Enum<com.
     enum entry MOUTH_FAILED // com.letta.mobile.data.voice/SpeechSkipReason.MOUTH_FAILED|null[0]
     enum entry PENDING_LIMIT // com.letta.mobile.data.voice/SpeechSkipReason.PENDING_LIMIT|null[0]
     enum entry REPLY_FAILED // com.letta.mobile.data.voice/SpeechSkipReason.REPLY_FAILED|null[0]
+    enum entry REVISED // com.letta.mobile.data.voice/SpeechSkipReason.REVISED|null[0]
     enum entry TIMED_OUT // com.letta.mobile.data.voice/SpeechSkipReason.TIMED_OUT|null[0]
 
     final val entries // com.letta.mobile.data.voice/SpeechSkipReason.entries|#static{}entries[0]
@@ -7598,9 +7599,11 @@ abstract interface com.letta.mobile.data.voice.session/VoiceAudio { // com.letta
 }
 
 abstract interface com.letta.mobile.data.voice.vad.ear/EarObserver { // com.letta.mobile.data.voice.vad.ear/EarObserver|null[0]
+    open fun offerWithdrawn() // com.letta.mobile.data.voice.vad.ear/EarObserver.offerWithdrawn|offerWithdrawn(){}[0]
     open fun transcriptAccepted(kotlin/Int) // com.letta.mobile.data.voice.vad.ear/EarObserver.transcriptAccepted|transcriptAccepted(kotlin.Int){}[0]
     open fun turnClosed(com.letta.mobile.data.voice.vad.ear/EarTurnReport, com.letta.mobile.data.voice.vad/TurnEndReason) // com.letta.mobile.data.voice.vad.ear/EarObserver.turnClosed|turnClosed(com.letta.mobile.data.voice.vad.ear.EarTurnReport;com.letta.mobile.data.voice.vad.TurnEndReason){}[0]
     open fun turnDiscarded(com.letta.mobile.data.voice.vad.ear/EarTurnReport, com.letta.mobile.data.voice.vad/TurnDiscardReason) // com.letta.mobile.data.voice.vad.ear/EarObserver.turnDiscarded|turnDiscarded(com.letta.mobile.data.voice.vad.ear.EarTurnReport;com.letta.mobile.data.voice.vad.TurnDiscardReason){}[0]
+    open fun turnOffered(kotlin/Boolean) // com.letta.mobile.data.voice.vad.ear/EarObserver.turnOffered|turnOffered(kotlin.Boolean){}[0]
     open fun turnOpened() // com.letta.mobile.data.voice.vad.ear/EarObserver.turnOpened|turnOpened(){}[0]
 
     final object Companion { // com.letta.mobile.data.voice.vad.ear/EarObserver.Companion|null[0]
@@ -26101,6 +26104,19 @@ sealed interface com.letta.mobile.data.voice.engine/VoiceEarEvent { // com.letta
         final fun toString(): kotlin/String // com.letta.mobile.data.voice.engine/VoiceEarEvent.PartialTranscript.toString|toString(){}[0]
     }
 
+    final class TentativeEndOfTurn : com.letta.mobile.data.voice.engine/VoiceEarEvent { // com.letta.mobile.data.voice.engine/VoiceEarEvent.TentativeEndOfTurn|null[0]
+        constructor <init>(com.letta.mobile.data.voice/VoiceUtterance) // com.letta.mobile.data.voice.engine/VoiceEarEvent.TentativeEndOfTurn.<init>|<init>(com.letta.mobile.data.voice.VoiceUtterance){}[0]
+
+        final val utterance // com.letta.mobile.data.voice.engine/VoiceEarEvent.TentativeEndOfTurn.utterance|{}utterance[0]
+            final fun <get-utterance>(): com.letta.mobile.data.voice/VoiceUtterance // com.letta.mobile.data.voice.engine/VoiceEarEvent.TentativeEndOfTurn.utterance.<get-utterance>|<get-utterance>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.voice/VoiceUtterance // com.letta.mobile.data.voice.engine/VoiceEarEvent.TentativeEndOfTurn.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.voice/VoiceUtterance = ...): com.letta.mobile.data.voice.engine/VoiceEarEvent.TentativeEndOfTurn // com.letta.mobile.data.voice.engine/VoiceEarEvent.TentativeEndOfTurn.copy|copy(com.letta.mobile.data.voice.VoiceUtterance){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.engine/VoiceEarEvent.TentativeEndOfTurn.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.engine/VoiceEarEvent.TentativeEndOfTurn.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.voice.engine/VoiceEarEvent.TentativeEndOfTurn.toString|toString(){}[0]
+    }
+
     final object ListeningStarted : com.letta.mobile.data.voice.engine/VoiceEarEvent { // com.letta.mobile.data.voice.engine/VoiceEarEvent.ListeningStarted|null[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.engine/VoiceEarEvent.ListeningStarted.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.engine/VoiceEarEvent.ListeningStarted.hashCode|hashCode(){}[0]
@@ -26117,6 +26133,12 @@ sealed interface com.letta.mobile.data.voice.engine/VoiceEarEvent { // com.letta
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.engine/VoiceEarEvent.SpeechStarted.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.engine/VoiceEarEvent.SpeechStarted.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.voice.engine/VoiceEarEvent.SpeechStarted.toString|toString(){}[0]
+    }
+
+    final object TentativeWithdrawn : com.letta.mobile.data.voice.engine/VoiceEarEvent { // com.letta.mobile.data.voice.engine/VoiceEarEvent.TentativeWithdrawn|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.engine/VoiceEarEvent.TentativeWithdrawn.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.engine/VoiceEarEvent.TentativeWithdrawn.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.voice.engine/VoiceEarEvent.TentativeWithdrawn.toString|toString(){}[0]
     }
 }
 
@@ -72217,6 +72239,7 @@ final class com.letta.mobile.data.voice.session/VoiceSetupStore { // com.letta.m
     final fun keyAfter(com.letta.mobile.data.voice.session/VoiceSetupDraft): kotlin/String? // com.letta.mobile.data.voice.session/VoiceSetupStore.keyAfter|keyAfter(com.letta.mobile.data.voice.session.VoiceSetupDraft){}[0]
     final fun save(com.letta.mobile.data.voice.session/VoiceSetupDraft): com.letta.mobile.data.voice/VoiceErrorCode? // com.letta.mobile.data.voice.session/VoiceSetupStore.save|save(com.letta.mobile.data.voice.session.VoiceSetupDraft){}[0]
     final fun setDeviceOnly(kotlin/Boolean) // com.letta.mobile.data.voice.session/VoiceSetupStore.setDeviceOnly|setDeviceOnly(kotlin.Boolean){}[0]
+    final fun setEarlyTurnPause(kotlin.time/Duration?) // com.letta.mobile.data.voice.session/VoiceSetupStore.setEarlyTurnPause|setEarlyTurnPause(kotlin.time.Duration?){}[0]
     final fun setEndOfTurnSilence(kotlin.time/Duration) // com.letta.mobile.data.voice.session/VoiceSetupStore.setEndOfTurnSilence|setEndOfTurnSilence(kotlin.time.Duration){}[0]
     final fun setInterruptBySpeaking(kotlin/Boolean) // com.letta.mobile.data.voice.session/VoiceSetupStore.setInterruptBySpeaking|setInterruptBySpeaking(kotlin.Boolean){}[0]
     final fun setListening(com.letta.mobile.data.voice.session/VoiceListening) // com.letta.mobile.data.voice.session/VoiceSetupStore.setListening|setListening(com.letta.mobile.data.voice.session.VoiceListening){}[0]
@@ -72231,6 +72254,8 @@ final class com.letta.mobile.data.voice.session/VoiceSetupStore { // com.letta.m
             final fun <get-KEY_BASE_URL>(): kotlin/String // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_BASE_URL.<get-KEY_BASE_URL>|<get-KEY_BASE_URL>(){}[0]
         final const val KEY_DEVICE_ONLY // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_DEVICE_ONLY|{}KEY_DEVICE_ONLY[0]
             final fun <get-KEY_DEVICE_ONLY>(): kotlin/String // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_DEVICE_ONLY.<get-KEY_DEVICE_ONLY>|<get-KEY_DEVICE_ONLY>(){}[0]
+        final const val KEY_EARLY_TURN_PAUSE_MS // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_EARLY_TURN_PAUSE_MS|{}KEY_EARLY_TURN_PAUSE_MS[0]
+            final fun <get-KEY_EARLY_TURN_PAUSE_MS>(): kotlin/String // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_EARLY_TURN_PAUSE_MS.<get-KEY_EARLY_TURN_PAUSE_MS>|<get-KEY_EARLY_TURN_PAUSE_MS>(){}[0]
         final const val KEY_END_OF_TURN_SILENCE_MS // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_END_OF_TURN_SILENCE_MS|{}KEY_END_OF_TURN_SILENCE_MS[0]
             final fun <get-KEY_END_OF_TURN_SILENCE_MS>(): kotlin/String // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_END_OF_TURN_SILENCE_MS.<get-KEY_END_OF_TURN_SILENCE_MS>|<get-KEY_END_OF_TURN_SILENCE_MS>(){}[0]
         final const val KEY_GRANTS // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_GRANTS|{}KEY_GRANTS[0]
@@ -72249,8 +72274,10 @@ final class com.letta.mobile.data.voice.session/VoiceSetupStore { // com.letta.m
 }
 
 final class com.letta.mobile.data.voice.session/VoiceTuning { // com.letta.mobile.data.voice.session/VoiceTuning|null[0]
-    constructor <init>(com.letta.mobile.data.voice.endpoint/SpeechSpeed = ..., kotlin.time/Duration = ..., kotlin/Boolean? = ...) // com.letta.mobile.data.voice.session/VoiceTuning.<init>|<init>(com.letta.mobile.data.voice.endpoint.SpeechSpeed;kotlin.time.Duration;kotlin.Boolean?){}[0]
+    constructor <init>(com.letta.mobile.data.voice.endpoint/SpeechSpeed = ..., kotlin.time/Duration = ..., kotlin/Boolean? = ..., kotlin.time/Duration? = ...) // com.letta.mobile.data.voice.session/VoiceTuning.<init>|<init>(com.letta.mobile.data.voice.endpoint.SpeechSpeed;kotlin.time.Duration;kotlin.Boolean?;kotlin.time.Duration?){}[0]
 
+    final val earlyTurnPause // com.letta.mobile.data.voice.session/VoiceTuning.earlyTurnPause|{}earlyTurnPause[0]
+        final fun <get-earlyTurnPause>(): kotlin.time/Duration? // com.letta.mobile.data.voice.session/VoiceTuning.earlyTurnPause.<get-earlyTurnPause>|<get-earlyTurnPause>(){}[0]
     final val endOfTurnSilence // com.letta.mobile.data.voice.session/VoiceTuning.endOfTurnSilence|{}endOfTurnSilence[0]
         final fun <get-endOfTurnSilence>(): kotlin.time/Duration // com.letta.mobile.data.voice.session/VoiceTuning.endOfTurnSilence.<get-endOfTurnSilence>|<get-endOfTurnSilence>(){}[0]
     final val livePartials // com.letta.mobile.data.voice.session/VoiceTuning.livePartials|{}livePartials[0]
@@ -72261,7 +72288,8 @@ final class com.letta.mobile.data.voice.session/VoiceTuning { // com.letta.mobil
     final fun component1(): com.letta.mobile.data.voice.endpoint/SpeechSpeed // com.letta.mobile.data.voice.session/VoiceTuning.component1|component1(){}[0]
     final fun component2(): kotlin.time/Duration // com.letta.mobile.data.voice.session/VoiceTuning.component2|component2(){}[0]
     final fun component3(): kotlin/Boolean? // com.letta.mobile.data.voice.session/VoiceTuning.component3|component3(){}[0]
-    final fun copy(com.letta.mobile.data.voice.endpoint/SpeechSpeed = ..., kotlin.time/Duration = ..., kotlin/Boolean? = ...): com.letta.mobile.data.voice.session/VoiceTuning // com.letta.mobile.data.voice.session/VoiceTuning.copy|copy(com.letta.mobile.data.voice.endpoint.SpeechSpeed;kotlin.time.Duration;kotlin.Boolean?){}[0]
+    final fun component4(): kotlin.time/Duration? // com.letta.mobile.data.voice.session/VoiceTuning.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.voice.endpoint/SpeechSpeed = ..., kotlin.time/Duration = ..., kotlin/Boolean? = ..., kotlin.time/Duration? = ...): com.letta.mobile.data.voice.session/VoiceTuning // com.letta.mobile.data.voice.session/VoiceTuning.copy|copy(com.letta.mobile.data.voice.endpoint.SpeechSpeed;kotlin.time.Duration;kotlin.Boolean?;kotlin.time.Duration?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.session/VoiceTuning.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.session/VoiceTuning.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.session/VoiceTuning.toString|toString(){}[0]
@@ -72306,8 +72334,31 @@ final class com.letta.mobile.data.voice.vad.ear/EarTurnReport { // com.letta.mob
     }
 }
 
+final class com.letta.mobile.data.voice.vad.ear/EarlyTurns { // com.letta.mobile.data.voice.vad.ear/EarlyTurns|null[0]
+    constructor <init>(kotlin.time/Duration? = ..., kotlin/Boolean = ...) // com.letta.mobile.data.voice.vad.ear/EarlyTurns.<init>|<init>(kotlin.time.Duration?;kotlin.Boolean){}[0]
+
+    final val pause // com.letta.mobile.data.voice.vad.ear/EarlyTurns.pause|{}pause[0]
+        final fun <get-pause>(): kotlin.time/Duration? // com.letta.mobile.data.voice.vad.ear/EarlyTurns.pause.<get-pause>|<get-pause>(){}[0]
+    final val reusePartials // com.letta.mobile.data.voice.vad.ear/EarlyTurns.reusePartials|{}reusePartials[0]
+        final fun <get-reusePartials>(): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/EarlyTurns.reusePartials.<get-reusePartials>|<get-reusePartials>(){}[0]
+
+    final fun component1(): kotlin.time/Duration? // com.letta.mobile.data.voice.vad.ear/EarlyTurns.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/EarlyTurns.component2|component2(){}[0]
+    final fun copy(kotlin.time/Duration? = ..., kotlin/Boolean = ...): com.letta.mobile.data.voice.vad.ear/EarlyTurns // com.letta.mobile.data.voice.vad.ear/EarlyTurns.copy|copy(kotlin.time.Duration?;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/EarlyTurns.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.vad.ear/EarlyTurns.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.vad.ear/EarlyTurns.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.voice.vad.ear/EarlyTurns.Companion|null[0]
+        final val DEFAULT_PAUSE // com.letta.mobile.data.voice.vad.ear/EarlyTurns.Companion.DEFAULT_PAUSE|{}DEFAULT_PAUSE[0]
+            final fun <get-DEFAULT_PAUSE>(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/EarlyTurns.Companion.DEFAULT_PAUSE.<get-DEFAULT_PAUSE>|<get-DEFAULT_PAUSE>(){}[0]
+        final val MIN_PAUSE // com.letta.mobile.data.voice.vad.ear/EarlyTurns.Companion.MIN_PAUSE|{}MIN_PAUSE[0]
+            final fun <get-MIN_PAUSE>(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/EarlyTurns.Companion.MIN_PAUSE.<get-MIN_PAUSE>|<get-MIN_PAUSE>(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.voice.vad.ear/LivePartials { // com.letta.mobile.data.voice.vad.ear/LivePartials|null[0]
-    constructor <init>(kotlin/Boolean = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ...) // com.letta.mobile.data.voice.vad.ear/LivePartials.<init>|<init>(kotlin.Boolean;kotlin.time.Duration;kotlin.time.Duration;kotlin.time.Duration){}[0]
+    constructor <init>(kotlin/Boolean = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin.time/Duration? = ...) // com.letta.mobile.data.voice.vad.ear/LivePartials.<init>|<init>(kotlin.Boolean;kotlin.time.Duration;kotlin.time.Duration;kotlin.time.Duration;kotlin.time.Duration?){}[0]
 
     final val enabled // com.letta.mobile.data.voice.vad.ear/LivePartials.enabled|{}enabled[0]
         final fun <get-enabled>(): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/LivePartials.enabled.<get-enabled>|<get-enabled>(){}[0]
@@ -72315,6 +72366,8 @@ final class com.letta.mobile.data.voice.vad.ear/LivePartials { // com.letta.mobi
         final fun <get-interval>(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/LivePartials.interval.<get-interval>|<get-interval>(){}[0]
     final val quietCutoff // com.letta.mobile.data.voice.vad.ear/LivePartials.quietCutoff|{}quietCutoff[0]
         final fun <get-quietCutoff>(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/LivePartials.quietCutoff.<get-quietCutoff>|<get-quietCutoff>(){}[0]
+    final val settle // com.letta.mobile.data.voice.vad.ear/LivePartials.settle|{}settle[0]
+        final fun <get-settle>(): kotlin.time/Duration? // com.letta.mobile.data.voice.vad.ear/LivePartials.settle.<get-settle>|<get-settle>(){}[0]
     final val window // com.letta.mobile.data.voice.vad.ear/LivePartials.window|{}window[0]
         final fun <get-window>(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/LivePartials.window.<get-window>|<get-window>(){}[0]
 
@@ -72322,10 +72375,16 @@ final class com.letta.mobile.data.voice.vad.ear/LivePartials { // com.letta.mobi
     final fun component2(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/LivePartials.component2|component2(){}[0]
     final fun component3(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/LivePartials.component3|component3(){}[0]
     final fun component4(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/LivePartials.component4|component4(){}[0]
-    final fun copy(kotlin/Boolean = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ...): com.letta.mobile.data.voice.vad.ear/LivePartials // com.letta.mobile.data.voice.vad.ear/LivePartials.copy|copy(kotlin.Boolean;kotlin.time.Duration;kotlin.time.Duration;kotlin.time.Duration){}[0]
+    final fun component5(): kotlin.time/Duration? // com.letta.mobile.data.voice.vad.ear/LivePartials.component5|component5(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin.time/Duration? = ...): com.letta.mobile.data.voice.vad.ear/LivePartials // com.letta.mobile.data.voice.vad.ear/LivePartials.copy|copy(kotlin.Boolean;kotlin.time.Duration;kotlin.time.Duration;kotlin.time.Duration;kotlin.time.Duration?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/LivePartials.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.vad.ear/LivePartials.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.vad.ear/LivePartials.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.voice.vad.ear/LivePartials.Companion|null[0]
+        final val DEFAULT_SETTLE // com.letta.mobile.data.voice.vad.ear/LivePartials.Companion.DEFAULT_SETTLE|{}DEFAULT_SETTLE[0]
+            final fun <get-DEFAULT_SETTLE>(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/LivePartials.Companion.DEFAULT_SETTLE.<get-DEFAULT_SETTLE>|<get-DEFAULT_SETTLE>(){}[0]
+    }
 }
 
 final class com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds { // com.letta.mobile.data.voice.vad.ear/NotSpeechThresholds|null[0]
@@ -72388,10 +72447,12 @@ final class com.letta.mobile.data.voice.vad.ear/TranscriptPolicy { // com.letta.
 }
 
 final class com.letta.mobile.data.voice.vad.ear/VadEarConfig { // com.letta.mobile.data.voice.vad.ear/VadEarConfig|null[0]
-    constructor <init>(com.letta.mobile.data.voice.audio/AudioFrameFormat = ..., com.letta.mobile.data.voice.vad/EndOfTurnPolicy = ..., com.letta.mobile.data.voice.vad/VadSensitivity = ..., com.letta.mobile.data.voice.vad/SpeechDetectorFactory? = ..., com.letta.mobile.data.voice.vad.ear/TranscriptPolicy = ..., com.letta.mobile.data.voice.vad.ear/EarObserver = ..., kotlin/Boolean = ..., kotlin.time/Duration = ..., com.letta.mobile.data.voice.vad.ear/LivePartials = ...) // com.letta.mobile.data.voice.vad.ear/VadEarConfig.<init>|<init>(com.letta.mobile.data.voice.audio.AudioFrameFormat;com.letta.mobile.data.voice.vad.EndOfTurnPolicy;com.letta.mobile.data.voice.vad.VadSensitivity;com.letta.mobile.data.voice.vad.SpeechDetectorFactory?;com.letta.mobile.data.voice.vad.ear.TranscriptPolicy;com.letta.mobile.data.voice.vad.ear.EarObserver;kotlin.Boolean;kotlin.time.Duration;com.letta.mobile.data.voice.vad.ear.LivePartials){}[0]
+    constructor <init>(com.letta.mobile.data.voice.audio/AudioFrameFormat = ..., com.letta.mobile.data.voice.vad/EndOfTurnPolicy = ..., com.letta.mobile.data.voice.vad/VadSensitivity = ..., com.letta.mobile.data.voice.vad/SpeechDetectorFactory? = ..., com.letta.mobile.data.voice.vad.ear/TranscriptPolicy = ..., com.letta.mobile.data.voice.vad.ear/EarObserver = ..., kotlin/Boolean = ..., kotlin.time/Duration = ..., com.letta.mobile.data.voice.vad.ear/LivePartials = ..., com.letta.mobile.data.voice.vad.ear/EarlyTurns = ...) // com.letta.mobile.data.voice.vad.ear/VadEarConfig.<init>|<init>(com.letta.mobile.data.voice.audio.AudioFrameFormat;com.letta.mobile.data.voice.vad.EndOfTurnPolicy;com.letta.mobile.data.voice.vad.VadSensitivity;com.letta.mobile.data.voice.vad.SpeechDetectorFactory?;com.letta.mobile.data.voice.vad.ear.TranscriptPolicy;com.letta.mobile.data.voice.vad.ear.EarObserver;kotlin.Boolean;kotlin.time.Duration;com.letta.mobile.data.voice.vad.ear.LivePartials;com.letta.mobile.data.voice.vad.ear.EarlyTurns){}[0]
 
     final val detectors // com.letta.mobile.data.voice.vad.ear/VadEarConfig.detectors|{}detectors[0]
         final fun <get-detectors>(): com.letta.mobile.data.voice.vad/SpeechDetectorFactory? // com.letta.mobile.data.voice.vad.ear/VadEarConfig.detectors.<get-detectors>|<get-detectors>(){}[0]
+    final val early // com.letta.mobile.data.voice.vad.ear/VadEarConfig.early|{}early[0]
+        final fun <get-early>(): com.letta.mobile.data.voice.vad.ear/EarlyTurns // com.letta.mobile.data.voice.vad.ear/VadEarConfig.early.<get-early>|<get-early>(){}[0]
     final val format // com.letta.mobile.data.voice.vad.ear/VadEarConfig.format|{}format[0]
         final fun <get-format>(): com.letta.mobile.data.voice.audio/AudioFrameFormat // com.letta.mobile.data.voice.vad.ear/VadEarConfig.format.<get-format>|<get-format>(){}[0]
     final val halfDuplex // com.letta.mobile.data.voice.vad.ear/VadEarConfig.halfDuplex|{}halfDuplex[0]
@@ -72410,6 +72471,7 @@ final class com.letta.mobile.data.voice.vad.ear/VadEarConfig { // com.letta.mobi
         final fun <get-transcripts>(): com.letta.mobile.data.voice.vad.ear/TranscriptPolicy // com.letta.mobile.data.voice.vad.ear/VadEarConfig.transcripts.<get-transcripts>|<get-transcripts>(){}[0]
 
     final fun component1(): com.letta.mobile.data.voice.audio/AudioFrameFormat // com.letta.mobile.data.voice.vad.ear/VadEarConfig.component1|component1(){}[0]
+    final fun component10(): com.letta.mobile.data.voice.vad.ear/EarlyTurns // com.letta.mobile.data.voice.vad.ear/VadEarConfig.component10|component10(){}[0]
     final fun component2(): com.letta.mobile.data.voice.vad/EndOfTurnPolicy // com.letta.mobile.data.voice.vad.ear/VadEarConfig.component2|component2(){}[0]
     final fun component3(): com.letta.mobile.data.voice.vad/VadSensitivity // com.letta.mobile.data.voice.vad.ear/VadEarConfig.component3|component3(){}[0]
     final fun component4(): com.letta.mobile.data.voice.vad/SpeechDetectorFactory? // com.letta.mobile.data.voice.vad.ear/VadEarConfig.component4|component4(){}[0]
@@ -72418,7 +72480,7 @@ final class com.letta.mobile.data.voice.vad.ear/VadEarConfig { // com.letta.mobi
     final fun component7(): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/VadEarConfig.component7|component7(){}[0]
     final fun component8(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/VadEarConfig.component8|component8(){}[0]
     final fun component9(): com.letta.mobile.data.voice.vad.ear/LivePartials // com.letta.mobile.data.voice.vad.ear/VadEarConfig.component9|component9(){}[0]
-    final fun copy(com.letta.mobile.data.voice.audio/AudioFrameFormat = ..., com.letta.mobile.data.voice.vad/EndOfTurnPolicy = ..., com.letta.mobile.data.voice.vad/VadSensitivity = ..., com.letta.mobile.data.voice.vad/SpeechDetectorFactory? = ..., com.letta.mobile.data.voice.vad.ear/TranscriptPolicy = ..., com.letta.mobile.data.voice.vad.ear/EarObserver = ..., kotlin/Boolean = ..., kotlin.time/Duration = ..., com.letta.mobile.data.voice.vad.ear/LivePartials = ...): com.letta.mobile.data.voice.vad.ear/VadEarConfig // com.letta.mobile.data.voice.vad.ear/VadEarConfig.copy|copy(com.letta.mobile.data.voice.audio.AudioFrameFormat;com.letta.mobile.data.voice.vad.EndOfTurnPolicy;com.letta.mobile.data.voice.vad.VadSensitivity;com.letta.mobile.data.voice.vad.SpeechDetectorFactory?;com.letta.mobile.data.voice.vad.ear.TranscriptPolicy;com.letta.mobile.data.voice.vad.ear.EarObserver;kotlin.Boolean;kotlin.time.Duration;com.letta.mobile.data.voice.vad.ear.LivePartials){}[0]
+    final fun copy(com.letta.mobile.data.voice.audio/AudioFrameFormat = ..., com.letta.mobile.data.voice.vad/EndOfTurnPolicy = ..., com.letta.mobile.data.voice.vad/VadSensitivity = ..., com.letta.mobile.data.voice.vad/SpeechDetectorFactory? = ..., com.letta.mobile.data.voice.vad.ear/TranscriptPolicy = ..., com.letta.mobile.data.voice.vad.ear/EarObserver = ..., kotlin/Boolean = ..., kotlin.time/Duration = ..., com.letta.mobile.data.voice.vad.ear/LivePartials = ..., com.letta.mobile.data.voice.vad.ear/EarlyTurns = ...): com.letta.mobile.data.voice.vad.ear/VadEarConfig // com.letta.mobile.data.voice.vad.ear/VadEarConfig.copy|copy(com.letta.mobile.data.voice.audio.AudioFrameFormat;com.letta.mobile.data.voice.vad.EndOfTurnPolicy;com.letta.mobile.data.voice.vad.VadSensitivity;com.letta.mobile.data.voice.vad.SpeechDetectorFactory?;com.letta.mobile.data.voice.vad.ear.TranscriptPolicy;com.letta.mobile.data.voice.vad.ear.EarObserver;kotlin.Boolean;kotlin.time.Duration;com.letta.mobile.data.voice.vad.ear.LivePartials;com.letta.mobile.data.voice.vad.ear.EarlyTurns){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/VadEarConfig.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.vad.ear/VadEarConfig.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.vad.ear/VadEarConfig.toString|toString(){}[0]

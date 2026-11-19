@@ -51,6 +51,15 @@ data class LivePartials(
         require(!quietCutoff.isNegative()) { "Partial quiet cutoff must not be negative" }
         require(settle == null || !settle.isNegative()) { "Partial settle must not be negative" }
     }
+
+    /** Defaults. */
+    companion object {
+        /**
+         * The settle used when a covering partial is wanted (so its words can be offered as the
+         * turn's): well inside [quietCutoff]'s default, after a typical gap between words.
+         */
+        val DEFAULT_SETTLE: Duration = 160.milliseconds
+    }
 }
 
 /**
@@ -105,14 +114,19 @@ internal class PartialTranscripts(
         val due = nextTick ?: return
         val quiet = position - lastVoiced
         if (quiet >= quietCutoff) return
-        val settling = settle != null && quiet >= settle && issuedEnd < lastVoiced
-        if (position < due && !settling) return
+        if (position < due && !settles(quiet)) return
         nextTick = position + interval
         if (job?.isActive == true) return
         val samples = snapshot(window)
         issuedEnd = position
         val ticket = synchronized(lock) { Ticket(turn, ++issued, position, whole = samples.size < window) }
         job = out.launch { request(samples, ticket) }
+    }
+
+    /** Whether, [quiet] samples into a pause, one more partial should go now: none sent so far reaches the last voice. */
+    private fun settles(quiet: Long): Boolean {
+        val after = settle ?: return false
+        return quiet >= after && issuedEnd < lastVoiced
     }
 
     /**

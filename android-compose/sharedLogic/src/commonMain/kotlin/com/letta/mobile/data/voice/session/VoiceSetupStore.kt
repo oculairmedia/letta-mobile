@@ -181,7 +181,7 @@ class VoiceSetupStore(
     val keepsApiKey: Boolean get() = secrets != null
 
     /** The stored key, read only to build a request. */
-    fun apiKey(): SpeechApiKey? = storedKey()?.let(::SpeechApiKey)
+    fun apiKey(): SpeechApiKey? = storedKey?.let(::SpeechApiKey)
 
     /**
      * Validates and stores [draft]: the address, a grant for both payloads to its origin when consent
@@ -305,17 +305,17 @@ class VoiceSetupStore(
     /** The key a [draft] would leave stored: the typed one, none when blanked, else the stored one. */
     fun keyAfter(draft: VoiceSetupDraft): String? = when {
         secrets == null -> null
-        draft.apiKey == null -> storedKey()
+        draft.apiKey == null -> storedKey
         else -> draft.apiKey.trim().takeIf { it.isNotEmpty() }
     }
 
 
-    private fun storedKey(): String? = secrets?.getString(KEY_API_KEY)?.takeIf { it.isNotBlank() }
+    private val storedKey: String? get() = secrets?.getString(KEY_API_KEY)?.takeIf { it.isNotBlank() }
 
     private fun read(): VoiceSetup = VoiceSetup(
         endpoint = VoiceEndpointSettings(baseUrl = settings.getString(KEY_BASE_URL)?.takeIf { it.isNotBlank() }?.let(::SpeechEndpointUrl)),
         grants = VoiceEndpointGrants(parseGrants(settings.getString(KEY_GRANTS).orEmpty())),
-        hasApiKey = storedKey() != null,
+        hasApiKey = storedKey != null,
         interruptBySpeaking = settings.getString(KEY_INTERRUPT_BY_SPEAKING) == true.toString(),
         listening = VoiceListening.entries.firstOrNull { it.name == settings.getString(KEY_LISTENING) } ?: VoiceListening.AUTOMATIC,
         tuning = readTuning(settings),

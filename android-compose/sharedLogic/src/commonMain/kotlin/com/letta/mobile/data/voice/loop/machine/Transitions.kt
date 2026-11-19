@@ -99,8 +99,6 @@ internal object Transitions {
         return when {
             model.turn.userSpeaking -> Step(if (head == null) model.copy(phase = VoicePhase.LISTENING) else model)
             head == null -> afterTurn(model)
-            // An answer to words offered early waits, whatever it holds, until the turn confirms them.
-            head.key == model.turn.tentative -> Step(model.copy(phase = VoicePhase.THINKING))
             !head.open && head.held.isEmpty() -> resume(model.withTurn { without(head.key) })
             head.held.isNotEmpty() -> promote(model, head)
             else -> Step(model.copy(phase = VoicePhase.THINKING))
@@ -109,6 +107,8 @@ internal object Transitions {
 
     /** Speaks the text [head] held; a head that has ended leaves the queue (its speech plays on). */
     private fun promote(model: LoopModel, head: PendingReply): Step {
+        // An answer to words offered early waits, whatever it holds, until the turn confirms them.
+        if (head.key == model.turn.tentative) return Step(model.copy(phase = VoicePhase.THINKING))
         val emptied = model.withTurn { if (head.open) update(head.key) { copy(held = emptyList()) } else without(head.key) }
         return speakAll(emptied, head.held, owner = head.key)
     }

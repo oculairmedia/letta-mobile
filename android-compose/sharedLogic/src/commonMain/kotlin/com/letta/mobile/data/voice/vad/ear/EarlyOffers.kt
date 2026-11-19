@@ -56,6 +56,9 @@ data class EarlyTurns(
 
 /** What [EarlyOffers] reads about the confirmed turn being heard. */
 internal interface HeardTurn {
+    /** Whether a confirmed turn is open now. */
+    val confirmed: Boolean
+
     /** Where the person's voice last ended, as a sample position. */
     val lastVoice: Long
 
@@ -89,10 +92,11 @@ internal class EarlyOffers(
     private class Offer(val transcript: Deferred<Result<SpeechTranscript>>?, var offered: VoiceText? = null)
 
     /**
-     * A hop of the confirmed turn ended at [position]. Voice in it withdraws an offer; a pause long
-     * enough makes one; an early transcription that has finished is offered.
+     * A hop ended at [position]; nothing happens outside a confirmed turn. Voice in it withdraws an
+     * offer; a pause long enough makes one; an early transcription that has finished is offered.
      */
     suspend fun heard(position: Long) {
+        if (!turn.confirmed) return
         if (turn.lastVoice == position) return withdraw()
         val current = offer
         if (current == null) {
@@ -111,9 +115,9 @@ internal class EarlyOffers(
         val current = offer
         offer = null
         if (current != null) return current.transcript
-        if (early.reusePartials && covering != null && accepted(covering, report)) {
+        reusable(covering, report)?.let { words ->
             parts.config.observer.turnOffered(fromPartials = true)
-            out.send(VoiceEarEvent.TentativeEndOfTurn(VoiceUtterance(covering)))
+            out.send(VoiceEarEvent.TentativeEndOfTurn(VoiceUtterance(words)))
         }
         return null
     }
@@ -138,8 +142,12 @@ internal class EarlyOffers(
     private suspend fun start(report: EarTurnReport, samples: ShortArray, covering: VoiceText?) {
         val created = Offer(transcribe(samples))
         offer = created
-        if (early.reusePartials && covering != null && accepted(covering, report)) offerWords(created, covering, fromPartials = true)
+        reusable(covering, report)?.let { offerWords(created, it, fromPartials = true) }
     }
+
+    /** [covering] partial words, when early turns reuse them and the policy keeps them. */
+    private fun reusable(covering: VoiceText?, report: EarTurnReport): VoiceText? =
+        covering?.takeIf { early.reusePartials && accepted(it, report) }
 
     private suspend fun offerWords(offer: Offer, words: VoiceText, fromPartials: Boolean) {
         offer.offered = words

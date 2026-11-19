@@ -49,7 +49,6 @@ import com.letta.mobile.data.voice.session.telemetry.attr
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /** What one voice session's engines are built from. Its [toString] carries no address or key. */
@@ -287,7 +286,7 @@ class EndpointVoiceEngineFactory(
         val telemetry = request.telemetry
         val transcriber = TelemetryTranscriber(speech.transcriber, telemetry)
         val policy = EndOfTurnPolicy(trailingSilence = request.setup.tuning.endOfTurnSilence)
-        val partials = LivePartials(enabled = speech.livePartials, settle = PARTIAL_SETTLE)
+        val partials = LivePartials(enabled = speech.livePartials, settle = LivePartials.DEFAULT_SETTLE)
         val early = EarlyTurns(pause = request.setup.tuning.earlyTurnPause)
         val observer = VoiceEarTelemetry(telemetry)
         val earConfig = VadEarConfig(format, policy, observer = observer, halfDuplex = halfDuplex, partials = partials, early = early)
@@ -324,8 +323,5 @@ class EndpointVoiceEngineFactory(
         /** The host serves one synthesis per connection: the next request starts once the current one completes. */
         const val HOST_IN_FLIGHT = 1
         const val DIRECT_IN_FLIGHT = 2
-
-        /** Silence after which one more partial is asked for, so its words can cover the whole turn. */
-        val PARTIAL_SETTLE = 160.milliseconds
     }
 }

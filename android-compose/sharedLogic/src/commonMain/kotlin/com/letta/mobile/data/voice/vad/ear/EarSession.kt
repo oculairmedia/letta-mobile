@@ -207,8 +207,6 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
     private val offers = EarlyOffers(parts, out, HeardSoFar())
     private var started = false
     private var peakDb = SILENT_DB
-    private var voicedSoFar = 0L
-    private var lastVoiceEnd = 0L
 
     suspend fun run() {
         memory.drainCommits()
@@ -275,16 +273,13 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
         detector.setOutputActive(guarded)
         val probability = detector.probability(hop.samples)
         val signal = tracker.onHop(HopObservation(probability, hop.end, guarded))
-        if (tracker.voicedSamples != voicedSoFar) {
-            voicedSoFar = tracker.voicedSamples
-            lastVoiceEnd = hop.end.value
-        }
         if (signal == TurnSignal.Candidate) peakDb = SILENT_DB
         if (tracker.recording || signal is TurnSignal.Ended) peakDb = maxOf(peakDb, PcmLevels.dbfs(hop.samples))
         apply(signal, hop)
         // Acts only between a confirmed start and the end or drop of that turn.
         partials.heard(hop.end.value, tracker.voicedSamples, recorder::tail)
-        if (tracker.confirmed) offerEarly(hop)
+        // Within a confirmed turn: voice withdraws an early offer, a long enough pause makes one.
+        offers.heard(hop.end.value)
         recorder.remember(hop.samples)
     }
 
@@ -305,18 +300,17 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
         }
     }
 
-    /** Within a confirmed turn: voice withdraws an early offer, a long enough pause makes one. */
-    private suspend fun offerEarly(hop: Hop) = offers.heard(hop.end.value)
-
     /** The turn being heard, as the early offers read it. */
     private inner class HeardSoFar : HeardTurn {
-        override val lastVoice: Long get() = lastVoiceEnd
+        override val confirmed: Boolean get() = tracker.confirmed
+
+        override val lastVoice: Long get() = tracker.lastVoiceEnd
 
         override fun report(): EarTurnReport = turnReport(tracker, peakDb, detector, format.sampleRateHz)
 
         override fun audio(): ShortArray = recorder.tail(Long.MAX_VALUE)
 
-        override fun covering(): VoiceText? = partials.covering(lastVoiceEnd)
+        override fun covering(): VoiceText? = partials.covering(tracker.lastVoiceEnd)
     }
 
     private fun record(hop: Hop?) {
@@ -338,7 +332,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
      */
     private suspend fun endTurn(hop: Hop?, reason: TurnEndReason) {
         record(hop)
-        val covering = partials.covering(lastVoiceEnd)
+        val covering = partials.covering(tracker.lastVoiceEnd)
         partials.turnEnded()
         val report = turnReport(tracker, peakDb, detector, format.sampleRateHz)
         observer.turnClosed(report, reason)

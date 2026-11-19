@@ -5,6 +5,7 @@ import com.letta.mobile.data.voice.VoiceDecision
 import com.letta.mobile.data.voice.VoicePhase
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.VoiceUtterance
+import com.letta.mobile.data.voice.engine.VoiceEarEvent
 
 // Words the ear offers before it has decided the turn is over
 // (com.letta.mobile.data.voice.engine.VoiceEarEvent.TentativeEndOfTurn) are sent at once, so the
@@ -22,13 +23,23 @@ import com.letta.mobile.data.voice.VoiceUtterance
  * offer replaces the one before it.
  */
 internal fun tentativeOffered(model: LoopModel, utterance: VoiceUtterance): Step {
-    val plain = utterance.decision == VoiceDecision.Respond && utterance.immediateReply == null
-    val answering = model.phase == VoicePhase.LISTENING || model.phase == VoicePhase.THINKING
-    if (utterance.isEmpty || !plain || !answering || !model.config.bargeIn) return Step(model)
+    if (!offerable(model, utterance)) return Step(model)
     val replaced = withdrawTentative(model)
     val key = TurnKey(replaced.model.turn.nextKey)
     val marked = replaced.model.withTurn { copy(tentative = key, tentativeWords = utterance.text) }
     return Turns.start(marked, utterance).after(replaced.effects)
+}
+
+/** The ear's offers and withdrawals. */
+internal fun tentativeEvent(model: LoopModel, event: VoiceEarEvent): Step = when (event) {
+    is VoiceEarEvent.TentativeEndOfTurn -> tentativeOffered(model, event.utterance)
+    else -> withdrawTentative(model)
+}
+
+private fun offerable(model: LoopModel, utterance: VoiceUtterance): Boolean = when {
+    utterance.isEmpty || !model.config.bargeIn -> false
+    utterance.decision != VoiceDecision.Respond || utterance.immediateReply != null -> false
+    else -> model.phase == VoicePhase.LISTENING || model.phase == VoicePhase.THINKING
 }
 
 /**
