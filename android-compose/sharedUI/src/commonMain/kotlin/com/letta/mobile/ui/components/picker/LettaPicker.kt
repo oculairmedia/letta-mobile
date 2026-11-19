@@ -232,7 +232,11 @@ private fun <T> PickerList(model: PickerListModel<T>, callbacks: PickerCallbacks
         modifier = modifier.fillMaxWidth().testTag(spec.tags.list),
     ) {
         if (model.layout.isEmpty) emptyLine(spec)
-        items(model.layout.lines, key = { it.key }) { line ->
+        items(
+            items = model.layout.lines,
+            key = { it.key },
+            contentType = { it::class },
+        ) { line ->
             when (line) {
                 is PickerLine.Header -> PickerSectionHeader(line.section, spec.tags, callbacks.onToggleSection, slots.sectionLeading)
                 is PickerLine.Row -> PickerRow(line, model, callbacks, slots)
