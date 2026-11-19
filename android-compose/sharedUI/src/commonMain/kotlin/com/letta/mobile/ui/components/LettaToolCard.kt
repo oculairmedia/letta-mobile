@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -39,6 +40,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -195,7 +197,10 @@ private fun LineStyle(
             parts.trailing?.invoke(this)
         }
         if (body != null) {
-            ToolCardAnimated(parts.expansion?.expanded == true) { LineBody(rail.insets().calculateLeftPadding(LayoutDirection.Ltr), body) }
+            val layoutDirection = LocalLayoutDirection.current
+            ToolCardAnimated(parts.expansion?.expanded == true) {
+                LineBody(rail.insets().calculateStartPadding(layoutDirection), body)
+            }
         }
     }
 }
@@ -218,8 +223,9 @@ private fun LineBody(railStart: Dp, body: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = indent
             .drawBehind {
-                val x = LettaDimens.Stroke.hairline.toPx() / 2
-                drawLine(rule, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = LettaDimens.Stroke.hairline.toPx())
+                val stroke = LettaDimens.Stroke.hairline.toPx()
+                val x = if (layoutDirection == LayoutDirection.Rtl) size.width - stroke / 2 else stroke / 2
+                drawLine(rule, start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = stroke)
             }
             .padding(start = LettaDimens.Space.md, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs)
             .testTag(LETTA_TOOL_CARD_BODY_TAG),

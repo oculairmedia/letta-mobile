@@ -100,7 +100,11 @@ private fun <T> LazyListScope.rosterLines(
     roster: RosterScope<T>,
     row: RosterRowContent<T>,
 ) {
-    items(roster.layouts.shown.lines, key = { it.key }) { line -> RosterLineContent(line, roster, row) }
+    items(
+        items = roster.layouts.shown.lines,
+        key = { it.key },
+        contentType = { it::class },
+    ) { line -> RosterLineContent(line, roster, row) }
 }
 
 @Composable

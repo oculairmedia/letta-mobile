@@ -73,6 +73,8 @@ import com.letta.mobile.data.lanes.ConversationLane
 import com.letta.mobile.data.lanes.ConversationPurpose
 import com.letta.mobile.data.lanes.LaneActivity
 import com.letta.mobile.ui.components.LocalConversationLanes
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 /** What a conversation row can do besides open (the roster's selection opens it); a null rename or pin is one the host does not offer. */
 data class ShellConversationRowActions(
@@ -135,7 +137,9 @@ fun ShellConversationRow(
     ui: ShellConversationListUi,
 ) {
     val lanes = LocalConversationLanes.current
-    val laneState = lanes?.activity?.collectAsState()?.value?.get(model.id)
+    val laneState = remember(lanes, model.id) {
+        lanes?.activity?.map { it[model.id] }?.distinctUntilChanged()
+    }?.collectAsState(lanes?.activity?.value?.get(model.id))?.value
     val laneActivity = laneActivityLabel(model, laneState, lanes?.available == true)
     val laneLabel = laneDescription(model.lane)
     val subtitle = listOf(laneLabel, model.subtitle).filter(String::isNotBlank).joinToString(" · ")
