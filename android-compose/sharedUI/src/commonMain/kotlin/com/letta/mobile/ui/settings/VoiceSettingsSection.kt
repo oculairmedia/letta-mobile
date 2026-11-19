@@ -15,9 +15,11 @@ import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.data.voice.VoiceErrorCode
+import com.letta.mobile.data.voice.catalog.SpeechCatalogSource
 import com.letta.mobile.data.voice.host.client.HostVoiceState
 import com.letta.mobile.data.voice.session.VoiceEndpointRules
 import com.letta.mobile.data.voice.session.VoiceListening
+import com.letta.mobile.data.voice.session.VoiceSetup
 import com.letta.mobile.data.voice.session.VoiceSetupDraft
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.voice_settings_consent
@@ -63,14 +65,28 @@ private fun outcomeOf(code: VoiceErrorCode?, success: StringResource): VoiceOutc
 
 /** What the Voice section is editing: kept in memory only (a typed key never enters saved UI state). */
 @Stable
-private class VoiceForm(private val access: VoiceSetupAccess, url: String, consent: Boolean, private val scope: CoroutineScope) {
+private class VoiceForm(
+    private val access: VoiceSetupAccess,
+    url: String,
+    consent: Boolean,
+    val names: VoiceNamesDraft,
+    private val scope: CoroutineScope,
+) {
     var url: String by mutableStateOf(url)
     var key: String by mutableStateOf("")
     var consent: Boolean by mutableStateOf(consent)
     var outcome: VoiceOutcome? by mutableStateOf(null)
     var testing: Boolean by mutableStateOf(false)
 
-    val draft: VoiceSetupDraft get() = VoiceSetupDraft(url, key.takeIf { it.isNotEmpty() }, consent)
+    val draft: VoiceSetupDraft
+        get() = VoiceSetupDraft(
+            url,
+            key.takeIf { it.isNotEmpty() },
+            consent,
+            names[VoiceNameKind.TRANSCRIPTION],
+            names[VoiceNameKind.SPEECH],
+            names[VoiceNameKind.VOICE],
+        )
 
     /** The address problem under the endpoint client's rules, counting the key that would be kept. */
     val problem: VoiceErrorCode? get() = VoiceEndpointRules.problem(url, withKey = access.store.keyAfter(draft) != null)
@@ -125,7 +141,11 @@ fun VoiceSettingsSection(access: VoiceSetupAccess, modifier: Modifier = Modifier
     // Reads the shared setup and learns whether this device may change it (a check that sends no audio or text).
     LaunchedEffect(shared) { shared?.learnAdmin() }
     val scope = rememberCoroutineScope()
-    val form = remember(access) { VoiceForm(access, stored.endpoint.baseUrl?.value.orEmpty(), stored.consented, scope) }
+    val form = remember(access) {
+        val endpoint = stored.endpoint
+        val names = VoiceNamesDraft(endpoint.transcriptionModel.value, endpoint.speechModel.value, endpoint.voice.value)
+        VoiceForm(access, endpoint.baseUrl?.value.orEmpty(), stored.consented, names, scope)
+    }
     val keySaved = stored.hasApiKey && access.store.keepsApiKey
     val header = SettingsHeader(
         VoiceSettingsKeys.SECTION,
@@ -139,6 +159,7 @@ fun VoiceSettingsSection(access: VoiceSetupAccess, modifier: Modifier = Modifier
             VoiceSettingsMode.HOST_SETUP -> shared?.let { HostVoiceSetupRows(it, onSaved) }
             VoiceSettingsMode.LOCAL -> {
                 VoiceAddressRows(form, keepsKey = access.store.keepsApiKey, keySaved = keySaved)
+                VoiceLocalNameRows(access, form, stored)
                 VoiceConsentRow(form)
             }
         }
@@ -171,6 +192,19 @@ private fun SettingsScope.VoiceAddressRows(form: VoiceForm, keepsKey: Boolean, k
         secret = true,
     )
     TextFieldRow(keyRow, form.key) { form.edit { key = it } }
+}
+
+/**
+ * This device's own server's models and voice, listed by asking the saved server directly with its
+ * own key (the typed address is listed once saved); edits are saved with Save.
+ */
+@Composable
+private fun SettingsScope.VoiceLocalNameRows(access: VoiceSetupAccess, form: VoiceForm, stored: VoiceSetup) {
+    val url = stored.endpoint.baseUrl?.value
+    val fetch = access.catalog
+    val source = if (url != null && fetch != null) SpeechCatalogSource { fetch(VoiceSetupDraft(url)) } else null
+    val catalog = rememberVoiceCatalog(url to stored.hasApiKey, source)
+    VoiceNameRows(form.names, catalog, host = false) { form.outcome = null }
 }
 
 @Composable

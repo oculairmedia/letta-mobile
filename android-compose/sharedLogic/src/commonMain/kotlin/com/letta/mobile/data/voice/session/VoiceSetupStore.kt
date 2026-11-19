@@ -2,6 +2,8 @@ package com.letta.mobile.data.voice.session
 
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.voice.SpeechEndpointUrl
+import com.letta.mobile.data.voice.SpeechModelName
+import com.letta.mobile.data.voice.SpeechVoiceName
 import com.letta.mobile.data.voice.VoiceEndpointSettings
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.consent.EndpointOrigin
@@ -127,7 +129,8 @@ data class VoiceSetup(
 
 /**
  * What the person is editing in the Voice settings. [apiKey] null keeps the stored key, blank
- * removes it. Its [toString] never prints the key.
+ * removes it; a null model or voice keeps the stored name, a blank one returns to the default. Its
+ * [toString] never prints the key.
  */
 class VoiceSetupDraft(
     /** The base URL as typed. */
@@ -136,6 +139,12 @@ class VoiceSetupDraft(
     val apiKey: String? = null,
     /** Whether the consent toggle is on. */
     val consent: Boolean = false,
+    /** The transcription model as chosen: null keeps the stored one, blank returns to the default. */
+    val transcriptionModel: String? = null,
+    /** The speech model as chosen: null keeps the stored one, blank returns to the default. */
+    val speechModel: String? = null,
+    /** The voice as chosen: null keeps the stored one, blank returns to the default. */
+    val voice: String? = null,
 ) {
     override fun toString(): String = "VoiceSetupDraft(keyTyped=${apiKey != null}, consent=$consent)"
 }
@@ -190,6 +199,9 @@ class VoiceSetupStore(
         val grants = consented?.let { granted -> VoiceEndpointPayload.entries.map { VoiceEndpointGrant(granted, it) } }.orEmpty()
         settings.putString(KEY_GRANTS, grants.joinToString(GRANT_SEPARATOR) { "${it.payload.name}$FIELD_SEPARATOR${it.origin.value}" })
         secrets.writeApiKey(draft.apiKey)
+        settings.writeName(KEY_TRANSCRIPTION_MODEL, draft.transcriptionModel)
+        settings.writeName(KEY_SPEECH_MODEL, draft.speechModel)
+        settings.writeName(KEY_VOICE, draft.voice)
         state.value = read()
         return null
     }
@@ -261,13 +273,12 @@ class VoiceSetupStore(
     }
 
     /**
-     * Removes this device's own speech server: its address, grants and key; with [keyOnly], only the
-     * key (it moved to the host) and the address and grants stay. Tuning and choices stay.
+     * Removes this device's own speech server: its address, grants, model and voice names and key;
+     * with [keyOnly], only the key (it moved to the host) and the rest stays. Tuning and choices stay.
      */
     fun clearEndpoint(keyOnly: Boolean = false) {
         if (!keyOnly) {
-            settings.remove(KEY_BASE_URL)
-            settings.remove(KEY_GRANTS)
+            listOf(KEY_BASE_URL, KEY_GRANTS, KEY_TRANSCRIPTION_MODEL, KEY_SPEECH_MODEL, KEY_VOICE).forEach(settings::remove)
         }
         secrets?.remove(KEY_API_KEY)
         state.value = read()
@@ -291,7 +302,7 @@ class VoiceSetupStore(
     private fun storedKey(): String? = secrets?.getString(KEY_API_KEY)?.takeIf { it.isNotBlank() }
 
     private fun read(): VoiceSetup = VoiceSetup(
-        endpoint = VoiceEndpointSettings(baseUrl = settings.getString(KEY_BASE_URL)?.takeIf { it.isNotBlank() }?.let(::SpeechEndpointUrl)),
+        endpoint = readEndpoint(settings),
         grants = VoiceEndpointGrants(parseGrants(settings.getString(KEY_GRANTS).orEmpty())),
         hasApiKey = storedKey() != null,
         interruptBySpeaking = settings.getString(KEY_INTERRUPT_BY_SPEAKING) == true.toString(),
@@ -333,6 +344,15 @@ class VoiceSetupStore(
         /** The shared server origin this device acknowledged sending its audio to; kept apart like the grants. */
         const val KEY_HOST_AUDIO_ACK: String = "voice.host.audioAck"
 
+        /** The transcription model on this device's own server; absent uses the default. */
+        const val KEY_TRANSCRIPTION_MODEL: String = "voice.endpoint.transcriptionModel"
+
+        /** The speech model on this device's own server; absent uses the default. */
+        const val KEY_SPEECH_MODEL: String = "voice.endpoint.speechModel"
+
+        /** The voice on this device's own server; absent uses the default. */
+        const val KEY_VOICE: String = "voice.endpoint.voice"
+
     }
 }
 
@@ -344,6 +364,24 @@ private fun SecureSettingsStore?.writeApiKey(typed: String?) {
     val store = this ?: return
     val key = typed?.trim() ?: return
     if (key.isEmpty()) store.remove(VoiceSetupStore.KEY_API_KEY) else store.putString(VoiceSetupStore.KEY_API_KEY, key)
+}
+
+/** Stores [chosen] under [key] (blank removes it, null keeps it). */
+private fun SecureSettingsStore.writeName(key: String, chosen: String?) {
+    val name = chosen?.trim() ?: return
+    if (name.isEmpty()) remove(key) else putString(key, name)
+}
+
+/** The stored address and names in [settings]; an absent name is the default. */
+private fun readEndpoint(settings: SecureSettingsStore): VoiceEndpointSettings {
+    val defaults = VoiceEndpointSettings()
+    fun name(key: String): String? = settings.getString(key)?.trim()?.takeIf { it.isNotEmpty() }
+    return VoiceEndpointSettings(
+        baseUrl = settings.getString(VoiceSetupStore.KEY_BASE_URL)?.takeIf { it.isNotBlank() }?.let(::SpeechEndpointUrl),
+        transcriptionModel = name(VoiceSetupStore.KEY_TRANSCRIPTION_MODEL)?.let(::SpeechModelName) ?: defaults.transcriptionModel,
+        speechModel = name(VoiceSetupStore.KEY_SPEECH_MODEL)?.let(::SpeechModelName) ?: defaults.speechModel,
+        voice = name(VoiceSetupStore.KEY_VOICE)?.let(::SpeechVoiceName) ?: defaults.voice,
+    )
 }
 
 /** The stored speed, end-of-turn silence and live-partials choice in [settings]. */
