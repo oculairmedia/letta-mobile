@@ -92,6 +92,12 @@ object PairingStrings {
     const val INVITE_ALL_AGENTS = "All agents"
     const val INVITE_CHOOSE_AGENTS = "Choose agents"
     const val INVITE_CHOOSE_AT_LEAST_ONE = "Choose at least one agent."
+    const val INVITE_SEARCH_AGENTS = "Search agents"
+
+    fun removeAgent(name: String) = "Remove $name"
+
+    fun noAgentMatch(query: String) = "No agents match \"$query\""
+
     const val INVITE_SETTINGS_TOGGLE = "Allow settings changes"
     const val INVITE_SETTINGS_BODY = "Lets the device change memory, tools, skills and schedules. Off: chat only."
     const val INVITE_SHOW_CODE = "Show pairing code"
@@ -238,12 +244,18 @@ object PairingTags {
     const val INVITE_ALL_AGENTS = "pairing_invite_all_agents"
     const val INVITE_CHOOSE_AGENTS = "pairing_invite_choose_agents"
     const val INVITE_SETTINGS = "pairing_invite_settings"
+    const val INVITE_AGENT_SEARCH = "pairing_invite_agent_search"
+    const val INVITE_AGENT_LIST = "pairing_invite_agent_list"
+    const val INVITE_AGENT_NO_MATCH = "pairing_invite_agent_no_match"
+    const val INVITE_CHOSEN_AGENTS = "pairing_invite_chosen_agents"
     const val THIS_DEVICE = "pairing_this_device"
     const val REVOKE_ALL_OTHERS = "pairing_revoke_all_others"
     const val REVOKE_ALL_CONFIRM = "pairing_revoke_all_confirm"
     const val AGENT_SCOPE_NOTE = "pairing_agent_scope_note"
 
     fun agentOption(id: String) = "pairing_agent_$id"
+
+    fun chosenAgent(id: String) = "pairing_chosen_agent_$id"
 
     fun revokeDevice(nodeId: String) = "pairing_revoke_$nodeId"
 
