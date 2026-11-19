@@ -122,8 +122,7 @@ internal fun AndroidShellWorkspace(start: ShellDestination, config: LettaConfig?
         controllers = rememberShellLibraryControllers(sources.sessions, sources.library, scope),
     )
     // Before the early return, so the one reporter outlives the waiting page's swap to the workspace.
-    val sessions = drawerModel.sources.sessions
-    ReportShellFirstUsable(workspace.destination, config, sessions.sessionError, observedAgents.isNotEmpty(), shell.sourceReady) {
+    ReportShellFirstUsable(workspace.destination, rememberAndroidConnection(shell), shell.sourceReady) {
         Telemetry.event("FirstUsable", "drawn", "reason" attr it.name)
     }
     if (!shell.sourceReady) return AndroidShellPage(shell, androidx.compose.ui.Modifier)

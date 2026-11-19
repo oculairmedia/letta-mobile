@@ -2,18 +2,14 @@ package com.letta.mobile.ui.shell
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.model.BackendConnectionStatus
-import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.backendConnectionStatus
 import com.letta.mobile.data.shell.ShellDestination
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -84,20 +80,16 @@ fun ReportFirstUsableContent(
 internal expect fun ReportHostDrawnWhen(drawn: Boolean)
 
 /**
- * The shell's first-usable report from its own inputs: the backend [config], the session [error] flow
- * and whether agents are loaded, for the page at [destination] once [sourceReady]. Place it at one stable
- * spot ahead of any early return; [onReported] receives the reason once.
+ * The shell's first-usable report: the page at [destination] with the backend [connection], once its
+ * source is [sourceReady]. Place it at one stable spot ahead of any early return; [onReported]
+ * receives the reason once.
  */
 @Composable
 fun ReportShellFirstUsable(
     destination: ShellDestination,
-    config: LettaConfig?,
-    error: StateFlow<Throwable?>,
-    agentsLoaded: Boolean,
+    connection: BackendConnectionStatus,
     sourceReady: Boolean,
     onReported: (FirstUsableReason) -> Unit = {},
 ) {
-    val sessionError by error.collectAsState()
-    val connection = backendConnectionStatus(config, sessionError, agentsLoaded)
     ReportFirstUsableContent(shellFirstScreenUsable(destination, connection, sourceReady), onReported = onReported)
 }

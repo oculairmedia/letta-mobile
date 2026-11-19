@@ -8011,7 +8011,7 @@ public final class com/letta/mobile/ui/shell/AgentEditorBinding {
 
 public final class com/letta/mobile/ui/shell/FirstUsableContentKt {
 	public static final fun ReportFirstUsableContent-NcHsxvU (ZJLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;II)V
-	public static final fun ReportShellFirstUsable (Lcom/letta/mobile/data/shell/ShellDestination;Lcom/letta/mobile/data/model/LettaConfig;Lkotlinx/coroutines/flow/StateFlow;ZZLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;II)V
+	public static final fun ReportShellFirstUsable (Lcom/letta/mobile/data/shell/ShellDestination;Lcom/letta/mobile/data/model/BackendConnectionStatus;ZLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;II)V
 	public static final fun getFIRST_USABLE_TIMEOUT ()J
 	public static final fun shellFirstScreenUsable (Lcom/letta/mobile/data/shell/ShellDestination;Lcom/letta/mobile/data/model/BackendConnectionStatus;Z)Z
 }
