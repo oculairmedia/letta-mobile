@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.transport.appserver.AppServerBackgroundProcess
 import com.letta.mobile.ui.components.foundation.LettaChip
 import com.letta.mobile.ui.components.foundation.LettaChipSlots
+import com.letta.mobile.ui.components.foundation.LettaClickTarget
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
@@ -96,6 +97,9 @@ private fun BackgroundProcessItem(
         text = process.description ?: process.id,
         onClick = onClick ?: onRequestStop,
         modifier = modifier.testTag("process_item_${process.id}"),
+        // A strip in the composer's stack: the chips take their drawn height, so the stack's one gap
+        // is all that stands between them and the queued row or the prompt bar below.
+        target = LettaClickTarget.Inline,
         slots = LettaChipSlots(
             leading = {
                 Text(
