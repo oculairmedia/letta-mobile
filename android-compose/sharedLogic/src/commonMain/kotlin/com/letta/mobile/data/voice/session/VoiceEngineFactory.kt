@@ -11,7 +11,6 @@ import com.letta.mobile.data.voice.endpoint.MouthOptions
 import com.letta.mobile.data.voice.endpoint.SpeechApiKey
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointClient
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointConfig
-import com.letta.mobile.data.voice.endpoint.SpeechEndpointLocality
 import com.letta.mobile.data.voice.endpoint.StreamingSpeechSynthesizer
 import com.letta.mobile.data.voice.SpeechEndpointUrl
 import com.letta.mobile.data.voice.consent.VoiceEndpointGrant
@@ -207,8 +206,7 @@ class EndpointVoiceEngineFactory(
             origin != null && VoiceEndpointGrant(origin, VoiceEndpointPayload.AUDIO_FOR_TRANSCRIPTION) in request.grants.current().grants
         }
         val transcriber = HostSpeechTranscriber(route.endpoint, acknowledged = acknowledged)
-        val local = route.status.baseUrl?.let { SpeechEndpointLocality.isLocal(SpeechEndpointUrl(it)) } == true
-        val partials = request.setup.tuning.livePartials ?: local
+        val partials = request.setup.tuning.livePartialsFor(route.status.baseUrl?.let(::SpeechEndpointUrl))
         return Speech(transcriber, HostSpeechSynthesizer(route.endpoint), partials) {}
     }
 

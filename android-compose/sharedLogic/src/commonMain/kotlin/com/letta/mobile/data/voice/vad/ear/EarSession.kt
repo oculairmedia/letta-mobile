@@ -311,7 +311,8 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
     private suspend fun endTurn(hop: Hop?, reason: TurnEndReason) {
         record(hop)
         partials.turnEnded()
-        val report = turnReport(tracker, peakDb, detector, format.sampleRateHz)
+        val trailing = ((gate.position - tracker.lastVoiceEnd).coerceAtLeast(0).toDouble() / format.sampleRateHz).seconds
+        val report = turnReport(tracker, peakDb, detector, format.sampleRateHz).copy(trailingSilence = trailing)
         observer.turnClosed(report, reason)
         out.send(VoiceEarEvent.SpeechEnded)
         val samples = recorder.finish()
