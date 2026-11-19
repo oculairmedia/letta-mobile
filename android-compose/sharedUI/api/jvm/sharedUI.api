@@ -2156,6 +2156,12 @@ public final class com/letta/mobile/ui/chat/surface/composer/ComposableSingleton
 	public final fun getLambda$-743077059$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
+public final class com/letta/mobile/ui/chat/surface/composer/ComposableSingletons$VoiceCardHeaderKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/composer/ComposableSingletons$VoiceCardHeaderKt;
+	public fun <init> ()V
+	public final fun getLambda$1725770366$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+}
+
 public final class com/letta/mobile/ui/chat/surface/composer/ComposerAgentMentionTags {
 	public static final field $stable I
 	public static final field CHIP Ljava/lang/String;
@@ -2404,6 +2410,35 @@ public final class com/letta/mobile/ui/chat/tools/ToolPresentersKt {
 	public static final fun title (Lcom/letta/mobile/data/chat/tools/ToolStepLine;Landroidx/compose/runtime/Composer;I)Ljava/lang/String;
 }
 
+public abstract interface class com/letta/mobile/ui/chat/voice/VoiceCardFeed {
+	public abstract fun getMicrophoneMute ()Lcom/letta/mobile/ui/chat/voice/VoiceCardSwitch;
+	public abstract fun getSpeakerMute ()Lcom/letta/mobile/ui/chat/voice/VoiceCardSwitch;
+	public abstract fun getSpeed ()Lcom/letta/mobile/ui/chat/voice/VoiceCardSpeed;
+	public abstract fun getSpokenSegments ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun now ()J
+}
+
+public final class com/letta/mobile/ui/chat/voice/VoiceCardSpeed {
+	public static final field $stable I
+	public static final field Companion Lcom/letta/mobile/ui/chat/voice/VoiceCardSpeed$Companion;
+	public fun <init> (Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Ljava/util/List;)V
+	public synthetic fun <init> (Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getChoices ()Ljava/util/List;
+	public final fun getSet ()Lkotlin/jvm/functions/Function1;
+	public final fun getValue ()Lkotlinx/coroutines/flow/StateFlow;
+}
+
+public final class com/letta/mobile/ui/chat/voice/VoiceCardSpeed$Companion {
+	public final fun getDEFAULT_CHOICES ()Ljava/util/List;
+}
+
+public final class com/letta/mobile/ui/chat/voice/VoiceCardSwitch {
+	public static final field $stable I
+	public fun <init> (Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;)V
+	public final fun getOn ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getSet ()Lkotlin/jvm/functions/Function1;
+}
+
 public final class com/letta/mobile/ui/chat/voice/VoiceErrorTextsKt {
 	public static final fun voiceErrorText (Lcom/letta/mobile/data/voice/VoiceErrorCode;)Lorg/jetbrains/compose/resources/StringResource;
 }
@@ -2427,6 +2462,19 @@ public final class com/letta/mobile/ui/chat/voice/VoiceModeKt {
 public final class com/letta/mobile/ui/chat/voice/VoiceModeTags {
 	public static final field $stable I
 	public static final field BUTTON Ljava/lang/String;
+	public static final field CARD Ljava/lang/String;
+	public static final field CARD_ACTION Ljava/lang/String;
+	public static final field CARD_BODY Ljava/lang/String;
+	public static final field CARD_CAPTION Ljava/lang/String;
+	public static final field CARD_COLLAPSE Ljava/lang/String;
+	public static final field CARD_END Ljava/lang/String;
+	public static final field CARD_INTERRUPT Ljava/lang/String;
+	public static final field CARD_MIC Ljava/lang/String;
+	public static final field CARD_SPEAKER Ljava/lang/String;
+	public static final field CARD_SPEAKER_MUTE Ljava/lang/String;
+	public static final field CARD_SPEED Ljava/lang/String;
+	public static final field CARD_STATUS Ljava/lang/String;
+	public static final field CARD_TIMER Ljava/lang/String;
 	public static final field HANDOVER Ljava/lang/String;
 	public static final field HANDOVER_CLOSE Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/voice/VoiceModeTags;
@@ -4720,6 +4768,7 @@ public final class com/letta/mobile/ui/icons/LettaIcons {
 	public final fun getArrowDropUp ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getArrowForward ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getArrowUp ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getAudioLines ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getAutoAwesome ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getAutorenew ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getBold ()Landroidx/compose/ui/graphics/vector/ImageVector;
@@ -4795,6 +4844,8 @@ public final class com/letta/mobile/ui/icons/LettaIcons {
 	public final fun getMaximize ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getMaximize2 ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getMenu ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getMic ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getMicOff ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getMoreVert ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getMousePointer ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getNoneSet ()Landroidx/compose/ui/graphics/vector/ImageVector;
@@ -4852,6 +4903,8 @@ public final class com/letta/mobile/ui/icons/LettaIcons {
 	public final fun getViewModule ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getVisibility ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getVisibilityOff ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getVolume ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getVolumeOff ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getWarning ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getWifiOff ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getZoomIn ()Landroidx/compose/ui/graphics/vector/ImageVector;
@@ -12258,6 +12311,7 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Pane {
 	public final fun getSidePanelWidth-D9Ej5fM ()F
 	public final fun getToolCardFactLabelWidth-D9Ej5fM ()F
 	public final fun getToolCardSectionMaxHeight-D9Ej5fM ()F
+	public final fun getVoiceCardOneLine-D9Ej5fM ()F
 	public final fun getWideBreakpoint-D9Ej5fM ()F
 }
 
@@ -12387,8 +12441,8 @@ public final class com/letta/mobile/ui/theme/pill/LettaPillColors {
 
 public final class com/letta/mobile/ui/theme/tokens/CustomColors {
 	public static final field $stable I
-	public synthetic fun <init> (JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJLkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-0d7_KjU ()J
 	public final fun component10-0d7_KjU ()J
 	public final fun component11-0d7_KjU ()J
@@ -12437,12 +12491,14 @@ public final class com/letta/mobile/ui/theme/tokens/CustomColors {
 	public final fun component50-0d7_KjU ()J
 	public final fun component51-0d7_KjU ()J
 	public final fun component52-0d7_KjU ()J
+	public final fun component53-0d7_KjU ()J
+	public final fun component54-0d7_KjU ()J
 	public final fun component6-0d7_KjU ()J
 	public final fun component7-0d7_KjU ()J
 	public final fun component8-0d7_KjU ()J
 	public final fun component9-0d7_KjU ()J
-	public final fun copy-0AuwwUk (JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ)Lcom/letta/mobile/ui/theme/tokens/CustomColors;
-	public static synthetic fun copy-0AuwwUk$default (Lcom/letta/mobile/ui/theme/tokens/CustomColors;JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJIILjava/lang/Object;)Lcom/letta/mobile/ui/theme/tokens/CustomColors;
+	public final fun copy-D1hvOHc (JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ)Lcom/letta/mobile/ui/theme/tokens/CustomColors;
+	public static synthetic fun copy-D1hvOHc$default (Lcom/letta/mobile/ui/theme/tokens/CustomColors;JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJIILjava/lang/Object;)Lcom/letta/mobile/ui/theme/tokens/CustomColors;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAgentAColor-0d7_KjU ()J
 	public final fun getAgentBColor-0d7_KjU ()J
@@ -12494,6 +12550,8 @@ public final class com/letta/mobile/ui/theme/tokens/CustomColors {
 	public final fun getTextSecondary-0d7_KjU ()J
 	public final fun getToolBubbleBgColor-0d7_KjU ()J
 	public final fun getUserBubbleBgColor-0d7_KjU ()J
+	public final fun getVoiceAgentColor-0d7_KjU ()J
+	public final fun getVoiceYouColor-0d7_KjU ()J
 	public final fun getWarningContainerColor-0d7_KjU ()J
 	public final fun getWarningTextColor-0d7_KjU ()J
 	public fun hashCode ()I

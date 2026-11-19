@@ -3,8 +3,6 @@ package com.letta.mobile.ui.chat.surface.composer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.luminance
 import com.letta.mobile.data.presence.RunPhase
 import com.letta.mobile.data.voice.session.VoiceModeState
 import com.letta.mobile.ui.chat.voice.VoiceModeHandle
@@ -45,33 +43,24 @@ internal fun VoiceModeHandle.glowLevel(state: VoiceModeState): (() -> Float)? = 
 }
 
 /**
- * The person's colour: the theme's amber accent (customColors.runningColor), the hue furthest from
- * the teal and cyan the agent's thinking glow is drawn in, in both themes.
+ * The person's colour: the theme's cool voice tint (customColors.voiceYouColor), deepened on a light
+ * theme so a hairline of it reads on the surface.
  */
 @Composable
-internal fun voiceYouColor(): Color = MaterialTheme.customColors.runningColor
-
-/** The agent's colour: the thinking glow's own (the tertiary accent the chat's glows run in). */
-@Composable
-internal fun voiceAgentColor(): Color = MaterialTheme.colorScheme.tertiary
+internal fun voiceYouColor(): Color = MaterialTheme.customColors.voiceYouColor
 
 /**
- * The person's colour for a thin edge on the current surface: on a light surface the amber is
- * deepened toward its own "on" colour so a hairline of it still stands out; on a dark one it is used
- * as it is.
+ * The agent's speaking colour: the theme's warm voice tint (customColors.voiceAgentColor), apart from
+ * the teal the run's own thinking outline and glow use.
  */
 @Composable
-internal fun voiceYouEdgeColor(): Color {
-    val you = voiceYouColor()
-    val lightSurface = MaterialTheme.colorScheme.surface.luminance() > LIGHT_SURFACE_LUMINANCE
-    return if (lightSurface) lerp(you, MaterialTheme.customColors.onRunningColor, LIGHT_EDGE_DEEPEN) else you
-}
+internal fun voiceAgentColor(): Color = MaterialTheme.customColors.voiceAgentColor
 
-private const val LIGHT_SURFACE_LUMINANCE = 0.5f
-private const val LIGHT_EDGE_DEEPEN = 0.45f
-
-/** The single visual treatment selected for a composer border. */
-internal enum class ComposerOutlineMode { Idle, Listening, Working, Thinking, Error }
+/**
+ * The single visual treatment selected for a composer border: [Voice] is the glow that follows a
+ * voice (the person's while they talk, the agent's while its reply is spoken).
+ */
+internal enum class ComposerOutlineMode { Idle, Voice, Working, Thinking, Error }
 
 /**
  * Voice owns the outline while active; otherwise use this conversation's phase.
@@ -83,8 +72,9 @@ internal fun composerOutlineMode(
     fallbackWorking: Boolean,
 ): ComposerOutlineMode = when (voice?.let(::voiceGlowRole)) {
     VoiceGlowRole.Error -> ComposerOutlineMode.Error
-    VoiceGlowRole.You -> ComposerOutlineMode.Listening
-    VoiceGlowRole.Agent -> ComposerOutlineMode.Working
+    VoiceGlowRole.You -> ComposerOutlineMode.Voice
+    // The spoken reply glows in the agent's colour at its playback level; waiting for it keeps the beam.
+    VoiceGlowRole.Agent -> if (voice == VoiceModeState.Speaking) ComposerOutlineMode.Voice else ComposerOutlineMode.Working
     VoiceGlowRole.Idle, null -> when (phase) {
         RunPhase.QUEUED,
         RunPhase.REASONING -> ComposerOutlineMode.Thinking

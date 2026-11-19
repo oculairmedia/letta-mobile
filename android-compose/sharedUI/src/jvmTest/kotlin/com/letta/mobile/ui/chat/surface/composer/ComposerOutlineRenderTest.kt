@@ -108,11 +108,13 @@ class ComposerOutlineRenderTest {
         }
         waitForIdle()
         val workingEnergy = onRoot().captureToImage().toPixelMap().energy()
+        // While voice mode runs, its glow rises from the seam with the voice card (VoiceCardDock): the
+        // prompt draws no outline of its own. Voice mode stopped on an error still marks the prompt.
         listOf(
-            Triple(VoiceModeState.Listening, ComposerOutlineMode.Listening, VoiceGlowRole.You),
-            Triple(VoiceModeState.Hearing, ComposerOutlineMode.Listening, VoiceGlowRole.You),
-            Triple(VoiceModeState.WaitingForReply, ComposerOutlineMode.Working, VoiceGlowRole.Agent),
-            Triple(VoiceModeState.Speaking, ComposerOutlineMode.Working, VoiceGlowRole.Agent),
+            Triple(VoiceModeState.Listening, ComposerOutlineMode.Idle, VoiceGlowRole.Idle),
+            Triple(VoiceModeState.Hearing, ComposerOutlineMode.Idle, VoiceGlowRole.Idle),
+            Triple(VoiceModeState.WaitingForReply, ComposerOutlineMode.Idle, VoiceGlowRole.Idle),
+            Triple(VoiceModeState.Speaking, ComposerOutlineMode.Idle, VoiceGlowRole.Idle),
             Triple(VoiceModeState.Error(VoiceErrorCode.ENGINE_FAILED), ComposerOutlineMode.Error, VoiceGlowRole.Error),
         ).forEach { (state, mode, role) ->
             voice.value = state
@@ -121,8 +123,8 @@ class ComposerOutlineRenderTest {
             assertEquals(mode, semantics[ComposerOutlineModeKey])
             assertEquals(role, semantics[VoiceOutlineRoleKey])
             val energy = onRoot().captureToImage().toPixelMap().energy()
-            assertTrue(energy > 0f, "$mode draws an outline")
-            if (role == VoiceGlowRole.Agent) assertEquals(workingEnergy, energy, "working never stacks voice strokes on the beam")
+            if (mode != ComposerOutlineMode.Idle) assertTrue(energy > 0f, "$mode draws an outline")
+            if (mode == ComposerOutlineMode.Working) assertEquals(workingEnergy, energy, "working never stacks voice strokes on the beam")
         }
     }
 

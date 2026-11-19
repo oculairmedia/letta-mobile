@@ -9,14 +9,16 @@ enum class AmbientVoiceRole {
     /** The person: the microphone is open (listening) or they are speaking. Drawn in its own colour. */
     You,
 
-    /** The agent: its reply is being spoken. Drawn in the thinking glow's own colour. */
+    /** The agent: its reply is being spoken. Drawn in [AmbientVoice.agentTintArgb], else the thinking glow's own colour. */
     Agent,
 }
 
 /**
  * Voice mode's drive for the ambient glow, while it follows a voice rather than the run: whose
  * voice ([role]), the colour the person's side is drawn in ([youTintArgb], an ARGB colour from the
- * theme), and the voice's smoothed [level] (0..1, read at draw time, never in composition).
+ * theme), the agent's ([agentTintArgb], or null for the glow's own running tint), the voice's
+ * smoothed [level] (0..1, read at draw time, never in composition), and how strongly the glow wears
+ * its faint dot texture ([dotGrid], 0..1; the shader's `uDotGrid`).
  *
  * A glow given none (the default) draws exactly as it always has. Given one it shows as a running
  * glow in the role's colour whose strength follows the level: [envelope] scales the shader's
@@ -31,7 +33,14 @@ class AmbientVoice(
     val youTintArgb: Int,
     /** The voice's smoothed level, 0..1; call it at draw time. */
     val level: () -> Float,
+    /** The agent's colour, as ARGB, or null to keep the glow's own running tint. */
+    val agentTintArgb: Int? = null,
+    /** How strongly the glow shows its dot texture, 0 (none) to 1. */
+    val dotGrid: Float = 0f,
 ) {
+    /** The tint for this voice as ARGB, or null where the glow keeps its own running tint. */
+    fun tintArgb(): Int? = if (role == AmbientVoiceRole.You) youTintArgb else agentTintArgb
+
     /** The glow's intensity [base] scaled by the level: a resting share at silence, all of it at full level. */
     fun envelope(base: Float): Float = base * (RESTING_SHARE + (1f - RESTING_SHARE) * currentLevel())
 
@@ -47,6 +56,9 @@ class AmbientVoice(
     companion object {
         /** The share of its intensity the glow keeps at silence (listening, nobody speaking). */
         const val RESTING_SHARE: Float = 0.35f
+
+        /** The dot texture's strength while the glow follows a voice: a faint grain, not a pattern. */
+        const val VOICE_DOT_GRID: Float = 0.45f
     }
 }
 

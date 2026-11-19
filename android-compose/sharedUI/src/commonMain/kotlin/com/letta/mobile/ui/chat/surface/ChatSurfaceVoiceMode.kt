@@ -15,6 +15,7 @@ import com.letta.mobile.data.voice.session.VoiceModeState
 import com.letta.mobile.ui.ambient.AmbientVoice
 import com.letta.mobile.ui.ambient.AmbientVoiceRole
 import com.letta.mobile.ui.ambient.LocalAmbientVoice
+import com.letta.mobile.ui.chat.surface.composer.voiceAgentColor
 import com.letta.mobile.ui.chat.surface.composer.voiceYouColor
 import com.letta.mobile.ui.chat.session.VoiceModeTelemetry
 import com.letta.mobile.ui.chat.voice.LocalVoiceSetup
@@ -53,9 +54,9 @@ internal fun rememberVoiceMode(sessions: VoiceChatSessions?): VoiceModeHandle? {
 }
 
 /**
- * Voice mode's drive for the page's ambient glows ([LocalAmbientVoice]): the person's colour and the
- * microphone level while listening and hearing, the agent's side and the playback level while
- * speaking; null otherwise, so the glows follow the run exactly as without voice mode (the thinking
+ * Voice mode's drive for the page's ambient glows ([LocalAmbientVoice]): the person's cool tint and
+ * the microphone level while listening and hearing, the agent's warm tint and the playback level
+ * while speaking, both over the faint dot texture; null otherwise, so the glows follow the run exactly as without voice mode (the thinking
  * animation while waiting for the reply included). It changes only when the role does; the glows
  * read the level at draw time.
  */
@@ -64,17 +65,18 @@ internal fun rememberAmbientVoice(handle: VoiceModeHandle?): AmbientVoice? {
     if (handle == null) return null
     val state by handle.state.collectAsState()
     val you = voiceYouColor().toArgb()
+    val agent = voiceAgentColor().toArgb()
     val role = when (state) {
         VoiceModeState.Listening, VoiceModeState.Hearing -> AmbientVoiceRole.You
         VoiceModeState.Speaking -> AmbientVoiceRole.Agent
         else -> return null
     }
-    return remember(handle, role, you) {
+    return remember(handle, role, you, agent) {
         val level: () -> Float = if (role == AmbientVoiceRole.You) {
             { handle.microphoneLevel.value }
         } else {
             { handle.playbackLevel.value }
         }
-        AmbientVoice(role, you, level)
+        AmbientVoice(role, you, level, agentTintArgb = agent, dotGrid = AmbientVoice.VOICE_DOT_GRID)
     }
 }

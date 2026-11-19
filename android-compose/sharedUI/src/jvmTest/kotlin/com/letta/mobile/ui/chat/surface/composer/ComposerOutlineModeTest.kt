@@ -25,10 +25,11 @@ class ComposerOutlineModeTest {
         val voices = mapOf(
             null to null,
             VoiceModeState.Off to null,
-            VoiceModeState.Listening to ComposerOutlineMode.Listening,
-            VoiceModeState.Hearing to ComposerOutlineMode.Listening,
+            VoiceModeState.Listening to ComposerOutlineMode.Voice,
+            VoiceModeState.Hearing to ComposerOutlineMode.Voice,
             VoiceModeState.WaitingForReply to ComposerOutlineMode.Working,
-            VoiceModeState.Speaking to ComposerOutlineMode.Working,
+            // The spoken reply follows its playback level in the agent's glow.
+            VoiceModeState.Speaking to ComposerOutlineMode.Voice,
             VoiceModeState.Error(VoiceErrorCode.ENGINE_FAILED) to ComposerOutlineMode.Error,
             VoiceModeState.TurnFailed(VoiceErrorCode.TRANSCRIPTION_FAILED, retryable = true) to ComposerOutlineMode.Error,
         )
@@ -53,7 +54,7 @@ class ComposerOutlineModeTest {
         listOf(RunPhase.WORKING, RunPhase.DELEGATING, RunPhase.RESPONDING, RunPhase.INTERRUPTING).forEach {
             assertEquals(ComposerOutlineMode.Working, composerOutlineMode(null, it, false))
         }
-        assertEquals(ComposerOutlineMode.Listening, composerOutlineMode(VoiceModeState.Listening, RunPhase.WORKING, true))
+        assertEquals(ComposerOutlineMode.Voice, composerOutlineMode(VoiceModeState.Listening, RunPhase.WORKING, true))
         assertEquals(ComposerOutlineMode.Working, composerOutlineMode(VoiceModeState.WaitingForReply, RunPhase.REASONING, false))
         assertEquals(ComposerOutlineMode.Working, composerOutlineMode(null, null, true))
         assertEquals(ComposerOutlineMode.Idle, composerOutlineMode(null, null, false))

@@ -57,6 +57,24 @@ class AmbientShaderSourceTest {
         }
     }
 
+    /**
+     * Voice mode's dot texture is one uniform every style honours: each style's alpha passes through
+     * dotGrid (Aurora directly, the others through glowFinish), and at 0 it returns 1 before any work,
+     * so a host that leaves it at 0 draws exactly the glow it always did.
+     */
+    @Test
+    fun everyStyleWearsTheDotTextureOnlyWhenAskedTo() {
+        assertContains(AMBIENT_SHADER_PRELUDE, "uniform float uDotGrid;")
+        assertContains(AMBIENT_SHADER_PRELUDE, "if (uDotGrid <= 0.0) return 1.0;")
+        assertContains(AMBIENT_SHADER_PRELUDE, "clamp(a * uEnvelope * uColor.a, 0.0, 0.8) * dotGrid(fragCoord)")
+        ThinkingGlowStyle.entries.forEach { style ->
+            val source = ambientGlowShaderSource(style)
+            val shaded = source.contains("* dotGrid(fragCoord) + dither(fragCoord)") || source.contains("return glowFinish(")
+            assertTrue(shaded, "$style passes its alpha through the dot texture")
+        }
+        assertTrue(AmbientVoice.VOICE_DOT_GRID in 0f..1f, "the voice texture's strength is a fraction")
+    }
+
     /** The palette is pulled toward the tint's hue, so the field cannot speak a foreign palette. */
     @Test
     fun thePaletteIsRotatedTowardTheTintHue() {

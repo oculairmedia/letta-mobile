@@ -2,6 +2,11 @@ package com.letta.mobile.ui.icons
 
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.composables.icons.lucide.Archive
+import com.composables.icons.lucide.AudioLines
+import com.composables.icons.lucide.VolumeX
+import com.composables.icons.lucide.Volume2
+import com.composables.icons.lucide.MicOff
+import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.File
 import com.composables.icons.lucide.Box
 import com.composables.icons.lucide.ListFilter
@@ -152,6 +157,13 @@ object LettaIcons {
     /** A destination to go to (a command palette row). */
     val ArrowForward: ImageVector get() = Lucide.ArrowRight
     val Close: ImageVector get() = Lucide.X
+
+    // Voice mode: the speaker glyphs and the voice card's audio switches.
+    val Mic: ImageVector get() = Lucide.Mic
+    val MicOff: ImageVector get() = Lucide.MicOff
+    val Volume: ImageVector get() = Lucide.Volume2
+    val VolumeOff: ImageVector get() = Lucide.VolumeX
+    val AudioLines: ImageVector get() = Lucide.AudioLines
     val Menu: ImageVector get() = Lucide.Menu
     val ChevronLeft: ImageVector get() = Lucide.ChevronLeft
     val ChevronRight: ImageVector get() = Lucide.ChevronRight
