@@ -77,7 +77,7 @@ def interrupted(signum, frame):
     raise KeyboardInterrupt(f"signal {signum}")
 
 
-def prepare_capture(args, parser):
+def verify_capture_device(args, parser):
     if args.serial != SERIAL:
         parser.error("fresh captures require --serial " + SERIAL)
     wait_for_pixel()
@@ -85,11 +85,9 @@ def prepare_capture(args, parser):
         parser.error("baseline requires at least three trials")
     if adb("get-state") != "device":
         raise RuntimeError("authorized Pixel 2 XL unavailable")
-    args.apk_sha256 = apk_digest(args.apk)
-    if args.install:
-        args.dexopt_status = install_capture(args)
-    else:
-        args.dexopt_status = require_compiled_install()
+
+
+def require_capture_apk(args):
     installed_sha256 = installed_app_hash()
     if installed_sha256 != args.apk_sha256:
         raise RuntimeError(
@@ -104,6 +102,13 @@ def prepare_capture(args, parser):
             f"{PACKAGE} is at dexopt status={args.dexopt_status['dexoptStatus']}; refusing to measure an "
             "uncompiled install. Run: " + args.dexopt_status["dexoptCompileCommands"][0]
         )
+
+
+def prepare_capture(args, parser):
+    verify_capture_device(args, parser)
+    args.apk_sha256 = apk_digest(args.apk)
+    args.dexopt_status = install_capture(args) if args.install else require_compiled_install()
+    require_capture_apk(args)
     args.capture_id = uuid.uuid4().hex
     args.output.mkdir(parents=True, exist_ok=False)
     signal.signal(signal.SIGTERM, interrupted)
