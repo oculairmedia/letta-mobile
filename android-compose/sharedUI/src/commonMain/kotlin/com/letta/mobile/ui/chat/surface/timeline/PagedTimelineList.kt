@@ -1,7 +1,5 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
-import com.letta.mobile.ui.chat.surface.timeline.days.TimelineDays
-import com.letta.mobile.ui.chat.surface.timeline.days.rememberCurrentDate
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +17,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import com.letta.mobile.ui.chat.surface.collectForChatSurface
 import androidx.compose.runtime.getValue
@@ -63,7 +62,6 @@ import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.stringResource
 
 /** Everything the paged list reads. */
@@ -140,10 +138,9 @@ private fun PagedTimelineBody(
     }
     val pinned = rememberPinnedPrompt(listState, rows.size, params.topReserve, rows::itemAt)
     val glide = rememberNewestEdgeGlide(listState)
-    val today = rememberCurrentDate()
-    // Each row's local date is parsed once for the list, not on every composition of the row.
-    val days = remember(presentation) { TimelineDays() }
+    val calendar = rememberTimelineCalendar(key = presentation)
     val bindings = rememberPagedRowBindings(params.bindings, rows)
+    val motion = rememberTimelineRowMotionGate(listState, rows.liveCount > 0 || params.state.isRunInFlight)
 
     Box(modifier) {
         TimelineListFrame(
@@ -175,7 +172,7 @@ private fun PagedTimelineBody(
             olderHistoryComplete = { settled.loadState.append.endOfPaginationReached },
             newerHistoryComplete = { settled.loadState.prepend.endOfPaginationReached },
         ) {
-            pagedRows(PagedRowsScope(rows, settled, params, TimelineCalendar(today, days), bindings))
+            pagedRows(PagedRowsScope(rows, settled, params, calendar, bindings, motion))
         }
         presentation.missingTarget?.let { missing ->
             Text(
@@ -244,10 +241,10 @@ private class PagedRowsScope(
     val params: PagedTimelineParams,
     val calendar: TimelineCalendar,
     val bindings: TimelineRowBindings,
+    /** Whether rows may move by themselves now (see rememberTimelineRowMotionGate). */
+    val motion: State<Boolean>,
 )
 
-/** The reader's date, and the list's parsed row dates. */
-private class TimelineCalendar(val today: LocalDate, val days: TimelineDays)
 
 private fun LazyListScope.pagedRows(scope: PagedRowsScope) {
     val rows = scope.rows
@@ -278,8 +275,10 @@ private fun LazyListScope.pagedRows(scope: PagedRowsScope) {
 private fun LazyItemScope.RenderPagedSlot(scope: PagedRowsScope, index: Int) {
     PagedSlot(scope.rows, scope.settled, index) { item, row ->
         val live = scope.rows.assembly.live.getOrNull(index - scope.rows.leading)
-        // Settled rows glide when displaced but never fade in on each page load.
-        val motion = timelineRowMotion(fadesIn = live != null && !live.isUserPrompt())
+        // Settled rows glide when displaced but never fade in on each page load. A live row is new
+        // content even in the frame it lands, before the gate has seen the turn begin.
+        val moves = timelineRowMoves(scope.motion, live = live != null, scope.params.listState)
+        val motion = timelineRowMotion(fadesIn = live != null && !live.isUserPrompt(), moves = moves)
         val probe = TimelineRenderProbe.sink
         val modifier = if (item != null && probe != null) motion.drawWithContent {
             drawContent()

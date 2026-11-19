@@ -78338,6 +78338,7 @@ public final class com/letta/mobile/ui/theme/LettaMotionTokens {
 	public static final field FAST_FADE_IN_MILLIS I
 	public static final field FAST_FADE_OUT_MILLIS I
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaMotionTokens;
+	public static final field ROW_MOTION_SETTLE_MILLIS I
 	public static final field STREAMING_SIZE_MILLIS I
 }
 
