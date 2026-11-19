@@ -3,6 +3,8 @@ package com.letta.mobile.quality
 import com.letta.mobile.quality.core.MobileRule
 import com.letta.mobile.quality.core.isGenerated
 import com.letta.mobile.quality.core.isTestSource
+import com.letta.mobile.quality.guardrails.ClientPersistenceOutsideClientStore
+import com.letta.mobile.quality.guardrails.DeviceFactWithoutJustification
 import com.letta.mobile.quality.guardrails.NoDeprecatedBrowserUnloadEvent
 import com.letta.mobile.quality.guardrails.NoHardcodedPaddingDirection
 import com.letta.mobile.quality.guardrails.NoNonAtomicStateFlowSelfCopy
@@ -367,6 +369,8 @@ class MobileGuardrailProvider : RuleSetProvider {
             WallClockInSharedLogic(config),
             HostOrUrlStringMatching(config),
             SecretBearingDataClass(config),
+            ClientPersistenceOutsideClientStore(config),
+            DeviceFactWithoutJustification(config),
         ),
     )
 }
