@@ -70,7 +70,7 @@ internal object HeadReplyRules {
     private fun canSpeak(model: LoopModel, head: PendingReply): Boolean {
         val answering = model.phase == VoicePhase.THINKING || model.phase == VoicePhase.SPEAKING
         val free = !model.outputActive || model.speech.owner == head.key
-        return answering && free && !model.turn.userSpeaking
+        return answering && free && !model.turn.userSpeaking && head.key != model.turn.tentative
     }
 
     /**

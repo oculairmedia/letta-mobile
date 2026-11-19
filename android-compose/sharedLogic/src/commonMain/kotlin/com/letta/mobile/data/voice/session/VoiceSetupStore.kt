@@ -18,6 +18,7 @@ import com.letta.mobile.data.voice.endpoint.SpeechSpeed
 import com.letta.mobile.data.voice.endpoint.SpeechTransportPolicy
 import com.letta.mobile.data.voice.host.client.VoiceRoute
 import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
+import com.letta.mobile.data.voice.vad.ear.EarlyTurns
 import io.ktor.client.engine.HttpClientEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,7 +37,23 @@ data class VoiceTuning(
     val endOfTurnSilence: Duration = EndOfTurnPolicy.DEFAULT_TRAILING_SILENCE,
     /** Whether the server ear requests live partial transcripts; null follows the endpoint ([VoiceSetup.livePartials]). */
     val livePartials: Boolean? = null,
+    /**
+     * After this pause the server ear offers the turn's words before the end-of-turn silence, so
+     * the agent starts sooner; the answer plays only once the turn ends with the same words, and
+     * is dropped if the person goes on. Null (the default) waits for the end of the turn: an offer
+     * the person talks past still reaches the conversation as a message whose run is stopped.
+     */
+    val earlyTurnPause: Duration? = null,
 )
+
+/**
+ * Whether the server ear requests live partial transcripts from the speech server at [server]: the
+ * stored choice, or by default on only when that server is on this machine or the person's own
+ * network ([SpeechEndpointLocality]); off with no server. The same rule holds for this device's own
+ * server and for the one the host shares.
+ */
+internal fun VoiceTuning.livePartialsFor(server: SpeechEndpointUrl?): Boolean =
+    livePartials ?: (server?.let(SpeechEndpointLocality::isLocal) == true)
 
 /** What the person configured for voice mode, as stored. Never carries the API key itself. */
 data class VoiceSetup(
@@ -72,7 +89,7 @@ data class VoiceSetup(
      * endpoint is on this machine or a private network (no per-request cost, nothing leaves it).
      */
     val livePartials: Boolean
-        get() = tuning.livePartials ?: (endpoint.baseUrl?.let(SpeechEndpointLocality::isLocal) == true)
+        get() = tuning.livePartialsFor(endpoint.baseUrl)
 
     /** Whether speaking over a reply interrupts it, on a microphone path that is [echoCancelled] or not. */
     fun bargeInByVoice(echoCancelled: Boolean): Boolean = echoCancelled || interruptBySpeaking
@@ -173,7 +190,7 @@ class VoiceSetupStore(
     val keepsApiKey: Boolean get() = secrets != null
 
     /** The stored key, read only to build a request. */
-    fun apiKey(): SpeechApiKey? = storedKey()?.let(::SpeechApiKey)
+    fun apiKey(): SpeechApiKey? = storedKey?.let(::SpeechApiKey)
 
     /**
      * Validates and stores [draft]: the address, a grant for both payloads to its origin when consent
@@ -273,6 +290,20 @@ class VoiceSetupStore(
         state.value = read()
     }
 
+    /**
+     * Stores the pause after which the server ear offers a turn's words early, clamped to the
+     * allowed range; null turns early offers off. Takes effect from the next start.
+     */
+    fun setEarlyTurnPause(pause: Duration?) {
+        if (pause == null) {
+            settings.remove(KEY_EARLY_TURN_PAUSE_MS)
+        } else {
+            val clamped = pause.coerceIn(EarlyTurns.MIN_PAUSE, EndOfTurnPolicy.MAX_TRAILING_SILENCE)
+            settings.putString(KEY_EARLY_TURN_PAUSE_MS, clamped.inWholeMilliseconds.toString())
+        }
+        state.value = read()
+    }
+
     /** Stores the silence that ends a turn, clamped to the allowed range; takes effect from the next start. */
     fun setEndOfTurnSilence(silence: Duration) {
         val clamped = silence.coerceIn(EndOfTurnPolicy.MIN_TRAILING_SILENCE, EndOfTurnPolicy.MAX_TRAILING_SILENCE)
@@ -283,17 +314,17 @@ class VoiceSetupStore(
     /** The key a [draft] would leave stored: the typed one, none when blanked, else the stored one. */
     fun keyAfter(draft: VoiceSetupDraft): String? = when {
         secrets == null -> null
-        draft.apiKey == null -> storedKey()
+        draft.apiKey == null -> storedKey
         else -> draft.apiKey.trim().takeIf { it.isNotEmpty() }
     }
 
 
-    private fun storedKey(): String? = secrets?.getString(KEY_API_KEY)?.takeIf { it.isNotBlank() }
+    private val storedKey: String? get() = secrets?.getString(KEY_API_KEY)?.takeIf { it.isNotBlank() }
 
     private fun read(): VoiceSetup = VoiceSetup(
         endpoint = VoiceEndpointSettings(baseUrl = settings.getString(KEY_BASE_URL)?.takeIf { it.isNotBlank() }?.let(::SpeechEndpointUrl)),
         grants = VoiceEndpointGrants(parseGrants(settings.getString(KEY_GRANTS).orEmpty())),
-        hasApiKey = storedKey() != null,
+        hasApiKey = storedKey != null,
         interruptBySpeaking = settings.getString(KEY_INTERRUPT_BY_SPEAKING) == true.toString(),
         listening = VoiceListening.entries.firstOrNull { it.name == settings.getString(KEY_LISTENING) } ?: VoiceListening.AUTOMATIC,
         tuning = readTuning(settings),
@@ -327,6 +358,9 @@ class VoiceSetupStore(
         /** Whether to request live partial transcripts; absent follows the endpoint. */
         const val KEY_LIVE_PARTIALS: String = "voice.livePartials"
 
+        /** The pause after which the server ear offers a turn's words early, in milliseconds; absent is off. */
+        const val KEY_EARLY_TURN_PAUSE_MS: String = "voice.earlyTurnPauseMs"
+
         /** Whether to use this device's own speech server even where the host shares one. */
         const val KEY_DEVICE_ONLY: String = "voice.endpoint.deviceOnly"
 
@@ -352,7 +386,9 @@ private fun readTuning(settings: SecureSettingsStore): VoiceTuning {
     val silence = settings.getString(VoiceSetupStore.KEY_END_OF_TURN_SILENCE_MS)?.toLongOrNull()?.milliseconds
         ?.coerceIn(EndOfTurnPolicy.MIN_TRAILING_SILENCE, EndOfTurnPolicy.MAX_TRAILING_SILENCE)
     val partials = settings.getString(VoiceSetupStore.KEY_LIVE_PARTIALS)?.toBooleanStrictOrNull()
-    return VoiceTuning(speed, silence ?: EndOfTurnPolicy.DEFAULT_TRAILING_SILENCE, partials)
+    val early = settings.getString(VoiceSetupStore.KEY_EARLY_TURN_PAUSE_MS)?.toLongOrNull()?.milliseconds
+        ?.coerceIn(EarlyTurns.MIN_PAUSE, EndOfTurnPolicy.MAX_TRAILING_SILENCE)
+    return VoiceTuning(speed, silence ?: EndOfTurnPolicy.DEFAULT_TRAILING_SILENCE, partials, early)
 }
 
 /** The grants stored as `PAYLOAD origin` lines. */

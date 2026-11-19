@@ -77,6 +77,21 @@ sealed interface VoiceEarEvent {
      */
     data object SpeechEnded : VoiceEarEvent
 
+    /**
+     * The ear offers the turn's words before it has decided the turn is over: after a short pause,
+     * or from live partial words that already cover the whole turn. The loop may start answering
+     * them, but plays nothing of that answer until the turn's [EndOfTurn] arrives with the same
+     * words; [TentativeWithdrawn], or an [EndOfTurn] with other words, voids the offer and the
+     * answer is dropped. An ear sends at most one offer per turn at a time.
+     */
+    data class TentativeEndOfTurn(
+        /** The words offered. */
+        val utterance: VoiceUtterance,
+    ) : VoiceEarEvent
+
+    /** The person went on speaking after a [TentativeEndOfTurn]: that offer is void and the turn goes on. */
+    data object TentativeWithdrawn : VoiceEarEvent
+
     /** The ear decided the person finished a turn. */
     data class EndOfTurn(
         /** The turn, with whatever the ear decided about it. */

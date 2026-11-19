@@ -107,6 +107,8 @@ internal object Transitions {
 
     /** Speaks the text [head] held; a head that has ended leaves the queue (its speech plays on). */
     private fun promote(model: LoopModel, head: PendingReply): Step {
+        // An answer to words offered early waits, whatever it holds, until the turn confirms them.
+        if (head.key == model.turn.tentative) return Step(model.copy(phase = VoicePhase.THINKING))
         val emptied = model.withTurn { if (head.open) update(head.key) { copy(held = emptyList()) } else without(head.key) }
         return speakAll(emptied, head.held, owner = head.key)
     }
@@ -160,7 +162,7 @@ internal object Interrupts {
             addAll(skipped(SpeechSkipReason.INTERRUPTED, dropped))
             open.forEach { add(LoopEffect.RequestInterrupt(it.key)) }
         }
-        val turn = stopping(model.turn, open).copy(replies = emptyList())
+        val turn = stopping(model.turn, open).copy(replies = emptyList(), tentative = null)
         return Step(model.silenced().copy(phase = VoicePhase.LISTENING, turn = turn), effects)
     }
 

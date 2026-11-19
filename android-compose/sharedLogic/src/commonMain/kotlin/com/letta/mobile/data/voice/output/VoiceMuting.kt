@@ -50,7 +50,7 @@ internal class MutedFrameSource(private val source: AudioFrameSource, private va
 
 /**
  * An ear that ignores the person while [muted]: a turn that starts while muted is dropped whole
- * (its partial words, its end and its utterance), and the input level reads silent. A turn that
+ * (its partial words, any words offered early, its end and its utterance), and the input level reads silent. A turn that
  * started before the mute goes through, so the loop never waits on a turn that cannot end.
  *
  * Every turn that goes through calls [turnStarted] when it starts (its speech start, or its first
@@ -96,7 +96,9 @@ internal class MutedEar(
     private fun VoiceEarEvent.endsTurn(): Boolean = this is VoiceEarEvent.EndOfTurn || this is VoiceEarEvent.Failed
 
     private fun VoiceEarEvent.belongsToTurn(): Boolean = when (this) {
-        VoiceEarEvent.SpeechStarted, VoiceEarEvent.SpeechEnded, is VoiceEarEvent.PartialTranscript, is VoiceEarEvent.EndOfTurn -> true
+        VoiceEarEvent.SpeechStarted, VoiceEarEvent.SpeechEnded, is VoiceEarEvent.PartialTranscript, is VoiceEarEvent.EndOfTurn,
+        is VoiceEarEvent.TentativeEndOfTurn, VoiceEarEvent.TentativeWithdrawn,
+        -> true
         else -> false
     }
 }
