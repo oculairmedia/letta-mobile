@@ -7,6 +7,18 @@ import xml.etree.ElementTree as ET
 from tool_boundary import run_tool, tool_arguments
 from .config import SERIAL, PACKAGE
 
+# Pixel 2 XL, 2026-11-19: a fresh `adb install -r` leaves the dev package at
+# status=run-from-apk and cold start measures 7401 ms (n=20) instead of
+# 1018 ms (n=10) at status=verify. PackageManager can report the old run-from-apk
+# state while a concurrent install disappears, so the status is re-read.
+UNCOMPILED_STATUS = "run-from-apk"
+COMPILED_STATUS = "verify"
+DEXOPT_POLLS = 3
+DEXOPT_POLL_SECONDS = 2
+DEXOPT_SETTLE_SECONDS = 3
+# Read-only restart of an already installed package; no data is cleared.
+DEXOPT_SETTLE_COMMAND = ("am", "force-stop", PACKAGE)
+
 
 def command(argv, **kwargs):
     return run_tool(*tool_arguments(argv), check=True, capture_output=True, timeout=30, **kwargs).stdout
@@ -16,12 +28,101 @@ def adb(*args):
     return command(["adb", "-s", SERIAL, *args]).decode().strip()
 
 
-def installed_app_hash():
+def installed_apk_path():
     paths = adb("shell", "pm", "path", PACKAGE).splitlines()
     if len(paths) != 1 or not paths[0].startswith("package:"):
         raise RuntimeError("expected one installed capture APK")
-    path = paths[0].removeprefix("package:")
-    return adb("shell", "sha256sum", path).split()[0]
+    return paths[0].removeprefix("package:")
+
+
+def installed_app_hash():
+    return adb("shell", "sha256sum", installed_apk_path()).split()[0]
+
+
+def adb_command(command_line):
+    return "adb -s " + SERIAL + " " + " ".join(command_line)
+
+
+def compiled_command():
+    return f"adb -s {SERIAL} shell cmd package compile -m {COMPILED_STATUS} -f {PACKAGE}"
+
+
+def require_installed_app():
+    if not installed_apk_path():
+        raise RuntimeError(f"{PACKAGE} has no installed APK; install or compile one before measuring")
+
+
+def dexopt_reading():
+    """Parsed `dumpsys package dexopt` for the dev package, or an explicit absence."""
+    lines = adb("shell", "dumpsys", "package", "dexopt").splitlines()
+    header = lines.index(f"  [{PACKAGE}]") if f"  [{PACKAGE}]" in lines else None
+    if header is None:
+        return dict(dexoptStatus=None, dexoptCompiled=False, dexoptDetail="dexopt state not reported for the package", dexoptReason=None)
+    section = []
+    for line in lines[header + 1 :]:
+        if line and not line.startswith("    "):
+            break
+        section.append(line.strip())
+    statuses = re.findall(r"\[status=([A-Za-z_-]+)\]", " ".join(section))
+    reasons = re.findall(r"\[reason=([A-Za-z_-]+)\]", " ".join(section))
+    if not statuses:
+        return dict(dexoptStatus=None, dexoptCompiled=False, dexoptDetail="no dexopt status within the package entry", dexoptReason=None)
+    primary = statuses[0]
+    return dict(
+        dexoptStatus=primary,
+        dexoptCompiled=primary != UNCOMPILED_STATUS,
+        dexoptDetail=(
+            "uncompiled: dexes are interpreted from the APK"
+            if primary == UNCOMPILED_STATUS
+            else f"dexopt status={primary}"
+        ),
+        dexoptReason=reasons[0] if reasons else None,
+    )
+
+
+def dexopt_record(installs=(), readings=None):
+    """One dexopt verdict plus the commands it is valid for, shaped for metadata.json."""
+    reading = readings[-1] if readings else dexopt_reading()
+    return dict(
+        **reading,
+        dexoptReadings=readings or [reading],
+        dexoptCompileCommands=[adb_command(installs)] if installs else [compiled_command()],
+        dexoptCheckedAfter=installs or None,
+        dexoptSettleCommands=[adb_command(("shell", *DEXOPT_SETTLE_COMMAND))] if installs else [],
+    )
+
+
+def compile_installed_app():
+    """Compile the installed dev package for speed and return its parsed dexopt status.
+
+    Call after any install: `cmd package compile -m verify -f` costs seconds per
+    dex and persists until the next install. An install that PackageManager
+    reports as finished can restart dexopt on its own, so the status is re-read.
+    """
+    require_installed_app()
+    compile_argv = ["shell", "cmd", "package", "compile", "-m", COMPILED_STATUS, "-f", PACKAGE]
+    adb(*compile_argv)
+    adb(*DEXOPT_SETTLE_COMMAND)
+    time.sleep(DEXOPT_SETTLE_SECONDS)
+    readings = []
+    for attempt in range(DEXOPT_POLLS):
+        readings.append(dexopt_reading())
+        if readings[-1]["dexoptCompiled"]:
+            break
+        if attempt + 1 < DEXOPT_POLLS:
+            time.sleep(DEXOPT_POLL_SECONDS)
+    return dexopt_record(compile_argv, readings)
+
+
+def require_compiled_install():
+    """Refuse a capture on an uncompiled install; every measured run must name its compile state."""
+    status = dexopt_record()
+    if not status["dexoptCompiled"]:
+        raise RuntimeError(
+            f"{PACKAGE} is at dexopt status={status['dexoptStatus'] or 'unknown'}; refusing to measure an "
+            f"uncompiled install. Run: {compiled_command()}"
+        )
+    return status
 
 
 def wall_ms():
