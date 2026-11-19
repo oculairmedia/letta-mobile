@@ -104,9 +104,15 @@ export function render(s, w, h) {
 /** One typed-array copy into Skia's wasm memory at `address`; false when that memory is not reachable. */
 export function copyIntoHeap(skiko, pixels, address) {
   const memory = skiko && skiko._ && skiko._.memory;
-  if (!memory) return false;
-  new Uint8Array(memory.buffer, address, pixels.length).set(pixels);
-  return true;
+  if (!memory || !memory.buffer) return false;
+  const offset = address >>> 0;
+  if (offset + pixels.length > memory.buffer.byteLength) return false;
+  try {
+    new Uint8Array(memory.buffer, offset, pixels.length).set(pixels);
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 export function pixelByte(pixels, index) {

@@ -133,7 +133,12 @@
             session.state = 'closed';
             sessions.delete(id);
             await Promise.allSettled([...session.relays].map((relayId) => window.irohRelayClose(relayId)));
-            await session.native.close();
+            try {
+                await session.native.close();
+            } catch (error) {
+                console.warn('Iroh session close deferred until in-flight call settles', error);
+                return;
+            }
             await Promise.allSettled(session.drains);
             session.native.free();
         };
