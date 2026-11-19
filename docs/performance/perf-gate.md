@@ -448,6 +448,23 @@ Rebuild verdicts without device access using `run-core-loop.py --rescore
 replays image analysis and normalizes the raw logs, preserving original JSON
 before overwriting verdicts. The MP4 and raw log/XML files are never changed.
 
+Every install of `com.letta.mobile.dev` must be compiled before it is measured.
+A fresh `adb install -r` leaves the package at `status=run-from-apk`, so all
+dexes are interpreted: cold start measured 7401 ms (n=20) and Perfetto showed
+9.6 s in `OpenDexFilesFromOat`, against 1018 ms (n=10) after
+`adb shell cmd package compile -m verify -f com.letta.mobile.dev`
+(status=verify). `run-core-loop.py --install` therefore runs that compile
+immediately after installing and before the first launch; every capture, with
+or without `--install`, records the parsed `dumpsys package dexopt` status in
+`metadata.json` (`dexoptStatus`, `dexoptCompiled`, `dexoptReadings`,
+`dexoptCompileCommands`, `dexoptCheckedAfter`) and refuses to run while the
+status is `run-from-apk`, printing the compile command to run. The APK-mismatch
+error prints both the installed and capture hashes plus the `--apk` hint, so a
+harness checked out here while the installed APK came from a worktree is
+diagnosable. `scripts/device-loop.sh` runs the same compile after its app
+install and prints the status; skip it only with `DEVICE_LOOP_SKIP_DEXOPT=1`,
+which makes the loop's timings non-comparable.
+
 Run fixture tests with `node --test scripts/test-sites/mini-bench/*.test.cjs`
 and scorer tests with `python3 -m pytest
 scripts/test-sites/mini-bench/test_*core_loop.py`. Pixel acceptance requires
