@@ -260,12 +260,15 @@ internal fun rememberAndroidConnection(shell: WorkspaceShell): BackendConnection
     val sessions = shell.drawerModel.sources.sessions
     val error by sessions.sessionError.collectAsStateWithLifecycle()
     val agents by shell.drawerModel.agents.collectAsStateWithLifecycle()
-    return when {
-        shell.config == null -> BackendConnectionStatus.Unconfigured
-        error != null -> BackendConnectionStatus.Failed(error?.message ?: "Couldn't reach the backend")
-        agents.isEmpty() -> BackendConnectionStatus.Connecting
-        else -> BackendConnectionStatus.Connected(shell.config.toBackendLabel().orEmpty())
-    }
+    return androidConnection(shell.config, error, agentsLoaded = agents.isNotEmpty())
+}
+
+/** The one rule behind [rememberAndroidConnection], for callers that already hold the inputs. */
+internal fun androidConnection(config: LettaConfig?, error: Throwable?, agentsLoaded: Boolean): BackendConnectionStatus = when {
+    config == null -> BackendConnectionStatus.Unconfigured
+    error != null -> BackendConnectionStatus.Failed(error.message ?: "Couldn't reach the backend")
+    !agentsLoaded -> BackendConnectionStatus.Connecting
+    else -> BackendConnectionStatus.Connected(config.toBackendLabel().orEmpty())
 }
 
 /** Home's connection hero until the backend is there; null once it is. */
