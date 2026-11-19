@@ -160,6 +160,10 @@ internal class TurnTracker(private val policy: EndOfTurnPolicy, format: AudioFra
     var voicedSamples: Long = 0
         private set
 
+    /** Where the last voiced hop of the candidate or turn being tracked (or of the last one) ended. */
+    var lastVoiceEnd: Long = 0
+        private set
+
     fun onHop(hopResult: HopObservation): TurnSignal = when (val current = phase) {
         TurnPhase.Quiet -> quiet(hopResult)
         is TurnPhase.Candidate -> candidate(current, hopResult)
@@ -176,6 +180,7 @@ internal class TurnTracker(private val policy: EndOfTurnPolicy, format: AudioFra
     private fun quiet(observed: HopObservation): TurnSignal {
         if (observed.probability.value < thresholds(observed).enter) return TurnSignal.None
         voicedSamples = hop.samples.toLong()
+        lastVoiceEnd = observed.end.value
         phase = TurnPhase.Candidate(observed.end.value - hop.samples, observed.end.value)
         return TurnSignal.Candidate
     }
@@ -184,7 +189,7 @@ internal class TurnTracker(private val policy: EndOfTurnPolicy, format: AudioFra
     private fun candidate(current: TurnPhase.Candidate, observed: HopObservation): TurnSignal {
         val end = observed.end.value
         val voiced = observed.probability.value >= thresholds(observed).exit
-        if (voiced) voicedSamples += hop.samples
+        if (voiced) countVoice(end)
         val lastVoice = if (voiced) end else current.lastVoice
         if (!stillOpen(current.start, end, voiced, lastVoice)) return abandon()
         if (voicedSamples >= needed(observed)) {
@@ -216,7 +221,7 @@ internal class TurnTracker(private val policy: EndOfTurnPolicy, format: AudioFra
     private fun speaking(current: TurnPhase.Speaking, observed: HopObservation): TurnSignal {
         val end = observed.end.value
         val voiced = observed.probability.value >= thresholds(observed).exit
-        if (voiced) voicedSamples += hop.samples
+        if (voiced) countVoice(end)
         val lastVoice = if (voiced) end else current.lastVoice
         phase = TurnPhase.Speaking(current.start, lastVoice)
         val reason = when {
@@ -226,6 +231,11 @@ internal class TurnTracker(private val policy: EndOfTurnPolicy, format: AudioFra
         }
         phase = TurnPhase.Quiet
         return TurnSignal.Ended(reason)
+    }
+
+    private fun countVoice(end: Long) {
+        voicedSamples += hop.samples
+        lastVoiceEnd = end
     }
 
     private fun thresholds(observed: HopObservation): SpeechThresholds =

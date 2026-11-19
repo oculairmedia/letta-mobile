@@ -72340,7 +72340,7 @@ final class com.letta.mobile.data.voice.speech/SentenceChunker { // com.letta.mo
 }
 
 final class com.letta.mobile.data.voice.vad.ear/EarTurnReport { // com.letta.mobile.data.voice.vad.ear/EarTurnReport|null[0]
-    constructor <init>(kotlin.time/Duration, kotlin/Double, kotlin/Double?) // com.letta.mobile.data.voice.vad.ear/EarTurnReport.<init>|<init>(kotlin.time.Duration;kotlin.Double;kotlin.Double?){}[0]
+    constructor <init>(kotlin.time/Duration, kotlin/Double, kotlin/Double?, kotlin.time/Duration = ...) // com.letta.mobile.data.voice.vad.ear/EarTurnReport.<init>|<init>(kotlin.time.Duration;kotlin.Double;kotlin.Double?;kotlin.time.Duration){}[0]
 
     final val floorDb // com.letta.mobile.data.voice.vad.ear/EarTurnReport.floorDb|{}floorDb[0]
         final fun <get-floorDb>(): kotlin/Double? // com.letta.mobile.data.voice.vad.ear/EarTurnReport.floorDb.<get-floorDb>|<get-floorDb>(){}[0]
@@ -72348,13 +72348,16 @@ final class com.letta.mobile.data.voice.vad.ear/EarTurnReport { // com.letta.mob
         final fun <get-peakDb>(): kotlin/Double // com.letta.mobile.data.voice.vad.ear/EarTurnReport.peakDb.<get-peakDb>|<get-peakDb>(){}[0]
     final val peakSnrDb // com.letta.mobile.data.voice.vad.ear/EarTurnReport.peakSnrDb|{}peakSnrDb[0]
         final fun <get-peakSnrDb>(): kotlin/Double? // com.letta.mobile.data.voice.vad.ear/EarTurnReport.peakSnrDb.<get-peakSnrDb>|<get-peakSnrDb>(){}[0]
+    final val trailingSilence // com.letta.mobile.data.voice.vad.ear/EarTurnReport.trailingSilence|{}trailingSilence[0]
+        final fun <get-trailingSilence>(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/EarTurnReport.trailingSilence.<get-trailingSilence>|<get-trailingSilence>(){}[0]
     final val voiced // com.letta.mobile.data.voice.vad.ear/EarTurnReport.voiced|{}voiced[0]
         final fun <get-voiced>(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/EarTurnReport.voiced.<get-voiced>|<get-voiced>(){}[0]
 
     final fun component1(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/EarTurnReport.component1|component1(){}[0]
     final fun component2(): kotlin/Double // com.letta.mobile.data.voice.vad.ear/EarTurnReport.component2|component2(){}[0]
     final fun component3(): kotlin/Double? // com.letta.mobile.data.voice.vad.ear/EarTurnReport.component3|component3(){}[0]
-    final fun copy(kotlin.time/Duration = ..., kotlin/Double = ..., kotlin/Double? = ...): com.letta.mobile.data.voice.vad.ear/EarTurnReport // com.letta.mobile.data.voice.vad.ear/EarTurnReport.copy|copy(kotlin.time.Duration;kotlin.Double;kotlin.Double?){}[0]
+    final fun component4(): kotlin.time/Duration // com.letta.mobile.data.voice.vad.ear/EarTurnReport.component4|component4(){}[0]
+    final fun copy(kotlin.time/Duration = ..., kotlin/Double = ..., kotlin/Double? = ..., kotlin.time/Duration = ...): com.letta.mobile.data.voice.vad.ear/EarTurnReport // com.letta.mobile.data.voice.vad.ear/EarTurnReport.copy|copy(kotlin.time.Duration;kotlin.Double;kotlin.Double?;kotlin.time.Duration){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.vad.ear/EarTurnReport.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.vad.ear/EarTurnReport.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.vad.ear/EarTurnReport.toString|toString(){}[0]
