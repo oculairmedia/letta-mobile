@@ -48,12 +48,14 @@ class FakeDevice:
         self.apk_path = apk_path
         self.digest = digest
         self.calls = []
+        self.timeouts = []
 
-    def dispatch(self, *args):
-        return self.adb(*(arg.render() if hasattr(arg, "render") else arg for arg in args))
+    def dispatch(self, *args, timeout=None):
+        return self.adb(*(arg.render() if hasattr(arg, "render") else arg for arg in args), timeout=timeout)
 
-    def adb(self, *args):
+    def adb(self, *args, timeout=None):
         self.calls.append(args)
+        self.timeouts.append((args, timeout))
         if args[:2] == ("install", "-r"):
             return "Success"
         if args[:4] == ("shell", "cmd", "package", "compile"):
@@ -296,3 +298,14 @@ def test_trial_records_dexopt_status_before_any_trial_directory(tmp_path):
     require_compiled.assert_called_once_with()
     select_conversation.assert_not_called()
     assert trial.metadata["dexoptStatus"] == "run-from-apk"
+
+
+def test_compile_gets_its_own_timeout_budget_above_the_default_adb_timeout():
+    """A forced verify compile took 27.3 s on the Pixel 2 XL; the 30 s default would race it."""
+    fake = verify_fake()
+    with patch.object(device, "adb", side_effect=fake.dispatch), patch.object(device.time, "sleep"):
+        device.compile_installed_app()
+    compile_timeouts = [t for args, t in fake.timeouts if args[:4] == ("shell", "cmd", "package", "compile")]
+    assert compile_timeouts == [device.DEXOPT_COMPILE_TIMEOUT_SECONDS]
+    assert device.DEXOPT_COMPILE_TIMEOUT_SECONDS >= 120
+    assert all(t is None for args, t in fake.timeouts if args[:4] != ("shell", "cmd", "package", "compile"))

@@ -20,12 +20,20 @@ DEXOPT_SETTLE_SECONDS = 3
 DEXOPT_SETTLE_COMMAND = ("am", "force-stop", PACKAGE)
 
 
-def command(argv, **kwargs):
-    return run_tool(*tool_arguments(argv), check=True, capture_output=True, timeout=30, **kwargs).stdout
+ADB_TIMEOUT_SECONDS = 30
+# Pixel 2 XL, 2026-11-19: a forced verify compile of the 26-dex debug APK took
+# 27.3 s, too close to the default adb timeout; give the compile its own budget.
+DEXOPT_COMPILE_TIMEOUT_SECONDS = 300
 
 
-def adb(*args):
-    return command(["adb", "-s", SERIAL, *args]).decode().strip()
+def command(argv, timeout=ADB_TIMEOUT_SECONDS, **kwargs):
+    return run_tool(*tool_arguments(argv), check=True, capture_output=True, timeout=timeout, **kwargs).stdout
+
+
+def adb(*args, timeout=None):
+    argv = ["adb", "-s", SERIAL, *args]
+    output = command(argv) if timeout is None else command(argv, timeout=timeout)
+    return output.decode().strip()
 
 
 def installed_apk_path():
@@ -101,7 +109,7 @@ def compile_installed_app():
     """
     require_installed_app()
     compile_argv = ["shell", "cmd", "package", "compile", "-m", COMPILED_STATUS, "-f", PACKAGE]
-    adb(*compile_argv)
+    adb(*compile_argv, timeout=DEXOPT_COMPILE_TIMEOUT_SECONDS)
     adb(*DEXOPT_SETTLE_COMMAND)
     time.sleep(DEXOPT_SETTLE_SECONDS)
     readings = []
