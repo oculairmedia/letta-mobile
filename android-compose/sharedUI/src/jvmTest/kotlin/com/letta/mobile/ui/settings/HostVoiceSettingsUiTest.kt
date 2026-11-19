@@ -2,11 +2,17 @@
 
 package com.letta.mobile.ui.settings
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
@@ -65,6 +71,12 @@ class HostVoiceSettingsUiTest {
 
     private fun access(host: Host) = VoiceSetupAccess(store, shared = SharedVoiceSetup(host)) { null }
 
+    /** The section in a scrolling column, as the Settings page shows it: the admin editor runs past one screen. */
+    @Composable
+    private fun Section(access: VoiceSetupAccess) {
+        MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) { VoiceSettingsSection(access) } }
+    }
+
     private fun row(key: String) = SettingsSectionTags.ROW_PREFIX + key
 
     private fun action(key: String) = SettingsSectionTags.ACTION_PREFIX + key
@@ -72,7 +84,7 @@ class HostVoiceSettingsUiTest {
     @Test
     fun aDeviceWithoutAdminRightsSeesTheSharedServerReadOnlyAndIsNotAskedForOne() = runComposeUiTest {
         val host = Host(CONFIGURED, admin = false)
-        setContent { MaterialTheme { VoiceSettingsSection(access(host)) } }
+        setContent { Section(access(host)) }
         waitUntil(timeoutMillis = 5_000) { host.calls.count { it.first == HostVoiceWire.SETUP_GET } >= 1 }
         waitForIdle()
 
@@ -88,12 +100,12 @@ class HostVoiceSettingsUiTest {
     @Test
     fun anAdminDeviceEditsTheSharedServerForEveryDevice() = runComposeUiTest {
         val host = Host(CONFIGURED, admin = true)
-        setContent { MaterialTheme { VoiceSettingsSection(access(host)) } }
+        setContent { Section(access(host)) }
         waitUntil(timeoutMillis = 5_000) { host.calls.any { it.first == HostVoiceWire.SETUP_TEST } }
         waitForIdle()
 
-        onNodeWithTag(row(VoiceSettingsKeys.HOST_KEY_FIELD)).performTextInput("sk-shared")
-        onNodeWithTag(action(VoiceSettingsKeys.HOST_SAVE)).performClick()
+        onNodeWithTag(row(VoiceSettingsKeys.HOST_KEY_FIELD)).performScrollTo().performTextInput("sk-shared")
+        onNodeWithTag(action(VoiceSettingsKeys.HOST_SAVE)).performScrollTo().performClick()
         waitUntil(timeoutMillis = 5_000) { host.writes().isNotEmpty() }
 
         val write = host.writes().single()
@@ -107,11 +119,11 @@ class HostVoiceSettingsUiTest {
     @Test
     fun thisDeviceAcknowledgesItsRecordingsGoToTheSharedServer() = runComposeUiTest {
         val host = Host(CONFIGURED, admin = false)
-        setContent { MaterialTheme { VoiceSettingsSection(access(host)) } }
+        setContent { Section(access(host)) }
         waitUntil(timeoutMillis = 5_000) { host.calls.isNotEmpty() }
         waitForIdle()
 
-        onNodeWithTag(row(VoiceSettingsKeys.HOST_ACK)).performClick()
+        onNodeWithTag(row(VoiceSettingsKeys.HOST_ACK)).performScrollTo().performClick()
 
         assertEquals(EndpointOrigin("https://speech.example.invalid:443"), store.setup.value.hostAudioAck)
     }
@@ -120,11 +132,11 @@ class HostVoiceSettingsUiTest {
     fun anAdminDeviceSharesItsOwnServerWithItsKeyAfterConfirming() = runComposeUiTest {
         assertNull(store.save(VoiceSetupDraft("https://speech.example.invalid", apiKey = "sk-local", consent = true)))
         val host = Host(NOTHING, admin = true)
-        setContent { MaterialTheme { VoiceSettingsSection(access(host)) } }
+        setContent { Section(access(host)) }
         waitUntil(timeoutMillis = 5_000) { host.calls.any { it.first == HostVoiceWire.SETUP_TEST } }
         waitForIdle()
 
-        onNodeWithTag(row(VoiceSettingsKeys.SHARE)).performClick()
+        onNodeWithTag(row(VoiceSettingsKeys.SHARE)).performScrollTo().performClick()
         onNodeWithText("Share").performClick()
         waitUntil(timeoutMillis = 5_000) { host.writes().isNotEmpty() }
         waitForIdle()
@@ -138,7 +150,7 @@ class HostVoiceSettingsUiTest {
     fun aDeviceWithoutAdminRightsIsToldAnAdminCanShareItsServer() = runComposeUiTest {
         assertNull(store.save(VoiceSetupDraft("https://speech.example.invalid", consent = true)))
         val host = Host(NOTHING, admin = false)
-        setContent { MaterialTheme { VoiceSettingsSection(access(host)) } }
+        setContent { Section(access(host)) }
         waitUntil(timeoutMillis = 5_000) { host.calls.any { it.first == HostVoiceWire.SETUP_TEST } }
         waitForIdle()
 
