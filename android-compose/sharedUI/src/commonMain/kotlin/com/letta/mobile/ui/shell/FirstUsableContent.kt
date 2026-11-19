@@ -8,8 +8,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.shell.ShellDestination
-import com.letta.mobile.util.Telemetry
-import com.letta.mobile.util.attr
 import kotlinx.coroutines.delay
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -59,12 +57,8 @@ fun ReportFirstUsableContent(usable: Boolean, timeout: Duration = FIRST_USABLE_T
         timedOut -> FirstUsableReason.Timeout
         else -> null
     }
-    var logged by remember { mutableStateOf(false) }
-    LaunchedEffect(reason) {
-        if (reason == null || logged) return@LaunchedEffect
-        logged = true
-        Telemetry.event("FirstUsable", "drawn", "reason" attr reason.name)
-    }
+    // No app telemetry event here: ui.shell must not import util (import cycle), and the platform's
+    // own "Fully drawn" log, Kotzilla and Macrobenchmark timeToFullDisplay already record this moment.
     ReportHostDrawnWhen(reason != null)
 }
 
