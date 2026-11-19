@@ -72,6 +72,9 @@ object LettaMotionTokens {
     const val FAST_FADE_IN_MILLIS = 120
     const val FAST_FADE_OUT_MILLIS = 90
     const val CHIP_MILLIS = 150
+
+    /** How long rows may still move by themselves after new content stops landing: a settle's placement spring. */
+    const val ROW_MOTION_SETTLE_MILLIS = 1_000
 }
 
 object LettaShapeTokens {

@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -84,6 +85,7 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
     )
     // One midnight watcher for the whole list, not one per divider.
     val today = rememberCurrentDate()
+    val motion = rememberTimelineRowMotionGate(listState, state.isRunInFlight)
     val pinned = rememberPinnedPrompt(listState, leading + rows.size, params.topReserve) { index ->
         (rows.getOrNull(index - leading) as? TimelineRow.Item)?.item
     }
@@ -110,6 +112,8 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
                 agentId = state.agentId,
                 messages = state.messages,
             ),
+            moves = motion,
+            listState = listState,
         )
     }
 }
@@ -171,11 +175,13 @@ private fun LazyListScope.legacyRows(
     bindings: TimelineRowBindings,
     today: LocalDate,
     edges: LegacyEdgeRows,
+    moves: State<Boolean>,
+    listState: LazyListState,
 ) {
     if (edges.thinking) item(key = THINKING_KEY) { ThinkingRow(edges.messages) }
     items(count = rows.size, key = { rows[it].key }, contentType = { rows[it].contentType() }) { index ->
         val row = rows[index]
-        val motion = timelineRowMotion(fadesIn = !row.isUserPrompt())
+        val motion = timelineRowMotion(fadesIn = !row.isUserPrompt(), moves = timelineRowMoves(moves, live = false, listState))
         // A message, a run and a tool group all draw through the one row call: a lone tool row that
         // grows into a group keeps its key, and with the one call site its composition too.
         val item = row.drawnItem()

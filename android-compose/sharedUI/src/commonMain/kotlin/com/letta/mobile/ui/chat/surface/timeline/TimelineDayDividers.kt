@@ -1,7 +1,11 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.ui.chat.surface.timeline.days.TimelineDays
+import com.letta.mobile.ui.chat.surface.timeline.days.rememberCurrentDate
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 
@@ -67,4 +71,18 @@ internal fun pagedBoundaryDate(
     // stays in the open section, as an unreadable stamp does in [withDayDividers].
     val olderKnown = olderDay ?: return null
     return newerDay.takeIf { it > olderKnown }
+}
+
+/** The reader's date, and the list's parsed row dates. */
+internal class TimelineCalendar(val today: LocalDate, val days: TimelineDays)
+
+/**
+ * The reader's date, and the list's row dates: each parsed once per [key] (the list's
+ * presentation), not on every composition of a row.
+ */
+@Composable
+internal fun rememberTimelineCalendar(key: CanonicalTimelinePresentation): TimelineCalendar {
+    val today = rememberCurrentDate()
+    val days = remember(key) { TimelineDays() }
+    return remember(today, days) { TimelineCalendar(today, days) }
 }

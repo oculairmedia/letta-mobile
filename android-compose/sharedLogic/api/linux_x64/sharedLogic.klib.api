@@ -82614,6 +82614,8 @@ final object com.letta.mobile.ui.theme/LettaMotionTokens { // com.letta.mobile.u
         final fun <get-FAST_FADE_IN_MILLIS>(): kotlin/Int // com.letta.mobile.ui.theme/LettaMotionTokens.FAST_FADE_IN_MILLIS.<get-FAST_FADE_IN_MILLIS>|<get-FAST_FADE_IN_MILLIS>(){}[0]
     final const val FAST_FADE_OUT_MILLIS // com.letta.mobile.ui.theme/LettaMotionTokens.FAST_FADE_OUT_MILLIS|{}FAST_FADE_OUT_MILLIS[0]
         final fun <get-FAST_FADE_OUT_MILLIS>(): kotlin/Int // com.letta.mobile.ui.theme/LettaMotionTokens.FAST_FADE_OUT_MILLIS.<get-FAST_FADE_OUT_MILLIS>|<get-FAST_FADE_OUT_MILLIS>(){}[0]
+    final const val ROW_MOTION_SETTLE_MILLIS // com.letta.mobile.ui.theme/LettaMotionTokens.ROW_MOTION_SETTLE_MILLIS|{}ROW_MOTION_SETTLE_MILLIS[0]
+        final fun <get-ROW_MOTION_SETTLE_MILLIS>(): kotlin/Int // com.letta.mobile.ui.theme/LettaMotionTokens.ROW_MOTION_SETTLE_MILLIS.<get-ROW_MOTION_SETTLE_MILLIS>|<get-ROW_MOTION_SETTLE_MILLIS>(){}[0]
     final const val STREAMING_SIZE_MILLIS // com.letta.mobile.ui.theme/LettaMotionTokens.STREAMING_SIZE_MILLIS|{}STREAMING_SIZE_MILLIS[0]
         final fun <get-STREAMING_SIZE_MILLIS>(): kotlin/Int // com.letta.mobile.ui.theme/LettaMotionTokens.STREAMING_SIZE_MILLIS.<get-STREAMING_SIZE_MILLIS>|<get-STREAMING_SIZE_MILLIS>(){}[0]
 }
