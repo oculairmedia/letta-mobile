@@ -1,7 +1,8 @@
 package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.messaging.AgentMessageProvenanceProjection
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
+import com.letta.mobile.data.model.toUiMediaAttachment
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
@@ -296,14 +297,11 @@ private fun TimelineEvent.Confirmed.confirmedUiToolCall(
 private fun messageAttachments(
     attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
     uiToolCalls: List<UiToolCall>?,
-): List<UiImageAttachment> {
+): List<UiMediaAttachment> {
     return if (uiToolCalls.orEmpty().any { it.generatedImageAttachments.isNotEmpty() }) {
         emptyList()
     } else {
-        attachments.map { UiImageAttachment(
-            base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize,
-            unavailableReason = it.unavailableReason, url = it.url,
-        ) }
+        attachments.map { it.toUiMediaAttachment() }
     }
 }
 

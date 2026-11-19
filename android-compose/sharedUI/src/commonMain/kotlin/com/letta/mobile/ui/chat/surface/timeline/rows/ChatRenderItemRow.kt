@@ -12,7 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.data.chat.projection.ChatRenderItem
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.common.GroupPosition
@@ -84,7 +84,7 @@ private fun WithRowFontScale(fontScale: Float, content: @Composable () -> Unit) 
 /** The full-screen image viewer the timeline shows over everything when an image is tapped. */
 @Composable
 internal fun ChatImageViewer(
-    images: List<UiImageAttachment>,
+    images: List<UiMediaAttachment>,
     initialIndex: Int,
     onDismiss: () -> Unit,
 ) {

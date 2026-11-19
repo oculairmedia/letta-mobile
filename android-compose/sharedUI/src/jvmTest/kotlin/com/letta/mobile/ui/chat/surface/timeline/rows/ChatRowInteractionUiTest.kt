@@ -47,7 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolCall
@@ -165,7 +165,7 @@ class ChatRowInteractionUiTest {
             result = "ok",
             status = "success",
             toolCallId = "img-1",
-            generatedImageAttachments = listOf(UiImageAttachment(base64 = "aaaa", mediaType = "image/png")),
+            generatedImageAttachments = listOf(UiMediaAttachment(base64 = "aaaa", mediaType = "image/png")),
         )
         assertTrue(tool.shouldInitiallyExpand())
         setContent { MaterialTheme { ToolStep(tool, "img-1", rowCallbacks()) } }
@@ -181,7 +181,7 @@ class ChatRowInteractionUiTest {
             result = "[Image: pixel.png]",
             status = "success",
             toolCallId = "read-image",
-            generatedImageAttachments = listOf(UiImageAttachment(
+            generatedImageAttachments = listOf(UiMediaAttachment(
                 base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==",
                 mediaType = "image/png",
             )),

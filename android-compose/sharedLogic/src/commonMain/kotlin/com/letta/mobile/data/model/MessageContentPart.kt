@@ -1,6 +1,7 @@
 package com.letta.mobile.data.model
 
 import com.letta.mobile.data.attachment.ImageUnavailableReason
+import com.letta.mobile.data.media.MediaKind
 import androidx.compose.runtime.Immutable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -41,9 +42,10 @@ sealed class MessageContentPart {
     data class Text(val text: String) : MessageContentPart()
 
     /**
-     * An inline image. On the wire this is encoded as a Letta `ImageContent`
-     * with a `Base64Image` source. The `data` field is the raw base64 payload
-     * with NO `data:` URL prefix — the server's pydantic schema rejects the
+     * An inline media part: an image, or since audio and video parts are parsed through the same
+     * path, any [kind] the agent shares. Only [MediaKind.Image] parts are sent; on the wire one is
+     * encoded as a Letta `ImageContent` with a `Base64Image` source. The `data` field is the raw
+     * base64 payload with NO `data:` URL prefix — the server's pydantic schema rejects the
      * prefixed form.
      *
      * @param base64 the base64-encoded image bytes (no `data:` prefix)
@@ -72,6 +74,9 @@ sealed class MessageContentPart {
          * that feed image bytes into Coil/AsyncImage.
          */
         fun toDataUrl(): String = url ?: "data:$mediaType;base64,$base64"
+
+        /** What this part is, from [mediaType] and then the extension of [url]. */
+        val kind: MediaKind get() = MediaKind.of(mediaType, url)
     }
 }
 
@@ -81,7 +86,8 @@ sealed class MessageContentPart {
  * see class docs on [MessageContentPart] for the exact schema.
  */
 fun List<MessageContentPart>.toJsonArray(): JsonArray {
-    val objs = map { part ->
+    // Letta's content union has no audio or video part: a shared media part is shown, never re-sent.
+    val objs = filter { it !is MessageContentPart.Image || it.kind == MediaKind.Image }.map { part ->
         when (part) {
             is MessageContentPart.Text -> JsonObject(
                 mapOf(

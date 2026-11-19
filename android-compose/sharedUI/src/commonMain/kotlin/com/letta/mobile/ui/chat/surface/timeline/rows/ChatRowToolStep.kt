@@ -316,8 +316,8 @@ internal val LocalToolImagesInline = staticCompositionLocalOf { true }
 @Composable
 internal fun ToolGeneratedImages(toolCall: UiToolCall, callbacks: ChatRowCallbacks) {
     if (toolCall.generatedImageAttachments.isEmpty()) return
-    val images = remember(toolCall.generatedImageAttachments) { toolCall.generatedImageAttachments.toImmutableList() }
-    ChatImageAttachmentsGrid(tap = ImageTap(images, callbacks.onImageTap), modifier = Modifier.fillMaxWidth())
+    val attachments = remember(toolCall.generatedImageAttachments) { toolCall.generatedImageAttachments.toImmutableList() }
+    ChatMediaAttachments(attachments, callbacks.onImageTap, Modifier.fillMaxWidth())
 }
 
 private const val TARGET_ALPHA = 0.8f

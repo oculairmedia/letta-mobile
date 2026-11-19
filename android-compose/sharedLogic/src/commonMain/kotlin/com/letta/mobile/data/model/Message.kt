@@ -1,6 +1,5 @@
 package com.letta.mobile.data.model
 
-import com.letta.mobile.data.attachment.ImageUnavailableReason
 import androidx.compose.runtime.Immutable
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
@@ -170,7 +169,7 @@ private fun extractAttachments(raw: JsonElement?): List<MessageContentPart.Image
 private fun JsonElement?.primitiveContentOrNull(): String? =
     (this as? JsonPrimitive)?.contentOrNull
 
-private fun JsonObject.fieldContent(key: String): String? =
+internal fun JsonObject.fieldContent(key: String): String? =
     this[key].primitiveContentOrNull()
 
 private fun JsonElement?.parseJsonStringPayload(): JsonElement? {
@@ -200,117 +199,11 @@ private fun firstNestedContent(obj: JsonObject, vararg keys: String): String? {
     return null
 }
 
-private fun extractObjectAttachments(obj: JsonObject): List<MessageContentPart.Image> {
-    val current = when (obj.fieldContent("type")) {
-            // Letta's native shape: { type:"image", source:{ type:"base64", media_type, data } | { type:"url", url } }
-            "image" -> parseLettaImagePart(obj)
-            // Legacy / OpenAI-style shape kept for backward compatibility with
-            // anything previously persisted or echoed by older server builds.
-            "image_url" -> {
-                val url = (obj["image_url"] as? JsonObject)
-                    ?.fieldContent("url")
-                url?.let { parseImageDataUrl(it) }
-            }
-            else -> null
-    }
-    return listOfNotNull(current) + obj.values.flatMap { extractAttachments(it) }
-}
+private fun extractObjectAttachments(obj: JsonObject): List<MessageContentPart.Image> =
+    listOfNotNull(parseMediaPart(obj)) + obj.values.flatMap { extractAttachments(it) }
 
 private fun extractContentPartResponse(raw: JsonElement?): String? {
     return extractContent(raw).takeIf { it.isNotBlank() }
-}
-
-/**
- * Dispatches to the per-shape image parsers.
- *
- * Two shapes are accepted:
- *   1. **Flat** `{ "type":"image", "data":"…", "mimeType":"…" }` — live wire
- *      and persisted rows occasionally emit this without a `source` wrapper;
- *      accepting the flat form preserves images forwarded between clients.
- *   2. **Wrapped** `{ "type":"image", "source": { "type":"base64"|"url"|"letta", … } }`
- *      — the canonical letta wire shape.
- *
- * Per-shape decoders live as siblings so the dispatcher stays a flat
- * "try flat, then wrapped" cascade and CodeScene's Complex-Method
- * biomarker (≤2 branches in the dispatch site) does not regress when a
- * fourth shape lands.
- */
-private fun parseLettaImagePart(obj: JsonObject): MessageContentPart.Image =
-    ImageUnavailableReason.fromWire(obj.fieldContent("unavailable_reason"))?.let { reason ->
-        MessageContentPart.Image("", "image/unknown", unavailableReason = reason)
-    } ?: parseFlatLettaImagePart(obj) ?: parseWrappedLettaImagePart(obj)
-        ?: MessageContentPart.Image(
-            base64 = obj.fieldContent("data").orEmpty(),
-            mediaType = obj.fieldContent("mimeType") ?: obj.fieldContent("media_type") ?: "image/unknown",
-            unavailableReason = when {
-                !obj.fieldContent("data").isNullOrBlank() -> null
-                obj["source"] != null || obj["image_ref"] != null -> ImageUnavailableReason.UnsupportedSource
-                else -> ImageUnavailableReason.Missing
-            },
-        )
-
-/**
- * Flat image shape: `{ "type":"image", "data":"…", "mimeType":"…" }`.
- * `media_type` is also accepted for letta wire compatibility; `mimeType`
- * wins when both are set (live wire uses `mimeType`; some legacy rows
- * persisted `media_type`). Returns null on missing/blank fields so the
- * wrapped-shape decoder still has a chance.
- */
-private fun parseFlatLettaImagePart(obj: JsonObject): MessageContentPart.Image? {
-    val data = obj.fieldContent("data")
-    val mediaType = obj.fieldContent("mimeType") ?: obj.fieldContent("media_type")
-    if (data.isNullOrBlank() || mediaType.isNullOrBlank()) return null
-    return MessageContentPart.Image(base64 = data, mediaType = mediaType)
-}
-
-/**
- * Wrapped image shape: `{ "type":"image", "source": { "type":<variant>, … } }`.
- * Dispatches to the per-variant decoder based on `source.type`. Returns
- * null when `source` is absent, malformed, or names an unknown variant.
- */
-private fun parseWrappedLettaImagePart(obj: JsonObject): MessageContentPart.Image? {
-    val source = obj["source"] as? JsonObject ?: return null
-    return when (source.fieldContent("type")) {
-        "base64" -> parseBase64ImageSource(source)
-        "url" -> parseUrlImageSource(source)
-        // "letta" — server-managed file reference. Empirically the server
-        // inlines the raw base64 under `data` alongside a `file_id` that
-        // would let us fetch via /v1/files if needed. Since the payload is
-        // already present, decode it directly and render inline (no extra
-        // network roundtrip). See bead letta-mobile-mge5.24.
-        "letta" -> parseBase64ImageSource(source)
-        else -> null
-    }
-}
-
-/** Decodes a `source.type == "base64" | "letta"` image source. */
-private fun parseBase64ImageSource(source: JsonObject): MessageContentPart.Image? {
-    val mediaType = source.fieldContent("media_type")
-    val data = source.fieldContent("data")
-    return MessageContentPart.Image(
-        base64 = data.orEmpty(), mediaType = mediaType?.takeIf { it.isNotBlank() } ?: "image/unknown",
-        unavailableReason = ImageUnavailableReason.Missing.takeIf { data.isNullOrBlank() },
-    )
-}
-
-/** Decodes inline data URLs and HTTP sources supported by the host image loader. */
-private fun parseUrlImageSource(source: JsonObject): MessageContentPart.Image? {
-    val url = source.fieldContent("url") ?: return null
-    return parseImageDataUrl(url)
-}
-
-private fun parseImageDataUrl(url: String): MessageContentPart.Image? {
-    if (url.startsWith("https://") || url.startsWith("http://")) {
-        return MessageContentPart.Image("", "image/unknown", url = url)
-    }
-    val prefix = "data:"
-    val separator = ";base64,"
-    val separatorIndex = url.indexOf(separator)
-    if (!url.startsWith(prefix) || separatorIndex < 0) return null
-    val mediaType = url.substring(prefix.length, separatorIndex)
-    val base64 = url.substring(separatorIndex + separator.length)
-    if (mediaType.isBlank() || base64.isBlank()) return null
-    return MessageContentPart.Image(base64 = base64, mediaType = mediaType)
 }
 
 @Serializable

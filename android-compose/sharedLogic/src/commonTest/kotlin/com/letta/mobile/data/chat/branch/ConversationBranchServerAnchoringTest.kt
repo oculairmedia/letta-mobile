@@ -4,7 +4,7 @@ import com.letta.mobile.data.chat.branch.ConversationBranchingTest.Companion.con
 import com.letta.mobile.data.chat.branch.ConversationBranchingTest.Companion.prompt
 import com.letta.mobile.data.chat.branch.ConversationBranchingTest.Companion.reply
 import com.letta.mobile.data.model.AssistantMessage
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UserMessage
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -113,7 +113,7 @@ class ConversationBranchServerAnchoringTest {
     @Test
     fun aRerunCarriesThePromptsImages() = runTest {
         val backend = Backend(stored)
-        val withImage = prompt("message-3", "add a museum").copy(attachments = listOf(UiImageAttachment("aGk=", "image/png")))
+        val withImage = prompt("message-3", "add a museum").copy(attachments = listOf(UiMediaAttachment("aGk=", "image/png")))
 
         val rerun = ConversationBranching(backend.asBackend()).rerun(source(emptyList()), withImage)
 
@@ -122,7 +122,8 @@ class ConversationBranchServerAnchoringTest {
 
     @Test
     fun aPromptWhoseImagesWereNotKeptCannotBeRerun() {
-        val pointerOnly = prompt("message-3", "add a museum").copy(attachments = listOf(UiImageAttachment("", "image/png", storedByteSize = 9)))
+        val pointerOnly = prompt("message-3", "add a museum")
+            .copy(attachments = listOf(UiMediaAttachment("", "image/png", storedByteSize = 9)))
         assertFalse(ConversationBranchPlanner.canRerun(pointerOnly))
         assertTrue(ConversationBranchPlanner.canRerun(prompt("message-3", "add a museum")))
     }

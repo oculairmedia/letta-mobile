@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.theme
 
 import androidx.compose.ui.unit.Dp
+import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 import androidx.compose.ui.unit.dp
 
 /**
@@ -24,7 +25,7 @@ object ChatRowDimens {
     val imageSingleHeight: Dp = 220.dp
 
     /** Portrait attachments fit whole inside this cap; square and landscape images follow their width. */
-    val imageSingleMaxHeight: Dp = 400.dp
+    val imageSingleMaxHeight: Dp = LettaSurfaceSizes.inlineMediaMaxHeight
 
     /** Each cell when several images share a row. */
     val imageGridHeight: Dp = 128.dp

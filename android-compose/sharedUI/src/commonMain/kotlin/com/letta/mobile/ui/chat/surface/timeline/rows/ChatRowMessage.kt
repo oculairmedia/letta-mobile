@@ -248,8 +248,8 @@ private fun ErrorBubble(text: String, labelled: Boolean = true, deliveryTimestam
 @Composable
 internal fun MessageImages(message: UiMessage, callbacks: ChatRowCallbacks) {
     if (message.attachments.isEmpty()) return
-    val images = remember(message.attachments) { message.attachments.toImmutableList() }
-    ChatImageAttachmentsGrid(tap = ImageTap(images, callbacks.onImageTap), modifier = Modifier.fillMaxWidth())
+    val attachments = remember(message.attachments) { message.attachments.toImmutableList() }
+    ChatMediaAttachments(attachments, callbacks.onImageTap, Modifier.fillMaxWidth())
 }
 
 /** Inter-agent provenance above a message: sender -> recipient, expandable to metadata. */

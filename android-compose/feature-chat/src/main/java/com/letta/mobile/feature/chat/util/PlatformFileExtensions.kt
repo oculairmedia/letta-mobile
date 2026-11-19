@@ -8,7 +8,7 @@ import android.provider.MediaStore
 import android.util.Base64
 import android.widget.Toast
 import androidx.core.content.FileProvider
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.feature.chat.R
 import io.github.vinceglb.filekit.AndroidFile
 import io.github.vinceglb.filekit.PlatformFile
@@ -24,7 +24,7 @@ val PlatformFile.uri: Uri
     }
 
 /** The shared image viewer's Save: MediaStore under Pictures/Letta, with a toast either way. */
-internal suspend fun saveAttachment(context: Context, attachment: UiImageAttachment) {
+internal suspend fun saveAttachment(context: Context, attachment: UiMediaAttachment) {
     val saved = withContext(Dispatchers.IO) { saveAttachmentToMediaStore(context, attachment) }
     context.toast(
         if (saved) {
@@ -36,7 +36,7 @@ internal suspend fun saveAttachment(context: Context, attachment: UiImageAttachm
 }
 
 /** The shared image viewer's Share: the share sheet through the chat-image FileProvider. */
-internal suspend fun shareAttachment(context: Context, attachment: UiImageAttachment) {
+internal suspend fun shareAttachment(context: Context, attachment: UiMediaAttachment) {
     val uri = withContext(Dispatchers.IO) { writeAttachmentForSharing(context, attachment) }
     if (uri == null) {
         context.toast(context.getString(R.string.screen_chat_image_share_error))
@@ -50,7 +50,7 @@ internal suspend fun shareAttachment(context: Context, attachment: UiImageAttach
     )
 }
 
-private fun saveAttachmentToMediaStore(context: Context, attachment: UiImageAttachment): Boolean {
+private fun saveAttachmentToMediaStore(context: Context, attachment: UiMediaAttachment): Boolean {
     val bytes = attachment.decodeBytesOrNull() ?: return false
     val resolver = context.contentResolver
     var uri: Uri? = null
@@ -76,7 +76,7 @@ private fun saveAttachmentToMediaStore(context: Context, attachment: UiImageAtta
     }
 }
 
-private fun writeAttachmentForSharing(context: Context, attachment: UiImageAttachment): Uri? = runCatching {
+private fun writeAttachmentForSharing(context: Context, attachment: UiMediaAttachment): Uri? = runCatching {
     val bytes = attachment.decodeBytesOrNull() ?: return null
     val imageDir = File(context.cacheDir, "shared-chat-images").apply { mkdirs() }
     val imageFile = File(imageDir, attachment.imageFilename())
@@ -84,17 +84,17 @@ private fun writeAttachmentForSharing(context: Context, attachment: UiImageAttac
     FileProvider.getUriForFile(context, "${context.packageName}.chat-image-share", imageFile)
 }.getOrNull()
 
-private fun UiImageAttachment.shareIntent(uri: Uri): Intent = Intent(Intent.ACTION_SEND).apply {
+private fun UiMediaAttachment.shareIntent(uri: Uri): Intent = Intent(Intent.ACTION_SEND).apply {
     type = mediaType
     putExtra(Intent.EXTRA_STREAM, uri)
     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 }
 
-private fun UiImageAttachment.decodeBytesOrNull(): ByteArray? = runCatching {
+private fun UiMediaAttachment.decodeBytesOrNull(): ByteArray? = runCatching {
     Base64.decode(base64, Base64.DEFAULT)
 }.getOrNull()
 
-private fun UiImageAttachment.imageFilename(): String =
+private fun UiMediaAttachment.imageFilename(): String =
     "letta-image-${System.currentTimeMillis()}.${mediaType.fileExtension()}"
 
 private fun String.fileExtension(): String = when (substringAfter('/').substringBefore(';').lowercase()) {

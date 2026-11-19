@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.branch
 
+import com.letta.mobile.data.media.MediaKind
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
@@ -18,7 +19,9 @@ data class BranchDraft(val text: String, val images: List<MessageContentPart.Ima
     companion object {
         fun of(message: UiMessage): BranchDraft = BranchDraft(
             text = message.content,
-            images = message.attachments.filter { it.base64.isNotEmpty() }.map { MessageContentPart.Image(it.base64, it.mediaType) },
+            images = message.attachments
+                .filter { it.base64.isNotEmpty() && it.kind == MediaKind.Image }
+                .map { MessageContentPart.Image(it.base64, it.mediaType) },
         )
     }
 }

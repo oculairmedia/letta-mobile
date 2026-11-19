@@ -9,6 +9,12 @@ import androidx.compose.ui.unit.dp
  * not a point on the spacing scale; a page that needs one of these sizes reads it from here.
  */
 object LettaSurfaceSizes {
+    /** The tallest an inline image or video in the timeline draws; it fits whole inside, letterboxed. */
+    val inlineMediaMaxHeight: Dp = 400.dp
+
+    /** A video's frame before its own size is known (its poster): 16:9. */
+    const val inlineVideoAspectRatio: Float = 16f / 9f
+
     /** A side pane's width when it first opens (LettaSidePane): wide enough for a form beside the chat. */
     val sidePaneWidth: Dp = 540.dp
 

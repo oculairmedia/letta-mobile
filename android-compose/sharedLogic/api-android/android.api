@@ -23983,6 +23983,164 @@ public final class com/letta/mobile/data/mapper/MessageMappingState {
 	public fun <init> ()V
 }
 
+public final class com/letta/mobile/data/media/MediaClockKt {
+	public static final fun formatMediaClock (J)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/media/MediaKind : java/lang/Enum {
+	public static final field Audio Lcom/letta/mobile/data/media/MediaKind;
+	public static final field Companion Lcom/letta/mobile/data/media/MediaKind$Companion;
+	public static final field File Lcom/letta/mobile/data/media/MediaKind;
+	public static final field Image Lcom/letta/mobile/data/media/MediaKind;
+	public static final field Video Lcom/letta/mobile/data/media/MediaKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/media/MediaKind;
+	public static fun values ()[Lcom/letta/mobile/data/media/MediaKind;
+}
+
+public final class com/letta/mobile/data/media/MediaKind$Companion {
+	public final fun isUninformative (Ljava/lang/String;)Z
+	public final fun of (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/media/MediaKind;
+	public static synthetic fun of$default (Lcom/letta/mobile/data/media/MediaKind$Companion;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/media/MediaKind;
+}
+
+public final class com/letta/mobile/data/media/MediaLimits {
+	public static final field INSTANCE Lcom/letta/mobile/data/media/MediaLimits;
+	public static final field MAX_BUFFERED_REMOTE_BYTES J
+	public static final field MAX_INLINE_PLAYBACK_BYTES J
+	public static final field SEEK_STEP_MS J
+	public final fun decodedBytes (I)J
+	public final fun inlinePlayable (I)Z
+}
+
+public final class com/letta/mobile/data/media/MediaPlaybackCoordinator {
+	public fun <init> ()V
+	public final fun forget (Lcom/letta/mobile/data/media/MediaPlayer;)V
+	public final fun getActivePlayer ()Lcom/letta/mobile/data/media/MediaPlayer;
+	public final fun pauseAll ()V
+	public final fun play (Lcom/letta/mobile/data/media/MediaPlayer;)V
+}
+
+public final class com/letta/mobile/data/media/MediaPlaybackState {
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/media/MediaPlaybackStatus;JLjava/lang/Long;FZLjava/lang/Integer;Ljava/lang/Integer;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/media/MediaPlaybackStatus;JLjava/lang/Long;FZLjava/lang/Integer;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/media/MediaPlaybackStatus;
+	public final fun component2 ()J
+	public final fun component3 ()Ljava/lang/Long;
+	public final fun component4 ()F
+	public final fun component5 ()Z
+	public final fun component6 ()Ljava/lang/Integer;
+	public final fun component7 ()Ljava/lang/Integer;
+	public final fun copy (Lcom/letta/mobile/data/media/MediaPlaybackStatus;JLjava/lang/Long;FZLjava/lang/Integer;Ljava/lang/Integer;)Lcom/letta/mobile/data/media/MediaPlaybackState;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/media/MediaPlaybackState;Lcom/letta/mobile/data/media/MediaPlaybackStatus;JLjava/lang/Long;FZLjava/lang/Integer;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/data/media/MediaPlaybackState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDurationMs ()Ljava/lang/Long;
+	public final fun getMuted ()Z
+	public final fun getPositionMs ()J
+	public final fun getStatus ()Lcom/letta/mobile/data/media/MediaPlaybackStatus;
+	public final fun getVideoHeight ()Ljava/lang/Integer;
+	public final fun getVideoWidth ()Ljava/lang/Integer;
+	public final fun getVolume ()F
+	public fun hashCode ()I
+	public final fun isPlayable ()Z
+	public final fun isPlaying ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/media/MediaPlaybackStatus : java/lang/Enum {
+	public static final field Ended Lcom/letta/mobile/data/media/MediaPlaybackStatus;
+	public static final field Failed Lcom/letta/mobile/data/media/MediaPlaybackStatus;
+	public static final field Idle Lcom/letta/mobile/data/media/MediaPlaybackStatus;
+	public static final field Loading Lcom/letta/mobile/data/media/MediaPlaybackStatus;
+	public static final field Paused Lcom/letta/mobile/data/media/MediaPlaybackStatus;
+	public static final field Playing Lcom/letta/mobile/data/media/MediaPlaybackStatus;
+	public static final field Ready Lcom/letta/mobile/data/media/MediaPlaybackStatus;
+	public static final field Released Lcom/letta/mobile/data/media/MediaPlaybackStatus;
+	public static final field Unsupported Lcom/letta/mobile/data/media/MediaPlaybackStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/media/MediaPlaybackStatus;
+	public static fun values ()[Lcom/letta/mobile/data/media/MediaPlaybackStatus;
+}
+
+public abstract interface class com/letta/mobile/data/media/MediaPlayer {
+	public abstract fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun load (Lcom/letta/mobile/data/media/MediaSource;)V
+	public abstract fun pause ()V
+	public abstract fun play ()V
+	public abstract fun release ()V
+	public abstract fun seekTo (J)V
+	public abstract fun setMuted (Z)V
+	public abstract fun setVolume (F)V
+}
+
+public abstract interface class com/letta/mobile/data/media/MediaPlayerFactory {
+	public abstract fun create (Lcom/letta/mobile/data/media/MediaKind;)Lcom/letta/mobile/data/media/MediaPlayer;
+}
+
+public abstract interface class com/letta/mobile/data/media/MediaSource {
+}
+
+public final class com/letta/mobile/data/media/MediaSource$Inline : com/letta/mobile/data/media/MediaSource {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/media/MediaSource$Inline;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/media/MediaSource$Inline;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/media/MediaSource$Inline;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBase64 ()Ljava/lang/String;
+	public final fun getMimeType ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/media/MediaSource$Remote : com/letta/mobile/data/media/MediaSource {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/media/MediaSource$Remote;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/media/MediaSource$Remote;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/media/MediaSource$Remote;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/media/UiMediaAttachment {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/Long;
+	public final fun component4 ()Lcom/letta/mobile/data/attachment/ImageUnavailableReason;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;)Lcom/letta/mobile/data/media/UiMediaAttachment;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/media/UiMediaAttachment;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/media/UiMediaAttachment;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBase64 ()Ljava/lang/String;
+	public final fun getByteSize ()Ljava/lang/Long;
+	public final fun getDisplayName ()Ljava/lang/String;
+	public final fun getKind ()Lcom/letta/mobile/data/media/MediaKind;
+	public final fun getMediaType ()Ljava/lang/String;
+	public final fun getStoredByteSize ()Ljava/lang/Long;
+	public final fun getUnavailableReason ()Lcom/letta/mobile/data/attachment/ImageUnavailableReason;
+	public final fun getUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun playbackSource ()Lcom/letta/mobile/data/media/MediaSource;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/media/UnsupportedMediaPlayer : com/letta/mobile/data/media/MediaPlayer {
+	public fun <init> ()V
+	public fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun load (Lcom/letta/mobile/data/media/MediaSource;)V
+	public fun pause ()V
+	public fun play ()V
+	public fun release ()V
+	public fun seekTo (J)V
+	public fun setMuted (Z)V
+	public fun setVolume (F)V
+}
+
 public final class com/letta/mobile/data/memory/MemoryAccentRole : java/lang/Enum {
 	public static final field Companion Lcom/letta/mobile/data/memory/MemoryAccentRole$Companion;
 	public static final field Error Lcom/letta/mobile/data/memory/MemoryAccentRole;
@@ -31337,6 +31495,7 @@ public final class com/letta/mobile/data/model/MessageContentPart$Image : com/le
 	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/MessageContentPart$Image;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/model/MessageContentPart$Image;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBase64 ()Ljava/lang/String;
+	public final fun getKind ()Lcom/letta/mobile/data/media/MediaKind;
 	public final fun getMediaType ()Ljava/lang/String;
 	public final fun getStoredByteSize ()Ljava/lang/Long;
 	public final fun getToolCallId ()Ljava/lang/String;
@@ -35004,26 +35163,6 @@ public final class com/letta/mobile/data/model/UiGeneratedComponent {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/letta/mobile/data/model/UiImageAttachment {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Ljava/lang/Long;
-	public final fun component4 ()Lcom/letta/mobile/data/attachment/ImageUnavailableReason;
-	public final fun component5 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;)Lcom/letta/mobile/data/model/UiImageAttachment;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/UiImageAttachment;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Lcom/letta/mobile/data/attachment/ImageUnavailableReason;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/model/UiImageAttachment;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getBase64 ()Ljava/lang/String;
-	public final fun getMediaType ()Ljava/lang/String;
-	public final fun getStoredByteSize ()Ljava/lang/Long;
-	public final fun getUnavailableReason ()Lcom/letta/mobile/data/attachment/ImageUnavailableReason;
-	public final fun getUrl ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
 public final class com/letta/mobile/data/model/UiMessage {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZZLjava/lang/Long;Ljava/util/List;Lcom/letta/mobile/data/model/UiGeneratedComponent;Lcom/letta/mobile/data/model/UiApprovalRequest;Lcom/letta/mobile/data/model/UiApprovalResponse;Lcom/letta/mobile/data/model/UiSubagentNotification;Ljava/util/List;Lcom/letta/mobile/data/messaging/AgentMessageProvenance;Ljava/util/List;Z)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZZLjava/lang/Long;Ljava/util/List;Lcom/letta/mobile/data/model/UiGeneratedComponent;Lcom/letta/mobile/data/model/UiApprovalRequest;Lcom/letta/mobile/data/model/UiApprovalResponse;Lcom/letta/mobile/data/model/UiSubagentNotification;Ljava/util/List;Lcom/letta/mobile/data/messaging/AgentMessageProvenance;Ljava/util/List;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -35076,6 +35215,10 @@ public final class com/letta/mobile/data/model/UiMessage {
 	public final fun isReasoning ()Z
 	public final fun isSendFailed ()Z
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/model/UiMessageKt {
+	public static final fun toUiMediaAttachment (Lcom/letta/mobile/data/model/MessageContentPart$Image;)Lcom/letta/mobile/data/media/UiMediaAttachment;
 }
 
 public final class com/letta/mobile/data/model/UiSubagentDispatch {

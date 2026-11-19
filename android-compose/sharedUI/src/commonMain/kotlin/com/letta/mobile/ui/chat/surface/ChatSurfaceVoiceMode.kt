@@ -2,11 +2,13 @@ package com.letta.mobile.ui.chat.surface
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.toArgb
+import com.letta.mobile.data.media.MediaPlaybackCoordinator
 import com.letta.mobile.data.voice.loop.VoiceLoopRuntime
 import com.letta.mobile.data.voice.session.EndpointVoiceEngineFactory
 import com.letta.mobile.data.voice.session.VoiceChatSessions
@@ -60,6 +62,25 @@ internal fun rememberVoiceMode(sessions: VoiceChatSessions?): VoiceModeHandle? {
     DisposableEffect(handle) { onDispose { scope.launch(NonCancellable) { handle.controller.shutdown() } } }
     DismissWhenOwnerStops { handle.controller.stop() }
     return handle
+}
+
+/**
+ * The page's one-at-a-time media coordinator, yielding to voice mode: whatever the timeline plays pauses when voice mode starts
+ * hearing the person or speaking the reply, and when the page's owner stops (the app goes to the
+ * background). Media may play again while voice mode only listens.
+ */
+@Composable
+internal fun rememberPageMediaPlayback(handle: VoiceModeHandle?): MediaPlaybackCoordinator {
+    val coordinator = remember { MediaPlaybackCoordinator() }
+    DismissWhenOwnerStops { coordinator.pauseAll() }
+    if (handle != null) {
+        LaunchedEffect(handle, coordinator) {
+            handle.state.collect { state ->
+                if (state == VoiceModeState.Speaking || state == VoiceModeState.Hearing) coordinator.pauseAll()
+            }
+        }
+    }
+    return coordinator
 }
 
 /**

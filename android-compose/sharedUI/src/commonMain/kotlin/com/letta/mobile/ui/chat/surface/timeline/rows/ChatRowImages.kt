@@ -32,7 +32,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.constrainHeight
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_attached_image
 import com.letta.mobile.sharedui.resources.rows_image_not_loaded
@@ -58,14 +58,14 @@ import com.letta.mobile.ui.components.foundation.lettaClickable
  * undecodable payload, so a bad image costs its cell, not the row.
  */
 @Composable
-internal fun rememberAttachmentBitmap(attachment: UiImageAttachment): ImageBitmap? =
+internal fun rememberAttachmentBitmap(attachment: UiMediaAttachment): ImageBitmap? =
     rememberDecodedImage(attachment.base64)
 
 /** Tap target for an image inside a row: opens the page's viewer on [index] of [images]. */
 @Stable
 internal class ImageTap(
-    val images: ImmutableList<UiImageAttachment>,
-    val onTap: (images: List<UiImageAttachment>, index: Int) -> Unit,
+    val images: ImmutableList<UiMediaAttachment>,
+    val onTap: (images: List<UiMediaAttachment>, index: Int) -> Unit,
 ) {
     fun open(index: Int) = onTap(images, index)
 }
@@ -188,11 +188,11 @@ internal fun ChatImageThumbnailStrip(
 
 /** An attachment cell's shape (Touch: the legacy inset cell; pointer: the outlined card), its press clipped to it too. */
 @Composable
-private fun attachmentShape(): Shape = if (touchStyle()) ChatRowInsetShape else MaterialTheme.shapes.medium
+internal fun attachmentShape(): Shape = if (touchStyle()) ChatRowInsetShape else MaterialTheme.shapes.medium
 
 @Composable
 internal fun ChatAttachmentImage(
-    attachment: UiImageAttachment,
+    attachment: UiMediaAttachment,
     modifier: Modifier = Modifier,
     cellHeight: Dp? = null,
 ) {
@@ -261,7 +261,7 @@ private fun Modifier.attachmentAspectSize(bitmap: ImageBitmap): Modifier = fillM
 
 /** Shared thumbnail/viewer path for HTTP sources supported by the host's Coil loader. */
 @Composable
-internal fun ChatRemoteImage(attachment: UiImageAttachment, modifier: Modifier = Modifier) {
+internal fun ChatRemoteImage(attachment: UiMediaAttachment, modifier: Modifier = Modifier) {
     var failed by remember(attachment.url) { mutableStateOf(false) }
     Box(modifier, contentAlignment = Alignment.Center) {
         AsyncImage(

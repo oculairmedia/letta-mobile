@@ -30,7 +30,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -62,7 +62,7 @@ import com.letta.mobile.ui.host.LocalLettaHost
 class TimelineDockedPromptImageUiTest {
     private val longAnswer = (1..120).joinToString("\n\n") { "Paragraph $it of a long answer." }
     private val secondAnswer = (1..40).joinToString("\n\n") { "Line $it of the second answer." }
-    private val image =UiImageAttachment(base64 = "", mediaType = "image/png")
+    private val image =UiMediaAttachment(base64 = "", mediaType = "image/png")
     private val messages = listOf(
         UiMessage(
             id = "q1",

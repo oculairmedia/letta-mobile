@@ -5,7 +5,7 @@ import com.letta.mobile.data.canvas.compose.ComposeKind
 import com.letta.mobile.data.chat.projection.CanvasArtifactError
 import com.letta.mobile.data.chat.projection.CanvasArtifactReceipt
 import com.letta.mobile.data.chat.projection.CanvasArtifactStatus
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -37,7 +37,7 @@ object PhoneFixtures {
     const val CONVERSATION_ID: String = "conv-1"
 
     /** A small gradient PNG standing in for a screenshot the person attached. */
-    val screenshot: UiImageAttachment by lazy { UiImageAttachment(base64 = sampleImageBase64(), mediaType = "image/png") }
+    val screenshot: UiMediaAttachment by lazy { UiMediaAttachment(base64 = sampleImageBase64(), mediaType = "image/png") }
 
     const val LONG_REPLY: String = "Here's a list for **six people**:\n\n" +
         "- 2 lb ground beef, or black beans for the vegetarians\n" +

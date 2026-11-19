@@ -7,7 +7,7 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiGeneratedComponent
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.model.extractSubagentDispatch
@@ -179,7 +179,7 @@ internal fun AppMessage.mapToUiMessage(): UiMessage {
             )
         },
         subagentNotification = notification,
-        attachments = attachments.map { UiImageAttachment(it.base64, it.mediaType) },
+        attachments = attachments.map { UiMediaAttachment(it.base64, it.mediaType) },
     )
 }
 

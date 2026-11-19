@@ -1,6 +1,6 @@
 package com.letta.mobile.data.chat.projection
 
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -29,7 +29,7 @@ class MessageActionPolicyTest {
     @Test
     fun `attachment messages do not expose lossy text-only send again`() {
         val message = message(role = "user").copy(
-            attachments = listOf(UiImageAttachment(base64 = "image", mediaType = "image/png")),
+            attachments = listOf(UiMediaAttachment(base64 = "image", mediaType = "image/png")),
         )
 
         assertFalse(availability(message).canSendAgain)
@@ -62,10 +62,10 @@ class MessageActionPolicyTest {
     fun `a prompt with images is edited and rerun with them unless only a pointer was kept`() {
         val support = BranchActionSupport(fork = true, edit = true, rerun = true)
         val withImage = message(role = "user").copy(
-            attachments = listOf(UiImageAttachment(base64 = "image", mediaType = "image/png")),
+            attachments = listOf(UiMediaAttachment(base64 = "image", mediaType = "image/png")),
         )
         val pointerOnly = message(role = "user").copy(
-            attachments = listOf(UiImageAttachment(base64 = "", mediaType = "image/png", storedByteSize = 4)),
+            attachments = listOf(UiMediaAttachment(base64 = "", mediaType = "image/png", storedByteSize = 4)),
         )
 
         assertTrue(availability(withImage, branching = support).canEdit)
