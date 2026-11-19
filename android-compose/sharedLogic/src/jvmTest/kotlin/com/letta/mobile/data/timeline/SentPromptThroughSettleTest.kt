@@ -91,7 +91,12 @@ class SentPromptThroughSettleTest {
 
         val history: List<LettaMessage> = listOf(
             AssistantMessage(id = "old-reply", contentRaw = JsonPrimitive("Earlier answer."), date = "2026-11-18T09:00:01.000Z"),
-            UserMessage(id = "old-prompt", contentRaw = JsonPrimitive("Earlier question"), date = "2026-11-18T09:00:00.000Z", otid = "cm-old"),
+            UserMessage(
+                id = "old-prompt",
+                contentRaw = JsonPrimitive("Earlier question"),
+                date = "2026-11-18T09:00:00.000Z",
+                otid = "cm-old",
+            ),
         )
         val prompt = UserMessage(
             id = "msg-prompt-7", contentRaw = JsonPrimitive("what's on today"), date = "2026-11-18T09:05:00.100Z", otid = PROMPT_OTID,
