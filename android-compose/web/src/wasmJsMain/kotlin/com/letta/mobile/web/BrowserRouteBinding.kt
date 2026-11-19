@@ -35,5 +35,5 @@ internal class BrowserRouteBinding(private val workspace: ShellWorkspaceState) {
 
 /** The page was opened with `?perf`: development counters are logged to the console. */
 internal val pagePerfRequested: Boolean by lazy {
-    window.location.search.removePrefix("?").split('&').any { it.substringBefore('=') == "perf" }
+    org.w3c.dom.url.URLSearchParams(window.location.search.toJsString()).has("perf")
 }

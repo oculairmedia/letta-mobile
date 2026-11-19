@@ -32,8 +32,14 @@ def dump(directory, name):
     adb("shell", "rm", "-f", "/sdcard/core-loop-ui.xml")
     adb("shell", "uiautomator", "dump", "/sdcard/core-loop-ui.xml")
     raw = command(["adb", "-s", SERIAL, "exec-out", "cat", "/sdcard/core-loop-ui.xml"])
+    try:
+        tree = ET.fromstring(raw)
+    except ET.ParseError as failure:
+        raise RuntimeError(f"{name}: UI hierarchy not produced: {failure}") from failure
+    if tree.tag != "hierarchy":
+        raise RuntimeError(f"{name}: unexpected UI hierarchy root")
     (directory / f"{name}.xml").write_bytes(raw)
-    return ET.fromstring(raw)
+    return tree
 
 
 def tap_node(tree, attribute, value):

@@ -31,7 +31,10 @@ class IndexedDbKeyValueStore(
             val created = request.result?.unsafeCast<IdbDatabase>()
             if (created != null && !created.objectStoreNames.contains(storeName)) created.createObjectStore(storeName)
         }
-        return checkNotNull(request.completion().await<JsAny?>()) { "IndexedDB opened no database" }.unsafeCast()
+        val opened = checkNotNull(request.completion().await<JsAny?>()) { "IndexedDB opened no database" }.unsafeCast<IdbDatabase>()
+        opened.onclose = { if (database === opened) database = null }
+        opened.onversionchange = { opened.close(); if (database === opened) database = null }
+        return opened
     }
 
     private suspend fun objectStore(mode: String): IdbObjectStore = database().transaction(storeName, mode).objectStore(storeName)
@@ -91,10 +94,11 @@ private external interface IdbStringList : JsAny {
 
 private external interface IdbDatabase : JsAny {
     val objectStoreNames: IdbStringList
-
+    var onclose: ((JsAny) -> Unit)?
+    var onversionchange: ((JsAny) -> Unit)?
     fun createObjectStore(name: String): JsAny
-
     fun transaction(storeName: String, mode: String): IdbTransaction
+    fun close()
 }
 
 private external interface IdbTransaction : JsAny {

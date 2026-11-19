@@ -10,6 +10,11 @@ package com.letta.mobile.ui.markdown
  */
 data class StreamingMarkdownDocument(
     val blocks: List<StreamingMarkdownDocumentBlock>,
+    /**
+     * The whole text's link reference definitions, by label ([markdownReferenceDefinitions]): each
+     * block renders in its own markdown pass, and resolves its reference links against these.
+     */
+    val referenceDefinitions: Map<String, String> = emptyMap(),
 ) {
     fun stableHeightToken(
         isStreaming: Boolean,
@@ -96,6 +101,7 @@ private val markdownLayoutChangingChars = setOf(
 class StreamingMarkdownDocumentState {
     private var previousRawText: String = ""
     private var previousBlocks: List<StreamingMarkdownDocumentBlock> = emptyList()
+    private var previousDefinitions: Map<String, String> = emptyMap()
     private var nextId: Long = 1L
 
     fun write(chunk: String): StreamingMarkdownDocument {
@@ -104,7 +110,7 @@ class StreamingMarkdownDocumentState {
 
     fun update(text: String): StreamingMarkdownDocument {
         if (text == previousRawText) {
-            return StreamingMarkdownDocument(previousBlocks)
+            return StreamingMarkdownDocument(previousBlocks, previousDefinitions)
         }
 
         // Streaming updates are append-only in the hot path. Reparse only the active tail plus
@@ -133,12 +139,14 @@ class StreamingMarkdownDocumentState {
 
         previousRawText = text
         previousBlocks = reconciled
-        return StreamingMarkdownDocument(reconciled)
+        previousDefinitions = markdownReferenceDefinitions(text)
+        return StreamingMarkdownDocument(reconciled, previousDefinitions)
     }
 
     fun reset() {
         previousRawText = ""
         previousBlocks = emptyList()
+        previousDefinitions = emptyMap()
         nextId = 1L
     }
 

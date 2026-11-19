@@ -1239,23 +1239,23 @@ public final class com/letta/mobile/ui/chat/ChatLayoutKt {
 public final class com/letta/mobile/ui/chat/ComposableSingletons$QueuedSendsPanelKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/ComposableSingletons$QueuedSendsPanelKt;
 	public fun <init> ()V
-	public final fun getLambda$-1093754708$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-1674662901$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-1778983120$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$455628306$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/chat/QueuedSendActions {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)V
-	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lkotlin/jvm/functions/Function1;
 	public final fun component2 ()Lkotlin/jvm/functions/Function1;
 	public final fun component3 ()Lkotlin/jvm/functions/Function0;
-	public final fun copy (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/chat/QueuedSendActions;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/chat/QueuedSendActions;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/chat/QueuedSendActions;
+	public final fun component4 ()Lkotlin/jvm/functions/Function1;
+	public final fun copy (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/ui/chat/QueuedSendActions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/chat/QueuedSendActions;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/letta/mobile/ui/chat/QueuedSendActions;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getOnCancel ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnEdit ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnResume ()Lkotlin/jvm/functions/Function0;
 	public final fun getOnSendNow ()Lkotlin/jvm/functions/Function1;
 	public fun hashCode ()I
@@ -4810,6 +4810,7 @@ public final class com/letta/mobile/ui/icons/LettaIcons {
 	public final fun getSchema ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getSearch ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getSend ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getSendNow ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getSendToBack ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getServer ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getSettings ()Landroidx/compose/ui/graphics/vector/ImageVector;
@@ -4881,6 +4882,11 @@ public final class com/letta/mobile/ui/markdown/MarkdownPaint {
 	public final fun getTextStyle ()Landroidx/compose/ui/text/TextStyle;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/markdown/MarkdownReferencesKt {
+	public static final fun MessageReferenceDefinitions (Ljava/util/Map;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun rememberMessageReferenceLinks (Landroidx/compose/runtime/Composer;I)Lcom/mikepenz/markdown/model/ReferenceLinkHandler;
 }
 
 public final class com/letta/mobile/ui/markdown/MarkdownSource {
@@ -4996,12 +5002,15 @@ public final class com/letta/mobile/ui/markdown/StreamingMarkdownBlockKind : jav
 
 public final class com/letta/mobile/ui/markdown/StreamingMarkdownDocument {
 	public static final field $stable I
-	public fun <init> (Ljava/util/List;)V
+	public fun <init> (Ljava/util/List;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
-	public final fun copy (Ljava/util/List;)Lcom/letta/mobile/ui/markdown/StreamingMarkdownDocument;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/markdown/StreamingMarkdownDocument;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/ui/markdown/StreamingMarkdownDocument;
+	public final fun component2 ()Ljava/util/Map;
+	public final fun copy (Ljava/util/List;Ljava/util/Map;)Lcom/letta/mobile/ui/markdown/StreamingMarkdownDocument;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/markdown/StreamingMarkdownDocument;Ljava/util/List;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/ui/markdown/StreamingMarkdownDocument;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBlocks ()Ljava/util/List;
+	public final fun getReferenceDefinitions ()Ljava/util/Map;
 	public fun hashCode ()I
 	public final fun stableHeightToken (ZLjava/lang/Integer;)Ljava/lang/String;
 	public static synthetic fun stableHeightToken$default (Lcom/letta/mobile/ui/markdown/StreamingMarkdownDocument;ZLjava/lang/Integer;ILjava/lang/Object;)Ljava/lang/String;
