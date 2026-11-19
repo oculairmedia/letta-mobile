@@ -150,6 +150,26 @@ const MODEL_CATALOG_PATCHES = [
     }
   }`,
   },
+  {
+    token: '  GOOGLE_MODELS = flattenChatModelCatalog("google", google_default);',
+    addition: `
+  // lcp-model-catalog: Antigravity Gemini 4 identities served by the lc-gemini
+  // proxy chain (shim -> gateway -> CLIProxy). Limits are the proxy catalog's.
+  if (GOOGLE_MODELS["gemini-3.8-flash"]) {
+    for (const [id, name, maxTokens] of [
+      ["gemini-4-neon-medium", "Gemini 4 Neon (Medium)", 65536],
+      ["gemini-4-neon-high", "Gemini 4 Neon (High)", 1048576],
+      ["gemini-4-argon-medium", "Gemini 4 Argon (Medium)", 65536],
+      ["gemini-4-argon-high", "Gemini 4 Argon (High)", 1048576],
+      ["gemini-4-hydrogen-medium", "Gemini 4 Hydrogen (Medium)", 262144],
+      ["gemini-4-hydrogen-xhigh", "Gemini 4 Hydrogen (XHigh)", 1048576]
+    ]) {
+      if (!GOOGLE_MODELS[id]) {
+        GOOGLE_MODELS[id] = { ...GOOGLE_MODELS["gemini-3.8-flash"], id, name, contextWindow: 1048576, maxTokens };
+      }
+    }
+  }`,
+  },
 ];
 
 // lcp-retry-otid (letta-mobile-93cml): App Server retries refresh every input
