@@ -5,14 +5,12 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.get
 import io.ktor.http.Url
-import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertIsNot
-import kotlin.test.assertNotNull
 import kotlin.test.fail
 
 /**
@@ -31,21 +29,28 @@ class VoiceUpstreamUnresolvedNameRealEngineTest {
         // .invalid is reserved by RFC 2606 and never resolves, so this fails at resolution, not routing.
         val unresolvable = Url("http://voice-diag-e86vv.invalid/v1/models")
         val client = HttpClient(CIO)
-        val thrown = try {
-            withTimeout(DNS_BUDGET_MS) { client.get(unresolvable) }
-            null
-        } catch (timedOut: TimeoutCancellationException) {
-            // The machine's resolver, not the classifier, would decide the verdict: say so rather than
-            // letting this land in the classification below.
-            fail("the resolver did not answer within ${DNS_BUDGET_MS} ms, so this test skipped its subject")
-        } catch (expected: Exception) {
-            expected
+        val outcome = try {
+            // A budget overrun comes back as null rather than as an exception, so it can never reach
+            // the classification below: the machine's resolver, not the classifier, would decide it.
+            withTimeoutOrNull(DNS_BUDGET_MS) {
+                try {
+                    client.get(unresolvable)
+                    Attempt.Answered
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (expected: Exception) {
+                    Attempt.Failed(expected)
+                }
+            }
         } finally {
             client.close()
         }
 
-        assertNotNull(thrown, "the request did not fail, so this test proves nothing about resolution")
-        assertIsNot<TimeoutCancellationException>(thrown, "a resolver timeout says nothing about classification")
+        val thrown = when (outcome) {
+            null -> fail("the resolver did not answer within $DNS_BUDGET_MS ms, so this test skipped its subject")
+            Attempt.Answered -> fail("the request did not fail, so this test proves nothing about resolution")
+            is Attempt.Failed -> outcome.error
+        }
         val failure = VoiceUpstreamWire.classify(thrown)
         assertIs<VoiceUpstreamFailure>(failure)
         assertEquals(
@@ -53,6 +58,13 @@ class VoiceUpstreamUnresolvedNameRealEngineTest {
             failure.code,
             "a real resolution failure must not be reported as a plain unreachable: ${thrown::class.simpleName}",
         )
+    }
+
+    /** What the request did within the budget. */
+    private sealed interface Attempt {
+        data object Answered : Attempt
+
+        class Failed(val error: Exception) : Attempt
     }
 
     private companion object {
