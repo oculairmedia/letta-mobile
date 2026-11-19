@@ -68,9 +68,14 @@ internal class VoiceTelemetry(
     @Volatile
     private var turnEnd: TimeMark? = null
 
+    /** Each turn's stage timing, reported as `turn.timing` when its answer's first audio plays (see [TurnTimings]). */
+    val timings: TurnTimings = TurnTimings(timeSource) { fields -> report("turn.timing", fields) }
+
     /** Reports [name] with [attrs] and the time since the session started. */
-    fun event(name: String, vararg attrs: VoiceTelemetryField) =
-        sink.event(TAG, name, attrs.asList() + ("tMs" attr since?.elapsedNow()?.inWholeMilliseconds))
+    fun event(name: String, vararg attrs: VoiceTelemetryField) = report(name, attrs.asList())
+
+    private fun report(name: String, fields: List<VoiceTelemetryField>) =
+        sink.event(TAG, name, fields + ("tMs" attr since?.elapsedNow()?.inWholeMilliseconds))
 
     /**
      * Voice mode started a session: the session's clock starts here. Reports whether the microphone
@@ -84,6 +89,7 @@ internal class VoiceTelemetry(
     /** Voice mode stopped for [reason]. */
     fun stopped(reason: String) {
         turnEnd = null
+        timings.forget()
         event("mode.stopped", "reason" attr reason)
     }
 
@@ -95,6 +101,7 @@ internal class VoiceTelemetry(
     /** The turn that ended last was dropped (its transcript was not the person's words): no answer will follow. */
     fun turnDropped() {
         turnEnd = null
+        timings.forget()
     }
 
     /**
@@ -103,6 +110,7 @@ internal class VoiceTelemetry(
      * answer's first audio (time to first audio). A duration only.
      */
     fun audioStarted() {
+        timings.audioStarted()
         val ended = turnEnd ?: return
         turnEnd = null
         event("speech.firstAudio", "afterTurnEndMs" attr ended.elapsedNow().inWholeMilliseconds)
@@ -168,6 +176,7 @@ internal class VoiceEarTelemetry(private val telemetry: VoiceTelemetry) : EarObs
 
     override fun turnClosed(report: EarTurnReport, reason: TurnEndReason) {
         telemetry.turnEnded()
+        telemetry.timings.closed(report.trailingSilence)
         telemetry.earTurn("turn.closed", reason.name, report)
     }
 
@@ -176,7 +185,10 @@ internal class VoiceEarTelemetry(private val telemetry: VoiceTelemetry) : EarObs
         telemetry.earTurn("turn.discarded", reason.name, report)
     }
 
-    override fun transcriptAccepted(characters: Int) = telemetry.event("transcript.accepted", "characters" attr characters)
+    override fun transcriptAccepted(characters: Int) {
+        telemetry.timings.transcribed()
+        telemetry.event("transcript.accepted", "characters" attr characters)
+    }
 
     private companion object {
         /** Sounds dropped before they became a turn; a turn that already closed still stands. */
@@ -192,6 +204,7 @@ internal class VoiceEarTelemetry(private val telemetry: VoiceTelemetry) : EarObs
 internal class LocalEarTelemetry(private val telemetry: VoiceTelemetry) : LocalEarObserver {
     override fun heard(characters: Int, sinceEndOfSpeech: Duration?) {
         telemetry.turnEnded(sinceEndOfSpeech ?: Duration.ZERO)
+        telemetry.timings.heardLocally(sinceEndOfSpeech)
         telemetry.event("local.heard", "characters" attr characters, "endToFinalMs" attr sinceEndOfSpeech?.inWholeMilliseconds)
     }
 
@@ -274,6 +287,7 @@ internal class TelemetryVoiceChatSession(
 
     override suspend fun send(text: VoiceText): SentUtterance {
         val before = delegate.state.value
+        telemetry.timings.sent()
         val utterance = delegate.send(text)
         rows.pending(utterance.id, before)
         val index = sentCount.getAndUpdate { it + 1 }
@@ -417,6 +431,7 @@ internal class TelemetryMouth(private val delegate: VoiceMouth, private val tele
     }
 
     override fun speak(segment: SpeechSegment) {
+        telemetry.timings.sentenceRequested()
         telemetry.event("speech.requested", "segment" attr segment.id.value, "characters" attr segment.text.value.length)
         delegate.speak(segment)
     }
