@@ -18,14 +18,21 @@ import com.letta.mobile.data.projects.RepositoryProjectsBackend
 import com.letta.mobile.data.projects.SettingsStoreProjectPinStore
 import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
 import com.letta.mobile.data.runs.RunMonitorController
+import com.letta.mobile.data.servicecredentials.ServiceCredentialLink
+import com.letta.mobile.data.servicecredentials.ServiceCredentialReply
+import com.letta.mobile.data.servicecredentials.ServiceCredentialsClient
+import com.letta.mobile.data.servicecredentials.ServiceCredentialsController
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellPageErrors
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.templates.AgentTemplatesController
+import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.ui.modelcontrol.ProviderSettingsActions
 import com.letta.mobile.ui.modelcontrol.ProviderSettingsPane
+import com.letta.mobile.ui.modelcontrol.ServiceCredentialActions
+import com.letta.mobile.ui.modelcontrol.ServiceCredentialsBinding
 import com.letta.mobile.ui.shell.ShellAdminPages
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageSlots
@@ -133,12 +140,33 @@ private fun ProjectSummary.agentIdOrNull(): AgentId? = lettaAgentId?.value?.take
 /**
  * Providers: the shared settings pane over the host's [session], the
  * one its model picker and Models sheet read, so a change here shows there at once.
+ * Its Services page reads the host's service credentials over [transport]; it
+ * shows only while the host keeps them, and nothing of it is stored here.
  */
-fun shellProvidersPage(session: ModelControlSession) = ShellPageContent<ShellDestination.Providers> { _, modifier ->
+fun shellProvidersPage(session: ModelControlSession, transport: IChannelTransport) = ShellPageContent<ShellDestination.Providers> { _, modifier ->
     val scope = rememberCoroutineScope()
     val controller = remember(session) { session.managementController(scope) }
     LaunchedEffect(controller) { controller.refresh() }
     val state by controller.state.collectAsState()
     val actions = remember(controller) { ProviderSettingsActions.bind(controller) }
-    ProviderSettingsPane(state = state, actions = actions, modifier = modifier)
+    val services = rememberServiceCredentials(transport)
+    ProviderSettingsPane(state = state, actions = actions, modifier = modifier, services = services)
+}
+
+/** The Services page over [transport], or null while the connected host keeps no service credentials. */
+@Composable
+private fun rememberServiceCredentials(transport: IChannelTransport): ServiceCredentialsBinding? {
+    val scope = rememberCoroutineScope()
+    val controller = remember(transport) {
+        val link = ServiceCredentialLink { method, params ->
+            val response = transport.adminRpc(method = method, path = "", body = params.toString())
+            ServiceCredentialReply(response.success, response.result, response.error)
+        }
+        val client = ServiceCredentialsClient(link) { transport.hostCapabilities }
+        ServiceCredentialsController(client, scope)
+    }
+    LaunchedEffect(controller) { controller.refresh() }
+    val state by controller.state.collectAsState()
+    val actions = remember(controller) { ServiceCredentialActions.bind(controller) }
+    return if (state.supported) ServiceCredentialsBinding(state, actions) else null
 }

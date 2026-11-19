@@ -313,6 +313,9 @@ object IrohPeerCapabilities {
         "pins.get",
         // Shell state v1: the host's shared shell and user state document, read like pins.get.
         "shell.state.get",
+        // Service credentials v1: every service's status (never a secret), read like provider.list. Its
+        // writes (service.credential.set / test / remove) stay admin.full via the else branch.
+        "service.credential.list",
     )
 
     // Voice endpoint v1: speaking and listening through the host act for the device like a chat send.

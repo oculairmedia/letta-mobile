@@ -217,6 +217,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Admin RPC Wire Contracts](reference/contracts/README.md)
 - [Secret request v1: secure secret-input flow](reference/contracts/secret-request-v1.md)
 - [Shell state v1: the host's one versioned document of shell and user state](reference/contracts/shell-state-v1.md)
+- [Service credentials v1: non-LLM service secrets held on the host](reference/contracts/service-credentials-v1.md)
 - [Voice endpoint v1: host-stored speech setup and speech through the host](reference/contracts/voice-endpoint-v1.md)
 
 ### reference/contracts/beads.config.get
@@ -406,6 +407,21 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 ### reference/contracts/shell.state.propose
 
 - [shell.state.propose: shell state v1](reference/contracts/shell.state.propose/shell-state-v1.md)
+### reference/contracts/service.credential.list
+
+- [service.credential.list: service credentials v1](reference/contracts/service.credential.list/service-credentials-v1.md)
+
+### reference/contracts/service.credential.remove
+
+- [service.credential.remove: service credentials v1](reference/contracts/service.credential.remove/service-credentials-v1.md)
+
+### reference/contracts/service.credential.set
+
+- [service.credential.set: service credentials v1](reference/contracts/service.credential.set/service-credentials-v1.md)
+
+### reference/contracts/service.credential.test
+
+- [service.credential.test: service credentials v1](reference/contracts/service.credential.test/service-credentials-v1.md)
 
 ### reference/contracts/slash\_command.execute
 

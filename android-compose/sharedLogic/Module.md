@@ -515,6 +515,10 @@ ActiveTurnCoordinator owns one trusted conversation lifecycle using active-turn-
 
 Project page state, backend ports and controller operations. Host project summaries/identifiers are separate from issue-work repository capabilities. Keep issue-work capabilities distinct from project catalog access; provide backend operations through [ProjectsBackend](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.projects/-projects-backend/index.html) and pin persistence through [ProjectPinStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.projects/-project-pin-store/index.html).
 
+# Package com.letta.mobile.data.servicecredentials
+
+The client side and wire types of the service-credentials v1 contract (`docs/reference/contracts/service-credentials-v1.md`): `ServiceCredentialWire` names, `ServiceId`, the status and list a host answers (never a secret, only `has_secret`), the closed `ServiceCredentialErrorCode` set and the write-only `ServiceCredentialSetCommand`, whose secret travels as a `SecretWriteValue` and whose serializer cannot decode. `ServiceCredentialsClient` calls the host over a `ServiceCredentialLink` (one Iroh `admin_rpc` per request, as the provider routes are called); `ServiceCredentialsController` holds the Services page's state in memory only, so no client stores a secret or any service state.
+
 # Package com.letta.mobile.data.rpcwire
 
 Small admin RPC primitives shared by clients that must not depend on a transport: the unknown-method error vocabulary (`AdminRpcErrors`) and the write-only secret wrapper (`SecretWriteValue`) whose value only an encoder reads. The provider and Iroh packages keep their old names for both as type aliases.
@@ -960,6 +964,10 @@ The host side of the pinned-agents v1 contract: one ordered list of pinned agent
 # Package com.letta.mobile.data.controller.node.iroh.shellstate
 
 The host side of the shell-state v1 contract: one versioned document of shell and user state shared by every paired device. `ShellStateRoutes.forHost` builds the `AdminRpcRoutes` a host registers on its built admin router; it registers `shell.state.get` and `shell.state.propose` and advertises `shell_state_v1`. The document, its revision and each entry's own revision live in `shell-state.json`, replaced by a rename and readable only by the host's user; a host that never stored one answers an empty document at revision 0. `shell.state.propose` is an all-or-nothing compare-and-set against each touched entry's expected revision, so writers of different entries never conflict, and it records the serving connection as the actor, never a value the caller sent. A file that does not decode, or is of a newer schema, is refused with `state_unreadable` and kept, never reset. `ShellStatePublisher` pushes each accepted change as a `shell_state_updated` frame with the whole document to every connection `ViewerHandle.receivesShellStateEvents` allows. Telemetry carries methods, outcomes, revisions and counts, never keys or values. The package depends on the iroh router package, never the reverse.
+
+# Package com.letta.mobile.data.controller.node.iroh.servicecredentials
+
+The host side of the service-credentials v1 contract: the credentials of the non-LLM services the system calls, held on the host and write-only over the wire. `ServiceCredentialRoutes.forHost` builds the `AdminRpcRoutes` a host registers on its built admin router; it registers the four `service.credential.*` methods and advertises `service_credentials_v1`. Settings without secrets (address override, declared settings, revision, last test) live in a JSON file; secrets live in one file only the host's user may read, written through `IrohSecretKeyStores.writeOwnerOnly` and bound to the origin they were entered for, behind `ServiceSecretStore`. A service is a `ServiceDescriptor` (data) plus a `ServiceAdapter` whose connection test sends only a fixed synthetic request; `TypeSafeJevAdapter` is the first. Nothing here logs or reports a secret, an address or any text. The package depends on the iroh router package, never the reverse, and never on voice code.
 
 # Package com.letta.mobile.data.controller.node.iroh.errors
 

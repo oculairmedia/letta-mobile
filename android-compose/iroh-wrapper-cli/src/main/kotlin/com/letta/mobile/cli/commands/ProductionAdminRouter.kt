@@ -85,6 +85,8 @@ fun buildProductionAdminRouter(
     pinsRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
     /** The shell-state routes (one versioned document of shell and user state shared by every device); null registers none. */
     shellStateRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
+    /** The service credential routes (non-LLM service secrets held on the host); null registers none. */
+    serviceCredentialRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
 ): AdminRpcRouter {
     // Every skill.list re-reads the root (a symlink is the controllable unit and can
     // change on disk at any time); the cold-start read below also logs what the host
@@ -178,5 +180,7 @@ fun buildProductionAdminRouter(
         pinsRoutes?.register(router)
         // Both shell-state routes or none; they advertise shell_state_v1 themselves.
         shellStateRoutes?.register(router)
+        // All four service credential routes or none; they advertise service_credentials_v1 themselves.
+        serviceCredentialRoutes?.register(router)
     }
 }

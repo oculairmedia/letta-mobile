@@ -45,9 +45,10 @@ class IrohAdminOwnershipMatrixTest {
         val allDeclared = operations.map { it.requiredString("method") }.toSet()
         val secretMethods = com.letta.mobile.data.secrets.wire.SecretRequestRouteWire.METHODS
         val voiceMethods = com.letta.mobile.data.voice.host.HostVoiceWire.METHODS
+        val serviceMethods = com.letta.mobile.data.servicecredentials.ServiceCredentialWire.METHODS
         val pinsMethods = com.letta.mobile.data.pins.wire.AgentPinsWire.METHODS
         val shellStateMethods = com.letta.mobile.data.shellstate.wire.ShellStateWire.METHODS
-        val conditional = CanvasMountWire.METHODS + secretMethods + voiceMethods + pinsMethods + shellStateMethods
+        val conditional = CanvasMountWire.METHODS + secretMethods + voiceMethods + pinsMethods + shellStateMethods + serviceMethods
         val declared = allDeclared.filterNot { it.startsWith("beads.") || it in conditional }.toSet()
 
         assertEquals(operations.size, allDeclared.size, "Duplicate method rows in the ownership matrix")
@@ -71,6 +72,11 @@ class IrohAdminOwnershipMatrixTest {
             val rows = allDeclared.filter { it.startsWith(prefix) }.toSet()
             assertEquals(methods, rows, "Conditional $prefix routes need ownership decisions")
         }
+        assertEquals(
+            serviceMethods,
+            allDeclared.filter { it.startsWith("service.credential.") }.toSet(),
+            "Conditional service credential routes must all have ownership decisions",
+        )
         assertEquals(
             emptySet(),
             registered - declared,
