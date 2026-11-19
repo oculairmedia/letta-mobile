@@ -94,6 +94,11 @@ class ListeningSelectionTest {
     fun automaticFallsBackToTheServerEarWhenTheRecogniserCannotGoOn() = runTest {
         val recognizer = FakeLocalRecognizer()
         val set = listenWith(VoiceListening.AUTOMATIC, recognizer)
+        // The on-device recogniser refuses the language, then so does the platform service it falls
+        // back to (letta-mobile-dovsq): only then can the device not go on.
+        recognizer.current.send(LocalRecognitionEvent.Failed(LocalRecognitionError.LANGUAGE_UNAVAILABLE))
+        runCurrent()
+        assertEquals(0, microphone.opens, "not handed over while the platform service can still try")
         recognizer.current.send(LocalRecognitionEvent.Failed(LocalRecognitionError.LANGUAGE_UNAVAILABLE))
         runCurrent()
 
