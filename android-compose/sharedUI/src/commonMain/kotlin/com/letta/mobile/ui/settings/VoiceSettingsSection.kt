@@ -54,7 +54,6 @@ import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -125,6 +124,7 @@ private class VoiceForm(private val access: VoiceSetupAccess, url: String, conse
 fun VoiceSettingsSection(access: VoiceSetupAccess, modifier: Modifier = Modifier, onSaved: ((ready: Boolean) -> Unit)? = null) {
     val stored by access.store.setup.collectAsState()
     val shared = access.shared
+    val noHost = remember { MutableStateFlow(HostVoiceState()) }
     val host by (shared?.state ?: noHost).collectAsState()
     // Reads the shared setup and learns whether this device may change it (a check that sends no audio or text).
     LaunchedEffect(shared) { shared?.learnAdmin() }
@@ -155,9 +155,6 @@ fun VoiceSettingsSection(access: VoiceSetupAccess, modifier: Modifier = Modifier
         }
     }
 }
-
-/** What a section without a host connection knows of the host: nothing. */
-private val noHost: StateFlow<HostVoiceState> = MutableStateFlow(HostVoiceState())
 
 @Composable
 private fun SettingsScope.VoiceAddressRows(form: VoiceForm, keepsKey: Boolean, keySaved: Boolean) {

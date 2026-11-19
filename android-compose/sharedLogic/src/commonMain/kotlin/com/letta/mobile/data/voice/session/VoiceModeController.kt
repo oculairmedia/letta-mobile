@@ -20,6 +20,7 @@ import com.letta.mobile.data.voice.session.telemetry.VoiceTelemetrySink
 import com.letta.mobile.data.voice.session.telemetry.diagnosticKey
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -317,11 +318,7 @@ class VoiceModeController(
     private fun launchLoop(session: BoundVoiceChatSession, setup: VoiceSetup, route: VoiceRoute): LiveVoice? {
         val job = SupervisorJob(runtime.scope.coroutineContext[Job])
         val scope = runtime.scope + job + runtime.dispatcher
-        val services = VoiceSessionServices(telemetry, controls)
-        // Through the host the key stays where it is: this device's own key is never handed to the engines.
-        val apiKey = if (route is VoiceRoute.Host) null else store.apiKey()
-        val grants = VoiceEndpointGrantSource { store.setup.value.effectiveGrants }
-        val request = VoiceEngineRequest(session, setup, apiKey, grants, scope, services, route)
+        val request = engineRequest(session, setup, route, scope)
         val built = runCatching { engines.create(request) }
         val error = built.exceptionOrNull()
         if (error is CancellationException) throw error
@@ -334,10 +331,8 @@ class VoiceModeController(
         val loopConfig = config.copy(voiceInterrupts = config.voiceInterrupts && set.bargeInByVoice)
         val (ear, mouth) = controls.engines(set.engines.ear, set.engines.mouth)
         val loop = VoiceLoop(set.engines.copy(ear = ear, mouth = mouth), loopConfig, runtime.copy(scope = scope, observer = telemetry.loop))
-        // A refused permission is a missing acknowledgement only where this session listens through the server.
-        val serverEar = { engines.listensOnServer(setup) || set.handover.value != null }
         val follower = scope.launch {
-            loop.state.collect { mutableState.value = VoiceModeProjection.of(it, store.setup.value.gapFor(route, serverEar())) }
+            loop.state.collect { mutableState.value = VoiceModeProjection.of(it, failureGap(setup, route, set)) }
         }
         val tracer = scope.launch { loop.state.distinctUntilChangedBy { it.diagnosticKey() }.collect(telemetry::loopState) }
         val watcher = scope.launch { session.awaitMove { commands.send(Command.Stop(CONVERSATION_CHANGED)) } }
@@ -359,6 +354,30 @@ class VoiceModeController(
         val handedOver = scope.launch { set.handover.collect { reason -> if (reason != null) mutableHandover.value = reason } }
         val controlled = scope.launch { controls.follow(loop.state) }
         return LiveVoice(loop, set, job, listOf(follower, tracer, watcher, hearing, playing, words, handedOver, controlled))
+    }
+
+    /**
+     * The request for one session's engines on [route]. Through the host this device's own key is
+     * never handed to the engines; the grants are read live, with this device's audio acknowledgement.
+     */
+    private fun engineRequest(
+        session: VoiceChatSession,
+        setup: VoiceSetup,
+        route: VoiceRoute,
+        scope: CoroutineScope,
+    ): VoiceEngineRequest {
+        val apiKey = if (route is VoiceRoute.Host) null else store.apiKey()
+        val grants = VoiceEndpointGrantSource { store.setup.value.effectiveGrants }
+        return VoiceEngineRequest(session, setup, apiKey, grants, scope, VoiceSessionServices(telemetry, controls), route)
+    }
+
+    /**
+     * The setup gap a loop failure points to: a refused permission is a missing acknowledgement only
+     * where this session listens through the server (its own ear, or the ear it handed over to).
+     */
+    private fun failureGap(setup: VoiceSetup, route: VoiceRoute, set: VoiceEngineSet): VoiceSetupGap? {
+        val serverEar = engines.listensOnServer(setup) || set.handover.value != null
+        return store.setup.value.gapFor(route, serverEar)
     }
 
     /** Releases the live session, if any (reporting [reason]), and then publishes [next]. Completes even when cancelled. */

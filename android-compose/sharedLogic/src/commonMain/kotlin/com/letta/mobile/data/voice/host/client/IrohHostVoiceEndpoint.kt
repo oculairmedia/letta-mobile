@@ -30,7 +30,7 @@ import kotlinx.coroutines.flow.produceIn
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
+import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -203,13 +203,9 @@ class IrohHostVoiceEndpoint(
         const val FRAME_BUFFER = 64
         const val RESPONSE_TYPE = "admin_rpc_response"
         val EMPTY = JsonObject(emptyMap())
-        // As the admin_rpc readers do: unknown fields ignored, an unknown enum value read as its
-        // default (a newer host's reachability code), null optionals omitted on write.
-        val json = Json {
-            ignoreUnknownKeys = true
-            coerceInputValues = true
-            explicitNulls = false
-        }
+        // The admin_rpc reader: unknown fields ignored, an unknown enum value read as its default
+        // (a newer host's reachability code), null optionals omitted on write.
+        val json = LettaJson.adminRpc
 
         fun JsonObject.type(): String? = (this["type"] as? JsonPrimitive)?.content
 

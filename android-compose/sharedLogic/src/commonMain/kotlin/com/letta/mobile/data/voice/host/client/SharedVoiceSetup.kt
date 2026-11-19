@@ -120,9 +120,9 @@ class SharedVoiceSetup(
      * host setup in force never silently gives way to this device's own.
      */
     fun route(preferDevice: Boolean): VoiceRoute {
+        if (preferDevice) return VoiceRoute.Direct
         val known = mutableState.value
-        val status = known.status?.takeIf { it.configured }
-        if (preferDevice || !supported || status == null) return VoiceRoute.Direct
+        val status = known.status?.takeIf { supported && it.configured } ?: return VoiceRoute.Direct
         return VoiceRoute.Host(endpoint, status, known.origin)
     }
 

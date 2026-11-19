@@ -1,6 +1,7 @@
 package com.letta.mobile.data.voice.session.migration
 
 import com.letta.mobile.data.rpcwire.SecretWriteValue
+import com.letta.mobile.data.voice.SpeechEndpointUrl
 import com.letta.mobile.data.voice.consent.EndpointOrigin
 import com.letta.mobile.data.voice.consent.VoiceEndpointPayload
 import com.letta.mobile.data.voice.host.HostVoiceEndpointChoice
@@ -54,32 +55,52 @@ class VoiceSetupMigration(
     suspend fun share(sendKey: Boolean): HostVoiceErrorCode? {
         val local = store.setup.value
         val url = local.endpoint.baseUrl ?: return HostVoiceErrorCode.INVALID_REQUEST
-        val key = if (sendKey) store.apiKeyForMove()?.let { HostVoiceKeyChange.Replace(SecretWriteValue(it)) } else null
-        val grants = HostVoiceGrants(
-            audioForTranscription = local.grants.allows(url, VoiceEndpointPayload.AUDIO_FOR_TRANSCRIPTION),
-            textForSynthesis = local.grants.allows(url, VoiceEndpointPayload.TEXT_FOR_SYNTHESIS),
-        )
-        val endpoint = local.endpoint
-        val choice = HostVoiceEndpointChoice(url, endpoint.transcriptionModel, endpoint.speechModel, endpoint.voice, endpoint.language)
-        val command = HostVoiceSetupCommand(choice, key ?: HostVoiceKeyChange.Keep, grants, shared.state.value.status?.revision)
-        val status = shared.write(command) ?: return shared.state.value.error ?: HostVoiceErrorCode.INTERNAL
-        if (key != null && status.hasApiKey) store.forgetApiKey()
+        val key = if (sendKey) keyToSend() else HostVoiceKeyChange.Keep
+        val grants = grantsFor(local, url)
+        val command = HostVoiceSetupCommand(choiceFor(local, url), key, grants, shared.state.value.status?.revision)
+        val status = shared.write(command) ?: return failure()
+        if (key is HostVoiceKeyChange.Replace && status.hasApiKey) store.forgetApiKey()
         if (grants.audioForTranscription) store.acknowledgeHostAudio(EndpointOrigin.of(url))
         return null
     }
+
+    /** This device's stored key, wrapped write-only for the one setup command that carries it; Keep without one. */
+    private fun keyToSend(): HostVoiceKeyChange =
+        store.apiKeyForMove()?.let { HostVoiceKeyChange.Replace(SecretWriteValue(it)) } ?: HostVoiceKeyChange.Keep
+
+    /** Why the write failed, as the host said. */
+    private fun failure(): HostVoiceErrorCode = shared.state.value.error ?: HostVoiceErrorCode.INTERNAL
 
     /** Removes this device's own server (address, grants and key) once the host's shared one is in force. */
     fun removeLocal() = store.clearEndpoint()
 }
 
 /** The offer for [local] against what is known of the host ([host]). */
-fun shareOfferFor(local: VoiceSetup, host: HostVoiceState): VoiceShareOffer {
-    val ownServer = local.endpoint.baseUrl != null
-    return when {
-        !host.supported || !ownServer || host.status == null -> VoiceShareOffer.NONE
-        host.configured -> if (local.deviceOnly) VoiceShareOffer.NONE else VoiceShareOffer.REMOVE_LOCAL
-        host.admin == true -> VoiceShareOffer.SHARE
-        host.admin == false -> VoiceShareOffer.ASK_ADMIN
-        else -> VoiceShareOffer.NONE
-    }
+fun shareOfferFor(local: VoiceSetup, host: HostVoiceState): VoiceShareOffer = when {
+    !knowsBoth(local, host) -> VoiceShareOffer.NONE
+    host.configured -> if (local.deviceOnly) VoiceShareOffer.NONE else VoiceShareOffer.REMOVE_LOCAL
+    else -> offerByAdmin(host.admin)
+}
+
+/** Whether there is anything to compare: a host serving the contract, its status read, and a server of this device's own. */
+private fun knowsBoth(local: VoiceSetup, host: HostVoiceState): Boolean =
+    host.supported && host.status != null && local.endpoint.baseUrl != null
+
+/** What a host without a setup lets this device offer, by whether it is an admin (null: not known yet). */
+private fun offerByAdmin(admin: Boolean?): VoiceShareOffer = when (admin) {
+    true -> VoiceShareOffer.SHARE
+    false -> VoiceShareOffer.ASK_ADMIN
+    null -> VoiceShareOffer.NONE
+}
+
+/** The grants this device recorded for [url], as the shared grant record. */
+private fun grantsFor(local: VoiceSetup, url: SpeechEndpointUrl): HostVoiceGrants = HostVoiceGrants(
+    audioForTranscription = local.grants.allows(url, VoiceEndpointPayload.AUDIO_FOR_TRANSCRIPTION),
+    textForSynthesis = local.grants.allows(url, VoiceEndpointPayload.TEXT_FOR_SYNTHESIS),
+)
+
+/** This device's server at [url] with its model names, voice and language hint. */
+private fun choiceFor(local: VoiceSetup, url: SpeechEndpointUrl): HostVoiceEndpointChoice {
+    val endpoint = local.endpoint
+    return HostVoiceEndpointChoice(url, endpoint.transcriptionModel, endpoint.speechModel, endpoint.voice, endpoint.language)
 }
