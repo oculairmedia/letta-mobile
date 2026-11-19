@@ -85,6 +85,7 @@ internal fun VoiceCardDock(uiState: ChatUiState, modifier: Modifier = Modifier, 
                             handle = handle,
                             conversation = VoiceCardConversation(uiState.agentName, reply),
                             seamGlow = glow,
+                            leaving = shown,
                             modifier = Modifier.semantics {
                                 shown?.let { voiceOutlineRole = voiceGlowRole(it) }
                                 voiceOutlineAnimated = level != null

@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -72,6 +73,10 @@ internal fun voiceSpeaker(state: VoiceModeState): VoiceCardSpeaker = when (state
  * type scale, control sizes and voice tints (customColors.voiceYouColor and voiceAgentColor). Under
  * reduced motion it holds still: no fold animation, a still thinking mark and glow, and the reply lit
  * a piece at a time.
+ *
+ * It shows the live state whenever voice mode runs, so every change of turn shows at once. Once voice
+ * mode stops it draws nothing, unless given [leaving], the last running state to keep showing while it
+ * folds away (VoiceCardDock passes it during the exit motion).
  */
 @Composable
 internal fun VoiceModeCard(
@@ -79,10 +84,12 @@ internal fun VoiceModeCard(
     conversation: VoiceCardConversation,
     seamGlow: () -> Color,
     modifier: Modifier = Modifier,
+    leaving: VoiceModeState? = null,
 ) {
     LocalRecompositionProbe.current?.invoke(PROBE_CARD)
-    // While voice mode runs; held at its last running state while the card folds away (VoiceCardDock).
-    val state = rememberShownState(handle) ?: return
+    val live by handle.state.collectAsState()
+    // The live state whenever voice mode runs; [leaving] only once it has stopped, while the card folds away.
+    val state = live.takeIf { it.active } ?: leaving ?: return
     val reducedMotion = LocalReducedMotion.current
     val speaker = voiceSpeaker(state)
     val now = rememberCardClock(handle.cardFeed)

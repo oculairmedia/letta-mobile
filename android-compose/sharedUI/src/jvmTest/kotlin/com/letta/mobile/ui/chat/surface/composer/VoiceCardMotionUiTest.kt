@@ -15,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runComposeUiTest
@@ -116,6 +118,20 @@ class VoiceCardMotionUiTest {
         assertTrue(card.bottom > barTop, "the card's bottom stays tucked under the bar")
         advance(FRAME_MILLIS * 4)
         assertEquals(full, dockHeight(), "the card has settled under the paused clock")
+    }
+
+    @Test
+    fun aChangeOfTurnShowsAtOnceOnTheDockedCard() = runComposeUiTest {
+        showDock(reduced = false)
+        state.value = VoiceModeState.Listening
+        settle()
+        onNodeWithTag(VoiceModeTags.CARD_STATUS, useUnmergedTree = true).assert(hasText("Listening"))
+
+        // Two frames: one for the state to reach the card, one for what it shows to draw.
+        state.value = VoiceModeState.WaitingForReply
+        advance(FRAME_MILLIS * 2)
+        onNodeWithTag(VoiceModeTags.CARD_SPEAKER, useUnmergedTree = true).assert(hasText("Scout"))
+        onNodeWithTag(VoiceModeTags.CARD_STATUS, useUnmergedTree = true).assert(hasText("Thinking…"))
     }
 
     @Test
