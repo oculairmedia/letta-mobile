@@ -3227,8 +3227,10 @@ final class com.letta.mobile.ui.chat.voice/VoiceModeHandle { // com.letta.mobile
 }
 
 final class com.letta.mobile.ui.chat.voice/VoiceSetupAccess { // com.letta.mobile.ui.chat.voice/VoiceSetupAccess|null[0]
-    constructor <init>(com.letta.mobile.data.voice.session/VoiceSetupStore, kotlin/Boolean = ..., com.letta.mobile.data.voice.local/LocalSpeechAvailability = ..., com.letta.mobile.data.voice.host.client/SharedVoiceSetup? = ..., kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.voice.session/VoiceSetupDraft, com.letta.mobile.data.voice/VoiceErrorCode?>) // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.<init>|<init>(com.letta.mobile.data.voice.session.VoiceSetupStore;kotlin.Boolean;com.letta.mobile.data.voice.local.LocalSpeechAvailability;com.letta.mobile.data.voice.host.client.SharedVoiceSetup?;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.voice.session.VoiceSetupDraft,com.letta.mobile.data.voice.VoiceErrorCode?>){}[0]
+    constructor <init>(com.letta.mobile.data.voice.session/VoiceSetupStore, kotlin/Boolean = ..., com.letta.mobile.data.voice.local/LocalSpeechAvailability = ..., com.letta.mobile.data.voice.host.client/SharedVoiceSetup? = ..., kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.voice.session/VoiceSetupDraft, com.letta.mobile.data.voice.catalog/SpeechCatalog>? = ..., kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.voice.session/VoiceSetupDraft, com.letta.mobile.data.voice/VoiceErrorCode?>) // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.<init>|<init>(com.letta.mobile.data.voice.session.VoiceSetupStore;kotlin.Boolean;com.letta.mobile.data.voice.local.LocalSpeechAvailability;com.letta.mobile.data.voice.host.client.SharedVoiceSetup?;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.voice.session.VoiceSetupDraft,com.letta.mobile.data.voice.catalog.SpeechCatalog>?;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.voice.session.VoiceSetupDraft,com.letta.mobile.data.voice.VoiceErrorCode?>){}[0]
 
+    final val catalog // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.catalog|{}catalog[0]
+        final fun <get-catalog>(): kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.voice.session/VoiceSetupDraft, com.letta.mobile.data.voice.catalog/SpeechCatalog>? // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.catalog.<get-catalog>|<get-catalog>(){}[0]
     final val check // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.check|{}check[0]
         final fun <get-check>(): kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.voice.session/VoiceSetupDraft, com.letta.mobile.data.voice/VoiceErrorCode?> // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.check.<get-check>|<get-check>(){}[0]
     final val echoCancelled // com.letta.mobile.ui.chat.voice/VoiceSetupAccess.echoCancelled|{}echoCancelled[0]
@@ -10988,8 +10990,14 @@ final object com.letta.mobile.ui.settings/SettingsSectionTags { // com.letta.mob
 }
 
 final object com.letta.mobile.ui.settings/VoiceSettingsKeys { // com.letta.mobile.ui.settings/VoiceSettingsKeys|null[0]
+    final const val CATALOG_RETRY_SUFFIX // com.letta.mobile.ui.settings/VoiceSettingsKeys.CATALOG_RETRY_SUFFIX|{}CATALOG_RETRY_SUFFIX[0]
+        final fun <get-CATALOG_RETRY_SUFFIX>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.CATALOG_RETRY_SUFFIX.<get-CATALOG_RETRY_SUFFIX>|<get-CATALOG_RETRY_SUFFIX>(){}[0]
+    final const val CATALOG_SUFFIX // com.letta.mobile.ui.settings/VoiceSettingsKeys.CATALOG_SUFFIX|{}CATALOG_SUFFIX[0]
+        final fun <get-CATALOG_SUFFIX>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.CATALOG_SUFFIX.<get-CATALOG_SUFFIX>|<get-CATALOG_SUFFIX>(){}[0]
     final const val CONSENT // com.letta.mobile.ui.settings/VoiceSettingsKeys.CONSENT|{}CONSENT[0]
         final fun <get-CONSENT>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.CONSENT.<get-CONSENT>|<get-CONSENT>(){}[0]
+    final const val CUSTOM_SUFFIX // com.letta.mobile.ui.settings/VoiceSettingsKeys.CUSTOM_SUFFIX|{}CUSTOM_SUFFIX[0]
+        final fun <get-CUSTOM_SUFFIX>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.CUSTOM_SUFFIX.<get-CUSTOM_SUFFIX>|<get-CUSTOM_SUFFIX>(){}[0]
     final const val DEVICE_ONLY // com.letta.mobile.ui.settings/VoiceSettingsKeys.DEVICE_ONLY|{}DEVICE_ONLY[0]
         final fun <get-DEVICE_ONLY>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.DEVICE_ONLY.<get-DEVICE_ONLY>|<get-DEVICE_ONLY>(){}[0]
     final const val HOST_ACK // com.letta.mobile.ui.settings/VoiceSettingsKeys.HOST_ACK|{}HOST_ACK[0]
@@ -11052,12 +11060,18 @@ final object com.letta.mobile.ui.settings/VoiceSettingsKeys { // com.letta.mobil
         final fun <get-SHARE_STATUS>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.SHARE_STATUS.<get-SHARE_STATUS>|<get-SHARE_STATUS>(){}[0]
     final const val SHARE_WITHOUT_KEY // com.letta.mobile.ui.settings/VoiceSettingsKeys.SHARE_WITHOUT_KEY|{}SHARE_WITHOUT_KEY[0]
         final fun <get-SHARE_WITHOUT_KEY>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.SHARE_WITHOUT_KEY.<get-SHARE_WITHOUT_KEY>|<get-SHARE_WITHOUT_KEY>(){}[0]
+    final const val SPEECH_MODEL // com.letta.mobile.ui.settings/VoiceSettingsKeys.SPEECH_MODEL|{}SPEECH_MODEL[0]
+        final fun <get-SPEECH_MODEL>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.SPEECH_MODEL.<get-SPEECH_MODEL>|<get-SPEECH_MODEL>(){}[0]
     final const val STATUS // com.letta.mobile.ui.settings/VoiceSettingsKeys.STATUS|{}STATUS[0]
         final fun <get-STATUS>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.STATUS.<get-STATUS>|<get-STATUS>(){}[0]
     final const val TEST // com.letta.mobile.ui.settings/VoiceSettingsKeys.TEST|{}TEST[0]
         final fun <get-TEST>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.TEST.<get-TEST>|<get-TEST>(){}[0]
+    final const val TRANSCRIPTION_MODEL // com.letta.mobile.ui.settings/VoiceSettingsKeys.TRANSCRIPTION_MODEL|{}TRANSCRIPTION_MODEL[0]
+        final fun <get-TRANSCRIPTION_MODEL>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.TRANSCRIPTION_MODEL.<get-TRANSCRIPTION_MODEL>|<get-TRANSCRIPTION_MODEL>(){}[0]
     final const val URL // com.letta.mobile.ui.settings/VoiceSettingsKeys.URL|{}URL[0]
         final fun <get-URL>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.URL.<get-URL>|<get-URL>(){}[0]
+    final const val VOICE // com.letta.mobile.ui.settings/VoiceSettingsKeys.VOICE|{}VOICE[0]
+        final fun <get-VOICE>(): kotlin/String // com.letta.mobile.ui.settings/VoiceSettingsKeys.VOICE.<get-VOICE>|<get-VOICE>(){}[0]
 }
 
 final object com.letta.mobile.ui.shell.header/ShellHeaderDefaults { // com.letta.mobile.ui.shell.header/ShellHeaderDefaults|null[0]

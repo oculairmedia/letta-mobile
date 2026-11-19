@@ -5179,6 +5179,10 @@ abstract fun interface com.letta.mobile.data.voice.audio.device/AudioFrameSource
     abstract fun open(com.letta.mobile.data.voice.audio/AudioFrameFormat): com.letta.mobile.data.voice.audio/AudioFrameSource // com.letta.mobile.data.voice.audio.device/AudioFrameSourceFactory.open|open(com.letta.mobile.data.voice.audio.AudioFrameFormat){}[0]
 }
 
+abstract fun interface com.letta.mobile.data.voice.catalog/SpeechCatalogSource { // com.letta.mobile.data.voice.catalog/SpeechCatalogSource|null[0]
+    abstract suspend fun load(): com.letta.mobile.data.voice.catalog/SpeechCatalog // com.letta.mobile.data.voice.catalog/SpeechCatalogSource.load|load(){}[0]
+}
+
 abstract fun interface com.letta.mobile.data.voice.consent/VoiceEndpointGrantSource { // com.letta.mobile.data.voice.consent/VoiceEndpointGrantSource|null[0]
     abstract fun current(): com.letta.mobile.data.voice.consent/VoiceEndpointGrants // com.letta.mobile.data.voice.consent/VoiceEndpointGrantSource.current|current(){}[0]
 }
@@ -15833,8 +15837,10 @@ sealed interface com.letta.mobile.data.settings/SettingsRow { // com.letta.mobil
     }
 
     final class Choice : com.letta.mobile.data.settings/SettingsRow { // com.letta.mobile.data.settings/SettingsRow.Choice|null[0]
-        constructor <init>(kotlin/String, kotlin/String, kotlin.collections/List<com.letta.mobile.data.settings/SettingsOption>, kotlin/String, kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Function1<kotlin/String, kotlin/Unit>) // com.letta.mobile.data.settings/SettingsRow.Choice.<init>|<init>(kotlin.String;kotlin.String;kotlin.collections.List<com.letta.mobile.data.settings.SettingsOption>;kotlin.String;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.Function1<kotlin.String,kotlin.Unit>){}[0]
+        constructor <init>(kotlin/String, kotlin/String, kotlin.collections/List<com.letta.mobile.data.settings/SettingsOption>, kotlin/String, kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Function1<kotlin/String, kotlin/Unit>) // com.letta.mobile.data.settings/SettingsRow.Choice.<init>|<init>(kotlin.String;kotlin.String;kotlin.collections.List<com.letta.mobile.data.settings.SettingsOption>;kotlin.String;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Function1<kotlin.String,kotlin.Unit>){}[0]
 
+        final val alwaysList // com.letta.mobile.data.settings/SettingsRow.Choice.alwaysList|{}alwaysList[0]
+            final fun <get-alwaysList>(): kotlin/Boolean // com.letta.mobile.data.settings/SettingsRow.Choice.alwaysList.<get-alwaysList>|<get-alwaysList>(){}[0]
         final val enabled // com.letta.mobile.data.settings/SettingsRow.Choice.enabled|{}enabled[0]
             final fun <get-enabled>(): kotlin/Boolean // com.letta.mobile.data.settings/SettingsRow.Choice.enabled.<get-enabled>|<get-enabled>(){}[0]
         final val inline // com.letta.mobile.data.settings/SettingsRow.Choice.inline|{}inline[0]
@@ -15859,8 +15865,9 @@ sealed interface com.letta.mobile.data.settings/SettingsRow { // com.letta.mobil
         final fun component5(): kotlin/String? // com.letta.mobile.data.settings/SettingsRow.Choice.component5|component5(){}[0]
         final fun component6(): kotlin/Boolean // com.letta.mobile.data.settings/SettingsRow.Choice.component6|component6(){}[0]
         final fun component7(): kotlin/Boolean // com.letta.mobile.data.settings/SettingsRow.Choice.component7|component7(){}[0]
-        final fun component8(): kotlin/Function1<kotlin/String, kotlin/Unit> // com.letta.mobile.data.settings/SettingsRow.Choice.component8|component8(){}[0]
-        final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<com.letta.mobile.data.settings/SettingsOption> = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Function1<kotlin/String, kotlin/Unit> = ...): com.letta.mobile.data.settings/SettingsRow.Choice // com.letta.mobile.data.settings/SettingsRow.Choice.copy|copy(kotlin.String;kotlin.String;kotlin.collections.List<com.letta.mobile.data.settings.SettingsOption>;kotlin.String;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.Function1<kotlin.String,kotlin.Unit>){}[0]
+        final fun component8(): kotlin/Boolean // com.letta.mobile.data.settings/SettingsRow.Choice.component8|component8(){}[0]
+        final fun component9(): kotlin/Function1<kotlin/String, kotlin/Unit> // com.letta.mobile.data.settings/SettingsRow.Choice.component9|component9(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<com.letta.mobile.data.settings/SettingsOption> = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Function1<kotlin/String, kotlin/Unit> = ...): com.letta.mobile.data.settings/SettingsRow.Choice // com.letta.mobile.data.settings/SettingsRow.Choice.copy|copy(kotlin.String;kotlin.String;kotlin.collections.List<com.letta.mobile.data.settings.SettingsOption>;kotlin.String;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Function1<kotlin.String,kotlin.Unit>){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.settings/SettingsRow.Choice.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.settings/SettingsRow.Choice.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.settings/SettingsRow.Choice.toString|toString(){}[0]
@@ -71034,6 +71041,29 @@ final class com.letta.mobile.data.voice.audio/PcmFormat { // com.letta.mobile.da
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.audio/PcmFormat.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.voice.catalog/SpeechCatalog { // com.letta.mobile.data.voice.catalog/SpeechCatalog|null[0]
+    constructor <init>(kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin/String>?) // com.letta.mobile.data.voice.catalog/SpeechCatalog.<init>|<init>(kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>?){}[0]
+
+    final val models // com.letta.mobile.data.voice.catalog/SpeechCatalog.models|{}models[0]
+        final fun <get-models>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.voice.catalog/SpeechCatalog.models.<get-models>|<get-models>(){}[0]
+    final val voices // com.letta.mobile.data.voice.catalog/SpeechCatalog.voices|{}voices[0]
+        final fun <get-voices>(): kotlin.collections/List<kotlin/String>? // com.letta.mobile.data.voice.catalog/SpeechCatalog.voices.<get-voices>|<get-voices>(){}[0]
+
+    final fun component1(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.voice.catalog/SpeechCatalog.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<kotlin/String>? // com.letta.mobile.data.voice.catalog/SpeechCatalog.component2|component2(){}[0]
+    final fun copy(kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String>? = ...): com.letta.mobile.data.voice.catalog/SpeechCatalog // com.letta.mobile.data.voice.catalog/SpeechCatalog.copy|copy(kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.catalog/SpeechCatalog.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.catalog/SpeechCatalog.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.catalog/SpeechCatalog.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.voice.catalog/SpeechCatalogException : kotlin/Exception { // com.letta.mobile.data.voice.catalog/SpeechCatalogException|null[0]
+    constructor <init>(com.letta.mobile.data.voice/VoiceErrorCode, kotlin/Throwable? = ...) // com.letta.mobile.data.voice.catalog/SpeechCatalogException.<init>|<init>(com.letta.mobile.data.voice.VoiceErrorCode;kotlin.Throwable?){}[0]
+
+    final val code // com.letta.mobile.data.voice.catalog/SpeechCatalogException.code|{}code[0]
+        final fun <get-code>(): com.letta.mobile.data.voice/VoiceErrorCode // com.letta.mobile.data.voice.catalog/SpeechCatalogException.code.<get-code>|<get-code>(){}[0]
+}
+
 final class com.letta.mobile.data.voice.consent/VoiceEndpointGrant { // com.letta.mobile.data.voice.consent/VoiceEndpointGrant|null[0]
     constructor <init>(com.letta.mobile.data.voice.consent/EndpointOrigin, com.letta.mobile.data.voice.consent/VoiceEndpointPayload) // com.letta.mobile.data.voice.consent/VoiceEndpointGrant.<init>|<init>(com.letta.mobile.data.voice.consent.EndpointOrigin;com.letta.mobile.data.voice.consent.VoiceEndpointPayload){}[0]
 
@@ -71064,6 +71094,17 @@ final class com.letta.mobile.data.voice.consent/VoiceEndpointGrants { // com.let
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.consent/VoiceEndpointGrants.toString|toString(){}[0]
     final fun with(com.letta.mobile.data.voice.consent/VoiceEndpointGrant): com.letta.mobile.data.voice.consent/VoiceEndpointGrants // com.letta.mobile.data.voice.consent/VoiceEndpointGrants.with|with(com.letta.mobile.data.voice.consent.VoiceEndpointGrant){}[0]
     final fun without(com.letta.mobile.data.voice.consent/VoiceEndpointGrant): com.letta.mobile.data.voice.consent/VoiceEndpointGrants // com.letta.mobile.data.voice.consent/VoiceEndpointGrants.without|without(com.letta.mobile.data.voice.consent.VoiceEndpointGrant){}[0]
+}
+
+final class com.letta.mobile.data.voice.endpoint/EndpointSpeechCatalog : com.letta.mobile.data.voice.catalog/SpeechCatalogSource { // com.letta.mobile.data.voice.endpoint/EndpointSpeechCatalog|null[0]
+    constructor <init>(io.ktor.client.engine/HttpClientEngine, com.letta.mobile.data.voice.endpoint/SpeechEndpointConfig) // com.letta.mobile.data.voice.endpoint/EndpointSpeechCatalog.<init>|<init>(io.ktor.client.engine.HttpClientEngine;com.letta.mobile.data.voice.endpoint.SpeechEndpointConfig){}[0]
+
+    final fun close() // com.letta.mobile.data.voice.endpoint/EndpointSpeechCatalog.close|close(){}[0]
+    final suspend fun load(): com.letta.mobile.data.voice.catalog/SpeechCatalog // com.letta.mobile.data.voice.endpoint/EndpointSpeechCatalog.load|load(){}[0]
+
+    final object Companion { // com.letta.mobile.data.voice.endpoint/EndpointSpeechCatalog.Companion|null[0]
+        final suspend fun list(kotlin/String, kotlin/String?, io.ktor.client.engine/HttpClientEngine): com.letta.mobile.data.voice.catalog/SpeechCatalog // com.letta.mobile.data.voice.endpoint/EndpointSpeechCatalog.Companion.list|list(kotlin.String;kotlin.String?;io.ktor.client.engine.HttpClientEngine){}[0]
+    }
 }
 
 final class com.letta.mobile.data.voice.endpoint/EndpointSpeechSynthesizer : com.letta.mobile.data.voice.endpoint/StreamingSpeechSynthesizer { // com.letta.mobile.data.voice.endpoint/EndpointSpeechSynthesizer|null[0]
@@ -71277,6 +71318,12 @@ final class com.letta.mobile.data.voice.engine/SpeechSegment { // com.letta.mobi
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.engine/SpeechSegment.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.engine/SpeechSegment.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.engine/SpeechSegment.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.voice.host.client/HostSpeechCatalog : com.letta.mobile.data.voice.catalog/SpeechCatalogSource { // com.letta.mobile.data.voice.host.client/HostSpeechCatalog|null[0]
+    constructor <init>(com.letta.mobile.data.voice.host/HostVoiceEndpoint) // com.letta.mobile.data.voice.host.client/HostSpeechCatalog.<init>|<init>(com.letta.mobile.data.voice.host.HostVoiceEndpoint){}[0]
+
+    final suspend fun load(): com.letta.mobile.data.voice.catalog/SpeechCatalog // com.letta.mobile.data.voice.host.client/HostSpeechCatalog.load|load(){}[0]
 }
 
 final class com.letta.mobile.data.voice.host.client/HostSpeechSynthesizer : com.letta.mobile.data.voice.endpoint/StreamingSpeechSynthesizer { // com.letta.mobile.data.voice.host.client/HostSpeechSynthesizer|null[0]
@@ -72211,7 +72258,7 @@ final class com.letta.mobile.data.voice.session/VoiceSetup { // com.letta.mobile
 }
 
 final class com.letta.mobile.data.voice.session/VoiceSetupDraft { // com.letta.mobile.data.voice.session/VoiceSetupDraft|null[0]
-    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/Boolean = ...) // com.letta.mobile.data.voice.session/VoiceSetupDraft.<init>|<init>(kotlin.String;kotlin.String?;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.voice.session/VoiceSetupDraft.<init>|<init>(kotlin.String;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
 
     final val apiKey // com.letta.mobile.data.voice.session/VoiceSetupDraft.apiKey|{}apiKey[0]
         final fun <get-apiKey>(): kotlin/String? // com.letta.mobile.data.voice.session/VoiceSetupDraft.apiKey.<get-apiKey>|<get-apiKey>(){}[0]
@@ -72219,6 +72266,12 @@ final class com.letta.mobile.data.voice.session/VoiceSetupDraft { // com.letta.m
         final fun <get-baseUrl>(): kotlin/String // com.letta.mobile.data.voice.session/VoiceSetupDraft.baseUrl.<get-baseUrl>|<get-baseUrl>(){}[0]
     final val consent // com.letta.mobile.data.voice.session/VoiceSetupDraft.consent|{}consent[0]
         final fun <get-consent>(): kotlin/Boolean // com.letta.mobile.data.voice.session/VoiceSetupDraft.consent.<get-consent>|<get-consent>(){}[0]
+    final val speechModel // com.letta.mobile.data.voice.session/VoiceSetupDraft.speechModel|{}speechModel[0]
+        final fun <get-speechModel>(): kotlin/String? // com.letta.mobile.data.voice.session/VoiceSetupDraft.speechModel.<get-speechModel>|<get-speechModel>(){}[0]
+    final val transcriptionModel // com.letta.mobile.data.voice.session/VoiceSetupDraft.transcriptionModel|{}transcriptionModel[0]
+        final fun <get-transcriptionModel>(): kotlin/String? // com.letta.mobile.data.voice.session/VoiceSetupDraft.transcriptionModel.<get-transcriptionModel>|<get-transcriptionModel>(){}[0]
+    final val voice // com.letta.mobile.data.voice.session/VoiceSetupDraft.voice|{}voice[0]
+        final fun <get-voice>(): kotlin/String? // com.letta.mobile.data.voice.session/VoiceSetupDraft.voice.<get-voice>|<get-voice>(){}[0]
 
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.session/VoiceSetupDraft.toString|toString(){}[0]
 }
@@ -72268,8 +72321,14 @@ final class com.letta.mobile.data.voice.session/VoiceSetupStore { // com.letta.m
             final fun <get-KEY_LISTENING>(): kotlin/String // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_LISTENING.<get-KEY_LISTENING>|<get-KEY_LISTENING>(){}[0]
         final const val KEY_LIVE_PARTIALS // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_LIVE_PARTIALS|{}KEY_LIVE_PARTIALS[0]
             final fun <get-KEY_LIVE_PARTIALS>(): kotlin/String // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_LIVE_PARTIALS.<get-KEY_LIVE_PARTIALS>|<get-KEY_LIVE_PARTIALS>(){}[0]
+        final const val KEY_SPEECH_MODEL // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_SPEECH_MODEL|{}KEY_SPEECH_MODEL[0]
+            final fun <get-KEY_SPEECH_MODEL>(): kotlin/String // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_SPEECH_MODEL.<get-KEY_SPEECH_MODEL>|<get-KEY_SPEECH_MODEL>(){}[0]
         final const val KEY_SPEECH_SPEED // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_SPEECH_SPEED|{}KEY_SPEECH_SPEED[0]
             final fun <get-KEY_SPEECH_SPEED>(): kotlin/String // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_SPEECH_SPEED.<get-KEY_SPEECH_SPEED>|<get-KEY_SPEECH_SPEED>(){}[0]
+        final const val KEY_TRANSCRIPTION_MODEL // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_TRANSCRIPTION_MODEL|{}KEY_TRANSCRIPTION_MODEL[0]
+            final fun <get-KEY_TRANSCRIPTION_MODEL>(): kotlin/String // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_TRANSCRIPTION_MODEL.<get-KEY_TRANSCRIPTION_MODEL>|<get-KEY_TRANSCRIPTION_MODEL>(){}[0]
+        final const val KEY_VOICE // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_VOICE|{}KEY_VOICE[0]
+            final fun <get-KEY_VOICE>(): kotlin/String // com.letta.mobile.data.voice.session/VoiceSetupStore.Companion.KEY_VOICE.<get-KEY_VOICE>|<get-KEY_VOICE>(){}[0]
     }
 }
 
@@ -82173,6 +82232,15 @@ final object com.letta.mobile.data.voice.audio.pcm/PcmLevels { // com.letta.mobi
 final object com.letta.mobile.data.voice.audio.pcm/WavCodec { // com.letta.mobile.data.voice.audio.pcm/WavCodec|null[0]
     final fun encode(com.letta.mobile.data.voice.audio.pcm/PcmAudio): kotlin/ByteArray // com.letta.mobile.data.voice.audio.pcm/WavCodec.encode|encode(com.letta.mobile.data.voice.audio.pcm.PcmAudio){}[0]
     final fun parse(kotlin/ByteArray): com.letta.mobile.data.voice.audio.pcm/WavParse // com.letta.mobile.data.voice.audio.pcm/WavCodec.parse|parse(kotlin.ByteArray){}[0]
+}
+
+final object com.letta.mobile.data.voice.catalog/SpeechChoices { // com.letta.mobile.data.voice.catalog/SpeechChoices|null[0]
+    final val OPENAI_VOICES // com.letta.mobile.data.voice.catalog/SpeechChoices.OPENAI_VOICES|{}OPENAI_VOICES[0]
+        final fun <get-OPENAI_VOICES>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.voice.catalog/SpeechChoices.OPENAI_VOICES.<get-OPENAI_VOICES>|<get-OPENAI_VOICES>(){}[0]
+
+    final fun speechModels(kotlin.collections/List<kotlin/String>, kotlin/String?): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.voice.catalog/SpeechChoices.speechModels|speechModels(kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
+    final fun transcriptionModels(kotlin.collections/List<kotlin/String>, kotlin/String?): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.voice.catalog/SpeechChoices.transcriptionModels|transcriptionModels(kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
+    final fun voices(kotlin.collections/List<kotlin/String>?, kotlin/String?): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.voice.catalog/SpeechChoices.voices|voices(kotlin.collections.List<kotlin.String>?;kotlin.String?){}[0]
 }
 
 final object com.letta.mobile.data.voice.host/HostVoiceConnectionCandidateSerializer : kotlinx.serialization/KSerializer<com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate> { // com.letta.mobile.data.voice.host/HostVoiceConnectionCandidateSerializer|null[0]

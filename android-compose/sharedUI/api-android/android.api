@@ -2481,8 +2481,9 @@ public final class com/letta/mobile/ui/chat/voice/VoiceModeTags {
 
 public final class com/letta/mobile/ui/chat/voice/VoiceSetupAccess {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lcom/letta/mobile/data/voice/host/client/SharedVoiceSetup;Lkotlin/jvm/functions/Function2;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lcom/letta/mobile/data/voice/host/client/SharedVoiceSetup;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lcom/letta/mobile/data/voice/host/client/SharedVoiceSetup;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/session/VoiceSetupStore;ZLcom/letta/mobile/data/voice/local/LocalSpeechAvailability;Lcom/letta/mobile/data/voice/host/client/SharedVoiceSetup;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCatalog ()Lkotlin/jvm/functions/Function2;
 	public final fun getCheck ()Lkotlin/jvm/functions/Function2;
 	public final fun getEchoCancelled ()Z
 	public final fun getLocalListening ()Lcom/letta/mobile/data/voice/local/LocalSpeechAvailability;
@@ -7823,7 +7824,10 @@ public final class com/letta/mobile/ui/settings/SettingsStandardSectionsKt {
 
 public final class com/letta/mobile/ui/settings/VoiceSettingsKeys {
 	public static final field $stable I
+	public static final field CATALOG_RETRY_SUFFIX Ljava/lang/String;
+	public static final field CATALOG_SUFFIX Ljava/lang/String;
 	public static final field CONSENT Ljava/lang/String;
+	public static final field CUSTOM_SUFFIX Ljava/lang/String;
 	public static final field DEVICE_ONLY Ljava/lang/String;
 	public static final field HOST_ACK Ljava/lang/String;
 	public static final field HOST_CLEAR Ljava/lang/String;
@@ -7856,9 +7860,12 @@ public final class com/letta/mobile/ui/settings/VoiceSettingsKeys {
 	public static final field SHARE Ljava/lang/String;
 	public static final field SHARE_STATUS Ljava/lang/String;
 	public static final field SHARE_WITHOUT_KEY Ljava/lang/String;
+	public static final field SPEECH_MODEL Ljava/lang/String;
 	public static final field STATUS Ljava/lang/String;
 	public static final field TEST Ljava/lang/String;
+	public static final field TRANSCRIPTION_MODEL Ljava/lang/String;
 	public static final field URL Ljava/lang/String;
+	public static final field VOICE Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/settings/VoiceSettingsSectionKt {

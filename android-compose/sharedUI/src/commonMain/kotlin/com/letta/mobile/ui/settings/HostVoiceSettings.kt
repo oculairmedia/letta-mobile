@@ -24,6 +24,7 @@ import com.letta.mobile.data.voice.host.HostVoiceKeyChange
 import com.letta.mobile.data.voice.host.HostVoiceReachabilityState
 import com.letta.mobile.data.voice.host.HostVoiceSetupCommand
 import com.letta.mobile.data.voice.host.HostVoiceSetupStatus
+import com.letta.mobile.data.voice.host.client.HostSpeechCatalog
 import com.letta.mobile.data.voice.host.client.HostVoiceState
 import com.letta.mobile.data.voice.host.client.SharedVoiceSetup
 import com.letta.mobile.data.voice.session.VoiceEndpointRules
@@ -59,10 +60,7 @@ import com.letta.mobile.sharedui.resources.voice_host_save
 import com.letta.mobile.sharedui.resources.voice_host_server
 import com.letta.mobile.sharedui.resources.voice_host_setup_note
 import com.letta.mobile.sharedui.resources.voice_host_speaking
-import com.letta.mobile.sharedui.resources.voice_host_speech_model
-import com.letta.mobile.sharedui.resources.voice_host_transcription_model
 import com.letta.mobile.sharedui.resources.voice_host_unchecked
-import com.letta.mobile.sharedui.resources.voice_host_voice
 import com.letta.mobile.sharedui.resources.voice_settings_reachable
 import com.letta.mobile.sharedui.resources.voice_settings_saved
 import com.letta.mobile.sharedui.resources.voice_settings_test
@@ -99,9 +97,7 @@ private fun hostFailureText(code: HostVoiceErrorCode): StringResource =
 private class HostVoiceForm(private val shared: SharedVoiceSetup, status: HostVoiceSetupStatus?, private val scope: CoroutineScope) {
     var url: String by mutableStateOf(status?.baseUrl.orEmpty())
     var key: String by mutableStateOf("")
-    var transcriptionModel: String by mutableStateOf(status?.transcription?.model.orEmpty())
-    var speechModel: String by mutableStateOf(status?.speech?.model.orEmpty())
-    var voice: String by mutableStateOf(status?.speech?.voice.orEmpty())
+    val names = VoiceNamesDraft(status?.transcription?.model.orEmpty(), status?.speech?.model.orEmpty(), status?.speech?.voice.orEmpty())
     var grantAudio: Boolean by mutableStateOf(status?.consent?.grants?.audioForTranscription == true)
     var grantText: Boolean by mutableStateOf(status?.consent?.grants?.textForSynthesis == true)
     var outcome: VoiceOutcome? by mutableStateOf(null)
@@ -120,9 +116,9 @@ private class HostVoiceForm(private val shared: SharedVoiceSetup, status: HostVo
         val keyChange = typedKey?.let { HostVoiceKeyChange.Replace(SecretWriteValue(it)) } ?: HostVoiceKeyChange.Keep
         val choice = HostVoiceEndpointChoice(
             SpeechEndpointUrl(url.trim()),
-            transcriptionModel.trim().takeIf { it.isNotEmpty() }?.let(::SpeechModelName),
-            speechModel.trim().takeIf { it.isNotEmpty() }?.let(::SpeechModelName),
-            voice.trim().takeIf { it.isNotEmpty() }?.let(::SpeechVoiceName),
+            names[VoiceNameKind.TRANSCRIPTION].trim().takeIf { it.isNotEmpty() }?.let(::SpeechModelName),
+            names[VoiceNameKind.SPEECH].trim().takeIf { it.isNotEmpty() }?.let(::SpeechModelName),
+            names[VoiceNameKind.VOICE].trim().takeIf { it.isNotEmpty() }?.let(::SpeechVoiceName),
         )
         val grants = HostVoiceGrants(audioForTranscription = grantAudio, textForSynthesis = grantText)
         val status = shared.write(HostVoiceSetupCommand(choice, keyChange, grants, shared.state.value.status?.revision))
@@ -273,7 +269,7 @@ private fun SettingsScope.HostVoiceEditor(shared: SharedVoiceSetup, status: Host
     val scope = rememberCoroutineScope()
     val form = remember(shared, status?.revision) { HostVoiceForm(shared, status, scope) }
     HostVoiceAddressRows(form)
-    HostVoiceNameRows(form)
+    HostVoiceNameRows(shared, status, form)
     HostVoiceGrantRows(form)
     val usable = form.problem == null && !form.busy
     val testLabel = stringResource(if (form.busy) Res.string.voice_settings_testing else Res.string.voice_settings_test)
@@ -313,15 +309,17 @@ private fun SettingsScope.HostVoiceAddressRows(form: HostVoiceForm) {
     TextFieldRow(keyRow, form.key) { form.edit { key = it } }
 }
 
+/**
+ * The shared server's models and voice, listed by the host (`voice.models.list`) with the key it
+ * keeps, so this device never calls the server. Only the stored server can be listed: until a new
+ * address is saved the names are typed.
+ */
 @Composable
-private fun SettingsScope.HostVoiceNameRows(form: HostVoiceForm) {
-    val transcriptionTitle = stringResource(Res.string.voice_host_transcription_model)
-    val transcription = SettingsRow.Text(VoiceSettingsKeys.HOST_TRANSCRIPTION_MODEL, transcriptionTitle)
-    TextFieldRow(transcription, form.transcriptionModel) { form.edit { transcriptionModel = it } }
-    val speech = SettingsRow.Text(VoiceSettingsKeys.HOST_SPEECH_MODEL, stringResource(Res.string.voice_host_speech_model))
-    TextFieldRow(speech, form.speechModel) { form.edit { speechModel = it } }
-    val voice = SettingsRow.Text(VoiceSettingsKeys.HOST_VOICE, stringResource(Res.string.voice_host_voice))
-    TextFieldRow(voice, form.voice) { form.edit { this.voice = it } }
+private fun SettingsScope.HostVoiceNameRows(shared: SharedVoiceSetup, status: HostVoiceSetupStatus?, form: HostVoiceForm) {
+    val listsStored = status?.configured == true && form.url.trim() == status.baseUrl
+    val hostCatalog = remember(shared) { HostSpeechCatalog(shared.endpoint) }
+    val catalog = rememberVoiceCatalog(status?.revision, hostCatalog.takeIf { listsStored })
+    VoiceNameRows(form.names, catalog, host = true) { form.outcome = null }
 }
 
 @Composable

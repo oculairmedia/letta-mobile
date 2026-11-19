@@ -217,24 +217,13 @@ class SpeechEndpointClient(
         val outcome = runCatching { block() }
         val error = outcome.exceptionOrNull()
         if (error is CancellationException) throw error
-        val failure = error?.let { classify(operation, it) }
+        val failure = error?.let { classifySpeechFailure(operation, it) }
         if (failure != null) {
             diagnostics?.record(SpeechClientEvent(operation, failure.code, failure.status))
             throw failure
         }
         diagnostics?.record(SpeechClientEvent(operation, null, HTTP_OK))
         return outcome.getOrThrow()
-    }
-
-    private fun classify(operation: SpeechOperation, error: Throwable): SpeechEndpointException = when (error) {
-        is SpeechEndpointException -> error
-        is VoiceAudioException -> SpeechEndpointException(operation, error.code)
-        is HttpRequestTimeoutException, is ConnectTimeoutException, is SocketTimeoutException ->
-            SpeechEndpointException(operation, VoiceErrorCode.TIMED_OUT)
-        else -> SpeechEndpointException(
-            operation,
-            if (NameResolutionFailures.matches(error)) VoiceErrorCode.UNRESOLVED else VoiceErrorCode.UNREACHABLE,
-        )
     }
 
     private companion object {
@@ -248,6 +237,21 @@ class SpeechEndpointClient(
         const val CHUNK_BYTES = 8 * 1024
         const val HTTP_OK = 200
     }
+}
+
+/**
+ * [error] as the failure of [operation] with a fixed code: a timeout is TIMED_OUT, a name that did
+ * not resolve UNRESOLVED, a refused decode its own code, anything else UNREACHABLE.
+ */
+internal fun classifySpeechFailure(operation: SpeechOperation, error: Throwable): SpeechEndpointException = when (error) {
+    is SpeechEndpointException -> error
+    is VoiceAudioException -> SpeechEndpointException(operation, error.code)
+    is HttpRequestTimeoutException, is ConnectTimeoutException, is SocketTimeoutException ->
+        SpeechEndpointException(operation, VoiceErrorCode.TIMED_OUT)
+    else -> SpeechEndpointException(
+        operation,
+        if (NameResolutionFailures.matches(error)) VoiceErrorCode.UNRESOLVED else VoiceErrorCode.UNREACHABLE,
+    )
 }
 
 /**
