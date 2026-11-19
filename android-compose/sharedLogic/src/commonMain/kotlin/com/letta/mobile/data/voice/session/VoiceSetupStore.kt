@@ -38,6 +38,15 @@ data class VoiceTuning(
     val livePartials: Boolean? = null,
 )
 
+/**
+ * Whether the server ear requests live partial transcripts from the speech server at [server]: the
+ * stored choice, or by default on only when that server is on this machine or the person's own
+ * network ([SpeechEndpointLocality]); off with no server. The same rule holds for this device's own
+ * server and for the one the host shares.
+ */
+internal fun VoiceTuning.livePartialsFor(server: SpeechEndpointUrl?): Boolean =
+    livePartials ?: (server?.let(SpeechEndpointLocality::isLocal) == true)
+
 /** What the person configured for voice mode, as stored. Never carries the API key itself. */
 data class VoiceSetup(
     /** The speech endpoint and its model names. */
@@ -72,7 +81,7 @@ data class VoiceSetup(
      * endpoint is on this machine or a private network (no per-request cost, nothing leaves it).
      */
     val livePartials: Boolean
-        get() = tuning.livePartials ?: (endpoint.baseUrl?.let(SpeechEndpointLocality::isLocal) == true)
+        get() = tuning.livePartialsFor(endpoint.baseUrl)
 
     /** Whether speaking over a reply interrupts it, on a microphone path that is [echoCancelled] or not. */
     fun bargeInByVoice(echoCancelled: Boolean): Boolean = echoCancelled || interruptBySpeaking

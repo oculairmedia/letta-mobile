@@ -76165,16 +76165,19 @@ public final class com/letta/mobile/data/voice/vad/ear/EarObserver$DefaultImpls 
 
 public final class com/letta/mobile/data/voice/vad/ear/EarTurnReport {
 	public static final field Companion Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport$Companion;
-	public synthetic fun <init> (JDLjava/lang/Double;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JDLjava/lang/Double;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JDLjava/lang/Double;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-UwyO8pc ()J
 	public final fun component2 ()D
 	public final fun component3 ()Ljava/lang/Double;
-	public final fun copy-KLykuaI (JDLjava/lang/Double;)Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;
-	public static synthetic fun copy-KLykuaI$default (Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;JDLjava/lang/Double;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;
+	public final fun component4-UwyO8pc ()J
+	public final fun copy-A4u-v98 (JDLjava/lang/Double;J)Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;
+	public static synthetic fun copy-A4u-v98$default (Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;JDLjava/lang/Double;JILjava/lang/Object;)Lcom/letta/mobile/data/voice/vad/ear/EarTurnReport;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getFloorDb ()Ljava/lang/Double;
 	public final fun getPeakDb ()D
 	public final fun getPeakSnrDb ()Ljava/lang/Double;
+	public final fun getTrailingSilence-UwyO8pc ()J
 	public final fun getVoiced-UwyO8pc ()J
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
