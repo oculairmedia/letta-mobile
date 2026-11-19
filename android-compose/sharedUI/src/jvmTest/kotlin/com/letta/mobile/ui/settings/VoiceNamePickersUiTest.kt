@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.data.voice.SpeechModelName
@@ -83,7 +84,7 @@ class VoiceNamePickersUiTest {
 
         onNodeWithTag(row(VoiceSettingsKeys.VOICE)).performScrollTo().performClick()
         onNodeWithTag(option(VoiceSettingsKeys.VOICE, CUSTOM)).performClick()
-        onNodeWithTag(row(VoiceSettingsKeys.VOICE + VoiceSettingsKeys.CUSTOM_SUFFIX)).performScrollTo().performTextInput("my-clone")
+        onNodeWithTag(row(VoiceSettingsKeys.VOICE + VoiceSettingsKeys.CUSTOM_SUFFIX)).performScrollTo().performTextReplacement("my-clone")
         onNodeWithTag(SettingsSectionTags.ACTION_PREFIX + VoiceSettingsKeys.SAVE).performScrollTo().performClick()
 
         assertEquals(SpeechVoiceName("my-clone"), store.setup.value.endpoint.voice)
@@ -108,13 +109,13 @@ class VoiceNamePickersUiTest {
     }
 
     @Test
-    fun noSavedServerMeansTypedNamesAndNoRequest() = runComposeUiTest {
+    fun noSavedServerMeansNoPickersAndNoRequest() = runComposeUiTest {
         var attempts = 0
         val access = VoiceSetupAccess(store, catalog = { attempts++; listed }) { null }
         setContent { Frame { Column(Modifier.verticalScroll(rememberScrollState())) { VoiceSettingsSection(access) } } }
         waitForIdle()
 
-        onNodeWithText("Save the server to choose from its list. You can type the names now.").assertExists()
+        onNodeWithTag(row(VoiceSettingsKeys.VOICE)).assertDoesNotExist()
         assertEquals(0, attempts)
     }
 

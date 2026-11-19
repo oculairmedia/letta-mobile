@@ -196,13 +196,14 @@ private fun SettingsScope.VoiceAddressRows(form: VoiceForm, keepsKey: Boolean, k
 
 /**
  * This device's own server's models and voice, listed by asking the saved server directly with its
- * own key (the typed address is listed once saved); edits are saved with Save.
+ * own key; edits are saved with Save. Shown once a server is saved (until then the defaults apply and
+ * there is nothing to list).
  */
 @Composable
 private fun SettingsScope.VoiceLocalNameRows(access: VoiceSetupAccess, form: VoiceForm, stored: VoiceSetup) {
-    val url = stored.endpoint.baseUrl?.value
+    val url = stored.endpoint.baseUrl?.value ?: return
     val fetch = access.catalog
-    val source = if (url != null && fetch != null) SpeechCatalogSource { fetch(VoiceSetupDraft(url)) } else null
+    val source = if (fetch != null) SpeechCatalogSource { fetch(VoiceSetupDraft(url)) } else null
     val catalog = rememberVoiceCatalog(url to stored.hasApiKey, source)
     VoiceNameRows(form.names, catalog, host = false) { form.outcome = null }
 }

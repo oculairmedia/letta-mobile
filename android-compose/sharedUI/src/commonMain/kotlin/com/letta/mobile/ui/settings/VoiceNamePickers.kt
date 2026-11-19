@@ -37,7 +37,11 @@ import org.jetbrains.compose.resources.stringResource
 
 /** Which name a picker chooses on the speech server, its title, and its row key on this device's own server and the shared one. */
 internal enum class VoiceNameKind(val title: StringResource, val localKey: String, val hostKey: String) {
-    TRANSCRIPTION(Res.string.voice_host_transcription_model, VoiceSettingsKeys.TRANSCRIPTION_MODEL, VoiceSettingsKeys.HOST_TRANSCRIPTION_MODEL),
+    TRANSCRIPTION(
+        Res.string.voice_host_transcription_model,
+        VoiceSettingsKeys.TRANSCRIPTION_MODEL,
+        VoiceSettingsKeys.HOST_TRANSCRIPTION_MODEL,
+    ),
     SPEECH(Res.string.voice_host_speech_model, VoiceSettingsKeys.SPEECH_MODEL, VoiceSettingsKeys.HOST_SPEECH_MODEL),
     VOICE(Res.string.voice_host_voice, VoiceSettingsKeys.VOICE, VoiceSettingsKeys.HOST_VOICE),
     ;
@@ -149,7 +153,13 @@ internal fun SettingsScope.VoiceNameRows(names: VoiceNamesDraft, catalog: VoiceC
 }
 
 @Composable
-private fun SettingsScope.VoiceNameRow(kind: VoiceNameKind, key: String, names: VoiceNamesDraft, catalog: VoiceCatalogState, onEdit: () -> Unit) {
+private fun SettingsScope.VoiceNameRow(
+    kind: VoiceNameKind,
+    key: String,
+    names: VoiceNamesDraft,
+    catalog: VoiceCatalogState,
+    onEdit: () -> Unit,
+) {
     val value = names[kind]
     val title = stringResource(kind.title)
     val type: (String) -> Unit = {
@@ -201,9 +211,8 @@ private fun SettingsScope.VoiceCatalogNote(key: String, catalog: VoiceCatalogSta
             val failed = SettingsStatus(stringResource(Res.string.voice_catalog_failed), SettingsTone.Warning)
             NoteRow(SettingsRow.Note(key + VoiceSettingsKeys.CATALOG_SUFFIX, failed))
             val reason = catalog.error?.let { stringResource(voiceErrorText(it)) }
-            val retry = SettingsRow.Link(key + VoiceSettingsKeys.CATALOG_RETRY_SUFFIX, stringResource(Res.string.voice_catalog_retry), reason) {
-                catalog.retry()
-            }
+            val retryTitle = stringResource(Res.string.voice_catalog_retry)
+            val retry = SettingsRow.Link(key + VoiceSettingsKeys.CATALOG_RETRY_SUFFIX, retryTitle, reason) { catalog.retry() }
             LinkRow(retry)
         }
         VoiceCatalogPhase.IDLE -> {

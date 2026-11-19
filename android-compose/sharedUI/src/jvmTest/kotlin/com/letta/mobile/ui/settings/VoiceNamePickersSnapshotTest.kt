@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Dp
@@ -32,6 +32,7 @@ import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.host.ProvideLettaHost
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.SharedMaterialTheme
+import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test
@@ -73,7 +74,17 @@ class VoiceNamePickersSnapshotTest {
             onNodeWithTag(SettingsSectionTags.ROW_PREFIX + VoiceSettingsKeys.VOICE).performClick()
             waitForIdle()
         }
-        val image = onRoot().captureToImage().toAwtImage()
+        // An open list is a popup with a root of its own: draw each root over the window in order.
+        val nodes = onAllNodes(isRoot()).fetchSemanticsNodes()
+        val window = onAllNodes(isRoot())[0].captureToImage().toAwtImage()
+        val image = BufferedImage(window.width, window.height, BufferedImage.TYPE_INT_ARGB)
+        val canvas = image.createGraphics()
+        canvas.drawImage(window, 0, 0, null)
+        nodes.indices.drop(1).forEach { index ->
+            val bounds = nodes[index].boundsInWindow
+            canvas.drawImage(onAllNodes(isRoot())[index].captureToImage().toAwtImage(), bounds.left.toInt(), bounds.top.toInt(), null)
+        }
+        canvas.dispose()
         val name = "${scene.name.lowercase()}-${width.value.toInt()}dp-${if (dark) "dark" else "light"}.png"
         val out = File("build/voice-picker-snapshots").apply { mkdirs() }.resolve(name)
         ImageIO.write(image, "png", out)
