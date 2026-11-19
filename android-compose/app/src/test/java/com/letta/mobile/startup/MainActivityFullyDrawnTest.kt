@@ -25,7 +25,7 @@ class MainActivityFullyDrawnTest {
         val report = source.indexOf("ReportFirstUsableContent(")
         val waitingReturn = source.indexOf("if (!shell.sourceReady) return AndroidShellPage")
         assertTrue("AndroidShellWorkspace never calls ReportFirstUsableContent", report >= 0)
-        assertTrue("the waiting-page early return precedes the report, which would then leave and re-enter the composition", report < waitingReturn)
+        assertTrue("the waiting-page return precedes the report, so it would leave and re-enter the composition", report < waitingReturn)
     }
 
     private companion object {
