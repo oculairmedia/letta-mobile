@@ -1,5 +1,6 @@
 package com.letta.mobile.quality
 
+import com.letta.mobile.quality.core.MobileRule
 import io.gitlab.arturbosch.detekt.api.Config
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtFile

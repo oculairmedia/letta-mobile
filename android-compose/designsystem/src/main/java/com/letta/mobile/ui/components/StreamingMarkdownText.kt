@@ -4,6 +4,7 @@ import com.letta.mobile.ui.markdown.ParsedMarkdownTable
 import com.letta.mobile.ui.markdown.ParsedTableColumnAlignment
 import com.letta.mobile.ui.markdown.looksLikeMarkdownTable
 import com.letta.mobile.ui.markdown.MarkdownSource
+import com.letta.mobile.ui.markdown.MessageReferenceDefinitions
 import com.letta.mobile.ui.markdown.rememberMarkdownTable
 import com.letta.mobile.ui.markdown.rememberStreamingMarkdownDocument
 import com.letta.mobile.ui.markdown.tailHasOpenBlockFence
@@ -217,7 +218,6 @@ fun StreamingMarkdownText(
     val documentState = remember { StreamingMarkdownDocumentState() }
     // A settled text reuses the page's kept document (its row scrolled away and back), not a parse here.
     val document = rememberStreamingMarkdownDocument(MarkdownSource(displayed), documentState, isStreaming)
-    val blocksForRender = document.blocks
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
     val chatFontScale = LocalChatFontScale.current
@@ -231,7 +231,7 @@ fun StreamingMarkdownText(
     }
     var measuredContentWidthPx by remember { mutableIntStateOf(0) }
     val activeLineCount = remember(
-        blocksForRender,
+        document.blocks,
         measuredContentWidthPx,
         activeTextStyle,
         scaledDensity.density,
@@ -239,7 +239,7 @@ fun StreamingMarkdownText(
         layoutDirection,
         isStreaming,
     ) {
-        val activeBlock = blocksForRender.lastOrNull()
+        val activeBlock = document.blocks.lastOrNull()
         if (
             isStreaming &&
             measuredContentWidthPx > 0 &&
@@ -321,17 +321,19 @@ fun StreamingMarkdownText(
                 }
             },
     ) {
-        StreamingMarkdownDocumentBlocks(
-            blocks = blocksForRender,
-            textColor = textColor,
-            stabilizeTables = stabilizeTables,
-            isStreaming = isStreaming,
-            tailTransform = tailTransform,
-            cursorText = cursorText,
-            cursorAlpha = cursorAlpha,
-            repairIncompleteMarkdown = deferUnstableMarkdown,
-            fadeAppendedText = fadeAppendedText,
-        )
+        MessageReferenceDefinitions(document.referenceDefinitions) {
+            StreamingMarkdownDocumentBlocks(
+                blocks = document.blocks,
+                textColor = textColor,
+                stabilizeTables = stabilizeTables,
+                isStreaming = isStreaming,
+                tailTransform = tailTransform,
+                cursorText = cursorText,
+                cursorAlpha = cursorAlpha,
+                repairIncompleteMarkdown = deferUnstableMarkdown,
+                fadeAppendedText = fadeAppendedText,
+            )
+        }
     }
 }
 
@@ -355,7 +357,6 @@ private fun StreamingMarkdownDocumentBlocks(
         tailTransform = tailTransform,
         fadeAppendedText = fadeAppendedText,
     )
-    val activeFadingRange = fade.range
 
     // Each block renders in its own key group. Unchanged blocks keep the same object and key, while
     // the final active block alone receives tail transforms and cursor injection.
@@ -391,7 +392,7 @@ private fun StreamingMarkdownDocumentBlocks(
             null
         }
 
-        val currentFadeRange = if (isActiveBlock) activeFadingRange else null
+        val currentFadeRange = if (isActiveBlock) fade.range else null
         val currentFadeAlpha = if (isActiveBlock && currentFadeRange != null) fade.alpha else 1f
 
         if (parsedTable != null) {

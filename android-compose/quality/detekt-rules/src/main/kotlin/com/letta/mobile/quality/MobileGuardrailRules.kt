@@ -1,14 +1,15 @@
 package com.letta.mobile.quality
 
-import io.gitlab.arturbosch.detekt.api.CodeSmell
+import com.letta.mobile.quality.core.MobileRule
+import com.letta.mobile.quality.core.isGenerated
+import com.letta.mobile.quality.core.isTestSource
+import com.letta.mobile.quality.guardrails.NoDeprecatedBrowserUnloadEvent
+import com.letta.mobile.quality.guardrails.NoHardcodedPaddingDirection
+import com.letta.mobile.quality.guardrails.NoNonAtomicStateFlowSelfCopy
+import com.letta.mobile.quality.guardrails.NoUnrememberedToolFactsInComposable
 import io.gitlab.arturbosch.detekt.api.Config
-import io.gitlab.arturbosch.detekt.api.Debt
-import io.gitlab.arturbosch.detekt.api.Entity
-import io.gitlab.arturbosch.detekt.api.Issue
-import io.gitlab.arturbosch.detekt.api.Rule
 import io.gitlab.arturbosch.detekt.api.RuleSet
 import io.gitlab.arturbosch.detekt.api.RuleSetProvider
-import io.gitlab.arturbosch.detekt.api.Severity
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtAnnotationEntry
 import org.jetbrains.kotlin.psi.KtBinaryExpression
@@ -29,21 +30,6 @@ import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.psi.KtTryExpression
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
-
-internal fun KtFile.normalizedPath(): String = virtualFilePath.replace('\\', '/')
-internal fun KtFile.isTestSource(): Boolean = normalizedPath().contains("/src/") &&
-    normalizedPath().substringAfter("/src/").substringBefore('/').contains("test", ignoreCase = true)
-internal fun KtFile.isGenerated(): Boolean = normalizedPath().let {
-    "/generated/" in it || "/build/" in it || "/ksp/" in it
-}
-
-internal abstract class MobileRule(config: Config, name: String, description: String) : Rule(config) {
-    final override val issue = Issue(name, Severity.Defect, description, Debt.TWENTY_MINS)
-
-    protected fun report(element: KtElement, message: String) {
-        report(CodeSmell(issue, Entity.from(element), message))
-    }
-}
 
 internal class NoAnyType(config: Config = Config.empty) : MobileRule(
     config,
@@ -374,6 +360,10 @@ class MobileGuardrailProvider : RuleSetProvider {
             ExceptionMessageToClientOrTelemetry(config),
             NoRunBlockingInProduction(config),
             UnboundedBufferNeedsPolicy(config),
+            NoHardcodedPaddingDirection(config),
+            NoDeprecatedBrowserUnloadEvent(config),
+            NoNonAtomicStateFlowSelfCopy(config),
+            NoUnrememberedToolFactsInComposable(config),
             WallClockInSharedLogic(config),
             HostOrUrlStringMatching(config),
             SecretBearingDataClass(config),

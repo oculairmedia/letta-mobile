@@ -63,7 +63,11 @@ fun ScheduleAgendaList(params: ScheduleCalendarParams, modifier: Modifier = Modi
     }
     LazyColumn(modifier.fillMaxSize(), state = state, contentPadding = PaddingValues(LettaDimens.Space.lg)) {
         header?.invoke(this)
-        items(items, key = { it.key }) { item -> AgendaLine(item, params) }
+        items(
+            items = items,
+            key = { it.key },
+            contentType = { it::class },
+        ) { item -> AgendaLine(item, params) }
     }
 }
 

@@ -1,5 +1,7 @@
 package com.letta.mobile.quality
 
+import com.letta.mobile.quality.core.MobileRule
+import com.letta.mobile.quality.core.isGenerated
 import io.gitlab.arturbosch.detekt.api.CodeSmell
 import io.gitlab.arturbosch.detekt.api.Config
 import io.gitlab.arturbosch.detekt.api.Entity

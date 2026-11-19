@@ -1,5 +1,8 @@
 package com.letta.mobile.quality
 
+import com.letta.mobile.quality.core.MobileRule
+import com.letta.mobile.quality.core.isGenerated
+import com.letta.mobile.quality.core.isTestSource
 import io.gitlab.arturbosch.detekt.api.Config
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtBinaryExpression

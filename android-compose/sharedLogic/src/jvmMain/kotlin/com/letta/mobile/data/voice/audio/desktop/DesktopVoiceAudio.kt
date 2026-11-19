@@ -4,6 +4,7 @@ import com.letta.mobile.data.voice.audio.AudioFrameFormat
 import com.letta.mobile.data.voice.audio.AudioFrameSource
 import com.letta.mobile.data.voice.audio.AudioPlayer
 import com.letta.mobile.data.voice.session.VoiceAudio
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -17,4 +18,6 @@ object DesktopVoiceAudio : VoiceAudio {
     override fun deviceChanges(): Flow<Unit> = DesktopAudio.deviceChanges()
 
     override fun speaker(): AudioPlayer = DesktopAudio.player()
+
+    override fun speaker(owner: CoroutineScope): AudioPlayer = DesktopAudio.heldPlayer(owner)
 }

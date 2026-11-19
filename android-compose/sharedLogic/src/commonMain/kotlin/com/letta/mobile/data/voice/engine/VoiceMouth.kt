@@ -5,6 +5,7 @@ import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoiceText
 import kotlinx.coroutines.flow.Flow
 import kotlin.jvm.JvmInline
+import kotlin.time.Duration
 
 /** The loop's number for one spoken segment. */
 @JvmInline
@@ -42,6 +43,21 @@ interface VoiceMouth {
      * stopped and the output device is released; the loop bounds the wait.
      */
     suspend fun stop()
+}
+
+/**
+ * Told how much audio a mouth has for each segment as it arrives: the playing time of the PCM
+ * received so far, and whether all of it has arrived. Never given the audio or the text.
+ */
+fun interface SpeechAudioMeter {
+    /** Segment [id] has [audio] of sound so far; [complete] once its whole response has arrived. */
+    fun measured(id: SpeechSegmentId, audio: Duration, complete: Boolean)
+
+    /** A meter that ignores everything. */
+    companion object {
+        /** Ignores everything. */
+        val None: SpeechAudioMeter = SpeechAudioMeter { _, _, _ -> }
+    }
 }
 
 /** What a mouth reports. */

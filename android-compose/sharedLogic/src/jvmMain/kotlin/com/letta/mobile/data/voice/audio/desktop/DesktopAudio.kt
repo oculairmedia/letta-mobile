@@ -8,9 +8,11 @@ import com.letta.mobile.data.voice.audio.device.AudioDeviceOption
 import com.letta.mobile.data.voice.audio.device.AudioDeviceSelection
 import com.letta.mobile.data.voice.audio.device.FrameAudioCapture
 import com.letta.mobile.data.voice.audio.device.MeteredFrameSource
+import com.letta.mobile.data.voice.audio.line.HeldOutputDevice
 import com.letta.mobile.data.voice.audio.line.LineFrameSource
 import com.letta.mobile.data.voice.audio.line.LinePcmPlayer
 import com.letta.mobile.data.voice.audio.line.PlayerOptions
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -55,6 +57,13 @@ object DesktopAudio {
      */
     fun player(device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault): AudioPlayer =
         LinePcmPlayer(JavaSoundOutputDevice(device), PlayerOptions())
+
+    /**
+     * Like [player], but consecutive streams (one reply's sentences) share one line, released
+     * shortly after the last one, and at the latest when [owner] ends.
+     */
+    fun heldPlayer(owner: CoroutineScope, device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault): AudioPlayer =
+        LinePcmPlayer(HeldOutputDevice(JavaSoundOutputDevice(device), owner), PlayerOptions())
 
     /** Mixers that can capture. */
     fun inputs(): List<AudioDeviceOption> = devicesWith(TargetDataLine::class.java)

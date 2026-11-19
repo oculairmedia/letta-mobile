@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -408,7 +408,10 @@ private fun SubagentTodoContent(content: SubagentTodoSheetState.Content) {
             contentPadding = PaddingValues(vertical = LettaDimens.Space.xs),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
-            items(items = content.items) { item ->
+            itemsIndexed(
+                items = content.items,
+                key = { index, item -> "$index-${item.label}" },
+            ) { _, item ->
                 SubagentTodoRow(item)
             }
         }
