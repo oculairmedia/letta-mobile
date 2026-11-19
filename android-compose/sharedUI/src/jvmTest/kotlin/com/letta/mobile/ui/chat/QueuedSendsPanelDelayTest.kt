@@ -61,7 +61,7 @@ class QueuedSendsPanelDelayTest {
         render { ConversationSendQueue(items = listOf(send("client"))) }
 
         onNodeWithTag(QueuedSendsPanelTestTags.ROW + "client").assertIsDisplayed()
-        onNodeWithText("Queued · 1").assertIsDisplayed()
+        onNodeWithTag(QueuedSendsPanelTestTags.SEND_NOW + "client").assertIsDisplayed()
         onNodeWithText("1 message queued").assertIsDisplayed()
     }
 

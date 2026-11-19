@@ -3230,10 +3230,12 @@ final class com.letta.mobile.ui.chat/AgentIdentity { // com.letta.mobile.ui.chat
 }
 
 final class com.letta.mobile.ui.chat/QueuedSendActions { // com.letta.mobile.ui.chat/QueuedSendActions|null[0]
-    constructor <init>(kotlin/Function1<com.letta.mobile.data.chat.send/QueuedSendId, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.data.chat.send/QueuedSendId, kotlin/Unit> = ..., kotlin/Function0<kotlin/Unit> = ...) // com.letta.mobile.ui.chat/QueuedSendActions.<init>|<init>(kotlin.Function1<com.letta.mobile.data.chat.send.QueuedSendId,kotlin.Unit>;kotlin.Function1<com.letta.mobile.data.chat.send.QueuedSendId,kotlin.Unit>;kotlin.Function0<kotlin.Unit>){}[0]
+    constructor <init>(kotlin/Function1<com.letta.mobile.data.chat.send/QueuedSendId, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.data.chat.send/QueuedSendId, kotlin/Unit> = ..., kotlin/Function0<kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.data.chat.send/QueuedChatSend, kotlin/Unit>? = ...) // com.letta.mobile.ui.chat/QueuedSendActions.<init>|<init>(kotlin.Function1<com.letta.mobile.data.chat.send.QueuedSendId,kotlin.Unit>;kotlin.Function1<com.letta.mobile.data.chat.send.QueuedSendId,kotlin.Unit>;kotlin.Function0<kotlin.Unit>;kotlin.Function1<com.letta.mobile.data.chat.send.QueuedChatSend,kotlin.Unit>?){}[0]
 
     final val onCancel // com.letta.mobile.ui.chat/QueuedSendActions.onCancel|{}onCancel[0]
         final fun <get-onCancel>(): kotlin/Function1<com.letta.mobile.data.chat.send/QueuedSendId, kotlin/Unit> // com.letta.mobile.ui.chat/QueuedSendActions.onCancel.<get-onCancel>|<get-onCancel>(){}[0]
+    final val onEdit // com.letta.mobile.ui.chat/QueuedSendActions.onEdit|{}onEdit[0]
+        final fun <get-onEdit>(): kotlin/Function1<com.letta.mobile.data.chat.send/QueuedChatSend, kotlin/Unit>? // com.letta.mobile.ui.chat/QueuedSendActions.onEdit.<get-onEdit>|<get-onEdit>(){}[0]
     final val onResume // com.letta.mobile.ui.chat/QueuedSendActions.onResume|{}onResume[0]
         final fun <get-onResume>(): kotlin/Function0<kotlin/Unit> // com.letta.mobile.ui.chat/QueuedSendActions.onResume.<get-onResume>|<get-onResume>(){}[0]
     final val onSendNow // com.letta.mobile.ui.chat/QueuedSendActions.onSendNow|{}onSendNow[0]
@@ -3242,7 +3244,8 @@ final class com.letta.mobile.ui.chat/QueuedSendActions { // com.letta.mobile.ui.
     final fun component1(): kotlin/Function1<com.letta.mobile.data.chat.send/QueuedSendId, kotlin/Unit> // com.letta.mobile.ui.chat/QueuedSendActions.component1|component1(){}[0]
     final fun component2(): kotlin/Function1<com.letta.mobile.data.chat.send/QueuedSendId, kotlin/Unit> // com.letta.mobile.ui.chat/QueuedSendActions.component2|component2(){}[0]
     final fun component3(): kotlin/Function0<kotlin/Unit> // com.letta.mobile.ui.chat/QueuedSendActions.component3|component3(){}[0]
-    final fun copy(kotlin/Function1<com.letta.mobile.data.chat.send/QueuedSendId, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.data.chat.send/QueuedSendId, kotlin/Unit> = ..., kotlin/Function0<kotlin/Unit> = ...): com.letta.mobile.ui.chat/QueuedSendActions // com.letta.mobile.ui.chat/QueuedSendActions.copy|copy(kotlin.Function1<com.letta.mobile.data.chat.send.QueuedSendId,kotlin.Unit>;kotlin.Function1<com.letta.mobile.data.chat.send.QueuedSendId,kotlin.Unit>;kotlin.Function0<kotlin.Unit>){}[0]
+    final fun component4(): kotlin/Function1<com.letta.mobile.data.chat.send/QueuedChatSend, kotlin/Unit>? // com.letta.mobile.ui.chat/QueuedSendActions.component4|component4(){}[0]
+    final fun copy(kotlin/Function1<com.letta.mobile.data.chat.send/QueuedSendId, kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.data.chat.send/QueuedSendId, kotlin/Unit> = ..., kotlin/Function0<kotlin/Unit> = ..., kotlin/Function1<com.letta.mobile.data.chat.send/QueuedChatSend, kotlin/Unit>? = ...): com.letta.mobile.ui.chat/QueuedSendActions // com.letta.mobile.ui.chat/QueuedSendActions.copy|copy(kotlin.Function1<com.letta.mobile.data.chat.send.QueuedSendId,kotlin.Unit>;kotlin.Function1<com.letta.mobile.data.chat.send.QueuedSendId,kotlin.Unit>;kotlin.Function0<kotlin.Unit>;kotlin.Function1<com.letta.mobile.data.chat.send.QueuedChatSend,kotlin.Unit>?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.chat/QueuedSendActions.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.ui.chat/QueuedSendActions.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.ui.chat/QueuedSendActions.toString|toString(){}[0]
@@ -9940,6 +9943,8 @@ final object com.letta.mobile.ui.icons/LettaIcons { // com.letta.mobile.ui.icons
         final fun <get-Search>(): androidx.compose.ui.graphics.vector/ImageVector // com.letta.mobile.ui.icons/LettaIcons.Search.<get-Search>|<get-Search>(){}[0]
     final val Send // com.letta.mobile.ui.icons/LettaIcons.Send|{}Send[0]
         final fun <get-Send>(): androidx.compose.ui.graphics.vector/ImageVector // com.letta.mobile.ui.icons/LettaIcons.Send.<get-Send>|<get-Send>(){}[0]
+    final val SendNow // com.letta.mobile.ui.icons/LettaIcons.SendNow|{}SendNow[0]
+        final fun <get-SendNow>(): androidx.compose.ui.graphics.vector/ImageVector // com.letta.mobile.ui.icons/LettaIcons.SendNow.<get-SendNow>|<get-SendNow>(){}[0]
     final val SendToBack // com.letta.mobile.ui.icons/LettaIcons.SendToBack|{}SendToBack[0]
         final fun <get-SendToBack>(): androidx.compose.ui.graphics.vector/ImageVector // com.letta.mobile.ui.icons/LettaIcons.SendToBack.<get-SendToBack>|<get-SendToBack>(){}[0]
     final val Server // com.letta.mobile.ui.icons/LettaIcons.Server|{}Server[0]
