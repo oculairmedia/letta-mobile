@@ -76070,6 +76070,7 @@ public final class com/letta/mobile/data/voice/tone/ToneCueStream {
 public final class com/letta/mobile/data/voice/tone/ToneCues {
 	public static final field INSTANCE Lcom/letta/mobile/data/voice/tone/ToneCues;
 	public static final field MAX_CUE_LENGTH I
+	public final fun accepts (Ljava/lang/String;)Z
 	public final fun count (Ljava/lang/String;)I
 	public final fun strip (Ljava/lang/String;)Ljava/lang/String;
 	public final fun strip (Ljava/lang/String;Z)Ljava/lang/String;

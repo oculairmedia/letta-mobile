@@ -56,13 +56,14 @@ internal object VoiceUpstreamWire {
         )
     }
 
-    /** The speech request, asking for WAVE. */
+    /** The speech request, asking for WAVE, with the reply's tone cue as `instructions` when there is one. */
     fun speechBody(request: VoiceSpeechCall): String {
         return buildJsonObject {
             put("model", request.model)
             put("voice", request.voice)
             put("input", request.text)
             put("response_format", WAV)
+            request.instructions?.let { put("instructions", it) }
         }.toString()
     }
 

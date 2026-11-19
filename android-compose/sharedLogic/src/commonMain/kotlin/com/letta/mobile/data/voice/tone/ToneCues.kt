@@ -56,6 +56,9 @@ object ToneCues {
     /** The longest cue, in characters between the brackets. */
     const val MAX_CUE_LENGTH: Int = 40
 
+    internal val CUE_CHARS: Set<Char> = ('a'..'z').toSet() + setOf(' ', ',', '-')
+    private const val TASK_BOX = "x"
+
     /** [text] as it should be shown: every cue removed (with the space after it). */
     fun strip(text: String): String = strip(text, streaming = false)
 
@@ -72,6 +75,14 @@ object ToneCues {
 
     /** How many cues [text] holds; for counting only. */
     fun count(text: String): Int = if (text.indexOf('[') < 0) 0 else ToneScan(text, false).tokens.count { it is ToneToken.Cue }
+
+    /**
+     * Whether [words] may be a cue's words: 1 to [MAX_CUE_LENGTH] lowercase letters, spaces, commas
+     * and hyphens with at least one letter, and not a task box's `x`. The host applies the same rule
+     * to the `instructions` a speech request carries.
+     */
+    fun accepts(words: String): Boolean =
+        words.length in 1..MAX_CUE_LENGTH && words.all { it in CUE_CHARS } && words.any(Char::isLetter) && words != TASK_BOX
 
     /** [words] marked with [cue] at their start, in the cue syntax; [words] alone when [cue] is null. */
     fun tag(cue: ToneCue?, words: String): String = if (cue == null) words else "[${cue.instructions}] $words"
@@ -162,14 +173,14 @@ private class ToneScan(private val text: String, private val streaming: Boolean)
     /** Reads a bracket opening at [open] that may be a cue; returns where scanning goes on. */
     private fun cueAt(open: Int): Int {
         var close = open + 1
-        while (close < text.length && close - open - 1 <= ToneCues.MAX_CUE_LENGTH && text[close] in CUE_CHARS) close++
+        while (close < text.length && close - open - 1 <= ToneCues.MAX_CUE_LENGTH && text[close] in ToneCues.CUE_CHARS) close++
         val length = close - open - 1
         val unfinished = close >= text.length
         val closed = !unfinished && text[close] == ']' && length in 1..ToneCues.MAX_CUE_LENGTH
         val words = if (closed) text.substring(open + 1, close) else ""
         return when {
             unfinished -> close.also { if (streaming && length <= ToneCues.MAX_CUE_LENGTH) hold(open) }
-            !closed || !words.any(Char::isLetter) || words in NOT_CUES -> open + 1
+            !closed || !ToneCues.accepts(words) -> open + 1
             else -> closedCue(open, close + 1, words)
         }
     }
@@ -212,10 +223,8 @@ private class ToneScan(private val text: String, private val streaming: Boolean)
 
     private companion object {
         const val FENCE = "```"
-        val CUE_CHARS: Set<Char> = ('a'..'z').toSet() + setOf(' ', ',', '-')
         val TERMINATORS = setOf('.', '!', '?', '…')
         val CLOSERS = setOf('"', '\'', ')', ']', '*', '_', '”', '’')
         val LINK_FOLLOWERS = setOf('(', '[', ':')
-        val NOT_CUES = setOf("x")
     }
 }
