@@ -75602,6 +75602,10 @@ public final class com/letta/mobile/data/voice/responder/chat/ChatVoiceChatSessi
 	public fun stopRun ()V
 }
 
+public final class com/letta/mobile/data/voice/responder/chat/ChatVoiceChatSessionKt {
+	public static final fun canonicalLiveRows (Lkotlinx/coroutines/flow/StateFlow;)Lkotlinx/coroutines/flow/StateFlow;
+}
+
 public final class com/letta/mobile/data/voice/session/EndpointVoiceEngineFactory : com/letta/mobile/data/voice/session/VoiceEngineFactory {
 	public fun <init> (Lcom/letta/mobile/data/voice/session/VoiceAudio;Lkotlin/jvm/functions/Function0;Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/voice/session/VoiceAudio;Lkotlin/jvm/functions/Function0;Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;ILkotlin/jvm/internal/DefaultConstructorMarker;)V

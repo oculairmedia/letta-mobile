@@ -184,6 +184,30 @@ internal class ChatVoiceLiveOverlayLoopTest : ChatSendCoordinatorConversationFix
         assertTrue(completedCharacters() > 0)
     }
 
+    @Test
+    fun theFirstSentenceIsSpokenFromTheLiveOverlayWhileTheReplyStillStreams() = runTest(UnconfinedTestDispatcher()) {
+        val rig = rig()
+        val otid = ask(rig)
+        val runs = OverlayRuns("local-run-544")
+
+        rig.coordinator.handleEvent(WsTimelineEvent.TurnStarted(TURN, AGENT, CONV, "local-run-544"))
+        rig.coordinator.handleEvent(echo(Stamp("local-run-544", otid)))
+        listOf("It is", "It is noon. It", "It is noon. It is sunny").forEach { streamed ->
+            rig.coordinator.handleEvent(reply(streamed, Stamp("local-run-544", otid)))
+            rig.overlay(streamed, runs)
+            advanceUntilIdle()
+        }
+        assertEquals(listOf("It is noon."), rig.mouth.spokenTexts.map { it.trim() }, "spoken before the turn is done")
+
+        rig.overlay("It is noon. It is sunny. Bye", runs)
+        advanceUntilIdle()
+        assertEquals(listOf("It is noon.", "It is sunny."), rig.mouth.spokenTexts.map { it.trim() })
+
+        rig.coordinator.handleEvent(WsTimelineEvent.TurnDone(TURN, "local-run-544", BridgeTurnStatus.Completed))
+        advanceUntilIdle()
+        assertEquals(listOf("It is noon.", "It is sunny.", "Bye"), rig.mouth.spokenTexts.map { it.trim() })
+    }
+
     private companion object {
         const val AGENT = "agent-1"
         const val CONV = "conv-1"

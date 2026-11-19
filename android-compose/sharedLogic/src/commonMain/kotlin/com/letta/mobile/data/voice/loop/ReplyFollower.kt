@@ -3,6 +3,7 @@ package com.letta.mobile.data.voice.loop
 import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoicePort
+import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.engine.VoiceCancelOutcome
 import com.letta.mobile.data.voice.engine.VoiceReply
 import com.letta.mobile.data.voice.engine.VoiceReplyEvent
@@ -11,6 +12,7 @@ import com.letta.mobile.data.voice.loop.machine.LoopInput
 import com.letta.mobile.data.voice.loop.machine.ReplySignal
 import com.letta.mobile.data.voice.loop.machine.TurnKey
 import com.letta.mobile.data.voice.speech.SentenceChunker
+import com.letta.mobile.data.voice.speech.batchSegments
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.SendChannel
@@ -100,7 +102,7 @@ internal class ReplyFollower(private val wiring: LoopWiring) {
 
     private suspend fun follow(turn: TurnKey, reply: VoiceReply) {
         val chunker = SentenceChunker(wiring.config.maxSegmentLength, wiring.config.firstClauseMinLength)
-        val forwarder = ReplyForwarder(turn, chunker, wiring.inputs)
+        val forwarder = ReplyForwarder(turn, chunker, wiring.config.maxSegmentLength, wiring.inputs)
         val outcome = runCatching { reply.events.collect(forwarder::forward) }
         val error = outcome.exceptionOrNull()
         if (error is CancellationException) throw error
@@ -108,14 +110,21 @@ internal class ReplyFollower(private val wiring: LoopWiring) {
     }
 }
 
-/** Chunks one answer's text into segments and forwards its events under its generation token. */
+/**
+ * Chunks one answer's text into segments and forwards its events under its generation token. Each
+ * segment goes out the moment the chunker releases it; segments released together (text that
+ * arrived as a burst) are joined up to [maxSegmentLength], except the answer's first segment, which
+ * always goes alone so first audio never waits for a batch.
+ */
 private class ReplyForwarder(
     private val turn: TurnKey,
     private val chunker: SentenceChunker,
+    private val maxSegmentLength: Int,
     private val inputs: SendChannel<LoopInput>,
 ) {
     private var ended = false
     private var started = false
+    private var segmented = false
 
     suspend fun forward(event: VoiceReplyEvent) {
         when (event) {
@@ -133,7 +142,7 @@ private class ReplyForwarder(
             started = true
             send(listOf(ReplySignal.TextStarted))
         }
-        send(chunker.push(event.delta).map(ReplySignal::Segment))
+        send(segments(chunker.push(event.delta)))
     }
 
     /** The answer's flow ended; [crashed] when it threw. An answer that just stopped counts as complete. */
@@ -149,7 +158,13 @@ private class ReplyForwarder(
     }
 
     private suspend fun flush(then: ReplySignal? = null) {
-        send(chunker.flush().map(ReplySignal::Segment) + listOfNotNull(then))
+        send(segments(chunker.flush()) + listOfNotNull(then))
+    }
+
+    private fun segments(released: List<VoiceText>): List<ReplySignal> {
+        val batches = batchSegments(released, firstAlone = !segmented, maxLength = maxSegmentLength)
+        if (batches.isNotEmpty()) segmented = true
+        return batches.map(ReplySignal::Segment)
     }
 
     private suspend fun send(signals: List<ReplySignal>) {
