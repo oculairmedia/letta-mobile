@@ -33,12 +33,12 @@ class VoiceLoopToneCueTest {
         h.listening()
         h.turn()
 
-        h.replyText(VoiceText("It is late. [sof"))
+        h.replyText(VoiceText("It is late. [qui"))
         assertEquals(listOf("It is late." to null), h.spoken(), "the sentence before the cue keeps no tone")
-        h.replyText(VoiceText("tly] Good night. "))
+        h.replyText(VoiceText("et] Good night. "))
         h.reply(VoiceReplyEvent.Completed)
 
-        assertEquals(listOf("It is late." to null, "Good night." to "softly"), h.spoken())
+        assertEquals(listOf("It is late." to null, "Good night." to "quiet"), h.spoken())
     }
 
     @Test

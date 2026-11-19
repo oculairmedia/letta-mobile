@@ -82363,8 +82363,8 @@ final object com.letta.mobile.data.voice.session/VoiceEndpointRules { // com.let
 }
 
 final object com.letta.mobile.data.voice.tone/ToneCues { // com.letta.mobile.data.voice.tone/ToneCues|null[0]
-    final const val MAX_CUE_LENGTH // com.letta.mobile.data.voice.tone/ToneCues.MAX_CUE_LENGTH|{}MAX_CUE_LENGTH[0]
-        final fun <get-MAX_CUE_LENGTH>(): kotlin/Int // com.letta.mobile.data.voice.tone/ToneCues.MAX_CUE_LENGTH.<get-MAX_CUE_LENGTH>|<get-MAX_CUE_LENGTH>(){}[0]
+    final val MODULES // com.letta.mobile.data.voice.tone/ToneCues.MODULES|{}MODULES[0]
+        final fun <get-MODULES>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.voice.tone/ToneCues.MODULES.<get-MODULES>|<get-MODULES>(){}[0]
 
     final fun accepts(kotlin/String): kotlin/Boolean // com.letta.mobile.data.voice.tone/ToneCues.accepts|accepts(kotlin.String){}[0]
     final fun count(kotlin/String): kotlin/Int // com.letta.mobile.data.voice.tone/ToneCues.count|count(kotlin.String){}[0]

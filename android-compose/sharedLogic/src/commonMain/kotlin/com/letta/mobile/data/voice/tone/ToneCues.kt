@@ -3,12 +3,12 @@ package com.letta.mobile.data.voice.tone
 import kotlin.jvm.JvmInline
 
 /**
- * One tone cue: how the following sentences should sound, as the agent wrote it (`excited`,
- * `slow, reassuring`). Sent to a speech server as its `instructions`. Its [toString] carries no text.
+ * One tone cue: the mood module the following sentences use (one of [ToneCues.MODULES], such as
+ * `warm` or `excited`), sent to a speech server as its `instructions`. Its [toString] carries no text.
  */
 @JvmInline
 value class ToneCue(
-    /** The cue's words, never logged. */
+    /** The module's name, never logged. */
     val instructions: String,
 ) {
     /** Whether this cue resets the tone (`[neutral]`): what follows it carries no instructions. */
@@ -39,25 +39,27 @@ sealed interface TonePiece {
 }
 
 /**
- * Inline tone cues in a reply: `[tone]` at the start of a sentence (the start of the text or of a
- * line, or after a sentence's end and whitespace), where `tone` is 1 to 40 lowercase letters, spaces,
- * commas and hyphens with at least one letter. A cue applies to its sentence and every later one
- * until the next cue or the end of the reply; `[neutral]` resets it.
+ * Inline tone cues in a reply: `[module]` at the start of a sentence (the start of the text or of a
+ * line, or after a sentence's end and whitespace), where `module` is one of the closed set of mood
+ * modules ([MODULES]: `neutral`, `warm`, `excited`, `sombre`, `quiet`, `fast`, `slow`). A cue
+ * applies to its sentence and every later one until the next cue or the end of the reply;
+ * `[neutral]` resets it. A cue only selects a module: it never carries a description of a voice,
+ * which comes from the agent's voice core, never from the reply.
  *
- * Ordinary bracketed text is never a cue: a citation (`[1]`), a link (`[text](url)`,
- * `[text][ref]` or a reference definition `[ref]: url`), a task box (`[x]`, `[ ]`), anything
- * mid-sentence or after a list marker, anything nested in another bracket, and anything inside a
- * code span or fence.
+ * Anything else in brackets is not a cue and stays text: a citation (`[1]`), a link (`[warm](url)`,
+ * `[warm][ref]` or a reference definition `[warm]: url`), a task box, a word outside the set
+ * (`[softly]`), anything mid-sentence or after a list marker, anything nested in another bracket, and
+ * anything inside a code span or fence.
  *
  * This is the one place that reads cues: the chat timeline and the dock show [strip]'s text, and voice
- * mode speaks what [ToneCueStream] passes on, each sentence with its cue's instructions.
+ * mode speaks what [ToneCueStream] passes on, each sentence with its module sent as `instructions`.
  */
 object ToneCues {
-    /** The longest cue, in characters between the brackets. */
-    const val MAX_CUE_LENGTH: Int = 40
+    /** The mood modules a cue may select; nothing else is a cue. */
+    val MODULES: Set<String> = setOf("neutral", "warm", "excited", "sombre", "quiet", "fast", "slow")
 
-    internal val CUE_CHARS: Set<Char> = ('a'..'z').toSet() + setOf(' ', ',', '-')
-    private const val TASK_BOX = "x"
+    /** The longest module name, in characters between the brackets. */
+    internal val MAX_CUE_LENGTH: Int = MODULES.maxOf { it.length }
 
     /** [text] as it should be shown: every cue removed (with the space after it). */
     fun strip(text: String): String = strip(text, streaming = false)
@@ -77,12 +79,10 @@ object ToneCues {
     fun count(text: String): Int = if (text.indexOf('[') < 0) 0 else ToneScan(text, false).tokens.count { it is ToneToken.Cue }
 
     /**
-     * Whether [words] may be a cue's words: 1 to [MAX_CUE_LENGTH] lowercase letters, spaces, commas
-     * and hyphens with at least one letter, and not a task box's `x`. The host applies the same rule
-     * to the `instructions` a speech request carries.
+     * Whether [words] select a mood module: exactly one of [MODULES]. The host applies the same rule
+     * to the `instructions` a speech request carries, so nothing but a module name reaches the server.
      */
-    fun accepts(words: String): Boolean =
-        words.length in 1..MAX_CUE_LENGTH && words.all { it in CUE_CHARS } && words.any(Char::isLetter) && words != TASK_BOX
+    fun accepts(words: String): Boolean = words in MODULES
 
     /** [words] marked with [cue] at their start, in the cue syntax; [words] alone when [cue] is null. */
     fun tag(cue: ToneCue?, words: String): String = if (cue == null) words else "[${cue.instructions}] $words"
@@ -173,13 +173,13 @@ private class ToneScan(private val text: String, private val streaming: Boolean)
     /** Reads a bracket opening at [open] that may be a cue; returns where scanning goes on. */
     private fun cueAt(open: Int): Int {
         var close = open + 1
-        while (close < text.length && close - open - 1 <= ToneCues.MAX_CUE_LENGTH && text[close] in ToneCues.CUE_CHARS) close++
+        while (close < text.length && close - open - 1 <= ToneCues.MAX_CUE_LENGTH && text[close] in 'a'..'z') close++
         val length = close - open - 1
         val unfinished = close >= text.length
         val closed = !unfinished && text[close] == ']' && length in 1..ToneCues.MAX_CUE_LENGTH
         val words = if (closed) text.substring(open + 1, close) else ""
         return when {
-            unfinished -> close.also { if (streaming && length <= ToneCues.MAX_CUE_LENGTH) hold(open) }
+            unfinished -> close.also { if (streaming && couldBecomeCue(open, close)) hold(open) }
             !closed || !ToneCues.accepts(words) -> open + 1
             else -> closedCue(open, close + 1, words)
         }
@@ -197,6 +197,12 @@ private class ToneScan(private val text: String, private val streaming: Boolean)
         tokens += ToneToken.Cue(open, end, ToneCue(words.trim()))
         wordsFrom = end
         return end
+    }
+
+    /** Whether the unfinished bracket from [open] to [close] is still the start of a module name. */
+    private fun couldBecomeCue(open: Int, close: Int): Boolean {
+        val typed = text.substring(open + 1, close)
+        return ToneCues.MODULES.any { it.startsWith(typed) }
     }
 
     /** The rest of the text, from [open], may still become a cue: it is held back, in no token. */

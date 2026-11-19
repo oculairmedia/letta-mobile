@@ -2,7 +2,9 @@ package com.letta.mobile.data.voice.tone
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ToneCuesTest {
     private fun stream(vararg deltas: String): List<TonePiece> {
@@ -10,7 +12,7 @@ class ToneCuesTest {
         return deltas.flatMap { tones.push(it) } + tones.finish()
     }
 
-    /** The stream's pieces as readable strings: words as they are, cues as `<cue>` (`<>` for a reset). */
+    /** The stream's pieces as readable strings: words as they are, cues as `<module>` (`<>` for a reset). */
     private fun readable(pieces: List<TonePiece>): List<String> = pieces.map {
         when (it) {
             is TonePiece.Words -> it.text
@@ -26,31 +28,32 @@ class ToneCuesTest {
     @Test
     fun aCueBeforeALaterSentenceIsRemovedToo() {
         assertEquals("Hello. We won!", ToneCues.strip("Hello. [excited] We won!"))
-        assertEquals("Done.\nNext step.", ToneCues.strip("Done.\n[slow, reassuring] Next step."))
+        assertEquals("Done.\nNext step.", ToneCues.strip("Done.\n[slow] Next step."))
     }
 
     @Test
-    fun cuesOfLettersSpacesCommasAndHyphensAreRead() {
-        assertEquals(1, ToneCues.count("[slow, reassuring] Okay."))
-        assertEquals(1, ToneCues.count("[half-whispering] Okay."))
-        assertEquals(1, ToneCues.count("[${"a".repeat(ToneCues.MAX_CUE_LENGTH)}] Okay."))
+    fun everyModuleIsACueAndNothingElseIs() {
+        ToneCues.MODULES.forEach { module -> assertEquals(1, ToneCues.count("[$module] Okay."), module) }
+        listOf("softly", "slow, reassuring", "warm and breathy", "whispering", "x").forEach { words ->
+            assertFalse(ToneCues.accepts(words), words)
+            assertEquals("[$words] Okay.", ToneCues.strip("[$words] Okay."), "stays text: $words")
+        }
     }
 
     @Test
     fun ordinaryBracketsAreNeverCues() {
         listOf(
             "[1] See the paper.",
-            "[Excited] Capitals are not a cue.",
-            "[see docs](https://example.com) for more.",
-            "[docs][ref] are linked.",
-            "[ref]: https://example.com",
+            "[Warm] Capitals are not a cue.",
+            "[warm](https://example.com) is a link.",
+            "[warm][ref] is a reference link.",
+            "[warm]: https://example.com",
             "[x] done",
             "[ ] not done",
-            "- [x] a task",
-            "Say [softly] mid-sentence.",
+            "- [warm] a list item",
+            "Say [quiet] mid-sentence.",
             "Nested [[excited]] brackets.",
-            "[${"a".repeat(ToneCues.MAX_CUE_LENGTH + 1)}] too long.",
-            "[note_1] has other characters.",
+            "[warmer] is not a module.",
         ).forEach { text ->
             assertEquals(text, ToneCues.strip(text), "not a cue: $text")
             assertEquals(0, ToneCues.count(text), "not a cue: $text")
@@ -60,22 +63,23 @@ class ToneCuesTest {
     @Test
     fun codeIsNeverReadForCues() {
         val span = "Use `[excited] x` here."
-        val fence = "Example:\n```\n[excited] inside code\n```\n[calm] After."
+        val fence = "Example:\n```\n[excited] inside code\n```\n[warm] After."
         assertEquals(span, ToneCues.strip(span))
         assertEquals("Example:\n```\n[excited] inside code\n```\nAfter.", ToneCues.strip(fence))
     }
 
     @Test
     fun aCueAfterAQuotedSentenceEndStillStartsASentence() {
-        assertEquals("He said \"go.\" Then we left.", ToneCues.strip("He said \"go.\" [quietly] Then we left."))
-        assertEquals("A \"word\" [calm] stays.", ToneCues.strip("A \"word\" [calm] stays."))
+        assertEquals("He said \"go.\" Then we left.", ToneCues.strip("He said \"go.\" [quiet] Then we left."))
+        assertEquals("A \"word\" [warm] stays.", ToneCues.strip("A \"word\" [warm] stays."))
     }
 
     @Test
-    fun anUnfinishedCueIsHeldWhileStreamingAndShownOnceItProvesNotToBeOne() {
+    fun anUnfinishedModuleIsHeldWhileStreamingAndShownOnceItProvesNotToBeOne() {
         assertEquals("Hello. ", ToneCues.strip("Hello. [exci", streaming = true))
         assertEquals("Hello. ", ToneCues.strip("Hello. [excited]", streaming = true), "a link could still follow")
         assertEquals("Hello. [exci", ToneCues.strip("Hello. [exci", streaming = false))
+        assertEquals("Hello. [softl", ToneCues.strip("Hello. [softl", streaming = true), "no module starts that way")
         assertEquals("Hello. [excited!", ToneCues.strip("Hello. [excited!", streaming = true))
     }
 
@@ -89,8 +93,8 @@ class ToneCuesTest {
 
     @Test
     fun aHeldBracketThatIsNotACueIsPassedOnAsWords() {
-        assertEquals(listOf("[see](https://x.y) now."), readable(stream("[see", "](https://x.y) now.")))
-        assertEquals(listOf("Hi. ", "[note!] ok"), readable(stream("Hi. [note", "!] ok")))
+        assertEquals(listOf("[warm](https://x.y) now."), readable(stream("[war", "m](https://x.y) now.")))
+        assertEquals(listOf("Hi. ", "[warmer] ok"), readable(stream("Hi. [warm", "er] ok")))
     }
 
     @Test
@@ -99,16 +103,17 @@ class ToneCuesTest {
     }
 
     @Test
-    fun aTaggedSegmentReadsBackItsCueAndWords() {
-        val tagged = ToneCues.tag(ToneCue("softly"), "Good night.")
+    fun aTaggedSegmentReadsBackItsModuleAndWords() {
+        val tagged = ToneCues.tag(ToneCue("quiet"), "Good night.")
         val (cue, words) = ToneCues.untag(tagged)
-        assertEquals("softly", cue?.instructions)
+        assertEquals("quiet", cue?.instructions)
         assertEquals("Good night.", words)
         assertEquals(null to "Plain.", ToneCues.untag(ToneCues.tag(null, "Plain.")))
+        assertTrue(ToneCues.accepts("sombre"))
     }
 
     @Test
-    fun aCueNeverPrintsItsWords() {
+    fun aCueNeverPrintsItsName() {
         assertNull(Regex("excited").find(ToneCue("excited").toString()))
         assertNull(Regex("excited").find(TonePiece.Cue(ToneCue("excited")).toString()))
     }

@@ -833,7 +833,7 @@ Turns streamed reply text into speakable sentences so speech starts before the r
 
 # Package com.letta.mobile.data.voice.tone
 
-Inline tone cues in a reply: `[tone]` at the start of a sentence, applying to it and every later sentence until the next cue (`[neutral]` resets). The one reader of cues: the chat timeline and the dock show the text with every cue removed (an unfinished cue is held back while the reply streams), and voice mode passes each cue to the speech server as the `instructions` of the segments it covers. Citations, links, task boxes, mid-sentence brackets and code are never cues. Cue words are never logged.
+Inline tone cues in a reply: `[module]` at the start of a sentence, where `module` is one of a closed set of mood modules (`neutral`, `warm`, `excited`, `sombre`, `quiet`, `fast`, `slow`); it applies to that sentence and every later one until the next cue (`[neutral]` resets). A cue only selects a module and never carries a voice description. Anything else in brackets stays text. The one reader of cues: the chat timeline and the dock show the text with every cue removed (an unfinished cue is held back while the reply streams), and voice mode passes each module to the speech server as the `instructions` of the segments it covers, through the host as well, which accepts only a module name. Citations, links, task boxes, mid-sentence brackets and code are never cues. Cue names are never logged.
 
 # Package com.letta.mobile.data.voice.vad
 

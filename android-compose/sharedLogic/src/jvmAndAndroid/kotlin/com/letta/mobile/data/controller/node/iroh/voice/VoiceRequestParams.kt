@@ -47,8 +47,9 @@ internal object VoiceRequestParams {
     }
 
     /**
-     * `voice.speech` params' optional `instructions` (the reply's tone cue): passed on only when it is
-     * a cue's words by [ToneCues.accepts]; anything else is dropped and the text is spoken plainly.
+     * `voice.speech` params' optional `instructions` (the reply's mood module): passed on only when it
+     * names a module by [ToneCues.accepts]; anything else, a free-form description included, is dropped
+     * and the text is spoken plainly.
      */
     fun speechInstructions(params: JsonObject?): String? = params?.voiceString("instructions")?.trim()?.takeIf(ToneCues::accepts)
 

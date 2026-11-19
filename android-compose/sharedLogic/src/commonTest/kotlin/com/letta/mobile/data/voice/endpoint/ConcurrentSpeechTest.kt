@@ -174,9 +174,9 @@ class ConcurrentSpeechTest {
     @Test
     fun aSegmentsToneGoesToTheEndpointAsInstructions() = streamTest { scope ->
         val mouth = EndpointVoiceMouth(synthesizer, HoldingPlayer(), scope)
-        mouth.speak(SpeechSegment(SpeechSegmentId(1), VoiceText("Sentence 1."), ToneCue("slow, reassuring")))
+        mouth.speak(SpeechSegment(SpeechSegmentId(1), VoiceText("Sentence 1."), ToneCue("slow")))
         bodyOf(1).answer(samplesOf(1))
-        assertTrue(synchronized(lock) { requestBodies.single() }.contains("\"instructions\":\"slow, reassuring\""))
+        assertTrue(synchronized(lock) { requestBodies.single() }.contains("\"instructions\":\"slow\""))
         mouth.stop()
     }
 
