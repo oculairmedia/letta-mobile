@@ -32,7 +32,9 @@ import com.letta.mobile.ui.shell.ShellDrawerLibrary
 import com.letta.mobile.ui.shell.pages.ShellHomeBackendFleetEffect
 import com.letta.mobile.ui.shell.pages.ShellLibraryControllers
 import com.letta.mobile.ui.shell.pages.rememberShellLibraryControllers
+import com.letta.mobile.ui.shell.ReportFirstUsableContent
 import com.letta.mobile.ui.shell.rememberShellWorkspaceState
+import com.letta.mobile.ui.shell.shellFirstScreenUsable
 import com.letta.mobile.ui.shell.shortcuts.ShellShortcutBinding
 import com.letta.mobile.ui.shell.shortcuts.ShellShortcutId
 import com.letta.mobile.ui.shell.shortcuts.ShortcutActions
@@ -118,6 +120,8 @@ internal fun AndroidShellWorkspace(start: ShellDestination, config: LettaConfig?
         chatPanel = remember { mutableStateOf(null) },
         controllers = rememberShellLibraryControllers(sources.sessions, sources.library, scope),
     )
+    // letta-mobile-1hzkq: before the early return, so the one reporter outlives the waiting page's swap to the workspace.
+    ReportFirstUsableContent(shellFirstScreenUsable(workspace.destination, rememberAndroidConnection(shell), shell.sourceReady))
     if (!shell.sourceReady) return AndroidShellPage(shell, androidx.compose.ui.Modifier)
     LaunchedEffect(agents) { workspace.rosterChanged(agents.map { it.id }) }
     LaunchedEffect(graph.id) { drawerModel.refresh(workspace.focusedAgentId, roster = true) }
