@@ -173,7 +173,11 @@ object TimelineHydrationReducer {
             serverEvent.toolReturnIsErrorByCallId.filterKeys { it in serverReturns }).toTimelinePersistentMap()
 
         val serverHasReturn = serverReturns.isNotEmpty() || !serverEvent.toolReturnContent.isNullOrBlank()
-        val mergedToolReturnContent = localEvent.toolReturnContent.takeIf { !it.isNullOrBlank() } ?: serverEvent.toolReturnContent
+        // A stored return that is blank (a command that printed only whitespace) is still the return:
+        // falling through to the server copy's null would rewrite the row on every unchanged replay.
+        val mergedToolReturnContent = localEvent.toolReturnContent.takeIf { !it.isNullOrBlank() }
+            ?: serverEvent.toolReturnContent
+            ?: localEvent.toolReturnContent
         val mergedToolReturnIsError = if (serverHasReturn) serverEvent.toolReturnIsError else localEvent.toolReturnIsError
         val mergedAttachments = if (serverEvent.attachments.isEmpty()) localEvent.attachments else serverEvent.attachments
 
