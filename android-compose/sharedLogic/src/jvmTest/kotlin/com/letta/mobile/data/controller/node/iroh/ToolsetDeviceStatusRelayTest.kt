@@ -42,7 +42,8 @@ class ToolsetDeviceStatusRelayTest {
     @Test
     fun forwardsAndReplaysOnlyToAuthorizedViewersAndClearsOnDisconnect() = runTest {
         val frames = MutableSharedFlow<AppServerReceivedFrame>()
-        val client = strictClient(frames, MutableStateFlow(true))
+        val connected = MutableStateFlow(true)
+        val client = strictClient(frames, connected)
         val registry = ConnectionRegistry().also { bindToolsetDeviceStatuses(backgroundScope, client, it) }
         val delivered = mutableListOf<String>()
         var allowedContext = AdminRpcRequestContext(true, grantedCapabilities = setOf(IrohPeerCapabilities.CHAT_READ))
