@@ -241,7 +241,7 @@ class SentenceChunker(
 
 /**
  * Merges the pieces after a part's first into segments of at least [minimum] characters (never
- * more than [maximum]); with no [minimum] every piece is its own segment. A part's first piece is
+ * more than [maximum], which also caps a larger [minimum]); with no [minimum] every piece is its own segment. A part's first piece is
  * never held: it goes out at once, and merging starts after it.
  */
 private class SegmentMerger(private val minimum: Int?, private val maximum: Int) {
@@ -254,7 +254,7 @@ private class SegmentMerger(private val minimum: Int?, private val maximum: Int)
 
     /** Takes [piece]; returns the segments that are complete now. */
     fun add(piece: String): List<String> {
-        val goal = minimum
+        val goal = minimum?.coerceAtMost(maximum)
         if (goal == null || !partSpoken) return listOf(release(piece))
         val full = if (held.isNotEmpty() && held.length + 1 + piece.length > maximum) take() else emptyList()
         if (held.isNotEmpty()) held.append(' ')

@@ -123,6 +123,10 @@ data class VoiceLoopConfig(
      */
     val maxPendingReplies: Int = DEFAULT_MAX_PENDING,
 ) {
+    init {
+        require(minSegmentLength == null || minSegmentLength > 0) { "minSegmentLength must be positive or null" }
+    }
+
     private companion object {
         const val DEFAULT_MAX_HELD = 16
         const val DEFAULT_MAX_PENDING = 4

@@ -7,6 +7,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 /**
  * A reply is spoken in few, longer segments (steadier voice from chunk to chunk) and its mood
@@ -127,6 +128,28 @@ class VoiceLoopSegmentMergeTest {
         h.reply(VoiceReplyEvent.Completed)
         h.finishSpeech()
         assertEquals(listOf("On it.", "Research done.", "It found two things."), h.mouth.spokenTexts)
+    }
+
+    @Test
+    fun aStoppedReplyReportsItsSegmentsOnceWithoutSpeakingWhatWasHeld() = runTest {
+        val h = LoopHarness(this, merging)
+        h.listening()
+        h.turn()
+
+        h.replyText(VoiceText("It is noon. It is sunny. "))
+        assertEquals(listOf("It is noon."), h.mouth.spokenTexts)
+        h.loop.stop()
+        h.settle()
+
+        assertEquals(listOf("1/11/11/0"), h.segmented, "reported once, for the segment that went out")
+        assertEquals(listOf("It is noon."), h.mouth.spokenTexts, "the held sentence is not flushed")
+    }
+
+    @Test
+    fun aMinimumLengthThatIsNotPositiveIsRejectedWhenConfigured() {
+        assertFailsWith<IllegalArgumentException> { VoiceLoopConfig(minSegmentLength = 0) }
+        assertFailsWith<IllegalArgumentException> { VoiceLoopConfig(minSegmentLength = -1) }
+        assertEquals(null, VoiceLoopConfig(minSegmentLength = null).minSegmentLength)
     }
 
     private companion object {

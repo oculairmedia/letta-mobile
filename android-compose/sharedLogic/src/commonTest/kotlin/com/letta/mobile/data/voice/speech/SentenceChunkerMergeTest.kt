@@ -77,6 +77,14 @@ class SentenceChunkerMergeTest {
     }
 
     @Test
+    fun aFullSizeSentenceIsReleasedEvenWhenTheMinimumIsAboveTheMaximum() {
+        val full = "z".repeat(89) + "."
+        val chunker = SentenceChunker(maxSegmentLength = 90, minSegmentLength = 500)
+        chunker.push(VoiceText("Hi there. "))
+        assertEquals(listOf(full), chunker.push(VoiceText("$full Next")).map { it.value }, "a segment at the maximum goes out at once")
+    }
+
+    @Test
     fun mergingNeverCrossesAFencedCodeBlock() {
         assertEquals(
             listOf("Alpha one.", "Beta two.", "Gamma three. Delta four."),

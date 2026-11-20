@@ -107,10 +107,15 @@ internal class ReplyFollower(private val wiring: LoopWiring) {
     private suspend fun follow(turn: TurnKey, reply: VoiceReply) {
         val chunker = SentenceChunker(wiring.config.maxSegmentLength, wiring.config.firstClauseMinLength, wiring.config.minSegmentLength)
         val forwarder = ReplyForwarder(turn, chunker, wiring.config.maxSegmentLength, wiring.inputs, wiring.observer)
-        val outcome = runCatching { reply.events.collect(forwarder::forward) }
-        val error = outcome.exceptionOrNull()
-        if (error is CancellationException) throw error
-        forwarder.finish(error != null)
+        try {
+            val outcome = runCatching { reply.events.collect(forwarder::forward) }
+            val error = outcome.exceptionOrNull()
+            if (error is CancellationException) throw error
+            forwarder.finish(error != null)
+        } finally {
+            // An interrupted answer reports what it said too, without flushing what was pending.
+            forwarder.report()
+        }
     }
 }
 
@@ -135,6 +140,7 @@ private class ReplyForwarder(
 ) {
     private val shape = ReplyShape()
     private var ended = false
+    private var reported = false
     private var started = false
     private var segmented = false
     private val tones = ToneCueStream()
@@ -184,8 +190,13 @@ private class ReplyForwarder(
         report()
     }
 
-    /** Tells the observer how the answer was segmented; an observer that throws is ignored (diagnostics never stop the loop). */
-    private fun report() {
+    /**
+     * Tells the observer how the answer was segmented, once, however it ended (completed, failed or
+     * interrupted); an observer that throws is ignored (diagnostics never stop the loop).
+     */
+    fun report() {
+        if (reported) return
+        reported = true
         val error = runCatching { shape.report(observer) }.exceptionOrNull()
         if (error is CancellationException) throw error
     }
