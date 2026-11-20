@@ -46,12 +46,16 @@ class ServiceCredentialsClientTest {
     private fun wire(value: ServiceCredentialStatus) = LettaJson.wire.encodeToJsonElement(ServiceCredentialStatus.serializer(), value)
 
     private fun list(vararg services: ServiceCredentialStatus, canManage: Boolean = true) =
-        LettaJson.wire.encodeToJsonElement(ServiceCredentialList.serializer(), ServiceCredentialList(canManage = canManage, services = services.toList()))
+        LettaJson.wire.encodeToJsonElement(
+            ServiceCredentialList.serializer(),
+            ServiceCredentialList(canManage = canManage, services = services.toList()),
+        )
 
     @Test
     fun aWriteCarriesTheTypedSecretOnlyInItsParamsAndNeverPrintsIt() = runTest {
         val host = Host { _, _ -> wire(status) }
-        val command = ServiceCredentialDraft("", "  placeholder-key-not-real ", mapOf("model" to " jev-1 ", "unused" to " ")).commandFor(status)
+        val draft = ServiceCredentialDraft("", "  placeholder-key-not-real ", mapOf("model" to " jev-1 ", "unused" to " "))
+        val command = draft.commandFor(status)
         assertFalse("placeholder-key-not-real" in command.toString())
         ServiceCredentialsClient(host.rpc) { setOf(ServiceCredentialWire.CAPABILITY) }.set(command)
         val (method, params) = host.calls.single()
@@ -78,7 +82,8 @@ class ServiceCredentialsClientTest {
         host.reply = { method, _ -> throw Refused(AdminRpcErrors.unknownMethod(method)) }
         assertEquals(ServiceCredentialErrorCode.UNSUPPORTED, assertFailsWith<ServiceCredentialException> { client.list() }.code)
         host.reply = { _, _ -> throw Refused("service.revision_conflict") }
-        assertEquals(ServiceCredentialErrorCode.REVISION_CONFLICT, assertFailsWith<ServiceCredentialException> { client.remove(jev, "rev-1") }.code)
+        val conflict = assertFailsWith<ServiceCredentialException> { client.remove(jev, "rev-1") }
+        assertEquals(ServiceCredentialErrorCode.REVISION_CONFLICT, conflict.code)
     }
 
     @Test

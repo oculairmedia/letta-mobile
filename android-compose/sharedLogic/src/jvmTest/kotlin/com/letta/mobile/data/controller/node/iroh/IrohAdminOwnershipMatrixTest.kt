@@ -73,11 +73,6 @@ class IrohAdminOwnershipMatrixTest {
             assertEquals(methods, rows, "Conditional $prefix routes need ownership decisions")
         }
         assertEquals(
-            serviceMethods,
-            allDeclared.filter { it.startsWith("service.credential.") }.toSet(),
-            "Conditional service credential routes must all have ownership decisions",
-        )
-        assertEquals(
             emptySet(),
             registered - declared,
             "Registered admin_rpc methods missing an ownership decision — add rows to iroh-admin-ownership-matrix.json",
@@ -86,6 +81,15 @@ class IrohAdminOwnershipMatrixTest {
             emptySet(),
             declared - registered,
             "Ownership matrix declares methods the router no longer registers — prune stale rows",
+        )
+    }
+
+    @Test
+    fun conditionalServiceCredentialRoutesAllHaveOwnershipDecisions() {
+        assertEquals(
+            com.letta.mobile.data.servicecredentials.ServiceCredentialWire.METHODS,
+            operations.map { it.requiredString("method") }.filter { it.startsWith("service.credential.") }.toSet(),
+            "Conditional service credential routes must all have ownership decisions",
         )
     }
 

@@ -145,7 +145,9 @@ internal class ServiceCredentialStore(
             done = true
         } finally {
             if (!done) {
-                runCatching { if (origin == null || before == null) secrets.delete(descriptor.id) else secrets.write(descriptor.id, origin, before) }
+                runCatching {
+                    if (origin == null || before == null) secrets.delete(descriptor.id) else secrets.write(descriptor.id, origin, before)
+                }
             }
         }
     }

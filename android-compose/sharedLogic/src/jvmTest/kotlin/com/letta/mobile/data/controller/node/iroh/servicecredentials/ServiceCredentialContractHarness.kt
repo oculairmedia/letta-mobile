@@ -84,7 +84,8 @@ internal object ServiceCredentialContractHarness {
                 revision = fields.getValue("revision").jsonPrimitive.content.removePrefix("rev-").toLong(),
                 baseUrl = fields["base_url"]?.jsonPrimitive?.content,
                 config = fields["config"]?.jsonObject.orEmpty().mapValues { it.value.jsonPrimitive.content },
-                lastTest = fields["last_test"]?.let { json.decodeFromJsonElement(ServiceTestStatus.serializer(), it) } ?: ServiceTestStatus(),
+                lastTest = fields["last_test"]
+                    ?.let { json.decodeFromJsonElement(ServiceTestStatus.serializer(), it) } ?: ServiceTestStatus(),
             )
             if (fields["has_secret"]?.jsonPrimitive?.content == "true") {
                 val address = credential.baseUrl ?: requireNotNull(adapter.descriptor.defaultBaseUrl)
@@ -102,7 +103,8 @@ internal object ServiceCredentialContractHarness {
         assertEquals("/v1/systemone", request.url.encodedPath)
         assertEquals("Bearer $PLACEHOLDER_SECRET", request.headers[HttpHeaders.Authorization])
         val sent = Json.parseToJsonElement(String(request.body.toByteArray())).jsonObject
-        assertEquals(TypeSafeJevAdapter.SYNTHETIC_TEXT, sent.getValue("state").jsonPrimitive.content, "Only synthetic text may go to TypeSafe")
+        val state = sent.getValue("state").jsonPrimitive.content
+        assertEquals(TypeSafeJevAdapter.SYNTHETIC_TEXT, state, "Only synthetic text may go to TypeSafe")
         respond(
             content = upstream["body"]?.toString().orEmpty(),
             status = HttpStatusCode.fromValue(upstream.getValue("status").jsonPrimitive.int),

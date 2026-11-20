@@ -21,7 +21,8 @@ import kotlinx.coroutines.test.runTest
 class ServiceCredentialStoreTest {
     private val serviceId = ServiceId("example-service")
     private val adapter = object : ServiceAdapter {
-        override val descriptor = ServiceDescriptor(serviceId, "Example", "A test service", null, baseUrlEditable = true, secretLabel = "Token")
+        override val descriptor =
+            ServiceDescriptor(serviceId, "Example", "A test service", null, baseUrlEditable = true, secretLabel = "Token")
 
         override suspend fun test(target: ServiceTarget): ServiceCredentialErrorCode? = null
     }
@@ -70,7 +71,8 @@ class ServiceCredentialStoreTest {
     fun addressesWithCredentialsOrQueriesAreRefused() = runTest {
         val store = store()
         listOf("https://user:pw@one.example.invalid", "https://one.example.invalid/?key=x", "ftp://one.example.invalid").forEach { url ->
-            assertEquals(ServiceCredentialErrorCode.INVALID_REQUEST, assertFailsWith<ServiceRefusal> { store.write(write(url, replace())) }.code)
+            val refused = assertFailsWith<ServiceRefusal> { store.write(write(url, replace())) }
+            assertEquals(ServiceCredentialErrorCode.INVALID_REQUEST, refused.code)
         }
     }
 

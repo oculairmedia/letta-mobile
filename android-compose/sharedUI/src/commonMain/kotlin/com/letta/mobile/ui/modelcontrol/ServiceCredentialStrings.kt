@@ -29,7 +29,8 @@ internal object ServiceCredentialStrings {
 
     fun removeTitle(name: String) = "Remove $name?"
 
-    const val REMOVE_MESSAGE = "The host deletes its key and settings for this service. Features that use it stop working until it is set up again."
+    const val REMOVE_MESSAGE = "The host deletes its key and settings for this service. " +
+        "Features that use it stop working until it is set up again."
 
     fun showSecret(label: String, shown: Boolean) = if (shown) "Hide $label" else "Show $label"
 

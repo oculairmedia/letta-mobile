@@ -131,7 +131,7 @@ class ServiceCredentialsController(
             mutableState.update { current ->
                 current.copy(
                     busy = null,
-                    services = updated?.let { fresh -> current.services.map { if (it.serviceId == serviceId) fresh else it } } ?: current.services,
+                    services = updated?.let { fresh -> current.services.replacing(fresh) } ?: current.services,
                     editing = if (updated != null && closeOnSuccess) null else current.editing,
                     error = (failure as? ServiceCredentialException)?.code,
                     failedService = serviceId.takeIf { failure != null },
@@ -142,3 +142,7 @@ class ServiceCredentialsController(
         }
     }
 }
+
+/** This list with [fresh] in place of the status of the same service. */
+private fun List<ServiceCredentialStatus>.replacing(fresh: ServiceCredentialStatus): List<ServiceCredentialStatus> =
+    map { if (it.serviceId == fresh.serviceId) fresh else it }

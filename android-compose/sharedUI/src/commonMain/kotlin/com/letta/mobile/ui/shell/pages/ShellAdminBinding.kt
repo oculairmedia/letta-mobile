@@ -143,7 +143,10 @@ private fun ProjectSummary.agentIdOrNull(): AgentId? = lettaAgentId?.value?.take
  * Its Services page reads the host's service credentials over [transport]; it
  * shows only while the host keeps them, and nothing of it is stored here.
  */
-fun shellProvidersPage(session: ModelControlSession, transport: IChannelTransport) = ShellPageContent<ShellDestination.Providers> { _, modifier ->
+fun shellProvidersPage(
+    session: ModelControlSession,
+    transport: IChannelTransport,
+) = ShellPageContent<ShellDestination.Providers> { _, modifier ->
     val scope = rememberCoroutineScope()
     val controller = remember(session) { session.managementController(scope) }
     LaunchedEffect(controller) { controller.refresh() }

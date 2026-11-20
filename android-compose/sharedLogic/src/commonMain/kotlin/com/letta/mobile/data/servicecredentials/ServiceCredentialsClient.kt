@@ -48,8 +48,10 @@ class ServiceCredentialsClient(
         status(ServiceCredentialWire.SET, json.encodeToJsonElement(ServiceCredentialSetCommand.serializer(), command))
 
     /** Tests the stored credential of [serviceId]; the status with the outcome recorded. */
-    suspend fun test(serviceId: ServiceId): ServiceCredentialStatus =
-        status(ServiceCredentialWire.TEST, json.encodeToJsonElement(ServiceCredentialTestParams.serializer(), ServiceCredentialTestParams(serviceId)))
+    suspend fun test(serviceId: ServiceId): ServiceCredentialStatus {
+        val params = ServiceCredentialTestParams(serviceId)
+        return status(ServiceCredentialWire.TEST, json.encodeToJsonElement(ServiceCredentialTestParams.serializer(), params))
+    }
 
     /** Removes everything stored for [serviceId] at [expectedRevision]; the empty status. */
     suspend fun remove(serviceId: ServiceId, expectedRevision: String?): ServiceCredentialStatus {

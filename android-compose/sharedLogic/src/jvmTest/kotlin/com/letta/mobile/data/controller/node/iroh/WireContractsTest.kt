@@ -75,20 +75,7 @@ class WireContractsTest {
                 )
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
-                if ("voice" in host) {
-                    // Voice cases run through the real stream server, capability gate and voice routes
-                    // (one is streamed, and several are refusals of the transport's gate).
-                    val expected = case["server_frames"]?.jsonArray?.map { it.jsonObject }.orEmpty() + fixture.response(name)
-                    val frames = com.letta.mobile.data.controller.node.iroh.voice.VoiceContractHarness.run(fixture.method, case)
-                    assertEquals(expected, frames, "${fixture.method}/$name wire frames")
-                    continue
-                }
-                if ("service_credentials" in host) {
-                    // Service credential cases run through the real stream server, capability gate and routes.
-                    val response = ServiceCredentialContractHarness.run(fixture.method, case)
-                    assertEquals(fixture.response(name), response, "${fixture.method}/$name wire response")
-                    continue
-                }
+                if (runsThroughStreamServer(fixture, case, host)) continue
                 val state = when (host.getValue("controller_state").jsonPrimitive.content) {
                     "connected" -> AppServerControllerState.Connected
                     "disconnected" -> AppServerControllerState.Disconnected()
@@ -113,6 +100,28 @@ class WireContractsTest {
                 }
             }
         }
+    }
+
+    /**
+     * Voice and service credential cases run through the real stream server, capability gate and routes
+     * (one voice method is streamed, and several cases are refusals of the transport's gate). True when
+     * [case] was one of them and has been checked.
+     */
+    private suspend fun runsThroughStreamServer(fixture: WireContractFixture, case: JsonObject, host: JsonObject): Boolean {
+        val name = case.getValue("name").jsonPrimitive.content
+        when {
+            "voice" in host -> {
+                val expected = case["server_frames"]?.jsonArray?.map { it.jsonObject }.orEmpty() + fixture.response(name)
+                val frames = com.letta.mobile.data.controller.node.iroh.voice.VoiceContractHarness.run(fixture.method, case)
+                assertEquals(expected, frames, "${fixture.method}/$name wire frames")
+            }
+            "service_credentials" in host -> {
+                val response = ServiceCredentialContractHarness.run(fixture.method, case)
+                assertEquals(fixture.response(name), response, "${fixture.method}/$name wire response")
+            }
+            else -> return false
+        }
+        return true
     }
 
     @Test

@@ -55,18 +55,23 @@ class ServicesPageSnapshotTest {
     @Composable
     private fun ServicesPane(state: com.letta.mobile.data.servicecredentials.ServiceCredentialsState) {
         val binding = ServiceCredentialsBinding(state, ServiceCredentialsUiFixtures.Recorder().actions)
-        ProviderSettingsPane(ModelControlUiFixtures.managementState(), noSettings, initialPage = ProviderSettingsPage.SERVICES, services = binding)
+        val providers = ModelControlUiFixtures.managementState()
+        ProviderSettingsPane(providers, noSettings, initialPage = ProviderSettingsPage.SERVICES, services = binding)
     }
 
     private fun renderAll(name: String, content: @Composable () -> Unit) {
-        widths.forEach { width -> listOf(false, true).forEach { dark -> render("$name-${width}dp-${if (dark) "dark" else "light"}", width, dark, content) } }
+        widths.forEach { width ->
+            listOf(false, true).forEach { dark -> render("$name-${width}dp-${if (dark) "dark" else "light"}", width, dark, content) }
+        }
     }
 
-    private fun render(file: String, width: Int, dark: Boolean, content: @Composable () -> Unit) = runDesktopComposeUiTest(width = 1300, height = 1000) {
+    private fun render(file: String, width: Int, dark: Boolean, content: @Composable () -> Unit) =
+        runDesktopComposeUiTest(width = 1300, height = 1000) {
         setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f)) {
                 MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
-                    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.size(width.dp, 900.dp).testTag(FRAME)) { content() }
+                    val frame = Modifier.size(width.dp, 900.dp).testTag(FRAME)
+                    Surface(color = MaterialTheme.colorScheme.background, modifier = frame) { content() }
                 }
             }
         }
