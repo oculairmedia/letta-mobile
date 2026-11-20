@@ -40,7 +40,7 @@ permissions:
 env:
   # Same launcher flag and cache prefix as android.yml (see the comments there).
   GRADLE_OPTS: --enable-native-access=ALL-UNNAMED
-  GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v2
+  GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v3
 
 jobs:
   embedded-runtime-node18:

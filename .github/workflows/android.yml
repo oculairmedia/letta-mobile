@@ -47,7 +47,10 @@ env:
   # Bump to discard the shared Gradle User Home caches. A transient Maven Central
   # 404 (leakcanary-android .aar, 2026-10-02) was persisted into the main-written
   # cache as a missing-artifact entry and failed build-apk until it was replaced.
-  GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v2
+  # gh-v3 (2026-11-20): the same happened to kotlin-stdlib 2.3.21 / annotations 13.0 and
+  # clikt / Compose runtime jars (letta-mobile-gh3gm): main runs searched only Central and
+  # failed although both Central and the mirror serve them, i.e. a cached negative entry.
+  GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v3
 
 jobs:
   api-contract-windows:
