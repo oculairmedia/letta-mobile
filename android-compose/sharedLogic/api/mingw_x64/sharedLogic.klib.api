@@ -7493,6 +7493,8 @@ abstract interface com.letta.mobile.data.transport.api/SubagentScopeAwareChannel
 abstract interface com.letta.mobile.data.transport.appserver/AppServerClient { // com.letta.mobile.data.transport.appserver/AppServerClient|null[0]
     abstract val events // com.letta.mobile.data.transport.appserver/AppServerClient.events|{}events[0]
         abstract fun <get-events>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.transport.appserver/AppServerReceivedFrame> // com.letta.mobile.data.transport.appserver/AppServerClient.events.<get-events>|<get-events>(){}[0]
+    open val connectionEpoch // com.letta.mobile.data.transport.appserver/AppServerClient.connectionEpoch|{}connectionEpoch[0]
+        open fun <get-connectionEpoch>(): kotlinx.coroutines.flow/Flow<kotlin/Long?>? // com.letta.mobile.data.transport.appserver/AppServerClient.connectionEpoch.<get-connectionEpoch>|<get-connectionEpoch>(){}[0]
     open val isConnected // com.letta.mobile.data.transport.appserver/AppServerClient.isConnected|{}isConnected[0]
         open fun <get-isConnected>(): kotlinx.coroutines.flow/Flow<kotlin/Boolean> // com.letta.mobile.data.transport.appserver/AppServerClient.isConnected.<get-isConnected>|<get-isConnected>(){}[0]
     open val serverInfo // com.letta.mobile.data.transport.appserver/AppServerClient.serverInfo|{}serverInfo[0]
@@ -11782,7 +11784,14 @@ sealed interface com.letta.mobile.data.controller.reconnect/ReconnectingClientSt
         final fun toString(): kotlin/String // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.GaveUp.toString|toString(){}[0]
     }
 
-    final object Ready : com.letta.mobile.data.controller.reconnect/ReconnectingClientState { // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready|null[0]
+    final class Ready : com.letta.mobile.data.controller.reconnect/ReconnectingClientState { // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready|null[0]
+        constructor <init>(kotlin/Long) // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.<init>|<init>(kotlin.Long){}[0]
+
+        final val connectionEpoch // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.connectionEpoch|{}connectionEpoch[0]
+            final fun <get-connectionEpoch>(): kotlin/Long // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.connectionEpoch.<get-connectionEpoch>|<get-connectionEpoch>(){}[0]
+
+        final fun component1(): kotlin/Long // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.component1|component1(){}[0]
+        final fun copy(kotlin/Long = ...): com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.copy|copy(kotlin.Long){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.toString|toString(){}[0]
@@ -40872,6 +40881,8 @@ final class com.letta.mobile.data.controller.reconnect/ReconnectResult { // com.
 final class com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient : com.letta.mobile.data.controller.reconnect/ForwardingAppServerClient { // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient|null[0]
     constructor <init>(kotlin.coroutines/SuspendFunction0<com.letta.mobile.data.controller.reconnect/AppServerClientGeneration>, com.letta.mobile.data.controller.reconnect/ReconnectingClientListener = ..., kotlin/String = ..., com.letta.mobile.data.controller.reconnect/FullJitterBackoff = ..., kotlin/Int = ..., kotlin.random/Random = ..., kotlin.coroutines/SuspendFunction1<kotlin/Long, kotlin/Unit> = ..., kotlin.coroutines/SuspendFunction0<com.letta.mobile.data.transport.appserver/AppServerProbeResult>? = ..., kotlin/Boolean = ...) // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient.<init>|<init>(kotlin.coroutines.SuspendFunction0<com.letta.mobile.data.controller.reconnect.AppServerClientGeneration>;com.letta.mobile.data.controller.reconnect.ReconnectingClientListener;kotlin.String;com.letta.mobile.data.controller.reconnect.FullJitterBackoff;kotlin.Int;kotlin.random.Random;kotlin.coroutines.SuspendFunction1<kotlin.Long,kotlin.Unit>;kotlin.coroutines.SuspendFunction0<com.letta.mobile.data.transport.appserver.AppServerProbeResult>?;kotlin.Boolean){}[0]
 
+    final val connectionEpoch // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient.connectionEpoch|{}connectionEpoch[0]
+        final fun <get-connectionEpoch>(): kotlinx.coroutines.flow/Flow<kotlin/Long?> // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient.connectionEpoch.<get-connectionEpoch>|<get-connectionEpoch>(){}[0]
     final val events // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient.events|{}events[0]
         final fun <get-events>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.transport.appserver/AppServerReceivedFrame> // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient.events.<get-events>|<get-events>(){}[0]
     final val isConnected // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient.isConnected|{}isConnected[0]
@@ -40888,12 +40899,6 @@ final class com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClie
         final const val DEFAULT_MAX_ATTEMPTS // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient.Companion.DEFAULT_MAX_ATTEMPTS|{}DEFAULT_MAX_ATTEMPTS[0]
             final fun <get-DEFAULT_MAX_ATTEMPTS>(): kotlin/Int // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient.Companion.DEFAULT_MAX_ATTEMPTS.<get-DEFAULT_MAX_ATTEMPTS>|<get-DEFAULT_MAX_ATTEMPTS>(){}[0]
     }
-}
-
-final class com.letta.mobile.data.controller.reconnect/ReconnectingConnectionEpochs { // com.letta.mobile.data.controller.reconnect/ReconnectingConnectionEpochs|null[0]
-    constructor <init>() // com.letta.mobile.data.controller.reconnect/ReconnectingConnectionEpochs.<init>|<init>(){}[0]
-
-    final fun project(com.letta.mobile.data.controller.reconnect/ReconnectingClientState, kotlin/String): com.letta.mobile.data.transport/ChannelTransportState // com.letta.mobile.data.controller.reconnect/ReconnectingConnectionEpochs.project|project(com.letta.mobile.data.controller.reconnect.ReconnectingClientState;kotlin.String){}[0]
 }
 
 final class com.letta.mobile.data.controller.reconnect/SessionSurvivingReconnectListener : com.letta.mobile.data.controller.reconnect/ReconnectingClientListener { // com.letta.mobile.data.controller.reconnect/SessionSurvivingReconnectListener|null[0]
@@ -71202,6 +71207,8 @@ final class com.letta.mobile.data.transport.appserver/DefaultAppServerClient : c
 final class com.letta.mobile.data.transport.appserver/DualLaneAppServerClient : com.letta.mobile.data.transport.appserver/AppServerClient { // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient|null[0]
     constructor <init>(com.letta.mobile.data.transport.appserver/AppServerClient, com.letta.mobile.data.transport.appserver/AppServerClient) // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.<init>|<init>(com.letta.mobile.data.transport.appserver.AppServerClient;com.letta.mobile.data.transport.appserver.AppServerClient){}[0]
 
+    final val connectionEpoch // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.connectionEpoch|{}connectionEpoch[0]
+        final fun <get-connectionEpoch>(): kotlinx.coroutines.flow/Flow<kotlin/Long?>? // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.connectionEpoch.<get-connectionEpoch>|<get-connectionEpoch>(){}[0]
     final val events // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.events|{}events[0]
         final fun <get-events>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.transport.appserver/AppServerReceivedFrame> // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.events.<get-events>|<get-events>(){}[0]
     final val isConnected // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.isConnected|{}isConnected[0]
@@ -83832,7 +83839,7 @@ final fun (com.letta.mobile.data.context/ContextReadingDisplay).com.letta.mobile
 final fun (com.letta.mobile.data.context/ContextWindowUsage).com.letta.mobile.data.context/towards(com.letta.mobile.data.context/ContextWindowUsage, kotlin/Float): com.letta.mobile.data.context/ContextWindowUsage // com.letta.mobile.data.context/towards|towards@com.letta.mobile.data.context.ContextWindowUsage(com.letta.mobile.data.context.ContextWindowUsage;kotlin.Float){}[0]
 final fun (com.letta.mobile.data.controller.fanout/AppServerRuntimeEventRouter).com.letta.mobile.data.runtime/attachTurnStack(com.letta.mobile.data.transport.appserver/AppServerClient, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.runtime/AppServerTurnStackSpec = ...): com.letta.mobile.data.runtime/AppServerTurnEngine // com.letta.mobile.data.runtime/attachTurnStack|attachTurnStack@com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter(com.letta.mobile.data.transport.appserver.AppServerClient;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.runtime.AppServerTurnStackSpec){}[0]
 final fun (com.letta.mobile.data.controller.fanout/AppServerRuntimeEventRouter).com.letta.mobile.data.runtime/turnEngine(com.letta.mobile.data.transport.appserver/AppServerClient, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.runtime/AppServerTurnStackSpec): com.letta.mobile.data.runtime/AppServerTurnEngine // com.letta.mobile.data.runtime/turnEngine|turnEngine@com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter(com.letta.mobile.data.transport.appserver.AppServerClient;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.runtime.AppServerTurnStackSpec){}[0]
-final fun (com.letta.mobile.data.controller.reconnect/ReconnectingClientState).com.letta.mobile.data.controller.reconnect/toChannelTransportState(kotlin/String, kotlin/String = ..., kotlin/Long = ...): com.letta.mobile.data.transport/ChannelTransportState // com.letta.mobile.data.controller.reconnect/toChannelTransportState|toChannelTransportState@com.letta.mobile.data.controller.reconnect.ReconnectingClientState(kotlin.String;kotlin.String;kotlin.Long){}[0]
+final fun (com.letta.mobile.data.controller.reconnect/ReconnectingClientState).com.letta.mobile.data.controller.reconnect/toChannelTransportState(kotlin/String, kotlin/String = ...): com.letta.mobile.data.transport/ChannelTransportState // com.letta.mobile.data.controller.reconnect/toChannelTransportState|toChannelTransportState@com.letta.mobile.data.controller.reconnect.ReconnectingClientState(kotlin.String;kotlin.String){}[0]
 final fun (com.letta.mobile.data.dreaming/DreamingRepository).com.letta.mobile.data.dreaming/orElse(com.letta.mobile.data.dreaming/DreamingRepository): com.letta.mobile.data.dreaming/DreamingRepository // com.letta.mobile.data.dreaming/orElse|orElse@com.letta.mobile.data.dreaming.DreamingRepository(com.letta.mobile.data.dreaming.DreamingRepository){}[0]
 final fun (com.letta.mobile.data.home/FleetSort).com.letta.mobile.data.home/toggled(com.letta.mobile.data.home/FleetSortKey): com.letta.mobile.data.home/FleetSort // com.letta.mobile.data.home/toggled|toggled@com.letta.mobile.data.home.FleetSort(com.letta.mobile.data.home.FleetSortKey){}[0]
 final fun (com.letta.mobile.data.home/HomePageState).com.letta.mobile.data.home/statTiles(): kotlin.collections/List<com.letta.mobile.data.home/HomeStatTile> // com.letta.mobile.data.home/statTiles|statTiles@com.letta.mobile.data.home.HomePageState(){}[0]

@@ -6,7 +6,7 @@ import com.letta.mobile.data.controller.reconnect.GiveUpKind
 import com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient
 import com.letta.mobile.data.controller.reconnect.ReconnectingClientListener
 import com.letta.mobile.data.controller.reconnect.ReconnectingClientState
-import com.letta.mobile.data.controller.reconnect.ReconnectingConnectionEpochs
+import com.letta.mobile.data.controller.reconnect.toChannelTransportState
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.data.transport.appserver.AppServerReadinessExpectation
@@ -141,10 +141,9 @@ internal class DesktopDirectAppServerSession private constructor(
                 dial.releaseSteps.forEach { release -> runCatching { release() } }
                 throw settled.firstDialFailure()
             }
-            val epochs = ReconnectingConnectionEpochs()
             val status = client.state
-                .map { epochs.project(it, serverId) }
-                .stateIn(scope, SharingStarted.Eagerly, epochs.project(client.state.value, serverId))
+                .map { it.toChannelTransportState(serverId = serverId) }
+                .stateIn(scope, SharingStarted.Eagerly, client.state.value.toChannelTransportState(serverId))
             return DesktopDirectAppServerSession(client, status, supervisor, dial.releaseSteps)
         }
     }

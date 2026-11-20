@@ -36,6 +36,14 @@ interface AppServerClient {
     val isConnected: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
 
     /**
+     * The identity of the connection that is up, or null while there is none: a number that differs for every
+     * connection of this client, minted by whoever owns the reconnecting, so that a drop and a redial are two
+     * values even to an observer that never saw the drop. Null as a flow (not as a value) for a client that has
+     * no such owner; its observers can only count the times [isConnected] turns true.
+     */
+    val connectionEpoch: Flow<Long?>? get() = null
+
+    /**
      * Discovered server capabilities from `app_server_info`.
      *
      * Populated after a successful [appServerInfo] call. Null until discovery

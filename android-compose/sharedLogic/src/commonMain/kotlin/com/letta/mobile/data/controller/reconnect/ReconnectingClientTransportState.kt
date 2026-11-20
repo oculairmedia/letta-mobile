@@ -11,18 +11,17 @@ import com.letta.mobile.data.transport.appserver.AppServerProbeResult
  *
  * [serverId] / [sessionId] label the Connected state. Terminal stops never report
  * `willReconnect`: [GiveUpKind.Authentication] is an auth failure (code 4001, as on Iroh), the
- * other kinds a plain disconnect the user has to retry. [connectionEpoch] labels the Connected state with
- * which connection of its owner it is (the caller counts them; this projection holds no state).
+ * other kinds a plain disconnect the user has to retry. The Connected state carries the generation's own
+ * connection epoch, so a redial is a different state even to an observer that missed the drop.
  */
 fun ReconnectingClientState.toChannelTransportState(
     serverId: String,
     sessionId: String = serverId,
-    connectionEpoch: Long = 0,
 ): ChannelTransportState = when (this) {
     is ReconnectingClientState.Connecting ->
         ChannelTransportState.Connecting(reconnecting = attempt > 0, attempt = attempt)
     ReconnectingClientState.Recovering -> ChannelTransportState.Connecting(reconnecting = true)
-    ReconnectingClientState.Ready -> ChannelTransportState.Connected(
+    is ReconnectingClientState.Ready -> ChannelTransportState.Connected(
         serverId = serverId, sessionId = sessionId, deviceId = null, connectionEpoch = connectionEpoch,
     )
     is ReconnectingClientState.BackingOff -> ChannelTransportState.Disconnected(
@@ -59,22 +58,4 @@ fun AppServerProbeResult.summary(): String = when (this) {
     is AppServerProbeResult.Authentication -> "Authentication failed: $detail"
     is AppServerProbeResult.Incompatible -> "Incompatible server: $reason"
     is AppServerProbeResult.Unavailable -> "Server unavailable: $detail"
-}
-
-/**
- * Numbers one session's connections for [toChannelTransportState]: each entry into Ready is a new one, so a
- * redial of the same server still reads as a different connection to a collector that never saw the drop.
- * Not thread-safe: feed it from one collector.
- */
-class ReconnectingConnectionEpochs {
-    private var epoch = 0L
-    private var wasReady = false
-
-    /** [state] as a channel transport state, with this session's current connection epoch. */
-    fun project(state: ReconnectingClientState, serverId: String): ChannelTransportState {
-        val ready = state is ReconnectingClientState.Ready
-        if (ready && !wasReady) epoch += 1
-        wasReady = ready
-        return state.toChannelTransportState(serverId = serverId, connectionEpoch = epoch)
-    }
 }

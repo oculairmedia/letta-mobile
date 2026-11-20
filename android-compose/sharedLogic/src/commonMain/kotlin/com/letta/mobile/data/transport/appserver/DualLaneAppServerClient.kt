@@ -22,6 +22,7 @@ class DualLaneAppServerClient(
 ) : AppServerClient {
     override val events: Flow<AppServerReceivedFrame> = runtime.events
     override val isConnected: Flow<Boolean> = runtime.isConnected
+    override val connectionEpoch: Flow<Long?>? = runtime.connectionEpoch
     override val serverInfo: StateFlow<AppServerInfoData?> = runtime.serverInfo
 
     /** The runtime lane delivers the tool call frames, so its trust is the one that counts. */

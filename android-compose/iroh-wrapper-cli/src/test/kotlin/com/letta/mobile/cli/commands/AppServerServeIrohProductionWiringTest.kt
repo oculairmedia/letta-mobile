@@ -117,7 +117,7 @@ class AppServerServeIrohProductionWiringTest {
         testScheduler.runCurrent()
         assertFalse(waiting.isCompleted)
 
-        state.value = ReconnectingClientState.Ready
+        state.value = ReconnectingClientState.Ready(connectionEpoch = 1)
         waiting.await()
     }
 

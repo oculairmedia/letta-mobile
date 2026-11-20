@@ -184,7 +184,7 @@ class ReconnectingAppServerClientTest {
         gen.ready()
         runCurrent()
 
-        assertEquals(ReconnectingClientState.Ready, client.state.value)
+        assertIs<ReconnectingClientState.Ready>(client.state.value)
         assertEquals(1, listener.recoveries.size)
         val response = client.sync(AppServerCommand.Sync(runtime = runtime, requestId = "s1"))
         assertTrue(response.success)
@@ -206,7 +206,7 @@ class ReconnectingAppServerClientTest {
         runCurrent()
         generations.first().ready()
         runCurrent()
-        assertEquals(ReconnectingClientState.Ready, client.state.value)
+        assertIs<ReconnectingClientState.Ready>(client.state.value)
 
         generations.first().fail("socket lost")
         runCurrent()
@@ -221,7 +221,7 @@ class ReconnectingAppServerClientTest {
         generations[1].ready()
         runCurrent()
 
-        assertEquals(ReconnectingClientState.Ready, client.state.value)
+        assertIs<ReconnectingClientState.Ready>(client.state.value)
         assertEquals(2, listener.recoveries.size)
         client.sync(AppServerCommand.Sync(runtime = runtime, requestId = "s3"))
         assertEquals(1, generations[1].client.syncCommands.size)
@@ -294,7 +294,7 @@ class ReconnectingAppServerClientTest {
         generations[1].ready()
         runCurrent()
 
-        assertEquals(ReconnectingClientState.Ready, client.state.value)
+        assertIs<ReconnectingClientState.Ready>(client.state.value)
         assertEquals(1, listener.recoveries.size)
     }
 
@@ -430,7 +430,7 @@ class ReconnectingAppServerClientTest {
         runCurrent()
         generations.single().ready()
         runCurrent()
-        assertEquals(ReconnectingClientState.Ready, client.state.value)
+        assertIs<ReconnectingClientState.Ready>(client.state.value)
 
         // The server was replaced by something that is not an App Server while we were connected.
         probeResult = AppServerProbeResult.Incompatible("HTTP 404")
@@ -501,7 +501,7 @@ class ReconnectingAppServerClientTest {
         runCurrent()
 
         assertEquals(1, generations.size, "an App Server older than /app-server-info is dialled")
-        assertEquals(ReconnectingClientState.Ready, client.state.value)
+        assertIs<ReconnectingClientState.Ready>(client.state.value)
     }
 
     @Test
@@ -567,7 +567,7 @@ class ReconnectingAppServerClientTest {
         assertEquals(ReconnectingClientState.Connecting(0), client.state.value)
         generations.single().ready()
         runCurrent()
-        assertEquals(ReconnectingClientState.Ready, client.state.value)
+        assertIs<ReconnectingClientState.Ready>(client.state.value)
     }
 
     @Test
@@ -593,6 +593,6 @@ class ReconnectingAppServerClientTest {
         runCurrent()
 
         assertTrue(recoverySyncSucceeded)
-        assertEquals(ReconnectingClientState.Ready, client.state.value)
+        assertIs<ReconnectingClientState.Ready>(client.state.value)
     }
 }

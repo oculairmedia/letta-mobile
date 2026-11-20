@@ -21607,6 +21607,7 @@ public abstract class com/letta/mobile/data/controller/reconnect/ForwardingAppSe
 	public fun deleteMemoryFile (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$DeleteMemoryFile;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun disconnectProvider (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$DisconnectProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun executeCommand (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$ExecuteCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getConnectionEpoch ()Lkotlinx/coroutines/flow/Flow;
 	public fun getCwdMap (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$GetCwdMap;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getReflectionSettings (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$GetReflectionSettings;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getServerInfo ()Lkotlinx/coroutines/flow/StateFlow;
@@ -21724,6 +21725,7 @@ public final class com/letta/mobile/data/controller/reconnect/ReconnectingAppSer
 	public static final field DEFAULT_MAX_ATTEMPTS I
 	public fun <init> (Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/controller/reconnect/ReconnectingClientListener;Ljava/lang/String;Lcom/letta/mobile/data/controller/reconnect/FullJitterBackoff;ILkotlin/random/Random;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Z)V
 	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/controller/reconnect/ReconnectingClientListener;Ljava/lang/String;Lcom/letta/mobile/data/controller/reconnect/FullJitterBackoff;ILkotlin/random/Random;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun getConnectionEpoch ()Lkotlinx/coroutines/flow/Flow;
 	public fun getEvents ()Lkotlinx/coroutines/flow/Flow;
 	public fun getServerInfo ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
@@ -21791,8 +21793,12 @@ public final class com/letta/mobile/data/controller/reconnect/ReconnectingClient
 }
 
 public final class com/letta/mobile/data/controller/reconnect/ReconnectingClientState$Ready : com/letta/mobile/data/controller/reconnect/ReconnectingClientState {
-	public static final field INSTANCE Lcom/letta/mobile/data/controller/reconnect/ReconnectingClientState$Ready;
+	public fun <init> (J)V
+	public final fun component1 ()J
+	public final fun copy (J)Lcom/letta/mobile/data/controller/reconnect/ReconnectingClientState$Ready;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/reconnect/ReconnectingClientState$Ready;JILjava/lang/Object;)Lcom/letta/mobile/data/controller/reconnect/ReconnectingClientState$Ready;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConnectionEpoch ()J
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -21813,13 +21819,8 @@ public final class com/letta/mobile/data/controller/reconnect/ReconnectingClient
 
 public final class com/letta/mobile/data/controller/reconnect/ReconnectingClientTransportStateKt {
 	public static final fun summary (Lcom/letta/mobile/data/transport/appserver/AppServerProbeResult;)Ljava/lang/String;
-	public static final fun toChannelTransportState (Lcom/letta/mobile/data/controller/reconnect/ReconnectingClientState;Ljava/lang/String;Ljava/lang/String;J)Lcom/letta/mobile/data/transport/ChannelTransportState;
-	public static synthetic fun toChannelTransportState$default (Lcom/letta/mobile/data/controller/reconnect/ReconnectingClientState;Ljava/lang/String;Ljava/lang/String;JILjava/lang/Object;)Lcom/letta/mobile/data/transport/ChannelTransportState;
-}
-
-public final class com/letta/mobile/data/controller/reconnect/ReconnectingConnectionEpochs {
-	public fun <init> ()V
-	public final fun project (Lcom/letta/mobile/data/controller/reconnect/ReconnectingClientState;Ljava/lang/String;)Lcom/letta/mobile/data/transport/ChannelTransportState;
+	public static final fun toChannelTransportState (Lcom/letta/mobile/data/controller/reconnect/ReconnectingClientState;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/transport/ChannelTransportState;
+	public static synthetic fun toChannelTransportState$default (Lcom/letta/mobile/data/controller/reconnect/ReconnectingClientState;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/transport/ChannelTransportState;
 }
 
 public abstract interface class com/letta/mobile/data/controller/reconnect/ResumeSyncResult {
@@ -63974,6 +63975,7 @@ public abstract interface class com/letta/mobile/data/transport/appserver/AppSer
 	public fun deleteMemoryFile (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$DeleteMemoryFile;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun disconnectProvider (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$DisconnectProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun executeCommand (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$ExecuteCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getConnectionEpoch ()Lkotlinx/coroutines/flow/Flow;
 	public fun getCwdMap (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$GetCwdMap;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun getEvents ()Lkotlinx/coroutines/flow/Flow;
 	public fun getReflectionSettings (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$GetReflectionSettings;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -64035,6 +64037,7 @@ public final class com/letta/mobile/data/transport/appserver/AppServerClient$Def
 	public static fun deleteMemoryFile (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lcom/letta/mobile/data/transport/appserver/AppServerCommand$DeleteMemoryFile;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun disconnectProvider (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lcom/letta/mobile/data/transport/appserver/AppServerCommand$DisconnectProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun executeCommand (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lcom/letta/mobile/data/transport/appserver/AppServerCommand$ExecuteCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getConnectionEpoch (Lcom/letta/mobile/data/transport/appserver/AppServerClient;)Lkotlinx/coroutines/flow/Flow;
 	public static fun getCwdMap (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lcom/letta/mobile/data/transport/appserver/AppServerCommand$GetCwdMap;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun getReflectionSettings (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lcom/letta/mobile/data/transport/appserver/AppServerCommand$GetReflectionSettings;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun getServerInfo (Lcom/letta/mobile/data/transport/appserver/AppServerClient;)Lkotlinx/coroutines/flow/StateFlow;
@@ -70376,6 +70379,7 @@ public final class com/letta/mobile/data/transport/appserver/DefaultAppServerCli
 	public fun disconnectProvider (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$DisconnectProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun executeCommand (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$ExecuteCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun failPendingRequests (Ljava/lang/String;)V
+	public fun getConnectionEpoch ()Lkotlinx/coroutines/flow/Flow;
 	public fun getCwdMap (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$GetCwdMap;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getEvents ()Lkotlinx/coroutines/flow/Flow;
 	public fun getReflectionSettings (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$GetReflectionSettings;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -70440,6 +70444,7 @@ public final class com/letta/mobile/data/transport/appserver/DualLaneAppServerCl
 	public fun deleteMemoryFile (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$DeleteMemoryFile;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun disconnectProvider (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$DisconnectProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun executeCommand (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$ExecuteCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getConnectionEpoch ()Lkotlinx/coroutines/flow/Flow;
 	public fun getCwdMap (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$GetCwdMap;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getEvents ()Lkotlinx/coroutines/flow/Flow;
 	public fun getReflectionSettings (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$GetReflectionSettings;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -76331,6 +76336,7 @@ public final class com/letta/mobile/data/workspace/relay/WorkspaceRelayClient : 
 	public fun deleteMemoryFile (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$DeleteMemoryFile;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun disconnectProvider (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$DisconnectProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun executeCommand (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$ExecuteCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getConnectionEpoch ()Lkotlinx/coroutines/flow/Flow;
 	public fun getCwdMap (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$GetCwdMap;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getEvents ()Lkotlinx/coroutines/flow/Flow;
 	public fun getReflectionSettings (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$GetReflectionSettings;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;

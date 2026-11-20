@@ -39,6 +39,8 @@ internal object AppServerClientForwardingProbe {
             when (method.name) {
                 "getEvents" -> emptyFlow<AppServerReceivedFrame>()
                 "isConnected" -> flowOf(true)
+                // No reconnect owner behind a recording client: it has no connection identity to report.
+                "getConnectionEpoch" -> null
                 "getServerInfo" -> MutableStateFlow<AppServerInfoData?>(null)
                 "toString" -> "recording:$lane"
                 "hashCode" -> lane.hashCode()

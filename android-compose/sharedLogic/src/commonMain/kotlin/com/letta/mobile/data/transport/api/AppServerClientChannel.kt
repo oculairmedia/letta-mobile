@@ -17,6 +17,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.shareIn
@@ -65,11 +66,7 @@ class AppServerClientChannel(
         }
     }
 
-    /** Counts this channel's connections: every time the client reports up is a new one. Touched only by the state flow's one collector. */
-    private var connectionEpoch = 0L
-
-    override val state: StateFlow<ChannelTransportState> = client.isConnected
-        .map { connected -> if (connected) connectedState(++connectionEpoch) else DISCONNECTED }
+    override val state: StateFlow<ChannelTransportState> = connectionStates(client)
         .stateIn(scope, SharingStarted.WhileSubscribed(), ChannelTransportState.Connecting())
 
     /**
@@ -97,6 +94,21 @@ class AppServerClientChannel(
 
         /** Host pushes with no typed frame; the shared pins and shell state decode their own raw body. */
         private val UNTYPED_HOST_PUSH_TYPES = setOf(AgentPinsWire.FRAME_TYPE, ShellStateWire.FRAME_TYPE)
+
+        /**
+         * The client's connection as a transport state. A client whose reconnect owner numbers its connections
+         * ([AppServerClient.connectionEpoch]) is projected from that number, upstream of any state-flow
+         * conflation, so a drop and redial never looks like staying connected. A client with no such owner (a
+         * plain single-socket client) has no identity to read, so the connections are counted here instead: every
+         * time it reports up is a new one.
+         */
+        private fun connectionStates(client: AppServerClient): Flow<ChannelTransportState> {
+            client.connectionEpoch?.let { epochs ->
+                return epochs.map { epoch -> epoch?.let(::connectedState) ?: DISCONNECTED }
+            }
+            var counted = 0L
+            return client.isConnected.map { up -> if (up) connectedState(++counted) else DISCONNECTED }
+        }
 
         fun connectedState(connectionEpoch: Long) = ChannelTransportState.Connected(
             serverId = "app-server", sessionId = "app-server", deviceId = null, connectionEpoch = connectionEpoch,
