@@ -70,8 +70,12 @@ sealed interface ReconnectingClientState {
      */
     data object Recovering : ReconnectingClientState
 
-    /** Generation is Ready and post-recovery reconciliation completed. */
-    data object Ready : ReconnectingClientState
+    /**
+     * Generation is Ready and post-recovery reconciliation completed. [connectionEpoch] numbers the generation
+     * (1 for the first to reach Ready, then one more each time): a redial lands in a Ready that is not equal to
+     * the one before it, so no observer of the state can mistake a reconnect for staying connected.
+     */
+    data class Ready(val connectionEpoch: Long) : ReconnectingClientState
 
     data class BackingOff(val attempt: Int, val delayMs: Long, val reason: String?) : ReconnectingClientState
 
@@ -160,6 +164,7 @@ class ReconnectingAppServerClient(
     private val _events = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = EVENT_BUFFER)
     override val events: Flow<AppServerReceivedFrame> = _events.asSharedFlow()
     override val isConnected: Flow<Boolean> = _state.map { it is ReconnectingClientState.Ready }
+    override val connectionEpoch: Flow<Long?> = _state.map { (it as? ReconnectingClientState.Ready)?.connectionEpoch }
 
     /**
      * Discovered server capabilities from the current generation.
@@ -183,6 +188,7 @@ class ReconnectingAppServerClient(
      * failGeneration must run on NeverReady-after-pipe via onDisconnected.
      */
     private val pipeGenerationSeq = kotlinx.atomicfu.atomic(0L)
+    private val connectionEpochSeq = kotlinx.atomicfu.atomic(0L)
 
     /** Set by [resumeNow]; consumed by the next backoff, which then redials at once. */
     private val resumeRequested = kotlinx.atomicfu.atomic(false)
@@ -359,7 +365,7 @@ class ReconnectingAppServerClient(
             return GenerationOutcome.NeverReady("recovery failed: ${e.message}")
         }
 
-        _state.value = ReconnectingClientState.Ready
+        _state.value = ReconnectingClientState.Ready(connectionEpochSeq.incrementAndGet())
         resumeRequested.value = false
         Telemetry.event(telemetryComponent, "generation.ready", "attempt" attr attempt)
 

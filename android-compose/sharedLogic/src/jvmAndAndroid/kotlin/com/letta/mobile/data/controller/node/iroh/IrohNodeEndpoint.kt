@@ -149,6 +149,17 @@ class IrohNodeEndpoint(
         Telemetry.event("IrohNode", "pins_updated.broadcast", "recipients" attr result.recipients, "delivered" attr result.delivered)
     }
 
+    /**
+     * Delivers the host's `shell_state_updated` frames (the whole shell state document) to every live connection
+     * allowed to read it ([ViewerHandle.receivesShellStateEvents]); agent-scoped peers get none.
+     */
+    suspend fun broadcastShellStateUpdated(frame: String) {
+        val result = connectionRegistry.broadcast(frame) { it.receivesShellStateEvents() }
+        Telemetry.event(
+            "IrohNode", "shell_state_updated.broadcast", "recipients" attr result.recipients, "delivered" attr result.delivered,
+        )
+    }
+
     /** Broadcasts inbox activity without changing any viewer subscription. Old clients receive nothing. */
     fun conversationActivityTarget(): ConversationChangeTarget = ConversationChangeTarget { frame ->
         val activity = kotlinx.serialization.json.Json.decodeFromString(

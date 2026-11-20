@@ -23,6 +23,7 @@ class InboxArrivalContractTest {
             when (method.name) {
                 "getEvents" -> source
                 "isConnected", "getIsConnected" -> kotlinx.coroutines.flow.flowOf(true)
+                "getConnectionEpoch" -> null
                 else -> error("activity must not call App Server: ${method.name}")
             }
         } as com.letta.mobile.data.transport.appserver.AppServerClient

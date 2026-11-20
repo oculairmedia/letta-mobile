@@ -53,6 +53,8 @@ class WireContractsTest {
         }
     }
 
+    private val contextKeys = setOf("authenticated", "authorized_conversation_ids", "authorized_agent_ids", "authenticated_endpoint_id")
+
     @Test
     fun everyFixtureMatchesTheRealHandlerExactly() = runTest {
         for (fixture in fixtures()) {
@@ -63,7 +65,7 @@ class WireContractsTest {
                 val known = setOf(
                     "controller_state", "conversations", "hidden_agent_ids", "visibility_index",
                     "reflection_settings", "monitor_success", "toolset_response", "cron_control", "execute_command_response", "voice",
-                    "pins",
+                    "pins", "shell_state",
                 )
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
@@ -83,7 +85,7 @@ class WireContractsTest {
                 withRouter(state, host) { router ->
                     assertTrue(fixture.method in router.registeredMethods, "Fixture names unregistered method ${fixture.method}")
                     val context = case.getValue("context").jsonObject
-                    require(context.keys.all { it in setOf("authenticated", "authorized_conversation_ids", "authorized_agent_ids") })
+                    require(context.keys.all { it in contextKeys })
                     val invocation = AdminRpcInvocation(
                         "contract", fixture.method, case.getValue("params").jsonObject,
                         AdminRpcRequestContext(
@@ -91,6 +93,7 @@ class WireContractsTest {
                             authorizedConversationIds = context["authorized_conversation_ids"]?.jsonArray
                                 ?.map { it.jsonPrimitive.content }?.toSet(),
                             authorizedAgentIds = context["authorized_agent_ids"]?.jsonArray?.map { it.jsonPrimitive.content }?.toSet(),
+                            authenticatedEndpointId = context["authenticated_endpoint_id"]?.jsonPrimitive?.content,
                         ),
                     )
                     val response = Json.parseToJsonElement(router.dispatch(invocation)).jsonObject
@@ -344,7 +347,7 @@ class WireContractsTest {
                 ),
             )
             // The production wrapper registers the voice and pins routes on the built router; so does this host.
-            listOf(voiceRoutes(dir), pinsRoutes(host)).forEach { it.register(router) }
+            listOf(voiceRoutes(dir), pinsRoutes(host), shellStateRoutes(host)).forEach { it.register(router) }
             block(router)
         } finally {
             runtime.close()
@@ -380,6 +383,24 @@ class WireContractsTest {
             ),
             // Never attached: the push is covered by AgentPinsRoutesTest and ConnectionRegistryTest.
             com.letta.mobile.data.controller.node.iroh.pins.AgentPinsPublisher(
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
+            ),
+        )
+    }
+
+    /** The real shell state routes over the case's stored document (`host_state.shell_state.stored`, absent or null: nothing stored). */
+    private fun shellStateRoutes(host: JsonObject?): AdminRpcRoutes {
+        val stored = host?.get("shell_state")?.jsonObject?.get("stored")?.takeUnless { it is kotlinx.serialization.json.JsonNull }
+        val seed = stored?.let {
+            Json.decodeFromJsonElement(com.letta.mobile.data.shellstate.ShellStateSnapshot.serializer(), it)
+        } ?: com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateStore.EMPTY
+        return com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateRouteSet(
+            com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateStore(
+                com.letta.mobile.data.controller.node.iroh.shellstate.InMemoryShellStatePersistence(seed),
+                clock = { com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateFixtures.CLOCK_MS },
+            ),
+            // Never attached: the push is covered by ShellStateRoutesTest and ConnectionRegistryTest.
+            com.letta.mobile.data.controller.node.iroh.shellstate.ShellStatePublisher(
                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
             ),
         )

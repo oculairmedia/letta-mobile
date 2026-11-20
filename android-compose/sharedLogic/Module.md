@@ -127,7 +127,7 @@ The app's side of host-owned canvas mounts: which canvas a conversation shows, a
 
 # Package com.letta.mobile.data.hoststate
 
-Host-owned sidecar transaction primitives shared by notebook grants and mount storage: one canonical-path coroutine owner, cancellable interprocess locking and forced atomic file replacement. `HostDirectoryDurability` centralizes directory-channel support and synchronization. On Windows, mounts proceed with forced atomic contents but unconfirmed directory entries (a lost newest binding is set again); notebook provisioning and revocation refuse before locking or touching files, while reads remain available. The wrapper refuses notebook sharing at startup on unsupported hosts. Other hosts retain directory synchronization. Trusted administrators must protect the parent directory, which must already exist.
+Host-owned sidecar transaction primitives shared by notebook grants and mount storage: one canonical-path coroutine owner, cancellable interprocess locking and forced atomic file replacement. `HostDirectoryDurability` centralizes directory-channel support and synchronization. On Windows, mounts proceed with forced atomic contents but unconfirmed directory entries (a lost newest binding is set again); notebook provisioning and revocation refuse before locking or touching files, while reads remain available. The wrapper refuses notebook sharing at startup on unsupported hosts. Other hosts retain directory synchronization. Trusted administrators must protect the parent directory, which must already exist. `HostStateFileLocks` hands every store of one state file the same coroutine lock, keyed by canonical path, so stores built per on-device dial over one file never accept writes against the same revision.
 
 # Package com.letta.mobile.data.canvas.mutations
 
@@ -639,7 +639,7 @@ Portable shell destinations, routes, workspace navigation and page errors. Entry
 
 # Package com.letta.mobile.data.shellstate
 
-The shell state document contract: the host-held, versioned document of shell and user state that the user and their agent both read and change, synced to every client. The host is the on-device runtime or a remote server host. Writes are revision-checked proposals in the style of the voice endpoint contract; a host-to-host move is one export and one import of the whole document under an explicit import policy, and never carries client store values or secrets. This package holds the schema and interface only; host routes and agent tools come later.
+The shell state document contract: the host-held, versioned document of shell and user state that the user and their agent both read and change, synced to every client. The host is the on-device runtime or a remote server host. Writes are revision-checked proposals in the style of the voice endpoint contract; a host-to-host move is one export and one import of the whole document under an explicit import policy, and never carries client store values or secrets. The schema and interface live here; `wire` holds the v1 contract's names, limits and codes, `shared` the in-memory client, and the host store and routes sit in the iroh `shellstate` package. No client area uses it yet; agent tools come later.
 
 # Package com.letta.mobile.data.shell.layout
 
@@ -961,6 +961,10 @@ The host side of the voice-endpoint v1 contract: one speech server setup shared 
 
 The host side of the pinned-agents v1 contract: one ordered list of pinned agents shared by every paired device. `AgentPinsRoutes.forHost` builds the `AdminRpcRoutes` a host registers on its built admin router; it registers `pins.get` and `pins.set` and advertises `pinned_agents_v1`. The list and its revision live in `pinned-agents.json`, replaced atomically; a host that never stored one answers an empty list at revision 0. `pins.set` is a compare-and-set against the caller's expected revision. `AgentPinsPublisher` pushes each accepted change as a `pins_updated` frame with the whole list to every connection allowed to read agents. Telemetry carries methods, outcomes, revisions and counts, never agent names. The package depends on the iroh router package, never the reverse.
 
+# Package com.letta.mobile.data.controller.node.iroh.shellstate
+
+The host side of the shell-state v1 contract: one versioned document of shell and user state shared by every paired device. `ShellStateRoutes.forHost` builds the `AdminRpcRoutes` a host registers on its built admin router; it registers `shell.state.get` and `shell.state.propose` and advertises `shell_state_v1`. The document, its revision and each entry's own revision live in `shell-state.json`, replaced by a rename and readable only by the host's user; a host that never stored one answers an empty document at revision 0. `shell.state.propose` is an all-or-nothing compare-and-set against each touched entry's expected revision, so writers of different entries never conflict, and it records the serving connection as the actor, never a value the caller sent. A file that does not decode, or is of a newer schema, is refused with `state_unreadable` and kept, never reset. `ShellStatePublisher` pushes each accepted change as a `shell_state_updated` frame with the whole document to every connection `ViewerHandle.receivesShellStateEvents` allows. Telemetry carries methods, outcomes, revisions and counts, never keys or values. The package depends on the iroh router package, never the reverse.
+
 # Package com.letta.mobile.data.controller.node.iroh.errors
 
 The one exception type whose message the admin RPC router returns to a remote client. Handlers raise it for deliberate, safe refusals built from the caller's own request; every other exception answers a fixed internal-error text so host paths and state never cross the wire. This leaf package imports nothing from the handlers or the router.
@@ -996,6 +1000,14 @@ The device settings facade owns one pin journal for its lifecycle, with no proce
 # Package com.letta.mobile.data.pins
 
 Device-local scoped pin membership/order, explicit-unpin tombstones and recoverable legacy import journal. Snapshot every available backing before union, retain raw/opaque entries and read/decode failures, verify persisted state before per-source checkpoints, and resume idempotently. Unfinished sources are reread with every distinct raw/parse snapshot retained; completed sources are never reread. Initialization failures preserve legacy data and expose unavailable or disabled pin actions while allowing the host to open. Only trusted ownership evidence may resolve pending domain entries; active backend alone is never evidence.
+
+# Package com.letta.mobile.data.shellstate.wire
+
+The dependency-free names of the shell-state v1 contract (`docs/reference/contracts/shell-state-v1.md`): `ShellStateWire` holds the capability, method names, the `shell_state_updated` frame type, size limits and error codes; `ShellStateChange` is one entry change of a proposal; `ShellStateError` maps a host's error string to a closed enum with an unknown fallback. Transport packages read the frame type from here without depending on the client.
+
+# Package com.letta.mobile.data.shellstate.shared
+
+The client of the shell-state v1 contract. `SharedShellState` is the one copy of the host's shell state document every surface reads and edits: it reads the document over `ShellStateLink` (bound to the channel transport by `channelShellStateLink`), proposes changes with each touched entry's last-seen revision, reads again after a conflict, adopts newer `shell_state_updated` pushes, refuses edits while the host is out of reach (nothing is queued) and meanwhile shows the last document it read, held in memory only. A failed read or write never leaves it read-only: the next edit reads first. Nothing is stored on the device: without the host's capability there is no state. Nothing here logs a key or a value.
 
 # Package com.letta.mobile.data.pins.wire
 

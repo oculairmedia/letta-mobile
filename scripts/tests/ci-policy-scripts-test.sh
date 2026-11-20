@@ -259,6 +259,53 @@ refresh_job="$(awk '/^  refresh-android-gate:$/ { active=1; next }
 assert_contains "$refresh_job" "if: always() && github.event.action == 'edited'"
 assert_contains "$refresh_job" '/jobs/${job_id}/rerun'
 assert_not_contains "$refresh_job" 'conclusion == "failure"'
+# The refresh must never re-run an OLD head's android.yml run: that attempt enters the shared
+# concurrency group and cancels the current head's run (CodeRabbit rewrites the body after every
+# push, so an `edited` event can carry a stale head). The live head is read at the start and again
+# right before the rerun call (a push can land during the wait loop).
+assert_contains "$refresh_job" 'PR_NUMBER: ${{ github.event.pull_request.number }}'
+assert_contains "$refresh_job" 'pulls/${PR_NUMBER}" --jq .head.sha'
+refresh_script="$(awk '/^        run: \|$/ { active=1; next } active { sub(/^          /, ""); print }' <<<"$refresh_job")"
+[[ "$(grep -c 'pulls/${PR_NUMBER}' <<<"$refresh_script")" -ge 2 ]] || fail 'refresh step must read the live PR head before the lookup and again before the rerun'
+rerun_line="$(grep -n -- '-X POST' <<<"$refresh_script" | head -1 | cut -d: -f1)"
+last_head_check="$(grep -n 'pulls/${PR_NUMBER}' <<<"$refresh_script" | tail -1 | cut -d: -f1)"
+[[ -n "$rerun_line" && -n "$last_head_check" && "$last_head_check" -lt "$rerun_line" ]] || fail 'the live-head re-check must come before the rerun call'
+# Behavioural check with a fake gh/sleep: the rerun POST happens only when the live head still equals
+# HEAD_SHA at the time of the call.
+refresh_bin="$TMP/refresh-bin"
+mkdir -p "$refresh_bin"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$refresh_bin/sleep"
+cat >"$refresh_bin/gh" <<'GH'
+#!/usr/bin/env bash
+# Fake gh. Each pulls/ read consumes the next live head from REFRESH_HEADS_FILE (the last repeats).
+args="$*"
+case "$args" in
+  *-X\ POST*) echo POST >>"$REFRESH_LOG" ;;
+  *pulls/*)
+    read -r first rest <"$REFRESH_HEADS_FILE"
+    echo "$first"
+    if [[ -n "$rest" ]]; then echo "$rest" >"$REFRESH_HEADS_FILE"; fi
+    ;;
+  *workflows/android.yml/runs*) echo 111 ;;
+  *jobs?per_page*) echo 222 ;;
+  *actions/runs/*) echo completed ;;
+esac
+GH
+chmod +x "$refresh_bin/gh" "$refresh_bin/sleep"
+run_refresh() { # live-head sequence (space separated); prints POST log
+  local heads="$1"
+  : >"$TMP/refresh.log"
+  printf '%s\n' "$heads" >"$TMP/refresh.heads"
+  (
+    export PATH="$refresh_bin:$PATH" GITHUB_REPOSITORY=o/r PR_NUMBER=7 HEAD_SHA=newsha \
+      REFRESH_LOG="$TMP/refresh.log" REFRESH_HEADS_FILE="$TMP/refresh.heads"
+    bash -c "$refresh_script" >"$TMP/refresh.out" 2>&1 || fail "refresh step failed: $(<"$TMP/refresh.out")"
+  )
+  cat "$TMP/refresh.log"
+}
+assert_eq "$(run_refresh 'newsha newsha')" 'POST'
+assert_eq "$(run_refresh 'oldsha')" ''
+assert_eq "$(run_refresh 'newsha newersha')" ''
 # The live body read must fail the job when it fails (errexit) and be the only body source: an empty
 # live body is a missing line, never a reason to fall back to the (stale) event payload.
 assert_contains "$body_script" 'set -euo pipefail'

@@ -3017,6 +3017,36 @@
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "shell.state.get",
+      "handler": "ShellStateRoutes.kt",
+      "current_backend": "host shell state store (shell-state.json beside the model exposure state, owner-only file), Iroh admin_rpc only",
+      "owner": "controller_native",
+      "public_contract": "docs/reference/contracts/shell-state-v1.md",
+      "authorization_class": "admin_read",
+      "data_store": "controller_state_file",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Shell state v1: registered only when the host supplies shell state routes (methods omitted otherwise). The versioned shell and user state document with its document revision. chat.read, like pins.get.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "shell.state.propose",
+      "handler": "ShellStateRoutes.kt",
+      "current_backend": "host shell state store (shell-state.json beside the model exposure state, owner-only file), Iroh admin_rpc only",
+      "owner": "controller_native",
+      "public_contract": "docs/reference/contracts/shell-state-v1.md",
+      "authorization_class": "admin_write",
+      "data_store": "controller_state_file",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Shell state v1: registered only when the host supplies shell state routes (methods omitted otherwise). All-or-nothing compare-and-set of entry changes against each entry's expected_revision (revision_conflict otherwise); records the serving connection as the actor; pushes shell_state_updated to every agent-reading, unscoped connection. conversation.manage.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "deny_fail_closed"
     }
   ],
   "unsupported_native_operations": [

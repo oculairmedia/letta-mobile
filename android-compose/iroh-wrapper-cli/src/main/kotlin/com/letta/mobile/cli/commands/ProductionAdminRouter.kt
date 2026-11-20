@@ -83,6 +83,8 @@ fun buildProductionAdminRouter(
     voiceRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
     /** The pinned-agents routes (one list shared by every device, pushed live); null registers none. */
     pinsRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
+    /** The shell-state routes (one versioned document of shell and user state shared by every device); null registers none. */
+    shellStateRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
 ): AdminRpcRouter {
     // Every skill.list re-reads the root (a symlink is the controllable unit and can
     // change on disk at any time); the cold-start read below also logs what the host
@@ -174,5 +176,7 @@ fun buildProductionAdminRouter(
         voiceRoutes?.register(router)
         // Both pins routes or none; they advertise pinned_agents_v1 themselves.
         pinsRoutes?.register(router)
+        // Both shell-state routes or none; they advertise shell_state_v1 themselves.
+        shellStateRoutes?.register(router)
     }
 }

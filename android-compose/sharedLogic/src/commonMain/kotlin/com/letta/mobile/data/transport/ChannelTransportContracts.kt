@@ -16,6 +16,12 @@ sealed interface ChannelTransportState {
         val canonicalLiveTransport: String? = null,
         val a2uiSupportedCatalogs: List<String> = emptyList(),
         val a2uiSupportedWidgets: List<String> = emptyList(),
+        /**
+         * Which connection of this transport this is: it goes up by one every time the transport (re)connects, so
+         * two connections to the same endpoint, which share [sessionId], still differ. 0 for a transport that does
+         * not count its connections.
+         */
+        val connectionEpoch: Long = 0,
     ) : ChannelTransportState
 
     data class Disconnected(

@@ -11,7 +11,8 @@ import com.letta.mobile.data.transport.appserver.AppServerProbeResult
  *
  * [serverId] / [sessionId] label the Connected state. Terminal stops never report
  * `willReconnect`: [GiveUpKind.Authentication] is an auth failure (code 4001, as on Iroh), the
- * other kinds a plain disconnect the user has to retry.
+ * other kinds a plain disconnect the user has to retry. The Connected state carries the generation's own
+ * connection epoch, so a redial is a different state even to an observer that missed the drop.
  */
 fun ReconnectingClientState.toChannelTransportState(
     serverId: String,
@@ -20,7 +21,9 @@ fun ReconnectingClientState.toChannelTransportState(
     is ReconnectingClientState.Connecting ->
         ChannelTransportState.Connecting(reconnecting = attempt > 0, attempt = attempt)
     ReconnectingClientState.Recovering -> ChannelTransportState.Connecting(reconnecting = true)
-    ReconnectingClientState.Ready -> ChannelTransportState.Connected(serverId = serverId, sessionId = sessionId, deviceId = null)
+    is ReconnectingClientState.Ready -> ChannelTransportState.Connected(
+        serverId = serverId, sessionId = sessionId, deviceId = null, connectionEpoch = connectionEpoch,
+    )
     is ReconnectingClientState.BackingOff -> ChannelTransportState.Disconnected(
         code = CLOSE_ABNORMAL,
         reason = reason.orEmpty(),
