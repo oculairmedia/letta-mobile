@@ -192,6 +192,32 @@ class SharedShellStateTest {
     }
 
     @Test
+    fun anOfflineRefreshKeepsTheLastDocumentAndAnOfflineEditIsOfflineNotUnsupported() = runTest {
+        val host = FakeHost().apply { seed("a", dark) }
+        val shared = SharedShellState(host).also { it.refresh() }
+        host.connected.value = false
+        val state = shared.refresh()
+        assertEquals(dark, state.entries.getValue("a").value, "the last document stays for offline display")
+        assertFalse(state.editable)
+        assertEquals(ShellStateEditOutcome.OFFLINE, shared.set("a", light))
+    }
+
+    @Test
+    fun aStaleReadAndANewerPushOnAFreshConnectionKeepTheNewerRevisionInBothOrders() = runTest(UnconfinedTestDispatcher()) {
+        listOf(true, false).forEach { pushDuringRead ->
+            val host = FakeHost(online = false).apply { seed("a", dark) }
+            val shared = SharedShellState(host)
+            val job = launch { shared.run() }
+            if (pushDuringRead) host.beforeGetReply = { host.pushRevision(3, "a", JsonPrimitive("pushed")) }
+            host.connected.value = true
+            if (!pushDuringRead) host.pushRevision(3, "a", JsonPrimitive("pushed"))
+            assertEquals(3L, shared.state.value.snapshot?.documentRevision, "push during read: $pushDuringRead")
+            assertTrue(shared.state.value.live)
+            job.cancel()
+        }
+    }
+
+    @Test
     fun aDisconnectKeepsTheLastDocumentShown() = runTest(UnconfinedTestDispatcher()) {
         val host = FakeHost().apply { seed("a", dark) }
         val shared = SharedShellState(host)
@@ -259,7 +285,7 @@ class SharedShellStateTest {
         var failNextCalls = 0
         var beforeGetReply: () -> Unit = {}
 
-        override val hostCapabilities: Set<String> get() = capabilities
+        override val hostCapabilities: Set<String> get() = if (connected.value) capabilities else emptySet()
         override val isConnected: Boolean get() = connected.value
         override val connection: Flow<Boolean> get() = connected
         override val pushes: Flow<JsonObject> = frames

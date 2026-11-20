@@ -90,7 +90,10 @@ class SharedShellState(
      * host's one connection: a snapshot kept from an earlier connection (possibly another host, at any
      * revision) never outranks what the current connection says.
      */
-    private val shownFromThisConnection = MutableStateFlow(false)
+    private var shownFromThisConnection = false
+
+    /** Held across every change of the snapshot and of [shownFromThisConnection], so deciding and adopting are one step. */
+    private val adopting = Mutex()
 
     /** What this device knows now. */
     val state: StateFlow<ShellStateState> = mutableState.asStateFlow()
@@ -107,10 +110,10 @@ class SharedShellState(
     /** Reads the host's document; a host without the contract leaves [state] unsupported. */
     suspend fun refresh(): ShellStateState {
         if (!supported) {
-            // A connected host without the contract has no state to show; another host's document must not linger.
-            // (A disconnect keeps the snapshot: offline display has its own contract.)
-            mutableState.update { it.copy(supported = false, live = false, snapshot = null) }
-            shownFromThisConnection.value = false
+            // While disconnected the link advertises nothing, which says nothing about the host: keep the last
+            // document for offline display. A connected host without the contract has no state to show, and
+            // another host's document must not linger.
+            if (link.isConnected) dropDocument() else markStale()
             return mutableState.value
         }
         mutableState.update { it.copy(supported = true) }
@@ -123,8 +126,13 @@ class SharedShellState(
 
     private fun markStale() = mutableState.update { it.copy(live = false) }
 
-    private fun connectionDown() {
-        shownFromThisConnection.value = false
+    private suspend fun dropDocument() = adopting.withLock {
+        shownFromThisConnection = false
+        mutableState.update { it.copy(supported = false, live = false, snapshot = null) }
+    }
+
+    private suspend fun connectionDown() = adopting.withLock {
+        shownFromThisConnection = false
         markStale()
     }
 
@@ -144,8 +152,8 @@ class SharedShellState(
      * the state read-only until a reconnect.
      */
     suspend fun propose(edits: List<Edit>): ShellStateEditOutcome = this.edits.withLock {
-        if (!supported) return@withLock ShellStateEditOutcome.UNSUPPORTED
         if (!link.isConnected) return@withLock ShellStateEditOutcome.OFFLINE
+        if (!supported) return@withLock ShellStateEditOutcome.UNSUPPORTED
         if (!mutableState.value.editable) refresh()
         val known = mutableState.value
         val base = known.snapshot
@@ -176,7 +184,7 @@ class SharedShellState(
         }
     }
 
-    private fun onPush(frame: JsonObject) {
+    private suspend fun onPush(frame: JsonObject) {
         val pushed = decode(frame) ?: return
         adopt(pushed, live = mutableState.value.live)
     }
@@ -186,26 +194,13 @@ class SharedShellState(
      * live: a read reply that arrives after a newer push never replaces it. Anything from an earlier connection
      * is replaced by whatever this connection says first.
      */
-    private fun adopt(snapshot: ShellStateSnapshot, live: Boolean) {
-        val fromThisConnection = shownFromThisConnection.value
-        val replaced = mutableState.updateAndGetReplaced(fromThisConnection, snapshot, live)
-        if (replaced) shownFromThisConnection.value = true
-    }
-
-    /** Applies [snapshot] unless [fromThisConnection] says a newer-or-equal one is shown; whether it replaced the shown one. */
-    private fun MutableStateFlow<ShellStateState>.updateAndGetReplaced(
-        fromThisConnection: Boolean,
-        snapshot: ShellStateSnapshot,
-        live: Boolean,
-    ): Boolean {
-        var replaced = false
-        update { current ->
-            val shownRevision = current.snapshot?.documentRevision ?: -1L
-            replaced = !(fromThisConnection && shownRevision >= snapshot.documentRevision)
-            val shown = if (replaced) snapshot else current.snapshot
-            current.copy(snapshot = shown, live = live || current.live, error = null)
+    private suspend fun adopt(snapshot: ShellStateSnapshot, live: Boolean) = adopting.withLock {
+        val shownRevision = mutableState.value.snapshot?.documentRevision ?: -1L
+        val keepShown = shownFromThisConnection && shownRevision >= snapshot.documentRevision
+        if (!keepShown) shownFromThisConnection = true
+        mutableState.update { current ->
+            current.copy(snapshot = if (keepShown) current.snapshot else snapshot, live = live || current.live, error = null)
         }
-        return replaced
     }
 
     /** One request whose result is the document; null on any failure, with its code in [state]. */
