@@ -186,13 +186,15 @@ class SharedShellState(
 
     private suspend fun onPush(frame: JsonObject) {
         val pushed = decode(frame) ?: return
-        adopt(pushed, live = mutableState.value.live)
+        adopt(pushed, live = false)
     }
 
     /**
      * Takes [snapshot] unless a newer one from this connection is already shown, whether or not it was read
      * live: a read reply that arrives after a newer push never replaces it. Anything from an earlier connection
-     * is replaced by whatever this connection says first.
+     * is replaced by whatever this connection says first. [live] only ever turns on: a successful read or write
+     * passes true, a push passes false and leaves the current value as it is (read inside the update, so a
+     * concurrent failure mark is never undone); only a failed call or a disconnect turns it off.
      */
     private suspend fun adopt(snapshot: ShellStateSnapshot, live: Boolean) = adopting.withLock {
         val shownRevision = mutableState.value.snapshot?.documentRevision ?: -1L

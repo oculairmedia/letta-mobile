@@ -261,6 +261,24 @@ class SharedShellStateTest {
     }
 
     @Test
+    fun aPushAfterARefusedWriteUpdatesTheDocumentButNeverRestoresLive() = runTest(UnconfinedTestDispatcher()) {
+        val host = FakeHost().apply { seed("a", dark) }
+        val shared = SharedShellState(host)
+        val job = launch { shared.run() }
+        host.refuseSetWith = ShellStateWire.TOO_LARGE
+        assertEquals(ShellStateEditOutcome.REFUSED, shared.set("a", light))
+        host.refuseSetWith = null
+        host.write("a", JsonPrimitive("pushed"))
+        host.pushRevision(2, "a", JsonPrimitive("pushed"))
+        assertEquals(2L, shared.state.value.snapshot?.documentRevision, "the push still updates the shown document")
+        assertFalse(shared.state.value.live, "a push never sets live")
+        host.calls.clear()
+        assertEquals(ShellStateEditOutcome.APPLIED, shared.set("a", light))
+        assertEquals(listOf(ShellStateWire.GET, ShellStateWire.PROPOSE), host.calls, "the next edit reads first")
+        job.cancel()
+    }
+
+    @Test
     fun aHostWithNoDocumentYetStartsEmpty() = runTest {
         val state = SharedShellState(FakeHost()).refresh()
         assertTrue(state.entries.isEmpty())

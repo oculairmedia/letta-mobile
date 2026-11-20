@@ -44,6 +44,41 @@ class SharedShellStateRaceTest {
         }
     }
 
+    @Test
+    fun pushesRacingARefusedWriteNeverFlipTheDocumentBackToLive() = runBlocking {
+        repeat(STRESS_ROUNDS) { round ->
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            val link = RefusingLink()
+            val shared = SharedShellState(link)
+            scope.launch { shared.run() }
+            withTimeout(TIMEOUT_MS) { while (!shared.state.value.live) Thread.yield() }
+            val write = scope.launch { shared.set("a", JsonPrimitive("x")) }
+            val pushes = scope.launch { (FIRST_PUSH..FIRST_PUSH + PUSHES).forEach { link.pushes.emit(frame(it)) } }
+            link.releaseRefusal()
+            write.join()
+            pushes.join()
+            assertEquals(false, shared.state.value.live, "round $round: only a successful read or write may set live again")
+            scope.cancel()
+        }
+    }
+
+    /** A connected host that reads fine and refuses the write once released. */
+    private inner class RefusingLink : ShellStateLink {
+        private val release = CompletableDeferred<Unit>()
+        override val pushes = MutableSharedFlow<JsonObject>()
+        override val hostCapabilities: Set<String> = setOf(ShellStateWire.CAPABILITY)
+        override val isConnected: Boolean = true
+        override val connection: Flow<Boolean> = flowOf(true)
+
+        fun releaseRefusal() = release.complete(Unit)
+
+        override suspend fun call(method: String, params: JsonObject): ShellStateReply {
+            if (method == ShellStateWire.GET) return ShellStateReply(true, encoded(1))
+            release.await()
+            return ShellStateReply(false, error = ShellStateWire.TOO_LARGE)
+        }
+    }
+
     private fun frame(revision: Long): JsonObject =
         JsonObject(encoded(revision) + ("type" to JsonPrimitive(ShellStateWire.FRAME_TYPE)))
 
@@ -74,6 +109,9 @@ class SharedShellStateRaceTest {
 
     private companion object {
         const val ROUNDS = 3000
+        const val STRESS_ROUNDS = 1500
+        const val FIRST_PUSH = 5L
+        const val PUSHES = 40L
         const val TIMEOUT_MS = 5_000L
         const val STALE = 2L
         const val NEWER = 3L
