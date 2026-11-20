@@ -85,6 +85,13 @@ class SharedShellState(
     private val edits = Mutex()
     private val mutableState = MutableStateFlow(ShellStateState())
 
+    /**
+     * Whether the shown snapshot came from the connection that is up now. Revisions only order snapshots of one
+     * host's one connection: a snapshot kept from an earlier connection (possibly another host, at any
+     * revision) never outranks what the current connection says.
+     */
+    @Volatile private var shownFromThisConnection = false
+
     /** What this device knows now. */
     val state: StateFlow<ShellStateState> = mutableState.asStateFlow()
 
@@ -94,13 +101,16 @@ class SharedShellState(
     /** Follows the connection and the host's pushes until cancelled: reads again on every reconnect. */
     suspend fun run() = coroutineScope {
         link.pushes.onEach(::onPush).launchIn(this)
-        link.connection.distinctUntilChanged().collect { up -> if (up) refresh() else markStale() }
+        link.connection.distinctUntilChanged().collect { up -> if (up) refresh() else connectionDown() }
     }
 
     /** Reads the host's document; a host without the contract leaves [state] unsupported. */
     suspend fun refresh(): ShellStateState {
         if (!supported) {
-            mutableState.update { it.copy(supported = false, live = false) }
+            // A connected host without the contract has no state to show; another host's document must not linger.
+            // (A disconnect keeps the snapshot: offline display has its own contract.)
+            mutableState.update { it.copy(supported = false, live = false, snapshot = null) }
+            shownFromThisConnection = false
             return mutableState.value
         }
         mutableState.update { it.copy(supported = true) }
@@ -112,6 +122,11 @@ class SharedShellState(
     }
 
     private fun markStale() = mutableState.update { it.copy(live = false) }
+
+    private fun connectionDown() {
+        shownFromThisConnection = false
+        markStale()
+    }
 
     /** Sets [key] to [value]. */
     suspend fun set(key: String, value: JsonElement): ShellStateEditOutcome = propose(listOf(Edit(key, value)))
@@ -149,7 +164,7 @@ class SharedShellState(
             return ShellStateEditOutcome.APPLIED
         }
         val error = ShellStateError.fromWire(answer?.error)
-        mutableState.update { it.copy(error = error, live = it.live && answer != null) }
+        mutableState.update { it.copy(error = error, live = false) }
         Telemetry.event(TAG, "edit.failed", "error" attr error.name, "revision" attr base.documentRevision)
         return when (error) {
             ShellStateError.UNREACHABLE -> ShellStateEditOutcome.OFFLINE
@@ -163,16 +178,34 @@ class SharedShellState(
 
     private fun onPush(frame: JsonObject) {
         val pushed = decode(frame) ?: return
-        val shown = mutableState.value
-        if (pushed.documentRevision > (shown.snapshot?.documentRevision ?: -1L)) adopt(pushed, live = shown.live)
+        adopt(pushed, live = mutableState.value.live)
     }
 
-    /** Takes [snapshot] unless a newer one is already shown live. */
+    /**
+     * Takes [snapshot] unless a newer one from this connection is already shown, whether or not it was read
+     * live: a read reply that arrives after a newer push never replaces it. Anything from an earlier connection
+     * is replaced by whatever this connection says first.
+     */
     private fun adopt(snapshot: ShellStateSnapshot, live: Boolean) {
-        mutableState.update { current ->
-            val newerShown = current.live && (current.snapshot?.documentRevision ?: -1L) > snapshot.documentRevision
-            current.copy(snapshot = if (newerShown) current.snapshot else snapshot, live = live || current.live, error = null)
+        val fromThisConnection = shownFromThisConnection
+        val replaced = mutableState.updateAndGetReplaced(fromThisConnection, snapshot, live)
+        if (replaced) shownFromThisConnection = true
+    }
+
+    /** Applies [snapshot] unless [fromThisConnection] says a newer-or-equal one is shown; whether it replaced the shown one. */
+    private fun MutableStateFlow<ShellStateState>.updateAndGetReplaced(
+        fromThisConnection: Boolean,
+        snapshot: ShellStateSnapshot,
+        live: Boolean,
+    ): Boolean {
+        var replaced = false
+        update { current ->
+            val shownRevision = current.snapshot?.documentRevision ?: -1L
+            replaced = !(fromThisConnection && shownRevision >= snapshot.documentRevision)
+            val shown = if (replaced) snapshot else current.snapshot
+            current.copy(snapshot = shown, live = live || current.live, error = null)
         }
+        return replaced
     }
 
     /** One request whose result is the document; null on any failure, with its code in [state]. */

@@ -16,6 +16,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -157,6 +159,29 @@ class AgentPinsRoutesTest {
         assertTrue(parsed.getValue("id").jsonPrimitive.content.startsWith("pins-updated-"))
         assertTrue(parsed.getValue("ts").jsonPrimitive.content.isNotBlank())
         return JsonObject(parsed - "id" - "ts")
+    }
+
+    @Test
+    fun twoRoutesetsOverTheSameFileNeverLoseAWrite() = runBlocking {
+        // Every on-device dial builds its own routes over the same state directory.
+        val dir = Files.createTempDirectory("agent-pins-dials")
+        val dials = (1..2).map { AdminRpcRouter().also { r -> AgentPinsRoutes.forHost(dir, publisher).register(r) } }
+        repeat(25) { round ->
+            val replies = dials.map { dial ->
+                async(Dispatchers.Default) {
+                    val params = setParams(listOf("agent-$round"), round.toLong())
+                    Json.parseToJsonElement(dial.dispatch(AdminRpcInvocation("r", AgentPinsWire.SET, params))).jsonObject
+                }
+            }.awaitAll()
+            assertEquals(1, replies.count { it["success"]!!.jsonPrimitive.boolean }, "round $round: one accept")
+            assertEquals(
+                AgentPinsWire.REVISION_CONFLICT,
+                replies.single { !it["success"]!!.jsonPrimitive.boolean }["error"]?.jsonPrimitive?.content,
+            )
+        }
+        val ids = Json.parseToJsonElement(dials[0].dispatch(AdminRpcInvocation("r", AgentPinsWire.GET, null)))
+            .jsonObject.getValue("result").jsonObject.ids()
+        assertEquals(1, ids.size, "each round replaced the list once")
     }
 
     @Test

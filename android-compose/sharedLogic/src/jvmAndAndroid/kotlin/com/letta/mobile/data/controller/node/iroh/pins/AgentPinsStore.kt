@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh.pins
 
 import com.letta.mobile.data.controller.node.iroh.AtomicJsonFile
+import com.letta.mobile.data.controller.node.iroh.HostStateFileLocks
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.pins.shared.AgentPinsSnapshot
 import com.letta.mobile.data.pins.wire.AgentPinsWire
@@ -61,10 +62,15 @@ internal class AgentPinsRefusal(val code: String, cause: Throwable? = null) : Ex
 /** What a write did: the list now, and whether it changed (and so must be pushed). */
 internal class AgentPinsWrite(val snapshot: AgentPinsSnapshot, val changed: Boolean)
 
-/** The host's one list of pinned agents. Writes are serialized, so revisions are issued exactly once. */
-internal class AgentPinsStore(private val persistence: AgentPinsPersistence) {
-    private val lock = Mutex()
-
+/**
+ * The host's one list of pinned agents. Writes are serialized, so revisions are issued exactly once. Stores
+ * over one file must share [lock] (see [HostStateFileLocks]), or two of them could accept writes against the
+ * same revision and one would overwrite the other.
+ */
+internal class AgentPinsStore(
+    private val persistence: AgentPinsPersistence,
+    private val lock: Mutex = Mutex(),
+) {
     /** The list now. */
     suspend fun snapshot(): AgentPinsSnapshot = lock.withLock { persistence.read() }
 

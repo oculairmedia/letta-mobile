@@ -5,6 +5,7 @@ import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.AgentScopeGuard
 import com.letta.mobile.data.controller.node.iroh.IrohPeerCapabilities
+import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStores
 import com.letta.mobile.data.shellstate.ShellStateActor
 import com.letta.mobile.data.shellstate.ShellStateSchema
 import com.letta.mobile.data.shellstate.ShellStateSnapshot
@@ -149,6 +150,36 @@ class ShellStateRoutesTest {
     }
 
     @Test
+    fun twoRoutesetsOverTheSameFileNeverLoseAWrite() = runBlocking {
+        // Every on-device dial builds its own routes over the same state directory.
+        val dir = Files.createTempDirectory("shell-state-dials")
+        fun dial() = AdminRpcRouter().also { ShellStateRoutes.forHost(dir, publisher).register(it) }
+        val dials = listOf(dial(), dial())
+        repeat(25) { round ->
+            val key = "round-$round"
+            val replies = dials.map { dialRouter ->
+                async(Dispatchers.Default) {
+                    Json.parseToJsonElement(
+                        dialRouter.dispatch(AdminRpcInvocation("r", ShellStateWire.PROPOSE, propose(change(key, JsonPrimitive(1), 0)))),
+                    ).jsonObject
+                }
+            }.awaitAll()
+            assertEquals(1, replies.count { it.getValue("success").jsonPrimitive.boolean }, "round $round: one accept")
+            val loser = replies.single { !it.getValue("success").jsonPrimitive.boolean }
+            assertEquals(ShellStateWire.REVISION_CONFLICT, loser["error"]?.jsonPrimitive?.content)
+        }
+        val reply = failureFreeGet(dials.first())
+        assertEquals(25, reply.getValue("entries").jsonObject.size, "no accepted write was overwritten")
+        assertEquals(25L, reply.getValue("document_revision").jsonPrimitive.long)
+    }
+
+    private suspend fun failureFreeGet(on: AdminRpcRouter): JsonObject {
+        val response = Json.parseToJsonElement(on.dispatch(AdminRpcInvocation("r", ShellStateWire.GET, null))).jsonObject
+        assertTrue(response.getValue("success").jsonPrimitive.boolean)
+        return response.getValue("result").jsonObject
+    }
+
+    @Test
     fun manyConcurrentWritersIssueEveryRevisionExactlyOnce() = runBlocking {
         val path = Files.createTempDirectory("shell-state-race").resolve("shell-state.json")
         val store = ShellStateStore(FileShellStatePersistence(path))
@@ -159,6 +190,16 @@ class ShellStateRoutesTest {
         val now = store.snapshot()
         assertEquals(20L, now.documentRevision)
         assertEquals((1L..20L).toList(), now.entries.values.map { it.revision }.sorted())
+    }
+
+    @Test
+    fun theOwnerOnlyWriteLeavesTheWholeDocumentOnDiskAndNoTempFile() {
+        val path = Files.createTempDirectory("owner-only").resolve("shell-state.json")
+        val big = "x".repeat(300_000)
+        IrohSecretKeyStores.writeOwnerOnly(path, big)
+        IrohSecretKeyStores.writeOwnerOnly(path, big + "y")
+        assertEquals(big + "y", String(Files.readAllBytes(path), Charsets.UTF_8))
+        assertEquals(listOf(path.fileName.toString()), Files.list(path.parent).use { s -> s.map { it.fileName.toString() }.toList() })
     }
 
     @Test

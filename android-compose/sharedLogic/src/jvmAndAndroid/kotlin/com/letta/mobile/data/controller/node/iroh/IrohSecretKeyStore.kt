@@ -91,7 +91,7 @@ object IrohSecretKeyStores {
         try {
             java.nio.file.Files.createFile(temp)
             restrictToOwnerOnly(temp)
-            java.nio.file.Files.write(temp, text.toByteArray(Charsets.UTF_8))
+            writeAndSync(temp, text.toByteArray(Charsets.UTF_8))
             runCatching {
                 java.nio.file.Files.move(
                     temp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
@@ -100,6 +100,15 @@ object IrohSecretKeyStores {
             restrictToOwnerOnly(path)
         } finally {
             java.nio.file.Files.deleteIfExists(temp)
+        }
+    }
+
+    /** Writes [bytes] into the existing [file] and forces them to storage, so a rename of it never exposes partial contents. */
+    private fun writeAndSync(file: java.nio.file.Path, bytes: ByteArray) {
+        java.nio.channels.FileChannel.open(file, java.nio.file.StandardOpenOption.WRITE).use { channel ->
+            val buffer = java.nio.ByteBuffer.wrap(bytes)
+            while (buffer.hasRemaining()) channel.write(buffer)
+            channel.force(true)
         }
     }
 

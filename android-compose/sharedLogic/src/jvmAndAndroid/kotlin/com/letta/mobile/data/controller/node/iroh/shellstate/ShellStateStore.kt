@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh.shellstate
 
+import com.letta.mobile.data.controller.node.iroh.HostStateFileLocks
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStores
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.shellstate.ShellStateActor
@@ -77,14 +78,14 @@ internal class ShellStateWrite(val snapshot: ShellStateSnapshot, val changed: Bo
  * The host's one shell state document. Writes are serialized, so every revision is issued exactly once.
  * The document revision goes up by one per accepted proposal that changed something, and every entry
  * that proposal wrote takes that revision, so an entry's revision never repeats, even when it is
- * removed and set again.
+ * removed and set again. Stores over one file must share [lock] (see [HostStateFileLocks]), or two of them
+ * could accept proposals against the same revision and one would overwrite the other.
  */
 internal class ShellStateStore(
     private val persistence: ShellStatePersistence,
+    private val lock: Mutex = Mutex(),
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    private val lock = Mutex()
-
     /** The document now. */
     suspend fun snapshot(): ShellStateSnapshot = lock.withLock { persistence.read() }
 

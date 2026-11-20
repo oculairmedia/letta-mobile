@@ -179,6 +179,62 @@ class SharedShellStateTest {
     }
 
     @Test
+    fun aConnectedHostWithoutTheContractShowsNoDocumentFromAnEarlierHost() = runTest {
+        val earlier = FakeHost().apply { seed("a", dark) }
+        val shared = SharedShellState(earlier)
+        shared.refresh()
+        assertEquals(dark, shared.state.value.entries.getValue("a").value)
+        earlier.capabilities = emptySet()
+        val state = shared.refresh()
+        assertFalse(state.supported)
+        assertTrue(state.entries.isEmpty())
+        assertFalse(state.editable)
+    }
+
+    @Test
+    fun aDisconnectKeepsTheLastDocumentShown() = runTest(UnconfinedTestDispatcher()) {
+        val host = FakeHost().apply { seed("a", dark) }
+        val shared = SharedShellState(host)
+        val job = launch { shared.run() }
+        host.connected.value = false
+        assertEquals(dark, shared.state.value.entries.getValue("a").value)
+        job.cancel()
+    }
+
+    @Test
+    fun aRefusedWriteMarksTheDocumentStaleSoTheNextEditReadsFirst() = runTest {
+        listOf(ShellStateWire.TOO_LARGE, ShellStateWire.STATE_UNREADABLE, "forbidden: agent not in this device's scope").forEach { code ->
+            val host = FakeHost().apply { seed("a", dark) }
+            val shared = SharedShellState(host).also { it.refresh() }
+            host.refuseSetWith = code
+            assertEquals(ShellStateEditOutcome.REFUSED, shared.set("a", light), code)
+            assertFalse(shared.state.value.editable, "$code leaves the document stale")
+            assertEquals(dark, shared.state.value.entries.getValue("a").value, "the shown document stays for display")
+            host.refuseSetWith = null
+            host.calls.clear()
+            assertEquals(ShellStateEditOutcome.APPLIED, shared.set("a", light), code)
+            assertEquals(listOf(ShellStateWire.GET, ShellStateWire.PROPOSE), host.calls, "$code: read before the next write")
+        }
+    }
+
+    @Test
+    fun aReadReplyThatArrivesAfterANewerPushNeverReplacesIt() = runTest(UnconfinedTestDispatcher()) {
+        val host = FakeHost().apply { seed("a", dark) }
+        val shared = SharedShellState(host)
+        val job = launch { shared.run() }
+        // Stale again (a failed write), then a read starts; a newer push lands before its reply.
+        host.failNextCalls = 1
+        shared.set("a", light)
+        assertFalse(shared.state.value.live)
+        host.beforeGetReply = { host.pushRevision(7, "a", JsonPrimitive("pushed")) }
+        shared.refresh()
+        assertEquals(JsonPrimitive("pushed"), shared.state.value.entries.getValue("a").value)
+        assertEquals(7L, shared.state.value.snapshot?.documentRevision)
+        assertTrue(shared.state.value.live, "a successful read still restores live")
+        job.cancel()
+    }
+
+    @Test
     fun aHostWithNoDocumentYetStartsEmpty() = runTest {
         val state = SharedShellState(FakeHost()).refresh()
         assertTrue(state.entries.isEmpty())
@@ -187,7 +243,7 @@ class SharedShellStateTest {
 
     /** A host serving the contract the way ShellStateStore does, in memory. */
     private class FakeHost(
-        val capabilities: Set<String> = setOf(ShellStateWire.CAPABILITY),
+        var capabilities: Set<String> = setOf(ShellStateWire.CAPABILITY),
         online: Boolean = true,
     ) : ShellStateLink {
         private var revision = 0L
@@ -201,6 +257,7 @@ class SharedShellStateTest {
         var refuseSetWith: String? = null
         var refuseGetOnce: String? = null
         var failNextCalls = 0
+        var beforeGetReply: () -> Unit = {}
 
         override val hostCapabilities: Set<String> get() = capabilities
         override val isConnected: Boolean get() = connected.value
@@ -232,7 +289,9 @@ class SharedShellStateTest {
 
         private fun get(): ShellStateReply {
             refuseGetOnce?.let { refuseGetOnce = null; return ShellStateReply(false, error = it) }
-            return ShellStateReply(true, encode(document()))
+            val reply = ShellStateReply(true, encode(document()))
+            beforeGetReply().also { beforeGetReply = {} }
+            return reply
         }
 
         private fun propose(params: JsonObject): ShellStateReply {
