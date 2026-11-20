@@ -32,7 +32,7 @@ class LettaHangingRowActionTest {
         val target = onNodeWithTag(ACTION).fetchSemanticsNode().boundsInRoot
         val minTarget = with(density) { LettaDimens.Control.minTouchTarget.toPx() }
 
-        assertTrue(abs(title.left - label.first) <= 1f, "the label's first letter is at x=${label.first}, off the content edge x=${title.left}")
+        assertOnEdge(title.left, label.first)
         assertTrue(abs(title.left - target.left) <= 1f, "the touch target starts at x=${target.left}, off the content edge x=${title.left}")
         assertTrue(label.second < minTarget, "the label (${label.second}px) must be narrower than the target for this to test anything")
         assertTrue(target.width >= minTarget - 1f, "touch target ${target.width}px wide, under $minTarget")
@@ -51,7 +51,11 @@ class LettaHangingRowActionTest {
         }
         val title = onNodeWithText("Title of the row", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val label = onNodeWithText("View conversation", useUnmergedTree = true).firstGlyphLeftAndWidth()
-        assertTrue(abs(title.left - label.first) <= 1f, "the label's first letter is at x=${label.first}, off the content edge x=${title.left}")
+        assertOnEdge(title.left, label.first)
+    }
+
+    private fun assertOnEdge(edge: Float, firstLetter: Float) {
+        assertTrue(abs(edge - firstLetter) <= 1f, "the label's first letter is at x=$firstLetter, off the content edge x=$edge")
     }
 
     /** Where the text's own first letter is drawn (x in the root) and how wide its glyphs are: not the node's padded bounds. */
