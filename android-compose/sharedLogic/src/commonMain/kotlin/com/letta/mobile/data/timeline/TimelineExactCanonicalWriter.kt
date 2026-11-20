@@ -52,6 +52,22 @@ class TimelineExactCanonicalWriter(
         return true
     }
 
+    /**
+     * One invocation can be listed twice, as a tool_call_message and as its approval_request_message
+     * (TimelineHydrationReducer.semanticIdentityKeyOrNull), and both fold onto one stored row. Each
+     * listing carries its own date and only the request carries an approval id, so whichever came
+     * last used to overwrite the other: the row flipped between the two on every replay of an
+     * unchanged page, and each flip advanced the durable revision. The row keeps the approval id once
+     * it has one, and the date of the listing that created it.
+     */
+    private fun TimelineEvent.Confirmed.keepingTheListingAlreadyStored(stored: TimelineEvent.Confirmed): TimelineEvent.Confirmed {
+        if (messageType != TimelineMessageType.TOOL_CALL) return this
+        return copy(
+            approvalRequestId = approvalRequestId ?: stored.approvalRequestId,
+            date = if (serverId == stored.serverId) date else stored.date,
+        )
+    }
+
     /** True when the row stored under [key] already carries exactly [bytes]. */
     private suspend fun TimelineStoreTransaction.holdsIdentical(identity: TimelineMessageId, key: TimelinePageKey, bytes: ByteArray): Boolean {
         val stored = metadata(TimelineReadPosition.Around(key), 1).rows.singleOrNull { it.key == key } ?: return false
@@ -146,7 +162,10 @@ class TimelineExactCanonicalWriter(
                 TerminalEvidenceDecision.Unchanged -> historical ?: throw TimelineMergeUnavailable(identity, "missing_terminal_body_for_index")
                 is TerminalEvidenceDecision.Unavailable -> throw TimelineMergeUnavailable(identity, decision.reason)
             }
-        } else historical?.let { TimelineHydrationReducer.mergeRicherEventFacts(incoming, it).copy(position = it.position, otid = it.otid) } ?: incoming
+        } else historical?.let {
+            TimelineHydrationReducer.mergeRicherEventFacts(incoming, it).copy(position = it.position, otid = it.otid)
+                .keepingTheListingAlreadyStored(it)
+        } ?: incoming
         for (call in merged.toolCalls) {
             val callId = call.effectiveId.takeIf { it.isNotBlank() } ?: continue
             val deferred = transaction.evidence(deferredReturnKey(callId), DEFERRED_RETURN_MAX_BYTES)?.let {
