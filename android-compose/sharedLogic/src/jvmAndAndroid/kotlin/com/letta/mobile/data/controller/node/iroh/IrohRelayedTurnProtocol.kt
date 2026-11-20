@@ -459,5 +459,5 @@ internal class RelayedInputTurn(
     val clientMsgId: String?,
     val fanout: ConversationTurnFanout,
     val protocol: IrohRelayedTurnProtocol,
-    val tracker: TurnFrameTracker?,
+    val journal: TurnJournalWriter,
 )

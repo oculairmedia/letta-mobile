@@ -57,6 +57,8 @@ class IrohNodeEndpoint(
     /** The host's stream-to-stored identity join, shared by every connection. */
     private val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
     private val connectionRegistry: ConnectionRegistry = ConnectionRegistry(),
+    /** The host's durable turn journal; the default keeps none, so a redial replays nothing. */
+    private val turnJournal: TurnJournal = NoTurnJournal,
 ) {
     private val alpn = binding.alpn
     private val relayConfig = binding.relayConfig
@@ -365,7 +367,7 @@ class IrohNodeEndpoint(
     fun start(controller: AppServerController) {
         val ep = checkNotNull(endpoint) { "IrohNodeEndpoint not created yet" }
         require(acceptJob == null) { "IrohNodeEndpoint already started" }
-        val host = NodeTurnHost.childOf(scope)
+        val host = NodeTurnHost.childOf(scope, turnJournal)
         turnHost = host
 
         acceptJob = scope.launch(irohExceptionHandler) {

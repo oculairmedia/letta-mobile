@@ -472,6 +472,7 @@ class AppServerServeIrohCommand : CliktCommand(
         canvasRelay = canvasRelay,
         protocolHandlers = protocolHandlers,
         turnIdentity = turnIdentity,
+        turnJournal = feedJournal,
     )
 
     /**
@@ -652,6 +653,7 @@ class AppServerServeIrohCommand : CliktCommand(
             serviceCredentialRoutes = com.letta.mobile.data.controller.node.iroh.servicecredentials.ServiceCredentialRoutes.forHost(
                 hostStateDirectory,
             ),
+            feedRoutes = com.letta.mobile.data.controller.node.iroh.feed.FeedRoutes.forHost(feedJournal),
         )
         notebookGrantsFile?.let { file ->
             val store = requireNotNull(notebooks) { "Notebook grants require a notebook store" }
@@ -907,6 +909,16 @@ class AppServerServeIrohCommand : CliktCommand(
         println("[iroh-app-server] Canvas relay: ON (ops: $canvasOps, assets: $canvasAssets, agent tools: ${hostCanvasTools.size}, directory: $canvasDirectory)")
         println("[iroh-app-server] Canvas mounts: ${if (canvasMounts != null) "ON (pending security review)" else "OFF"}")
         return canvasRelay
+    }
+
+    /**
+     * The host's durable turn journal, beside its other state so a wrapper restart keeps finished turns. One per process:
+     * the endpoint's turns write to it and `feed.subscribe` reads it.
+     */
+    private val feedJournal: com.letta.mobile.data.controller.node.iroh.feed.FeedJournalStore by lazy {
+        com.letta.mobile.data.controller.node.iroh.feed.FeedJournalStore(
+            java.io.File(resolvedModelExposureFile()).absoluteFile.parentFile.toPath().resolve("conversation-feed"),
+        )
     }
 
     private fun resolvedModelExposureFile(): String =

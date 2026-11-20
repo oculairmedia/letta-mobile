@@ -207,6 +207,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [Active turn v1: contract proposal](reference/contracts/active-turn-v1.md)
 - [Canvas mount v1: host-owned canvas defaults and bindings](reference/contracts/canvas-mount-v1.md)
+- [Conversation feed v1: the host's durable, resumable record of every turn](reference/contracts/conversation-feed-v1.md)
 - [Conversation lanes v1](reference/contracts/conversation-lanes-v1.md)
 - [Current focus v1: contract proposal](reference/contracts/current-focus-v1.md)
 - [Keystore v1: provider contract](reference/contracts/keystore-v1.md)
@@ -339,6 +340,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 ### reference/contracts/cron.resume
 
 - [\`cron.resume\` v1](reference/contracts/cron.resume/control-v1.md)
+
+### reference/contracts/feed.subscribe
+
+- [feed.subscribe: conversation feed v1](reference/contracts/feed.subscribe/feed-v1.md)
 
 ### reference/contracts/health.check
 

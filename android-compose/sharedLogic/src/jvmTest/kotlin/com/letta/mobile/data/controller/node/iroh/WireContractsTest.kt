@@ -71,7 +71,7 @@ class WireContractsTest {
                 val known = setOf(
                     "controller_state", "conversations", "hidden_agent_ids", "visibility_index",
                     "reflection_settings", "monitor_success", "toolset_response", "cron_control", "execute_command_response", "voice",
-                    "pins", "shell_state", "service_credentials",
+                    "pins", "shell_state", "service_credentials", "feed",
                 )
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
@@ -367,8 +367,11 @@ class WireContractsTest {
                     permissionModes = PermissionModePublisher(plugins.scope),
                 ),
             )
-            // The production wrapper registers the voice, pins, shell state and service credential routes on the built router; so does this host.
-            listOf(voiceRoutes(dir), pinsRoutes(host), shellStateRoutes(host), serviceCredentialRoutes(dir)).forEach { it.register(router) }
+            // The production wrapper registers the voice, pins, shell state, service credential and feed routes on the
+            // built router; so does this host.
+            listOf(
+                voiceRoutes(dir), pinsRoutes(host), shellStateRoutes(host), serviceCredentialRoutes(dir), feedRoutes(host, dir),
+            ).forEach { it.register(router) }
             block(router)
         } finally {
             runtime.close()
@@ -425,6 +428,13 @@ class WireContractsTest {
                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
             ),
         )
+    }
+
+    /** The real feed route over the journal the case's `host_state.feed.turns` wrote, in a file store beside the host's other state. */
+    private fun feedRoutes(host: JsonObject?, dir: File): AdminRpcRoutes {
+        val store = File(dir, "conversation-feed").toPath()
+        val journal = com.letta.mobile.data.controller.node.iroh.feed.FeedContractSeed.journal(host, store)
+        return com.letta.mobile.data.controller.node.iroh.feed.FeedRoutes.forHost(journal)
     }
 
     /** The real voice routes over file stores in the test's directory; any speech server call fails the test. */

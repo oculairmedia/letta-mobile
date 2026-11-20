@@ -80,12 +80,15 @@ class IrohEventSeqWireOrderTest {
         val lock = PreemptedFirstLock()
         val viewer = wire.viewer(lock)
         val liveTurn = initiatorFanout(viewer, initiatorWrites = ObserverWriteQueue(backgroundScope))
-        val parked = listOf(
-            buildJsonObject { put("message_type", "assistant_message"); put("otid", "otid-old"); put("content", "old") },
-            buildJsonObject { put("message_type", "stop_reason"); put("stop_reason", "end_turn") },
-        ).joinToString("\n")
+        val parked = InitiatorReplay(
+            listOf(
+                buildJsonObject { put("message_type", "assistant_message"); put("otid", "otid-old"); put("content", "old") },
+                buildJsonObject { put("message_type", "stop_reason"); put("stop_reason", "end_turn") },
+            ).map { it.toString() },
+            terminalObserved = true,
+        ) {}
 
-        launch { replayParkedDeltas(viewer, runtime, parked) }
+        launch { replayJournalDeltas(viewer, runtime, parked) }
         runCurrent()
         assertTrue(lock.holdingFirstWriter, "the replay must be parked at the lock")
 
@@ -135,11 +138,11 @@ class IrohEventSeqWireOrderTest {
             frameParts = { false },
             maxFrameBytes = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES,
         )
-        val parked = buildJsonObject { put("message_type", "stop_reason") }.toString()
+        val parked = InitiatorReplay(listOf(buildJsonObject { put("message_type", "stop_reason") }.toString()), terminalObserved = true) {}
 
-        val outcome = runCatching { replayParkedDeltas(viewer, runtime, parked) }
+        val outcome = runCatching { replayJournalDeltas(viewer, runtime, parked) }
 
-        assertFalse(outcome.isSuccess, "a failed replay write must surface so the tail is re-parked")
+        assertFalse(outcome.isSuccess, "a failed replay write must surface so the tail stays owed")
     }
 
     private fun TestScope.initiatorFanout(viewer: IrohViewerHandle, initiatorWrites: ObserverWriteQueue?) =

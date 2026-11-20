@@ -87,6 +87,8 @@ fun buildProductionAdminRouter(
     shellStateRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
     /** The service credential routes (non-LLM service secrets held on the host); null registers none. */
     serviceCredentialRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
+    /** The conversation feed route (`feed.subscribe` over the host's durable turn journal); null registers none. */
+    feedRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
 ): AdminRpcRouter {
     // Every skill.list re-reads the root (a symlink is the controllable unit and can
     // change on disk at any time); the cold-start read below also logs what the host
@@ -182,5 +184,7 @@ fun buildProductionAdminRouter(
         shellStateRoutes?.register(router)
         // All four service credential routes or none; they advertise service_credentials_v1 themselves.
         serviceCredentialRoutes?.register(router)
+        // The one feed method; it advertises conversation_feed_v1 itself.
+        feedRoutes?.register(router)
     }
 }

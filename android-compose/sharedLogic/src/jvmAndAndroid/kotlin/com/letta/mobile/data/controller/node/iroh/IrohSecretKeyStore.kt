@@ -103,6 +103,23 @@ object IrohSecretKeyStores {
         }
     }
 
+    /**
+     * Forces the directory entry of [path] to storage: a rename (the replacement [writeOwnerOnly] makes, or a file just created
+     * in a directory) is durable only once its parent directory is synced as well. Best effort: a platform that cannot sync a
+     * directory (Windows) or a failing sync is skipped, never an error. [writeOwnerOnly] itself could call this after its rename.
+     */
+    internal fun syncParentDirectory(path: java.nio.file.Path) {
+        val parent = path.toAbsolutePath().parent ?: return
+        if (!AtomicJsonFile.directorySyncSupported) return
+        try {
+            AtomicJsonFile.syncDirectory(parent)
+        } catch (expected: java.io.IOException) {
+            // Best effort: the data is still on its way to disk, only the entry's durability is not forced.
+        } catch (expected: UnsupportedOperationException) {
+            // Directory channels are not supported on every platform.
+        }
+    }
+
     /** Writes [bytes] into the existing [file] and forces them to storage, so a rename of it never exposes partial contents. */
     private fun writeAndSync(file: java.nio.file.Path, bytes: ByteArray) {
         java.nio.channels.FileChannel.open(file, java.nio.file.StandardOpenOption.WRITE).use { channel ->

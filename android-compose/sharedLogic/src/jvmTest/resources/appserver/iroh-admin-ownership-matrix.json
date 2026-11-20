@@ -3107,6 +3107,21 @@
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "feed.subscribe",
+      "handler": "FeedRoutes.kt",
+      "current_backend": "host conversation-feed journal (conversation-feed/*.jsonl beside the model exposure state), Iroh admin_rpc only",
+      "owner": "controller_native",
+      "public_contract": "docs/reference/contracts/conversation-feed-v1.md",
+      "authorization_class": "conversation_scoped",
+      "data_store": "controller_state_file",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Conversation feed v1: registered only when the host supplies the feed route (method omitted otherwise). Reads one conversation's durable turn journal from an {epoch, seq} cursor (replay) or starts it over (snapshot: no_cursor, epoch_changed, behind_horizon, ahead_of_head). Authorized per request: conversation scope as message.list, and the owning agent resolved from the alias, the request or the journal must be in an agent-scoped peer's scope (an unresolvable owner is refused, never answered empty). chat.read.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "deny_fail_closed"
     }
   ],
   "unsupported_native_operations": [
