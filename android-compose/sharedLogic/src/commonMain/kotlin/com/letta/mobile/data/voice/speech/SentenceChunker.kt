@@ -23,6 +23,7 @@ import com.letta.mobile.data.voice.VoiceText
 class SentenceChunker(
     private val maxSegmentLength: Int = DEFAULT_MAX_SEGMENT_LENGTH,
     private val firstClauseMinLength: Int? = null,
+    private val minSegmentLength: Int? = null,
 ) {
     private val pending = StringBuilder()
     private var inCodeBlock = false
@@ -33,6 +34,7 @@ class SentenceChunker(
     init {
         require(maxSegmentLength >= MIN_SEGMENT_LENGTH) { "maxSegmentLength too small" }
         require(firstClauseMinLength == null || firstClauseMinLength > 0) { "firstClauseMinLength must be positive" }
+        require(minSegmentLength == null || minSegmentLength > 0) { "minSegmentLength must be positive" }
     }
 
     /** Appends [delta] and returns every segment that is now complete. */

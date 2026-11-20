@@ -105,7 +105,7 @@ internal class ReplyFollower(private val wiring: LoopWiring) {
     }
 
     private suspend fun follow(turn: TurnKey, reply: VoiceReply) {
-        val chunker = SentenceChunker(wiring.config.maxSegmentLength, wiring.config.firstClauseMinLength)
+        val chunker = SentenceChunker(wiring.config.maxSegmentLength, wiring.config.firstClauseMinLength, wiring.config.minSegmentLength)
         val forwarder = ReplyForwarder(turn, chunker, wiring.config.maxSegmentLength, wiring.inputs)
         val outcome = runCatching { reply.events.collect(forwarder::forward) }
         val error = outcome.exceptionOrNull()
