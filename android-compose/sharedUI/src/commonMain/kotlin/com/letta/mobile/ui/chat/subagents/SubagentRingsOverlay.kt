@@ -40,14 +40,24 @@ data class SubagentRingsState(
  * desktop overlay and the Android shared page) leaves it out here, in one place.
  */
 @Composable
-fun rememberSubagentRingsState(snapshot: ImmutableList<ActiveSubagent>, self: ActiveSubagent? = null): SubagentRingsState {
-    var tick by remember { mutableLongStateOf(nowMillis()) }
-    LaunchedEffect(snapshot) {
-        while (snapshot.any { it.hasDeterminateProgress && it.keepsRingsTicking() }) {
-            tick = nowMillis()
+fun rememberSubagentRingsState(snapshot: ImmutableList<ActiveSubagent>, self: ActiveSubagent? = null): SubagentRingsState =
+    rememberSubagentRingsState(snapshot, self, ::nowMillis)
+
+/** [rememberSubagentRingsState] reading time from [clock], so a test can count the ticks. */
+@Composable
+internal fun rememberSubagentRingsState(
+    snapshot: ImmutableList<ActiveSubagent>,
+    self: ActiveSubagent?,
+    clock: () -> Long,
+): SubagentRingsState {
+    var tick by remember { mutableLongStateOf(clock()) }
+    LaunchedEffect(snapshot, self) {
+        // The rings drawn are the planned self ring and the planned snapshot runs; any of them still live keeps the clock going.
+        while ((snapshot + listOfNotNull(self)).any { it.hasDeterminateProgress && it.keepsRingsTicking() }) {
+            tick = clock()
             delay(1.seconds)
         }
-        tick = nowMillis()
+        tick = clock()
     }
     val subagents = remember(snapshot, tick, self) {
         val lingering = snapshot.withLingeringTerminals(tick)

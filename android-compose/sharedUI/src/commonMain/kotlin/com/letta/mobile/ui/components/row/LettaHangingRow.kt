@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -48,18 +49,24 @@ internal fun LettaHangingRow(
 
 /**
  * A text action on a [LettaHangingRow]'s content edge ("View conversation", "Dismiss"): primary ink,
- * a button to assistive technology, the platform's minimum touch height, and no horizontal inset,
- * so its first letter lines up with the title above it.
+ * a button to assistive technology, the platform's minimum touch size, and no horizontal inset, so
+ * its first letter lines up with the title above it. A label narrower than the minimum touch width
+ * keeps its start on the edge: the touch box grows to the right of it instead of centring the label.
  */
 @Composable
 internal fun LettaHangingRowAction(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, tag: String = "") {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.primary,
-        maxLines = 1,
+    Box(
         modifier = modifier
-            .lettaClickable(role = Role.Button, target = LettaClickTarget.Standalone, onClick = onClick)
+            .lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = onClick)
+            .defaultMinSize(minWidth = LettaDimens.Control.minTouchTarget, minHeight = LettaDimens.Control.minTouchTarget)
             .then(if (tag.isEmpty()) Modifier else Modifier.testTag(tag)),
-    )
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+        )
+    }
 }
