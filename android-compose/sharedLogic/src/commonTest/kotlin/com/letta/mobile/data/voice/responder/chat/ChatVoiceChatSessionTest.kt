@@ -39,6 +39,23 @@ class ChatVoiceChatSessionTest {
     }
 
     @Test
+    fun theAnsweringAgentIsCapturedWhenTheReplyStarts() = runTest {
+        assertNull(session.agentId, "nothing sent, no agent answering")
+        page.showAgent("agent-a")
+        session.send(VoiceText("hello"))
+        page.showAgent("agent-b")
+        assertEquals("agent-a", session.agentId, "the reply in progress keeps the agent that answers it")
+
+        sender.refuse = true
+        assertFailsWith<ChatSendRefusedException> { session.send(VoiceText("refused")) }
+        assertEquals("agent-a", session.agentId, "a refused send starts no reply")
+
+        sender.refuse = false
+        session.send(VoiceText("again"))
+        assertEquals("agent-b", session.agentId)
+    }
+
+    @Test
     fun stopIsThePagesOwnStop() {
         session.stopRun()
         assertEquals(1, page.stops)

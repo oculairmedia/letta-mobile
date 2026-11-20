@@ -3,11 +3,13 @@ package com.letta.mobile.data.agenteditor
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.CompactAgentProfile
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.withCatalogModelRouting
+import com.letta.mobile.data.voice.core.VoiceCore
 import kotlinx.collections.immutable.toImmutableList
 
 /**
@@ -41,7 +43,11 @@ object AgentEditorParams {
         systemPrompt = agent.system.orEmpty(),
         toolIds = agent.tools.map { it.id.value }.toSet(),
         compactProfile = CompactAgentProfile.isCompact(agent.tags),
+        voiceDescription = VoiceCore.fromBlock(voiceBlockOf(agent)?.value)?.description.orEmpty(),
     )
+
+    /** [agent]'s `voice` memory block, if it has one. */
+    fun voiceBlockOf(agent: Agent?): Block? = agent?.coreBlocks?.firstOrNull { it.label == VoiceCore.BLOCK_LABEL }
 
     /** Keeps edits made while loading, rebasing untouched fields onto the fresh detail. */
     internal fun rebase(displayed: AgentEditorForm, edited: AgentEditorForm, fresh: AgentEditorForm): AgentEditorForm = fresh.copy(
@@ -54,6 +60,7 @@ object AgentEditorParams {
         toolIds = (fresh.toolIds - (displayed.toolIds - edited.toolIds)) + (edited.toolIds - displayed.toolIds),
         metadata = keepEdit(displayed.metadata, edited.metadata, fresh.metadata),
         compactProfile = keepEdit(displayed.compactProfile, edited.compactProfile, fresh.compactProfile),
+        voiceDescription = keepEdit(displayed.voiceDescription, edited.voiceDescription, fresh.voiceDescription),
     )
 
     private fun <T> keepEdit(displayed: T, edited: T, fresh: T): T = if (edited != displayed) edited else fresh

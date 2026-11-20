@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller.node.iroh.voice
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
+import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.controller.node.iroh.adminError
 import com.letta.mobile.data.controller.node.iroh.hostWireJson
 import com.letta.mobile.data.voice.endpoint.SpeechHttpEngines
@@ -10,6 +11,7 @@ import com.letta.mobile.data.voice.host.HostVoiceErrorCode
 import com.letta.mobile.data.voice.host.HostVoiceWire
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
+import java.io.File
 import java.nio.file.Path
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.KSerializer
@@ -28,16 +30,28 @@ object VoiceEndpointRoutes {
      * `voice-setup.json` and the speech server key in `voice-speech-key`, a file only the host's user
      * may read. The key is write-only over the wire and never logged.
      */
-    fun forHost(stateDirectory: Path, clock: () -> Long = System::currentTimeMillis): AdminRpcRoutes = VoiceRoutes(
-        store = VoiceSetupStore(
-            FileVoiceSetupPersistence(stateDirectory.resolve(SETUP_FILE)),
-            FileVoiceKeyStore(stateDirectory.resolve(KEY_FILE)),
-            clock,
-        ),
-        upstream = KtorVoiceSpeechUpstream(SpeechHttpEngines.create()),
-        inFlight = VoiceInFlight(),
-        clock = clock,
-    )
+    fun forHost(stateDirectory: Path, clock: () -> Long = System::currentTimeMillis): AdminRpcRoutes = forHost(stateDirectory, null, clock)
+
+    /**
+     * As [forHost], with the agents' memory under [localBackendDir] (the letta-code local backend), so
+     * `voice.speech` speaks each agent in the voice core of its `voice` block; null reads no cores.
+     */
+    fun forHost(stateDirectory: Path, localBackendDir: File?, clock: () -> Long = System::currentTimeMillis): AdminRpcRoutes =
+        VoiceRoutes(
+            store = VoiceSetupStore(
+                FileVoiceSetupPersistence(stateDirectory.resolve(SETUP_FILE)),
+                FileVoiceKeyStore(stateDirectory.resolve(KEY_FILE)),
+                clock,
+            ),
+            upstream = KtorVoiceSpeechUpstream(SpeechHttpEngines.create()),
+            inFlight = VoiceInFlight(),
+            cores = VoiceCores(
+                files = localBackendDir?.let { dir -> LocalBackendAdminStore(dir) }?.let { store ->
+                    AgentBlockFiles { agentId, label -> store.agentBlockFile(agentId, label) }
+                },
+            ),
+            clock = clock,
+        )
 
     private const val SETUP_FILE = "voice-setup.json"
     private const val KEY_FILE = "voice-speech-key"
@@ -52,10 +66,15 @@ internal class VoiceRoutes(
     store: VoiceSetupStore,
     upstream: VoiceSpeechUpstream,
     inFlight: VoiceInFlight,
+    cores: VoiceCores,
     clock: () -> Long,
 ) : AdminRpcRoutes {
+    /** Routes that read no voice cores: every agent speaks in the stored voice. */
+    constructor(store: VoiceSetupStore, upstream: VoiceSpeechUpstream, inFlight: VoiceInFlight, clock: () -> Long) :
+        this(store, upstream, inFlight, VoiceCores(files = null), clock)
+
     private val setup = VoiceSetupHandlers(store, upstream, clock)
-    private val requests = VoiceRequestHandlers(store, upstream, inFlight)
+    private val requests = VoiceRequestHandlers(store, upstream, inFlight, cores)
 
     override fun register(router: AdminRpcRouter) {
         router.voice(HostVoiceWire.SETUP_GET) { _, _ -> setup.get() }

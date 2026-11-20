@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh.voice
 
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
 import com.letta.mobile.data.voice.host.HostVoiceErrorCode
+import com.letta.mobile.data.voice.tone.ToneModule
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -64,10 +65,13 @@ internal class VoiceSpeechCall(
     val text: String,
     val model: String,
     val voice: String,
-    /** The reply's tone cue for the speech server's `instructions`; null for none. */
-    val instructions: String? = null,
+    /** The speaking agent's voice core, from its own memory; null speaks in [voice] alone. */
+    val voiceCore: String? = null,
+    /** The reply's mood module for the speech server's `instructions`; null for none. */
+    val instructions: ToneModule? = null,
 ) {
-    override fun toString(): String = "VoiceSpeechCall(textLength=${text.length}, instructed=${instructions != null})"
+    override fun toString(): String =
+        "VoiceSpeechCall(textLength=${text.length}, voiced=${voiceCore != null}, instructed=${instructions != null})"
 }
 
 /** An upstream call failed with [code]; [status] is the HTTP status when the server answered. */

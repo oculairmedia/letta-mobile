@@ -6,12 +6,16 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
+import com.letta.mobile.data.repository.api.AgentBlockTarget
+import com.letta.mobile.data.repository.api.IAgentBlockWriteRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.IToolRepository
+import com.letta.mobile.data.voice.core.VoiceCore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -41,6 +45,13 @@ interface AgentEditorBackend {
     suspend fun detachTool(agentId: AgentId, toolId: ToolId)
     suspend fun delete(agentId: AgentId)
 
+    /**
+     * Writes [value] into [agentId]'s `voice` memory block through the agent memory update path
+     * (creating the block when [exists] is false). A backend without that path refuses.
+     */
+    suspend fun writeVoiceCore(agentId: AgentId, value: String, exists: Boolean): Unit =
+        throw AppServerRouteUnavailable(SessionRoute.BLOCKS)
+
     /** The named reasoning efforts [handle] accepts; empty when it has none or the backend cannot say. */
     fun reasoningEffortsFor(handle: String): List<String> = emptyList()
 }
@@ -62,6 +73,8 @@ class AgentEditorRepositories(
     val tools: IToolRepository?,
     val models: IModelRepository?,
     val modelCatalog: StateFlow<List<LlmModel>>? = null,
+    /** The agent memory update path, for the voice block; null when the session serves none. */
+    val blocks: IAgentBlockWriteRepository? = null,
 )
 
 /**
@@ -78,6 +91,7 @@ class RepositoryAgentEditorBackend(
     private val agentRepository = repositories.agents
     private val toolRepository = repositories.tools
     private val modelRepository = repositories.models
+    private val blockRepository = repositories.blocks
 
     override val agents: StateFlow<List<Agent>> = agentRepository?.agents ?: MutableStateFlow(emptyList())
     override val models: StateFlow<List<LlmModel>> =
@@ -106,6 +120,12 @@ class RepositoryAgentEditorBackend(
     override suspend fun detachTool(agentId: AgentId, toolId: ToolId) = servedTools().detachTool(agentId, toolId)
 
     override suspend fun delete(agentId: AgentId) = servedAgents().deleteAgent(agentId)
+
+    override suspend fun writeVoiceCore(agentId: AgentId, value: String, exists: Boolean) {
+        val blocks = served(blockRepository, SessionRoute.BLOCKS)
+        val target = AgentBlockTarget(agentId.value, VoiceCore.BLOCK_LABEL)
+        if (exists) blocks.writeAgentBlock(target, BlockUpdateParams(value = value)) else blocks.createAgentBlock(target, value)
+    }
 
     private fun servedAgents(): IAgentRepository = served(agentRepository, SessionRoute.AGENTS)
 

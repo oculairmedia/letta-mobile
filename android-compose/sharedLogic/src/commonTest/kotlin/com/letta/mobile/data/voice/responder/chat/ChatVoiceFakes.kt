@@ -38,6 +38,9 @@ internal class FakeChatPage : ChatSessionPort {
 
     fun add(vararg rows: UiMessage) = ui.update { it.copy(messages = (it.messages + rows).toPersistentList()) }
 
+    /** Moves the page to [agentId], as picking another agent does. */
+    fun showAgent(agentId: String) = ui.update { it.copy(agentId = agentId) }
+
     /** Shows [queue] as the conversation's send queue, as the chat page does with its host's queue. */
     fun showQueue(queue: ConversationSendQueue) = ui.update { it.copy(sendQueue = queue) }
 

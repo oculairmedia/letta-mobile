@@ -108,6 +108,13 @@ interface VoiceChatSession {
     /** The conversation state. */
     val state: StateFlow<VoiceChatState>
 
+    /**
+     * The agent answering the reply in progress, whose voice speaks it: captured once when [send]
+     * started that reply, so every segment of one reply names the same agent. Null when the session
+     * cannot say or nothing was sent yet.
+     */
+    val agentId: String? get() = null
+
     /** Sends [text] and returns its identity. */
     suspend fun send(text: VoiceText): SentUtterance
 

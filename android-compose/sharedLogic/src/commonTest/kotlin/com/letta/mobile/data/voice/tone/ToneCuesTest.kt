@@ -33,7 +33,7 @@ class ToneCuesTest {
 
     @Test
     fun everyModuleIsACueAndNothingElseIs() {
-        ToneCues.MODULES.forEach { module -> assertEquals(1, ToneCues.count("[$module] Okay."), module) }
+        ToneCues.MODULES.forEach { module -> assertEquals(1, ToneCues.count("[${module.wireName}] Okay."), module.wireName) }
         listOf("softly", "slow, reassuring", "warm and breathy", "whispering", "x").forEach { words ->
             assertFalse(ToneCues.accepts(words), words)
             assertEquals("[$words] Okay.", ToneCues.strip("[$words] Okay."), "stays text: $words")
@@ -104,7 +104,7 @@ class ToneCuesTest {
 
     @Test
     fun aTaggedSegmentReadsBackItsModuleAndWords() {
-        val tagged = ToneCues.tag(ToneCue("quiet"), "Good night.")
+        val tagged = ToneCues.tag(ToneCue(ToneModule.QUIET), "Good night.")
         val (cue, words) = ToneCues.untag(tagged)
         assertEquals("quiet", cue?.instructions)
         assertEquals("Good night.", words)
@@ -113,8 +113,16 @@ class ToneCuesTest {
     }
 
     @Test
+    fun aModuleIsNamedOnlyByItsExactWireName() {
+        ToneModule.entries.forEach { module -> assertEquals(module, ToneModule.named(module.wireName)) }
+        listOf("Warm", " warm", "warmly", "").forEach { words -> assertNull(ToneModule.named(words), words) }
+        assertTrue(ToneCue(ToneModule.NEUTRAL).resets)
+        assertFalse(ToneCue(ToneModule.WARM).resets)
+    }
+
+    @Test
     fun aCueNeverPrintsItsName() {
-        assertNull(Regex("excited").find(ToneCue("excited").toString()))
-        assertNull(Regex("excited").find(TonePiece.Cue(ToneCue("excited")).toString()))
+        assertNull(Regex("excited").find(ToneCue(ToneModule.EXCITED).toString()))
+        assertNull(Regex("excited").find(TonePiece.Cue(ToneCue(ToneModule.EXCITED)).toString()))
     }
 }

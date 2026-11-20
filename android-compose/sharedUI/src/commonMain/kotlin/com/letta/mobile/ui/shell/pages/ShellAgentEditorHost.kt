@@ -13,6 +13,7 @@ import com.letta.mobile.data.agenteditor.RepositoryAgentEditorBackend
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.repository.api.IAgentBlockWriteRepository
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.shell.ShellDestination
@@ -63,6 +64,8 @@ private fun rememberAgentEditor(agent: AgentId?, graph: SessionRepositoryGraph, 
             tools = graph.ifSupported(SessionRoute.TOOLS) { toolRepository },
             models = graph.ifSupported(SessionRoute.MODELS) { modelRepository },
             modelCatalog = host.modelCatalog,
+            // The voice block is written through the agent memory update path the memory page uses.
+            blocks = graph.ifSupported(SessionRoute.BLOCKS) { blockRepository } as? IAgentBlockWriteRepository,
         )
         val creator = host.creator
         val backend = creator?.let { RepositoryAgentEditorBackend(repositories, it) } ?: RepositoryAgentEditorBackend(repositories)

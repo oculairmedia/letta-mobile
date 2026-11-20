@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
+import com.letta.mobile.data.voice.core.VoiceCore
 import com.letta.mobile.ui.chat.session.ChatModelOption
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
@@ -47,6 +48,9 @@ class AgentEditorController(
     /** The agent a new one starts from, once picked and loaded. */
     private var starterAgent: Agent? = null
     private var loadJob: Job? = null
+
+    /** Whether the agent's `voice` block is known to exist because this editor wrote it. */
+    private var voiceBlockCreated = false
 
     init {
         combine(backend.agents, backend.models, backend.tools) { agents, models, tools ->
@@ -137,7 +141,24 @@ class AgentEditorController(
         val (attach, detach) = AgentEditorParams.toolChanges(original, current.form)
         attach.forEach { backend.attachTool(id, ToolId(it)) }
         detach.forEach { backend.detachTool(id, ToolId(it)) }
+        saveVoiceCore(id, original, current)
         return AgentCreated(agentId)
+    }
+
+    /**
+     * Writes the voice block when its description changed (validation already refused one too long).
+     * The block is read again just before the write, so the front matter kept is the block's as it
+     * stands now, not as the editor loaded it: a header another writer changed since is not undone.
+     * Once this editor has created the block, later saves write it rather than create it again.
+     */
+    private suspend fun saveVoiceCore(id: AgentId, original: AgentEditorForm, current: AgentEditorState) {
+        if (current.form.voiceDescription == original.voiceDescription) return
+        val block = AgentEditorParams.voiceBlockOf(loadAgent(id.value))
+        val value = VoiceCore.blockValueOf(current.form.voiceDescription, block?.value) ?: return
+        val exists = block != null || voiceBlockCreated
+        if (!exists && value.isEmpty()) return
+        backend.writeVoiceCore(id, value, exists)
+        voiceBlockCreated = true
     }
 
     /** The agent, or a failure once [LOAD_TIMEOUT_MS] passes: a load that never answers must not spin forever. */

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.AgentId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -135,6 +136,12 @@ internal class LocalBackendBlockReader(private val support: LocalBackendStoreSup
         val files = systemMemoryDir(agentId).listFiles { f -> f.isFile && f.name.endsWith(".md") }
             ?: return emptyList()
         return files.map { it.name.removeSuffix(".md") }.sorted()
+    }
+
+    /** The file holding [agentId]'s [label] block (it need not exist), confined to the agent's memory. */
+    internal fun blockFile(agentId: AgentId, label: String): File {
+        require(isSafeMemfsSegment(label)) { "label must be a single path segment" }
+        return File(systemMemoryDir(agentId.value), "$label.md")
     }
 
     private fun readBlockValue(agentId: String, label: String): String =

@@ -6,6 +6,7 @@ import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsSectionModel
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
+import com.letta.mobile.data.voice.core.VoiceCore
 import com.letta.mobile.data.workspace.directory.DevicePath
 import com.letta.mobile.data.workspace.directory.WorkingDirectoryPickerGates
 
@@ -43,6 +44,7 @@ object AgentEditorSectionKeys {
     const val MODEL = "agent-model"
     const val PROMPT = "agent-prompt"
     const val TOOLS = "agent-tools"
+    const val VOICE = "agent-voice"
     const val DEFAULTS = "agent-defaults"
     const val MORE = "agent-more"
     const val DANGER = "agent-danger"
@@ -67,6 +69,7 @@ class AgentEditorSections(
         model(),
         prompt(),
         tools(),
+        voice(),
         defaults(),
         more(),
         danger(),
@@ -131,6 +134,24 @@ class AgentEditorSections(
             options = options,
             selected = form.reasoningEffort ?: DEFAULT_EFFORT,
         ) { key -> actions.update { copy(reasoningEffort = key.takeIf { it != DEFAULT_EFFORT }) } }
+    }
+
+    /**
+     * The agent's voice core: one typed description kept in its `voice` memory block, saved with the
+     * editor's Save. Only an existing agent has memory to keep it in.
+     */
+    private fun voice(): SettingsSectionModel? {
+        if (state.creating) return null
+        val row = SettingsRow.Text(
+            key = VOICE_DESCRIPTION_KEY,
+            title = "Voice description",
+            value = form.voiceDescription,
+            placeholder = "A calm, low voice with a slight smile",
+            supporting = "How this agent sounds when it speaks, up to ${VoiceCore.MAX_LENGTH} characters. Kept in its memory.",
+            problem = AgentEditorValidation::voiceDescriptionProblem,
+            lines = VOICE_LINES,
+        ) { text -> actions.update { copy(voiceDescription = text) } }
+        return SettingsSectionModel(AgentEditorSectionKeys.VOICE, "Voice", listOf(row))
     }
 
     private fun prompt() = SettingsSectionModel(
@@ -213,6 +234,8 @@ class AgentEditorSections(
     private companion object {
         const val DEFAULT_EFFORT = "default"
         const val PROMPT_LINES = 6
+        const val VOICE_LINES = 2
+        const val VOICE_DESCRIPTION_KEY = "voice-description"
         const val COMPACT_KEY = "compact-profile"
         const val DEFAULT_CWD_KEY = "default-cwd"
         const val COMPACT_SUPPORTING = "Short instructions, a few core tools and no skills list, so a small model stays fast and on topic."

@@ -148,7 +148,8 @@ fun interface VoiceEngineFactory {
  *   reached over the host connection. The server ear transcribes each turn (and its live partials)
  *   with `voice.transcribe` after checking this device's own audio acknowledgement; the mouth
  *   streams PCM with `voice.speech`, one request at a time (the host serves one per connection), at
- *   the server's normal speed. This device's key and HTTP client are never used.
+ *   the server's normal speed, naming the session's agent so the host speaks it in the voice core
+ *   of that agent's own `voice` memory block. This device's key and HTTP client are never used.
  * - **Directly** ([VoiceRoute.Direct]): this device's own speech server through a fresh HTTP client on
  *   an engine from [httpEngine], closed on release; the mouth keeps two requests in flight and asks
  *   for the stored speed.
@@ -215,7 +216,7 @@ class EndpointVoiceEngineFactory(
         }
         val transcriber = HostSpeechTranscriber(route.endpoint, acknowledged = acknowledged)
         val partials = request.setup.tuning.livePartialsFor(route.status.baseUrl?.let(::SpeechEndpointUrl))
-        return Speech(transcriber, HostSpeechSynthesizer(route.endpoint), partials) {}
+        return Speech(transcriber, HostSpeechSynthesizer(route.endpoint) { request.session.agentId }, partials) {}
     }
 
     private fun directSpeech(request: VoiceEngineRequest): Speech {

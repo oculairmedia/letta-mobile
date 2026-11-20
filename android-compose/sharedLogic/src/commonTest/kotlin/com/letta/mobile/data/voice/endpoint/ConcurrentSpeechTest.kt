@@ -18,6 +18,7 @@ import com.letta.mobile.data.voice.engine.SpeechAudioMeter
 import com.letta.mobile.data.voice.engine.SpeechSegment
 import com.letta.mobile.data.voice.engine.SpeechSegmentId
 import com.letta.mobile.data.voice.tone.ToneCue
+import com.letta.mobile.data.voice.tone.ToneModule
 import io.ktor.client.engine.callContext
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -211,7 +212,7 @@ class ConcurrentSpeechTest {
     @Test
     fun aSegmentsToneGoesToTheEndpointAsInstructions() = streamTest { scope ->
         val mouth = EndpointVoiceMouth(synthesizer, HoldingPlayer(), scope)
-        mouth.speak(SpeechSegment(SpeechSegmentId(1), VoiceText("Sentence 1."), ToneCue("slow")))
+        mouth.speak(SpeechSegment(SpeechSegmentId(1), VoiceText("Sentence 1."), ToneCue(ToneModule.SLOW)))
         bodyOf(1).answer(samplesOf(1))
         assertTrue(synchronized(lock) { requestBodies.single() }.contains("\"instructions\":\"slow\""))
         mouth.stop()

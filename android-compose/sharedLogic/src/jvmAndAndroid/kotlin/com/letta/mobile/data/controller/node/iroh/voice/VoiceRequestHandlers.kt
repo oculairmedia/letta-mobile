@@ -15,6 +15,7 @@ import com.letta.mobile.data.voice.host.HostTranscriptSegment
 import com.letta.mobile.data.voice.host.HostTranscriptionResult
 import com.letta.mobile.data.voice.host.HostVoiceErrorCode
 import com.letta.mobile.data.voice.host.HostVoiceWire
+import com.letta.mobile.data.voice.tone.ToneModule
 import kotlin.io.encoding.Base64
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.json.JsonElement
@@ -31,6 +32,7 @@ internal class VoiceRequestHandlers(
     private val store: VoiceSetupStore,
     private val upstream: VoiceSpeechUpstream,
     private val inFlight: VoiceInFlight,
+    private val cores: VoiceCores = VoiceCores(files = null),
 ) {
     /** The setup revision whose server refused `verbose_json`; it gets plain `json` from then on. */
     @Volatile
@@ -85,7 +87,8 @@ internal class VoiceRequestHandlers(
     private suspend fun synthesize(call: AdminRpcStreamedCall): AdminRpcStreamOutcome {
         val text = VoiceRequestParams.speechText(call.params)
         val snapshot = configured()
-        val request = speechCall(snapshot.setup, text, VoiceRequestParams.speechInstructions(call.params))
+        val core = cores.coreOf(VoiceRequestParams.speechAgent(call.params))
+        val request = speechCall(snapshot.setup, text, core?.description, VoiceRequestParams.speechInstructions(call.params))
         requireGrant(snapshot.setup.grants.textForSynthesis)
         // The slot is released before the exchange writes the final response, so the next request never races it.
         return holding(connectionKey(null), VoiceRequestKind.SPEECH) {
@@ -98,10 +101,10 @@ internal class VoiceRequestHandlers(
 
     private suspend fun configured(): VoiceSetupSnapshot = store.snapshot() ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
 
-    private fun speechCall(setup: StoredVoiceSetup, text: String, instructions: String?): VoiceSpeechCall {
+    private fun speechCall(setup: StoredVoiceSetup, text: String, voiceCore: String?, instructions: ToneModule?): VoiceSpeechCall {
         val model = setup.speechModel ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
         val voice = setup.voice ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
-        return VoiceSpeechCall(text, model, voice, instructions)
+        return VoiceSpeechCall(text, model, voice, voiceCore, instructions)
     }
 
     private fun requireGrant(granted: Boolean) {

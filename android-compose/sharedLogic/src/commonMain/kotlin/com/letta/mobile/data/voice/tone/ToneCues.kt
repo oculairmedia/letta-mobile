@@ -2,23 +2,43 @@ package com.letta.mobile.data.voice.tone
 
 import kotlin.jvm.JvmInline
 
+/** One of the closed set of mood modules a tone cue may select, by the [wireName] a reply and a speech request use. */
+enum class ToneModule(
+    /** The module's name in a cue (`[warm]`) and in a speech request's `instructions`. */
+    val wireName: String,
+) {
+    NEUTRAL("neutral"),
+    WARM("warm"),
+    EXCITED("excited"),
+    SOMBRE("sombre"),
+    QUIET("quiet"),
+    FAST("fast"),
+    SLOW("slow"),
+    ;
+
+    /** The module names. */
+    companion object {
+        /** The module named [wireName] exactly; null for anything else. */
+        fun named(wireName: String): ToneModule? = entries.firstOrNull { it.wireName == wireName }
+    }
+}
+
 /**
- * One tone cue: the mood module the following sentences use (one of [ToneCues.MODULES], such as
- * `warm` or `excited`), sent to a speech server as its `instructions`. Its [toString] carries no text.
+ * One tone cue: the mood module the following sentences use ([module], such as [ToneModule.WARM]),
+ * sent to a speech server as its `instructions`. Its [toString] carries no text.
  */
 @JvmInline
 value class ToneCue(
-    /** The module's name, never logged. */
-    val instructions: String,
+    /** The module, never logged. */
+    val module: ToneModule,
 ) {
+    /** The module's name, as the speech request's `instructions` carry it. */
+    val instructions: String get() = module.wireName
+
     /** Whether this cue resets the tone (`[neutral]`): what follows it carries no instructions. */
-    val resets: Boolean get() = instructions == NEUTRAL
+    val resets: Boolean get() = module == ToneModule.NEUTRAL
 
     override fun toString(): String = "ToneCue(length=${instructions.length})"
-
-    private companion object {
-        const val NEUTRAL = "neutral"
-    }
 }
 
 /** Where a reply's text goes: words to show and speak, or a change of tone. */
@@ -56,10 +76,10 @@ sealed interface TonePiece {
  */
 object ToneCues {
     /** The mood modules a cue may select; nothing else is a cue. */
-    val MODULES: Set<String> = setOf("neutral", "warm", "excited", "sombre", "quiet", "fast", "slow")
+    val MODULES: Set<ToneModule> = ToneModule.entries.toSet()
 
     /** The longest module name, in characters between the brackets. */
-    internal val MAX_CUE_LENGTH: Int = MODULES.maxOf { it.length }
+    internal val MAX_CUE_LENGTH: Int = MODULES.maxOf { it.wireName.length }
 
     /** [text] as it should be shown: every cue removed (with the space after it). */
     fun strip(text: String): String = strip(text, streaming = false)
@@ -82,7 +102,7 @@ object ToneCues {
      * Whether [words] select a mood module: exactly one of [MODULES]. The host applies the same rule
      * to the `instructions` a speech request carries, so nothing but a module name reaches the server.
      */
-    fun accepts(words: String): Boolean = words in MODULES
+    fun accepts(words: String): Boolean = ToneModule.named(words) != null
 
     /** [words] marked with [cue] at their start, in the cue syntax; [words] alone when [cue] is null. */
     fun tag(cue: ToneCue?, words: String): String = if (cue == null) words else "[${cue.instructions}] $words"
@@ -178,8 +198,8 @@ private class ToneScan(private val text: String, private val streaming: Boolean)
     private fun cueAt(open: Int): Int {
         val close = readCueWord(open)
         if (close >= text.length) return close.also { if (streaming && couldBecomeCue(open, close)) hold(open) }
-        val words = closedWords(open, close) ?: return open + 1
-        return closedCue(open, close + 1, words)
+        val module = closedModule(open, close) ?: return open + 1
+        return closedCue(open, close + 1, module)
     }
 
     /** Where the lowercase letters after [open] stop, reading no further than a module name could reach. */
@@ -191,24 +211,23 @@ private class ToneScan(private val text: String, private val streaming: Boolean)
 
     private fun continuesCueWord(open: Int, at: Int): Boolean = at - open - 1 <= ToneCues.MAX_CUE_LENGTH && text[at] in 'a'..'z'
 
-    /** The bracket's words when it closes at [close] and they name a module; null otherwise. */
-    private fun closedWords(open: Int, close: Int): String? {
+    /** The module the bracket's words name when it closes at [close]; null otherwise. */
+    private fun closedModule(open: Int, close: Int): ToneModule? {
         if (text[close] != ']') return null
-        val words = text.substring(open + 1, close)
-        return words.takeIf(ToneCues::accepts)
+        return ToneModule.named(text.substring(open + 1, close))
     }
 
     /**
-     * A bracketed [words] from [open] to [after]: a cue unless a link follows it (and, while
+     * A bracketed [module] from [open] to [after]: a cue unless a link follows it (and, while
      * streaming, held when nothing follows it yet); returns where scanning goes on.
      */
-    private fun closedCue(open: Int, after: Int, words: String): Int {
+    private fun closedCue(open: Int, after: Int, module: ToneModule): Int {
         val next = text.getOrNull(after)
         if (next == null && streaming) return after.also { hold(open) }
         if (next in LINK_FOLLOWERS) return after
         val end = if (next == ' ') after + 1 else after
         if (open > wordsFrom) tokens += ToneToken.Words(wordsFrom, open)
-        tokens += ToneToken.Cue(open, end, ToneCue(words))
+        tokens += ToneToken.Cue(open, end, ToneCue(module))
         wordsFrom = end
         return end
     }
@@ -216,7 +235,7 @@ private class ToneScan(private val text: String, private val streaming: Boolean)
     /** Whether the unfinished bracket from [open] to [close] is still the start of a module name. */
     private fun couldBecomeCue(open: Int, close: Int): Boolean {
         val typed = text.substring(open + 1, close)
-        return ToneCues.MODULES.any { it.startsWith(typed) }
+        return ToneCues.MODULES.any { it.wireName.startsWith(typed) }
     }
 
     /** The rest of the text, from [open], may still become a cue: it is held back, in no token. */

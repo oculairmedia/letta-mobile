@@ -892,10 +892,12 @@ public abstract interface class com/letta/mobile/data/agenteditor/AgentEditorBac
 	public fun reasoningEffortsFor (Ljava/lang/String;)Ljava/util/List;
 	public abstract fun refreshCatalogs (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun update-mT_9V4Y (Ljava/lang/String;Lcom/letta/mobile/data/model/AgentUpdateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun writeVoiceCore-VjJ7TUg (Ljava/lang/String;Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/agenteditor/AgentEditorBackend$DefaultImpls {
 	public static fun reasoningEffortsFor (Lcom/letta/mobile/data/agenteditor/AgentEditorBackend;Ljava/lang/String;)Ljava/util/List;
+	public static fun writeVoiceCore-VjJ7TUg (Lcom/letta/mobile/data/agenteditor/AgentEditorBackend;Ljava/lang/String;Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/agenteditor/AgentEditorController : com/letta/mobile/data/agenteditor/AgentEditorActions {
@@ -935,6 +937,7 @@ public final class com/letta/mobile/data/agenteditor/AgentEditorField : java/lan
 	public static final field ContextLimit Lcom/letta/mobile/data/agenteditor/AgentEditorField;
 	public static final field Model Lcom/letta/mobile/data/agenteditor/AgentEditorField;
 	public static final field Name Lcom/letta/mobile/data/agenteditor/AgentEditorField;
+	public static final field VoiceDescription Lcom/letta/mobile/data/agenteditor/AgentEditorField;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/agenteditor/AgentEditorField;
 	public static fun values ()[Lcom/letta/mobile/data/agenteditor/AgentEditorField;
@@ -942,9 +945,10 @@ public final class com/letta/mobile/data/agenteditor/AgentEditorField : java/lan
 
 public final class com/letta/mobile/data/agenteditor/AgentEditorForm {
 	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/util/Map;Ljava/lang/Boolean;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/util/Map;Ljava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/util/Map;Ljava/lang/Boolean;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/util/Map;Ljava/lang/Boolean;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
@@ -953,8 +957,8 @@ public final class com/letta/mobile/data/agenteditor/AgentEditorForm {
 	public final fun component7 ()Ljava/util/Set;
 	public final fun component8 ()Ljava/util/Map;
 	public final fun component9 ()Ljava/lang/Boolean;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/util/Map;Ljava/lang/Boolean;)Lcom/letta/mobile/data/agenteditor/AgentEditorForm;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/agenteditor/AgentEditorForm;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/util/Map;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/letta/mobile/data/agenteditor/AgentEditorForm;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/util/Map;Ljava/lang/Boolean;Ljava/lang/String;)Lcom/letta/mobile/data/agenteditor/AgentEditorForm;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/agenteditor/AgentEditorForm;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/util/Map;Ljava/lang/Boolean;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/agenteditor/AgentEditorForm;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCompactProfile ()Ljava/lang/Boolean;
 	public final fun getContextLimit ()Ljava/lang/String;
@@ -965,6 +969,7 @@ public final class com/letta/mobile/data/agenteditor/AgentEditorForm {
 	public final fun getReasoningEffort ()Ljava/lang/String;
 	public final fun getSystemPrompt ()Ljava/lang/String;
 	public final fun getToolIds ()Ljava/util/Set;
+	public final fun getVoiceDescription ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -1046,12 +1051,14 @@ public final class com/letta/mobile/data/agenteditor/AgentEditorParams {
 	public final fun starterFormOf (Lcom/letta/mobile/data/model/Agent;Lcom/letta/mobile/data/agenteditor/AgentEditorForm;)Lcom/letta/mobile/data/agenteditor/AgentEditorForm;
 	public final fun toolChanges (Lcom/letta/mobile/data/agenteditor/AgentEditorForm;Lcom/letta/mobile/data/agenteditor/AgentEditorForm;)Lkotlin/Pair;
 	public final fun updateOf (Lcom/letta/mobile/data/agenteditor/AgentEditorForm;Lcom/letta/mobile/data/agenteditor/AgentEditorForm;Lcom/letta/mobile/data/model/Agent;)Lcom/letta/mobile/data/model/AgentUpdateParams;
+	public final fun voiceBlockOf (Lcom/letta/mobile/data/model/Agent;)Lcom/letta/mobile/data/model/Block;
 }
 
 public final class com/letta/mobile/data/agenteditor/AgentEditorRepositories {
-	public fun <init> (Lcom/letta/mobile/data/repository/api/IAgentRepository;Lcom/letta/mobile/data/repository/api/IToolRepository;Lcom/letta/mobile/data/repository/api/IModelRepository;Lkotlinx/coroutines/flow/StateFlow;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/repository/api/IAgentRepository;Lcom/letta/mobile/data/repository/api/IToolRepository;Lcom/letta/mobile/data/repository/api/IModelRepository;Lkotlinx/coroutines/flow/StateFlow;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/repository/api/IAgentRepository;Lcom/letta/mobile/data/repository/api/IToolRepository;Lcom/letta/mobile/data/repository/api/IModelRepository;Lkotlinx/coroutines/flow/StateFlow;Lcom/letta/mobile/data/repository/api/IAgentBlockWriteRepository;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/repository/api/IAgentRepository;Lcom/letta/mobile/data/repository/api/IToolRepository;Lcom/letta/mobile/data/repository/api/IModelRepository;Lkotlinx/coroutines/flow/StateFlow;Lcom/letta/mobile/data/repository/api/IAgentBlockWriteRepository;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getAgents ()Lcom/letta/mobile/data/repository/api/IAgentRepository;
+	public final fun getBlocks ()Lcom/letta/mobile/data/repository/api/IAgentBlockWriteRepository;
 	public final fun getModelCatalog ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getModels ()Lcom/letta/mobile/data/repository/api/IModelRepository;
 	public final fun getTools ()Lcom/letta/mobile/data/repository/api/IToolRepository;
@@ -1067,6 +1074,7 @@ public final class com/letta/mobile/data/agenteditor/AgentEditorSectionKeys {
 	public static final field PROMPT Ljava/lang/String;
 	public static final field STARTER Ljava/lang/String;
 	public static final field TOOLS Ljava/lang/String;
+	public static final field VOICE Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/agenteditor/AgentEditorSections {
@@ -1133,7 +1141,9 @@ public final class com/letta/mobile/data/agenteditor/AgentEditorValidation {
 	public static final field NAME_REQUIRED Ljava/lang/String;
 	public final fun contextLimitOf (Ljava/lang/String;)Ljava/lang/Integer;
 	public final fun contextLimitProblem (Ljava/lang/String;)Ljava/lang/String;
+	public final fun getVOICE_DESCRIPTION_TOO_LONG ()Ljava/lang/String;
 	public final fun problems (Lcom/letta/mobile/data/agenteditor/AgentEditorForm;Lcom/letta/mobile/data/agenteditor/AgentEditorMode;)Ljava/util/Map;
+	public final fun voiceDescriptionProblem (Ljava/lang/String;)Ljava/lang/String;
 }
 
 public abstract interface class com/letta/mobile/data/agenteditor/AgentStarter {
@@ -1206,6 +1216,7 @@ public final class com/letta/mobile/data/agenteditor/RepositoryAgentEditorBacken
 	public fun reasoningEffortsFor (Ljava/lang/String;)Ljava/util/List;
 	public fun refreshCatalogs (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun update-mT_9V4Y (Ljava/lang/String;Lcom/letta/mobile/data/model/AgentUpdateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun writeVoiceCore-VjJ7TUg (Ljava/lang/String;Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/agents/AgentRailGroup {
@@ -21624,7 +21635,9 @@ public final class com/letta/mobile/data/controller/node/iroh/shellstate/ShellSt
 
 public final class com/letta/mobile/data/controller/node/iroh/voice/VoiceEndpointRoutes {
 	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/voice/VoiceEndpointRoutes;
+	public final fun forHost (Ljava/nio/file/Path;Ljava/io/File;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 	public final fun forHost (Ljava/nio/file/Path;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
+	public static synthetic fun forHost$default (Lcom/letta/mobile/data/controller/node/iroh/voice/VoiceEndpointRoutes;Ljava/nio/file/Path;Ljava/io/File;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 	public static synthetic fun forHost$default (Lcom/letta/mobile/data/controller/node/iroh/voice/VoiceEndpointRoutes;Ljava/nio/file/Path;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 }
 
@@ -75029,6 +75042,28 @@ public final class com/letta/mobile/data/voice/consent/VoiceEndpointPayload : ja
 	public static fun values ()[Lcom/letta/mobile/data/voice/consent/VoiceEndpointPayload;
 }
 
+public final class com/letta/mobile/data/voice/core/VoiceCore {
+	public static final field BLOCK_LABEL Ljava/lang/String;
+	public static final field Companion Lcom/letta/mobile/data/voice/core/VoiceCore$Companion;
+	public static final field MAX_LENGTH I
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/core/VoiceCore;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getDescription ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/core/VoiceCore$Companion {
+	public final fun blockValueOf (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public static synthetic fun blockValueOf$default (Lcom/letta/mobile/data/voice/core/VoiceCore$Companion;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
+	public final fun fromBlock-vpHVcUU (Ljava/lang/String;)Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/voice/endpoint/EndpointSpeechCatalog : com/letta/mobile/data/voice/catalog/SpeechCatalogSource {
 	public static final field Companion Lcom/letta/mobile/data/voice/endpoint/EndpointSpeechCatalog$Companion;
 	public fun <init> (Lio/ktor/client/engine/HttpClientEngine;Lcom/letta/mobile/data/voice/endpoint/SpeechEndpointConfig;)V
@@ -75044,7 +75079,7 @@ public final class com/letta/mobile/data/voice/endpoint/EndpointSpeechSynthesize
 	public fun <init> (Lcom/letta/mobile/data/voice/endpoint/SpeechEndpointClient;Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrantSource;Lcom/letta/mobile/data/voice/VoiceEndpointSettings;Lcom/letta/mobile/data/voice/audio/AudioEncoding;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/voice/endpoint/SpeechEndpointClient;Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrantSource;Lcom/letta/mobile/data/voice/VoiceEndpointSettings;Lcom/letta/mobile/data/voice/audio/AudioEncoding;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun stream-ZkLOLLg (Ljava/lang/String;F)Lkotlinx/coroutines/flow/Flow;
-	public fun stream-lLqmRqw (Ljava/lang/String;FLjava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+	public fun stream-lLqmRqw (Ljava/lang/String;FLcom/letta/mobile/data/voice/tone/ToneModule;)Lkotlinx/coroutines/flow/Flow;
 	public final fun synthesize-iyX4eW4 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun warm (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -75159,22 +75194,22 @@ public final class com/letta/mobile/data/voice/endpoint/SpeechOperation : java/l
 }
 
 public final class com/letta/mobile/data/voice/endpoint/SpeechRequest {
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/audio/AudioEncoding;FLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/audio/AudioEncoding;FLjava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/audio/AudioEncoding;FLcom/letta/mobile/data/voice/tone/ToneModule;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/audio/AudioEncoding;FLcom/letta/mobile/data/voice/tone/ToneModule;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-WHRWuv8 ()Ljava/lang/String;
 	public final fun component2-CAMs64U ()Ljava/lang/String;
 	public final fun component3-ama1Wpo ()Ljava/lang/String;
 	public final fun component4 ()Lcom/letta/mobile/data/voice/audio/AudioEncoding;
 	public final fun component5-DPQ_umU ()F
-	public final fun component6-rC5dE0I ()Ljava/lang/String;
-	public final fun copy-O50M6Xs (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/audio/AudioEncoding;FLjava/lang/String;)Lcom/letta/mobile/data/voice/endpoint/SpeechRequest;
-	public static synthetic fun copy-O50M6Xs$default (Lcom/letta/mobile/data/voice/endpoint/SpeechRequest;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/audio/AudioEncoding;FLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/endpoint/SpeechRequest;
+	public final fun component6-rC5dE0I ()Lcom/letta/mobile/data/voice/tone/ToneModule;
+	public final fun copy-O50M6Xs (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/audio/AudioEncoding;FLcom/letta/mobile/data/voice/tone/ToneModule;)Lcom/letta/mobile/data/voice/endpoint/SpeechRequest;
+	public static synthetic fun copy-O50M6Xs$default (Lcom/letta/mobile/data/voice/endpoint/SpeechRequest;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/audio/AudioEncoding;FLcom/letta/mobile/data/voice/tone/ToneModule;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/endpoint/SpeechRequest;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getEncoding ()Lcom/letta/mobile/data/voice/audio/AudioEncoding;
 	public final fun getModel-CAMs64U ()Ljava/lang/String;
 	public final fun getSpeed-DPQ_umU ()F
 	public final fun getText-WHRWuv8 ()Ljava/lang/String;
-	public final fun getTone-rC5dE0I ()Ljava/lang/String;
+	public final fun getTone-rC5dE0I ()Lcom/letta/mobile/data/voice/tone/ToneModule;
 	public final fun getVoice-ama1Wpo ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -75233,13 +75268,13 @@ public final class com/letta/mobile/data/voice/endpoint/SpeechTranscript {
 public abstract interface class com/letta/mobile/data/voice/endpoint/StreamingSpeechSynthesizer {
 	public abstract fun stream-ZkLOLLg (Ljava/lang/String;F)Lkotlinx/coroutines/flow/Flow;
 	public static synthetic fun stream-ZkLOLLg$default (Lcom/letta/mobile/data/voice/endpoint/StreamingSpeechSynthesizer;Ljava/lang/String;FILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
-	public fun stream-lLqmRqw (Ljava/lang/String;FLjava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+	public fun stream-lLqmRqw (Ljava/lang/String;FLcom/letta/mobile/data/voice/tone/ToneModule;)Lkotlinx/coroutines/flow/Flow;
 	public fun warm (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/voice/endpoint/StreamingSpeechSynthesizer$DefaultImpls {
 	public static synthetic fun stream-ZkLOLLg$default (Lcom/letta/mobile/data/voice/endpoint/StreamingSpeechSynthesizer;Ljava/lang/String;FILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
-	public static fun stream-lLqmRqw (Lcom/letta/mobile/data/voice/endpoint/StreamingSpeechSynthesizer;Ljava/lang/String;FLjava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+	public static fun stream-lLqmRqw (Lcom/letta/mobile/data/voice/endpoint/StreamingSpeechSynthesizer;Ljava/lang/String;FLcom/letta/mobile/data/voice/tone/ToneModule;)Lkotlinx/coroutines/flow/Flow;
 	public static fun warm (Lcom/letta/mobile/data/voice/endpoint/StreamingSpeechSynthesizer;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -75269,17 +75304,17 @@ public final class com/letta/mobile/data/voice/engine/SpeechAudioMeter$Companion
 }
 
 public final class com/letta/mobile/data/voice/engine/SpeechSegment {
-	public synthetic fun <init> (JLjava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (JLjava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JLjava/lang/String;Lcom/letta/mobile/data/voice/tone/ToneModule;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JLjava/lang/String;Lcom/letta/mobile/data/voice/tone/ToneModule;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-N_zLtOA ()J
 	public final fun component2-WHRWuv8 ()Ljava/lang/String;
-	public final fun component3-rC5dE0I ()Ljava/lang/String;
-	public final fun copy-prqeXFc (JLjava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/voice/engine/SpeechSegment;
-	public static synthetic fun copy-prqeXFc$default (Lcom/letta/mobile/data/voice/engine/SpeechSegment;JLjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/SpeechSegment;
+	public final fun component3-rC5dE0I ()Lcom/letta/mobile/data/voice/tone/ToneModule;
+	public final fun copy-prqeXFc (JLjava/lang/String;Lcom/letta/mobile/data/voice/tone/ToneModule;)Lcom/letta/mobile/data/voice/engine/SpeechSegment;
+	public static synthetic fun copy-prqeXFc$default (Lcom/letta/mobile/data/voice/engine/SpeechSegment;JLjava/lang/String;Lcom/letta/mobile/data/voice/tone/ToneModule;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/SpeechSegment;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getId-N_zLtOA ()J
 	public final fun getText-WHRWuv8 ()Ljava/lang/String;
-	public final fun getTone-rC5dE0I ()Ljava/lang/String;
+	public final fun getTone-rC5dE0I ()Lcom/letta/mobile/data/voice/tone/ToneModule;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -75672,8 +75707,8 @@ public abstract interface class com/letta/mobile/data/voice/host/HostVoiceEndpoi
 	public static synthetic fun clearSetup$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public abstract fun models (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun status (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun synthesize-5z-TYYI (Ljava/lang/String;Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
-	public abstract fun synthesize-8iZQIHs (Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+	public abstract fun synthesize-iyX4eW4 (Ljava/lang/String;Lcom/letta/mobile/data/voice/host/SpeechContext;)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun synthesize-iyX4eW4$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Ljava/lang/String;Lcom/letta/mobile/data/voice/host/SpeechContext;ILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
 	public abstract fun testConnection (Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun testConnection$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidate;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public abstract fun transcribe-SW44lzk (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -75683,7 +75718,7 @@ public abstract interface class com/letta/mobile/data/voice/host/HostVoiceEndpoi
 
 public final class com/letta/mobile/data/voice/host/HostVoiceEndpoint$DefaultImpls {
 	public static synthetic fun clearSetup$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static fun synthesize-5z-TYYI (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Ljava/lang/String;Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun synthesize-iyX4eW4$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Ljava/lang/String;Lcom/letta/mobile/data/voice/host/SpeechContext;ILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
 	public static synthetic fun testConnection$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidate;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static synthetic fun transcribe-SW44lzk$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
@@ -76009,15 +76044,30 @@ public final class com/letta/mobile/data/voice/host/HostVoiceWire {
 	public final fun getMETHODS ()Ljava/util/Set;
 }
 
+public final class com/letta/mobile/data/voice/host/SpeechContext {
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/tone/ToneModule;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/tone/ToneModule;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-rC5dE0I ()Lcom/letta/mobile/data/voice/tone/ToneModule;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy-YDImhOs (Lcom/letta/mobile/data/voice/tone/ToneModule;Ljava/lang/String;)Lcom/letta/mobile/data/voice/host/SpeechContext;
+	public static synthetic fun copy-YDImhOs$default (Lcom/letta/mobile/data/voice/host/SpeechContext;Lcom/letta/mobile/data/voice/tone/ToneModule;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/host/SpeechContext;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
+	public final fun getTone-rC5dE0I ()Lcom/letta/mobile/data/voice/tone/ToneModule;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/voice/host/client/HostSpeechCatalog : com/letta/mobile/data/voice/catalog/SpeechCatalogSource {
 	public fun <init> (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;)V
 	public fun load (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/voice/host/client/HostSpeechSynthesizer : com/letta/mobile/data/voice/endpoint/StreamingSpeechSynthesizer {
-	public fun <init> (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;)V
+	public fun <init> (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun stream-ZkLOLLg (Ljava/lang/String;F)Lkotlinx/coroutines/flow/Flow;
-	public fun stream-lLqmRqw (Ljava/lang/String;FLjava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+	public fun stream-lLqmRqw (Ljava/lang/String;FLcom/letta/mobile/data/voice/tone/ToneModule;)Lkotlinx/coroutines/flow/Flow;
 	public fun warm (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -76069,8 +76119,7 @@ public final class com/letta/mobile/data/voice/host/client/IrohHostVoiceEndpoint
 	public fun clearSetup (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun models (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun status (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun synthesize-5z-TYYI (Ljava/lang/String;Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
-	public fun synthesize-8iZQIHs (Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+	public fun synthesize-iyX4eW4 (Ljava/lang/String;Lcom/letta/mobile/data/voice/host/SpeechContext;)Lkotlinx/coroutines/flow/Flow;
 	public fun testConnection (Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun transcribe-SW44lzk (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun writeSetup (Lcom/letta/mobile/data/voice/host/HostVoiceSetupCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -76538,9 +76587,14 @@ public final class com/letta/mobile/data/voice/responder/VoiceChatRow {
 }
 
 public abstract interface class com/letta/mobile/data/voice/responder/VoiceChatSession {
+	public fun getAgentId ()Ljava/lang/String;
 	public abstract fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun send-iyX4eW4 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun stopRun ()V
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceChatSession$DefaultImpls {
+	public static fun getAgentId (Lcom/letta/mobile/data/voice/responder/VoiceChatSession;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/voice/responder/VoiceChatState {
@@ -76624,6 +76678,7 @@ public final class com/letta/mobile/data/voice/responder/chat/ChatSendRefusedExc
 public final class com/letta/mobile/data/voice/responder/chat/ChatVoiceChatSession : com/letta/mobile/data/voice/responder/VoiceChatSession {
 	public fun <init> (Lcom/letta/mobile/ui/chat/session/ChatSessionPort;Lcom/letta/mobile/data/chat/sentruns/IdentifiedChatSend;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;)V
 	public synthetic fun <init> (Lcom/letta/mobile/ui/chat/session/ChatSessionPort;Lcom/letta/mobile/data/chat/sentruns/IdentifiedChatSend;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun getAgentId ()Ljava/lang/String;
 	public fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun send-iyX4eW4 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun stopRun ()V
@@ -77062,18 +77117,19 @@ public final class com/letta/mobile/data/voice/speech/SentenceChunker$Companion 
 }
 
 public final class com/letta/mobile/data/voice/tone/ToneCue {
-	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/tone/ToneCue;
-	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public static final synthetic fun box-impl (Lcom/letta/mobile/data/voice/tone/ToneModule;)Lcom/letta/mobile/data/voice/tone/ToneCue;
+	public static fun constructor-impl (Lcom/letta/mobile/data/voice/tone/ToneModule;)Lcom/letta/mobile/data/voice/tone/ToneModule;
 	public fun equals (Ljava/lang/Object;)Z
-	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
-	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
-	public final fun getInstructions ()Ljava/lang/String;
-	public static final fun getResets-impl (Ljava/lang/String;)Z
+	public static fun equals-impl (Lcom/letta/mobile/data/voice/tone/ToneModule;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Lcom/letta/mobile/data/voice/tone/ToneModule;Lcom/letta/mobile/data/voice/tone/ToneModule;)Z
+	public static final fun getInstructions-impl (Lcom/letta/mobile/data/voice/tone/ToneModule;)Ljava/lang/String;
+	public final fun getModule ()Lcom/letta/mobile/data/voice/tone/ToneModule;
+	public static final fun getResets-impl (Lcom/letta/mobile/data/voice/tone/ToneModule;)Z
 	public fun hashCode ()I
-	public static fun hashCode-impl (Ljava/lang/String;)I
+	public static fun hashCode-impl (Lcom/letta/mobile/data/voice/tone/ToneModule;)I
 	public fun toString ()Ljava/lang/String;
-	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
-	public final synthetic fun unbox-impl ()Ljava/lang/String;
+	public static fun toString-impl (Lcom/letta/mobile/data/voice/tone/ToneModule;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Lcom/letta/mobile/data/voice/tone/ToneModule;
 }
 
 public final class com/letta/mobile/data/voice/tone/ToneCueStream {
@@ -77089,20 +77145,39 @@ public final class com/letta/mobile/data/voice/tone/ToneCues {
 	public final fun getMODULES ()Ljava/util/Set;
 	public final fun strip (Ljava/lang/String;)Ljava/lang/String;
 	public final fun strip (Ljava/lang/String;Z)Ljava/lang/String;
-	public final fun tag-YDImhOs (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public final fun tag-YDImhOs (Lcom/letta/mobile/data/voice/tone/ToneModule;Ljava/lang/String;)Ljava/lang/String;
 	public final fun untag (Ljava/lang/String;)Lkotlin/Pair;
+}
+
+public final class com/letta/mobile/data/voice/tone/ToneModule : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/data/voice/tone/ToneModule$Companion;
+	public static final field EXCITED Lcom/letta/mobile/data/voice/tone/ToneModule;
+	public static final field FAST Lcom/letta/mobile/data/voice/tone/ToneModule;
+	public static final field NEUTRAL Lcom/letta/mobile/data/voice/tone/ToneModule;
+	public static final field QUIET Lcom/letta/mobile/data/voice/tone/ToneModule;
+	public static final field SLOW Lcom/letta/mobile/data/voice/tone/ToneModule;
+	public static final field SOMBRE Lcom/letta/mobile/data/voice/tone/ToneModule;
+	public static final field WARM Lcom/letta/mobile/data/voice/tone/ToneModule;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getWireName ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/tone/ToneModule;
+	public static fun values ()[Lcom/letta/mobile/data/voice/tone/ToneModule;
+}
+
+public final class com/letta/mobile/data/voice/tone/ToneModule$Companion {
+	public final fun named (Ljava/lang/String;)Lcom/letta/mobile/data/voice/tone/ToneModule;
 }
 
 public abstract interface class com/letta/mobile/data/voice/tone/TonePiece {
 }
 
 public final class com/letta/mobile/data/voice/tone/TonePiece$Cue : com/letta/mobile/data/voice/tone/TonePiece {
-	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1-rC5dE0I ()Ljava/lang/String;
-	public final fun copy-YB9IDUA (Ljava/lang/String;)Lcom/letta/mobile/data/voice/tone/TonePiece$Cue;
-	public static synthetic fun copy-YB9IDUA$default (Lcom/letta/mobile/data/voice/tone/TonePiece$Cue;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/tone/TonePiece$Cue;
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/tone/ToneModule;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-rC5dE0I ()Lcom/letta/mobile/data/voice/tone/ToneModule;
+	public final fun copy-YB9IDUA (Lcom/letta/mobile/data/voice/tone/ToneModule;)Lcom/letta/mobile/data/voice/tone/TonePiece$Cue;
+	public static synthetic fun copy-YB9IDUA$default (Lcom/letta/mobile/data/voice/tone/TonePiece$Cue;Lcom/letta/mobile/data/voice/tone/ToneModule;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/tone/TonePiece$Cue;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getCue-rC5dE0I ()Ljava/lang/String;
+	public final fun getCue-rC5dE0I ()Lcom/letta/mobile/data/voice/tone/ToneModule;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }

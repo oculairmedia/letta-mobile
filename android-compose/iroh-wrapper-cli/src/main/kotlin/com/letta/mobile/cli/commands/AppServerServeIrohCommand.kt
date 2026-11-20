@@ -439,7 +439,10 @@ class AppServerServeIrohCommand : CliktCommand(
             canvasMountRoutes = canvasMounts?.routes(authPolicy, nativeAdminClient, endpoint.conversationViewers())
             setupAdminRpc(
                 endpoint = endpoint,
-                admin = AdminContext(controller, nativeAdminClient, pairingService, turnIdentity, identityRows),
+                admin = AdminContext(
+                    controller, nativeAdminClient, pairingService, turnIdentity, identityRows,
+                    memoryDir = voiceMemoryDir(backendDir, System.getenv("LETTA_LOCAL_BACKEND_DIR")),
+                ),
                 scope = scope,
                 pairingQr = access.pairingQrConfig(endpoint, irohSecretKeyPath),
                 pluginRoutes = pluginHost?.let { com.letta.mobile.data.controller.node.iroh.PluginAdminHandlers(it, pluginCanvas.assets) },
@@ -575,6 +578,8 @@ class AppServerServeIrohCommand : CliktCommand(
         val pairingService: IrohPairingService?,
         val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger,
         val identityRows: com.letta.mobile.data.controller.node.iroh.LateBoundConversationRows,
+        /** Where the agents' memory lives for the voice cores ([voiceMemoryDir]); null reads none. */
+        val memoryDir: java.io.File?,
     )
 
     /**
@@ -640,7 +645,8 @@ class AppServerServeIrohCommand : CliktCommand(
             pluginRoutes = pluginRoutes,
             canvasMountRoutes = canvasMountRoutes,
             // The shared speech setup lives beside the model exposure decisions; its key in an owner-only file.
-            voiceRoutes = com.letta.mobile.data.controller.node.iroh.voice.VoiceEndpointRoutes.forHost(hostStateDirectory),
+            // Each agent's voice core is read from its own `voice` memory block in the local backend.
+            voiceRoutes = com.letta.mobile.data.controller.node.iroh.voice.VoiceEndpointRoutes.forHost(hostStateDirectory, admin.memoryDir),
             pinsRoutes = com.letta.mobile.data.controller.node.iroh.pins.AgentPinsRoutes.forHost(hostStateDirectory, pinsPublisher),
             shellStateRoutes = com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateRoutes.forHost(
                 hostStateDirectory, shellStatePublisher,
@@ -1240,3 +1246,12 @@ internal fun effectiveA2aBackendDir(explicit: String?, ownAppServer: Boolean, ho
         ?: if (ownAppServer) java.io.File(requireNotNull(home?.takeIf { it.isNotBlank() }) {
             "user.home is required for the owned App Server default; set --local-backend-dir"
         }, ".letta/lc-local-backend") else null
+
+/**
+ * Where the host reads each agent's `voice` memory block: the effective backend directory
+ * ([effectiveA2aBackendDir], which is the owned App Server's own directory under `--own-app-server`),
+ * else `LETTA_LOCAL_BACKEND_DIR` ([environmentDir]); null when neither names one, so no voice cores
+ * are read.
+ */
+internal fun voiceMemoryDir(effectiveBackendDir: java.io.File?, environmentDir: String?): java.io.File? =
+    effectiveBackendDir ?: environmentDir?.takeIf { it.isNotBlank() }?.let { java.io.File(it) }

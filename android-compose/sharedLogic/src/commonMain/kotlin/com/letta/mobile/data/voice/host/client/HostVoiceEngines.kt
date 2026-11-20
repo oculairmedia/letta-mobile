@@ -12,6 +12,7 @@ import com.letta.mobile.data.voice.endpoint.SpeechTranscript
 import com.letta.mobile.data.voice.endpoint.StreamingSpeechSynthesizer
 import com.letta.mobile.data.voice.host.HostVoiceEndpoint
 import com.letta.mobile.data.voice.host.HostVoiceException
+import com.letta.mobile.data.voice.host.SpeechContext
 import com.letta.mobile.data.voice.tone.ToneCue
 import com.letta.mobile.data.voice.vad.ear.SpeechTranscriber
 import kotlinx.coroutines.flow.Flow
@@ -43,12 +44,19 @@ class HostSpeechTranscriber(
  * [SpeechEndpointException]s carrying the voice loop's code. There is nothing to warm: the request
  * rides the host connection that is already open.
  */
-class HostSpeechSynthesizer(private val endpoint: HostVoiceEndpoint) : StreamingSpeechSynthesizer {
+class HostSpeechSynthesizer(
+    private val endpoint: HostVoiceEndpoint,
+    /**
+     * The agent answering the reply being spoken, as its session captured it when the reply started
+     * ([com.letta.mobile.data.voice.responder.VoiceChatSession.agentId]); null speaks in the stored voice.
+     */
+    private val agentId: () -> String? = { null },
+) : StreamingSpeechSynthesizer {
     override fun stream(text: VoiceText, speed: SpeechSpeed): Flow<PcmChunk> = stream(text, speed, null)
 
     /** As [stream], with [tone] passed to the host as the request's `instructions`. */
     override fun stream(text: VoiceText, speed: SpeechSpeed, tone: ToneCue?): Flow<PcmChunk> =
-        endpoint.synthesize(text, tone).catch { throw asSpeechFailure(it, SpeechOperation.SPEECH) }
+        endpoint.synthesize(text, SpeechContext(tone, agentId())).catch { throw asSpeechFailure(it, SpeechOperation.SPEECH) }
 }
 
 /** A host failure as the endpoint exception the voice loop reads its code from; anything else, cancellation included, as it was. */

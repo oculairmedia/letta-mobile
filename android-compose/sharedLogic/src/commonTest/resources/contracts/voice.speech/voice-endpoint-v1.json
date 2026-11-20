@@ -23,6 +23,19 @@
       "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"audio_frames": 2, "sample_frames": 6}}
     },
     {
+      "name": "streamed reply naming the speaking agent",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "speech_model": "tts-model-a", "voice": "voice-a", "grants": {"audio_for_transcription": false, "text_for_synthesis": true}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"speech": "wav_stream", "sample_rate_hz": 24000, "channels": 1}}},
+      "params": {"text": "Placeholder reply.", "agent_id": "agent-contract"},
+      "client_frames": [],
+      "server_frames": [
+        {"type": "admin_rpc_stream", "request_id": "contract", "seq": 0, "event": "format", "sample_rate_hz": 24000, "channels": 1, "sample_format": "s16le"},
+        {"type": "admin_rpc_stream", "request_id": "contract", "seq": 1, "event": "audio", "pcm": "AAAAAAAAAAA="},
+        {"type": "admin_rpc_stream", "request_id": "contract", "seq": 2, "event": "audio", "pcm": "AAAAAA=="}
+      ],
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"audio_frames": 2, "sample_frames": 6}}
+    },
+    {
       "name": "cancelled after first audio",
       "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
       "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "speech_model": "tts-model-a", "voice": "voice-a", "grants": {"audio_for_transcription": false, "text_for_synthesis": true}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"speech": "wav_stream_slow", "sample_rate_hz": 24000, "channels": 1}}},
