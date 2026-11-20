@@ -16,7 +16,8 @@ internal fun parseMediaPart(obj: JsonObject): MessageContentPart.Image? = when (
     // anything previously persisted or echoed by older server builds.
     "image_url" -> (obj["image_url"] as? JsonObject)?.fieldContent("url")?.let { parseImageDataUrl(it) }
     // Audio and video take the image part's flat and wrapped shapes (MCP AudioContent is the flat one).
-    "audio", "video" -> parseTypedMediaPart(obj, fallbackMime = "$type/unknown")
+    "audio" -> parseTypedMediaPart(obj, MediaKind.Audio)
+    "video" -> parseTypedMediaPart(obj, MediaKind.Video)
     else -> parseForeignMediaPart(type, obj)
 }
 
@@ -68,40 +69,40 @@ private fun parseFlatLettaImagePart(obj: JsonObject): MessageContentPart.Image? 
  * Dispatches to the per-variant decoder based on `source.type`. Returns
  * null when `source` is absent, malformed, or names an unknown variant.
  */
-private fun parseWrappedLettaImagePart(obj: JsonObject, fallbackMime: String = IMAGE_UNKNOWN): MessageContentPart.Image? {
+private fun parseWrappedLettaImagePart(obj: JsonObject, fallback: MediaKind = MediaKind.Image): MessageContentPart.Image? {
     val source = obj["source"] as? JsonObject ?: return null
     return when (source.fieldContent("type")) {
-        "base64" -> parseBase64ImageSource(source, fallbackMime)
-        "url" -> parseUrlImageSource(source, fallbackMime)
+        "base64" -> parseBase64ImageSource(source, fallback)
+        "url" -> parseUrlImageSource(source, fallback)
         // "letta" — server-managed file reference. Empirically the server
         // inlines the raw base64 under `data` alongside a `file_id` that
         // would let us fetch via /v1/files if needed. Since the payload is
         // already present, decode it directly and render inline (no extra
         // network roundtrip). See bead letta-mobile-mge5.24.
-        "letta" -> parseBase64ImageSource(source, fallbackMime)
+        "letta" -> parseBase64ImageSource(source, fallback)
         else -> null
     }
 }
 
 /** Decodes a `source.type == "base64" | "letta"` image source. */
-private fun parseBase64ImageSource(source: JsonObject, fallbackMime: String): MessageContentPart.Image? {
+private fun parseBase64ImageSource(source: JsonObject, fallback: MediaKind): MessageContentPart.Image? {
     val mediaType = source.fieldContent("media_type")
     val data = source.fieldContent("data")
     return MessageContentPart.Image(
-        base64 = data.orEmpty(), mediaType = mediaType?.takeIf { it.isNotBlank() } ?: fallbackMime,
+        base64 = data.orEmpty(), mediaType = mediaType?.takeIf { it.isNotBlank() } ?: fallback.unknownMimeType,
         unavailableReason = ImageUnavailableReason.Missing.takeIf { data.isNullOrBlank() },
     )
 }
 
 /** Decodes inline data URLs and HTTP sources supported by the host image loader. */
-private fun parseUrlImageSource(source: JsonObject, fallbackMime: String): MessageContentPart.Image? {
+private fun parseUrlImageSource(source: JsonObject, fallback: MediaKind): MessageContentPart.Image? {
     val url = source.fieldContent("url") ?: return null
-    return parseImageDataUrl(url, fallbackMime)
+    return parseImageDataUrl(url, fallback)
 }
 
-private fun parseImageDataUrl(url: String, fallbackMime: String = IMAGE_UNKNOWN): MessageContentPart.Image? {
+private fun parseImageDataUrl(url: String, fallback: MediaKind = MediaKind.Image): MessageContentPart.Image? {
     if (url.startsWith("https://") || url.startsWith("http://")) {
-        return MessageContentPart.Image("", fallbackMime, url = url)
+        return MessageContentPart.Image("", fallback.unknownMimeType, url = url)
     }
     val prefix = "data:"
     val separator = ";base64,"
@@ -113,20 +114,18 @@ private fun parseImageDataUrl(url: String, fallbackMime: String = IMAGE_UNKNOWN)
     return MessageContentPart.Image(base64 = base64, mediaType = mediaType)
 }
 
-private const val IMAGE_UNKNOWN = "image/unknown"
-
 /**
  * An `audio` or `video` part in the image part's shapes: flat `{ data, mimeType }` (MCP AudioContent),
  * wrapped `{ source: { type: base64|url|letta } }`, or a bare `url`. Unlike an image, a part with no
  * payload yields nothing rather than a placeholder: tool results use `type: audio` for other things.
  */
-private fun parseTypedMediaPart(obj: JsonObject, fallbackMime: String): MessageContentPart.Image? {
+private fun parseTypedMediaPart(obj: JsonObject, fallback: MediaKind): MessageContentPart.Image? {
     val part = parseFlatLettaImagePart(obj)
-        ?: parseWrappedLettaImagePart(obj, fallbackMime)
-        ?: obj.fieldContent("url")?.let { parseImageDataUrl(it, fallbackMime) }
+        ?: parseWrappedLettaImagePart(obj, fallback)
+        ?: obj.fieldContent("url")?.let { parseImageDataUrl(it, fallback) }
         ?: return null
     if (part.base64.isEmpty() && part.url == null) return null
-    return part.takeUnless { MediaKind.isUninformative(it.mediaType) } ?: part.copy(mediaType = fallbackMime)
+    return part.takeUnless { MediaKind.isUninformative(it.mediaType) } ?: part.copy(mediaType = fallback.unknownMimeType)
 }
 
 /**

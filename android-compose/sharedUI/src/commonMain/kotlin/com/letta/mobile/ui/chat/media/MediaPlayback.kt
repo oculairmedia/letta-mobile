@@ -15,6 +15,7 @@ import com.letta.mobile.data.media.MediaKind
 import com.letta.mobile.data.media.MediaLimits
 import com.letta.mobile.data.media.MediaPlaybackCoordinator
 import com.letta.mobile.data.media.MediaPlaybackState
+import com.letta.mobile.data.media.MediaPlaybackStatus
 import com.letta.mobile.data.media.MediaPlayer
 import com.letta.mobile.data.media.MediaPlayerFactory
 import com.letta.mobile.data.media.MediaSource
@@ -45,7 +46,11 @@ internal class MediaItemPlayback(
 
     /** Load without playing (a video's first frame as its poster). Returns the player, or null with no source. */
     fun load(): MediaPlayer? {
-        player?.let { return it }
+        player?.let { current ->
+            // A failed load (offline, a server error) is retried on the next request, not kept.
+            if (current.state.value.status != MediaPlaybackStatus.Failed) return current
+            release()
+        }
         val from = source ?: return null
         return factory.create(kind).also { created ->
             created.load(from)

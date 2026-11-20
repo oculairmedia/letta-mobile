@@ -24059,6 +24059,7 @@ public final class com/letta/mobile/data/media/MediaKind : java/lang/Enum {
 	public static final field Image Lcom/letta/mobile/data/media/MediaKind;
 	public static final field Video Lcom/letta/mobile/data/media/MediaKind;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getUnknownMimeType ()Ljava/lang/String;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/media/MediaKind;
 	public static fun values ()[Lcom/letta/mobile/data/media/MediaKind;
 }
@@ -24082,6 +24083,8 @@ public final class com/letta/mobile/data/media/MediaPlaybackCoordinator {
 	public fun <init> ()V
 	public final fun forget (Lcom/letta/mobile/data/media/MediaPlayer;)V
 	public final fun getActivePlayer ()Lcom/letta/mobile/data/media/MediaPlayer;
+	public final fun getHeld ()Z
+	public final fun hold (Z)V
 	public final fun pauseAll ()V
 	public final fun play (Lcom/letta/mobile/data/media/MediaPlayer;)V
 }

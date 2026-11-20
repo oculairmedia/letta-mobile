@@ -8,7 +8,11 @@ import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioInputStream
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.LineUnavailableException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -17,7 +21,13 @@ import kotlin.test.assertEquals
  * no audio device): the clip factory throws, which must surface as Failed, not a crash.
  */
 class JavaSoundMediaPlayerTest {
+    private val scope = CoroutineScope(SupervisorJob())
+
+    @AfterTest
+    fun cancelScope() = scope.cancel()
+
     private fun player() = JavaSoundMediaPlayer(
+        scope = scope,
         io = Dispatchers.Unconfined,
         openClip = { throw LineUnavailableException("no device in tests") },
         fetch = { _, _ -> wav(seconds = 1) },
@@ -47,7 +57,11 @@ class JavaSoundMediaPlayerTest {
 
     @Test
     fun aFailedFetchIsFailed() {
-        val player = JavaSoundMediaPlayer(io = Dispatchers.Unconfined, fetch = { _, _ -> throw java.io.IOException("offline") })
+        val player = JavaSoundMediaPlayer(
+            scope = scope,
+            io = Dispatchers.Unconfined,
+            fetch = { _, _ -> throw java.io.IOException("offline") },
+        )
         player.load(MediaSource.Remote("https://host/a.wav"))
         assertEquals(MediaPlaybackStatus.Failed, player.state.value.status)
     }
@@ -78,9 +92,9 @@ class JavaSoundMediaPlayerTest {
 
     @Test
     fun remoteReadsStopAtTheLimit() {
-        val result = runCatching { JavaSoundMediaPlayer.readBounded(ByteArrayInputStream(ByteArray(10)), 4L) }
+        val result = runCatching { JavaSoundBuffers.readBounded(ByteArrayInputStream(ByteArray(10)), 4L) }
         assertEquals(true, result.isFailure)
-        assertEquals(3, JavaSoundMediaPlayer.readBounded(ByteArrayInputStream(ByteArray(3)), 4L).size)
+        assertEquals(3, JavaSoundBuffers.readBounded(ByteArrayInputStream(ByteArray(3)), 4L).size)
     }
 
     private fun wav(seconds: Int): ByteArray {

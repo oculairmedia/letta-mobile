@@ -2,11 +2,6 @@ package com.letta.mobile.data.media
 
 import java.io.ByteArrayInputStream
 import java.io.IOException
-import java.io.InputStream
-import java.net.HttpURLConnection
-import java.net.URI
-import javax.sound.sampled.AudioFormat
-import javax.sound.sampled.AudioInputStream
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.BooleanControl
 import javax.sound.sampled.Clip
@@ -19,8 +14,6 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,17 +28,19 @@ import kotlinx.coroutines.launch
  * offers to open them elsewhere. The whole file is buffered (within [MediaLimits]) because a [Clip]
  * needs it; the output line opens only on the first play, so loading works without an audio device.
  *
+ * @param scope the owner's scope (the card's composition): loading and the position clock run in it
+ *   and stop with it; [release] cancels only this player's own jobs.
  * @param openClip the output line, injectable for tests.
  * @param fetch reads a remote URL up to a byte cap; injectable for tests. Never logs the URL.
  */
 class JavaSoundMediaPlayer(
-    io: CoroutineDispatcher = Dispatchers.IO,
+    private val scope: CoroutineScope,
+    private val io: CoroutineDispatcher = Dispatchers.IO,
     private val openClip: () -> Clip = AudioSystem::getClip,
-    private val fetch: (url: String, maxBytes: Long) -> ByteArray = ::fetchBounded,
+    private val fetch: (url: String, maxBytes: Long) -> ByteArray = JavaSoundBuffers::fetchBounded,
 ) : MediaPlayer {
     private val mutableState = MutableStateFlow(MediaPlaybackState())
     override val state: StateFlow<MediaPlaybackState> = mutableState.asStateFlow()
-    private val scope = CoroutineScope(SupervisorJob() + io)
     private val lock = Any()
     private var bytes: ByteArray? = null
     private var clip: Clip? = null
@@ -62,7 +57,7 @@ class JavaSoundMediaPlayer(
         playWhenLoaded = false
         mutableState.update { MediaPlaybackState(status = MediaPlaybackStatus.Loading, volume = it.volume, muted = it.muted) }
         val generation = ++loadGeneration
-        loading = scope.launch { decode(source, generation) }
+        loading = scope.launch(io) { decode(source, generation) }
     }
 
     private fun decode(source: MediaSource, generation: Int) {
@@ -71,7 +66,7 @@ class JavaSoundMediaPlayer(
                 is MediaSource.Inline -> java.util.Base64.getMimeDecoder().decode(source.base64)
                 is MediaSource.Remote -> fetch(source.url, MediaLimits.MAX_BUFFERED_REMOTE_BYTES)
             }
-            data to AudioSystem.getAudioInputStream(ByteArrayInputStream(data)).use(::durationOf)
+            data to AudioSystem.getAudioInputStream(ByteArrayInputStream(data)).use(JavaSoundBuffers::durationOf)
         }
         synchronized(lock) {
             if (isReleased || generation != loadGeneration) return
@@ -108,11 +103,14 @@ class JavaSoundMediaPlayer(
     private fun openLine(): Clip? = try {
         val data = bytes ?: return null
         openClip().also { line ->
-            line.open(pcmStream(data))
+            line.open(JavaSoundBuffers.pcmStream(data))
             line.addLineListener { event -> if (event.type == LineEvent.Type.STOP) onStopped(line) }
             clip = line
         }
     } catch (expected: LineUnavailableException) {
+        mutableState.update { it.copy(status = MediaPlaybackStatus.Failed) }
+        null
+    } catch (expected: IOException) {
         mutableState.update { it.copy(status = MediaPlaybackStatus.Failed) }
         null
     } catch (expected: IllegalArgumentException) {
@@ -166,7 +164,7 @@ class JavaSoundMediaPlayer(
 
     override fun release(): Unit = synchronized(lock) {
         if (isReleased) return
-        scope.cancel()
+        loading?.cancel()
         closeClip()
         bytes = null
         mutableState.update { it.copy(status = MediaPlaybackStatus.Released) }
@@ -187,7 +185,7 @@ class JavaSoundMediaPlayer(
 
     private fun startTicker() {
         ticker?.cancel()
-        ticker = scope.launch {
+        ticker = scope.launch(io) {
             while (isActive) {
                 delay(POSITION_TICK_MS)
                 synchronized(lock) {
@@ -211,47 +209,9 @@ class JavaSoundMediaPlayer(
 
     private val isReleased: Boolean get() = mutableState.value.status == MediaPlaybackStatus.Released
 
-    internal companion object {
-        private const val MICROS_PER_MILLI = 1_000L
-        private const val MILLIS_PER_SECOND = 1_000.0
-        private const val POSITION_TICK_MS = 200L
-        private const val DECIBELS_PER_DECADE = 20f
-        private const val PCM_BITS = 16
-        private const val CONNECT_TIMEOUT_MS = 10_000
-        private const val READ_TIMEOUT_MS = 30_000
-
-        private fun durationOf(stream: AudioInputStream): Long? {
-            val frames = stream.frameLength
-            val rate = stream.format.frameRate
-            if (frames == AudioSystem.NOT_SPECIFIED.toLong() || rate <= 0f) return null
-            return (frames / rate * MILLIS_PER_SECOND).toLong()
-        }
-
-        /** A stream a Clip can open: the file's own PCM, or a 16-bit signed PCM conversion of it. */
-        private fun pcmStream(data: ByteArray): AudioInputStream {
-            val source = AudioSystem.getAudioInputStream(ByteArrayInputStream(data))
-            val format = source.format
-            if (format.encoding == AudioFormat.Encoding.PCM_SIGNED && format.sampleSizeInBits == PCM_BITS) return source
-            val target = AudioFormat(format.sampleRate, PCM_BITS, format.channels, true, false)
-            return AudioSystem.getAudioInputStream(target, source)
-        }
-
-        private fun fetchBounded(url: String, maxBytes: Long): ByteArray {
-            val connection = URI(url).toURL().openConnection()
-            connection.connectTimeout = CONNECT_TIMEOUT_MS
-            connection.readTimeout = READ_TIMEOUT_MS
-            try {
-                return connection.getInputStream().use { readBounded(it, maxBytes) }
-            } finally {
-                (connection as? HttpURLConnection)?.disconnect()
-            }
-        }
-
-        /** Reads [input] whole, refusing more than [maxBytes]. */
-        internal fun readBounded(input: InputStream, maxBytes: Long): ByteArray {
-            val data = input.readNBytes((maxBytes + 1).toInt())
-            if (data.size > maxBytes) throw IOException("media exceeds the buffered playback limit")
-            return data
-        }
+    private companion object {
+        const val MICROS_PER_MILLI = 1_000L
+        const val POSITION_TICK_MS = 200L
+        const val DECIBELS_PER_DECADE = 20f
     }
 }

@@ -285,11 +285,12 @@ private fun PromptImages(message: UiMessage, callbacks: ChatRowCallbacks) {
     // enough to look at. A single image uses its aspect on every host;
     // multiple pointer images keep their compact strip.
     val touch = touchStyle()
-    ChatMediaAttachments(attachments, callbacks.onImageTap, docked) { tap, cell ->
+    // Only the images compact as the copy docks; audio and video controls keep their size.
+    ChatMediaAttachments(attachments, callbacks.onImageTap) { tap, cell ->
         if (touch || tap.images.size == 1) {
-            ChatPromptImageGrid(tap = tap, modifier = cell.fillMaxWidth())
+            ChatPromptImageGrid(tap = tap, modifier = docked.then(cell).fillMaxWidth())
         } else {
-            ChatImageThumbnailStrip(tap = tap, modifier = cell)
+            ChatImageThumbnailStrip(tap = tap, modifier = docked.then(cell))
         }
     }
 }

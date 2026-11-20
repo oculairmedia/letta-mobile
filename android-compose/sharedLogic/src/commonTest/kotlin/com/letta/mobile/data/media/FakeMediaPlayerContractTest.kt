@@ -20,6 +20,22 @@ class FakeMediaPlayerContractTest : MediaPlayerContract() {
     }
 
     @Test
+    fun pauseWhileLoadingCancelsTheQueuedPlayAndReleaseIsFinal() {
+        val player = FakeMediaPlayer(loadsImmediately = false)
+        player.load(MediaSource.Remote("https://host/a.mp3"))
+        player.play()
+        player.pause()
+        player.finishLoading()
+        assertEquals(MediaPlaybackStatus.Ready, player.state.value.status)
+        val released = FakeMediaPlayer(loadsImmediately = false)
+        released.load(MediaSource.Remote("https://host/b.mp3"))
+        released.play()
+        released.release()
+        released.finishLoading()
+        assertEquals(MediaPlaybackStatus.Released, released.state.value.status)
+    }
+
+    @Test
     fun sourcesNeverPrintTheirUrlOrBytes() {
         assertEquals("Remote(url=<redacted>)", MediaSource.Remote("https://host/a.mp3?token=secret").toString())
         assertEquals("Inline(mimeType=audio/wav, chars=8)", MediaSource.Inline("QUJDREVG", "audio/wav").toString())

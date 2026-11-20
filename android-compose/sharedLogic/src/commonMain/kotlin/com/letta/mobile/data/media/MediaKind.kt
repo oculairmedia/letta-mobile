@@ -19,19 +19,34 @@ enum class MediaKind {
     File,
     ;
 
+    /** The MIME type a part of this kind gets when its producer named none. */
+    val unknownMimeType: String
+        get() = when (this) {
+            Image -> "image/unknown"
+            Audio -> "audio/unknown"
+            Video -> "video/unknown"
+            File -> "application/octet-stream"
+        }
+
     companion object {
         /**
          * The kind of a part with [mimeType], falling back to the extension in [nameOrUrl] when the
          * type is blank or uninformative (`image/unknown`, `application/octet-stream`). A URL's query
-         * and fragment are never read. An uninformative `image/…` type with no telling extension
-         * stays [Image], as every image part parsed before audio and video existed.
+         * and fragment are never read. Inline bytes with an uninformative type, and an `image/` type
+         * with no telling extension, stay [Image]: only image parts carry inline bytes without a
+         * specific type (audio and video parts take their part type's), as before audio and video existed.
          */
         fun of(mimeType: String?, nameOrUrl: String? = null): MediaKind {
             val type = mimeType?.trim()?.lowercase().orEmpty()
-            val byMime = byMimeType(type)
-            if (byMime != null) return byMime
-            val byExtension = nameOrUrl?.let(::extensionOf)?.let(EXTENSION_KINDS::get)
-            return byExtension ?: if (type.startsWith("image/") || type.isEmpty() && nameOrUrl == null) Image else File
+            return byMimeType(type) ?: nameOrUrl?.let(::byExtension) ?: fallback(type, nameOrUrl)
+        }
+
+        private fun byExtension(nameOrUrl: String): MediaKind? = extensionOf(nameOrUrl)?.let(EXTENSION_KINDS::get)
+
+        private fun fallback(type: String, nameOrUrl: String?): MediaKind = when {
+            nameOrUrl == null -> Image
+            type.startsWith("image/") -> Image
+            else -> File
         }
 
         /** Whether [mimeType] says nothing about the kind, so a caller may substitute what it knows. */

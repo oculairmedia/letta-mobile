@@ -13,10 +13,7 @@ import com.letta.mobile.data.media.MediaPlaybackStatus
 import com.letta.mobile.data.media.MediaPlayer
 import com.letta.mobile.data.media.MediaSource
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,9 +25,10 @@ import kotlinx.coroutines.launch
 /**
  * The Android [MediaPlayer]: Media3 ExoPlayer, created and driven on the main thread. Media usage
  * with audio-focus handling, so voice mode's transient focus ducks or pauses it, and unplugging
- * headphones pauses it. Sources are never logged.
+ * headphones pauses it. Sources are never logged. The position clock runs in [scope], the owning
+ * composition's, so it stops with the card even if [release] were missed.
  */
-internal class ExoMediaPlayer(context: Context) : MediaPlayer {
+internal class ExoMediaPlayer(context: Context, private val scope: CoroutineScope) : MediaPlayer {
     val exoPlayer: ExoPlayer = ExoPlayer.Builder(context).build().apply {
         setAudioAttributes(
             AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
@@ -40,7 +38,6 @@ internal class ExoMediaPlayer(context: Context) : MediaPlayer {
     }
     private val mutableState = MutableStateFlow(MediaPlaybackState())
     override val state: StateFlow<MediaPlaybackState> = mutableState.asStateFlow()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var ticker: Job? = null
     private var released = false
 
@@ -106,7 +103,7 @@ internal class ExoMediaPlayer(context: Context) : MediaPlayer {
     override fun release() {
         if (released) return
         released = true
-        scope.cancel()
+        ticker?.cancel()
         exoPlayer.removeListener(listener)
         exoPlayer.release()
         mutableState.update { it.copy(status = MediaPlaybackStatus.Released) }

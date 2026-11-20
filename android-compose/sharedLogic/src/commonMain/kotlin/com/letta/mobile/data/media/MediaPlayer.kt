@@ -76,7 +76,8 @@ data class MediaPlaybackState(
  * - [load] moves Idle -> Loading -> Ready (or Failed/Unsupported); a second [load] replaces the source.
  * - [play] from Ready/Paused/Ended moves to Playing (Ended restarts at 0); during Loading it plays
  *   once loaded; ignored otherwise.
- * - [pause] from Playing moves to Paused; ignored otherwise.
+ * - [pause] from Playing moves to Paused; during Loading it cancels a queued [play] (the coordinator
+ *   relies on this when it hands playback to another item); ignored otherwise.
  * - [seekTo] clamps to 0..duration and keeps the playing/paused status.
  * - [setVolume] clamps to 0..1; [setMuted] never changes [MediaPlaybackState.volume].
  * - [release] moves to Released and frees platform resources; it is idempotent, and every later

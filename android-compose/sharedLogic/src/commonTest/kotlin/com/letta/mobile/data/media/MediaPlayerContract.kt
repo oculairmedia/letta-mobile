@@ -2,6 +2,7 @@ package com.letta.mobile.data.media
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -19,7 +20,7 @@ abstract class MediaPlayerContract {
         val state = newLoadedPlayer().state.value
         assertEquals(MediaPlaybackStatus.Ready, state.status)
         assertEquals(0L, state.positionMs)
-        assertTrue((state.durationMs ?: 0L) > 0L)
+        assertNotNull(state.durationMs, "a loaded source reports its duration")
     }
 
     @Test

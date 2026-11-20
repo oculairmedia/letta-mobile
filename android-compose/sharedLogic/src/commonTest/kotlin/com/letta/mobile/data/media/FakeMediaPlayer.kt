@@ -26,6 +26,7 @@ class FakeMediaPlayer(
     }
 
     fun finishLoading(status: MediaPlaybackStatus = MediaPlaybackStatus.Ready) {
+        if (released()) return
         mutableState.value = current().copy(status = status, durationMs = durationMs.takeIf { status == MediaPlaybackStatus.Ready })
         if (status == MediaPlaybackStatus.Ready && playWhenLoaded) play()
     }

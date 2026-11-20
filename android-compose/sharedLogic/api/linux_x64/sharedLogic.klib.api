@@ -1602,6 +1602,8 @@ final enum class com.letta.mobile.data.media/MediaKind : kotlin/Enum<com.letta.m
 
     final val entries // com.letta.mobile.data.media/MediaKind.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.media/MediaKind> // com.letta.mobile.data.media/MediaKind.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val unknownMimeType // com.letta.mobile.data.media/MediaKind.unknownMimeType|{}unknownMimeType[0]
+        final fun <get-unknownMimeType>(): kotlin/String // com.letta.mobile.data.media/MediaKind.unknownMimeType.<get-unknownMimeType>|<get-unknownMimeType>(){}[0]
 
     final fun valueOf(kotlin/String): com.letta.mobile.data.media/MediaKind // com.letta.mobile.data.media/MediaKind.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<com.letta.mobile.data.media/MediaKind> // com.letta.mobile.data.media/MediaKind.values|values#static(){}[0]
@@ -42474,7 +42476,11 @@ final class com.letta.mobile.data.media/MediaPlaybackCoordinator { // com.letta.
     final val activePlayer // com.letta.mobile.data.media/MediaPlaybackCoordinator.activePlayer|{}activePlayer[0]
         final fun <get-activePlayer>(): com.letta.mobile.data.media/MediaPlayer? // com.letta.mobile.data.media/MediaPlaybackCoordinator.activePlayer.<get-activePlayer>|<get-activePlayer>(){}[0]
 
+    final var held // com.letta.mobile.data.media/MediaPlaybackCoordinator.held|{}held[0]
+        final fun <get-held>(): kotlin/Boolean // com.letta.mobile.data.media/MediaPlaybackCoordinator.held.<get-held>|<get-held>(){}[0]
+
     final fun forget(com.letta.mobile.data.media/MediaPlayer) // com.letta.mobile.data.media/MediaPlaybackCoordinator.forget|forget(com.letta.mobile.data.media.MediaPlayer){}[0]
+    final fun hold(kotlin/Boolean) // com.letta.mobile.data.media/MediaPlaybackCoordinator.hold|hold(kotlin.Boolean){}[0]
     final fun pauseAll() // com.letta.mobile.data.media/MediaPlaybackCoordinator.pauseAll|pauseAll(){}[0]
     final fun play(com.letta.mobile.data.media/MediaPlayer) // com.letta.mobile.data.media/MediaPlaybackCoordinator.play|play(com.letta.mobile.data.media.MediaPlayer){}[0]
 }

@@ -65,9 +65,10 @@ internal fun rememberVoiceMode(sessions: VoiceChatSessions?): VoiceModeHandle? {
 }
 
 /**
- * The page's one-at-a-time media coordinator, yielding to voice mode: whatever the timeline plays pauses when voice mode starts
- * hearing the person or speaking the reply, and when the page's owner stops (the app goes to the
- * background). Media may play again while voice mode only listens.
+ * The page's one-at-a-time media coordinator, yielding to voice mode: whatever the timeline plays
+ * pauses, and Play does nothing, while voice mode hears the person or speaks the reply; it also pauses
+ * when the page's owner stops (the app goes to the background). Media may play while voice mode only
+ * listens.
  */
 @Composable
 internal fun rememberPageMediaPlayback(handle: VoiceModeHandle?): MediaPlaybackCoordinator {
@@ -75,8 +76,10 @@ internal fun rememberPageMediaPlayback(handle: VoiceModeHandle?): MediaPlaybackC
     DismissWhenOwnerStops { coordinator.pauseAll() }
     if (handle != null) {
         LaunchedEffect(handle, coordinator) {
-            handle.state.collect { state ->
-                if (state == VoiceModeState.Speaking || state == VoiceModeState.Hearing) coordinator.pauseAll()
+            try {
+                handle.state.collect { state -> coordinator.hold(state == VoiceModeState.Speaking || state == VoiceModeState.Hearing) }
+            } finally {
+                coordinator.hold(false)
             }
         }
     }

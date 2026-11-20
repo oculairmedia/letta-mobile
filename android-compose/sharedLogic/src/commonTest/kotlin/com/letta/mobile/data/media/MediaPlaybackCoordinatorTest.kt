@@ -30,6 +30,20 @@ class MediaPlaybackCoordinatorTest {
     }
 
     @Test
+    fun aHoldPausesWhatPlaysAndRefusesNewPlaybackUntilReleased() {
+        val coordinator = MediaPlaybackCoordinator()
+        val player = loaded()
+        coordinator.play(player)
+        coordinator.hold(true)
+        assertEquals(MediaPlaybackStatus.Paused, player.state.value.status)
+        coordinator.play(player)
+        assertEquals(MediaPlaybackStatus.Paused, player.state.value.status)
+        coordinator.hold(false)
+        coordinator.play(player)
+        assertEquals(MediaPlaybackStatus.Playing, player.state.value.status)
+    }
+
+    @Test
     fun pauseAllKeepsThePositionAndForgetDropsTheReleasedPlayer() {
         val coordinator = MediaPlaybackCoordinator()
         val player = loaded()

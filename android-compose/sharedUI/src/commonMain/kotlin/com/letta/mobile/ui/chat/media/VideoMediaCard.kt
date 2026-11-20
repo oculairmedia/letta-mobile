@@ -91,13 +91,18 @@ private fun VideoFrame(playback: MediaItemPlayback, state: MediaPlaybackState, s
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             contentAlignment = Alignment.Center,
         ) {
-            val player = playback.player
-            if (showSurface && player != null && state.status != MediaPlaybackStatus.Unsupported) {
-                MediaVideoSurface(player, Modifier.fillMaxSize().testTag(MediaTestTags.VIDEO_SURFACE))
-            }
+            if (showSurface) VideoSurfaceIfPlayable(playback, state)
             if (!state.isPlaying) PosterGlyph()
         }
     }
+}
+
+/** The platform surface once the item has a player this platform can draw; the poster otherwise. */
+@Composable
+private fun VideoSurfaceIfPlayable(playback: MediaItemPlayback, state: MediaPlaybackState) {
+    val player = playback.player ?: return
+    if (state.status == MediaPlaybackStatus.Unsupported) return
+    MediaVideoSurface(player, Modifier.fillMaxSize().testTag(MediaTestTags.VIDEO_SURFACE))
 }
 
 @Composable

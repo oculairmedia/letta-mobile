@@ -37,6 +37,13 @@ class MediaAttachmentParsingTest {
     }
 
     @Test
+    fun anImagePartWithAnUninformativeTypeStaysAnImage() {
+        val image = parts("""[{"type":"image","data":"AAAA","mimeType":"application/octet-stream"}]""").single()
+        assertEquals(MediaKind.Image, image.kind)
+        assertEquals(1, listOf(image).toJsonArray().size)
+    }
+
+    @Test
     fun mcpAudioContentIsTheFlatImageShape() {
         val audio = parts("""[{"type":"audio","data":"UklGRg==","mimeType":"audio/wav"}]""").single()
         assertEquals(MessageContentPart.Image("UklGRg==", "audio/wav"), audio)
