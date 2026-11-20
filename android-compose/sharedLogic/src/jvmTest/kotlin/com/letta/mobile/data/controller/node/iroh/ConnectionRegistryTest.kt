@@ -21,10 +21,33 @@ class ConnectionRegistryTest {
         override val connectionId: String,
         private val capabilities: Set<String>,
         private val writable: Boolean = true,
+        private val context: AdminRpcRequestContext? = AdminRpcRequestContext.Authenticated,
     ) : ViewerHandle {
         val frames = mutableListOf<String>()
         override suspend fun writeFrame(frame: String): Boolean = writable.also { if (it) frames += frame }
         override fun receivesAgentEvents(): Boolean = IrohPeerCapabilities.CHAT_READ in capabilities
+        override fun adminContext(): AdminRpcRequestContext? = context
+    }
+
+    @Test
+    fun pinsPushesSkipAgentScopedAndUnauthenticatedViewers() = runTest {
+        val registry = ConnectionRegistry()
+        val read = setOf(IrohPeerCapabilities.CHAT_READ)
+        val owner = BroadcastViewer("endpoint-owner", read)
+        val scoped = BroadcastViewer(
+            "endpoint-scoped", read, context = AdminRpcRequestContext(authenticated = true, authorizedAgentIds = setOf("agent-a")),
+        )
+        val signedOut = BroadcastViewer("endpoint-signed-out", read, context = null)
+        val noRead = BroadcastViewer("endpoint-no-read", emptySet())
+        listOf(owner, scoped, signedOut, noRead).forEach { registry.claim(it) }
+
+        val result = registry.broadcast("""{"type":"pins_updated"}""") { it.receivesPinsEvents() }
+
+        assertEquals(BroadcastResult(recipients = 1, delivered = 1), result)
+        assertEquals(1, owner.frames.size)
+        assertTrue(scoped.frames.isEmpty(), "an agent-scoped peer must not learn the host's pinned ids")
+        assertTrue(signedOut.frames.isEmpty())
+        assertTrue(noRead.frames.isEmpty())
     }
 
     @Test

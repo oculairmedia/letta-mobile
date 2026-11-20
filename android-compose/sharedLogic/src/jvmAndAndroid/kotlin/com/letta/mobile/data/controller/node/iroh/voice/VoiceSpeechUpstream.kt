@@ -64,8 +64,10 @@ internal class VoiceSpeechCall(
     val text: String,
     val model: String,
     val voice: String,
+    /** The reply's tone cue for the speech server's `instructions`; null for none. */
+    val instructions: String? = null,
 ) {
-    override fun toString(): String = "VoiceSpeechCall(textLength=${text.length})"
+    override fun toString(): String = "VoiceSpeechCall(textLength=${text.length}, instructed=${instructions != null})"
 }
 
 /** An upstream call failed with [code]; [status] is the HTTP status when the server answered. */
