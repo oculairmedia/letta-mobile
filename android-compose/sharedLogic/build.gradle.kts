@@ -213,6 +213,8 @@ val contractTestFixtures = listOf(
     Triple("VoiceSpeech", "voice.speech/voice-endpoint-v1.json", "com.letta.mobile.data.voice.host"),
     Triple("PinsGet", "pins.get/pins-v1.json", "com.letta.mobile.data.pins.shared"),
     Triple("PinsSet", "pins.set/pins-v1.json", "com.letta.mobile.data.pins.shared"),
+    Triple("ShellStateGet", "shell.state.get/shell-state-v1.json", "com.letta.mobile.data.shellstate.shared"),
+    Triple("ShellStatePropose", "shell.state.propose/shell-state-v1.json", "com.letta.mobile.data.shellstate.shared"),
 )
 contractTestFixtures.forEach { (name, fixture, packageName) ->
     val generate = tasks.register("generate${name}TestData") {

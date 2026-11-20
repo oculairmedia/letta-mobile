@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport.api
 
 import com.letta.mobile.data.pins.wire.AgentPinsWire
+import com.letta.mobile.data.shellstate.wire.ShellStateWire
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -88,8 +89,11 @@ class AppServerClientChannel(
                 ?.takeIf {
                     it is ServerFrame.PendingApprovalsUpdated || it is ServerFrame.PermissionModeUpdated ||
                         it is ServerFrame.ConversationActivity || it is ServerFrame.ConversationUpdated ||
-                        (it is ServerFrame.Unknown && it.type == AgentPinsWire.FRAME_TYPE)
+                        (it is ServerFrame.Unknown && it.type in UNTYPED_HOST_PUSH_TYPES)
                 }
+
+        /** Host pushes with no typed frame; the shared pins and shell state decode their own raw body. */
+        private val UNTYPED_HOST_PUSH_TYPES = setOf(AgentPinsWire.FRAME_TYPE, ShellStateWire.FRAME_TYPE)
 
         val CONNECTED = ChannelTransportState.Connected(serverId = "app-server", sessionId = "app-server", deviceId = null)
         val DISCONNECTED = ChannelTransportState.Disconnected(code = 1000, reason = "App Server session closed")

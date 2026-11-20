@@ -145,6 +145,33 @@ class DirectAppServerDialTest {
         }
     }
 
+    @Test
+    fun theOnDeviceHostServesSharedShellStateThroughTheSameContract() = runBlocking {
+        val port = startStockServer()
+        val stateDir = java.nio.file.Files.createTempDirectory("local-shell-state")
+        val routes = listOf(
+            com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateRoutes.forHost(
+                stateDir, com.letta.mobile.data.controller.node.iroh.shellstate.ShellStatePublisher(scope),
+            ),
+        )
+        val transport = directTransport(port, AtomicInteger(), routes)
+        try {
+            withTimeout(TIMEOUT) { transport.adminRpc("agent.list", "/v1/agents", null) }
+            val shared = com.letta.mobile.data.shellstate.shared.SharedShellState(
+                com.letta.mobile.data.shellstate.shared.channelShellStateLink(transport),
+            )
+            assertTrue(com.letta.mobile.data.shellstate.wire.ShellStateWire.CAPABILITY in transport.hostCapabilities)
+            assertTrue(shared.refresh().editable)
+            val theme = kotlinx.serialization.json.JsonPrimitive("dark")
+            assertEquals(com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome.APPLIED, shared.set("appearance.theme", theme))
+            assertEquals(theme, shared.refresh().entries.getValue("appearance.theme").value)
+            assertTrue(java.nio.file.Files.exists(stateDir.resolve("shell-state.json")), "the host keeps the document")
+            assertFalse(received.any { it == "admin_rpc" }, "the stock server never sees the shell state calls")
+        } finally {
+            transport.close()
+        }
+    }
+
     private fun directTransport(
         port: Int,
         releases: AtomicInteger,

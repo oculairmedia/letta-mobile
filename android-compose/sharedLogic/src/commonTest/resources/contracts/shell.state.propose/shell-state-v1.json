@@ -1,0 +1,857 @@
+{
+  "method": "shell.state.propose",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/shellstate/ShellStateRoutes.kt",
+  "contract": "shell-state",
+  "capability": "shell_state_v1",
+  "required_capability": "conversation.manage",
+  "streamed": false,
+  "spec": "docs/reference/contracts/shell-state-v1.md",
+  "note": "Synthetic keys and values only. The host clock is fixed at updated_at_ms 1700000000000. pushed_frame lists the deterministic fields of the shell_state_updated push an accepted change sends; id (shell-state-updated-<uuid>) and ts (ISO-8601) vary per push. A case without pushed_frame sends no push. The too_large case carries a value one byte over the 8192-byte cap.",
+  "cases": [
+    {
+      "name": "first write of two entries",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": null
+        }
+      },
+      "params": {
+        "changes": [
+          {
+            "key": "appearance.theme",
+            "value": {
+              "mode": "dark"
+            },
+            "expected_revision": 0
+          },
+          {
+            "key": "layout.sidebar_open",
+            "value": true,
+            "expected_revision": 0
+          }
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "schema_version": 1,
+          "document_revision": 1,
+          "entries": {
+            "appearance.theme": {
+              "value": {
+                "mode": "dark"
+              },
+              "revision": 1,
+              "updated_by": {
+                "type": "user",
+                "client_id": "endpoint-a"
+              },
+              "updated_at_ms": 1700000000000
+            },
+            "layout.sidebar_open": {
+              "value": true,
+              "revision": 1,
+              "updated_by": {
+                "type": "user",
+                "client_id": "endpoint-a"
+              },
+              "updated_at_ms": 1700000000000
+            }
+          }
+        }
+      },
+      "pushed_frame": {
+        "v": 1,
+        "type": "shell_state_updated",
+        "schema_version": 1,
+        "document_revision": 1,
+        "entries": {
+          "appearance.theme": {
+            "value": {
+              "mode": "dark"
+            },
+            "revision": 1,
+            "updated_by": {
+              "type": "user",
+              "client_id": "endpoint-a"
+            },
+            "updated_at_ms": 1700000000000
+          },
+          "layout.sidebar_open": {
+            "value": true,
+            "revision": 1,
+            "updated_by": {
+              "type": "user",
+              "client_id": "endpoint-a"
+            },
+            "updated_at_ms": 1700000000000
+          }
+        }
+      }
+    },
+    {
+      "name": "change one entry and keep the other",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "layout.sidebar_open": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {
+        "changes": [
+          {
+            "key": "appearance.theme",
+            "value": {
+              "mode": "light"
+            },
+            "expected_revision": 3
+          }
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "schema_version": 1,
+          "document_revision": 5,
+          "entries": {
+            "appearance.theme": {
+              "value": {
+                "mode": "light"
+              },
+              "revision": 5,
+              "updated_by": {
+                "type": "user",
+                "client_id": "endpoint-a"
+              },
+              "updated_at_ms": 1700000000000
+            },
+            "layout.sidebar_open": {
+              "value": true,
+              "revision": 4,
+              "updated_by": {
+                "type": "user",
+                "client_id": "endpoint-b"
+              },
+              "updated_at_ms": 1700000000000
+            }
+          }
+        }
+      },
+      "pushed_frame": {
+        "v": 1,
+        "type": "shell_state_updated",
+        "schema_version": 1,
+        "document_revision": 5,
+        "entries": {
+          "appearance.theme": {
+            "value": {
+              "mode": "light"
+            },
+            "revision": 5,
+            "updated_by": {
+              "type": "user",
+              "client_id": "endpoint-a"
+            },
+            "updated_at_ms": 1700000000000
+          },
+          "layout.sidebar_open": {
+            "value": true,
+            "revision": 4,
+            "updated_by": {
+              "type": "user",
+              "client_id": "endpoint-b"
+            },
+            "updated_at_ms": 1700000000000
+          }
+        }
+      }
+    },
+    {
+      "name": "remove an entry",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "layout.sidebar_open": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {
+        "changes": [
+          {
+            "key": "layout.sidebar_open",
+            "expected_revision": 4
+          }
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "schema_version": 1,
+          "document_revision": 5,
+          "entries": {
+            "appearance.theme": {
+              "value": {
+                "mode": "dark"
+              },
+              "revision": 3,
+              "updated_by": {
+                "type": "user",
+                "client_id": "endpoint-b"
+              },
+              "updated_at_ms": 1700000000000
+            }
+          }
+        }
+      },
+      "pushed_frame": {
+        "v": 1,
+        "type": "shell_state_updated",
+        "schema_version": 1,
+        "document_revision": 5,
+        "entries": {
+          "appearance.theme": {
+            "value": {
+              "mode": "dark"
+            },
+            "revision": 3,
+            "updated_by": {
+              "type": "user",
+              "client_id": "endpoint-b"
+            },
+            "updated_at_ms": 1700000000000
+          }
+        }
+      }
+    },
+    {
+      "name": "unchanged value keeps the revision",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "layout.sidebar_open": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {
+        "changes": [
+          {
+            "key": "appearance.theme",
+            "value": {
+              "mode": "dark"
+            },
+            "expected_revision": 3
+          }
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "schema_version": 1,
+          "document_revision": 4,
+          "entries": {
+            "appearance.theme": {
+              "value": {
+                "mode": "dark"
+              },
+              "revision": 3,
+              "updated_by": {
+                "type": "user",
+                "client_id": "endpoint-b"
+              },
+              "updated_at_ms": 1700000000000
+            },
+            "layout.sidebar_open": {
+              "value": true,
+              "revision": 4,
+              "updated_by": {
+                "type": "user",
+                "client_id": "endpoint-b"
+              },
+              "updated_at_ms": 1700000000000
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "stale entry revision",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "layout.sidebar_open": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {
+        "changes": [
+          {
+            "key": "appearance.theme",
+            "value": {
+              "mode": "light"
+            },
+            "expected_revision": 2
+          }
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "revision_conflict"
+      }
+    },
+    {
+      "name": "one stale change refuses the whole proposal",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "layout.sidebar_open": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {
+        "changes": [
+          {
+            "key": "layout.sidebar_open",
+            "value": false,
+            "expected_revision": 4
+          },
+          {
+            "key": "appearance.theme",
+            "value": {
+              "mode": "light"
+            },
+            "expected_revision": 0
+          }
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "revision_conflict"
+      }
+    },
+    {
+      "name": "missing changes",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "layout.sidebar_open": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {},
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "invalid_request"
+      }
+    },
+    {
+      "name": "empty changes",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "layout.sidebar_open": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {
+        "changes": []
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "invalid_request"
+      }
+    },
+    {
+      "name": "key with upper case",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "layout.sidebar_open": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {
+        "changes": [
+          {
+            "key": "Appearance",
+            "value": {
+              "mode": "dark"
+            },
+            "expected_revision": 0
+          }
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "invalid_request"
+      }
+    },
+    {
+      "name": "repeated key",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "layout.sidebar_open": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {
+        "changes": [
+          {
+            "key": "layout.a",
+            "value": 1,
+            "expected_revision": 0
+          },
+          {
+            "key": "layout.a",
+            "value": 2,
+            "expected_revision": 0
+          }
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "invalid_request"
+      }
+    },
+    {
+      "name": "missing expected revision",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "layout.sidebar_open": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {
+        "changes": [
+          {
+            "key": "layout.a",
+            "value": 1
+          }
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "invalid_request"
+      }
+    },
+    {
+      "name": "value over the entry cap",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "layout.sidebar_open": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {
+        "changes": [
+          {
+            "key": "layout.big",
+            "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "expected_revision": 0
+          }
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "too_large"
+      }
+    },
+    {
+      "name": "agent-scoped peer",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a",
+        "authorized_agent_ids": [
+          "agent-a"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "layout.sidebar_open": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {
+        "changes": [
+          {
+            "key": "layout.a",
+            "value": 1,
+            "expected_revision": 0
+          }
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "forbidden: agent not in this device's scope"
+      }
+    }
+  ]
+}

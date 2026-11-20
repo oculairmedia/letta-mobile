@@ -51,6 +51,38 @@ class ConnectionRegistryTest {
     }
 
     @Test
+    fun shellStatePushesSkipAgentScopedAndUnauthenticatedViewers() = runTest {
+        val registry = ConnectionRegistry()
+        val read = setOf(IrohPeerCapabilities.CHAT_READ)
+        val owner = BroadcastViewer("endpoint-owner", read)
+        val scoped = BroadcastViewer(
+            "endpoint-scoped", read, context = AdminRpcRequestContext(authenticated = true, authorizedAgentIds = setOf("agent-a")),
+        )
+        val signedOut = BroadcastViewer("endpoint-signed-out", read, context = null)
+        val noRead = BroadcastViewer("endpoint-no-read", emptySet())
+        listOf(owner, scoped, signedOut, noRead).forEach { registry.claim(it) }
+
+        val result = registry.broadcast("""{"type":"shell_state_updated"}""") { it.receivesShellStateEvents() }
+
+        assertEquals(BroadcastResult(recipients = 1, delivered = 1), result)
+        assertEquals(1, owner.frames.size)
+        assertTrue(scoped.frames.isEmpty(), "an agent-scoped peer must not learn the host's shell state")
+        assertTrue(signedOut.frames.isEmpty())
+        assertTrue(noRead.frames.isEmpty())
+    }
+
+    @Test
+    fun theShellStateGateEqualsThePinsGate() {
+        val read = setOf(IrohPeerCapabilities.CHAT_READ)
+        val scoped = AdminRpcRequestContext(authenticated = true, authorizedAgentIds = setOf("agent-a"))
+        val unauthenticated = AdminRpcRequestContext(authenticated = false)
+        listOf(
+            BroadcastViewer("a", read), BroadcastViewer("b", read, context = scoped), BroadcastViewer("c", read, context = null),
+            BroadcastViewer("d", emptySet()), BroadcastViewer("e", read, context = unauthenticated),
+        ).forEach { viewer -> assertEquals(viewer.receivesPinsEvents(), viewer.receivesShellStateEvents(), viewer.connectionId) }
+    }
+
+    @Test
     fun broadcastReachesOnlyLiveConnectionsHoldingTheCapability() = runTest {
         val registry = ConnectionRegistry()
         val reader = BroadcastViewer("endpoint-reader", setOf(IrohPeerCapabilities.CHAT_READ))

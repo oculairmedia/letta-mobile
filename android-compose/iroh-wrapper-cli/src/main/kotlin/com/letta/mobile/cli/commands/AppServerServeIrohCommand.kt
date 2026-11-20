@@ -609,6 +609,8 @@ class AppServerServeIrohCommand : CliktCommand(
         val permissionModes = com.letta.mobile.data.controller.node.iroh.PermissionModePublisher(scope)
         // The pinned agents every device shares; each accepted change is pushed to all of them.
         val pinsPublisher = com.letta.mobile.data.controller.node.iroh.pins.AgentPinsPublisher(scope)
+        // The shell state document every device shares; each accepted change is pushed to all of them.
+        val shellStatePublisher = com.letta.mobile.data.controller.node.iroh.shellstate.ShellStatePublisher(scope)
         val hostStateDirectory = java.io.File(resolvedModelExposureFile()).absoluteFile.parentFile.toPath()
         val adminRpcRouter = buildProductionAdminRouter(
             controller = admin.controller,
@@ -640,6 +642,9 @@ class AppServerServeIrohCommand : CliktCommand(
             // The shared speech setup lives beside the model exposure decisions; its key in an owner-only file.
             voiceRoutes = com.letta.mobile.data.controller.node.iroh.voice.VoiceEndpointRoutes.forHost(hostStateDirectory),
             pinsRoutes = com.letta.mobile.data.controller.node.iroh.pins.AgentPinsRoutes.forHost(hostStateDirectory, pinsPublisher),
+            shellStateRoutes = com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateRoutes.forHost(
+                hostStateDirectory, shellStatePublisher,
+            ),
         )
         notebookGrantsFile?.let { file ->
             val store = requireNotNull(notebooks) { "Notebook grants require a notebook store" }
@@ -662,6 +667,7 @@ class AppServerServeIrohCommand : CliktCommand(
         agentChanges.attach(endpoint.agentChangeTarget())
         conversationChanges.attach(endpoint.conversationChangeTarget())
         pinsPublisher.attach(endpoint::broadcastPinsUpdated)
+        shellStatePublisher.attach(endpoint::broadcastShellStateUpdated)
         println(
             "[iroh-app-server] admin_rpc handlers registered " +
                 "(methods: ${adminRpcRouter.methodCount}, " +

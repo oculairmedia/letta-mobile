@@ -78,6 +78,40 @@ object IrohSecretKeyStores {
         }
     }
 
+    /**
+     * Writes [text] to [path] in a file only the host's user may read (POSIX `rw-------`, else an ACL
+     * naming only the owner), the way the host keeps its secrets. The file is restricted before the text
+     * is written into it and replaced by a rename; where neither restriction applies this throws, so a
+     * secret is never written into a file others may read (unlike [restrictKeyFilePermissions], there is
+     * no best-effort fallback).
+     */
+    internal fun writeOwnerOnly(path: java.nio.file.Path, text: String) {
+        path.parent?.let(java.nio.file.Files::createDirectories)
+        val temp = path.resolveSibling(".${path.fileName}.tmp-${java.util.UUID.randomUUID()}")
+        try {
+            java.nio.file.Files.createFile(temp)
+            restrictToOwnerOnly(temp)
+            java.nio.file.Files.write(temp, text.toByteArray(Charsets.UTF_8))
+            runCatching {
+                java.nio.file.Files.move(
+                    temp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                )
+            }.getOrElse { java.nio.file.Files.move(temp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING) }
+            restrictToOwnerOnly(path)
+        } finally {
+            java.nio.file.Files.deleteIfExists(temp)
+        }
+    }
+
+    /** Owner-only access (POSIX `rw-------`, else an ACL naming only the owner), or a thrown error. */
+    private fun restrictToOwnerOnly(file: java.nio.file.Path) {
+        val posix = runCatching {
+            java.nio.file.Files.setPosixFilePermissions(file, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"))
+        }
+        if (posix.isSuccess) return
+        restrictToOwnerAcl(file)
+    }
+
     /** Replaces [path]'s ACL with one entry: full control for its owner. Throws where ACLs are unsupported. */
     fun restrictToOwnerAcl(path: java.nio.file.Path) {
         val view = requireNotNull(

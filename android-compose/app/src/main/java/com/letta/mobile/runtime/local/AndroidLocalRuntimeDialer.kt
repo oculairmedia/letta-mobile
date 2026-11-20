@@ -2,6 +2,7 @@ package com.letta.mobile.runtime.local
 
 import android.util.Log
 import com.letta.mobile.data.controller.node.iroh.pins.AgentPinsRoutes
+import com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateRoutes
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.runtime.OnDeviceModelFollowPolicy
 import com.letta.mobile.data.runtime.OnDeviceModelFollower
@@ -51,7 +52,13 @@ class AndroidLocalRuntimeDialer @Inject constructor(
                 requestTimeoutMs = LOCAL_REQUEST_TIMEOUT_MS,
             ),
             scope = scope,
-            router = directDialRouter(backendDir.absolutePath, listOf(AgentPinsRoutes.forOnDeviceHost(backendDir.toPath(), scope))),
+            router = directDialRouter(
+                backendDir.absolutePath,
+                listOf(
+                    AgentPinsRoutes.forOnDeviceHost(backendDir.toPath(), scope),
+                    ShellStateRoutes.forOnDeviceHost(backendDir.toPath(), scope),
+                ),
+            ),
             release = lease::close,
         )
         config?.let(EmbeddedLettaCodeModelSelection::from)?.let { followDeviceModel(dial, it) }
