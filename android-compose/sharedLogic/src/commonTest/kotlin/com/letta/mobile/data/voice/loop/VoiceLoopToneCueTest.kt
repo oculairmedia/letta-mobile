@@ -42,6 +42,19 @@ class VoiceLoopToneCueTest {
     }
 
     @Test
+    fun theSpeakingViewShowsTheWordsNeverTheCue() = runTest {
+        val h = LoopHarness(this)
+        h.listening()
+        h.turn()
+
+        h.replyText(VoiceText("[warm] It is noon. "))
+        h.mouth.started(h.mouth.segments.single().id)
+        h.settle()
+
+        assertEquals(VoiceText("It is noon."), h.state.speaking)
+    }
+
+    @Test
     fun bracketsThatAreNotCuesAreLeftToTheChunker() = runTest {
         val h = LoopHarness(this)
         h.listening()

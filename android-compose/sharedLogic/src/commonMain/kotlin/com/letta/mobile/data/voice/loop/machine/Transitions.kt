@@ -64,13 +64,15 @@ internal object Transitions {
 
     /**
      * Queues [text] for the mouth under a new segment id, for the speech queue's current owner. A
-     * tone cue the text starts with ([ToneCues.tag]) becomes the segment's tone, not its words.
+     * tone cue the text starts with ([ToneCues.tag]) becomes the segment's tone, not its words: only
+     * the words are kept as outstanding, so the speaking view never shows a cue.
      */
     fun speak(model: LoopModel, text: VoiceText): Step {
         val id = SpeechSegmentId(model.speech.nextId)
-        val speech = model.speech.copy(outstanding = model.speech.outstanding + (id to text), nextId = model.speech.nextId + 1)
-        val (tone, words) = ToneCues.untag(text.value)
-        return Step(model.copy(speech = speech), listOf(LoopEffect.Speak(SpeechSegment(id, VoiceText(words), tone))))
+        val (tone, untagged) = ToneCues.untag(text.value)
+        val words = VoiceText(untagged)
+        val speech = model.speech.copy(outstanding = model.speech.outstanding + (id to words), nextId = model.speech.nextId + 1)
+        return Step(model.copy(speech = speech), listOf(LoopEffect.Speak(SpeechSegment(id, words, tone))))
     }
 
     /**

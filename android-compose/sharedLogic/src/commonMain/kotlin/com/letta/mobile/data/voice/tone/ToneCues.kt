@@ -148,41 +148,54 @@ private class ToneScan(private val text: String, private val streaming: Boolean)
     val tokens = mutableListOf<ToneToken>()
 
     private var wordsFrom = 0
+    private var fence = false
+    private var span = false
 
     init {
         var index = 0
-        var fence = false
-        var span = false
-        while (index < text.length) {
-            when {
-                text.startsWith(FENCE, index) && !span -> {
-                    fence = !fence
-                    index += FENCE.length
-                }
-                text[index] == '`' && !fence -> {
-                    span = !span
-                    index++
-                }
-                fence || span || text[index] != '[' || !startsSentence(index) -> index++
-                else -> index = cueAt(index)
-            }
-        }
+        while (index < text.length) index = step(index)
         if (wordsFrom < text.length) tokens += ToneToken.Words(wordsFrom, text.length)
     }
 
+    /** Reads what starts at [index] (a fence, a code span mark, a possible cue or a plain character); returns where scanning goes on. */
+    private fun step(index: Int): Int = when {
+        opensFence(index) -> index.also { fence = !fence } + FENCE.length
+        marksSpan(index) -> index.also { span = !span } + 1
+        mayOpenCue(index) -> cueAt(index)
+        else -> index + 1
+    }
+
+    private fun opensFence(index: Int): Boolean = !span && text.startsWith(FENCE, index)
+
+    private fun marksSpan(index: Int): Boolean = !fence && text[index] == '`'
+
+    /** A `[` outside code, at the start of a sentence. */
+    private fun mayOpenCue(index: Int): Boolean = !inCode() && text[index] == '[' && text.startsSentenceAt(index)
+
+    private fun inCode(): Boolean = fence || span
+
     /** Reads a bracket opening at [open] that may be a cue; returns where scanning goes on. */
     private fun cueAt(open: Int): Int {
+        val close = readCueWord(open)
+        if (close >= text.length) return close.also { if (streaming && couldBecomeCue(open, close)) hold(open) }
+        val words = closedWords(open, close) ?: return open + 1
+        return closedCue(open, close + 1, words)
+    }
+
+    /** Where the lowercase letters after [open] stop, reading no further than a module name could reach. */
+    private fun readCueWord(open: Int): Int {
         var close = open + 1
-        while (close < text.length && close - open - 1 <= ToneCues.MAX_CUE_LENGTH && text[close] in 'a'..'z') close++
-        val length = close - open - 1
-        val unfinished = close >= text.length
-        val closed = !unfinished && text[close] == ']' && length in 1..ToneCues.MAX_CUE_LENGTH
-        val words = if (closed) text.substring(open + 1, close) else ""
-        return when {
-            unfinished -> close.also { if (streaming && couldBecomeCue(open, close)) hold(open) }
-            !closed || !ToneCues.accepts(words) -> open + 1
-            else -> closedCue(open, close + 1, words)
-        }
+        while (close < text.length && continuesCueWord(open, close)) close++
+        return close
+    }
+
+    private fun continuesCueWord(open: Int, at: Int): Boolean = at - open - 1 <= ToneCues.MAX_CUE_LENGTH && text[at] in 'a'..'z'
+
+    /** The bracket's words when it closes at [close] and they name a module; null otherwise. */
+    private fun closedWords(open: Int, close: Int): String? {
+        if (text[close] != ']') return null
+        val words = text.substring(open + 1, close)
+        return words.takeIf(ToneCues::accepts)
     }
 
     /**
@@ -190,11 +203,12 @@ private class ToneScan(private val text: String, private val streaming: Boolean)
      * streaming, held when nothing follows it yet); returns where scanning goes on.
      */
     private fun closedCue(open: Int, after: Int, words: String): Int {
-        if (after >= text.length && streaming) return after.also { hold(open) }
-        if (after < text.length && text[after] in LINK_FOLLOWERS) return after
-        val end = if (after < text.length && text[after] == ' ') after + 1 else after
+        val next = text.getOrNull(after)
+        if (next == null && streaming) return after.also { hold(open) }
+        if (next in LINK_FOLLOWERS) return after
+        val end = if (next == ' ') after + 1 else after
         if (open > wordsFrom) tokens += ToneToken.Words(wordsFrom, open)
-        tokens += ToneToken.Cue(open, end, ToneCue(words.trim()))
+        tokens += ToneToken.Cue(open, end, ToneCue(words))
         wordsFrom = end
         return end
     }
@@ -211,26 +225,45 @@ private class ToneScan(private val text: String, private val streaming: Boolean)
         wordsFrom = text.length
     }
 
-    /**
-     * At the start of the text or a line, or after a sentence's end (a terminator, with any closing
-     * quotes or brackets after it) followed by whitespace.
-     */
-    private fun startsSentence(index: Int): Boolean {
-        var before = index - 1
-        if (before < 0 || text[before] == '\n') return true
-        if (!text[before].isWhitespace()) return false
-        while (before >= 0 && text[before].isWhitespace()) {
-            if (text[before] == '\n') return true
-            before--
-        }
-        while (before >= 0 && text[before] in CLOSERS) before--
-        return before < 0 || text[before] in TERMINATORS
-    }
-
     private companion object {
         const val FENCE = "```"
-        val TERMINATORS = setOf('.', '!', '?', '…')
-        val CLOSERS = setOf('"', '\'', ')', ']', '*', '_', '”', '’')
         val LINK_FOLLOWERS = setOf('(', '[', ':')
     }
 }
+
+/**
+ * Whether [index] starts a sentence in this text: the start of the text or a line, or after a
+ * sentence's end (a terminator, with any closing quotes or brackets after it) followed by whitespace.
+ */
+private fun String.startsSentenceAt(index: Int): Boolean {
+    if (atLineStart(index - 1)) return true
+    if (!this[index - 1].isWhitespace()) return false
+    val beforeSpace = lastBeforeSpaces(index - 1) ?: return true
+    return endsSentenceAt(beforeSpace)
+}
+
+/** Whether the character before a position, at [before], is the start of the text or a line break. */
+private fun String.atLineStart(before: Int): Boolean = before < 0 || this[before] == '\n'
+
+/**
+ * The position of the last character before the whitespace ending at [from], or null when that
+ * whitespace holds a line break or reaches the start of the text (both start a sentence).
+ */
+private fun String.lastBeforeSpaces(from: Int): Int? {
+    var before = from
+    while (before >= 0 && this[before].isWhitespace()) {
+        if (this[before] == '\n') return null
+        before--
+    }
+    return before.takeIf { it >= 0 }
+}
+
+/** Whether the text up to [last] ends a sentence: a terminator, then any closing quotes or brackets. */
+private fun String.endsSentenceAt(last: Int): Boolean {
+    var before = last
+    while (before >= 0 && this[before] in SENTENCE_CLOSERS) before--
+    return before < 0 || this[before] in SENTENCE_TERMINATORS
+}
+
+private val SENTENCE_TERMINATORS = setOf('.', '!', '?', '…')
+private val SENTENCE_CLOSERS = setOf('"', '\'', ')', ']', '*', '_', '”', '’')
