@@ -7,6 +7,7 @@ import com.letta.mobile.data.voice.audio.PcmChunk
 import com.letta.mobile.data.voice.audio.PcmFormat
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
 import com.letta.mobile.data.voice.host.HostSpeechEvent
+import com.letta.mobile.data.voice.host.HostSpeechParams
 import com.letta.mobile.data.voice.host.HostSpeechStreamFrame
 import com.letta.mobile.data.voice.host.HostTranscriptionResult
 import com.letta.mobile.data.voice.host.HostVoiceClearParams
@@ -19,6 +20,7 @@ import com.letta.mobile.data.voice.host.HostVoiceSetupCommand
 import com.letta.mobile.data.voice.host.HostVoiceSetupStatus
 import com.letta.mobile.data.voice.host.HostVoiceTestResult
 import com.letta.mobile.data.voice.host.HostVoiceWire
+import com.letta.mobile.data.voice.tone.ToneCue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
@@ -97,9 +99,12 @@ class IrohHostVoiceEndpoint(
         return SpeechTranscript(VoiceText(words), parts.flatMap { it.segments })
     }
 
-    override fun synthesize(text: VoiceText): Flow<PcmChunk> = channelFlow {
+    override fun synthesize(text: VoiceText): Flow<PcmChunk> = synthesize(text, null)
+
+    override fun synthesize(text: VoiceText, tone: ToneCue?): Flow<PcmChunk> = channelFlow {
         if (text.value.length > HostVoiceWire.MAX_SPEECH_TEXT_CHARS) throw HostVoiceException(HostVoiceErrorCode.PAYLOAD_TOO_LARGE)
-        val params = buildJsonObject { put("text", text.value) }
+        val request = HostSpeechParams(text.value, tone?.instructions)
+        val params = json.encodeToJsonElement(HostSpeechParams.serializer(), request) as JsonObject
         var attempt = 1
         while (speakOnce(this, params) == SpeechAttempt.BUSY) {
             if (attempt >= busyAttempts) throw HostVoiceException(HostVoiceErrorCode.BUSY)

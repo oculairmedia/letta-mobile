@@ -34,6 +34,7 @@ import com.letta.mobile.data.chat.projection.isMonitorWatcher
 import com.letta.mobile.data.chat.projection.monitorEvent
 import com.letta.mobile.data.chat.projection.requiresUserInput
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.voice.tone.ToneCues
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_message_actions
 import com.letta.mobile.sharedui.resources.rows_copy_response
@@ -162,7 +163,8 @@ private fun AssistantPrimaryContent(
         }
         else -> AgentText(
             AgentTextParams(
-                text = message.content,
+                // Tone cues are for the voice, never shown; an unfinished one is held while it streams.
+                text = ToneCues.strip(message.content, streaming = context.isStreaming(message)),
                 isError = false,
                 isStreaming = context.isStreaming(message),
                 deliveryTimestamp = message.timestamp.takeIf { message.id == context.newestMessageId && !context.isStreaming(message) },

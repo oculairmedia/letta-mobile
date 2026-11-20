@@ -17,6 +17,7 @@ import com.letta.mobile.data.voice.consent.VoiceEndpointPayload
 import com.letta.mobile.data.voice.engine.SpeechAudioMeter
 import com.letta.mobile.data.voice.engine.SpeechSegment
 import com.letta.mobile.data.voice.engine.SpeechSegmentId
+import com.letta.mobile.data.voice.tone.ToneCue
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.content.TextContent
@@ -167,6 +168,24 @@ class ConcurrentSpeechTest {
         }
         assertEquals(Measured(SpeechSegmentId(1), 500.milliseconds, complete = true), final)
         assertTrue(synchronized(lock) { requestBodies.single() }.contains("\"speed\":1.25"), "the speed goes to the endpoint")
+        mouth.stop()
+    }
+
+    @Test
+    fun aSegmentsToneGoesToTheEndpointAsInstructions() = streamTest { scope ->
+        val mouth = EndpointVoiceMouth(synthesizer, HoldingPlayer(), scope)
+        mouth.speak(SpeechSegment(SpeechSegmentId(1), VoiceText("Sentence 1."), ToneCue("slow")))
+        bodyOf(1).answer(samplesOf(1))
+        assertTrue(synchronized(lock) { requestBodies.single() }.contains("\"instructions\":\"slow\""))
+        mouth.stop()
+    }
+
+    @Test
+    fun aSegmentWithoutAToneSendsNoInstructions() = streamTest { scope ->
+        val mouth = EndpointVoiceMouth(synthesizer, HoldingPlayer(), scope)
+        mouth.speak(segment(1))
+        bodyOf(1).answer(samplesOf(1))
+        assertTrue("instructions" !in synchronized(lock) { requestBodies.single() })
         mouth.stop()
     }
 

@@ -3,6 +3,7 @@ package com.letta.mobile.data.voice.engine
 import com.letta.mobile.data.voice.AudioLevel
 import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoiceText
+import com.letta.mobile.data.voice.tone.ToneCue
 import kotlinx.coroutines.flow.Flow
 import kotlin.jvm.JvmInline
 import kotlin.time.Duration
@@ -18,8 +19,10 @@ value class SpeechSegmentId(
 data class SpeechSegment(
     /** Its number. */
     val id: SpeechSegmentId,
-    /** What to say. */
+    /** What to say, with no tone cue in it. */
     val text: VoiceText,
+    /** How to say it: the reply's tone cue in force for this segment, sent as `instructions`; null for none. */
+    val tone: ToneCue? = null,
 )
 
 /**
