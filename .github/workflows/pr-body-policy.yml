@@ -9,10 +9,10 @@ name: PR body policy
 # Merge gating (no policy is weakened): android.yml runs the same script (scripts/ci/pr-body-policy.sh)
 # as its `pr-body-gate` job on opened/synchronize/reopened, and the required `test` aggregate needs
 # it. A description edit does not re-run android.yml, so on `edited` this workflow gives the verdict
-# in about a minute and, when the android.yml run on the same head SHA already finished with a failed
-# gate, re-runs just that job (and the dependent `test` aggregate) so the required `test` context
-# turns green without a new push. If that run is still in progress GitHub refuses the re-run: it
-# prints the job id to re-run (`gh run rerun <run-id> --job <job-id>`) once the run finishes.
+# in about a minute and then re-runs the android.yml `pr-body-gate` of the same head (whatever its
+# earlier result) together with its dependent `test` aggregate: a body that becomes invalid turns the
+# required `test` red, and fixing it turns it green, with no push. If the android.yml run is still in
+# progress GitHub cannot re-run a job of it, so the refresh waits for the run to finish first.
 
 on:
   pull_request:
@@ -51,19 +51,20 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: bash scripts/ci/pr-body-policy.sh
 
-  # Never fails the run: the verdict is the pr-body-policy job above.
+  # Never fails the run: the verdict is the pr-body-policy job above. Runs after a failed policy
+  # job too (always()): that is exactly when a previously green `test` must turn red.
   refresh-android-gate:
     name: refresh-android-gate
     needs: pr-body-policy
-    if: github.event.action == 'edited'
+    if: always() && github.event.action == 'edited'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 60
     continue-on-error: true
     permissions:
       actions: write
       contents: read
     steps:
-      - name: Re-run a failed pr-body-gate on the same head
+      - name: Re-run pr-body-gate (and the dependent test aggregate) on the same head
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -75,15 +76,15 @@ jobs:
             echo "No android.yml run on ${HEAD_SHA}; nothing to refresh."
             exit 0
           fi
-          status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '.status')"
+          # A job of a run in progress cannot be re-run; wait (the cancel-in-progress group of this
+          # workflow lets a newer edit supersede this wait).
+          while [[ "$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '.status')" != completed ]]; do
+            sleep 30
+          done
           job_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs?per_page=100" \
-            --jq '[.jobs[] | select((.name | startswith("pr-body-gate")) and .conclusion == "failure")][0].id // empty')"
+            --jq '[.jobs[] | select(.name | startswith("pr-body-gate"))][0].id // empty')"
           if [[ -z "$job_id" ]]; then
-            echo "android.yml run ${run_id} has no failed pr-body-gate; nothing to refresh."
-            exit 0
-          fi
-          if [[ "$status" != completed ]]; then
-            echo "::notice::android.yml run ${run_id} is ${status}; GitHub only re-runs a job of a finished run. Re-run pr-body-gate (job ${job_id}) when it finishes."
+            echo "android.yml run ${run_id} has no pr-body-gate job; nothing to refresh."
             exit 0
           fi
           gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/jobs/${job_id}/rerun"

@@ -6,7 +6,7 @@
 #
 # Env: GH_TOKEN, GITHUB_REPOSITORY, PR_NUMBER, PR_AUTHOR, BASE_SHA, BASE_REF.
 # Runs every check even after one fails, so a single run lists every missing line.
-set -uo pipefail
+set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
@@ -16,9 +16,15 @@ if ! git rev-parse --verify -q "${BASE_SHA}^{commit}" >/dev/null; then
     || git fetch --no-tags origin "${BASE_REF}"
 fi
 
+# errexit makes a failed read fail the job: a missing token, rate limit or outage must never
+# look like an empty (or stale) description.
 PR_BODY="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.body // ""')"
 export PR_BODY
+# The live read is authoritative, including when it is empty: every guard falls back to the
+# triggering event's (possibly stale) body when PR_BODY is empty, so the event is hidden from them.
+unset GITHUB_EVENT_PATH
 
+set +e
 status=0
 echo "::group::Shared implementation searched"
 bash scripts/ci/agents-policy-check.sh --require-shared-search || status=1

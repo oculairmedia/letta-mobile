@@ -39,7 +39,9 @@ on:
 concurrency:
   # The event is part of the group so a main push never cancels the nightly
   # run (or the other way round); a newer push still supersedes an older one.
-  group: android-perf-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  # A main run is never cancelled, and its group carries the commit: a shared group would still
+  # replace a *pending* main run (queue: single), so a burst of merges would drop commits' runs.
+  group: android-perf-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
