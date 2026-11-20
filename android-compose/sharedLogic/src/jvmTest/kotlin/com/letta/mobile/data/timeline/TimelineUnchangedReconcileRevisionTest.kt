@@ -191,6 +191,14 @@ class TimelineUnchangedReconcileRevisionTest {
             """"tool_call_id":"call-approve","status":"success","tool_return":"written""""))
         val approvalResponse = wire(WireRow("msg-approval-response", "approval_response_message", RUN, 6,
             """"approve":true,"approval_request_id":"msg-approval""""))
+        // One invocation the host lists twice: as a tool_call_message and as its approval_request_message
+        // (TimelineHydrationReducer.semanticIdentityKeyOrNull), each under its own server id and date.
+        val dualCall = wire(WireRow("msg-dual-call", "tool_call_message", RUN, 2,
+            """"tool_call":{"tool_call_id":"call-dual","name":"Bash","arguments":"{}"}"""))
+        val dualRequest = wire(WireRow("msg-dual:tool:call-dual:request", "approval_request_message", RUN, 3,
+            """"tool_call":{"tool_call_id":"call-dual","name":"Bash","arguments":"{}"}"""))
+        val dualReturn = wire(WireRow("msg-dual-return", "tool_return_message", RUN, 4,
+            """"tool_call_id":"call-dual","status":"success","tool_return":"ok""""))
         val readCall = wire(WireRow("msg-read", "tool_call_message", RUN, 7,
             """"tool_call":{"tool_call_id":"call-read","name":"Read","arguments":"{}"}"""))
         val readReturn = wire(WireRow("msg-read-return", "tool_return_message", RUN, 8,
@@ -223,6 +231,7 @@ class TimelineUnchangedReconcileRevisionTest {
             RowKind("tool call + blank return", listOf(call, blankReturn)),
             RowKind("tool return whose call is older than the page", listOf(callReturn)),
             RowKind("approval request + return", listOf(approval, approvalReturn)),
+            RowKind("one call listed as tool call and as approval request", listOf(dualCall, dualRequest, dualReturn)),
             readImage,
             RowKind("mid-turn follow-up prompt (#2460)", listOf(narration, followUp, reply)),
             RowKind("mid-turn follow-up prompt inside the run", listOf(narration, followUpInRun, reply)),
