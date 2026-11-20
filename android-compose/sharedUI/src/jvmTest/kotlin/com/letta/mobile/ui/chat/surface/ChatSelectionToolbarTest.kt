@@ -12,8 +12,10 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
@@ -118,7 +120,11 @@ class ChatSelectionToolbarTest {
             }
         }
         mainClock.advanceTimeBy(SETTLE_MILLIS)
+        // The reply's text is composed off the test clock, so on a loaded machine the first frames can
+        // precede it: step the manual clock until the row shows its text, never on elapsed time alone.
+        advanceClockUntil { onAllNodesWithText(REPLY, substring = true, useUnmergedTree = true).fetchSemanticsNodes().size == 1 }
         onAllNodesWithTag(ChatRowTestTags.AGENT_TEXT)[0].performTouchInput { longClick(center) }
+        advanceClockUntil { toolbar.status == TextToolbarStatus.Shown }
         mainClock.advanceTimeBy(SETTLE_MILLIS)
         assertEquals(TextToolbarStatus.Shown, toolbar.status, "the long press selects and shows the toolbar")
         val shows = toolbar.shows
@@ -128,7 +134,21 @@ class ChatSelectionToolbarTest {
         assertEquals(hides, toolbar.hides, "the toolbar was hidden while nothing moved")
     }
 
+    /** Steps the manual clock a frame at a time (letting off-clock work run between frames) until [condition] holds. */
+    private fun ComposeUiTest.advanceClockUntil(condition: () -> Boolean) {
+        val deadline = System.nanoTime() + CONDITION_TIMEOUT_MILLIS * NANOS_PER_MILLI
+        while (!condition()) {
+            check(System.nanoTime() < deadline) { "the condition did not hold within $CONDITION_TIMEOUT_MILLIS ms" }
+            mainClock.advanceTimeByFrame()
+            Thread.sleep(POLL_MILLIS)
+        }
+    }
+
     private companion object {
+        const val CONDITION_TIMEOUT_MILLIS = 10_000L
+        const val NANOS_PER_MILLI = 1_000_000L
+        const val POLL_MILLIS = 5L
+        const val REPLY = "Here's an L-shaped plan with an island and a pantry wall."
         const val AGENT = "agent-1"
         const val PHONE_WIDTH = 412
         const val PHONE_HEIGHT = 900

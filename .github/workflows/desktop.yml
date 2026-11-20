@@ -54,7 +54,7 @@ on:
 
 concurrency:
   group: desktop-installer-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -120,7 +120,10 @@ jobs:
         # desktop/build.gradle.kts downloadDesktopJbr). The archive lands in
         # the build downloads dir under D:\l (the WiX-friendly packaging
         # workspace). Cache the zip so subsequent runs skip the ~180MB pull.
-        uses: actions/cache@v4
+        # Restore here; the save step after packaging writes it from main pushes only
+        # (PR merge refs wrote private 312 MB duplicates that no other ref can read).
+        id: jbr
+        uses: actions/cache/restore@v4
         with:
           path: D:\l\downloads
           key: ${{ runner.os }}-jbr-${{ hashFiles('android-compose/desktop/build.gradle.kts') }}
@@ -131,7 +134,9 @@ jobs:
         # build-bridge.sh keeps rive-runtime's headers and release libraries (~1.7 GB, mostly
         # rive.lib) as D:\rb\work\sdk and reuses them at the pinned commit, so a hit skips the
         # clone and the ~3 min library build; the bridge itself always recompiles.
-        uses: actions/cache@v4
+        # Saved from main pushes only (see the save step after the bridge build).
+        id: rive-sdk
+        uses: actions/cache/restore@v4
         with:
           path: D:\rb\work\sdk
           key: ${{ runner.os }}-rive-runtime-sdk-${{ hashFiles('android-compose/avatar/renderer-rive/native/desktop/rive-runtime.version', 'android-compose/avatar/renderer-rive/native/desktop/tools/**', 'android-compose/avatar/renderer-rive/native/desktop/build-bridge.sh') }}
@@ -143,6 +148,13 @@ jobs:
         run: |
           bash avatar/renderer-rive/native/desktop/build-bridge.sh /d/rb/work /d/rb/out
           echo 'LETTA_RIVE_BRIDGE_DLL=D:\rb\out\rive_desktop_bridge.dll' >> "$GITHUB_ENV"
+
+      - name: Save rive-runtime build (main pushes only)
+        if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.rive-sdk.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: D:\rb\work\sdk
+          key: ${{ steps.rive-sdk.outputs.cache-primary-key }}
 
       - name: Build Windows EXE + MSI installers
         env:
@@ -162,6 +174,13 @@ jobs:
         # plus JBR verify actions). :desktop:run is configuration-cache safe;
         # this entry point is not, so keep the cache off here only.
         run: ./gradlew --no-configuration-cache :desktop:packageDistributionForCurrentOS
+
+      - name: Save JetBrains Runtime download (main pushes only)
+        if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.jbr.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: D:\l\downloads
+          key: ${{ steps.jbr.outputs.cache-primary-key }}
 
       - name: Verify the mascot renderer is in the app image
         shell: pwsh
@@ -286,8 +305,10 @@ jobs:
           python3 scripts/tests/test_linux_startup_diagnostic.py
           python3 scripts/tests/test_nucleus_hotkey.py
 
-      - name: Cache pinned Linux Rive build
-        uses: actions/cache@v4
+      - name: Restore pinned Linux Rive build
+        # Saved from main pushes only (step after the bridge build).
+        id: rive-linux
+        uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/rive-linux
           key: ubuntu-22.04-rive-gl-${{ hashFiles('android-compose/avatar/renderer-rive/native/desktop/rive-runtime.version', 'android-compose/avatar/renderer-rive/native/desktop/build-linux.sh', 'android-compose/avatar/renderer-rive/native/desktop/tools/**') }}
@@ -299,6 +320,13 @@ jobs:
           python3 avatar/renderer-rive/native/desktop/smoke-linux.py \
             "$RUNNER_TEMP/rive-out/librive_desktop_bridge.so" avatar/renderer-rive/src/androidMain/res/raw/mascot.riv \
             "$RUNNER_TEMP/linux-rive-smoke"
+
+      - name: Save pinned Linux Rive build (main pushes only)
+        if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.rive-linux.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/rive-linux
+          key: ${{ steps.rive-linux.outputs.cache-primary-key }}
 
       - name: Upload Linux Rive frames
         if: always()

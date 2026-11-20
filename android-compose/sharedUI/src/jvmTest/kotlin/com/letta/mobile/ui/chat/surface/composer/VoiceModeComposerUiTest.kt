@@ -26,10 +26,12 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.waitUntilExactlyOneExists
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
@@ -358,6 +360,9 @@ class VoiceModeComposerUiTest {
 
         onNodeWithTag(VoiceModeTags.BUTTON).performClick()
         waitForState({ handle }, VoiceModeState.Listening)
+        // The card unfolds from fully transparent, and a transparent node is not in the merged tree (it is
+        // in the unmerged one): on a loaded machine the first frame lands before it has any opacity.
+        waitUntilExactlyOneExists(hasTestTag(VoiceModeTags.CARD), timeoutMillis = 5_000)
         waitForIdle()
         onNodeWithTag(VoiceModeTags.CARD).assertExists()
         val card = bounds(VoiceModeTags.CARD)

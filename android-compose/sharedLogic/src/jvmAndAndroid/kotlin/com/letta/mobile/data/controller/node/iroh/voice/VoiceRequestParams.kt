@@ -5,6 +5,7 @@ import com.letta.mobile.data.voice.audio.pcm.WavParse
 import com.letta.mobile.data.voice.host.HostTranscriptionParams
 import com.letta.mobile.data.voice.host.HostVoiceErrorCode
 import com.letta.mobile.data.voice.host.HostVoiceWire
+import com.letta.mobile.data.voice.tone.ToneCues
 import kotlin.io.encoding.Base64
 import kotlinx.serialization.json.JsonObject
 
@@ -44,6 +45,13 @@ internal object VoiceRequestParams {
         if (text.length > HostVoiceWire.MAX_SPEECH_TEXT_CHARS) voiceRefuse(HostVoiceErrorCode.PAYLOAD_TOO_LARGE)
         return text
     }
+
+    /**
+     * `voice.speech` params' optional `instructions` (the reply's mood module): passed on only when it
+     * names a module by [ToneCues.accepts]; anything else, a free-form description included, is dropped
+     * and the text is spoken plainly.
+     */
+    fun speechInstructions(params: JsonObject?): String? = params?.voiceString("instructions")?.trim()?.takeIf(ToneCues::accepts)
 
     /** Base64 of the largest accepted clip, rounded up to whole groups. */
     private const val MAX_AUDIO_BASE64_CHARS = (HostVoiceWire.MAX_TRANSCRIPTION_AUDIO_BYTES + 2) / 3 * 4

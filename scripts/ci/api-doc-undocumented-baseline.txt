@@ -514,7 +514,6 @@
 :sharedLogic com.letta.mobile.data.timeline/CanonicalTimelineCoordinator/reconcileRecent/#com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner/ (common)
 :sharedLogic com.letta.mobile.data.timeline/CanonicalTimelineCoordinator/reconcileRecentDetailed/#com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner/ (common)
 :sharedLogic com.letta.mobile.data.timeline/CanonicalTimelineCoordinator/withRepairLease/#com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner#kotlin.coroutines.SuspendFunction0[TypeParam(bounds=[kotlin.Any?])]/ (common)
-:sharedLogic com.letta.mobile.data.timeline/CanonicalTimelineEngine/advanceToolSweep/#com.letta.mobile.data.timeline.TimelineEngineSelection/ (common)
 :sharedLogic com.letta.mobile.data.timeline/CanonicalTimelineEngine/applyPage/#com.letta.mobile.data.timeline.TimelineEngineRequest#com.letta.mobile.data.timeline.TimelineRemotePageResult.Page/ (common)
 :sharedLogic com.letta.mobile.data.timeline/CanonicalTimelineEngine/beginLive/#com.letta.mobile.data.timeline.TimelineEngineSelection/ (common)
 :sharedLogic com.letta.mobile.data.timeline/CanonicalTimelineEngine/beginPage/#com.letta.mobile.data.timeline.TimelineEngineSelection/ (common)

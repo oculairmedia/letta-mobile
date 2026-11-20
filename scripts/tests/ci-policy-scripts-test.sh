@@ -159,12 +159,15 @@ required_test_job="$(
 )"
 assert_contains "$required_test_job" 'name: test'
 # letta-mobile-l8lcn: web tests are part of the required set too.
-assert_contains "$required_test_job" 'needs: [test, api-docs, api-contract-windows, web-wasm]'
+# PR-description checks (pr-body-gate) are part of the same aggregate: a missing body line blocks merge.
+assert_contains "$required_test_job" 'needs: [test, api-docs, api-contract-windows, web-wasm, pr-body-gate]'
 assert_contains "$required_test_job" 'if: always()'
 assert_contains "$required_test_job" 'TEST_RESULT: ${{ needs.test.result }}'
 assert_contains "$required_test_job" 'DOCS_RESULT: ${{ needs.api-docs.result }}'
 assert_contains "$required_test_job" 'WINDOWS_API_RESULT: ${{ needs.api-contract-windows.result }}'
 assert_contains "$required_test_job" 'WEB_RESULT: ${{ needs.web-wasm.result }}'
+assert_contains "$required_test_job" 'BODY_RESULT: ${{ needs.pr-body-gate.result }}'
+assert_contains "$required_test_job" 'EVENT_NAME: ${{ github.event_name }}'
 api_docs_job="$(awk '/^  api-docs:$/ { active=1; next }
   active && /^  [[:alnum:]_-]+:$/ { exit }
   active { print }' "$android_workflow")"
@@ -196,12 +199,24 @@ for test_result in success failure cancelled skipped; do
   for docs_result in success failure cancelled skipped; do
     for windows_api_result in success failure cancelled skipped; do
       for web_result in success failure skipped; do
-        combo="$test_result/$docs_result/$windows_api_result/$web_result"
-        if TEST_RESULT="$test_result" DOCS_RESULT="$docs_result" WINDOWS_API_RESULT="$windows_api_result"           WEB_RESULT="$web_result" bash -e -c "$required_test_script"; then
-          [[ "$combo" == success/success/success/success ]] || fail "required test accepted $combo"
-        else
-          [[ "$combo" != success/success/success/success ]] || fail "required test rejected successful jobs"
-        fi
+        for event_name in pull_request push; do
+          for body_result in success failure cancelled skipped; do
+            combo="$test_result/$docs_result/$windows_api_result/$web_result/$event_name/$body_result"
+            # A PR needs the description checks to succeed; a push has none, so they must be skipped.
+            body_ok=no
+            if [[ "$event_name/$body_result" == pull_request/success || "$event_name/$body_result" == push/skipped ]]; then
+              body_ok=yes
+            fi
+            if TEST_RESULT="$test_result" DOCS_RESULT="$docs_result" WINDOWS_API_RESULT="$windows_api_result" \
+              WEB_RESULT="$web_result" EVENT_NAME="$event_name" BODY_RESULT="$body_result" bash -e -c "$required_test_script"; then
+              [[ "$test_result/$docs_result/$windows_api_result/$web_result/$body_ok" == success/success/success/success/yes ]] \
+                || fail "required test accepted $combo"
+            else
+              [[ "$test_result/$docs_result/$windows_api_result/$web_result/$body_ok" != success/success/success/success/yes ]] \
+                || fail "required test rejected successful jobs ($combo)"
+            fi
+          done
+        done
       done
     done
   done
@@ -211,9 +226,67 @@ assert_contains "$test_job" 'python3 scripts/ci/parity_gates.py'
 assert_contains "$test_job" 'bash scripts/ci/platform-ui-gate.sh --enforce'
 assert_contains "$test_job" 'python3 scripts/ci/baseline-ratchet-guard.py --diff-base "$BASE_SHA"'
 assert_contains "$test_job" 'python3 scripts/ci/tree-hygiene.py --diff-base "$BASE_SHA"'
-assert_contains "$test_job" 'python3 scripts/ci/web-bundle-raise-guard.py --diff-base "$BASE_SHA"'
 assert_contains "$test_job" 'test_gate_hygiene.py'
-assert_contains "$test_job" 'bash scripts/ci/agents-policy-check.sh --require-shared-search'
+# The PR-description checks (shared-search line, web-bundle approval, test-weakening reason) moved out of
+# test-workload into pr-body-policy.sh, run by the pr-body-gate job (needed by required `test`) and by
+# pr-body-policy.yml on every description edit. They must stay out of the heavy graph: an edit must
+# never re-run it.
+body_script="$(<"$SOURCE_ROOT/scripts/ci/pr-body-policy.sh")"
+assert_contains "$body_script" 'bash scripts/ci/agents-policy-check.sh --require-shared-search'
+assert_contains "$body_script" 'python3 scripts/ci/web-bundle-raise-guard.py --diff-base "$BASE_SHA"'
+assert_contains "$body_script" 'python3 scripts/ci/test-weakening-guard.py --diff-base "$BASE_SHA"'
+assert_contains "$body_script" "gh api \"repos/\${GITHUB_REPOSITORY}/pulls/\${PR_NUMBER}\" --jq '.body // \"\"'"
+assert_not_contains "$test_job" 'agents-policy-check.sh --require-shared-search'
+assert_not_contains "$test_job" 'web-bundle-raise-guard.py --diff-base'
+assert_not_contains "$test_job" 'test-weakening-guard.py --diff-base'
+assert_not_contains "$test_job" 'PR_BODY'
+pr_body_gate_job="$(
+  awk '/^  pr-body-gate:$/ { active=1; next }
+       active && /^  [[:alnum:]_-]+:$/ { exit }
+       active { print }' "$android_workflow"
+)"
+assert_contains "$pr_body_gate_job" "if: github.event_name == 'pull_request'"
+assert_contains "$pr_body_gate_job" 'run: bash scripts/ci/pr-body-policy.sh'
+body_workflow="$(<"$SOURCE_ROOT/.github/workflows/pr-body-policy.yml")"
+assert_contains "$body_workflow" 'types: [opened, edited, synchronize, reopened]'
+assert_contains "$body_workflow" 'run: bash scripts/ci/pr-body-policy.sh'
+assert_not_contains "$body_workflow" 'gradlew'
+# An edit that invalidates the body must turn the required `test` red: the refresh re-runs pr-body-gate
+# whatever its earlier result, and still runs after a failed policy job.
+refresh_job="$(awk '/^  refresh-android-gate:$/ { active=1; next }
+  active && /^  [[:alnum:]_-]+:$/ { exit }
+  active { print }' <<<"$body_workflow")"
+assert_contains "$refresh_job" "if: always() && github.event.action == 'edited'"
+assert_contains "$refresh_job" '/jobs/${job_id}/rerun'
+assert_not_contains "$refresh_job" 'conclusion == "failure"'
+# The live body read must fail the job when it fails (errexit) and be the only body source: an empty
+# live body is a missing line, never a reason to fall back to the (stale) event payload.
+assert_contains "$body_script" 'set -euo pipefail'
+assert_contains "$body_script" 'unset GITHUB_EVENT_PATH'
+body_repo="$TMP/body-policy"
+mkdir -p "$body_repo/bin" "$body_repo/event"
+echo '{"pull_request":{"body":"Shared implementation searched: android-compose/sharedUI/"}}' > "$body_repo/event/event.json"
+run_body_policy() {  # $1 = fake gh stdout, $2 = fake gh exit code
+  printf '#!/usr/bin/env bash\nprintf "%%s" "$FAKE_GH_BODY"\nexit "$FAKE_GH_EXIT"\n' > "$body_repo/bin/gh"
+  chmod +x "$body_repo/bin/gh"
+  PATH="$body_repo/bin:$PATH" FAKE_GH_BODY="$1" FAKE_GH_EXIT="$2" GITHUB_REPOSITORY=o/r PR_NUMBER=1 PR_AUTHOR=a \
+    BASE_SHA="$(git -C "$SOURCE_ROOT" rev-parse HEAD)" BASE_REF=main GITHUB_EVENT_PATH="$body_repo/event/event.json" \
+    bash "$SOURCE_ROOT/scripts/ci/pr-body-policy.sh" 2>&1
+}
+run_body_policy 'Shared implementation searched: android-compose/sharedUI/' 0 >/dev/null || fail 'pr-body-policy.sh rejected a valid live body'
+if run_body_policy '' 0 >/dev/null; then fail 'pr-body-policy.sh fell back to the event payload on an empty live body'; fi
+if run_body_policy 'Shared implementation searched: android-compose/sharedUI/' 1 >/dev/null; then fail 'pr-body-policy.sh passed although the gh api read failed'; fi
+# A body edit must not start (or cancel) the heavy Android graph, and a main run must never be cancelled.
+assert_not_contains "$pr_triggers" 'edited'
+assert_contains "$pr_triggers" 'types: [opened, synchronize, reopened]'
+assert_contains "$android_workflow_text" "cancel-in-progress: \${{ github.ref != 'refs/heads/main' }}"
+# Every android.yml job carries its own timeout-minutes (the default is 360).
+while IFS= read -r job_name; do
+  job_block="$(awk -v job="  ${job_name}:" '$0 == job { active=1; next }
+    active && /^  [[:alnum:]_-]+:$/ { exit }
+    active { print }' "$android_workflow")"
+  assert_contains "$job_block" $'\n    timeout-minutes: '
+done < <(awk '/^jobs:$/ { active=1; next } active && /^  [[:alnum:]_-]+:$/ { sub(/:$/, "", $1); print $1 }' "$android_workflow")
 assert_contains "$test_job" 'test_parity_gates.py'
 assert_contains "$test_job" "python3 -m unittest discover -s scripts/ci -p 'test_baseline_ratchet_guard.py' -v"
 assert_contains "$test_job" 'scripts/tests/platform-ui-gate-test.sh'
@@ -293,6 +366,10 @@ assert_contains "$perf_workflow" '- "feat/**"'
 assert_contains "$perf_workflow" '- "cursor/**"'
 assert_contains "$perf_workflow" '- "codex/**"'
 assert_contains "$perf_workflow" 'cache-read-only: true'
+# A main run is never cancelled and keeps its own group per commit, so a burst of merges cannot
+# replace a pending main run (queue: single).
+assert_contains "$perf_workflow" "cancel-in-progress: \${{ github.ref != 'refs/heads/main' }}"
+assert_contains "$perf_workflow" "github.ref == 'refs/heads/main' && format('-{0}', github.sha)"
 
 # Required Gradle caches belong to main, never ephemeral PR merge refs.
 # Keep job-scoped snapshots: setup-gradle deduplicates their shared artifacts.

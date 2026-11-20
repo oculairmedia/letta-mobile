@@ -212,6 +212,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Keystore v1: provider contract](reference/contracts/keystore-v1.md)
 - [Lane inbox v1](reference/contracts/lane-inbox-v1.md)
 - [Object verbs v1: contract proposal](reference/contracts/object-verbs-v1.md)
+- [Pins v1: the host's pinned agents, one list shared by every device](reference/contracts/pins-v1.md)
 - [Project registry v1: host-owned project record, project file and read methods](reference/contracts/project-registry-v1.md)
 - [Admin RPC Wire Contracts](reference/contracts/README.md)
 - [Secret request v1: secure secret-input flow](reference/contracts/secret-request-v1.md)
@@ -352,6 +353,14 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 ### reference/contracts/monitor.stop
 
 - [monitor.stop: Background process stop v1](reference/contracts/monitor.stop/process-v1.md)
+
+### reference/contracts/pins.get
+
+- [pins.get: pins v1](reference/contracts/pins.get/pins-v1.md)
+
+### reference/contracts/pins.set
+
+- [pins.set: pins v1](reference/contracts/pins.set/pins-v1.md)
 
 ### reference/contracts/reflection.get
 

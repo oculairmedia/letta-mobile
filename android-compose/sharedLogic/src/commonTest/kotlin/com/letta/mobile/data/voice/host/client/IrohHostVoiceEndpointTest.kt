@@ -22,6 +22,7 @@ import com.letta.mobile.data.voice.host.HostVoiceGrants
 import com.letta.mobile.data.voice.host.HostVoiceKeyChange
 import com.letta.mobile.data.voice.host.HostVoiceSetupCommand
 import com.letta.mobile.data.voice.host.HostVoiceWire
+import com.letta.mobile.data.voice.tone.ToneCue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
@@ -199,6 +200,20 @@ class IrohHostVoiceEndpointTest {
         assertEquals(HostVoiceErrorCode.UNSUPPORTED, assertFailsWith<HostVoiceException> { endpoint.status() }.code)
         link.answer = { _, _ -> HostVoiceReply(true, JsonPrimitive("not a status")) }
         assertEquals(HostVoiceErrorCode.INTERNAL, assertFailsWith<HostVoiceException> { endpoint.status() }.code)
+    }
+
+    @Test
+    fun aToneGoesToTheHostAsInstructionsAndNoToneSendsNone() = runTest {
+        val case = VoiceFixtures.case(HostVoiceWire.SPEECH, "streamed reply")
+        link.frames = { case.stream() }
+
+        endpoint.synthesize(VoiceText("Placeholder reply."), ToneCue("excited")).toList()
+        endpoint.synthesize(VoiceText("Placeholder reply."), null).toList()
+
+        val (toned, plain) = link.calls.map { it.second }
+        assertEquals(JsonPrimitive("excited"), toned["instructions"])
+        assertEquals(JsonPrimitive("Placeholder reply."), toned["text"])
+        assertEquals(null, plain["instructions"])
     }
 
     @Test

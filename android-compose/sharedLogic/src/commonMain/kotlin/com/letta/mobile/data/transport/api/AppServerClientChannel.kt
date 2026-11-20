@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.api
 
+import com.letta.mobile.data.pins.wire.AgentPinsWire
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -86,7 +87,8 @@ class AppServerClientChannel(
                 .getOrNull()
                 ?.takeIf {
                     it is ServerFrame.PendingApprovalsUpdated || it is ServerFrame.PermissionModeUpdated ||
-                        it is ServerFrame.ConversationActivity || it is ServerFrame.ConversationUpdated
+                        it is ServerFrame.ConversationActivity || it is ServerFrame.ConversationUpdated ||
+                        (it is ServerFrame.Unknown && it.type == AgentPinsWire.FRAME_TYPE)
                 }
 
         val CONNECTED = ChannelTransportState.Connected(serverId = "app-server", sessionId = "app-server", deviceId = null)
