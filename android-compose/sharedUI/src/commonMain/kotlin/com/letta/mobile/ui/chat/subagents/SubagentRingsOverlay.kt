@@ -33,12 +33,17 @@ data class SubagentRingsState(
  * live (running, or a finished ring still lingering) the clock ticks once a second so lingering
  * rings expire and stuck rings turn; it stops once nothing would change (a
  * retained hidden reflection never keeps it ticking). [self] (the agent's own plan) leads the rings.
+ *
+ * Only a run with a plan gets a ring: the fill is the plan's progress, which nothing else shows. A
+ * plan-less run would be a bare spinner floating over the timeline, repeating the agent-task chip
+ * and the roster card that already own it, so every host that draws rings from this state (the
+ * desktop overlay and the Android shared page) leaves it out here, in one place.
  */
 @Composable
 fun rememberSubagentRingsState(snapshot: ImmutableList<ActiveSubagent>, self: ActiveSubagent? = null): SubagentRingsState {
     var tick by remember { mutableLongStateOf(nowMillis()) }
     LaunchedEffect(snapshot) {
-        while (snapshot.any(ActiveSubagent::keepsRingsTicking)) {
+        while (snapshot.any { it.hasDeterminateProgress && it.keepsRingsTicking() }) {
             tick = nowMillis()
             delay(1.seconds)
         }
@@ -46,7 +51,8 @@ fun rememberSubagentRingsState(snapshot: ImmutableList<ActiveSubagent>, self: Ac
     }
     val subagents = remember(snapshot, tick, self) {
         val lingering = snapshot.withLingeringTerminals(tick)
-        if (self == null) lingering else (listOf(self) + lingering).toImmutableList()
+        val all = if (self == null) lingering else listOf(self) + lingering
+        all.filter(ActiveSubagent::hasDeterminateProgress).toImmutableList()
     }
     return SubagentRingsState(subagents, tick)
 }
@@ -69,11 +75,8 @@ fun SubagentRingsOverlay(
     modifier: Modifier = Modifier,
     onViewConversation: ((agentId: String, conversationId: String) -> Unit)? = null,
 ) {
-    // A ring only for a run with a plan: its fill is the plan's progress, which nothing else shows.
-    // A run without one would be a bare spinner repeating the agent-task chip and the roster.
-    val snapshot = remember(entries) {
-        entries.map { it.toActiveSubagent() }.filter { it.hasDeterminateProgress }.toImmutableList()
-    }
+    // Plan-less runs are left out by rememberSubagentRingsState, the one place both hosts share.
+    val snapshot = remember(entries) { entries.map { it.toActiveSubagent() }.toImmutableList() }
     val rings = rememberSubagentRingsState(snapshot)
     var target by remember { mutableStateOf<SubagentTodoSheetTarget?>(null) }
     Box(modifier.fillMaxSize()) {

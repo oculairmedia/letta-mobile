@@ -24,6 +24,8 @@ import com.letta.mobile.data.subagents.SubagentRosterItem
 import com.letta.mobile.data.subagents.SubagentRosterStatus
 import com.letta.mobile.ui.chat.AgentActivity
 import com.letta.mobile.ui.chat.AgentActivityOrb
+import com.letta.mobile.ui.components.row.LettaHangingRow
+import com.letta.mobile.ui.components.row.LettaHangingRowAction
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterRowSlots
@@ -59,22 +61,16 @@ internal fun RunningCard(
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Column(
+        LettaHangingRow(
+            leading = { AgentActivityOrb(size = LettaDimens.Orb.sm, activity = orbActivity) },
             modifier = Modifier
                 .then(expandToggle)
                 .padding(LettaDimens.Space.md),
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AgentActivityOrb(size = LettaDimens.Orb.sm, activity = orbActivity)
-                TitleBlock(item, modifier = Modifier.weight(1f))
-            }
+            TitleBlock(item)
             visibleLines.forEach { line -> ActivityLine(line) }
             ConversationAction(item, onOpenConversation)
-            if (onDismiss != null) TextButton(onClick = { onDismiss(item) }) { Text("Dismiss") }
+            if (onDismiss != null) LettaHangingRowAction(label = "Dismiss", onClick = { onDismiss(item) })
         }
     }
 }
@@ -119,8 +115,8 @@ private fun RosterStatusGlyph(status: SubagentRosterStatus) {
 }
 
 @Composable
-private fun TitleBlock(item: SubagentRosterItem, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
+private fun TitleBlock(item: SubagentRosterItem) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
@@ -159,10 +155,9 @@ private fun ActivityLine(text: String) {
 @Composable
 private fun ConversationAction(item: SubagentRosterItem, onOpenConversation: OpenSubagentConversation?) {
     if (onOpenConversation == null || !item.canOpenConversation) return
-    TextButton(
+    LettaHangingRowAction(
+        label = "View conversation",
         onClick = { onOpenConversation(item) },
-        modifier = Modifier.testTag(SubagentRosterTag.OPEN.of(item.key)),
-    ) {
-        Text("View conversation", style = MaterialTheme.typography.labelMedium)
-    }
+        tag = SubagentRosterTag.OPEN.of(item.key),
+    )
 }

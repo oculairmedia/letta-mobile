@@ -139,7 +139,7 @@ Reusable list parts, errors, refresh, page headers and pane primitives, and the 
 
 # Package com.letta.mobile.ui.components.row
 
-The one list row every roster, recents and history list uses. [LettaListRow] owns the row's interaction source, hover, focus and press states, the rounded background ladder, the pointer cursor, muting and the tooltip entry point, so callers describe a row with [LettaListRowSpec] and never re-implement any of it. The tooltip is injected by the host, so this package depends on no host, shell or chat package.
+The one list row every roster, recents and history list uses. [LettaListRow] owns the row's interaction source, hover, focus and press states, the rounded background ladder, the pointer cursor, muting and the tooltip entry point, so callers describe a row with [LettaListRowSpec] and never re-implement any of it. The tooltip is injected by the host, so this package depends on no host, shell or chat package. `LettaHangingRow` is the hanging-indent item (a leading mark in its own column, every line and action of the item on one left edge after it) with `LettaHangingRowAction` for text actions on that edge; the subagent roster's running cards use it.
 
 # Package com.letta.mobile.ui.components.line
 
