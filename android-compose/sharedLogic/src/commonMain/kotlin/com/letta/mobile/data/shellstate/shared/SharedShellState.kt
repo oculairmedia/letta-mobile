@@ -90,7 +90,7 @@ class SharedShellState(
      * host's one connection: a snapshot kept from an earlier connection (possibly another host, at any
      * revision) never outranks what the current connection says.
      */
-    @Volatile private var shownFromThisConnection = false
+    private val shownFromThisConnection = MutableStateFlow(false)
 
     /** What this device knows now. */
     val state: StateFlow<ShellStateState> = mutableState.asStateFlow()
@@ -110,7 +110,7 @@ class SharedShellState(
             // A connected host without the contract has no state to show; another host's document must not linger.
             // (A disconnect keeps the snapshot: offline display has its own contract.)
             mutableState.update { it.copy(supported = false, live = false, snapshot = null) }
-            shownFromThisConnection = false
+            shownFromThisConnection.value = false
             return mutableState.value
         }
         mutableState.update { it.copy(supported = true) }
@@ -124,7 +124,7 @@ class SharedShellState(
     private fun markStale() = mutableState.update { it.copy(live = false) }
 
     private fun connectionDown() {
-        shownFromThisConnection = false
+        shownFromThisConnection.value = false
         markStale()
     }
 
@@ -187,9 +187,9 @@ class SharedShellState(
      * is replaced by whatever this connection says first.
      */
     private fun adopt(snapshot: ShellStateSnapshot, live: Boolean) {
-        val fromThisConnection = shownFromThisConnection
+        val fromThisConnection = shownFromThisConnection.value
         val replaced = mutableState.updateAndGetReplaced(fromThisConnection, snapshot, live)
-        if (replaced) shownFromThisConnection = true
+        if (replaced) shownFromThisConnection.value = true
     }
 
     /** Applies [snapshot] unless [fromThisConnection] says a newer-or-equal one is shown; whether it replaced the shown one. */
