@@ -1,0 +1,27 @@
+# newFileGuardrailDetekt (quality/detekt-rules): rules that hold for every Kotlin file added since the
+# PR base, in all of their scope at once. guardrailDetekt (detekt-guardrails.yml) runs the same rules
+# on changed older files through its path ratchet; a new file never waits for its directory to be clean.
+build:
+  maxIssues: 0
+
+letta-mobile-guardrails:
+  active: true
+  # Clients keep no persistent state: shell and user state is host-held (ShellStateDocument), and
+  # only packages with a `clientstore` segment, or host packages (the node, hoststate, and the
+  # on-device runtime in com.letta.mobile.runtime.local), may persist. Client modules only;
+  # the host modules (iroh-wrapper-cli, appserver-cli, cli, letta-code-runtime) own the state store.
+  ClientPersistenceOutsideClientStore:
+    active: true
+    includes:
+      - "**/app/src/**"
+      - "**/avatar/**"
+      - "**/core/**"
+      - "**/designsystem/src/**"
+      - "**/desktop/src/**"
+      - "**/feature-chat/src/**"
+      - "**/plugin-view/src/**"
+      - "**/sharedLogic/src/**"
+      - "**/sharedUI/src/**"
+      - "**/web/src/**"
+  DeviceFactWithoutJustification:
+    active: true

@@ -105,6 +105,7 @@ class ChangedKotlinCodeTest(unittest.TestCase):
             (sources / 'Deleted.kt').unlink()
             selected = {Path(path).stem for path in selector.changed_files(root, base)}
             self.assertEqual({'Staged', 'Literal', 'Broken', 'New'}, selected)
+            self.assertEqual({'New'}, {Path(path).stem for path in selector.changed_files(root, base, added_only=True)})
             with patch.dict(os.environ, {"GITHUB_BASE_REF": ""}):
                 self.assertEqual(selected, {Path(path).stem for path in selector.changed_files(root, selector.default_base())})
             with patch.dict(os.environ, {"GITHUB_BASE_REF": "missing-pr-target"}):

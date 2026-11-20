@@ -138,8 +138,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        // Signal the first interactive frame to Android Vitals; subsequent calls are no-ops.
-        reportFullyDrawn()
+        // No reportFullyDrawn() here: it would fire before anything usable is drawn. The shell's
+        // ReportFirstUsableContent feeds the activity's FullyDrawnReporter once its content is there (letta-mobile-1hzkq).
     }
 
     @Composable

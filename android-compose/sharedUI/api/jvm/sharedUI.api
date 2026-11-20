@@ -8077,6 +8077,21 @@ public final class com/letta/mobile/ui/shell/AgentEditorBinding {
 	public final fun getOptions ()Lkotlin/jvm/functions/Function4;
 }
 
+public final class com/letta/mobile/ui/shell/FirstUsableContentKt {
+	public static final fun ReportFirstUsableContent-NcHsxvU (ZJLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;II)V
+	public static final fun ReportShellFirstUsable (Lcom/letta/mobile/data/shell/ShellDestination;Lcom/letta/mobile/data/model/BackendConnectionStatus;ZLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;II)V
+	public static final fun getFIRST_USABLE_TIMEOUT ()J
+	public static final fun shellFirstScreenUsable (Lcom/letta/mobile/data/shell/ShellDestination;Lcom/letta/mobile/data/model/BackendConnectionStatus;Z)Z
+}
+
+public final class com/letta/mobile/ui/shell/FirstUsableReason : java/lang/Enum {
+	public static final field Content Lcom/letta/mobile/ui/shell/FirstUsableReason;
+	public static final field Timeout Lcom/letta/mobile/ui/shell/FirstUsableReason;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/shell/FirstUsableReason;
+	public static fun values ()[Lcom/letta/mobile/ui/shell/FirstUsableReason;
+}
+
 public final class com/letta/mobile/ui/shell/ShellAdminPages {
 	public static final field $stable I
 	public fun <init> ()V

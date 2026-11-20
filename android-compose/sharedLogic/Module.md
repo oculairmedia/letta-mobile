@@ -235,6 +235,10 @@ A lenient reader of the shell scripts agents pass to their shell tools: quotes, 
 
 What the timeline does with steps once presenters have drawn them: which kind of work a run of steps adds up to ("Explored files, ran commands"), and which steps the person opened or closed against their default, remembered across reloads in a bounded set. Keep per-tool reading in the presenters; group steps with [ToolActivity](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.steps/-tool-activity/index.html) and keep disclosure state in [ToolStepExpansions](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.steps/-tool-step-expansions/index.html).
 
+# Package com.letta.mobile.data.clientstore
+
+The only persistent state a client may keep, declared in ClientStoreEntries: connection bootstrap (host address or pairing, this device's identity key or token), disposable caches that rebuild from the host and are wiped through DisposableCache.clearAll, and the few per-device facts the host cannot own, each with a justification. Preferences, pins, layout choices, drafts, history and settings are host state (see com.letta.mobile.data.shellstate). The ClientPersistenceOutsideClientStore guardrail allows client persistence APIs only in packages with a `clientstore` segment and in host packages.
+
 # Package com.letta.mobile.data.commands
 
 Slash-command contracts and commands answered by the client itself. Navigation/local actions remain distinct from commands requiring active backend support. Keep arbitrary shell execution outside slash-command discovery; provide backend command capabilities through [SlashCommandsApi](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.commands.api/-slash-commands-api/index.html) and client commands through [ClientSlashCommands](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.commands/-client-slash-commands/index.html).
@@ -632,6 +636,10 @@ A saver recreating the owner before its trusted source is available calls `holdP
 Existing workspace/navigator names remain dispatch/read adapters for later consumer slices; migrated consumers read `currentFocus` and observe `settledSnapshot` for source-scoped next-start seeds, without a feedback sync loop.
 
 Portable shell destinations, routes, workspace navigation and page errors. Entry points translate external navigation into these destinations instead of duplicating route policy. Keep platform navigation controllers outside portable routes; hosts map [ShellRoute](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.shell/-shell-route/index.html) and [ShellDestination](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.shell/-shell-destination/index.html) and bind chat behavior through [ShellChatPort](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.shell/-shell-chat-port/index.html).
+
+# Package com.letta.mobile.data.shellstate
+
+The shell state document contract: the host-held, versioned document of shell and user state that the user and their agent both read and change, synced to every client. The host is the on-device runtime or a remote server host. Writes are revision-checked proposals in the style of the voice endpoint contract; a host-to-host move is one export and one import of the whole document under an explicit import policy, and never carries client store values or secrets. This package holds the schema and interface only; host routes and agent tools come later.
 
 # Package com.letta.mobile.data.shell.layout
 
