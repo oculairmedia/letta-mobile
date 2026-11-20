@@ -21,27 +21,27 @@ import kotlin.test.assertEquals
 class MarkdownBreakoutTest {
     @Test
     fun noSpareWhileTheColumnFillsTheLane() {
-        assertEquals(0, breakoutSpare(laneWidthPx = 676, columnMaxWidthPx = 760, gutterPx = 16))
-        assertEquals(0, breakoutSpare(laneWidthPx = 780, columnMaxWidthPx = 760, gutterPx = 16))
-        assertEquals(1084, breakoutSpare(laneWidthPx = 1876, columnMaxWidthPx = 760, gutterPx = 16))
+        assertEquals(0.dp, breakoutSpare(laneWidth = 676.dp, columnMaxWidth = 760.dp, gutter = 16.dp))
+        assertEquals(0.dp, breakoutSpare(laneWidth = 780.dp, columnMaxWidth = 760.dp, gutter = 16.dp))
+        assertEquals(1084.dp, breakoutSpare(laneWidth = 1876.dp, columnMaxWidth = 760.dp, gutter = 16.dp))
     }
 
     @Test
     fun aBlockThatFitsTheColumnStaysInIt() {
-        assertEquals(700, breakoutWidth(parentPx = 700, naturalPx = 480, sparePx = 1000, capPx = 1440))
-        assertEquals(700, breakoutWidth(parentPx = 700, naturalPx = 960, sparePx = 0, capPx = 1440))
+        assertEquals(700.dp, breakoutWidth(parent = 700.dp, natural = 480.dp, spare = 1000.dp, cap = 1440.dp))
+        assertEquals(700.dp, breakoutWidth(parent = 700.dp, natural = 960.dp, spare = 0.dp, cap = 1440.dp))
     }
 
     @Test
     fun aWideBlockTakesTheSpareUpToTheCap() {
-        assertEquals(860, breakoutWidth(parentPx = 760, naturalPx = 960, sparePx = 100, capPx = 1440))
-        assertEquals(1440, breakoutWidth(parentPx = 760, naturalPx = 960, sparePx = 1084, capPx = 1440))
+        assertEquals(860.dp, breakoutWidth(parent = 760.dp, natural = 960.dp, spare = 100.dp, cap = 1440.dp))
+        assertEquals(1440.dp, breakoutWidth(parent = 760.dp, natural = 960.dp, spare = 1084.dp, cap = 1440.dp))
     }
 
     /** Rows streaming into a broken-out table never change its width: the header row settles it. */
     @Test
     fun streamingRowsKeepTheTableWidth() = runDesktopComposeUiTest(width = 1900, height = 900) {
-        val lane = MarkdownBreakoutLane().apply { update(laneWidthPx = 1876, columnMaxWidthPx = 760, gutterPx = 16) }
+        val lane = MarkdownBreakoutLane().apply { update(breakoutSpare(laneWidth = 1876.dp, columnMaxWidth = COLUMN.dp, gutter = 16.dp)) }
         val text = mutableStateOf(TABLE_HEAD + ROW)
         setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, 1f), LocalMarkdownBreakoutLane provides lane) {

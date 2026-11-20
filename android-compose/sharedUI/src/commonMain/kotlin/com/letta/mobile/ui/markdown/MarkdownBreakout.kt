@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
@@ -21,6 +21,9 @@ import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.max
+import androidx.compose.ui.unit.min
 import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 import com.mikepenz.markdown.compose.LocalMarkdownDimens
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
@@ -28,8 +31,7 @@ import com.mikepenz.markdown.compose.elements.MarkdownTable
 import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.flavours.gfm.GFMElementTypes
 import org.intellij.markdown.flavours.gfm.GFMTokenTypes
-import kotlin.math.max
-import kotlin.math.min
+import kotlin.math.max as maxOf
 
 /**
  * The spare width beside a centred reading column that a wide block (a table) may break out into.
@@ -41,8 +43,8 @@ import kotlin.math.min
  */
 @Stable
 internal class MarkdownBreakoutLane {
-    /** Spare width beside the column, both sides together, in px; 0 where the column fills the lane. */
-    var sparePx: Int by mutableIntStateOf(0)
+    /** Spare width beside the column, both sides together; none where the column fills the lane. */
+    var spare: Dp by mutableStateOf(0.dp)
         private set
 
     /**
@@ -50,9 +52,8 @@ internal class MarkdownBreakoutLane {
      * observed read would subscribe the list's own measure to this state, so every write would
      * invalidate the list that made it and the page would re-measure without ever going idle.
      */
-    fun update(laneWidthPx: Int, columnMaxWidthPx: Int, gutterPx: Int) {
-        val spare = breakoutSpare(laneWidthPx, columnMaxWidthPx, gutterPx)
-        if (spare != Snapshot.withoutReadObservation { sparePx }) sparePx = spare
+    fun update(newSpare: Dp) {
+        if (newSpare != Snapshot.withoutReadObservation { spare }) spare = newSpare
     }
 }
 
@@ -66,22 +67,22 @@ internal val LocalTimelineBreakoutLane = staticCompositionLocalOf<MarkdownBreako
 internal val LocalMarkdownBreakoutLane = staticCompositionLocalOf<MarkdownBreakoutLane?> { null }
 
 /**
- * Spare width beside a column capped at [columnMaxWidthPx] in a lane [laneWidthPx] wide, less a
- * [gutterPx] margin on each side. None while the column fills the lane (a phone, a narrow window).
+ * Spare width beside a column capped at [columnMaxWidth] in a lane [laneWidth] wide, less a
+ * [gutter] margin on each side. None while the column fills the lane (a phone, a narrow window).
  */
-internal fun breakoutSpare(laneWidthPx: Int, columnMaxWidthPx: Int, gutterPx: Int): Int {
-    val column = min(laneWidthPx, columnMaxWidthPx)
-    return (laneWidthPx - column - 2 * gutterPx).coerceAtLeast(0)
+internal fun breakoutSpare(laneWidth: Dp, columnMaxWidth: Dp, gutter: Dp): Dp {
+    val column = min(laneWidth, columnMaxWidth)
+    return (laneWidth - column - gutter * 2).coerceAtLeast(0.dp)
 }
 
 /**
- * How wide a block of [naturalPx] draws in a column [parentPx] wide with [sparePx] beside it: the
+ * How wide a block of [natural] width draws in a column [parent] wide with [spare] beside it: the
  * column's own width when it fits there or nothing is spare, otherwise everything the spare
- * allows, up to [capPx]. A block still wider than that scrolls within it.
+ * allows, up to [cap]. A block still wider than that scrolls within it.
  */
-internal fun breakoutWidth(parentPx: Int, naturalPx: Int, sparePx: Int, capPx: Int): Int {
-    if (naturalPx <= parentPx || sparePx <= 0) return parentPx
-    return max(parentPx, min(parentPx + sparePx, capPx))
+internal fun breakoutWidth(parent: Dp, natural: Dp, spare: Dp, cap: Dp): Dp {
+    if (natural <= parent || spare <= 0.dp) return parent
+    return max(parent, min(parent + spare, cap))
 }
 
 /**
@@ -120,11 +121,12 @@ private class BreakoutLaneNode(
 ) : Modifier.Node(), LayoutModifierNode {
     override fun MeasureScope.measure(measurable: Measurable, constraints: Constraints): MeasureResult {
         if (constraints.hasBoundedWidth && !isLookingAhead) {
-            lane.update(
-                laneWidthPx = constraints.maxWidth - 2 * lanePadding.roundToPx(),
-                columnMaxWidthPx = columnMaxWidth.roundToPx(),
-                gutterPx = LettaSurfaceSizes.wideContentGutter.roundToPx(),
+            val spare = breakoutSpare(
+                laneWidth = constraints.maxWidth.toDp() - lanePadding * 2,
+                columnMaxWidth = columnMaxWidth,
+                gutter = LettaSurfaceSizes.wideContentGutter,
             )
+            lane.update(spare)
         }
         val placeable = measurable.measure(constraints)
         return layout(placeable.width, placeable.height) { placeable.place(0, 0) }
@@ -157,16 +159,16 @@ internal fun Modifier.markdownBreakout(lane: MarkdownBreakoutLane?, naturalWidth
         }
         val parent = constraints.maxWidth
         val width = breakoutWidth(
-            parentPx = parent,
-            naturalPx = naturalWidth.roundToPx(),
-            sparePx = lane.sparePx,
-            capPx = LettaSurfaceSizes.wideContentMaxWidth.roundToPx(),
-        )
+            parent = parent.toDp(),
+            natural = naturalWidth,
+            spare = lane.spare,
+            cap = LettaSurfaceSizes.wideContentMaxWidth,
+        ).roundToPx().coerceAtLeast(parent)
         // In the column it measures exactly as it always did; broken out, at the width it takes.
         val placeable = measurable.measure(
             if (width == parent) constraints else constraints.copy(minWidth = width, maxWidth = width),
         )
-        layout(max(placeable.width.coerceAtMost(parent), constraints.minWidth), placeable.height) {
+        layout(maxOf(placeable.width.coerceAtMost(parent), constraints.minWidth), placeable.height) {
             placeable.place((parent - width) / 2, 0)
         }
     }
