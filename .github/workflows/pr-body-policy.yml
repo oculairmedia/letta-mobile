@@ -67,9 +67,18 @@ jobs:
       - name: Re-run pr-body-gate (and the dependent test aggregate) on the same head
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          # HEAD_SHA comes from the `edited` event and can be OLD (CodeRabbit rewrites the body after
+          # every push). Re-running an old head's android.yml run enters the shared concurrency group
+          # and cancels the CURRENT head's run, so only refresh while HEAD_SHA is still the live head.
+          live_head="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq .head.sha)"
+          if [[ "$live_head" != "$HEAD_SHA" ]]; then
+            echo "Event head ${HEAD_SHA} is not the live head ${live_head}; skipping the refresh."
+            exit 0
+          fi
           run_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/android.yml/runs?head_sha=${HEAD_SHA}&event=pull_request&per_page=1" \
             --jq '.workflow_runs[0].id // empty')"
           if [[ -z "$run_id" ]]; then
@@ -85,6 +94,12 @@ jobs:
             --jq '[.jobs[] | select(.name | startswith("pr-body-gate"))][0].id // empty')"
           if [[ -z "$job_id" ]]; then
             echo "android.yml run ${run_id} has no pr-body-gate job; nothing to refresh."
+            exit 0
+          fi
+          # A push may have landed during the wait above: re-check right before the rerun.
+          live_head="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq .head.sha)"
+          if [[ "$live_head" != "$HEAD_SHA" ]]; then
+            echo "Head moved from ${HEAD_SHA} to ${live_head} during the wait; not re-running the old run."
             exit 0
           fi
           gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/jobs/${job_id}/rerun"
