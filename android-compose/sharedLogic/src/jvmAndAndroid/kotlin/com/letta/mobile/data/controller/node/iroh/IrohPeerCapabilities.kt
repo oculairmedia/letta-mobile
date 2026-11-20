@@ -309,6 +309,8 @@ object IrohPeerCapabilities {
         // models, read like provider.list. Its writes (voice.setup.set / clear / test) stay admin.full
         // via the else branch, like provider.connect.
         "voice.setup.get", "voice.models.list",
+        // Pinned agents v1: the shared pinned-agents list, read like agent.list.
+        "pins.get",
     )
 
     // Voice endpoint v1: speaking and listening through the host act for the device like a chat send.
@@ -322,6 +324,9 @@ object IrohPeerCapabilities {
         "conversation.compact",
         // letta-mobile-by4vm.51: re-renders (and saves) the conversation's system prompt.
         "conversation.recompile",
+        // Pinned agents v1: organising which agents are pinned is a chat-role preference edit, like
+        // archiving a conversation, so every paired chat device can pin.
+        "pins.set",
     )
 
     // letta-mobile-qjncd: SUBAGENT_SPAWN is a CLIENT-side authorization construct.

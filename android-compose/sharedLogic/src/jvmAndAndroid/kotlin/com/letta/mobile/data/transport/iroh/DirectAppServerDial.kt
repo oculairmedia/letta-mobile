@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.data.controller.node.iroh.AdminRpcInvocation
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
 import com.letta.mobile.data.controller.node.iroh.NativeSlashCommandCatalog
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -54,14 +55,29 @@ fun interface DirectAppServerDialer {
 }
 
 /**
- * Dials [target] over its own [directAppServerHttpClient] and serves its `admin_rpc` in process.
+ * Builds the in-process admin router of one direct dial over its socket's client and command catalog.
  * [localBackendDir] lets the router read the on-disk store the server writes (runs, context, memory
- * blocks); null for a server elsewhere. [release] runs after the socket closes.
+ * blocks); null for a server elsewhere. [hostRoutes] are the host-held shared state routes the dialer's
+ * host serves in process (the on-device runtime's pins); a server elsewhere gets none, since state kept
+ * here would be this device's, not the host's.
+ */
+fun directDialRouter(
+    localBackendDir: String? = null,
+    hostRoutes: List<AdminRpcRoutes> = emptyList(),
+): (AppServerClient, NativeSlashCommandCatalog) -> AdminRpcRouter = { client, commands ->
+    AdminRpcRegistry.buildRouter(
+        native = AdminRpcNativeSources(nativeClient = client, slashCommands = commands, localBackendDir = localBackendDir),
+    ).also { router -> hostRoutes.forEach { it.register(router) } }
+}
+
+/**
+ * Dials [target] over its own [directAppServerHttpClient] and serves its `admin_rpc` in process with the
+ * router [router] builds (see [directDialRouter]). [release] runs after the socket closes.
  */
 suspend fun openDirectAppServerDial(
     target: AppServerWebSocketDial,
     scope: CoroutineScope,
-    localBackendDir: String? = null,
+    router: (AppServerClient, NativeSlashCommandCatalog) -> AdminRpcRouter = directDialRouter(),
     release: () -> Unit = {},
 ): DirectAppServerDial {
     val httpClient = directAppServerHttpClient()
@@ -74,19 +90,13 @@ suspend fun openDirectAppServerDial(
         .getOrThrow()
     val commandCatalog = NativeSlashCommandCatalog()
     val commandCatalogJob = commandCatalog.start(scope, connection.client.events)
-    val router = AdminRpcRegistry.buildRouter(
-        native = AdminRpcNativeSources(
-            nativeClient = connection.client,
-            slashCommands = commandCatalog,
-            localBackendDir = localBackendDir,
-        ),
-    )
+    val adminRouter = router(connection.client, commandCatalog)
     return DirectAppServerDial(
         client = connection.client,
         connectionState = connection.connectionState,
         streamFrames = connection.streamFrames,
-        hostCapabilities = router.featureCapabilities,
-        adminRpc = { method, path, body -> router.answer(method, appServerAdminRpcParams(path, body)) },
+        hostCapabilities = adminRouter.featureCapabilities,
+        adminRpc = { method, path, body -> adminRouter.answer(method, appServerAdminRpcParams(path, body)) },
         close = { reason ->
             commandCatalogJob.cancel()
             connection.close(reason)

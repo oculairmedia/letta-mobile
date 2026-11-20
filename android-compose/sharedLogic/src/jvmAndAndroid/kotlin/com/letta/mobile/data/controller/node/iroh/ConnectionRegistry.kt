@@ -37,6 +37,16 @@ interface ViewerHandle {
      */
     fun receivesConversationEvents(): Boolean = false
 
+    /**
+     * Whether this connection may receive the host's `pins_updated` pushes, which name every pinned agent on
+     * the host: the peer must be authenticated, allowed to read agents, and not bounded to some agents (the
+     * same peers `pins.get` answers). Evaluated at send time. Default: only through those two checks.
+     */
+    fun receivesPinsEvents(): Boolean {
+        val context = adminContext() ?: return false
+        return context.authenticated && context.authorizedAgentIds == null && receivesAgentEvents()
+    }
+
     /** Whether the client negotiated the separate persisted-activity frame. Authorization is checked separately. */
     fun receivesConversationActivity(agentId: AgentId): Boolean = false
 

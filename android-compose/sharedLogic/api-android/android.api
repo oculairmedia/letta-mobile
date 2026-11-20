@@ -20235,6 +20235,7 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint {
 	public final fun attachPermissionModePublisher (Lcom/letta/mobile/data/controller/node/iroh/PermissionModePublisher;)V
 	public final fun attachSubagentPublisher (Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistryPublisher;)V
 	public final fun attachToolsetStatuses (Lcom/letta/mobile/data/transport/appserver/AppServerClient;)Lkotlinx/coroutines/Job;
+	public final fun broadcastPinsUpdated (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun connect (Lcomputer/iroh/EndpointAddr;[BLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun conversationActivityTarget ()Lcom/letta/mobile/data/controller/node/iroh/ConversationChangeTarget;
 	public final fun conversationChangeTarget ()Lcom/letta/mobile/data/controller/node/iroh/ConversationChangeTarget;
@@ -21076,6 +21077,7 @@ public abstract interface class com/letta/mobile/data/controller/node/iroh/Viewe
 	public fun receivesAgentEvents ()Z
 	public fun receivesConversationActivity-qkT7gGE (Ljava/lang/String;)Z
 	public fun receivesConversationEvents ()Z
+	public fun receivesPinsEvents ()Z
 	public abstract fun writeFrame (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -21084,6 +21086,7 @@ public final class com/letta/mobile/data/controller/node/iroh/ViewerHandle$Defau
 	public static fun receivesAgentEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
 	public static fun receivesConversationActivity-qkT7gGE (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Ljava/lang/String;)Z
 	public static fun receivesConversationEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
+	public static fun receivesPinsEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
 }
 
 public abstract interface class com/letta/mobile/data/controller/node/iroh/ViewerJoinedListener {
@@ -21273,6 +21276,19 @@ public final class com/letta/mobile/data/controller/node/iroh/mounts/upgrade/Can
 	public final fun getUpgraded ()I
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/pins/AgentPinsPublisher {
+	public fun <init> (Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun attach (Lkotlin/jvm/functions/Function2;)V
+	public final fun publish (Lcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;)V
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/pins/AgentPinsRoutes {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/pins/AgentPinsRoutes;
+	public final fun forHost (Ljava/nio/file/Path;Lcom/letta/mobile/data/controller/node/iroh/pins/AgentPinsPublisher;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
+	public final fun forOnDeviceHost (Ljava/nio/file/Path;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/records/FileWrapperRecordStore : com/letta/mobile/data/controller/node/iroh/records/WrapperRecordStore {
@@ -39312,6 +39328,133 @@ public final synthetic class com/letta/mobile/data/pins/ScopedObjectRef$$seriali
 
 public final class com/letta/mobile/data/pins/ScopedObjectRef$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/pins/shared/AgentPinsEditOutcome : java/lang/Enum {
+	public static final field APPLIED Lcom/letta/mobile/data/pins/shared/AgentPinsEditOutcome;
+	public static final field CONFLICT Lcom/letta/mobile/data/pins/shared/AgentPinsEditOutcome;
+	public static final field OFFLINE Lcom/letta/mobile/data/pins/shared/AgentPinsEditOutcome;
+	public static final field REFUSED Lcom/letta/mobile/data/pins/shared/AgentPinsEditOutcome;
+	public static final field UNSUPPORTED Lcom/letta/mobile/data/pins/shared/AgentPinsEditOutcome;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/pins/shared/AgentPinsEditOutcome;
+	public static fun values ()[Lcom/letta/mobile/data/pins/shared/AgentPinsEditOutcome;
+}
+
+public abstract interface class com/letta/mobile/data/pins/shared/AgentPinsLink {
+	public abstract fun call (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getConnection ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun getHostCapabilities ()Ljava/util/Set;
+	public abstract fun getPushes ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun isConnected ()Z
+}
+
+public final class com/letta/mobile/data/pins/shared/AgentPinsLinkKt {
+	public static final fun channelAgentPinsLink (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Lcom/letta/mobile/data/pins/shared/AgentPinsLink;
+}
+
+public final class com/letta/mobile/data/pins/shared/AgentPinsReply {
+	public fun <init> (ZLkotlinx/serialization/json/JsonElement;Ljava/lang/String;)V
+	public synthetic fun <init> (ZLkotlinx/serialization/json/JsonElement;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getError ()Ljava/lang/String;
+	public final fun getResult ()Lkotlinx/serialization/json/JsonElement;
+	public final fun getSuccess ()Z
+}
+
+public final class com/letta/mobile/data/pins/shared/AgentPinsSnapshot {
+	public static final field Companion Lcom/letta/mobile/data/pins/shared/AgentPinsSnapshot$Companion;
+	public fun <init> ()V
+	public fun <init> (JLjava/util/List;)V
+	public synthetic fun <init> (JLjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (JLjava/util/List;)Lcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;JLjava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentIds ()Ljava/util/List;
+	public final fun getRevision ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/pins/shared/AgentPinsSnapshot$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/pins/shared/AgentPinsSnapshot$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/pins/shared/AgentPinsSnapshot$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/pins/shared/AgentPinsState {
+	public fun <init> ()V
+	public fun <init> (ZLcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;ZLcom/letta/mobile/data/pins/wire/AgentPinsError;)V
+	public synthetic fun <init> (ZLcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;ZLcom/letta/mobile/data/pins/wire/AgentPinsError;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Lcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;
+	public final fun component3 ()Z
+	public final fun component4 ()Lcom/letta/mobile/data/pins/wire/AgentPinsError;
+	public final fun copy (ZLcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;ZLcom/letta/mobile/data/pins/wire/AgentPinsError;)Lcom/letta/mobile/data/pins/shared/AgentPinsState;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/pins/shared/AgentPinsState;ZLcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;ZLcom/letta/mobile/data/pins/wire/AgentPinsError;ILjava/lang/Object;)Lcom/letta/mobile/data/pins/shared/AgentPinsState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentIds ()Ljava/util/List;
+	public final fun getEditable ()Z
+	public final fun getError ()Lcom/letta/mobile/data/pins/wire/AgentPinsError;
+	public final fun getLive ()Z
+	public final fun getSnapshot ()Lcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;
+	public final fun getSupported ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/pins/shared/SharedAgentPins {
+	public fun <init> (Lcom/letta/mobile/data/pins/shared/AgentPinsLink;)V
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getSupported ()Z
+	public final fun refresh (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun reorder (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun run (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun setPinned-mT_9V4Y (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/pins/wire/AgentPinsError : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/data/pins/wire/AgentPinsError$Companion;
+	public static final field FORBIDDEN Lcom/letta/mobile/data/pins/wire/AgentPinsError;
+	public static final field INVALID_REQUEST Lcom/letta/mobile/data/pins/wire/AgentPinsError;
+	public static final field REVISION_CONFLICT Lcom/letta/mobile/data/pins/wire/AgentPinsError;
+	public static final field STATE_UNREADABLE Lcom/letta/mobile/data/pins/wire/AgentPinsError;
+	public static final field UNKNOWN Lcom/letta/mobile/data/pins/wire/AgentPinsError;
+	public static final field UNREACHABLE Lcom/letta/mobile/data/pins/wire/AgentPinsError;
+	public static final field UNSUPPORTED Lcom/letta/mobile/data/pins/wire/AgentPinsError;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/pins/wire/AgentPinsError;
+	public static fun values ()[Lcom/letta/mobile/data/pins/wire/AgentPinsError;
+}
+
+public final class com/letta/mobile/data/pins/wire/AgentPinsError$Companion {
+	public final fun fromWire (Ljava/lang/String;)Lcom/letta/mobile/data/pins/wire/AgentPinsError;
+}
+
+public final class com/letta/mobile/data/pins/wire/AgentPinsWire {
+	public static final field AGENT_IDS Ljava/lang/String;
+	public static final field CAPABILITY Ljava/lang/String;
+	public static final field EXPECTED_REVISION Ljava/lang/String;
+	public static final field FRAME_TYPE Ljava/lang/String;
+	public static final field GET Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/data/pins/wire/AgentPinsWire;
+	public static final field INVALID_REQUEST Ljava/lang/String;
+	public static final field MAX_ID_CHARS I
+	public static final field MAX_PINS I
+	public static final field REVISION_CONFLICT Ljava/lang/String;
+	public static final field SET Ljava/lang/String;
+	public static final field STATE_UNREADABLE Ljava/lang/String;
+	public final fun getMETHODS ()Ljava/util/Set;
 }
 
 public final class com/letta/mobile/data/platform/HeapPressure {
@@ -70436,8 +70579,10 @@ public final class com/letta/mobile/data/transport/iroh/DirectAppServerDial {
 
 public final class com/letta/mobile/data/transport/iroh/DirectAppServerDialKt {
 	public static final fun directAppServerHttpClient ()Lio/ktor/client/HttpClient;
-	public static final fun openDirectAppServerDial (Lcom/letta/mobile/data/transport/appserver/AppServerWebSocketDial;Lkotlinx/coroutines/CoroutineScope;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun openDirectAppServerDial$default (Lcom/letta/mobile/data/transport/appserver/AppServerWebSocketDial;Lkotlinx/coroutines/CoroutineScope;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun directDialRouter (Ljava/lang/String;Ljava/util/List;)Lkotlin/jvm/functions/Function2;
+	public static synthetic fun directDialRouter$default (Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lkotlin/jvm/functions/Function2;
+	public static final fun openDirectAppServerDial (Lcom/letta/mobile/data/transport/appserver/AppServerWebSocketDial;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun openDirectAppServerDial$default (Lcom/letta/mobile/data/transport/appserver/AppServerWebSocketDial;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public abstract interface class com/letta/mobile/data/transport/iroh/DirectAppServerDialer {

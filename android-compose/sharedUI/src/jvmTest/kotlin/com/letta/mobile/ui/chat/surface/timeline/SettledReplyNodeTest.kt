@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import com.letta.mobile.data.model.AssistantMessage
@@ -116,13 +117,21 @@ class SettledReplyNodeTest {
                 }
             }
         }
+        // The reply's text is composed off the test clock (a Default-dispatcher decode), so on a loaded
+        // machine the first frame can precede it: wait on the node itself, never on elapsed time.
+        waitUntilReplyTextShown()
         val before = onNodeWithText(TEXT, substring = true, useUnmergedTree = true).fetchSemanticsNode().id
         runOnIdle { state = state.copy(messages = live.map { it.copy(id = "stored-${it.id}") }.toImmutableList()) }
         waitForIdle()
+        waitUntilReplyTextShown()
         assertEquals(before, onNodeWithText(TEXT, substring = true, useUnmergedTree = true).fetchSemanticsNode().id)
         for (identity in listOf("stream-reply", "reasoning:stream-thought")) {
             assertEquals(listOf(identity to true), lifetimes.filter { it.first == identity })
         }
+    }
+
+    private fun ComposeUiTest.waitUntilReplyTextShown() = waitUntil(timeoutMillis = NODE_TIMEOUT_MILLIS) {
+        onAllNodesWithText(TEXT, substring = true, useUnmergedTree = true).fetchSemanticsNodes().size == 1
     }
 
     private fun openRig(promptResident: Boolean) = runBlocking {
@@ -184,5 +193,6 @@ class SettledReplyNodeTest {
         const val RUN = "live-run"
         const val TEXT = "The final reply stays on screen."
         const val LIVE_FRAMES = 40
+        const val NODE_TIMEOUT_MILLIS = 10_000L
     }
 }
