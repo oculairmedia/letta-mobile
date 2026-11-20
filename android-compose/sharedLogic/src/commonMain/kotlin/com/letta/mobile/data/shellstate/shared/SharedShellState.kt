@@ -128,7 +128,8 @@ class SharedShellState(
      * cancelled and the new one's started on its own coroutine.
      */
     suspend fun run() = coroutineScope {
-        link.pushes.onEach(::onPush).launchIn(this)
+        // A push belongs to whatever generation and connection are current when it is handled, and never touches `live`.
+        link.pushes.onEach { frame -> decode(frame)?.let { adopt(it, issued = null, live = false) } }.launchIn(this)
         var read: Job? = null
         link.connection.distinctUntilChanged().collect { session ->
             read?.cancel()
@@ -211,27 +212,13 @@ class SharedShellState(
         val changes = edits.map { ShellStateChange(it.key, it.value, base.entries[it.key]?.revision ?: 0L) }
         val params = buildJsonObject { put(ShellStateWire.CHANGES, JsonArray(changes.map(ShellStateChange::toJson))) }
         val reply = request(issued, ShellStateWire.PROPOSE, params)
-        return when {
-            reply.document != null -> if (adopt(reply.document, issued, live = true)) ShellStateEditOutcome.APPLIED else ShellStateEditOutcome.OFFLINE
-            !reply.current -> ShellStateEditOutcome.OFFLINE
-            else -> refused(reply.error, base)
-        }
-    }
-
-    /** How a refusal of the current connection ends the edit. */
-    private suspend fun refused(error: ShellStateError, base: ShellStateSnapshot): ShellStateEditOutcome {
-        Telemetry.event(TAG, "edit.failed", "error" attr error.name, "revision" attr base.documentRevision)
-        return when (error) {
-            ShellStateError.UNREACHABLE -> ShellStateEditOutcome.OFFLINE
-            ShellStateError.REVISION_CONFLICT -> ShellStateEditOutcome.CONFLICT.also { refresh() }
-            else -> ShellStateEditOutcome.REFUSED
-        }
-    }
-
-    /** A push belongs to whatever generation and connection are current when it is handled, and never touches `live`. */
-    private suspend fun onPush(frame: JsonObject) {
-        val pushed = decode(frame) ?: return
-        adopt(pushed, issued = null, live = false)
+        val written = reply.document?.let { adopt(it, issued, live = true) }
+        if (written != null) return if (written) ShellStateEditOutcome.APPLIED else ShellStateEditOutcome.OFFLINE
+        // A refusal that comes from a connection that is gone says nothing about the host now.
+        if (!reply.current) return ShellStateEditOutcome.OFFLINE
+        Telemetry.event(TAG, "edit.failed", "error" attr reply.error.name, "revision" attr base.documentRevision)
+        if (reply.error == ShellStateError.REVISION_CONFLICT) refresh()
+        return reply.error.outcome()
     }
 
     /**
@@ -242,21 +229,15 @@ class SharedShellState(
      */
     private suspend fun adopt(snapshot: ShellStateSnapshot, issued: Issue?, live: Boolean): Boolean = model.withLock {
         val shownRevision = mutableState.value.snapshot?.documentRevision ?: NO_REVISION
-        when (ledger.admit(issued, snapshot.documentRevision, shownRevision)) {
-            Admission.DROP -> false
-            Admission.KEEP_SHOWN -> true.also { show(newSnapshot = null, live) }
-            Admission.REPLACE -> true.also {
-                ledger.recordShown()
-                show(snapshot, live)
+        val admission = ledger.admit(issued, snapshot.documentRevision, shownRevision)
+        if (admission == Admission.REPLACE) ledger.recordShown()
+        if (admission != Admission.DROP) {
+            mutableState.update { current ->
+                val shown = if (admission == Admission.REPLACE) snapshot else current.snapshot
+                current.copy(snapshot = shown, live = live || current.live, error = null)
             }
         }
-    }
-
-    /** Takes [newSnapshot] if there is one, turns `live` on if [live], and clears the last error. */
-    private fun show(newSnapshot: ShellStateSnapshot?, live: Boolean) {
-        mutableState.update { current ->
-            current.copy(snapshot = newSnapshot ?: current.snapshot, live = live || current.live, error = null)
-        }
+        admission != Admission.DROP
     }
 
     /**
@@ -279,13 +260,20 @@ class SharedShellState(
         return Reply(document, error, current)
     }
 
-    /** The document in [element], or null when it is unreadable or of a newer schema than this build reads. */
-    private fun decode(element: JsonElement): ShellStateSnapshot? =
-        runCatching { LettaJson.wire.decodeFromJsonElement(ShellStateSnapshot.serializer(), element) }.getOrNull()
-            ?.takeIf { it.schemaVersion <= ShellStateSchema.VERSION }
-
     private companion object {
         const val TAG = "SharedShellState"
         const val NO_REVISION = -1L
     }
 }
+
+/** How a refusal of the current connection ends an edit: the host's own answer is final, a lost link is offline. */
+private fun ShellStateError.outcome(): ShellStateEditOutcome = when (this) {
+    ShellStateError.UNREACHABLE -> ShellStateEditOutcome.OFFLINE
+    ShellStateError.REVISION_CONFLICT -> ShellStateEditOutcome.CONFLICT
+    else -> ShellStateEditOutcome.REFUSED
+}
+
+/** The document in [element], or null when it is unreadable or of a newer schema than this build reads. */
+private fun decode(element: JsonElement): ShellStateSnapshot? =
+    runCatching { LettaJson.wire.decodeFromJsonElement(ShellStateSnapshot.serializer(), element) }.getOrNull()
+        ?.takeIf { it.schemaVersion <= ShellStateSchema.VERSION }
