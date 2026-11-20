@@ -53729,9 +53729,14 @@ public final class com/letta/mobile/data/shellstate/shared/ShellStateEditOutcome
 public abstract interface class com/letta/mobile/data/shellstate/shared/ShellStateLink {
 	public abstract fun call (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun getConnection ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun getCurrentConnection ()Ljava/lang/String;
 	public abstract fun getHostCapabilities ()Ljava/util/Set;
 	public abstract fun getPushes ()Lkotlinx/coroutines/flow/Flow;
-	public abstract fun isConnected ()Z
+	public fun isConnected ()Z
+}
+
+public final class com/letta/mobile/data/shellstate/shared/ShellStateLink$DefaultImpls {
+	public static fun isConnected (Lcom/letta/mobile/data/shellstate/shared/ShellStateLink;)Z
 }
 
 public final class com/letta/mobile/data/shellstate/shared/ShellStateLinkKt {

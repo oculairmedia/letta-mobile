@@ -28,8 +28,16 @@ interface ShellStateLink {
     /** The feature capabilities the connected host advertised; empty while disconnected. */
     val hostCapabilities: Set<String>
 
-    /** Whether the host is connected right now: the same as [connection] having a session. */
-    val isConnected: Boolean
+    /**
+     * The identity of the connection that is up right now, read synchronously: the value [connection] last
+     * emitted, or null while there is none. A caller that holds a document or a request across a suspension
+     * compares this to the identity it started with, so it never acts on another connection's state before the
+     * collector that follows [connection] has run.
+     */
+    val currentConnection: String?
+
+    /** Whether the host is connected right now: the same as [currentConnection] being set. */
+    val isConnected: Boolean get() = currentConnection != null
 
     /**
      * The identity of the connection that is up, or null while there is none: its session id and its connection
@@ -61,7 +69,7 @@ private class ChannelShellStateLink(private val transport: IChannelTransport) : 
 
     override val connection: Flow<String?> = transport.state.map(::sessionOf)
 
-    override val isConnected: Boolean get() = sessionOf(transport.state.value) != null
+    override val currentConnection: String? get() = sessionOf(transport.state.value)
 
     override val hostCapabilities: Set<String> get() = transport.hostCapabilities
 

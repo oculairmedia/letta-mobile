@@ -7176,12 +7176,14 @@ abstract interface com.letta.mobile.data.shell/ShellChatPort { // com.letta.mobi
 abstract interface com.letta.mobile.data.shellstate.shared/ShellStateLink { // com.letta.mobile.data.shellstate.shared/ShellStateLink|null[0]
     abstract val connection // com.letta.mobile.data.shellstate.shared/ShellStateLink.connection|{}connection[0]
         abstract fun <get-connection>(): kotlinx.coroutines.flow/Flow<kotlin/String?> // com.letta.mobile.data.shellstate.shared/ShellStateLink.connection.<get-connection>|<get-connection>(){}[0]
+    abstract val currentConnection // com.letta.mobile.data.shellstate.shared/ShellStateLink.currentConnection|{}currentConnection[0]
+        abstract fun <get-currentConnection>(): kotlin/String? // com.letta.mobile.data.shellstate.shared/ShellStateLink.currentConnection.<get-currentConnection>|<get-currentConnection>(){}[0]
     abstract val hostCapabilities // com.letta.mobile.data.shellstate.shared/ShellStateLink.hostCapabilities|{}hostCapabilities[0]
         abstract fun <get-hostCapabilities>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.shellstate.shared/ShellStateLink.hostCapabilities.<get-hostCapabilities>|<get-hostCapabilities>(){}[0]
-    abstract val isConnected // com.letta.mobile.data.shellstate.shared/ShellStateLink.isConnected|{}isConnected[0]
-        abstract fun <get-isConnected>(): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/ShellStateLink.isConnected.<get-isConnected>|<get-isConnected>(){}[0]
     abstract val pushes // com.letta.mobile.data.shellstate.shared/ShellStateLink.pushes|{}pushes[0]
         abstract fun <get-pushes>(): kotlinx.coroutines.flow/Flow<kotlinx.serialization.json/JsonObject> // com.letta.mobile.data.shellstate.shared/ShellStateLink.pushes.<get-pushes>|<get-pushes>(){}[0]
+    open val isConnected // com.letta.mobile.data.shellstate.shared/ShellStateLink.isConnected|{}isConnected[0]
+        open fun <get-isConnected>(): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/ShellStateLink.isConnected.<get-isConnected>|<get-isConnected>(){}[0]
 
     abstract suspend fun call(kotlin/String, kotlinx.serialization.json/JsonObject): com.letta.mobile.data.shellstate.shared/ShellStateReply // com.letta.mobile.data.shellstate.shared/ShellStateLink.call|call(kotlin.String;kotlinx.serialization.json.JsonObject){}[0]
 }

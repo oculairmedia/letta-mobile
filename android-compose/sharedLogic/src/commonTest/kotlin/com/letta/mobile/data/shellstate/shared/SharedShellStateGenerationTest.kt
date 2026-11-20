@@ -166,7 +166,7 @@ class SharedShellStateGenerationTest {
         }
 
         override val hostCapabilities: Set<String> get() = if (isConnected) setOf(ShellStateWire.CAPABILITY) else emptySet()
-        override val isConnected: Boolean get() = session.value != null
+        override val currentConnection: String? get() = session.value
         override val connection: Flow<String?> get() = session
         override val pushes: Flow<JsonObject> = frames
 

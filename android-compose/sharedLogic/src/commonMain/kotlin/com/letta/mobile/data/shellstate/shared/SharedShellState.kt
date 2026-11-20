@@ -88,9 +88,12 @@ enum class ShellStateEditOutcome {
  * - [generation] goes up on every connection transition (a new session, a drop, a connected host without the
  *   contract, an offline refresh). The connection is observed by session identity, so a drop and reconnect
  *   queued before the collector runs still count, and without waiting for any read.
- * - Every request captures the generation it was issued under; a push carries the generation current when it
- *   is handled. A reply is applied only if its generation is still current: anything from an earlier
- *   connection is dropped, whatever its revision.
+ * - Every request captures the generation it was issued under, and the link's connection identity, read
+ *   synchronously (the collector that bumps the generation may not have run yet); a push carries the generation
+ *   current when it is handled. A reply is applied only if both are still current: anything from an earlier
+ *   connection is dropped, whatever its revision. The shown document also remembers the connection identity it
+ *   was read on, and a proposal refreshes first unless that is the connection now, so no edit is ever based on
+ *   another connection's revisions.
  * - The shown document remembers the generation it came from. A newer-or-equal revision from the current
  *   generation is kept over an older one; a document from an earlier generation is replaced by whatever the
  *   current one says first (revisions only order documents of one connection).
@@ -113,6 +116,12 @@ class SharedShellState(
 
     /** The [generation] the shown snapshot was adopted under; no generation equals [NO_GENERATION]. Guarded by [model]. */
     private var shownGeneration = NO_GENERATION
+
+    /** The link's connection identity the shown snapshot was read on; null while none is shown. Guarded by [model]. */
+    private var shownConnection: String? = null
+
+    /** Where a request was issued: the [generation] and the link's connection identity at that moment. */
+    private class Issue(val generation: Long, val connection: String?)
 
     /** What this device knows now. */
     val state: StateFlow<ShellStateState> = mutableState.asStateFlow()
@@ -145,8 +154,11 @@ class SharedShellState(
             transition { if (connected) it.copy(supported = false, live = false, snapshot = null) else it.copy(live = false) }
             return mutableState.value
         }
-        val issuedUnder = model.withLock { generation.also { mutableState.update { it.copy(supported = true) } } }
-        request(issuedUnder, ShellStateWire.GET, JsonObject(emptyMap())).document?.let { adopt(it, issuedUnder, live = true) }
+        val issued = model.withLock {
+            mutableState.update { it.copy(supported = true) }
+            Issue(generation, link.currentConnection)
+        }
+        request(issued, ShellStateWire.GET, JsonObject(emptyMap())).document?.let { adopt(it, issued, live = true) }
         return mutableState.value
     }
 
@@ -154,12 +166,15 @@ class SharedShellState(
     private suspend fun transition(change: (ShellStateState) -> ShellStateState) = model.withLock {
         generation += 1
         mutableState.update(change)
+        if (mutableState.value.snapshot == null) shownConnection = null
     }
 
-    /** Applies [change] only while [issuedUnder] is still the current generation. */
-    private suspend fun settle(issuedUnder: Long, change: (ShellStateState) -> ShellStateState) = model.withLock {
-        if (issuedUnder == generation) mutableState.update(change)
+    /** Applies [change] only while [issued] is still the current generation and connection. */
+    private suspend fun settle(issued: Issue, change: (ShellStateState) -> ShellStateState) = model.withLock {
+        if (isCurrent(issued)) mutableState.update(change)
     }
+
+    private fun isCurrent(issued: Issue): Boolean = issued.generation == generation && issued.connection == link.currentConnection
 
     /** Sets [key] to [value]. */
     suspend fun set(key: String, value: JsonElement): ShellStateEditOutcome = propose(listOf(Edit(key, value)))
@@ -179,20 +194,21 @@ class SharedShellState(
     suspend fun propose(edits: List<Edit>): ShellStateEditOutcome = this.edits.withLock {
         if (!link.isConnected) return@withLock ShellStateEditOutcome.OFFLINE
         if (!supported) return@withLock ShellStateEditOutcome.UNSUPPORTED
-        if (!mutableState.value.editable) refresh()
-        val (known, issuedUnder) = model.withLock { mutableState.value to generation }
+        if (!baselineIsCurrent()) refresh()
+        val (known, issued) = model.withLock { mutableState.value to Issue(generation, link.currentConnection) }
         val base = known.snapshot
-        if (!known.editable || base == null) ShellStateEditOutcome.OFFLINE else send(base, issuedUnder, edits)
+        if (!known.editable || base == null || !baselineIsCurrent()) ShellStateEditOutcome.OFFLINE else send(base, issued, edits)
     }
 
-    private suspend fun send(base: ShellStateSnapshot, issuedUnder: Long, edits: List<Edit>): ShellStateEditOutcome {
+    /** Whether the shown document is live and was read on the connection that is up now. */
+    private suspend fun baselineIsCurrent(): Boolean =
+        model.withLock { mutableState.value.editable && shownConnection == link.currentConnection }
+
+    private suspend fun send(base: ShellStateSnapshot, issued: Issue, edits: List<Edit>): ShellStateEditOutcome {
         val changes = edits.map { ShellStateChange(it.key, it.value, base.entries[it.key]?.revision ?: 0L) }
         val params = buildJsonObject { put(ShellStateWire.CHANGES, JsonArray(changes.map(ShellStateChange::toJson))) }
-        val reply = request(issuedUnder, ShellStateWire.PROPOSE, params)
-        reply.document?.let {
-            adopt(it, issuedUnder, live = true)
-            return ShellStateEditOutcome.APPLIED
-        }
+        val reply = request(issued, ShellStateWire.PROPOSE, params)
+        reply.document?.let { return if (adopt(it, issued, live = true)) ShellStateEditOutcome.APPLIED else ShellStateEditOutcome.OFFLINE }
         val error = reply.error
         Telemetry.event(TAG, "edit.failed", "error" attr error.name, "revision" attr base.documentRevision)
         return when (error) {
@@ -205,43 +221,50 @@ class SharedShellState(
         }
     }
 
-    /** A push belongs to whatever generation is current when it is handled, and never touches `live`. */
+    /** A push belongs to whatever generation and connection are current when it is handled, and never touches `live`. */
     private suspend fun onPush(frame: JsonObject) {
         val pushed = decode(frame) ?: return
-        adopt(pushed, issuedUnder = null, live = false)
+        adopt(pushed, issued = null, live = false)
     }
 
     /**
-     * Applies [snapshot] unless it is out of date. [issuedUnder] is the generation its request captured (null
-     * for a push, which takes the current one): a reply of an earlier generation is dropped. Within the current
-     * generation a document that is not newer than the shown one is kept out, whether the shown one was read
-     * or pushed. [live] only ever turns on, and only for a successful read or write; a push passes false and
-     * leaves the value as it is.
+     * Applies [snapshot] unless it is out of date; whether it was applied or kept out by recency. [issued] is
+     * where its request was issued (null for a push, which takes the current generation and connection): a reply
+     * of another generation or connection is dropped, and so reports false. Within the current generation and
+     * connection a document that is not newer than the shown one is kept out, whether the shown one was read or
+     * pushed; a shown one read on another connection is replaced whatever its revision.
+     * [live] only ever turns on, and only for a successful read or write; a push passes false and leaves the
+     * value as it is.
      */
-    private suspend fun adopt(snapshot: ShellStateSnapshot, issuedUnder: Long?, live: Boolean) = model.withLock {
-        if (issuedUnder != null && issuedUnder != generation) return@withLock
+    private suspend fun adopt(snapshot: ShellStateSnapshot, issued: Issue?, live: Boolean): Boolean = model.withLock {
+        if (issued != null && !isCurrent(issued)) return@withLock false
         val shownRevision = mutableState.value.snapshot?.documentRevision ?: -1L
-        val keepShown = shownGeneration == generation && shownRevision >= snapshot.documentRevision
-        if (!keepShown) shownGeneration = generation
+        val shownHere = shownGeneration == generation && shownConnection == link.currentConnection
+        val keepShown = shownHere && shownRevision >= snapshot.documentRevision
+        if (!keepShown) {
+            shownGeneration = generation
+            shownConnection = link.currentConnection
+        }
         mutableState.update { current ->
             current.copy(snapshot = if (keepShown) current.snapshot else snapshot, live = live || current.live, error = null)
         }
+        true
     }
 
     /** What one request came to: the [document] it answered, or else the [error] it failed with. */
     private class Reply(val document: ShellStateSnapshot?, val error: ShellStateError)
 
     /**
-     * One request. A failure of the current generation records its code and turns `live` off; one of an
-     * earlier generation changes nothing.
+     * One request. A failure of the current generation and connection records its code and turns `live` off;
+     * one issued on an earlier one changes nothing.
      */
-    private suspend fun request(issuedUnder: Long, method: String, params: JsonObject): Reply {
+    private suspend fun request(issued: Issue, method: String, params: JsonObject): Reply {
         val outcome = runCatching { link.call(method, params) }
         (outcome.exceptionOrNull() as? CancellationException)?.let { throw it }
         val reply = outcome.getOrNull()
         val document = reply?.takeIf { it.success }?.result?.let(::decode)
         val error = ShellStateError.fromWire(reply?.error)
-        if (document == null) settle(issuedUnder) { it.copy(error = error, live = false) }
+        if (document == null) settle(issued) { it.copy(error = error, live = false) }
         return Reply(document, error)
     }
 

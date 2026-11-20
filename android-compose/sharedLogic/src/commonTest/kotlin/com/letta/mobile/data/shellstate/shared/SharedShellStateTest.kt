@@ -305,7 +305,7 @@ class SharedShellStateTest {
         var beforeGetReply: () -> Unit = {}
 
         override val hostCapabilities: Set<String> get() = if (connected.value) capabilities else emptySet()
-        override val isConnected: Boolean get() = connected.value
+        override val currentConnection: String? get() = "session".takeIf { connected.value }
         override val connection: Flow<String?> get() = connected.map { up -> "session".takeIf { up } }
         override val pushes: Flow<JsonObject> = frames
 

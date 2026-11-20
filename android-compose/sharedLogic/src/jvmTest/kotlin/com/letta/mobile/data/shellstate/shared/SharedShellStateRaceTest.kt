@@ -56,7 +56,10 @@ class SharedShellStateRaceTest {
             val link = RefusingLink()
             val shared = SharedShellState(link)
             scope.launch { shared.run() }
-            withTimeout(TIMEOUT_MS) { shared.state.first { it.live } }
+            withTimeout(TIMEOUT_MS) {
+                link.pushes.subscriptionCount.first { it > 0 }
+                shared.state.first { it.live }
+            }
             val write = scope.launch { shared.set("a", JsonPrimitive("x")) }
             val pushes = scope.launch { (FIRST_PUSH..FIRST_PUSH + PUSHES).forEach { link.pushes.emit(frame(it)) } }
             link.releaseRefusal()
@@ -72,7 +75,7 @@ class SharedShellStateRaceTest {
         private val release = CompletableDeferred<Unit>()
         override val pushes = MutableSharedFlow<JsonObject>()
         override val hostCapabilities: Set<String> = setOf(ShellStateWire.CAPABILITY)
-        override val isConnected: Boolean = true
+        override val currentConnection: String? = "session"
         override val connection: Flow<String?> = flowOf("session")
 
         fun releaseRefusal() = release.complete(Unit)
@@ -100,7 +103,7 @@ class SharedShellStateRaceTest {
         val readStarted = CompletableDeferred<Unit>()
         override val pushes = MutableSharedFlow<JsonObject>()
         override val hostCapabilities: Set<String> = setOf(ShellStateWire.CAPABILITY)
-        override val isConnected: Boolean = true
+        override val currentConnection: String? = "session"
         override val connection: Flow<String?> = flowOf("session")
 
         fun releaseReply() = release.complete(Unit)
