@@ -32,6 +32,9 @@ import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.ui.markdown.LocalTimelineBreakoutLane
+import com.letta.mobile.ui.markdown.MarkdownBreakoutLane
+import com.letta.mobile.ui.markdown.markdownBreakoutLane
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.chat.surface.LocalScrollToLatestAction
 import com.letta.mobile.ui.chat.surface.LocalChatLaneBounds
@@ -117,8 +120,14 @@ internal fun TimelineListFrame(
     // The prompt's sticky copy stands in for its row, which hides meanwhile.
     val sticky = pinned
     val laneButton = rememberLaneScrollToLatest(overlays)
+    // The spare width beside the reading column, which a reply's wide table may break out into.
+    val breakoutLane = remember { MarkdownBreakoutLane() }
     Box(modifier = modifier.fillMaxWidth().then(laneButton)) {
-        CompositionLocalProvider(LocalTextSelectionColors provides selectionColors, LocalStickyPrompt provides sticky) {
+        CompositionLocalProvider(
+            LocalTextSelectionColors provides selectionColors,
+            LocalStickyPrompt provides sticky,
+            LocalTimelineBreakoutLane provides breakoutLane,
+        ) {
             LazyColumn(
                 state = listState,
                 reverseLayout = true,
@@ -126,6 +135,8 @@ internal fun TimelineListFrame(
                 overscrollEffect = overscroll,
                 modifier = Modifier
                     .fillMaxSize()
+                    // Measured before the rows, so each row reads this pass's lane.
+                    .markdownBreakoutLane(breakoutLane, ChatColumnMaxWidth, ChatRowSpacing.contentPaddingHorizontal)
                     // The glide's springback lifts the rows inside the list's bounds and fades.
                     .clipToBounds()
                     // Under floating chrome the dissolve runs from the top edge through it (Android's

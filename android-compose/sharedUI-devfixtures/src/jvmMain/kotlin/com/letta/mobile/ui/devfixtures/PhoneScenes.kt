@@ -111,6 +111,8 @@ object PhoneScenes {
 
     val receiptLight = receiptDark.copy(id = "canvas-artifact-phone-light", label = "canvas.compose receipts (light)", dark = false)
 
+    val wideTable = fullScreenDark.copy(id = "phone-wide-table", label = "Chat - wide table", state = PhoneFixtures.wideTableState)
+
     /** In the playground's order. */
     val all: List<PhoneScene> = listOf(
         fullScreenDark,
@@ -128,6 +130,7 @@ object PhoneScenes {
         canvasKeyboard,
         receiptDark,
         receiptLight,
+        wideTable,
     )
 
     private const val HEAD_LEFT_Y = 0.25f
