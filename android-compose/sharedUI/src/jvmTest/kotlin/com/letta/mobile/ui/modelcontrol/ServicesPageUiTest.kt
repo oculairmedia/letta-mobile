@@ -94,8 +94,10 @@ class ServicesPageUiTest {
     }
 
     @Test
-    fun theKeptKeyHintOnlyPromisesRetentionForTheSameAddress() {
-        assertTrue("same address" in ServiceCredentialStrings.SECRET_KEPT_HINT, ServiceCredentialStrings.SECRET_KEPT_HINT)
+    fun theKeptKeyHintPromisesRetentionOnlyForTheSameOrigin() {
+        val hint = ServiceCredentialStrings.SECRET_KEPT_HINT
+        // The key is bound to the origin (ServiceAddress.originOf): scheme, host and effective port; a path change keeps it.
+        assertTrue(listOf("scheme", "host", "port").all { it in hint }, hint)
     }
 
     @Test
