@@ -15,7 +15,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -33,8 +35,8 @@ class SharedShellStateGenerationTest {
         val second = link.expectRead()
         val shared = SharedShellState(link)
         val job = launch { shared.run() }
-        link.connected.value = false
-        link.connected.value = true
+        link.disconnect()
+        link.connect()
         second.complete(link.document(1))
         first.complete(link.document(100))
         assertEquals(1L, shared.state.value.snapshot?.documentRevision, "the earlier connection's read is dropped")
@@ -44,14 +46,36 @@ class SharedShellStateGenerationTest {
     }
 
     @Test
+    fun aReconnectQueuedBeforeTheCollectorResumesStillStartsAFreshRead() = runTest(StandardTestDispatcher()) {
+        val link = ScriptedLink()
+        val earlier = link.expectRead()
+        val fresh = link.expectRead()
+        val shared = SharedShellState(link)
+        val job = launch { shared.run() }
+        runCurrent()
+        assertEquals(1, link.reads, "the first connection's read is in flight")
+        // Down and up again, both queued before the collector gets to run: it never sees a disconnected value.
+        link.dropAndReconnect()
+        runCurrent()
+        assertEquals(2, link.reads, "the new connection started a fresh read")
+        fresh.complete(link.document(2))
+        runCurrent()
+        earlier.complete(link.document(100))
+        runCurrent()
+        assertEquals(2L, shared.state.value.snapshot?.documentRevision, "the earlier connection's late reply is dropped")
+        assertTrue(shared.state.value.live)
+        job.cancel()
+    }
+
+    @Test
     fun aReplyFromAnEarlierConnectionNeverReplacesTheCurrentDocument() = runTest(UnconfinedTestDispatcher()) {
         val link = ScriptedLink()
         val shared = SharedShellState(link)
         val earlier = link.expectRead()
         val pending = launch { shared.refresh() }
-        link.connected.value = false
+        link.disconnect()
         shared.refresh()
-        link.connected.value = true
+        link.connect()
         val current = link.expectRead()
         val reading = launch { shared.refresh() }
         current.complete(link.document(1))
@@ -70,10 +94,10 @@ class SharedShellStateGenerationTest {
         read.complete(link.document(10))
         shared.refresh()
         assertEquals(10L, shared.state.value.snapshot?.documentRevision)
-        link.connected.value = false
+        link.disconnect()
         shared.refresh()
         assertEquals(10L, shared.state.value.snapshot?.documentRevision, "the offline document stays shown")
-        link.connected.value = true
+        link.connect()
         val next = link.expectRead()
         next.complete(link.document(0))
         shared.refresh()
@@ -87,9 +111,9 @@ class SharedShellStateGenerationTest {
         val shared = SharedShellState(link)
         val earlier = link.expectRead()
         val pending = launch { shared.refresh() }
-        link.connected.value = false
+        link.disconnect()
         shared.refresh()
-        link.connected.value = true
+        link.connect()
         val current = link.expectRead()
         current.complete(link.document(1))
         shared.refresh()
@@ -109,7 +133,7 @@ class SharedShellStateGenerationTest {
         assertTrue(shared.state.value.live)
         link.push(2)
         assertTrue(shared.state.value.live, "a push leaves a live document live")
-        link.connected.value = false
+        link.disconnect()
         link.push(3)
         assertFalse(shared.state.value.live, "a push leaves a stale document stale")
         assertEquals(3L, shared.state.value.snapshot?.documentRevision)
@@ -118,15 +142,32 @@ class SharedShellStateGenerationTest {
 
     /** A host whose reads are answered when the test says so, and whose capabilities vanish while disconnected. */
     private class ScriptedLink : ShellStateLink {
-        val connected = MutableStateFlow(true)
+        private val session = MutableStateFlow<String?>("session-0")
+        private var sessions = 0
         val frames = MutableSharedFlow<JsonObject>(extraBufferCapacity = 8)
         private val scripted = ArrayDeque<CompletableDeferred<ShellStateReply>>()
         var reads = 0
             private set
 
-        override val hostCapabilities: Set<String> get() = if (connected.value) setOf(ShellStateWire.CAPABILITY) else emptySet()
-        override val isConnected: Boolean get() = connected.value
-        override val connection: Flow<Boolean> get() = connected
+        fun disconnect() {
+            session.value = null
+        }
+
+        /** Connects as a new session. */
+        fun connect() {
+            sessions += 1
+            session.value = "session-$sessions"
+        }
+
+        /** Down and up again as one step: the collector never sees the null, only a different session. */
+        fun dropAndReconnect() {
+            disconnect()
+            connect()
+        }
+
+        override val hostCapabilities: Set<String> get() = if (isConnected) setOf(ShellStateWire.CAPABILITY) else emptySet()
+        override val isConnected: Boolean get() = session.value != null
+        override val connection: Flow<String?> get() = session
         override val pushes: Flow<JsonObject> = frames
 
         /** The next read will wait on the returned deferred, which the test completes with a document or a failure. */

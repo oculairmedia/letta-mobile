@@ -85,8 +85,9 @@ enum class ShellStateEditOutcome {
  *
  * Replies, pushes and connection changes arrive from different connections and from calls that were already
  * in flight, so nothing here is decided from a flag read earlier. Instead:
- * - [generation] goes up on every connection transition (up, down, a connected host without the contract, an
- *   offline refresh). The connection is observed without waiting for any read.
+ * - [generation] goes up on every connection transition (a new session, a drop, a connected host without the
+ *   contract, an offline refresh). The connection is observed by session identity, so a drop and reconnect
+ *   queued before the collector runs still count, and without waiting for any read.
  * - Every request captures the generation it was issued under; a push carries the generation current when it
  *   is handled. A reply is applied only if its generation is still current: anything from an earlier
  *   connection is dropped, whatever its revision.
@@ -127,10 +128,10 @@ class SharedShellState(
     suspend fun run() = coroutineScope {
         link.pushes.onEach(::onPush).launchIn(this)
         var read: Job? = null
-        link.connection.distinctUntilChanged().collect { up ->
+        link.connection.distinctUntilChanged().collect { session ->
             read?.cancel()
             transition { it.copy(live = false) }
-            read = if (up) launch { refresh() } else null
+            read = if (session != null) launch { refresh() } else null
         }
     }
 

@@ -73,7 +73,7 @@ class SharedShellStateRaceTest {
         override val pushes = MutableSharedFlow<JsonObject>()
         override val hostCapabilities: Set<String> = setOf(ShellStateWire.CAPABILITY)
         override val isConnected: Boolean = true
-        override val connection: Flow<Boolean> = flowOf(true)
+        override val connection: Flow<String?> = flowOf("session")
 
         fun releaseRefusal() = release.complete(Unit)
 
@@ -101,7 +101,7 @@ class SharedShellStateRaceTest {
         override val pushes = MutableSharedFlow<JsonObject>()
         override val hostCapabilities: Set<String> = setOf(ShellStateWire.CAPABILITY)
         override val isConnected: Boolean = true
-        override val connection: Flow<Boolean> = flowOf(true)
+        override val connection: Flow<String?> = flowOf("session")
 
         fun releaseReply() = release.complete(Unit)
 

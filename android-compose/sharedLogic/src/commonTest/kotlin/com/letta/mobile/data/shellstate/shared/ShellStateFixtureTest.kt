@@ -110,7 +110,7 @@ class ShellStateFixtureTest {
     private class ReplayLink(private val start: ShellStateSnapshot, private val setResponse: JsonObject) : ShellStateLink {
         override val hostCapabilities: Set<String> = setOf(ShellStateWire.CAPABILITY)
         override val isConnected: Boolean = true
-        override val connection: Flow<Boolean> = flowOf(true)
+        override val connection: Flow<String?> = flowOf("session")
         override val pushes: Flow<JsonObject> = emptyFlow()
 
         override suspend fun call(method: String, params: JsonObject): ShellStateReply = when (method) {

@@ -28,11 +28,15 @@ interface ShellStateLink {
     /** The feature capabilities the connected host advertised; empty while disconnected. */
     val hostCapabilities: Set<String>
 
-    /** Whether the host is connected right now. */
+    /** Whether the host is connected right now: the same as [connection] having a session. */
     val isConnected: Boolean
 
-    /** Emits each time the connection comes up (true) or goes down (false). */
-    val connection: Flow<Boolean>
+    /**
+     * The identity of the connection that is up (its session id), or null while there is none. It is the
+     * identity, not a yes or no, that is observed: a drop and a reconnect queued before a collector runs
+     * leave no null in between, but the session differs, and any change of it is a new connection.
+     */
+    val connection: Flow<String?>
 
     /** Every `shell_state_updated` frame the host pushes, raw. */
     val pushes: Flow<JsonObject>
@@ -53,11 +57,11 @@ private class ChannelShellStateLink(private val transport: IChannelTransport) : 
         (frame as? ServerFrame.Unknown)?.takeIf { it.type == ShellStateWire.FRAME_TYPE }?.raw
     }
 
-    override val connection: Flow<Boolean> = transport.state.map(::isUp)
+    override val connection: Flow<String?> = transport.state.map(::sessionOf)
 
-    override val isConnected: Boolean get() = isUp(transport.state.value)
+    override val isConnected: Boolean get() = sessionOf(transport.state.value) != null
 
     override val hostCapabilities: Set<String> get() = transport.hostCapabilities
 
-    private fun isUp(state: ChannelTransportState): Boolean = state is ChannelTransportState.Connected
+    private fun sessionOf(state: ChannelTransportState): String? = (state as? ChannelTransportState.Connected)?.sessionId
 }

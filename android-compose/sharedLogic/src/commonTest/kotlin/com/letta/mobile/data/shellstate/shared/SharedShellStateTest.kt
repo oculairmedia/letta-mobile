@@ -15,6 +15,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -305,7 +306,7 @@ class SharedShellStateTest {
 
         override val hostCapabilities: Set<String> get() = if (connected.value) capabilities else emptySet()
         override val isConnected: Boolean get() = connected.value
-        override val connection: Flow<Boolean> get() = connected
+        override val connection: Flow<String?> get() = connected.map { up -> "session".takeIf { up } }
         override val pushes: Flow<JsonObject> = frames
 
         fun seed(key: String, value: JsonElement) = write(key, value)

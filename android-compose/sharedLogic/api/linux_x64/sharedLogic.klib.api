@@ -7175,7 +7175,7 @@ abstract interface com.letta.mobile.data.shell/ShellChatPort { // com.letta.mobi
 
 abstract interface com.letta.mobile.data.shellstate.shared/ShellStateLink { // com.letta.mobile.data.shellstate.shared/ShellStateLink|null[0]
     abstract val connection // com.letta.mobile.data.shellstate.shared/ShellStateLink.connection|{}connection[0]
-        abstract fun <get-connection>(): kotlinx.coroutines.flow/Flow<kotlin/Boolean> // com.letta.mobile.data.shellstate.shared/ShellStateLink.connection.<get-connection>|<get-connection>(){}[0]
+        abstract fun <get-connection>(): kotlinx.coroutines.flow/Flow<kotlin/String?> // com.letta.mobile.data.shellstate.shared/ShellStateLink.connection.<get-connection>|<get-connection>(){}[0]
     abstract val hostCapabilities // com.letta.mobile.data.shellstate.shared/ShellStateLink.hostCapabilities|{}hostCapabilities[0]
         abstract fun <get-hostCapabilities>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.shellstate.shared/ShellStateLink.hostCapabilities.<get-hostCapabilities>|<get-hostCapabilities>(){}[0]
     abstract val isConnected // com.letta.mobile.data.shellstate.shared/ShellStateLink.isConnected|{}isConnected[0]
