@@ -159,12 +159,15 @@ required_test_job="$(
 )"
 assert_contains "$required_test_job" 'name: test'
 # letta-mobile-l8lcn: web tests are part of the required set too.
-assert_contains "$required_test_job" 'needs: [test, api-docs, api-contract-windows, web-wasm]'
+# PR-description checks (pr-body-gate) are part of the same aggregate: a missing body line blocks merge.
+assert_contains "$required_test_job" 'needs: [test, api-docs, api-contract-windows, web-wasm, pr-body-gate]'
 assert_contains "$required_test_job" 'if: always()'
 assert_contains "$required_test_job" 'TEST_RESULT: ${{ needs.test.result }}'
 assert_contains "$required_test_job" 'DOCS_RESULT: ${{ needs.api-docs.result }}'
 assert_contains "$required_test_job" 'WINDOWS_API_RESULT: ${{ needs.api-contract-windows.result }}'
 assert_contains "$required_test_job" 'WEB_RESULT: ${{ needs.web-wasm.result }}'
+assert_contains "$required_test_job" 'BODY_RESULT: ${{ needs.pr-body-gate.result }}'
+assert_contains "$required_test_job" 'EVENT_NAME: ${{ github.event_name }}'
 api_docs_job="$(awk '/^  api-docs:$/ { active=1; next }
   active && /^  [[:alnum:]_-]+:$/ { exit }
   active { print }' "$android_workflow")"
@@ -196,12 +199,24 @@ for test_result in success failure cancelled skipped; do
   for docs_result in success failure cancelled skipped; do
     for windows_api_result in success failure cancelled skipped; do
       for web_result in success failure skipped; do
-        combo="$test_result/$docs_result/$windows_api_result/$web_result"
-        if TEST_RESULT="$test_result" DOCS_RESULT="$docs_result" WINDOWS_API_RESULT="$windows_api_result"           WEB_RESULT="$web_result" bash -e -c "$required_test_script"; then
-          [[ "$combo" == success/success/success/success ]] || fail "required test accepted $combo"
-        else
-          [[ "$combo" != success/success/success/success ]] || fail "required test rejected successful jobs"
-        fi
+        for event_name in pull_request push; do
+          for body_result in success failure cancelled skipped; do
+            combo="$test_result/$docs_result/$windows_api_result/$web_result/$event_name/$body_result"
+            # A PR needs the description checks to succeed; a push has none, so they must be skipped.
+            body_ok=no
+            if [[ "$event_name/$body_result" == pull_request/success || "$event_name/$body_result" == push/skipped ]]; then
+              body_ok=yes
+            fi
+            if TEST_RESULT="$test_result" DOCS_RESULT="$docs_result" WINDOWS_API_RESULT="$windows_api_result" \
+              WEB_RESULT="$web_result" EVENT_NAME="$event_name" BODY_RESULT="$body_result" bash -e -c "$required_test_script"; then
+              [[ "$test_result/$docs_result/$windows_api_result/$web_result/$body_ok" == success/success/success/success/yes ]] \
+                || fail "required test accepted $combo"
+            else
+              [[ "$test_result/$docs_result/$windows_api_result/$web_result/$body_ok" != success/success/success/success/yes ]] \
+                || fail "required test rejected successful jobs ($combo)"
+            fi
+          done
+        done
       done
     done
   done
@@ -211,9 +226,42 @@ assert_contains "$test_job" 'python3 scripts/ci/parity_gates.py'
 assert_contains "$test_job" 'bash scripts/ci/platform-ui-gate.sh --enforce'
 assert_contains "$test_job" 'python3 scripts/ci/baseline-ratchet-guard.py --diff-base "$BASE_SHA"'
 assert_contains "$test_job" 'python3 scripts/ci/tree-hygiene.py --diff-base "$BASE_SHA"'
-assert_contains "$test_job" 'python3 scripts/ci/web-bundle-raise-guard.py --diff-base "$BASE_SHA"'
 assert_contains "$test_job" 'test_gate_hygiene.py'
-assert_contains "$test_job" 'bash scripts/ci/agents-policy-check.sh --require-shared-search'
+# The PR-description checks (shared-search line, web-bundle approval, test-weakening reason) moved out of
+# test-workload into pr-body-policy.sh, run by the pr-body-gate job (needed by required `test`) and by
+# pr-body-policy.yml on every description edit. They must stay out of the heavy graph: an edit must
+# never re-run it.
+body_script="$(<"$SOURCE_ROOT/scripts/ci/pr-body-policy.sh")"
+assert_contains "$body_script" 'bash scripts/ci/agents-policy-check.sh --require-shared-search'
+assert_contains "$body_script" 'python3 scripts/ci/web-bundle-raise-guard.py --diff-base "$BASE_SHA"'
+assert_contains "$body_script" 'python3 scripts/ci/test-weakening-guard.py --diff-base "$BASE_SHA"'
+assert_contains "$body_script" "gh api \"repos/\${GITHUB_REPOSITORY}/pulls/\${PR_NUMBER}\" --jq '.body // \"\"'"
+assert_not_contains "$test_job" 'agents-policy-check.sh --require-shared-search'
+assert_not_contains "$test_job" 'web-bundle-raise-guard.py --diff-base'
+assert_not_contains "$test_job" 'test-weakening-guard.py --diff-base'
+assert_not_contains "$test_job" 'PR_BODY'
+pr_body_gate_job="$(
+  awk '/^  pr-body-gate:$/ { active=1; next }
+       active && /^  [[:alnum:]_-]+:$/ { exit }
+       active { print }' "$android_workflow"
+)"
+assert_contains "$pr_body_gate_job" "if: github.event_name == 'pull_request'"
+assert_contains "$pr_body_gate_job" 'run: bash scripts/ci/pr-body-policy.sh'
+body_workflow="$(<"$SOURCE_ROOT/.github/workflows/pr-body-policy.yml")"
+assert_contains "$body_workflow" 'types: [opened, edited, synchronize, reopened]'
+assert_contains "$body_workflow" 'run: bash scripts/ci/pr-body-policy.sh'
+assert_not_contains "$body_workflow" 'gradlew'
+# A body edit must not start (or cancel) the heavy Android graph, and a main run must never be cancelled.
+assert_not_contains "$pr_triggers" 'edited'
+assert_contains "$pr_triggers" 'types: [opened, synchronize, reopened]'
+assert_contains "$android_workflow_text" "cancel-in-progress: \${{ github.ref != 'refs/heads/main' }}"
+# Every android.yml job carries its own timeout-minutes (the default is 360).
+while IFS= read -r job_name; do
+  job_block="$(awk -v job="  ${job_name}:" '$0 == job { active=1; next }
+    active && /^  [[:alnum:]_-]+:$/ { exit }
+    active { print }' "$android_workflow")"
+  assert_contains "$job_block" $'\n    timeout-minutes: '
+done < <(awk '/^jobs:$/ { active=1; next } active && /^  [[:alnum:]_-]+:$/ { sub(/:$/, "", $1); print $1 }' "$android_workflow")
 assert_contains "$test_job" 'test_parity_gates.py'
 assert_contains "$test_job" "python3 -m unittest discover -s scripts/ci -p 'test_baseline_ratchet_guard.py' -v"
 assert_contains "$test_job" 'scripts/tests/platform-ui-gate-test.sh'

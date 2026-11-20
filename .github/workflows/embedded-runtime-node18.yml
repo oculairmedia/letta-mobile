@@ -32,7 +32,7 @@ on:
 
 concurrency:
   group: embedded-runtime-node18-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
