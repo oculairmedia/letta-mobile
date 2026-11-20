@@ -128,7 +128,13 @@ class SharedShellState(
      * cancelled and the new one's started on its own coroutine.
      */
     suspend fun run() = coroutineScope {
-        link.pushes.onEach(::onPush).launchIn(this)
+        // A push is bound to the connection it was received on: where it arrived is recorded before anything
+        // suspends, and it is adopted only if that is still the current generation and connection, so one received
+        // on A never becomes B's document. It never touches `live`.
+        link.pushes.onEach { frame ->
+            val receivedOn = ledger.issue()
+            decode(frame)?.let { adopt(it, receivedOn, live = false) }
+        }.launchIn(this)
         var read: Job? = null
         link.connection.distinctUntilChanged().collect { session ->
             read?.cancel()
@@ -170,16 +176,6 @@ class SharedShellState(
     /** Applies [change] only while [issued] is still current; whether it was. */
     private suspend fun settle(issued: Issue, change: (ShellStateState) -> ShellStateState): Boolean = model.withLock {
         ledger.isCurrent(issued).also { current -> if (current) mutableState.update(change) }
-    }
-
-    /**
-     * A push is bound to the connection it was received on: where it arrived is recorded before anything
-     * suspends, and it is adopted only if that is still the current generation and connection, so one received
-     * on A never becomes B's document. It never touches `live`.
-     */
-    private suspend fun onPush(frame: JsonObject) {
-        val receivedOn = ledger.issue()
-        decode(frame)?.let { adopt(it, receivedOn, live = false) }
     }
 
     /** Sets [key] to [value]. */
