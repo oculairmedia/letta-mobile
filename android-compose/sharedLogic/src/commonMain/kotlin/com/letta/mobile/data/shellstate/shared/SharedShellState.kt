@@ -235,7 +235,7 @@ class SharedShellState(
     private suspend fun adopt(snapshot: ShellStateSnapshot, issued: Issue, live: Boolean): Boolean = model.withLock {
         val shownRevision = mutableState.value.snapshot?.documentRevision ?: NO_REVISION
         val admission = ledger.admit(issued, snapshot.documentRevision, shownRevision)
-        if (admission == Admission.REPLACE) ledger.recordShown()
+        if (admission == Admission.REPLACE) ledger.recordShown(issued)
         if (admission != Admission.DROP) {
             mutableState.update { current ->
                 val shown = if (admission == Admission.REPLACE) snapshot else current.snapshot

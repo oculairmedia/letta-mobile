@@ -96,6 +96,30 @@ class SharedShellStateBaselineTest {
         job.cancel()
     }
 
+    @Test
+    fun aDocumentAdmittedOnAIsRecordedAsAEvenIfTheLinkMovesToBBeforeTheProvenanceIsWritten() = runTest(StandardTestDispatcher()) {
+        val link = IdentityLink()
+        val shared = SharedShellState(link)
+        val read = link.holdNext()
+        val refreshing = launch { shared.refresh() }
+        runCurrent()
+        // The read of A is in flight. When its reply is admitted (the one read of the link's identity the check
+        // makes), the link moves to B: anything that reads the identity again after that would see B.
+        link.afterNextRead = { link.identity.value = "B" }
+        read.complete(link.reply(document(5, "from-A")))
+        refreshing.join()
+        assertEquals(5L, shared.state.value.snapshot?.documentRevision, "A's document was admitted")
+
+        link.answerNext(document(7, "from-B"))
+        link.answerNext(document(8, "edited"))
+        assertEquals(ShellStateEditOutcome.APPLIED, shared.set("a", JsonPrimitive("edited")))
+        assertEquals(
+            listOf(ShellStateWire.GET, ShellStateWire.GET, ShellStateWire.PROPOSE), link.methods,
+            "A's document is not B's baseline, so the edit reads B first",
+        )
+        assertEquals(7L, link.proposedExpectedRevision, "the revision sent is B's, never A's 5")
+    }
+
     private fun pushFrame(revision: Long, value: String): JsonObject {
         val body = LettaJson.persisted.encodeToJsonElement(ShellStateSnapshot.serializer(), document(revision, value)) as JsonObject
         return JsonObject(body + ("type" to JsonPrimitive(ShellStateWire.FRAME_TYPE)))

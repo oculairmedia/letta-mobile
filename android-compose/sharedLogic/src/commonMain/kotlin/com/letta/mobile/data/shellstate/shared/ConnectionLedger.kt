@@ -52,10 +52,13 @@ internal class ConnectionLedger(private val currentConnection: () -> String?) {
         return if (shownHere && shownRevision >= offeredRevision) Admission.KEEP_SHOWN else Admission.REPLACE
     }
 
-    /** Records that the shown document now comes from the current generation and connection. */
-    fun recordShown() {
-        shownGeneration = generation.value
-        shownConnection = currentConnection()
+    /**
+     * Records that the shown document comes from where [admitted] was issued or received: the identity [admit]
+     * just checked, never a fresh read of the generation or the link, which could already have moved on.
+     */
+    fun recordShown(admitted: Issue) {
+        shownGeneration = admitted.generation
+        shownConnection = admitted.connection
     }
 
     private companion object {
