@@ -7,9 +7,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.IntrinsicMeasurable
+import androidx.compose.ui.layout.IntrinsicMeasureScope
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.node.LayoutModifierNode
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
@@ -36,9 +45,14 @@ internal class MarkdownBreakoutLane {
     var sparePx: Int by mutableIntStateOf(0)
         private set
 
+    /**
+     * Called from the list's measure. The comparison reads the old value without observing it: an
+     * observed read would subscribe the list's own measure to this state, so every write would
+     * invalidate the list that made it and the page would re-measure without ever going idle.
+     */
     fun update(laneWidthPx: Int, columnMaxWidthPx: Int, gutterPx: Int) {
         val spare = breakoutSpare(laneWidthPx, columnMaxWidthPx, gutterPx)
-        if (spare != sparePx) sparePx = spare
+        if (spare != Snapshot.withoutReadObservation { sparePx }) sparePx = spare
     }
 }
 
@@ -73,21 +87,60 @@ internal fun breakoutWidth(parentPx: Int, naturalPx: Int, sparePx: Int, capPx: I
 /**
  * Records the lane this list's rows sit in: its measured width less [lanePadding] on each side (the
  * list's content padding), against a reading column of [columnMaxWidth].
+ *
+ * A node element compared by value, not a layout lambda: the list's frame recomposes on every
+ * scroll (its edge fades read the list state), and a new lambda each time would re-measure the
+ * list, which updates that state again, so the page would never go idle.
  */
 internal fun Modifier.markdownBreakoutLane(
     lane: MarkdownBreakoutLane,
     columnMaxWidth: Dp,
     lanePadding: Dp,
-): Modifier = layout { measurable, constraints ->
-    if (constraints.hasBoundedWidth) {
-        lane.update(
-            laneWidthPx = constraints.maxWidth - 2 * lanePadding.roundToPx(),
-            columnMaxWidthPx = columnMaxWidth.roundToPx(),
-            gutterPx = LettaSurfaceSizes.wideContentGutter.roundToPx(),
-        )
+): Modifier = this then BreakoutLaneElement(lane, columnMaxWidth, lanePadding)
+
+private data class BreakoutLaneElement(
+    val lane: MarkdownBreakoutLane,
+    val columnMaxWidth: Dp,
+    val lanePadding: Dp,
+) : ModifierNodeElement<BreakoutLaneNode>() {
+    override fun create() = BreakoutLaneNode(lane, columnMaxWidth, lanePadding)
+
+    override fun update(node: BreakoutLaneNode) {
+        node.lane = lane
+        node.columnMaxWidth = columnMaxWidth
+        node.lanePadding = lanePadding
     }
-    val placeable = measurable.measure(constraints)
-    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+}
+
+/** Writes the lane from the list's real measure only: intrinsic and lookahead passes pass straight through. */
+private class BreakoutLaneNode(
+    var lane: MarkdownBreakoutLane,
+    var columnMaxWidth: Dp,
+    var lanePadding: Dp,
+) : Modifier.Node(), LayoutModifierNode {
+    override fun MeasureScope.measure(measurable: Measurable, constraints: Constraints): MeasureResult {
+        if (constraints.hasBoundedWidth && !isLookingAhead) {
+            lane.update(
+                laneWidthPx = constraints.maxWidth - 2 * lanePadding.roundToPx(),
+                columnMaxWidthPx = columnMaxWidth.roundToPx(),
+                gutterPx = LettaSurfaceSizes.wideContentGutter.roundToPx(),
+            )
+        }
+        val placeable = measurable.measure(constraints)
+        return layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+    }
+
+    override fun IntrinsicMeasureScope.minIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int) =
+        measurable.minIntrinsicWidth(height)
+
+    override fun IntrinsicMeasureScope.maxIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int) =
+        measurable.maxIntrinsicWidth(height)
+
+    override fun IntrinsicMeasureScope.minIntrinsicHeight(measurable: IntrinsicMeasurable, width: Int) =
+        measurable.minIntrinsicHeight(width)
+
+    override fun IntrinsicMeasureScope.maxIntrinsicHeight(measurable: IntrinsicMeasurable, width: Int) =
+        measurable.maxIntrinsicHeight(width)
 }
 
 /**
@@ -129,7 +182,9 @@ internal fun SharedMarkdownTable(model: MarkdownComponentModel) {
     val lane = LocalMarkdownBreakoutLane.current
     val columns = remember(model.node) { model.node.tableColumnCount() }
     val naturalWidth = LocalMarkdownDimens.current.tableCellWidth * columns
-    Box(Modifier.markdownBreakout(lane, naturalWidth).testTag(SHARED_MARKDOWN_TABLE_TAG)) {
+    // Remembered, so a recomposition of the table does not hand it a new layout lambda (and a re-measure).
+    val breakout = remember(lane, naturalWidth) { Modifier.markdownBreakout(lane, naturalWidth) }
+    Box(breakout.testTag(SHARED_MARKDOWN_TABLE_TAG)) {
         MarkdownTable(content = model.content, node = model.node, style = model.typography.table)
     }
 }
