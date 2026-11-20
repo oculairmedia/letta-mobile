@@ -23,7 +23,9 @@ import com.letta.mobile.data.voice.output.VoiceSessionControls
 import com.letta.mobile.data.voice.responder.VoiceChatResponder
 import com.letta.mobile.data.voice.responder.VoiceChatSession
 import com.letta.mobile.data.voice.session.telemetry.TelemetryMouth
+import com.letta.mobile.data.voice.session.telemetry.TelemetryPlayer
 import com.letta.mobile.data.voice.session.telemetry.TelemetryResponder
+import com.letta.mobile.data.voice.session.telemetry.TelemetrySynthesizer
 import com.letta.mobile.data.voice.session.telemetry.TelemetryTranscriber
 import com.letta.mobile.data.voice.session.telemetry.TelemetryVoiceChatSession
 import com.letta.mobile.data.voice.session.telemetry.VoiceEarTelemetry
@@ -164,7 +166,9 @@ fun interface VoiceEngineFactory {
  * them early when they already cover a closed turn (and, with an early-turn pause stored, offers a
  * turn's words after that pause; see [EarlyTurns]). Every engine
  * reports its decisions as `VoiceMode` telemetry (states, reasons, ids, counts and levels; never
- * audio, text, the key or the address).
+ * audio, text, the key or the address), and each speech request and playback stream reports its
+ * stages (`speech.request.*`, `speech.firstFrame`, `playback.*`), so a reply that is never heard
+ * shows where it stopped.
  */
 class EndpointVoiceEngineFactory(
     private val audio: VoiceAudio,
@@ -181,8 +185,9 @@ class EndpointVoiceEngineFactory(
         controls.warmUpWith { speech.synthesizer.warm() }
         val inFlight = if (throughHost) HOST_IN_FLIGHT else DIRECT_IN_FLIGHT
         val options = MouthOptions(maxInFlight = inFlight, speed = controls::speed, meter = controls.meter)
-        val speaker = controls.speaker(audio.speaker(request.scope))
-        val mouth = TelemetryMouth(EndpointVoiceMouth(speech.synthesizer, speaker, request.scope, options), telemetry)
+        val speaker = controls.speaker(TelemetryPlayer(audio.speaker(request.scope), telemetry))
+        val synthesizer = TelemetrySynthesizer(speech.synthesizer, telemetry)
+        val mouth = TelemetryMouth(EndpointVoiceMouth(synthesizer, speaker, request.scope, options), telemetry)
         val session = TelemetryVoiceChatSession(request.session, telemetry)
         val responder = TelemetryResponder(VoiceChatResponder(session), telemetry, session)
         val engines = VoiceEngines(ear = hearing.ear, responder = responder, mouth = mouth)

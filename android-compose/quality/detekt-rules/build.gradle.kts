@@ -28,14 +28,14 @@ tasks.test {
     useJUnitPlatform()
 }
 
-val changedKotlinFiles = providers.provider {
+fun selectedKotlinFiles(addedOnly: Boolean) = providers.provider {
     val repositoryRoot = rootProject.projectDir.parentFile
     val python = if (System.getProperty("os.name").startsWith("Windows")) "python" else "python3"
     val paths = providers.exec {
         workingDir(repositoryRoot)
         // Track the PR context as an input; the selector also handles an empty value on push events.
         environment("GITHUB_BASE_REF", providers.environmentVariable("GITHUB_BASE_REF").orElse("").get())
-        commandLine(python, "scripts/ci/changed-kotlin-code.py")
+        commandLine(listOf(python, "scripts/ci/changed-kotlin-code.py") + if (addedOnly) listOf("--added") else emptyList())
     }.standardOutput.asText.get().lineSequence().filter(String::isNotBlank).toSet()
     paths.asSequence()
         .filter { it.startsWith("android-compose/") && it.endsWith(".kt") }
@@ -46,6 +46,9 @@ val changedKotlinFiles = providers.provider {
         .filter(File::isFile)
         .toList()
 }
+
+val changedKotlinFiles = selectedKotlinFiles(addedOnly = false)
+val addedKotlinFiles = selectedKotlinFiles(addedOnly = true)
 
 tasks.register<io.gitlab.arturbosch.detekt.Detekt>("guardrailDetekt") {
     description = "Block high-risk Kotlin policy violations in files with code changes from the PR base."
@@ -66,8 +69,28 @@ tasks.register<io.gitlab.arturbosch.detekt.Detekt>("guardrailDetekt") {
     }
 }
 
+// Rules that hold for every new file in their scope at once, before the paths of older files are clean.
+tasks.register<io.gitlab.arturbosch.detekt.Detekt>("newFileGuardrailDetekt") {
+    description = "Block policy violations in Kotlin files added since the PR base, whatever their path's ratchet."
+    group = "verification"
+    dependsOn(tasks.jar)
+    setSource(addedKotlinFiles)
+    config.setFrom(rootProject.file("detekt-guardrails-new-files.yml"))
+    buildUponDefaultConfig = false
+    parallel = true
+    jvmTarget = "17"
+    ignoreFailures = false
+    reports {
+        sarif.required.set(true)
+        xml.required.set(true)
+        html.required.set(true)
+        txt.required.set(false)
+        md.required.set(false)
+    }
+}
+
 tasks.check {
-    dependsOn("guardrailDetekt")
+    dependsOn("guardrailDetekt", "newFileGuardrailDetekt")
 }
 
 // Local counting aid for design-system debt; deliberately not wired into check or CI.

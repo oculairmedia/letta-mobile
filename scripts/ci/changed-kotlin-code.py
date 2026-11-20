@@ -209,14 +209,17 @@ def code_changed(path, original):
         return True  # Broken syntax must reach the Kotlin checks.
 
 
-def changed_files(root, base):
+def changed_files(root, base, added_only=False):
+    """Kotlin sources whose code changed since the merge base with [base]; with added_only, only new files."""
     commit = commit_result(root, "rev-parse", "--verify", "--end-of-options", base + "^{commit}")
     ancestor = commit_result(root, "merge-base", commit, "HEAD")
     candidates = sorted(name for name in changed_names(root, ancestor) if candidate_source(root, name))
     tracked = tree_blobs(git(root, "ls-tree", "-r", "-z", ancestor))
     blobs = read_blobs(root, (tracked[name] for name in candidates if name in tracked))
     for name in candidates:
-        if name not in tracked or code_changed(root / name, blobs[tracked[name]]):
+        if name not in tracked:
+            yield name
+        elif not added_only and code_changed(root / name, blobs[tracked[name]]):
             yield name
 
 
@@ -229,5 +232,6 @@ def default_base():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", default=default_base())
+    parser.add_argument("--added", action="store_true", help="only files that do not exist at the merge base")
     args = parser.parse_args()
-    print("\n".join(changed_files(Path(__file__).resolve().parents[2], args.base)))
+    print("\n".join(changed_files(Path(__file__).resolve().parents[2], args.base, added_only=args.added)))

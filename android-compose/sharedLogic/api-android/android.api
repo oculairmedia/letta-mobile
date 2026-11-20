@@ -16477,6 +16477,71 @@ public final class com/letta/mobile/data/chat/tools/steps/ToolStepExpansions {
 public final class com/letta/mobile/data/chat/tools/steps/ToolStepExpansions$Companion {
 }
 
+public final class com/letta/mobile/data/clientstore/ClientStoreEntries {
+	public static final field INSTANCE Lcom/letta/mobile/data/clientstore/ClientStoreEntries;
+	public final fun clearAll (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun declarationOf (Ljava/lang/String;)Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public final fun getActiveBackendConfig ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public final fun getAll ()Ljava/util/List;
+	public final fun getAutomationImport ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public final fun getBackendConfigs ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public final fun getCaches ()Ljava/util/List;
+	public final fun getChannelSyncState ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public final fun getContextReadings ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public final fun getDesktopBackendConfig ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public final fun getDesktopIrohIdentity ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public final fun getDesktopLocalRuntime ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public final fun getMascotIdentity ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public final fun getNotebookIdentity ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public final fun getNotificationLaunchTokens ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public final fun getVoiceHostAudioAck ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public final fun getWebBackend ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+}
+
+public final class com/letta/mobile/data/clientstore/ClientStoreEntry {
+	public final fun getKind ()Lcom/letta/mobile/data/clientstore/ClientStoreKind;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getStorageKey ()Ljava/lang/String;
+	public final fun getSummary ()Ljava/lang/String;
+	public final fun isPrefix ()Z
+	public final fun keyFor (Ljava/lang/String;)Ljava/lang/String;
+	public final fun matches (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/clientstore/ClientStoreKind {
+}
+
+public final class com/letta/mobile/data/clientstore/ClientStoreKind$ConnectionBootstrap : com/letta/mobile/data/clientstore/ClientStoreKind {
+	public static final field INSTANCE Lcom/letta/mobile/data/clientstore/ClientStoreKind$ConnectionBootstrap;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/clientstore/ClientStoreKind$DeviceFact : com/letta/mobile/data/clientstore/ClientStoreKind {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/clientstore/ClientStoreKind$DeviceFact;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/clientstore/ClientStoreKind$DeviceFact;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/clientstore/ClientStoreKind$DeviceFact;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getJustification ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/clientstore/ClientStoreKind$DisposableCache : com/letta/mobile/data/clientstore/ClientStoreKind {
+	public static final field INSTANCE Lcom/letta/mobile/data/clientstore/ClientStoreKind$DisposableCache;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/clientstore/DisposableCache {
+	public abstract fun clearAll (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getEntry ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+}
+
 public final class com/letta/mobile/data/commands/AppServerSlashCommandApi : com/letta/mobile/data/transport/appserver/AppServerSlashCommandApi {
 	public static final field Companion Lcom/letta/mobile/data/commands/AppServerSlashCommandApi$Companion;
 	public fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;)V
@@ -28389,6 +28454,10 @@ public final class com/letta/mobile/data/model/BackendConnectionStatus$Unconfigu
 	public fun equals (Ljava/lang/Object;)Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/model/BackendConnectionStatusKt {
+	public static final fun backendConnectionStatus (Lcom/letta/mobile/data/model/LettaConfig;Ljava/lang/Throwable;Z)Lcom/letta/mobile/data/model/BackendConnectionStatus;
 }
 
 public final class com/letta/mobile/data/model/BackendKind : java/lang/Enum {
@@ -53242,6 +53311,221 @@ public final class com/letta/mobile/data/shell/sidemenu/RailViews {
 	public final fun getDefault ()Ljava/util/List;
 	public final fun getHOME-p0dNODo ()Ljava/lang/String;
 	public final fun getNEW-p0dNODo ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/shellstate/ShellStateActor {
+	public static final field Companion Lcom/letta/mobile/data/shellstate/ShellStateActor$Companion;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateActor$Agent : com/letta/mobile/data/shellstate/ShellStateActor {
+	public static final field Companion Lcom/letta/mobile/data/shellstate/ShellStateActor$Agent$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/shellstate/ShellStateActor$Agent;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shellstate/ShellStateActor$Agent;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/shellstate/ShellStateActor$Agent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/shellstate/ShellStateActor$Agent$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/shellstate/ShellStateActor$Agent$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/shellstate/ShellStateActor$Agent;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/shellstate/ShellStateActor$Agent;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateActor$Agent$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateActor$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateActor$User : com/letta/mobile/data/shellstate/ShellStateActor {
+	public static final field Companion Lcom/letta/mobile/data/shellstate/ShellStateActor$User$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/shellstate/ShellStateActor$User;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shellstate/ShellStateActor$User;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/shellstate/ShellStateActor$User;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClientId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/shellstate/ShellStateActor$User$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/shellstate/ShellStateActor$User$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/shellstate/ShellStateActor$User;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/shellstate/ShellStateActor$User;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateActor$User$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/data/shellstate/ShellStateDocument {
+	public abstract fun export (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getSnapshot ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun import (Lcom/letta/mobile/data/shellstate/ShellStateExport;Lcom/letta/mobile/data/shellstate/ShellStateImportPolicy;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun propose (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Long;Lcom/letta/mobile/data/shellstate/ShellStateActor;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateEntry {
+	public static final field Companion Lcom/letta/mobile/data/shellstate/ShellStateEntry$Companion;
+	public fun <init> (Lkotlinx/serialization/json/JsonElement;JLcom/letta/mobile/data/shellstate/ShellStateActor;J)V
+	public final fun component1 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun component2 ()J
+	public final fun component3 ()Lcom/letta/mobile/data/shellstate/ShellStateActor;
+	public final fun component4 ()J
+	public final fun copy (Lkotlinx/serialization/json/JsonElement;JLcom/letta/mobile/data/shellstate/ShellStateActor;J)Lcom/letta/mobile/data/shellstate/ShellStateEntry;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shellstate/ShellStateEntry;Lkotlinx/serialization/json/JsonElement;JLcom/letta/mobile/data/shellstate/ShellStateActor;JILjava/lang/Object;)Lcom/letta/mobile/data/shellstate/ShellStateEntry;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRevision ()J
+	public final fun getUpdatedAtMs ()J
+	public final fun getUpdatedBy ()Lcom/letta/mobile/data/shellstate/ShellStateActor;
+	public final fun getValue ()Lkotlinx/serialization/json/JsonElement;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/shellstate/ShellStateEntry$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/shellstate/ShellStateEntry$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/shellstate/ShellStateEntry;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/shellstate/ShellStateEntry;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateEntry$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateExport {
+	public static final field Companion Lcom/letta/mobile/data/shellstate/ShellStateExport$Companion;
+	public fun <init> (IJLjava/lang/String;Ljava/util/Map;)V
+	public final fun component1 ()I
+	public final fun component2 ()J
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/util/Map;
+	public final fun copy (IJLjava/lang/String;Ljava/util/Map;)Lcom/letta/mobile/data/shellstate/ShellStateExport;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shellstate/ShellStateExport;IJLjava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/shellstate/ShellStateExport;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEntries ()Ljava/util/Map;
+	public final fun getExportedAtMs ()J
+	public final fun getSchemaVersion ()I
+	public final fun getSourceHost ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/shellstate/ShellStateExport$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/shellstate/ShellStateExport$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/shellstate/ShellStateExport;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/shellstate/ShellStateExport;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateExport$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateImportPolicy : java/lang/Enum {
+	public static final field IntoEmpty Lcom/letta/mobile/data/shellstate/ShellStateImportPolicy;
+	public static final field Replace Lcom/letta/mobile/data/shellstate/ShellStateImportPolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/shellstate/ShellStateImportPolicy;
+	public static fun values ()[Lcom/letta/mobile/data/shellstate/ShellStateImportPolicy;
+}
+
+public abstract interface class com/letta/mobile/data/shellstate/ShellStateProposal {
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateProposal$Applied : com/letta/mobile/data/shellstate/ShellStateProposal {
+	public fun <init> (J)V
+	public final fun component1 ()J
+	public final fun copy (J)Lcom/letta/mobile/data/shellstate/ShellStateProposal$Applied;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shellstate/ShellStateProposal$Applied;JILjava/lang/Object;)Lcom/letta/mobile/data/shellstate/ShellStateProposal$Applied;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRevision ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateProposal$Conflict : com/letta/mobile/data/shellstate/ShellStateProposal {
+	public fun <init> (Lcom/letta/mobile/data/shellstate/ShellStateEntry;)V
+	public final fun component1 ()Lcom/letta/mobile/data/shellstate/ShellStateEntry;
+	public final fun copy (Lcom/letta/mobile/data/shellstate/ShellStateEntry;)Lcom/letta/mobile/data/shellstate/ShellStateProposal$Conflict;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shellstate/ShellStateProposal$Conflict;Lcom/letta/mobile/data/shellstate/ShellStateEntry;ILjava/lang/Object;)Lcom/letta/mobile/data/shellstate/ShellStateProposal$Conflict;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCurrent ()Lcom/letta/mobile/data/shellstate/ShellStateEntry;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateProposal$Rejected : com/letta/mobile/data/shellstate/ShellStateProposal {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/shellstate/ShellStateProposal$Rejected;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shellstate/ShellStateProposal$Rejected;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/shellstate/ShellStateProposal$Rejected;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateSchema {
+	public static final field INSTANCE Lcom/letta/mobile/data/shellstate/ShellStateSchema;
+	public static final field VERSION I
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateSnapshot {
+	public static final field Companion Lcom/letta/mobile/data/shellstate/ShellStateSnapshot$Companion;
+	public fun <init> (IJLjava/util/Map;)V
+	public final fun component1 ()I
+	public final fun component2 ()J
+	public final fun component3 ()Ljava/util/Map;
+	public final fun copy (IJLjava/util/Map;)Lcom/letta/mobile/data/shellstate/ShellStateSnapshot;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shellstate/ShellStateSnapshot;IJLjava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/shellstate/ShellStateSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDocumentRevision ()J
+	public final fun getEntries ()Ljava/util/Map;
+	public final fun getSchemaVersion ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/shellstate/ShellStateSnapshot$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/shellstate/ShellStateSnapshot$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/shellstate/ShellStateSnapshot;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/shellstate/ShellStateSnapshot;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateSnapshot$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class com/letta/mobile/data/skills/Skill {
