@@ -96,6 +96,39 @@ class TimelineUnchangedReconcileRevisionTest {
         assertNotEquals(settled, engine.publication.value.durableRevision, "a real edit must replace the generation")
     }
 
+    /**
+     * Control for the dual listing: a call first seen alone and later also as its approval request
+     * is new information and advances the revision once; replaying that page, or editing the return,
+     * behaves like any other row.
+     */
+    @Test fun aCallLaterListedAsAnApprovalRequestAdvancesOnceAndAnEditedReturnStillApplies() = runTest {
+        val store = InMemoryTimelineStore()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, MAX_BODY_BYTES), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        fun page(vararg rows: String) = rows.map(::decode)
+        fun revision() = engine.publication.value.durableRevision
+        fun storedRows() = store.rows.values.map { it.body.decodeToString() }
+
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, page(prompt, dualCall, dualReturn)))
+        val callOnly = revision()
+        assertTrue(storedRows().none { DUAL_REQUEST_ID in it }, "no request has been listed yet")
+
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, page(prompt, dualCall, dualRequest, dualReturn)))
+        val withRequest = revision()
+        assertNotEquals(callOnly, withRequest, "a request the row has never seen must reach it")
+        assertTrue(storedRows().any { DUAL_REQUEST_ID in it }, "the approval id the request carries is stored")
+
+        repeat(POST_SEND_DELAYS_MS.size) {
+            assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, page(prompt, dualCall, dualRequest, dualReturn)))
+        }
+        assertEquals(withRequest, revision(), "replaying the same two listings must not advance the revision")
+
+        val editedReturn = wire(WireRow("msg-dual-return", "tool_return_message", RUN, 4,
+            """"tool_call_id":"call-dual","status":"success","tool_return":"changed""""))
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, page(prompt, dualCall, dualRequest, editedReturn)))
+        assertNotEquals(withRequest, revision(), "a genuinely edited return must still replace the row")
+    }
+
     /** The slots of the schedule whose reconcile advanced the revision past the previous one. */
     private suspend fun revisionsAdvancedBySchedule(store: TimelineBoundedStore, page: () -> List<LettaMessage>): List<Long> {
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, MAX_BODY_BYTES), enabled = true)
@@ -160,6 +193,7 @@ class TimelineUnchangedReconcileRevisionTest {
     private companion object {
         val scope = TimelineScope("backend", "conv-reconcile", "agent")
         const val RUN = "local-run-125"
+        const val DUAL_REQUEST_ID = "msg-dual:tool:call-dual:request"
         const val MAX_BODY_BYTES = 2 * 1024 * 1024
         val POST_SEND_DELAYS_MS = listOf(750L, 2_500L, 6_000L)
         val json = Json { ignoreUnknownKeys = true }
