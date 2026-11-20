@@ -18,7 +18,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /** The real [channelShellStateLink] over a channel transport: a reconnect to the same endpoint is a new connection. */
@@ -48,8 +47,9 @@ class ShellStateChannelLinkTest {
         job.cancel()
     }
 
-    private fun connected(epoch: Long) =
-        ChannelTransportState.Connected(serverId = "iroh-app-server", sessionId = SAME_SESSION, deviceId = "device", connectionEpoch = epoch)
+    private fun connected(epoch: Long) = ChannelTransportState.Connected(
+        serverId = "iroh-app-server", sessionId = SAME_SESSION, deviceId = "device", connectionEpoch = epoch,
+    )
 
     private fun response(revision: Long) = AppServerInboundFrame.AdminRpcResponse(
         requestId = "r", success = true,
