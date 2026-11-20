@@ -35,6 +35,7 @@ class ToolsetDeviceStatusRelayTest {
             when (method.name) {
                 "getEvents" -> frames
                 "isConnected" -> connected
+                "getConnectionEpoch" -> null
                 else -> error("Unexpected call: ${method.name}")
             }
         } as AppServerClient
@@ -97,6 +98,7 @@ class ToolsetDeviceStatusRelayTest {
             when (method.name) {
                 "getEvents" -> frames
                 "isConnected" -> connected
+                "getConnectionEpoch" -> null
                 else -> error("Unexpected call: ${method.name}")
             }
         } as AppServerClient

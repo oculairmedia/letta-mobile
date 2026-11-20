@@ -1,5 +1,7 @@
 package com.letta.mobile.data.shellstate.shared
 
+import kotlinx.atomicfu.atomic
+
 /** Where a request was issued: the ledger's generation and the link's connection identity at that moment. */
 internal class Issue(val generation: Long, val connection: String?)
 
@@ -23,35 +25,36 @@ internal enum class Admission {
  * change it leads to are one step. [currentConnection] reads the link's identity synchronously.
  */
 internal class ConnectionLedger(private val currentConnection: () -> String?) {
-    private var generation = 0L
+    // Atomic so that [issue] can record where a push was received without taking the owner's lock.
+    private val generation = atomic(0L)
     private var shownGeneration = NO_GENERATION
     private var shownConnection: String? = null
 
     /** Where a request issued now is issued. */
-    fun issue() = Issue(generation, currentConnection())
+    fun issue() = Issue(generation.value, currentConnection())
 
     /** Whether [issued] is still the current generation and connection. */
-    fun isCurrent(issued: Issue): Boolean = issued.generation == generation && issued.connection == currentConnection()
+    fun isCurrent(issued: Issue): Boolean = issued.generation == generation.value && issued.connection == currentConnection()
 
     /** Whether the shown document was read on the connection that is up now. */
     fun shownOnCurrentConnection(): Boolean = shownConnection == currentConnection()
 
     /** Starts a new generation. With no document shown, nothing is remembered about the connection it came from. */
     fun advance(documentShown: Boolean) {
-        generation += 1
+        generation.incrementAndGet()
         if (!documentShown) shownConnection = null
     }
 
-    /** Decides what to do with a document of [offeredRevision] against a shown one of [shownRevision]; [issued] is null for a push. */
-    fun admit(issued: Issue?, offeredRevision: Long, shownRevision: Long): Admission {
-        if (issued != null && !isCurrent(issued)) return Admission.DROP
-        val shownHere = shownGeneration == generation && shownOnCurrentConnection()
+    /** Decides what to do with a document of [offeredRevision] against a shown one of [shownRevision]; [issued] is where it was issued or received. */
+    fun admit(issued: Issue, offeredRevision: Long, shownRevision: Long): Admission {
+        if (!isCurrent(issued)) return Admission.DROP
+        val shownHere = shownGeneration == generation.value && shownOnCurrentConnection()
         return if (shownHere && shownRevision >= offeredRevision) Admission.KEEP_SHOWN else Admission.REPLACE
     }
 
     /** Records that the shown document now comes from the current generation and connection. */
     fun recordShown() {
-        shownGeneration = generation
+        shownGeneration = generation.value
         shownConnection = currentConnection()
     }
 

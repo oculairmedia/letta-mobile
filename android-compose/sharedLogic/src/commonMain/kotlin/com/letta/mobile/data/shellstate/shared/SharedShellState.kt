@@ -89,8 +89,8 @@ enum class ShellStateEditOutcome {
  *   contract, an offline refresh). The connection is observed by session identity, so a drop and reconnect
  *   queued before the collector runs still count, and without waiting for any read.
  * - Every request captures the generation it was issued under, and the link's connection identity, read
- *   synchronously (the collector that bumps the generation may not have run yet); a push carries the generation
- *   current when it is handled. A reply is applied only if both are still current: anything from an earlier
+ *   synchronously (the collector that bumps the generation may not have run yet); a push carries where it was
+ *   received. A reply is applied only if both are still current: anything from an earlier
  *   connection is dropped, whatever its revision. The shown document also remembers the connection identity it
  *   was read on, and a proposal refreshes first unless that is the connection now, so no edit is ever based on
  *   another connection's revisions.
@@ -128,8 +128,7 @@ class SharedShellState(
      * cancelled and the new one's started on its own coroutine.
      */
     suspend fun run() = coroutineScope {
-        // A push belongs to whatever generation and connection are current when it is handled, and never touches `live`.
-        link.pushes.onEach { frame -> decode(frame)?.let { adopt(it, issued = null, live = false) } }.launchIn(this)
+        link.pushes.onEach(::onPush).launchIn(this)
         var read: Job? = null
         link.connection.distinctUntilChanged().collect { session ->
             read?.cancel()
@@ -171,6 +170,16 @@ class SharedShellState(
     /** Applies [change] only while [issued] is still current; whether it was. */
     private suspend fun settle(issued: Issue, change: (ShellStateState) -> ShellStateState): Boolean = model.withLock {
         ledger.isCurrent(issued).also { current -> if (current) mutableState.update(change) }
+    }
+
+    /**
+     * A push is bound to the connection it was received on: where it arrived is recorded before anything
+     * suspends, and it is adopted only if that is still the current generation and connection, so one received
+     * on A never becomes B's document. It never touches `live`.
+     */
+    private suspend fun onPush(frame: JsonObject) {
+        val receivedOn = ledger.issue()
+        decode(frame)?.let { adopt(it, receivedOn, live = false) }
     }
 
     /** Sets [key] to [value]. */
@@ -223,11 +232,11 @@ class SharedShellState(
 
     /**
      * Applies [snapshot] unless it is out of date; whether it was applied or kept out by recency (a dropped reply
-     * reports false). [issued] is where its request was issued, null for a push. [ConnectionLedger.admit] decides.
+     * reports false). [issued] is where its request was issued, or where a push was received. [ConnectionLedger.admit] decides.
      * [live] only ever turns on, and only for a successful read or write; a push passes false and leaves the
      * value as it is.
      */
-    private suspend fun adopt(snapshot: ShellStateSnapshot, issued: Issue?, live: Boolean): Boolean = model.withLock {
+    private suspend fun adopt(snapshot: ShellStateSnapshot, issued: Issue, live: Boolean): Boolean = model.withLock {
         val shownRevision = mutableState.value.snapshot?.documentRevision ?: NO_REVISION
         val admission = ledger.admit(issued, snapshot.documentRevision, shownRevision)
         if (admission == Admission.REPLACE) ledger.recordShown()

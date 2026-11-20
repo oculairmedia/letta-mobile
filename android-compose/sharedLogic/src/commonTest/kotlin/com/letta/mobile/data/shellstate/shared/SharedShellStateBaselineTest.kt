@@ -35,11 +35,11 @@ class SharedShellStateBaselineTest {
         assertTrue(shared.state.value.editable)
         // The connection changes and nothing has observed it yet (no run()): the baseline is another host's.
         link.identity.value = "B"
-        link.answerNext(document(5, "from-B"))
-        link.answerNext(document(6, "edited"))
+        link.answerNext(document(7, "from-B"))
+        link.answerNext(document(8, "edited"))
         assertEquals(ShellStateEditOutcome.APPLIED, shared.set("a", JsonPrimitive("edited")))
         assertEquals(listOf(ShellStateWire.GET, ShellStateWire.GET, ShellStateWire.PROPOSE), link.methods)
-        assertEquals(5L, link.proposedExpectedRevision, "the revision sent is the one read on connection B")
+        assertEquals(7L, link.proposedExpectedRevision, "the revision sent is the one read on connection B, not A's 5")
     }
 
     @Test
@@ -79,6 +79,28 @@ class SharedShellStateBaselineTest {
         }
     }
 
+    @Test
+    fun aPushIsBoundToTheConnectionItWasReceivedOnEvenIfTheLinkMovesBeforeItIsAdopted() = runTest(StandardTestDispatcher()) {
+        val link = IdentityLink()
+        val shared = SharedShellState(link)
+        link.answerNext(document(5, "from-A"))
+        val job = launch { shared.run() }
+        runCurrent()
+        assertEquals(5L, shared.state.value.snapshot?.documentRevision)
+        // The push is taken in on connection A; the link moves to B at the instant the receipt is recorded, before
+        // the push is adopted. B's own read has not happened yet.
+        link.afterNextRead = { link.identity.value = "B" }
+        link.frames.tryEmit(pushFrame(9, "pushed-on-A"))
+        runCurrent()
+        assertEquals(5L, shared.state.value.snapshot?.documentRevision, "A's push is not adopted as B's document")
+        job.cancel()
+    }
+
+    private fun pushFrame(revision: Long, value: String): JsonObject {
+        val body = LettaJson.persisted.encodeToJsonElement(ShellStateSnapshot.serializer(), document(revision, value)) as JsonObject
+        return JsonObject(body + ("type" to JsonPrimitive(ShellStateWire.FRAME_TYPE)))
+    }
+
     private fun document(revision: Long, value: String) = ShellStateSnapshot(
         1, revision, mapOf("a" to ShellStateEntry(JsonPrimitive(value), revision, ShellStateActor.User("endpoint-b"), 1)),
     )
@@ -91,9 +113,14 @@ class SharedShellStateBaselineTest {
         private val answers = ArrayDeque<CompletableDeferred<ShellStateReply>>()
 
         override val hostCapabilities: Set<String> get() = if (currentConnection != null) setOf(ShellStateWire.CAPABILITY) else emptySet()
-        override val currentConnection: String? get() = identity.value
+        override val currentConnection: String?
+            get() = identity.value.also { afterNextRead?.invoke().also { afterNextRead = null } }
         override val connection: Flow<String?> get() = identity
-        override val pushes: Flow<JsonObject> = kotlinx.coroutines.flow.emptyFlow()
+        val frames = kotlinx.coroutines.flow.MutableSharedFlow<JsonObject>(extraBufferCapacity = 4)
+        override val pushes: Flow<JsonObject> = frames
+
+        /** Runs once, right after the next read of [currentConnection]: a connection change at a chosen instant. */
+        var afterNextRead: (() -> Unit)? = null
 
         fun reply(document: ShellStateSnapshot) =
             ShellStateReply(true, LettaJson.persisted.encodeToJsonElement(ShellStateSnapshot.serializer(), document))

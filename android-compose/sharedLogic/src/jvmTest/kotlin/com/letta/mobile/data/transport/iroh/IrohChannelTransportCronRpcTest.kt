@@ -38,6 +38,7 @@ class IrohChannelTransportCronRpcTest {
         ) { _, method, args ->
             when (method.name) {
                 "isConnected", "getIsConnected" -> kotlinx.coroutines.flow.MutableStateFlow(true)
+                "getConnectionEpoch" -> null
                 "getEvents" -> kotlinx.coroutines.flow.MutableSharedFlow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>()
                 "adminRpc" -> {
                     val command = args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.AdminRpc
