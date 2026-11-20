@@ -995,7 +995,7 @@ The dependency-free names of the pinned-agents v1 contract (`docs/reference/cont
 
 # Package com.letta.mobile.data.pins.shared
 
-The client of the pinned-agents v1 contract and the wire it shares with the host. `SharedAgentPins` is the one list of pinned agents every surface reads and edits: it reads the host's list over `AgentPinsLink` (bound to the channel transport by `channelAgentPinsLink`), applies edits optimistically with compare-and-set and rolls them back on a conflict, adopts newer `pins_updated` pushes, refuses edits while the host is out of reach (nothing is queued) and shows the last list learned from `AgentPinsCache` meanwhile. There is no device-local list: without the host's capability there are no pins. `AgentPinsSnapshot` is the list with its revision, the same shape the host stores and a host-state export carries. Nothing here logs an agent name.
+The client of the pinned-agents v1 contract and the wire it shares with the host. `SharedAgentPins` is the one list of pinned agents every surface reads and edits: it reads the host's list over `AgentPinsLink` (bound to the channel transport by `channelAgentPinsLink`), applies edits optimistically with compare-and-set and rolls them back on a conflict, adopts newer `pins_updated` pushes, refuses edits while the host is out of reach (nothing is queued) and meanwhile shows the last list it read, held in memory only. Nothing is stored on the device: without the host's capability there are no pins. `AgentPinsSnapshot` is the list with its revision, the same shape the host stores and a host-state export carries. Nothing here logs an agent name.
 
 # Package com.letta.mobile.data.objectverbs.refs
 

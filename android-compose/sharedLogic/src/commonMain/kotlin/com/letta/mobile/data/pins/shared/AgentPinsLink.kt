@@ -1,8 +1,6 @@
 package com.letta.mobile.data.pins.shared
 
 import com.letta.mobile.data.pins.wire.AgentPinsWire
-import com.letta.mobile.data.serialization.LettaJson
-import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -10,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -61,31 +58,5 @@ fun channelAgentPinsLink(transport: IChannelTransport): AgentPinsLink = object :
     override suspend fun call(method: String, params: JsonObject): AgentPinsReply {
         val response = transport.adminRpc(method = method, path = "", body = params.toString())
         return AgentPinsReply(response.success, response.result, response.error)
-    }
-}
-
-/** The last shared list this device learned from one host, shown while that host is out of reach. */
-interface AgentPinsCache {
-    /** The last list stored; null when none was. */
-    fun read(): AgentPinsSnapshot?
-
-    /** Stores [snapshot] as the last list learned. */
-    fun write(snapshot: AgentPinsSnapshot)
-}
-
-/**
- * [AgentPinsCache] in [store], one entry per host [scope] (the backend identity the session is bound
- * to). A corrupt entry reads as none; it is a cache of the host's value, never the source of truth.
- */
-class SettingsAgentPinsCache(private val store: SecureSettingsStore, scope: String) : AgentPinsCache {
-    private val key = "$KEY_PREFIX$scope"
-
-    override fun read(): AgentPinsSnapshot? = store.getString(key)
-        ?.let { runCatching { LettaJson.persisted.decodeFromString<AgentPinsSnapshot>(it) }.getOrNull() }
-
-    override fun write(snapshot: AgentPinsSnapshot) = store.putString(key, LettaJson.persisted.encodeToString(snapshot))
-
-    private companion object {
-        const val KEY_PREFIX = "pins.agents.shared.v1:"
     }
 }

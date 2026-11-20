@@ -3,7 +3,6 @@ package com.letta.mobile.data.pins.shared
 import com.letta.mobile.data.pins.wire.AgentPinsError
 import com.letta.mobile.data.pins.wire.AgentPinsWire
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -34,18 +33,17 @@ class SharedAgentPinsTest {
     @Test
     fun readsTheHostListAndCachesIt() = runTest {
         val host = FakeHost(revision = 4, ids = listOf(a, b))
-        val cache = cache()
-        val pins = SharedAgentPins(host, cache)
+        val pins = SharedAgentPins(host)
         val state = pins.refresh()
         assertEquals(listOf(a, b), state.agentIds)
         assertTrue(state.editable)
-        assertEquals(AgentPinsSnapshot(4, listOf(a, b)), cache.read())
+        assertEquals(AgentPinsSnapshot(4, listOf(a, b)), state.snapshot)
     }
 
     @Test
     fun anAcceptedEditShowsAtOnceAndTakesTheHostRevision() = runTest {
         val host = FakeHost(revision = 1, ids = listOf(a))
-        val pins = SharedAgentPins(host, cache()).also { it.refresh() }
+        val pins = SharedAgentPins(host).also { it.refresh() }
         host.beforeSet = { assertEquals(listOf(a, b), pins.state.value.agentIds) }
         assertEquals(AgentPinsEditOutcome.APPLIED, pins.setPinned(b, true))
         assertEquals(AgentPinsSnapshot(2, listOf(a, b)), pins.state.value.snapshot)
@@ -55,7 +53,7 @@ class SharedAgentPinsTest {
     @Test
     fun aConflictRollsBackToTheHostList() = runTest {
         val host = FakeHost(revision = 1, ids = listOf(a))
-        val pins = SharedAgentPins(host, cache()).also { it.refresh() }
+        val pins = SharedAgentPins(host).also { it.refresh() }
         host.write(listOf(c))
         assertEquals(AgentPinsEditOutcome.CONFLICT, pins.setPinned(b, true))
         assertEquals(AgentPinsSnapshot(2, listOf(c)), pins.state.value.snapshot)
@@ -65,7 +63,7 @@ class SharedAgentPinsTest {
     @Test
     fun aRefusedEditIsRolledBack() = runTest {
         val host = FakeHost(revision = 1, ids = listOf(a))
-        val pins = SharedAgentPins(host, cache()).also { it.refresh() }
+        val pins = SharedAgentPins(host).also { it.refresh() }
         host.refuseSetWith = AgentPinsWire.INVALID_REQUEST
         assertEquals(AgentPinsEditOutcome.REFUSED, pins.setPinned(c, true))
         assertEquals(AgentPinsSnapshot(1, listOf(a)), pins.state.value.snapshot)
@@ -74,7 +72,7 @@ class SharedAgentPinsTest {
     @Test
     fun newerPushesReplaceTheListAndOlderOnesAreIgnored() = runTest(UnconfinedTestDispatcher()) {
         val host = FakeHost(revision = 3, ids = listOf(a))
-        val pins = SharedAgentPins(host, cache())
+        val pins = SharedAgentPins(host)
         val job = launch { pins.run() }
         assertEquals(listOf(a), pins.state.value.agentIds)
         host.push(5, listOf(b, a))
@@ -86,10 +84,8 @@ class SharedAgentPinsTest {
 
     @Test
     fun offlineShowsTheLastListAndRefusesEditsWithoutQueueing() = runTest(UnconfinedTestDispatcher()) {
-        val cache = cache().apply { write(AgentPinsSnapshot(7, listOf(a))) }
         val host = FakeHost(revision = 7, ids = listOf(a), online = false)
-        val pins = SharedAgentPins(host, cache)
-        assertEquals(listOf(a), pins.state.value.agentIds)
+        val pins = SharedAgentPins(host)
         assertEquals(AgentPinsEditOutcome.OFFLINE, pins.setPinned(b, true))
         val job = launch { pins.run() }
         host.connected.value = true
@@ -105,7 +101,7 @@ class SharedAgentPinsTest {
     @Test
     fun aHostWithoutTheContractIsUnsupported() = runTest {
         val host = FakeHost(revision = 0, ids = emptyList(), capabilities = emptySet())
-        val pins = SharedAgentPins(host, cache())
+        val pins = SharedAgentPins(host)
         assertFalse(pins.refresh().supported)
         assertEquals(AgentPinsEditOutcome.UNSUPPORTED, pins.setPinned(a, true))
         assertTrue(host.calls.isEmpty())
@@ -114,7 +110,7 @@ class SharedAgentPinsTest {
     @Test
     fun aTransientFailureNeverLeavesThePinsReadOnly() = runTest {
         val host = FakeHost(revision = 1, ids = listOf(a))
-        val pins = SharedAgentPins(host, cache()).also { it.refresh() }
+        val pins = SharedAgentPins(host).also { it.refresh() }
         host.failNextCalls = 1
         assertEquals(AgentPinsEditOutcome.OFFLINE, pins.setPinned(b, true))
         assertFalse(pins.state.value.editable)
@@ -126,7 +122,7 @@ class SharedAgentPinsTest {
     @Test
     fun aFailedReadIsRetriedBeforeTheNextEdit() = runTest {
         val host = FakeHost(revision = 3, ids = listOf(a)).apply { failNextCalls = 1 }
-        val pins = SharedAgentPins(host, cache())
+        val pins = SharedAgentPins(host)
         assertFalse(pins.refresh().live)
         assertEquals(AgentPinsError.UNREACHABLE, pins.state.value.error)
         assertEquals(AgentPinsEditOutcome.APPLIED, pins.setPinned(c, true))
@@ -135,13 +131,11 @@ class SharedAgentPinsTest {
 
     @Test
     fun aHostWithNoListYetStartsEmpty() = runTest {
-        val pins = SharedAgentPins(FakeHost(revision = 0, ids = emptyList()), cache())
+        val pins = SharedAgentPins(FakeHost(revision = 0, ids = emptyList()))
         val state = pins.refresh()
         assertEquals(emptyList(), state.agentIds)
         assertTrue(state.editable)
     }
-
-    private fun cache() = SettingsAgentPinsCache(InMemorySecureSettingsStore(), "host-1")
 
     /** A host serving the contract the way AgentPinsStore does, in memory. */
     private class FakeHost(

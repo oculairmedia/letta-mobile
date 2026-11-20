@@ -3,7 +3,6 @@ package com.letta.mobile.data.pins.shared
 import com.letta.mobile.data.pins.wire.AgentPinsError
 import com.letta.mobile.data.pins.wire.AgentPinsWire
 import com.letta.mobile.data.serialization.LettaJson
-import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -59,7 +58,7 @@ class AgentPinsFixtureTest {
             val stored = case.getValue("host_state").jsonObject.getValue("pins").jsonObject["stored"]
             val start = stored?.takeUnless { it is JsonNull }?.let(::decode) ?: AgentPinsSnapshot()
             val response = case.getValue("expected_response").jsonObject
-            val pins = SharedAgentPins(ReplayLink(start, response), SettingsAgentPinsCache(InMemorySecureSettingsStore(), "fixture"))
+            val pins = SharedAgentPins(ReplayLink(start, response))
             pins.refresh()
             val outcome = pins.setPinned(com.letta.mobile.data.model.AgentId("agent-new"), true)
             val name = case.getValue("name").jsonPrimitive.content

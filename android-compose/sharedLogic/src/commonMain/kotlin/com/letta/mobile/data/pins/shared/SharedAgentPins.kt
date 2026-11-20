@@ -24,9 +24,10 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * What this device knows of the host's pinned agents. [snapshot] is the last list learned (from the
- * cache until the host answers, kept across a failed read); [live] is whether it was read from the
- * connected host since the connection came up. Edits need [editable].
+ * What this device knows of the host's pinned agents. [snapshot] is the last list read from the host
+ * while this repository lives (kept in memory across a failed read or a disconnect, never stored on the
+ * device); [live] is whether it was read from the connected host since the connection came up. Edits
+ * need [editable].
  */
 data class AgentPinsState(
     /** Whether the connected host serves the pinned-agents contract. */
@@ -76,10 +77,9 @@ enum class AgentPinsEditOutcome {
  */
 class SharedAgentPins(
     private val link: AgentPinsLink,
-    private val cache: AgentPinsCache,
 ) {
     private val edits = Mutex()
-    private val mutableState = MutableStateFlow(AgentPinsState(snapshot = cache.read()))
+    private val mutableState = MutableStateFlow(AgentPinsState())
 
     /** What this device knows now. */
     val state: StateFlow<AgentPinsState> = mutableState.asStateFlow()
@@ -181,14 +181,13 @@ class SharedAgentPins(
         adopt(pushed, live = mutableState.value.live)
     }
 
-    /** Takes [snapshot] unless an equally new or newer one is already shown, and caches it. */
+    /** Takes [snapshot] unless a newer one is already shown live. */
     private fun adopt(snapshot: AgentPinsSnapshot, live: Boolean) {
         mutableState.update { current ->
             val shown = current.snapshot
             val keep = shown != null && current.live && shown.revision > snapshot.revision
             current.copy(snapshot = if (keep) shown else snapshot, live = live || current.live, error = null)
         }
-        mutableState.value.snapshot?.let(cache::write)
     }
 
     /** One request whose result is a list; null on any failure, with its code in [state]. */

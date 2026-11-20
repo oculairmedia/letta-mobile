@@ -132,9 +132,6 @@ class DirectAppServerDialTest {
             withTimeout(TIMEOUT) { transport.adminRpc("agent.list", "/v1/agents", null) }
             val pins = com.letta.mobile.data.pins.shared.SharedAgentPins(
                 com.letta.mobile.data.pins.shared.channelAgentPinsLink(transport),
-                com.letta.mobile.data.pins.shared.SettingsAgentPinsCache(
-                    com.letta.mobile.data.storage.InMemorySecureSettingsStore(), "local",
-                ),
             )
             assertTrue(com.letta.mobile.data.pins.wire.AgentPinsWire.CAPABILITY in transport.hostCapabilities)
             assertTrue(pins.refresh().editable)

@@ -39330,11 +39330,6 @@ public final class com/letta/mobile/data/pins/ScopedObjectRef$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
-public abstract interface class com/letta/mobile/data/pins/shared/AgentPinsCache {
-	public abstract fun read ()Lcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;
-	public abstract fun write (Lcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;)V
-}
-
 public final class com/letta/mobile/data/pins/shared/AgentPinsEditOutcome : java/lang/Enum {
 	public static final field APPLIED Lcom/letta/mobile/data/pins/shared/AgentPinsEditOutcome;
 	public static final field CONFLICT Lcom/letta/mobile/data/pins/shared/AgentPinsEditOutcome;
@@ -39418,14 +39413,8 @@ public final class com/letta/mobile/data/pins/shared/AgentPinsState {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/letta/mobile/data/pins/shared/SettingsAgentPinsCache : com/letta/mobile/data/pins/shared/AgentPinsCache {
-	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;)V
-	public fun read ()Lcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;
-	public fun write (Lcom/letta/mobile/data/pins/shared/AgentPinsSnapshot;)V
-}
-
 public final class com/letta/mobile/data/pins/shared/SharedAgentPins {
-	public fun <init> (Lcom/letta/mobile/data/pins/shared/AgentPinsLink;Lcom/letta/mobile/data/pins/shared/AgentPinsCache;)V
+	public fun <init> (Lcom/letta/mobile/data/pins/shared/AgentPinsLink;)V
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getSupported ()Z
 	public final fun refresh (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;

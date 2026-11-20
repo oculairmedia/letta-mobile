@@ -6201,11 +6201,6 @@ abstract interface com.letta.mobile.data.pairing/BackendConfigSink { // com.lett
     abstract suspend fun save(com.letta.mobile.data.model/LettaConfig) // com.letta.mobile.data.pairing/BackendConfigSink.save|save(com.letta.mobile.data.model.LettaConfig){}[0]
 }
 
-abstract interface com.letta.mobile.data.pins.shared/AgentPinsCache { // com.letta.mobile.data.pins.shared/AgentPinsCache|null[0]
-    abstract fun read(): com.letta.mobile.data.pins.shared/AgentPinsSnapshot? // com.letta.mobile.data.pins.shared/AgentPinsCache.read|read(){}[0]
-    abstract fun write(com.letta.mobile.data.pins.shared/AgentPinsSnapshot) // com.letta.mobile.data.pins.shared/AgentPinsCache.write|write(com.letta.mobile.data.pins.shared.AgentPinsSnapshot){}[0]
-}
-
 abstract interface com.letta.mobile.data.pins.shared/AgentPinsLink { // com.letta.mobile.data.pins.shared/AgentPinsLink|null[0]
     abstract val connection // com.letta.mobile.data.pins.shared/AgentPinsLink.connection|{}connection[0]
         abstract fun <get-connection>(): kotlinx.coroutines.flow/Flow<kotlin/Boolean> // com.letta.mobile.data.pins.shared/AgentPinsLink.connection.<get-connection>|<get-connection>(){}[0]
@@ -55991,15 +55986,8 @@ final class com.letta.mobile.data.pins.shared/AgentPinsState { // com.letta.mobi
     final fun toString(): kotlin/String // com.letta.mobile.data.pins.shared/AgentPinsState.toString|toString(){}[0]
 }
 
-final class com.letta.mobile.data.pins.shared/SettingsAgentPinsCache : com.letta.mobile.data.pins.shared/AgentPinsCache { // com.letta.mobile.data.pins.shared/SettingsAgentPinsCache|null[0]
-    constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore, kotlin/String) // com.letta.mobile.data.pins.shared/SettingsAgentPinsCache.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore;kotlin.String){}[0]
-
-    final fun read(): com.letta.mobile.data.pins.shared/AgentPinsSnapshot? // com.letta.mobile.data.pins.shared/SettingsAgentPinsCache.read|read(){}[0]
-    final fun write(com.letta.mobile.data.pins.shared/AgentPinsSnapshot) // com.letta.mobile.data.pins.shared/SettingsAgentPinsCache.write|write(com.letta.mobile.data.pins.shared.AgentPinsSnapshot){}[0]
-}
-
 final class com.letta.mobile.data.pins.shared/SharedAgentPins { // com.letta.mobile.data.pins.shared/SharedAgentPins|null[0]
-    constructor <init>(com.letta.mobile.data.pins.shared/AgentPinsLink, com.letta.mobile.data.pins.shared/AgentPinsCache) // com.letta.mobile.data.pins.shared/SharedAgentPins.<init>|<init>(com.letta.mobile.data.pins.shared.AgentPinsLink;com.letta.mobile.data.pins.shared.AgentPinsCache){}[0]
+    constructor <init>(com.letta.mobile.data.pins.shared/AgentPinsLink) // com.letta.mobile.data.pins.shared/SharedAgentPins.<init>|<init>(com.letta.mobile.data.pins.shared.AgentPinsLink){}[0]
 
     final val state // com.letta.mobile.data.pins.shared/SharedAgentPins.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.pins.shared/AgentPinsState> // com.letta.mobile.data.pins.shared/SharedAgentPins.state.<get-state>|<get-state>(){}[0]
