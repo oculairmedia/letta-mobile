@@ -106,21 +106,27 @@ class EngineMediaPlayer(
         val current = mutableState.value
         if (current.status in SETTLED) return
         val reading = engine.read()
-        val status = reading.failure?.let(::failedStatus) ?: nextStatus(current.status, reading)
-        if (status in SETTLED) progress.playRequested = false
+        val status = statusAfter(current.status, reading)
         val duration = reading.durationMs ?: current.durationMs
-        val position = if (status == MediaPlaybackStatus.Ended) duration ?: reading.positionMs else settledPosition(reading)
+        val position = progress.positionAfter(status, reading, duration)
         progress.engineWasPlaying = reading.isPlaying
         mutableState.update {
             it.copy(
                 status = status,
-                positionMs = position.coerceIn(0L, duration ?: Long.MAX_VALUE),
+                positionMs = position,
                 durationMs = duration,
                 videoWidth = reading.videoWidth ?: it.videoWidth,
                 videoHeight = reading.videoHeight ?: it.videoHeight,
             )
         }
         if (status in TICKING) startTicker()
+    }
+
+    /** The status a reading moves the player to; a failure or release also drops a queued play. */
+    private fun statusAfter(current: MediaPlaybackStatus, reading: MediaEngineReading): MediaPlaybackStatus {
+        val status = reading.failure?.let(::failedStatus) ?: nextStatus(current, reading)
+        if (status in SETTLED) progress.playRequested = false
+        return status
     }
 
     private fun nextStatus(current: MediaPlaybackStatus, reading: MediaEngineReading): MediaPlaybackStatus {
@@ -143,14 +149,6 @@ class EngineMediaPlayer(
         progress.played = true
         engine.play()
         return MediaPlaybackStatus.Playing
-    }
-
-    /** The reading's position, held at a seek's target until the engine catches up with it. */
-    private fun settledPosition(reading: MediaEngineReading): Long {
-        val pending = progress.pendingSeekMs ?: return reading.positionMs
-        val caughtUp = abs(reading.positionMs - pending) <= SEEK_TOLERANCE_MS
-        if (caughtUp || ++progress.pendingSeekTicks > SEEK_SETTLE_TICKS) progress.pendingSeekMs = null
-        return if (caughtUp) reading.positionMs else pending
     }
 
     private fun startTicker() {
@@ -177,6 +175,20 @@ class EngineMediaPlayer(
             engineWasPlaying = false
             pendingSeekMs = null
             pendingSeekTicks = 0
+        }
+
+        /** The position to show: the end once ended, otherwise the settled reading, within the duration. */
+        fun positionAfter(status: MediaPlaybackStatus, reading: MediaEngineReading, duration: Long?): Long {
+            val position = if (status == MediaPlaybackStatus.Ended) duration ?: reading.positionMs else settledPosition(reading)
+            return position.coerceIn(0L, duration ?: Long.MAX_VALUE)
+        }
+
+        /** The reading's position, held at a seek's target until the engine catches up with it. */
+        private fun settledPosition(reading: MediaEngineReading): Long {
+            val pending = pendingSeekMs ?: return reading.positionMs
+            val caughtUp = abs(reading.positionMs - pending) <= SEEK_TOLERANCE_MS
+            if (caughtUp || ++pendingSeekTicks > SEEK_SETTLE_TICKS) pendingSeekMs = null
+            return if (caughtUp) reading.positionMs else pending
         }
     }
 

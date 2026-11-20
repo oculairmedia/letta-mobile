@@ -3,13 +3,10 @@ package com.letta.mobile.data.media
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import javax.sound.sampled.AudioSystem
-import javax.sound.sampled.BooleanControl
 import javax.sound.sampled.Clip
-import javax.sound.sampled.FloatControl
 import javax.sound.sampled.LineEvent
 import javax.sound.sampled.LineUnavailableException
 import javax.sound.sampled.UnsupportedAudioFileException
-import kotlin.math.log10
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,15 +46,17 @@ class JavaSoundMediaPlayer(
     private var playWhenLoaded = false
     private var loadGeneration = 0
 
-    override fun load(source: MediaSource): Unit = synchronized(lock) {
-        if (isReleased) return
-        closeClip()
-        loading?.cancel()
-        bytes = null
-        playWhenLoaded = false
-        mutableState.update { MediaPlaybackState(status = MediaPlaybackStatus.Loading, volume = it.volume, muted = it.muted) }
-        val generation = ++loadGeneration
-        loading = scope.launch(io) { decode(source, generation) }
+    override fun load(source: MediaSource) {
+        synchronized(lock) {
+            if (isReleased) return
+            closeClip()
+            loading?.cancel()
+            bytes = null
+            playWhenLoaded = false
+            mutableState.update { MediaPlaybackState(status = MediaPlaybackStatus.Loading, volume = it.volume, muted = it.muted) }
+            val generation = ++loadGeneration
+            loading = scope.launch(io) { decode(source, generation) }
+        }
     }
 
     private fun decode(source: MediaSource, generation: Int) {
@@ -81,11 +80,13 @@ class JavaSoundMediaPlayer(
         }
     }
 
-    override fun play(): Unit = synchronized(lock) {
-        when (mutableState.value.status) {
-            MediaPlaybackStatus.Loading -> playWhenLoaded = true
-            MediaPlaybackStatus.Ready, MediaPlaybackStatus.Paused, MediaPlaybackStatus.Ended -> startLocked()
-            else -> Unit
+    override fun play() {
+        synchronized(lock) {
+            when (mutableState.value.status) {
+                MediaPlaybackStatus.Loading -> playWhenLoaded = true
+                MediaPlaybackStatus.Ready, MediaPlaybackStatus.Paused, MediaPlaybackStatus.Ended -> startLocked()
+                else -> Unit
+            }
         }
     }
 
@@ -94,92 +95,95 @@ class JavaSoundMediaPlayer(
         val line = clip ?: openLine() ?: return
         if (mutableState.value.status == MediaPlaybackStatus.Ended) mutableState.update { it.copy(positionMs = 0L) }
         line.microsecondPosition = mutableState.value.positionMs * MICROS_PER_MILLI
-        applyVolume(line)
+        JavaSoundBuffers.applyLevel(line, mutableState.value)
         line.start()
         mutableState.update { it.copy(status = MediaPlaybackStatus.Playing) }
         startTicker()
     }
 
-    private fun openLine(): Clip? = try {
+    private fun openLine(): Clip? {
         val data = bytes ?: return null
-        openClip().also { line ->
-            line.open(JavaSoundBuffers.pcmStream(data))
-            line.addLineListener { event -> if (event.type == LineEvent.Type.STOP) onStopped(line) }
-            clip = line
+        return try {
+            openClip().also { line ->
+                line.open(JavaSoundBuffers.pcmStream(data))
+                line.addLineListener { event -> if (event.type == LineEvent.Type.STOP) onStopped(line) }
+                clip = line
+            }
+        } catch (expected: LineUnavailableException) {
+            failOpen(MediaPlaybackStatus.Failed)
+        } catch (expected: IOException) {
+            failOpen(MediaPlaybackStatus.Failed)
+        } catch (expected: IllegalArgumentException) {
+            failOpen(MediaPlaybackStatus.Unsupported)
         }
-    } catch (expected: LineUnavailableException) {
-        mutableState.update { it.copy(status = MediaPlaybackStatus.Failed) }
-        null
-    } catch (expected: IOException) {
-        mutableState.update { it.copy(status = MediaPlaybackStatus.Failed) }
-        null
-    } catch (expected: IllegalArgumentException) {
-        mutableState.update { it.copy(status = MediaPlaybackStatus.Unsupported) }
-        null
     }
 
-    private fun onStopped(line: Clip): Unit = synchronized(lock) {
-        if (clip !== line || mutableState.value.status != MediaPlaybackStatus.Playing) return
-        val atEnd = line.framePosition >= line.frameLength
-        ticker?.cancel()
-        mutableState.update {
-            if (atEnd) {
-                it.copy(status = MediaPlaybackStatus.Ended, positionMs = it.durationMs ?: it.positionMs)
-            } else {
-                it.copy(status = MediaPlaybackStatus.Paused)
+    private fun failOpen(status: MediaPlaybackStatus): Clip? {
+        mutableState.update { it.copy(status = status) }
+        return null
+    }
+
+    private fun onStopped(line: Clip) {
+        synchronized(lock) {
+            if (clip !== line || mutableState.value.status != MediaPlaybackStatus.Playing) return
+            val atEnd = line.framePosition >= line.frameLength
+            ticker?.cancel()
+            mutableState.update {
+                if (atEnd) {
+                    it.copy(status = MediaPlaybackStatus.Ended, positionMs = it.durationMs ?: it.positionMs)
+                } else {
+                    it.copy(status = MediaPlaybackStatus.Paused)
+                }
             }
         }
     }
 
-    override fun pause(): Unit = synchronized(lock) {
-        if (mutableState.value.status == MediaPlaybackStatus.Loading) playWhenLoaded = false
-        if (mutableState.value.status != MediaPlaybackStatus.Playing) return
-        ticker?.cancel()
-        val line = clip
-        val position = line?.let { it.microsecondPosition / MICROS_PER_MILLI }
-        mutableState.update { it.copy(status = MediaPlaybackStatus.Paused, positionMs = position ?: it.positionMs) }
-        line?.stop()
-    }
-
-    override fun seekTo(positionMs: Long): Unit = synchronized(lock) {
-        val current = mutableState.value
-        if (!current.isPlayable) return
-        val target = positionMs.coerceIn(0L, current.durationMs ?: Long.MAX_VALUE)
-        clip?.microsecondPosition = target * MICROS_PER_MILLI
-        val status = if (current.status == MediaPlaybackStatus.Ended) MediaPlaybackStatus.Paused else current.status
-        mutableState.update { it.copy(positionMs = target, status = status) }
-    }
-
-    override fun setVolume(volume: Float): Unit = synchronized(lock) {
-        if (isReleased) return
-        mutableState.update { it.copy(volume = volume.coerceIn(0f, 1f)) }
-        clip?.let(::applyVolume)
-    }
-
-    override fun setMuted(muted: Boolean): Unit = synchronized(lock) {
-        if (isReleased) return
-        mutableState.update { it.copy(muted = muted) }
-        clip?.let(::applyVolume)
-    }
-
-    override fun release(): Unit = synchronized(lock) {
-        if (isReleased) return
-        loading?.cancel()
-        closeClip()
-        bytes = null
-        mutableState.update { it.copy(status = MediaPlaybackStatus.Released) }
-    }
-
-    private fun applyVolume(line: Clip) {
-        val current = mutableState.value
-        if (line.isControlSupported(BooleanControl.Type.MUTE)) {
-            (line.getControl(BooleanControl.Type.MUTE) as BooleanControl).value = current.muted
+    override fun pause() {
+        synchronized(lock) {
+            if (mutableState.value.status == MediaPlaybackStatus.Loading) playWhenLoaded = false
+            if (mutableState.value.status != MediaPlaybackStatus.Playing) return
+            ticker?.cancel()
+            val line = clip
+            val position = line?.let { it.microsecondPosition / MICROS_PER_MILLI }
+            mutableState.update { it.copy(status = MediaPlaybackStatus.Paused, positionMs = position ?: it.positionMs) }
+            line?.stop()
         }
-        if (line.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
-            val gain = line.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
-            val level = if (current.muted) 0f else current.volume
-            val decibels = if (level <= 0f) gain.minimum else (DECIBELS_PER_DECADE * log10(level)).coerceIn(gain.minimum, gain.maximum)
-            gain.value = decibels
+    }
+
+    override fun seekTo(positionMs: Long) {
+        synchronized(lock) {
+            val current = mutableState.value
+            if (!current.isPlayable) return
+            val target = positionMs.coerceIn(0L, current.durationMs ?: Long.MAX_VALUE)
+            clip?.microsecondPosition = target * MICROS_PER_MILLI
+            val status = if (current.status == MediaPlaybackStatus.Ended) MediaPlaybackStatus.Paused else current.status
+            mutableState.update { it.copy(positionMs = target, status = status) }
+        }
+    }
+
+    override fun setVolume(volume: Float) {
+        synchronized(lock) {
+            if (isReleased) return
+            mutableState.update { it.copy(volume = volume.coerceIn(0f, 1f)) }
+            clip?.let { JavaSoundBuffers.applyLevel(it, mutableState.value) }
+        }
+    }
+
+    override fun setMuted(muted: Boolean) {
+        synchronized(lock) {
+            if (isReleased) return
+            mutableState.update { it.copy(muted = muted) }
+            clip?.let { JavaSoundBuffers.applyLevel(it, mutableState.value) }
+        }
+    }
+
+    override fun release() {
+        synchronized(lock) {
+            if (isReleased) return
+            loading?.cancel()
+            closeClip()
+            bytes = null
+            mutableState.update { it.copy(status = MediaPlaybackStatus.Released) }
         }
     }
 
@@ -212,6 +216,5 @@ class JavaSoundMediaPlayer(
     private companion object {
         const val MICROS_PER_MILLI = 1_000L
         const val POSITION_TICK_MS = 200L
-        const val DECIBELS_PER_DECADE = 20f
     }
 }

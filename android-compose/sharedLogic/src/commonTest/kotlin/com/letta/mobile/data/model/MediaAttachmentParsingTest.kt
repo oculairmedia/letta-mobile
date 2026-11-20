@@ -82,6 +82,18 @@ class MediaAttachmentParsingTest {
     }
 
     @Test
+    fun aResourceKeepsTheKindItsNameGaveWhenTheTypeSaysNothing() {
+        val parsed = parts(
+            """[{"type":"resource","resource":{"uri":"file:///voice.mp3","mimeType":"application/octet-stream","blob":"SUQz"}},
+               {"type":"resource","resource":{"uri":"file:///clip.webm","mimeType":"application/octet-stream","blob":"GkXf"}},
+               {"type":"resource_link","uri":"https://host/download/123","name":"voice.mp3"}]""",
+        )
+        assertEquals(listOf(MediaKind.Audio, MediaKind.Video, MediaKind.Audio), parsed.map { it.kind })
+        assertEquals(listOf("audio/unknown", "video/unknown", "audio/unknown"), parsed.map { it.mediaType })
+        assertEquals(0, parsed.toJsonArray().size)
+    }
+
+    @Test
     fun resourcesThatAreNotPlayableMediaAreIgnored() {
         val parsed = parts(
             """[{"type":"resource","resource":{"uri":"file:///a.txt","mimeType":"text/plain","text":"hello"}},

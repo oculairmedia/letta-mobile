@@ -33,7 +33,7 @@ internal class ComposeMediaEngine(
         // Both engines read `data:` URIs, so inline bytes are never written anywhere.
         val uri = when (source) {
             is MediaSource.Remote -> source.url
-            is MediaSource.Inline -> "data:${source.mimeType};base64,${source.base64}"
+            is MediaSource.Inline -> "data:${safeMimeType(source.mimeType)};base64,${source.base64}"
         }
         videoState.openUri(uri, InitialPlayerState.PAUSE)
     }
@@ -78,6 +78,12 @@ internal class ComposeMediaEngine(
 
         /** The library's seek scale: 0 is the start, this the end. */
         const val SLIDER_RANGE = 1_000.0
+
+        /** A bare `type/subtype` token pattern; anything else in an agent-supplied type is dropped. */
+        val MIME_TYPE = Regex("^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*$")
+
+        /** [mimeType] when it is a bare `type/subtype`, so it cannot add parameters to the `data:` URI. */
+        fun safeMimeType(mimeType: String): String = mimeType.takeIf(MIME_TYPE::matches) ?: "application/octet-stream"
 
         /** A codec error is a format this engine cannot decode; anything else is a read failure. */
         fun failureOf(error: VideoPlayerError): MediaEngineFailure =

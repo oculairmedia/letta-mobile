@@ -29,26 +29,28 @@ class EngineMediaPlayerContractTest : MediaPlayerContract() {
         scope.runCurrent()
     }
 
-    @Test
-    fun playWhileLoadingStartsOnceTheEngineHasLoaded() {
+    /** Loads [SOURCE] on an engine that loads later, queues a play, optionally pauses, then lets it load. */
+    private fun queuedPlay(pauseBeforeLoad: Boolean): Pair<MediaPlayer, ScriptedMediaEngine> {
         val engine = ScriptedMediaEngine(loadsImmediately = false)
         val player = player(engine).apply { load(SOURCE) }
         player.play()
         assertEquals(MediaPlaybackStatus.Loading, player.state.value.status)
+        if (pauseBeforeLoad) player.pause()
         engine.finishLoading()
         tick()
+        return player to engine
+    }
+
+    @Test
+    fun playWhileLoadingStartsOnceTheEngineHasLoaded() {
+        val (player, engine) = queuedPlay(pauseBeforeLoad = false)
         assertEquals(MediaPlaybackStatus.Playing, player.state.value.status)
         assertEquals(listOf("open", "play"), engine.commands)
     }
 
     @Test
     fun pauseWhileLoadingCancelsTheQueuedPlay() {
-        val engine = ScriptedMediaEngine(loadsImmediately = false)
-        val player = player(engine).apply { load(SOURCE) }
-        player.play()
-        player.pause()
-        engine.finishLoading()
-        tick()
+        val (player, engine) = queuedPlay(pauseBeforeLoad = true)
         assertEquals(MediaPlaybackStatus.Ready, player.state.value.status)
         assertEquals(listOf("open"), engine.commands)
     }

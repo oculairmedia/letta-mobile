@@ -146,14 +146,24 @@ private fun parseForeignMediaPart(type: String?, obj: JsonObject): MessageConten
 
 private fun parseResourceLink(obj: JsonObject): MessageContentPart.Image? {
     val uri = obj.fieldContent("uri")?.takeIf { it.startsWith("https://") || it.startsWith("http://") } ?: return null
-    val mediaType = obj.fieldContent("mimeType")?.takeIf { it.isNotBlank() } ?: "application/octet-stream"
-    if (MediaKind.of(mediaType, obj.fieldContent("name") ?: uri) == MediaKind.Image) return null
-    return MessageContentPart.Image("", mediaType, url = uri)
+    val mimeType = obj.fieldContent("mimeType")
+    val kind = MediaKind.of(mimeType, obj.fieldContent("name") ?: uri)
+    if (kind == MediaKind.Image) return null
+    return MessageContentPart.Image("", typeKeepingKind(mimeType, kind), url = uri)
 }
 
 private fun parseEmbeddedResourceBlob(resource: JsonObject): MessageContentPart.Image? {
     val blob = resource.fieldContent("blob")?.takeIf { it.isNotBlank() } ?: return null
-    val mediaType = resource.fieldContent("mimeType")?.takeIf { it.isNotBlank() } ?: return null
-    val kind = MediaKind.of(mediaType, resource.fieldContent("uri"))
-    return if (kind == MediaKind.Audio || kind == MediaKind.Video) MessageContentPart.Image(base64 = blob, mediaType = mediaType) else null
+    val mimeType = resource.fieldContent("mimeType")?.takeIf { it.isNotBlank() } ?: return null
+    val kind = MediaKind.of(mimeType, resource.fieldContent("uri"))
+    if (kind != MediaKind.Audio && kind != MediaKind.Video) return null
+    return MessageContentPart.Image(base64 = blob, mediaType = typeKeepingKind(mimeType, kind))
 }
+
+/**
+ * The producer's [mimeType], or [kind]'s own unknown type when it says nothing. A resource whose
+ * kind came from its name or URI keeps that kind after the name is dropped, so an uninformative
+ * type on inline bytes is left to image parts alone.
+ */
+private fun typeKeepingKind(mimeType: String?, kind: MediaKind): String =
+    mimeType?.takeUnless { MediaKind.isUninformative(it) } ?: kind.unknownMimeType

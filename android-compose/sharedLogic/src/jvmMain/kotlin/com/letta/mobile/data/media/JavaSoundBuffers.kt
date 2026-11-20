@@ -8,16 +8,22 @@ import java.net.URI
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioInputStream
 import javax.sound.sampled.AudioSystem
+import javax.sound.sampled.BooleanControl
+import javax.sound.sampled.Clip
+import javax.sound.sampled.FloatControl
+import kotlin.math.log10
 
 /**
  * The byte work [JavaSoundMediaPlayer] needs around its state machine: fetching a remote file within
- * a cap, measuring a decoded stream and converting it to PCM a Clip can open. Never logs a URL.
+ * a cap, measuring a decoded stream, converting it to PCM a Clip can open and setting a line's level.
+ * Never logs a URL.
  */
 internal object JavaSoundBuffers {
     private const val MILLIS_PER_SECOND = 1_000.0
     private const val PCM_BITS = 16
     private const val CONNECT_TIMEOUT_MS = 10_000
     private const val READ_TIMEOUT_MS = 30_000
+    private const val DECIBELS_PER_DECADE = 20f
 
     /** The stream's length in milliseconds, or null when the format does not say. */
     fun durationOf(stream: AudioInputStream): Long? {
@@ -57,5 +63,21 @@ internal object JavaSoundBuffers {
         val data = input.readNBytes((maxBytes + 1).toInt())
         if (data.size > maxBytes) throw IOException("media exceeds the buffered playback limit")
         return data
+    }
+
+    /** Sets [line]'s mute and gain from [state]'s volume and mute, for whichever controls the line has. */
+    fun applyLevel(line: Clip, state: MediaPlaybackState) {
+        if (line.isControlSupported(BooleanControl.Type.MUTE)) {
+            (line.getControl(BooleanControl.Type.MUTE) as BooleanControl).value = state.muted
+        }
+        if (line.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+            val gain = line.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
+            gain.value = decibelsFor(if (state.muted) 0f else state.volume, gain)
+        }
+    }
+
+    private fun decibelsFor(level: Float, gain: FloatControl): Float {
+        if (level <= 0f) return gain.minimum
+        return (DECIBELS_PER_DECADE * log10(level)).coerceIn(gain.minimum, gain.maximum)
     }
 }

@@ -302,9 +302,10 @@ private fun messageAttachments(
     val all = attachments.map { it.toUiMediaAttachment() }
     val rendered = uiToolCalls.orEmpty().flatMap { it.generatedImageAttachments }
     if (rendered.isEmpty()) return all
-    // A tool card already draws its images, so the message keeps no image of its own (as before).
-    // Audio, video and files no card drew stay on the message rather than disappearing.
-    return all.filter { it.kind != MediaKind.Image && it !in rendered }
+    // A tool card that draws an image leaves the message no image of its own (as before). A card
+    // with only audio, video or files suppresses nothing else, and media no card drew stays here.
+    val cardDrawsImage = rendered.any { it.kind == MediaKind.Image }
+    return all.filter { it !in rendered && !(cardDrawsImage && it.kind == MediaKind.Image) }
 }
 
 /** The approval buttons for [toolCalls] while request [requestId] is undecided; null once decided or with no request. */

@@ -6,6 +6,7 @@ import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.model.extractSubagentDispatch
+import com.letta.mobile.data.model.toUiMediaAttachment
 import java.time.Duration
 
 internal data class MappedToolCall(val message: UiMessage, val consumedReturnId: String?)
@@ -83,7 +84,7 @@ internal fun AppMessage.baseUiMessage(params: BaseUiMessageParams): UiMessage = 
 )
 
 internal fun AppMessage?.imageAttachments(): List<UiMediaAttachment> =
-    this?.attachments.orEmpty().map { UiMediaAttachment(it.base64, it.mediaType) }
+    this?.attachments.orEmpty().map { it.toUiMediaAttachment() }
 
 internal fun mapSubagentDispatch(name: String?, toolCallId: String?, arguments: String, result: String?) =
     if (name == "Agent") extractSubagentDispatch(toolCallId, arguments, result) else null

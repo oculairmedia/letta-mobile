@@ -15,12 +15,20 @@ class ToolMediaProjectionTest {
     private val image = MessageContentPart.Image("IMG+/==", "image/png", toolCallId = "a")
     private val unownedImage = MessageContentPart.Image("UNOWNED=", "image/png")
     private val unownedAudio = MessageContentPart.Image("", "audio/mpeg", url = "https://host/a.mp3")
+    private val ownedAudio = MessageContentPart.Image("", "audio/mpeg", url = "https://host/b.mp3", toolCallId = "a")
 
     @Test
     fun unownedAudioBesideAnOwnedImageStaysOnTheMessage() {
         val ui = timelineEventToUiMessage(event(listOf(image, unownedImage, unownedAudio)))!!
         assertEquals(listOf(MediaKind.Audio), ui.attachments.map { it.kind })
         assertEquals(listOf(MediaKind.Image), ui.toolCalls.orEmpty().flatMap { it.generatedImageAttachments }.map { it.kind })
+    }
+
+    @Test
+    fun aCardWithOnlyAudioLeavesUnownedImagesOnTheMessage() {
+        val ui = timelineEventToUiMessage(event(listOf(ownedAudio, unownedImage)))!!
+        assertEquals(listOf(MediaKind.Image), ui.attachments.map { it.kind })
+        assertEquals(listOf(MediaKind.Audio), ui.toolCalls.orEmpty().flatMap { it.generatedImageAttachments }.map { it.kind })
     }
 
     @Test
