@@ -706,22 +706,12 @@ class CanonicalTimelineEngine(
         mutableLive.value?.takeIf { it.settlementRevision != null }?.let { mutableLive.value = it.withoutTurnFailureNotices() }
     }
 
-    /**
-     * The generation a turn-end sweep fences itself with: the one the turn's start already
-     * committed, read without writing.
-     *
-     * Advancing it again at turn end changed nothing a reader can see but still cost a durable
-     * revision (every real store requires one for any write), and every published revision
-     * replaces the Paging generation, so the settled list redrew once per turn end. A later turn
-     * start advances the generation and so still fences this sweep; the settlement itself
-     * advances the revision only when it repairs a row ([settleToolSweep]).
-     */
+    /** The sweep generation turnStarted committed, read without a write (a write would publish a revision). */
     internal suspend fun currentToolSweep(selection: TimelineEngineSelection): Long = mutex.withLock {
         check(selection === mutablePublication.value.selection)
         store.read(selection.scope) { toolSweepGeneration() }
     }
 
-    /** Starts a new fence generation, cancelling every earlier sweep; publishes the revision it costs. */
     suspend fun advanceToolSweep(selection: TimelineEngineSelection): Long = mutex.withLock {
         check(selection === mutablePublication.value.selection)
         val (sweepGeneration, revision) = store.transaction(selection.scope) {
