@@ -14,6 +14,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -30,7 +31,11 @@ class SharedShellStateRaceTest {
             val link = RacingLink()
             val shared = SharedShellState(link)
             scope.launch { shared.run() }
-            withTimeout(TIMEOUT_MS) { while (!link.collecting()) Thread.yield() }
+            // A push only follows a connect: wait until the push collector is subscribed and this connection's read is in flight.
+            withTimeout(TIMEOUT_MS) {
+                link.pushes.subscriptionCount.first { it > 0 }
+                link.readStarted.await()
+            }
             val pushed = scope.launch {
                 link.pushes.emit(frame(NEWER))
                 // Unbuffered: this second emit only returns once the collector finished handling the first push.
@@ -38,7 +43,7 @@ class SharedShellStateRaceTest {
             }
             link.releaseReply()
             pushed.join()
-            withTimeout(TIMEOUT_MS) { while (!shared.state.value.live) Thread.yield() }
+            withTimeout(TIMEOUT_MS) { shared.state.first { it.live } }
             assertEquals(NEWER, shared.state.value.snapshot?.documentRevision, "round $round")
             scope.cancel()
         }
@@ -51,7 +56,7 @@ class SharedShellStateRaceTest {
             val link = RefusingLink()
             val shared = SharedShellState(link)
             scope.launch { shared.run() }
-            withTimeout(TIMEOUT_MS) { while (!shared.state.value.live) Thread.yield() }
+            withTimeout(TIMEOUT_MS) { shared.state.first { it.live } }
             val write = scope.launch { shared.set("a", JsonPrimitive("x")) }
             val pushes = scope.launch { (FIRST_PUSH..FIRST_PUSH + PUSHES).forEach { link.pushes.emit(frame(it)) } }
             link.releaseRefusal()
@@ -92,16 +97,16 @@ class SharedShellStateRaceTest {
     /** A connected host whose `shell.state.get` answers the stale revision once released. */
     private inner class RacingLink : ShellStateLink {
         private val release = CompletableDeferred<Unit>()
+        val readStarted = CompletableDeferred<Unit>()
         override val pushes = MutableSharedFlow<JsonObject>()
         override val hostCapabilities: Set<String> = setOf(ShellStateWire.CAPABILITY)
         override val isConnected: Boolean = true
         override val connection: Flow<Boolean> = flowOf(true)
 
-        fun collecting(): Boolean = pushes.subscriptionCount.value > 0
-
         fun releaseReply() = release.complete(Unit)
 
         override suspend fun call(method: String, params: JsonObject): ShellStateReply {
+            readStarted.complete(Unit)
             release.await()
             return ShellStateReply(true, encoded(STALE))
         }

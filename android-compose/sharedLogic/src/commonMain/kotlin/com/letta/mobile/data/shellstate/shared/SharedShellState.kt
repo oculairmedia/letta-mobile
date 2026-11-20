@@ -11,6 +11,7 @@ import com.letta.mobile.data.shellstate.wire.toJson
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
@@ -78,6 +80,23 @@ enum class ShellStateEditOutcome {
  * the host replace the document when they are newer. A host without the contract has no shell state at
  * all, and no device-local copy stands in for it. Nothing here logs a key or a value; counts and
  * revisions only.
+ *
+ * ## One model for every interleaving
+ *
+ * Replies, pushes and connection changes arrive from different connections and from calls that were already
+ * in flight, so nothing here is decided from a flag read earlier. Instead:
+ * - [generation] goes up on every connection transition (up, down, a connected host without the contract, an
+ *   offline refresh). The connection is observed without waiting for any read.
+ * - Every request captures the generation it was issued under; a push carries the generation current when it
+ *   is handled. A reply is applied only if its generation is still current: anything from an earlier
+ *   connection is dropped, whatever its revision.
+ * - The shown document remembers the generation it came from. A newer-or-equal revision from the current
+ *   generation is kept over an older one; a document from an earlier generation is replaced by whatever the
+ *   current one says first (revisions only order documents of one connection).
+ * - [ShellStateState.live] turns on only through a successful read or write of the current generation, and
+ *   off through a failure of the current generation or any transition. A push never touches it and nothing
+ *   restores a value captured earlier.
+ * All of it changes under one lock, so deciding and applying are a single step.
  */
 class SharedShellState(
     private val link: ShellStateLink,
@@ -85,15 +104,14 @@ class SharedShellState(
     private val edits = Mutex()
     private val mutableState = MutableStateFlow(ShellStateState())
 
-    /**
-     * Whether the shown snapshot came from the connection that is up now. Revisions only order snapshots of one
-     * host's one connection: a snapshot kept from an earlier connection (possibly another host, at any
-     * revision) never outranks what the current connection says.
-     */
-    private var shownFromThisConnection = false
+    /** Held across every change of the state, [generation] and [shownGeneration]. */
+    private val model = Mutex()
 
-    /** Held across every change of the snapshot and of [shownFromThisConnection], so deciding and adopting are one step. */
-    private val adopting = Mutex()
+    /** The connection epoch: bumped by every [transition]. Guarded by [model]. */
+    private var generation = 0L
+
+    /** The [generation] the shown snapshot was adopted under; no generation equals [NO_GENERATION]. Guarded by [model]. */
+    private var shownGeneration = NO_GENERATION
 
     /** What this device knows now. */
     val state: StateFlow<ShellStateState> = mutableState.asStateFlow()
@@ -101,10 +119,19 @@ class SharedShellState(
     /** Whether the connected host serves the contract right now. */
     val supported: Boolean get() = ShellStateWire.CAPABILITY in link.hostCapabilities
 
-    /** Follows the connection and the host's pushes until cancelled: reads again on every reconnect. */
+    /**
+     * Follows the connection and the host's pushes until cancelled: reads again on every reconnect. A
+     * connection change is handled at once, never behind a pending read: the previous connection's read is
+     * cancelled and the new one's started on its own coroutine.
+     */
     suspend fun run() = coroutineScope {
         link.pushes.onEach(::onPush).launchIn(this)
-        link.connection.distinctUntilChanged().collect { up -> if (up) refresh() else connectionDown() }
+        var read: Job? = null
+        link.connection.distinctUntilChanged().collect { up ->
+            read?.cancel()
+            transition { it.copy(live = false) }
+            read = if (up) launch { refresh() } else null
+        }
     }
 
     /** Reads the host's document; a host without the contract leaves [state] unsupported. */
@@ -113,27 +140,24 @@ class SharedShellState(
             // While disconnected the link advertises nothing, which says nothing about the host: keep the last
             // document for offline display. A connected host without the contract has no state to show, and
             // another host's document must not linger.
-            if (link.isConnected) dropDocument() else markStale()
+            val connected = link.isConnected
+            transition { if (connected) it.copy(supported = false, live = false, snapshot = null) else it.copy(live = false) }
             return mutableState.value
         }
-        mutableState.update { it.copy(supported = true) }
-        when (val read = request(ShellStateWire.GET, JsonObject(emptyMap()))) {
-            null -> markStale()
-            else -> adopt(read, live = true)
-        }
+        val issuedUnder = model.withLock { generation.also { mutableState.update { it.copy(supported = true) } } }
+        request(issuedUnder, ShellStateWire.GET, JsonObject(emptyMap())).document?.let { adopt(it, issuedUnder, live = true) }
         return mutableState.value
     }
 
-    private fun markStale() = mutableState.update { it.copy(live = false) }
-
-    private suspend fun dropDocument() = adopting.withLock {
-        shownFromThisConnection = false
-        mutableState.update { it.copy(supported = false, live = false, snapshot = null) }
+    /** Starts a new generation and applies [change] with it: the one place the connection epoch moves. */
+    private suspend fun transition(change: (ShellStateState) -> ShellStateState) = model.withLock {
+        generation += 1
+        mutableState.update(change)
     }
 
-    private suspend fun connectionDown() = adopting.withLock {
-        shownFromThisConnection = false
-        markStale()
+    /** Applies [change] only while [issuedUnder] is still the current generation. */
+    private suspend fun settle(issuedUnder: Long, change: (ShellStateState) -> ShellStateState) = model.withLock {
+        if (issuedUnder == generation) mutableState.update(change)
     }
 
     /** Sets [key] to [value]. */
@@ -155,24 +179,20 @@ class SharedShellState(
         if (!link.isConnected) return@withLock ShellStateEditOutcome.OFFLINE
         if (!supported) return@withLock ShellStateEditOutcome.UNSUPPORTED
         if (!mutableState.value.editable) refresh()
-        val known = mutableState.value
+        val (known, issuedUnder) = model.withLock { mutableState.value to generation }
         val base = known.snapshot
-        if (!known.editable || base == null) ShellStateEditOutcome.OFFLINE else send(base, edits)
+        if (!known.editable || base == null) ShellStateEditOutcome.OFFLINE else send(base, issuedUnder, edits)
     }
 
-    private suspend fun send(base: ShellStateSnapshot, edits: List<Edit>): ShellStateEditOutcome {
+    private suspend fun send(base: ShellStateSnapshot, issuedUnder: Long, edits: List<Edit>): ShellStateEditOutcome {
         val changes = edits.map { ShellStateChange(it.key, it.value, base.entries[it.key]?.revision ?: 0L) }
         val params = buildJsonObject { put(ShellStateWire.CHANGES, JsonArray(changes.map(ShellStateChange::toJson))) }
-        val reply = runCatching { link.call(ShellStateWire.PROPOSE, params) }
-        reply.exceptionOrNull()?.let { if (it is CancellationException) throw it }
-        val answer = reply.getOrNull()
-        val accepted = answer?.takeIf { it.success }?.result?.let(::decode)
-        if (accepted != null) {
-            adopt(accepted, live = true)
+        val reply = request(issuedUnder, ShellStateWire.PROPOSE, params)
+        reply.document?.let {
+            adopt(it, issuedUnder, live = true)
             return ShellStateEditOutcome.APPLIED
         }
-        val error = ShellStateError.fromWire(answer?.error)
-        mutableState.update { it.copy(error = error, live = false) }
+        val error = reply.error
         Telemetry.event(TAG, "edit.failed", "error" attr error.name, "revision" attr base.documentRevision)
         return when (error) {
             ShellStateError.UNREACHABLE -> ShellStateEditOutcome.OFFLINE
@@ -184,35 +204,44 @@ class SharedShellState(
         }
     }
 
+    /** A push belongs to whatever generation is current when it is handled, and never touches `live`. */
     private suspend fun onPush(frame: JsonObject) {
         val pushed = decode(frame) ?: return
-        adopt(pushed, live = false)
+        adopt(pushed, issuedUnder = null, live = false)
     }
 
     /**
-     * Takes [snapshot] unless a newer one from this connection is already shown, whether or not it was read
-     * live: a read reply that arrives after a newer push never replaces it. Anything from an earlier connection
-     * is replaced by whatever this connection says first. [live] only ever turns on: a successful read or write
-     * passes true, a push passes false and leaves the current value as it is (read inside the update, so a
-     * concurrent failure mark is never undone); only a failed call or a disconnect turns it off.
+     * Applies [snapshot] unless it is out of date. [issuedUnder] is the generation its request captured (null
+     * for a push, which takes the current one): a reply of an earlier generation is dropped. Within the current
+     * generation a document that is not newer than the shown one is kept out, whether the shown one was read
+     * or pushed. [live] only ever turns on, and only for a successful read or write; a push passes false and
+     * leaves the value as it is.
      */
-    private suspend fun adopt(snapshot: ShellStateSnapshot, live: Boolean) = adopting.withLock {
+    private suspend fun adopt(snapshot: ShellStateSnapshot, issuedUnder: Long?, live: Boolean) = model.withLock {
+        if (issuedUnder != null && issuedUnder != generation) return@withLock
         val shownRevision = mutableState.value.snapshot?.documentRevision ?: -1L
-        val keepShown = shownFromThisConnection && shownRevision >= snapshot.documentRevision
-        if (!keepShown) shownFromThisConnection = true
+        val keepShown = shownGeneration == generation && shownRevision >= snapshot.documentRevision
+        if (!keepShown) shownGeneration = generation
         mutableState.update { current ->
             current.copy(snapshot = if (keepShown) current.snapshot else snapshot, live = live || current.live, error = null)
         }
     }
 
-    /** One request whose result is the document; null on any failure, with its code in [state]. */
-    private suspend fun request(method: String, params: JsonObject): ShellStateSnapshot? {
+    /** What one request came to: the [document] it answered, or else the [error] it failed with. */
+    private class Reply(val document: ShellStateSnapshot?, val error: ShellStateError)
+
+    /**
+     * One request. A failure of the current generation records its code and turns `live` off; one of an
+     * earlier generation changes nothing.
+     */
+    private suspend fun request(issuedUnder: Long, method: String, params: JsonObject): Reply {
         val outcome = runCatching { link.call(method, params) }
         (outcome.exceptionOrNull() as? CancellationException)?.let { throw it }
         val reply = outcome.getOrNull()
         val document = reply?.takeIf { it.success }?.result?.let(::decode)
-        if (document == null) mutableState.update { it.copy(error = ShellStateError.fromWire(reply?.error)) }
-        return document
+        val error = ShellStateError.fromWire(reply?.error)
+        if (document == null) settle(issuedUnder) { it.copy(error = error, live = false) }
+        return Reply(document, error)
     }
 
     /** The document in [element], or null when it is unreadable or of a newer schema than this build reads. */
@@ -222,5 +251,6 @@ class SharedShellState(
 
     private companion object {
         const val TAG = "SharedShellState"
+        const val NO_GENERATION = -1L
     }
 }
