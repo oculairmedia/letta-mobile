@@ -941,7 +941,10 @@ jobs:
 
   build-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # The play-release leg (main pushes only: assemblePlayRelease + APK size/R8 validation) takes
+    # 24-30 min on hosted runners (e.g. 29m41s on 99e0241c1, 2026-11-20); 25 cancelled a healthy run
+    # on 006513558a and turned build-apk-pass red. 45 keeps a backstop above the observed maximum.
+    timeout-minutes: 45
     # Deliberately independent of `test`: GitHub can fan out test, shared KMP
     # verification, and both APK variants as soon as the workflow starts. The
     # jobs restore warm state from prior trusted runs instead of serializing the
