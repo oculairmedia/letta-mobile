@@ -439,10 +439,7 @@ class AppServerServeIrohCommand : CliktCommand(
             canvasMountRoutes = canvasMounts?.routes(authPolicy, nativeAdminClient, endpoint.conversationViewers())
             setupAdminRpc(
                 endpoint = endpoint,
-                admin = AdminContext(
-                    controller, nativeAdminClient, pairingService, turnIdentity, identityRows,
-                    memoryDir = voiceMemoryDir(backendDir, System.getenv("LETTA_LOCAL_BACKEND_DIR")),
-                ),
+                admin = AdminContext(controller, nativeAdminClient, pairingService, turnIdentity, identityRows, voiceMemoryDir(backendDir)),
                 scope = scope,
                 pairingQr = access.pairingQrConfig(endpoint, irohSecretKeyPath),
                 pluginRoutes = pluginHost?.let { com.letta.mobile.data.controller.node.iroh.PluginAdminHandlers(it, pluginCanvas.assets) },
@@ -1253,5 +1250,8 @@ internal fun effectiveA2aBackendDir(explicit: String?, ownAppServer: Boolean, ho
  * else `LETTA_LOCAL_BACKEND_DIR` ([environmentDir]); null when neither names one, so no voice cores
  * are read.
  */
-internal fun voiceMemoryDir(effectiveBackendDir: java.io.File?, environmentDir: String?): java.io.File? =
+internal fun voiceMemoryDir(
+    effectiveBackendDir: java.io.File?,
+    environmentDir: String? = System.getenv("LETTA_LOCAL_BACKEND_DIR"),
+): java.io.File? =
     effectiveBackendDir ?: environmentDir?.takeIf { it.isNotBlank() }?.let { java.io.File(it) }
