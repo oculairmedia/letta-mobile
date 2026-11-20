@@ -16,7 +16,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import com.letta.mobile.ui.components.foundation.LettaClickTarget
 import com.letta.mobile.ui.components.foundation.lettaClickable
-import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaControlTokens
+import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
 
 /**
  * A hanging-indent row: [leading] (a status dot, an orb, a glyph) in its own column, and every line
@@ -35,13 +36,13 @@ internal fun LettaHangingRow(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+        horizontalArrangement = Arrangement.spacedBy(LettaSpaceTokens.md),
         verticalAlignment = Alignment.Top,
     ) {
         Box(contentAlignment = Alignment.Center) { leading() }
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+            verticalArrangement = Arrangement.spacedBy(LettaSpaceTokens.xs),
             content = content,
         )
     }
@@ -58,7 +59,7 @@ internal fun LettaHangingRowAction(label: String, onClick: () -> Unit, modifier:
     Box(
         modifier = modifier
             .lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = onClick)
-            .defaultMinSize(minWidth = LettaDimens.Control.minTouchTarget, minHeight = LettaDimens.Control.minTouchTarget)
+            .defaultMinSize(minWidth = LettaControlTokens.minTouchTarget, minHeight = LettaControlTokens.minTouchTarget)
             .then(if (tag.isEmpty()) Modifier else Modifier.testTag(tag)),
         contentAlignment = Alignment.CenterStart,
     ) {
