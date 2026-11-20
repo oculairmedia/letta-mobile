@@ -2,7 +2,7 @@ package com.letta.mobile.data.mapper
 
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.UiGeneratedComponent
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.model.extractSubagentDispatch
@@ -15,7 +15,7 @@ internal data class BaseUiMessageParams(
     val content: String,
     val toolCalls: List<UiToolCall>? = null,
     val generatedUi: UiGeneratedComponent? = null,
-    val attachments: List<UiImageAttachment> = emptyList(),
+    val attachments: List<UiMediaAttachment> = emptyList(),
 )
 
 internal fun AppMessage.mapToolCall(
@@ -82,8 +82,8 @@ internal fun AppMessage.baseUiMessage(params: BaseUiMessageParams): UiMessage = 
     attachments = params.attachments,
 )
 
-internal fun AppMessage?.imageAttachments(): List<UiImageAttachment> =
-    this?.attachments.orEmpty().map { UiImageAttachment(it.base64, it.mediaType) }
+internal fun AppMessage?.imageAttachments(): List<UiMediaAttachment> =
+    this?.attachments.orEmpty().map { UiMediaAttachment(it.base64, it.mediaType) }
 
 internal fun mapSubagentDispatch(name: String?, toolCallId: String?, arguments: String, result: String?) =
     if (name == "Agent") extractSubagentDispatch(toolCallId, arguments, result) else null

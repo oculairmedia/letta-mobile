@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface
 
+import com.letta.mobile.ui.chat.media.LocalMediaPlaybackCoordinator
 import com.letta.mobile.ui.markdown.LocalSettledMarkdownParses
 import com.letta.mobile.ui.markdown.SettledMarkdownParses
 import com.letta.mobile.data.voice.session.VoiceChatSessions
@@ -228,16 +229,19 @@ private fun rememberBoardOnShow(
 /** The page's layers for its idiom, under the send flight. Skipped while only the keyboard moves. */
 @Composable
 private fun ChatSurfaceLayers(frame: ChatSurfaceFrame, canvas: (@Composable () -> Unit)?) {
-    // On a phone the last touch is the mascot's cursor for a moment (te3n1.2); the desktop's mouse
-    // is captured at its window root instead.
-    SendFlightLayer(rememberSendFlightState(), Modifier.fillMaxSize().mascotTouchPresence()) {
-        if (touchStyle()) {
-            // Phones: the canvas over a flush chat bar with a floating chat head, no panel.
-            TouchCanvasWithChat(frame, canvas)
-        } else if (canvas == null) {
-            PageWithoutCanvas(frame)
-        } else {
-            CanvasWithChat(frame, canvas)
+    // One item of inline media plays at a time on the page, yielding to voice mode.
+    CompositionLocalProvider(LocalMediaPlaybackCoordinator provides rememberPageMediaPlayback(LocalVoiceMode.current)) {
+        // On a phone the last touch is the mascot's cursor for a moment (te3n1.2); the desktop's mouse
+        // is captured at its window root instead.
+        SendFlightLayer(rememberSendFlightState(), Modifier.fillMaxSize().mascotTouchPresence()) {
+            if (touchStyle()) {
+                // Phones: the canvas over a flush chat bar with a floating chat head, no panel.
+                TouchCanvasWithChat(frame, canvas)
+            } else if (canvas == null) {
+                PageWithoutCanvas(frame)
+            } else {
+                CanvasWithChat(frame, canvas)
+            }
         }
     }
 }

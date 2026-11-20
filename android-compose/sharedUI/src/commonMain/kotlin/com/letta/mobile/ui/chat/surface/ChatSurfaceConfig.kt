@@ -6,7 +6,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.host.LocalLettaHost
 
@@ -108,8 +108,8 @@ data class ChatSurfacePlatform(
 /** What the image viewer can do with the image on screen, beyond looking at it. */
 @Immutable
 class ChatImageActions(
-    val save: (UiImageAttachment) -> Unit,
-    val share: (UiImageAttachment) -> Unit,
+    val save: (UiMediaAttachment) -> Unit,
+    val share: (UiMediaAttachment) -> Unit,
 )
 
 /** The page's [ChatSurfacePlatform.imageActions], for the viewer deep under the timeline. */

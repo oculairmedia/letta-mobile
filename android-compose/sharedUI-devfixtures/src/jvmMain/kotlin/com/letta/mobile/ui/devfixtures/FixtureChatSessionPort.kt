@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.devfixtures
 
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatActions
@@ -40,7 +40,7 @@ class FixtureChatSessionPort(
             role = "user",
             content = current.text,
             timestamp = "2026-10-01T10:30:00Z",
-            attachments = current.attachments.map { image -> UiImageAttachment(base64 = image.base64, mediaType = image.mediaType) },
+            attachments = current.attachments.map { image -> UiMediaAttachment(base64 = image.base64, mediaType = image.mediaType) },
         )
     }
 

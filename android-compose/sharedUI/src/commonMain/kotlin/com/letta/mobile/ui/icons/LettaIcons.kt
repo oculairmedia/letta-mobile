@@ -63,6 +63,9 @@ import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Pin
 import com.composables.icons.lucide.PinOff
 import com.composables.icons.lucide.Play
+import com.composables.icons.lucide.Pause
+import com.composables.icons.lucide.Minimize
+import com.composables.icons.lucide.Film
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.QrCode
 import com.composables.icons.lucide.RefreshCw
@@ -203,6 +206,11 @@ object LettaIcons {
     val Share: ImageVector get() = Lucide.Share2
     val MoreVert: ImageVector get() = Lucide.Ellipsis
     val Play: ImageVector get() = Lucide.Play
+    val Pause: ImageVector get() = Lucide.Pause
+
+    // Inline media the agent shares: the video card's glyph and leaving full screen (audio uses AudioLines).
+    val Video: ImageVector get() = Lucide.Film
+    val Minimize: ImageVector get() = Lucide.Minimize
     val ManageSearch: ImageVector get() = Lucide.TextSearch
 
     // letta-mobile-g2d2i: device pairing (QR scan / invite generation).

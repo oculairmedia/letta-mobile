@@ -49,7 +49,7 @@ import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_close_viewer
 import com.letta.mobile.sharedui.resources.rows_image_counter
@@ -86,7 +86,7 @@ private var SemanticsPropertyReceiver.chatImageViewerScale by ChatImageViewerSca
  */
 @Composable
 internal fun ChatImageViewerContent(
-    images: List<UiImageAttachment>,
+    images: List<UiMediaAttachment>,
     initialIndex: Int,
     onDismiss: () -> Unit,
 ) {
@@ -164,7 +164,7 @@ private fun handleViewerKey(
 
 /** One image, zoomable: [inset] keeps the pointer host's margin; the phone runs edge to edge. */
 @Composable
-private fun ViewerPage(attachment: UiImageAttachment, page: Int, inset: Boolean, onDismiss: () -> Unit) {
+private fun ViewerPage(attachment: UiMediaAttachment, page: Int, inset: Boolean, onDismiss: () -> Unit) {
     val bitmap = rememberAttachmentBitmap(attachment)
     val transform = remember(page) { mutableStateOf(ImageTransformState()) }
     val containerSize = remember(page) { mutableStateOf(Size.Zero) }
@@ -236,10 +236,10 @@ private fun ViewerChrome(pagerState: PagerState, count: Int, onDismiss: () -> Un
 /** What the phone's top bar reads: the page, the images, and what the host lets it do with them. */
 private class ViewerChromeState(
     val pagerState: PagerState,
-    val images: List<UiImageAttachment>,
+    val images: List<UiMediaAttachment>,
     val actions: ChatImageActions?,
 ) {
-    val current: UiImageAttachment get() = images[pagerState.currentPage.coerceIn(0, images.lastIndex)]
+    val current: UiMediaAttachment get() = images[pagerState.currentPage.coerceIn(0, images.lastIndex)]
 }
 
 /** The legacy phone viewer's top bar: "2 / 3" on the left; Share, Save and Close on the right. */

@@ -2,7 +2,8 @@ package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.chat.projection.meridian.MeridianCommandCall
 import com.letta.mobile.data.messaging.AgentMessageProvenanceProjection
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
+import com.letta.mobile.data.model.toUiMediaAttachment
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
@@ -54,7 +55,7 @@ private fun normalizeSkillToolCall(name: String, arguments: String): NormalizedT
 internal data class ToolCallRenderData(
     val result: String?,
     val isError: Boolean,
-    val generatedImageAttachments: List<UiImageAttachment>,
+    val generatedImageAttachments: List<UiMediaAttachment>,
     val executionTimeMs: Long? = null,
     val approvalDecision: UiToolApprovalDecision? = null,
     val resultTruncation: UiToolResultTruncation? = null,
@@ -102,13 +103,10 @@ private fun com.letta.mobile.data.model.ToolCall.toNativeUiToolCall(data: ToolCa
 internal fun com.letta.mobile.data.model.ToolCall.generatedImageAttachments(
     attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
     allowUnowned: Boolean,
-): List<UiImageAttachment> =
+): List<UiMediaAttachment> =
     attachments.filter { it.toolCallId == effectiveId || (it.toolCallId == null && allowUnowned) }
         .distinctBy { it.base64.takeIf(String::isNotEmpty) ?: it }
-        .map { UiImageAttachment(
-            base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize,
-            unavailableReason = it.unavailableReason, url = it.url,
-        ) }
+        .map { it.toUiMediaAttachment() }
 
 /**
  * Approval chip for a TOOL_CALL event. An explicit

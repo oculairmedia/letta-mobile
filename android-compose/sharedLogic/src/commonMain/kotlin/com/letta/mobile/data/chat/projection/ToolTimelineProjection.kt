@@ -3,7 +3,7 @@ package com.letta.mobile.data.chat.projection
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.ToolReturnStatus
 import com.letta.mobile.data.model.UiApprovalRequest
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolApprovalDecision
@@ -38,7 +38,7 @@ data class ToolTimelineCall(
     val summary: String,
     val executionTimeMs: Long? = null,
     val approvalDecision: UiToolApprovalDecision? = null,
-    val generatedImageAttachments: List<UiImageAttachment> = emptyList(),
+    val generatedImageAttachments: List<UiMediaAttachment> = emptyList(),
     val subagentDispatch: UiSubagentDispatch? = null,
     val resultTruncation: UiToolResultTruncation? = null,
 ) {

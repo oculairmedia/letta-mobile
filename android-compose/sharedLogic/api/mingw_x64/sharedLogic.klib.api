@@ -1594,6 +1594,44 @@ final enum class com.letta.mobile.data.lens/WorkPlayMode : kotlin/Enum<com.letta
     final fun values(): kotlin/Array<com.letta.mobile.data.lens/WorkPlayMode> // com.letta.mobile.data.lens/WorkPlayMode.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.media/MediaKind : kotlin/Enum<com.letta.mobile.data.media/MediaKind> { // com.letta.mobile.data.media/MediaKind|null[0]
+    enum entry Audio // com.letta.mobile.data.media/MediaKind.Audio|null[0]
+    enum entry File // com.letta.mobile.data.media/MediaKind.File|null[0]
+    enum entry Image // com.letta.mobile.data.media/MediaKind.Image|null[0]
+    enum entry Video // com.letta.mobile.data.media/MediaKind.Video|null[0]
+
+    final val entries // com.letta.mobile.data.media/MediaKind.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.media/MediaKind> // com.letta.mobile.data.media/MediaKind.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val unknownMimeType // com.letta.mobile.data.media/MediaKind.unknownMimeType|{}unknownMimeType[0]
+        final fun <get-unknownMimeType>(): kotlin/String // com.letta.mobile.data.media/MediaKind.unknownMimeType.<get-unknownMimeType>|<get-unknownMimeType>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.media/MediaKind // com.letta.mobile.data.media/MediaKind.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.media/MediaKind> // com.letta.mobile.data.media/MediaKind.values|values#static(){}[0]
+
+    final object Companion { // com.letta.mobile.data.media/MediaKind.Companion|null[0]
+        final fun isUninformative(kotlin/String?): kotlin/Boolean // com.letta.mobile.data.media/MediaKind.Companion.isUninformative|isUninformative(kotlin.String?){}[0]
+        final fun of(kotlin/String?, kotlin/String? = ...): com.letta.mobile.data.media/MediaKind // com.letta.mobile.data.media/MediaKind.Companion.of|of(kotlin.String?;kotlin.String?){}[0]
+    }
+}
+
+final enum class com.letta.mobile.data.media/MediaPlaybackStatus : kotlin/Enum<com.letta.mobile.data.media/MediaPlaybackStatus> { // com.letta.mobile.data.media/MediaPlaybackStatus|null[0]
+    enum entry Ended // com.letta.mobile.data.media/MediaPlaybackStatus.Ended|null[0]
+    enum entry Failed // com.letta.mobile.data.media/MediaPlaybackStatus.Failed|null[0]
+    enum entry Idle // com.letta.mobile.data.media/MediaPlaybackStatus.Idle|null[0]
+    enum entry Loading // com.letta.mobile.data.media/MediaPlaybackStatus.Loading|null[0]
+    enum entry Paused // com.letta.mobile.data.media/MediaPlaybackStatus.Paused|null[0]
+    enum entry Playing // com.letta.mobile.data.media/MediaPlaybackStatus.Playing|null[0]
+    enum entry Ready // com.letta.mobile.data.media/MediaPlaybackStatus.Ready|null[0]
+    enum entry Released // com.letta.mobile.data.media/MediaPlaybackStatus.Released|null[0]
+    enum entry Unsupported // com.letta.mobile.data.media/MediaPlaybackStatus.Unsupported|null[0]
+
+    final val entries // com.letta.mobile.data.media/MediaPlaybackStatus.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.media/MediaPlaybackStatus> // com.letta.mobile.data.media/MediaPlaybackStatus.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.media/MediaPlaybackStatus // com.letta.mobile.data.media/MediaPlaybackStatus.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.media/MediaPlaybackStatus> // com.letta.mobile.data.media/MediaPlaybackStatus.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.memory.graph/MemoryGraphLayoutMode : kotlin/Enum<com.letta.mobile.data.memory.graph/MemoryGraphLayoutMode> { // com.letta.mobile.data.memory.graph/MemoryGraphLayoutMode|null[0]
     enum entry Force // com.letta.mobile.data.memory.graph/MemoryGraphLayoutMode.Force|null[0]
     enum entry Radial // com.letta.mobile.data.memory.graph/MemoryGraphLayoutMode.Radial|null[0]
@@ -5132,6 +5170,10 @@ abstract fun interface com.letta.mobile.data.lanes/LaneActivitySource { // com.l
     abstract fun arrivals(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.lanes/LaneArrival> // com.letta.mobile.data.lanes/LaneActivitySource.arrivals|arrivals(){}[0]
 }
 
+abstract fun interface com.letta.mobile.data.media/MediaPlayerFactory { // com.letta.mobile.data.media/MediaPlayerFactory|null[0]
+    abstract fun create(com.letta.mobile.data.media/MediaKind): com.letta.mobile.data.media/MediaPlayer // com.letta.mobile.data.media/MediaPlayerFactory.create|create(com.letta.mobile.data.media.MediaKind){}[0]
+}
+
 abstract fun interface com.letta.mobile.data.meridian/AgentToolsModes { // com.letta.mobile.data.meridian/AgentToolsModes|null[0]
     abstract fun modeFor(kotlin/String?): com.letta.mobile.data.meridian/AgentToolsMode // com.letta.mobile.data.meridian/AgentToolsModes.modeFor|modeFor(kotlin.String?){}[0]
 
@@ -6149,6 +6191,19 @@ abstract interface com.letta.mobile.data.home/HomePinStore { // com.letta.mobile
 
     abstract fun setOrder(kotlin.collections/List<kotlin/String>) // com.letta.mobile.data.home/HomePinStore.setOrder|setOrder(kotlin.collections.List<kotlin.String>){}[0]
     abstract fun setPinned(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.home/HomePinStore.setPinned|setPinned(kotlin.String;kotlin.Boolean){}[0]
+}
+
+abstract interface com.letta.mobile.data.media/MediaPlayer { // com.letta.mobile.data.media/MediaPlayer|null[0]
+    abstract val state // com.letta.mobile.data.media/MediaPlayer.state|{}state[0]
+        abstract fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.media/MediaPlaybackState> // com.letta.mobile.data.media/MediaPlayer.state.<get-state>|<get-state>(){}[0]
+
+    abstract fun load(com.letta.mobile.data.media/MediaSource) // com.letta.mobile.data.media/MediaPlayer.load|load(com.letta.mobile.data.media.MediaSource){}[0]
+    abstract fun pause() // com.letta.mobile.data.media/MediaPlayer.pause|pause(){}[0]
+    abstract fun play() // com.letta.mobile.data.media/MediaPlayer.play|play(){}[0]
+    abstract fun release() // com.letta.mobile.data.media/MediaPlayer.release|release(){}[0]
+    abstract fun seekTo(kotlin/Long) // com.letta.mobile.data.media/MediaPlayer.seekTo|seekTo(kotlin.Long){}[0]
+    abstract fun setMuted(kotlin/Boolean) // com.letta.mobile.data.media/MediaPlayer.setMuted|setMuted(kotlin.Boolean){}[0]
+    abstract fun setVolume(kotlin/Float) // com.letta.mobile.data.media/MediaPlayer.setVolume|setVolume(kotlin.Float){}[0]
 }
 
 abstract interface com.letta.mobile.data.memory.graph.forces/ForceElementTuning { // com.letta.mobile.data.memory.graph.forces/ForceElementTuning|null[0]
@@ -12262,6 +12317,37 @@ sealed interface com.letta.mobile.data.home/HomePinnedItem { // com.letta.mobile
         final fun parseAgentKey(kotlin/String): kotlin/String? // com.letta.mobile.data.home/HomePinnedItem.Companion.parseAgentKey|parseAgentKey(kotlin.String){}[0]
         final fun parseShortcutKey(kotlin/String): com.letta.mobile.data.home.shortcut/HomeShortcut? // com.letta.mobile.data.home/HomePinnedItem.Companion.parseShortcutKey|parseShortcutKey(kotlin.String){}[0]
         final fun shortcutKey(com.letta.mobile.data.home.shortcut/HomeShortcut): kotlin/String // com.letta.mobile.data.home/HomePinnedItem.Companion.shortcutKey|shortcutKey(com.letta.mobile.data.home.shortcut.HomeShortcut){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.media/MediaSource { // com.letta.mobile.data.media/MediaSource|null[0]
+    final class Inline : com.letta.mobile.data.media/MediaSource { // com.letta.mobile.data.media/MediaSource.Inline|null[0]
+        constructor <init>(kotlin/String, kotlin/String) // com.letta.mobile.data.media/MediaSource.Inline.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+        final val base64 // com.letta.mobile.data.media/MediaSource.Inline.base64|{}base64[0]
+            final fun <get-base64>(): kotlin/String // com.letta.mobile.data.media/MediaSource.Inline.base64.<get-base64>|<get-base64>(){}[0]
+        final val mimeType // com.letta.mobile.data.media/MediaSource.Inline.mimeType|{}mimeType[0]
+            final fun <get-mimeType>(): kotlin/String // com.letta.mobile.data.media/MediaSource.Inline.mimeType.<get-mimeType>|<get-mimeType>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.media/MediaSource.Inline.component1|component1(){}[0]
+        final fun component2(): kotlin/String // com.letta.mobile.data.media/MediaSource.Inline.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String = ...): com.letta.mobile.data.media/MediaSource.Inline // com.letta.mobile.data.media/MediaSource.Inline.copy|copy(kotlin.String;kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.media/MediaSource.Inline.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.media/MediaSource.Inline.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.media/MediaSource.Inline.toString|toString(){}[0]
+    }
+
+    final class Remote : com.letta.mobile.data.media/MediaSource { // com.letta.mobile.data.media/MediaSource.Remote|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.data.media/MediaSource.Remote.<init>|<init>(kotlin.String){}[0]
+
+        final val url // com.letta.mobile.data.media/MediaSource.Remote.url|{}url[0]
+            final fun <get-url>(): kotlin/String // com.letta.mobile.data.media/MediaSource.Remote.url.<get-url>|<get-url>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.media/MediaSource.Remote.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.data.media/MediaSource.Remote // com.letta.mobile.data.media/MediaSource.Remote.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.media/MediaSource.Remote.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.media/MediaSource.Remote.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.media/MediaSource.Remote.toString|toString(){}[0]
     }
 }
 
@@ -37301,7 +37387,7 @@ final class com.letta.mobile.data.chat.projection/TimelineRowAssembly { // com.l
 }
 
 final class com.letta.mobile.data.chat.projection/ToolTimelineCall { // com.letta.mobile.data.chat.projection/ToolTimelineCall|null[0]
-    constructor <init>(kotlin/String, kotlin/String?, kotlin/String, kotlin/String, kotlin/String?, kotlin/String? = ..., com.letta.mobile.data.chat.projection/ToolTimelineState, kotlin/String, kotlin/Long? = ..., com.letta.mobile.data.model/UiToolApprovalDecision? = ..., kotlin.collections/List<com.letta.mobile.data.model/UiImageAttachment> = ..., com.letta.mobile.data.model/UiSubagentDispatch? = ..., com.letta.mobile.data.model/UiToolResultTruncation? = ...) // com.letta.mobile.data.chat.projection/ToolTimelineCall.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;com.letta.mobile.data.chat.projection.ToolTimelineState;kotlin.String;kotlin.Long?;com.letta.mobile.data.model.UiToolApprovalDecision?;kotlin.collections.List<com.letta.mobile.data.model.UiImageAttachment>;com.letta.mobile.data.model.UiSubagentDispatch?;com.letta.mobile.data.model.UiToolResultTruncation?){}[0]
+    constructor <init>(kotlin/String, kotlin/String?, kotlin/String, kotlin/String, kotlin/String?, kotlin/String? = ..., com.letta.mobile.data.chat.projection/ToolTimelineState, kotlin/String, kotlin/Long? = ..., com.letta.mobile.data.model/UiToolApprovalDecision? = ..., kotlin.collections/List<com.letta.mobile.data.media/UiMediaAttachment> = ..., com.letta.mobile.data.model/UiSubagentDispatch? = ..., com.letta.mobile.data.model/UiToolResultTruncation? = ...) // com.letta.mobile.data.chat.projection/ToolTimelineCall.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;com.letta.mobile.data.chat.projection.ToolTimelineState;kotlin.String;kotlin.Long?;com.letta.mobile.data.model.UiToolApprovalDecision?;kotlin.collections.List<com.letta.mobile.data.media.UiMediaAttachment>;com.letta.mobile.data.model.UiSubagentDispatch?;com.letta.mobile.data.model.UiToolResultTruncation?){}[0]
 
     final val approvalDecision // com.letta.mobile.data.chat.projection/ToolTimelineCall.approvalDecision|{}approvalDecision[0]
         final fun <get-approvalDecision>(): com.letta.mobile.data.model/UiToolApprovalDecision? // com.letta.mobile.data.chat.projection/ToolTimelineCall.approvalDecision.<get-approvalDecision>|<get-approvalDecision>(){}[0]
@@ -37312,7 +37398,7 @@ final class com.letta.mobile.data.chat.projection/ToolTimelineCall { // com.lett
     final val executionTimeMs // com.letta.mobile.data.chat.projection/ToolTimelineCall.executionTimeMs|{}executionTimeMs[0]
         final fun <get-executionTimeMs>(): kotlin/Long? // com.letta.mobile.data.chat.projection/ToolTimelineCall.executionTimeMs.<get-executionTimeMs>|<get-executionTimeMs>(){}[0]
     final val generatedImageAttachments // com.letta.mobile.data.chat.projection/ToolTimelineCall.generatedImageAttachments|{}generatedImageAttachments[0]
-        final fun <get-generatedImageAttachments>(): kotlin.collections/List<com.letta.mobile.data.model/UiImageAttachment> // com.letta.mobile.data.chat.projection/ToolTimelineCall.generatedImageAttachments.<get-generatedImageAttachments>|<get-generatedImageAttachments>(){}[0]
+        final fun <get-generatedImageAttachments>(): kotlin.collections/List<com.letta.mobile.data.media/UiMediaAttachment> // com.letta.mobile.data.chat.projection/ToolTimelineCall.generatedImageAttachments.<get-generatedImageAttachments>|<get-generatedImageAttachments>(){}[0]
     final val isTerminal // com.letta.mobile.data.chat.projection/ToolTimelineCall.isTerminal|{}isTerminal[0]
         final fun <get-isTerminal>(): kotlin/Boolean // com.letta.mobile.data.chat.projection/ToolTimelineCall.isTerminal.<get-isTerminal>|<get-isTerminal>(){}[0]
     final val key // com.letta.mobile.data.chat.projection/ToolTimelineCall.key|{}key[0]
@@ -37334,7 +37420,7 @@ final class com.letta.mobile.data.chat.projection/ToolTimelineCall { // com.lett
 
     final fun component1(): kotlin/String // com.letta.mobile.data.chat.projection/ToolTimelineCall.component1|component1(){}[0]
     final fun component10(): com.letta.mobile.data.model/UiToolApprovalDecision? // com.letta.mobile.data.chat.projection/ToolTimelineCall.component10|component10(){}[0]
-    final fun component11(): kotlin.collections/List<com.letta.mobile.data.model/UiImageAttachment> // com.letta.mobile.data.chat.projection/ToolTimelineCall.component11|component11(){}[0]
+    final fun component11(): kotlin.collections/List<com.letta.mobile.data.media/UiMediaAttachment> // com.letta.mobile.data.chat.projection/ToolTimelineCall.component11|component11(){}[0]
     final fun component12(): com.letta.mobile.data.model/UiSubagentDispatch? // com.letta.mobile.data.chat.projection/ToolTimelineCall.component12|component12(){}[0]
     final fun component13(): com.letta.mobile.data.model/UiToolResultTruncation? // com.letta.mobile.data.chat.projection/ToolTimelineCall.component13|component13(){}[0]
     final fun component2(): kotlin/String? // com.letta.mobile.data.chat.projection/ToolTimelineCall.component2|component2(){}[0]
@@ -37345,7 +37431,7 @@ final class com.letta.mobile.data.chat.projection/ToolTimelineCall { // com.lett
     final fun component7(): com.letta.mobile.data.chat.projection/ToolTimelineState // com.letta.mobile.data.chat.projection/ToolTimelineCall.component7|component7(){}[0]
     final fun component8(): kotlin/String // com.letta.mobile.data.chat.projection/ToolTimelineCall.component8|component8(){}[0]
     final fun component9(): kotlin/Long? // com.letta.mobile.data.chat.projection/ToolTimelineCall.component9|component9(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.chat.projection/ToolTimelineState = ..., kotlin/String = ..., kotlin/Long? = ..., com.letta.mobile.data.model/UiToolApprovalDecision? = ..., kotlin.collections/List<com.letta.mobile.data.model/UiImageAttachment> = ..., com.letta.mobile.data.model/UiSubagentDispatch? = ..., com.letta.mobile.data.model/UiToolResultTruncation? = ...): com.letta.mobile.data.chat.projection/ToolTimelineCall // com.letta.mobile.data.chat.projection/ToolTimelineCall.copy|copy(kotlin.String;kotlin.String?;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;com.letta.mobile.data.chat.projection.ToolTimelineState;kotlin.String;kotlin.Long?;com.letta.mobile.data.model.UiToolApprovalDecision?;kotlin.collections.List<com.letta.mobile.data.model.UiImageAttachment>;com.letta.mobile.data.model.UiSubagentDispatch?;com.letta.mobile.data.model.UiToolResultTruncation?){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.chat.projection/ToolTimelineState = ..., kotlin/String = ..., kotlin/Long? = ..., com.letta.mobile.data.model/UiToolApprovalDecision? = ..., kotlin.collections/List<com.letta.mobile.data.media/UiMediaAttachment> = ..., com.letta.mobile.data.model/UiSubagentDispatch? = ..., com.letta.mobile.data.model/UiToolResultTruncation? = ...): com.letta.mobile.data.chat.projection/ToolTimelineCall // com.letta.mobile.data.chat.projection/ToolTimelineCall.copy|copy(kotlin.String;kotlin.String?;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;com.letta.mobile.data.chat.projection.ToolTimelineState;kotlin.String;kotlin.Long?;com.letta.mobile.data.model.UiToolApprovalDecision?;kotlin.collections.List<com.letta.mobile.data.media.UiMediaAttachment>;com.letta.mobile.data.model.UiSubagentDispatch?;com.letta.mobile.data.model.UiToolResultTruncation?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.projection/ToolTimelineCall.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.projection/ToolTimelineCall.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.projection/ToolTimelineCall.toString|toString(){}[0]
@@ -42597,6 +42683,103 @@ final class com.letta.mobile.data.lanes/LaneArrival { // com.letta.mobile.data.l
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.lanes/LaneArrival.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.lanes/LaneArrival.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.lanes/LaneArrival.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.media/MediaPlaybackCoordinator { // com.letta.mobile.data.media/MediaPlaybackCoordinator|null[0]
+    constructor <init>() // com.letta.mobile.data.media/MediaPlaybackCoordinator.<init>|<init>(){}[0]
+
+    final val activePlayer // com.letta.mobile.data.media/MediaPlaybackCoordinator.activePlayer|{}activePlayer[0]
+        final fun <get-activePlayer>(): com.letta.mobile.data.media/MediaPlayer? // com.letta.mobile.data.media/MediaPlaybackCoordinator.activePlayer.<get-activePlayer>|<get-activePlayer>(){}[0]
+
+    final var held // com.letta.mobile.data.media/MediaPlaybackCoordinator.held|{}held[0]
+        final fun <get-held>(): kotlin/Boolean // com.letta.mobile.data.media/MediaPlaybackCoordinator.held.<get-held>|<get-held>(){}[0]
+
+    final fun forget(com.letta.mobile.data.media/MediaPlayer) // com.letta.mobile.data.media/MediaPlaybackCoordinator.forget|forget(com.letta.mobile.data.media.MediaPlayer){}[0]
+    final fun hold(kotlin/Boolean) // com.letta.mobile.data.media/MediaPlaybackCoordinator.hold|hold(kotlin.Boolean){}[0]
+    final fun pauseAll() // com.letta.mobile.data.media/MediaPlaybackCoordinator.pauseAll|pauseAll(){}[0]
+    final fun play(com.letta.mobile.data.media/MediaPlayer) // com.letta.mobile.data.media/MediaPlaybackCoordinator.play|play(com.letta.mobile.data.media.MediaPlayer){}[0]
+}
+
+final class com.letta.mobile.data.media/MediaPlaybackState { // com.letta.mobile.data.media/MediaPlaybackState|null[0]
+    constructor <init>(com.letta.mobile.data.media/MediaPlaybackStatus = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Float = ..., kotlin/Boolean = ..., kotlin/Int? = ..., kotlin/Int? = ...) // com.letta.mobile.data.media/MediaPlaybackState.<init>|<init>(com.letta.mobile.data.media.MediaPlaybackStatus;kotlin.Long;kotlin.Long?;kotlin.Float;kotlin.Boolean;kotlin.Int?;kotlin.Int?){}[0]
+
+    final val durationMs // com.letta.mobile.data.media/MediaPlaybackState.durationMs|{}durationMs[0]
+        final fun <get-durationMs>(): kotlin/Long? // com.letta.mobile.data.media/MediaPlaybackState.durationMs.<get-durationMs>|<get-durationMs>(){}[0]
+    final val isPlayable // com.letta.mobile.data.media/MediaPlaybackState.isPlayable|{}isPlayable[0]
+        final fun <get-isPlayable>(): kotlin/Boolean // com.letta.mobile.data.media/MediaPlaybackState.isPlayable.<get-isPlayable>|<get-isPlayable>(){}[0]
+    final val isPlaying // com.letta.mobile.data.media/MediaPlaybackState.isPlaying|{}isPlaying[0]
+        final fun <get-isPlaying>(): kotlin/Boolean // com.letta.mobile.data.media/MediaPlaybackState.isPlaying.<get-isPlaying>|<get-isPlaying>(){}[0]
+    final val muted // com.letta.mobile.data.media/MediaPlaybackState.muted|{}muted[0]
+        final fun <get-muted>(): kotlin/Boolean // com.letta.mobile.data.media/MediaPlaybackState.muted.<get-muted>|<get-muted>(){}[0]
+    final val positionMs // com.letta.mobile.data.media/MediaPlaybackState.positionMs|{}positionMs[0]
+        final fun <get-positionMs>(): kotlin/Long // com.letta.mobile.data.media/MediaPlaybackState.positionMs.<get-positionMs>|<get-positionMs>(){}[0]
+    final val status // com.letta.mobile.data.media/MediaPlaybackState.status|{}status[0]
+        final fun <get-status>(): com.letta.mobile.data.media/MediaPlaybackStatus // com.letta.mobile.data.media/MediaPlaybackState.status.<get-status>|<get-status>(){}[0]
+    final val videoHeight // com.letta.mobile.data.media/MediaPlaybackState.videoHeight|{}videoHeight[0]
+        final fun <get-videoHeight>(): kotlin/Int? // com.letta.mobile.data.media/MediaPlaybackState.videoHeight.<get-videoHeight>|<get-videoHeight>(){}[0]
+    final val videoWidth // com.letta.mobile.data.media/MediaPlaybackState.videoWidth|{}videoWidth[0]
+        final fun <get-videoWidth>(): kotlin/Int? // com.letta.mobile.data.media/MediaPlaybackState.videoWidth.<get-videoWidth>|<get-videoWidth>(){}[0]
+    final val volume // com.letta.mobile.data.media/MediaPlaybackState.volume|{}volume[0]
+        final fun <get-volume>(): kotlin/Float // com.letta.mobile.data.media/MediaPlaybackState.volume.<get-volume>|<get-volume>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.media/MediaPlaybackStatus // com.letta.mobile.data.media/MediaPlaybackState.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // com.letta.mobile.data.media/MediaPlaybackState.component2|component2(){}[0]
+    final fun component3(): kotlin/Long? // com.letta.mobile.data.media/MediaPlaybackState.component3|component3(){}[0]
+    final fun component4(): kotlin/Float // com.letta.mobile.data.media/MediaPlaybackState.component4|component4(){}[0]
+    final fun component5(): kotlin/Boolean // com.letta.mobile.data.media/MediaPlaybackState.component5|component5(){}[0]
+    final fun component6(): kotlin/Int? // com.letta.mobile.data.media/MediaPlaybackState.component6|component6(){}[0]
+    final fun component7(): kotlin/Int? // com.letta.mobile.data.media/MediaPlaybackState.component7|component7(){}[0]
+    final fun copy(com.letta.mobile.data.media/MediaPlaybackStatus = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Float = ..., kotlin/Boolean = ..., kotlin/Int? = ..., kotlin/Int? = ...): com.letta.mobile.data.media/MediaPlaybackState // com.letta.mobile.data.media/MediaPlaybackState.copy|copy(com.letta.mobile.data.media.MediaPlaybackStatus;kotlin.Long;kotlin.Long?;kotlin.Float;kotlin.Boolean;kotlin.Int?;kotlin.Int?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.media/MediaPlaybackState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.media/MediaPlaybackState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.media/MediaPlaybackState.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.media/UiMediaAttachment { // com.letta.mobile.data.media/UiMediaAttachment|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/Long? = ..., com.letta.mobile.data.attachment/ImageUnavailableReason? = ..., kotlin/String? = ...) // com.letta.mobile.data.media/UiMediaAttachment.<init>|<init>(kotlin.String;kotlin.String;kotlin.Long?;com.letta.mobile.data.attachment.ImageUnavailableReason?;kotlin.String?){}[0]
+
+    final val base64 // com.letta.mobile.data.media/UiMediaAttachment.base64|{}base64[0]
+        final fun <get-base64>(): kotlin/String // com.letta.mobile.data.media/UiMediaAttachment.base64.<get-base64>|<get-base64>(){}[0]
+    final val byteSize // com.letta.mobile.data.media/UiMediaAttachment.byteSize|{}byteSize[0]
+        final fun <get-byteSize>(): kotlin/Long? // com.letta.mobile.data.media/UiMediaAttachment.byteSize.<get-byteSize>|<get-byteSize>(){}[0]
+    final val displayName // com.letta.mobile.data.media/UiMediaAttachment.displayName|{}displayName[0]
+        final fun <get-displayName>(): kotlin/String? // com.letta.mobile.data.media/UiMediaAttachment.displayName.<get-displayName>|<get-displayName>(){}[0]
+    final val kind // com.letta.mobile.data.media/UiMediaAttachment.kind|{}kind[0]
+        final fun <get-kind>(): com.letta.mobile.data.media/MediaKind // com.letta.mobile.data.media/UiMediaAttachment.kind.<get-kind>|<get-kind>(){}[0]
+    final val mediaType // com.letta.mobile.data.media/UiMediaAttachment.mediaType|{}mediaType[0]
+        final fun <get-mediaType>(): kotlin/String // com.letta.mobile.data.media/UiMediaAttachment.mediaType.<get-mediaType>|<get-mediaType>(){}[0]
+    final val storedByteSize // com.letta.mobile.data.media/UiMediaAttachment.storedByteSize|{}storedByteSize[0]
+        final fun <get-storedByteSize>(): kotlin/Long? // com.letta.mobile.data.media/UiMediaAttachment.storedByteSize.<get-storedByteSize>|<get-storedByteSize>(){}[0]
+    final val unavailableReason // com.letta.mobile.data.media/UiMediaAttachment.unavailableReason|{}unavailableReason[0]
+        final fun <get-unavailableReason>(): com.letta.mobile.data.attachment/ImageUnavailableReason? // com.letta.mobile.data.media/UiMediaAttachment.unavailableReason.<get-unavailableReason>|<get-unavailableReason>(){}[0]
+    final val url // com.letta.mobile.data.media/UiMediaAttachment.url|{}url[0]
+        final fun <get-url>(): kotlin/String? // com.letta.mobile.data.media/UiMediaAttachment.url.<get-url>|<get-url>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.media/UiMediaAttachment.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.media/UiMediaAttachment.component2|component2(){}[0]
+    final fun component3(): kotlin/Long? // com.letta.mobile.data.media/UiMediaAttachment.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.data.attachment/ImageUnavailableReason? // com.letta.mobile.data.media/UiMediaAttachment.component4|component4(){}[0]
+    final fun component5(): kotlin/String? // com.letta.mobile.data.media/UiMediaAttachment.component5|component5(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/Long? = ..., com.letta.mobile.data.attachment/ImageUnavailableReason? = ..., kotlin/String? = ...): com.letta.mobile.data.media/UiMediaAttachment // com.letta.mobile.data.media/UiMediaAttachment.copy|copy(kotlin.String;kotlin.String;kotlin.Long?;com.letta.mobile.data.attachment.ImageUnavailableReason?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.media/UiMediaAttachment.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.media/UiMediaAttachment.hashCode|hashCode(){}[0]
+    final fun playbackSource(): com.letta.mobile.data.media/MediaSource? // com.letta.mobile.data.media/UiMediaAttachment.playbackSource|playbackSource(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.media/UiMediaAttachment.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.media/UnsupportedMediaPlayer : com.letta.mobile.data.media/MediaPlayer { // com.letta.mobile.data.media/UnsupportedMediaPlayer|null[0]
+    constructor <init>() // com.letta.mobile.data.media/UnsupportedMediaPlayer.<init>|<init>(){}[0]
+
+    final val state // com.letta.mobile.data.media/UnsupportedMediaPlayer.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.media/MediaPlaybackState> // com.letta.mobile.data.media/UnsupportedMediaPlayer.state.<get-state>|<get-state>(){}[0]
+
+    final fun load(com.letta.mobile.data.media/MediaSource) // com.letta.mobile.data.media/UnsupportedMediaPlayer.load|load(com.letta.mobile.data.media.MediaSource){}[0]
+    final fun pause() // com.letta.mobile.data.media/UnsupportedMediaPlayer.pause|pause(){}[0]
+    final fun play() // com.letta.mobile.data.media/UnsupportedMediaPlayer.play|play(){}[0]
+    final fun release() // com.letta.mobile.data.media/UnsupportedMediaPlayer.release|release(){}[0]
+    final fun seekTo(kotlin/Long) // com.letta.mobile.data.media/UnsupportedMediaPlayer.seekTo|seekTo(kotlin.Long){}[0]
+    final fun setMuted(kotlin/Boolean) // com.letta.mobile.data.media/UnsupportedMediaPlayer.setMuted|setMuted(kotlin.Boolean){}[0]
+    final fun setVolume(kotlin/Float) // com.letta.mobile.data.media/UnsupportedMediaPlayer.setVolume|setVolume(kotlin.Float){}[0]
 }
 
 final class com.letta.mobile.data.memory.graph.barneshut/BarnesHutTree { // com.letta.mobile.data.memory.graph.barneshut/BarnesHutTree|null[0]
@@ -54662,33 +54845,8 @@ final class com.letta.mobile.data.model/UiGeneratedComponent { // com.letta.mobi
     final fun toString(): kotlin/String // com.letta.mobile.data.model/UiGeneratedComponent.toString|toString(){}[0]
 }
 
-final class com.letta.mobile.data.model/UiImageAttachment { // com.letta.mobile.data.model/UiImageAttachment|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/Long? = ..., com.letta.mobile.data.attachment/ImageUnavailableReason? = ..., kotlin/String? = ...) // com.letta.mobile.data.model/UiImageAttachment.<init>|<init>(kotlin.String;kotlin.String;kotlin.Long?;com.letta.mobile.data.attachment.ImageUnavailableReason?;kotlin.String?){}[0]
-
-    final val base64 // com.letta.mobile.data.model/UiImageAttachment.base64|{}base64[0]
-        final fun <get-base64>(): kotlin/String // com.letta.mobile.data.model/UiImageAttachment.base64.<get-base64>|<get-base64>(){}[0]
-    final val mediaType // com.letta.mobile.data.model/UiImageAttachment.mediaType|{}mediaType[0]
-        final fun <get-mediaType>(): kotlin/String // com.letta.mobile.data.model/UiImageAttachment.mediaType.<get-mediaType>|<get-mediaType>(){}[0]
-    final val storedByteSize // com.letta.mobile.data.model/UiImageAttachment.storedByteSize|{}storedByteSize[0]
-        final fun <get-storedByteSize>(): kotlin/Long? // com.letta.mobile.data.model/UiImageAttachment.storedByteSize.<get-storedByteSize>|<get-storedByteSize>(){}[0]
-    final val unavailableReason // com.letta.mobile.data.model/UiImageAttachment.unavailableReason|{}unavailableReason[0]
-        final fun <get-unavailableReason>(): com.letta.mobile.data.attachment/ImageUnavailableReason? // com.letta.mobile.data.model/UiImageAttachment.unavailableReason.<get-unavailableReason>|<get-unavailableReason>(){}[0]
-    final val url // com.letta.mobile.data.model/UiImageAttachment.url|{}url[0]
-        final fun <get-url>(): kotlin/String? // com.letta.mobile.data.model/UiImageAttachment.url.<get-url>|<get-url>(){}[0]
-
-    final fun component1(): kotlin/String // com.letta.mobile.data.model/UiImageAttachment.component1|component1(){}[0]
-    final fun component2(): kotlin/String // com.letta.mobile.data.model/UiImageAttachment.component2|component2(){}[0]
-    final fun component3(): kotlin/Long? // com.letta.mobile.data.model/UiImageAttachment.component3|component3(){}[0]
-    final fun component4(): com.letta.mobile.data.attachment/ImageUnavailableReason? // com.letta.mobile.data.model/UiImageAttachment.component4|component4(){}[0]
-    final fun component5(): kotlin/String? // com.letta.mobile.data.model/UiImageAttachment.component5|component5(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/Long? = ..., com.letta.mobile.data.attachment/ImageUnavailableReason? = ..., kotlin/String? = ...): com.letta.mobile.data.model/UiImageAttachment // com.letta.mobile.data.model/UiImageAttachment.copy|copy(kotlin.String;kotlin.String;kotlin.Long?;com.letta.mobile.data.attachment.ImageUnavailableReason?;kotlin.String?){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/UiImageAttachment.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/UiImageAttachment.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.model/UiImageAttachment.toString|toString(){}[0]
-}
-
 final class com.letta.mobile.data.model/UiMessage { // com.letta.mobile.data.model/UiMessage|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Long? = ..., kotlin.collections/List<com.letta.mobile.data.model/UiToolCall>? = ..., com.letta.mobile.data.model/UiGeneratedComponent? = ..., com.letta.mobile.data.model/UiApprovalRequest? = ..., com.letta.mobile.data.model/UiApprovalResponse? = ..., com.letta.mobile.data.model/UiSubagentNotification? = ..., kotlin.collections/List<com.letta.mobile.data.model/UiImageAttachment> = ..., com.letta.mobile.data.messaging/AgentMessageProvenance? = ..., kotlin.collections/List<com.letta.mobile.data.chat.projection/CanvasArtifactReceipt> = ..., kotlin/Boolean = ...) // com.letta.mobile.data.model/UiMessage.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Long?;kotlin.collections.List<com.letta.mobile.data.model.UiToolCall>?;com.letta.mobile.data.model.UiGeneratedComponent?;com.letta.mobile.data.model.UiApprovalRequest?;com.letta.mobile.data.model.UiApprovalResponse?;com.letta.mobile.data.model.UiSubagentNotification?;kotlin.collections.List<com.letta.mobile.data.model.UiImageAttachment>;com.letta.mobile.data.messaging.AgentMessageProvenance?;kotlin.collections.List<com.letta.mobile.data.chat.projection.CanvasArtifactReceipt>;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Long? = ..., kotlin.collections/List<com.letta.mobile.data.model/UiToolCall>? = ..., com.letta.mobile.data.model/UiGeneratedComponent? = ..., com.letta.mobile.data.model/UiApprovalRequest? = ..., com.letta.mobile.data.model/UiApprovalResponse? = ..., com.letta.mobile.data.model/UiSubagentNotification? = ..., kotlin.collections/List<com.letta.mobile.data.media/UiMediaAttachment> = ..., com.letta.mobile.data.messaging/AgentMessageProvenance? = ..., kotlin.collections/List<com.letta.mobile.data.chat.projection/CanvasArtifactReceipt> = ..., kotlin/Boolean = ...) // com.letta.mobile.data.model/UiMessage.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Long?;kotlin.collections.List<com.letta.mobile.data.model.UiToolCall>?;com.letta.mobile.data.model.UiGeneratedComponent?;com.letta.mobile.data.model.UiApprovalRequest?;com.letta.mobile.data.model.UiApprovalResponse?;com.letta.mobile.data.model.UiSubagentNotification?;kotlin.collections.List<com.letta.mobile.data.media.UiMediaAttachment>;com.letta.mobile.data.messaging.AgentMessageProvenance?;kotlin.collections.List<com.letta.mobile.data.chat.projection.CanvasArtifactReceipt>;kotlin.Boolean){}[0]
 
     final val agentId // com.letta.mobile.data.model/UiMessage.agentId|{}agentId[0]
         final fun <get-agentId>(): kotlin/String? // com.letta.mobile.data.model/UiMessage.agentId.<get-agentId>|<get-agentId>(){}[0]
@@ -54701,7 +54859,7 @@ final class com.letta.mobile.data.model/UiMessage { // com.letta.mobile.data.mod
     final val artifacts // com.letta.mobile.data.model/UiMessage.artifacts|{}artifacts[0]
         final fun <get-artifacts>(): kotlin.collections/List<com.letta.mobile.data.chat.projection/CanvasArtifactReceipt> // com.letta.mobile.data.model/UiMessage.artifacts.<get-artifacts>|<get-artifacts>(){}[0]
     final val attachments // com.letta.mobile.data.model/UiMessage.attachments|{}attachments[0]
-        final fun <get-attachments>(): kotlin.collections/List<com.letta.mobile.data.model/UiImageAttachment> // com.letta.mobile.data.model/UiMessage.attachments.<get-attachments>|<get-attachments>(){}[0]
+        final fun <get-attachments>(): kotlin.collections/List<com.letta.mobile.data.media/UiMediaAttachment> // com.letta.mobile.data.model/UiMessage.attachments.<get-attachments>|<get-attachments>(){}[0]
     final val clientMessageId // com.letta.mobile.data.model/UiMessage.clientMessageId|{}clientMessageId[0]
         final fun <get-clientMessageId>(): kotlin/String? // com.letta.mobile.data.model/UiMessage.clientMessageId.<get-clientMessageId>|<get-clientMessageId>(){}[0]
     final val content // com.letta.mobile.data.model/UiMessage.content|{}content[0]
@@ -54745,7 +54903,7 @@ final class com.letta.mobile.data.model/UiMessage { // com.letta.mobile.data.mod
     final fun component16(): com.letta.mobile.data.model/UiApprovalRequest? // com.letta.mobile.data.model/UiMessage.component16|component16(){}[0]
     final fun component17(): com.letta.mobile.data.model/UiApprovalResponse? // com.letta.mobile.data.model/UiMessage.component17|component17(){}[0]
     final fun component18(): com.letta.mobile.data.model/UiSubagentNotification? // com.letta.mobile.data.model/UiMessage.component18|component18(){}[0]
-    final fun component19(): kotlin.collections/List<com.letta.mobile.data.model/UiImageAttachment> // com.letta.mobile.data.model/UiMessage.component19|component19(){}[0]
+    final fun component19(): kotlin.collections/List<com.letta.mobile.data.media/UiMediaAttachment> // com.letta.mobile.data.model/UiMessage.component19|component19(){}[0]
     final fun component2(): kotlin/String // com.letta.mobile.data.model/UiMessage.component2|component2(){}[0]
     final fun component20(): com.letta.mobile.data.messaging/AgentMessageProvenance? // com.letta.mobile.data.model/UiMessage.component20|component20(){}[0]
     final fun component21(): kotlin.collections/List<com.letta.mobile.data.chat.projection/CanvasArtifactReceipt> // com.letta.mobile.data.model/UiMessage.component21|component21(){}[0]
@@ -54757,7 +54915,7 @@ final class com.letta.mobile.data.model/UiMessage { // com.letta.mobile.data.mod
     final fun component7(): kotlin/String? // com.letta.mobile.data.model/UiMessage.component7|component7(){}[0]
     final fun component8(): kotlin/String? // com.letta.mobile.data.model/UiMessage.component8|component8(){}[0]
     final fun component9(): kotlin/Boolean // com.letta.mobile.data.model/UiMessage.component9|component9(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Long? = ..., kotlin.collections/List<com.letta.mobile.data.model/UiToolCall>? = ..., com.letta.mobile.data.model/UiGeneratedComponent? = ..., com.letta.mobile.data.model/UiApprovalRequest? = ..., com.letta.mobile.data.model/UiApprovalResponse? = ..., com.letta.mobile.data.model/UiSubagentNotification? = ..., kotlin.collections/List<com.letta.mobile.data.model/UiImageAttachment> = ..., com.letta.mobile.data.messaging/AgentMessageProvenance? = ..., kotlin.collections/List<com.letta.mobile.data.chat.projection/CanvasArtifactReceipt> = ..., kotlin/Boolean = ...): com.letta.mobile.data.model/UiMessage // com.letta.mobile.data.model/UiMessage.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Long?;kotlin.collections.List<com.letta.mobile.data.model.UiToolCall>?;com.letta.mobile.data.model.UiGeneratedComponent?;com.letta.mobile.data.model.UiApprovalRequest?;com.letta.mobile.data.model.UiApprovalResponse?;com.letta.mobile.data.model.UiSubagentNotification?;kotlin.collections.List<com.letta.mobile.data.model.UiImageAttachment>;com.letta.mobile.data.messaging.AgentMessageProvenance?;kotlin.collections.List<com.letta.mobile.data.chat.projection.CanvasArtifactReceipt>;kotlin.Boolean){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Long? = ..., kotlin.collections/List<com.letta.mobile.data.model/UiToolCall>? = ..., com.letta.mobile.data.model/UiGeneratedComponent? = ..., com.letta.mobile.data.model/UiApprovalRequest? = ..., com.letta.mobile.data.model/UiApprovalResponse? = ..., com.letta.mobile.data.model/UiSubagentNotification? = ..., kotlin.collections/List<com.letta.mobile.data.media/UiMediaAttachment> = ..., com.letta.mobile.data.messaging/AgentMessageProvenance? = ..., kotlin.collections/List<com.letta.mobile.data.chat.projection/CanvasArtifactReceipt> = ..., kotlin/Boolean = ...): com.letta.mobile.data.model/UiMessage // com.letta.mobile.data.model/UiMessage.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Long?;kotlin.collections.List<com.letta.mobile.data.model.UiToolCall>?;com.letta.mobile.data.model.UiGeneratedComponent?;com.letta.mobile.data.model.UiApprovalRequest?;com.letta.mobile.data.model.UiApprovalResponse?;com.letta.mobile.data.model.UiSubagentNotification?;kotlin.collections.List<com.letta.mobile.data.media.UiMediaAttachment>;com.letta.mobile.data.messaging.AgentMessageProvenance?;kotlin.collections.List<com.letta.mobile.data.chat.projection.CanvasArtifactReceipt>;kotlin.Boolean){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/UiMessage.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/UiMessage.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.model/UiMessage.toString|toString(){}[0]
@@ -54832,7 +54990,7 @@ final class com.letta.mobile.data.model/UiSubagentNotification { // com.letta.mo
 }
 
 final class com.letta.mobile.data.model/UiToolCall { // com.letta.mobile.data.model/UiToolCall|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/String?, kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.model/UiImageAttachment> = ..., kotlin/Long? = ..., kotlin/String? = ..., kotlin/Boolean = ..., com.letta.mobile.data.model/UiToolApprovalDecision? = ..., com.letta.mobile.data.model/UiSubagentDispatch? = ..., com.letta.mobile.data.model/UiToolResultTruncation? = ..., com.letta.mobile.data.messaging/AgentMessageProvenance? = ..., kotlin/String? = ...) // com.letta.mobile.data.model/UiToolCall.<init>|<init>(kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.model.UiImageAttachment>;kotlin.Long?;kotlin.String?;kotlin.Boolean;com.letta.mobile.data.model.UiToolApprovalDecision?;com.letta.mobile.data.model.UiSubagentDispatch?;com.letta.mobile.data.model.UiToolResultTruncation?;com.letta.mobile.data.messaging.AgentMessageProvenance?;kotlin.String?){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String?, kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.media/UiMediaAttachment> = ..., kotlin/Long? = ..., kotlin/String? = ..., kotlin/Boolean = ..., com.letta.mobile.data.model/UiToolApprovalDecision? = ..., com.letta.mobile.data.model/UiSubagentDispatch? = ..., com.letta.mobile.data.model/UiToolResultTruncation? = ..., com.letta.mobile.data.messaging/AgentMessageProvenance? = ..., kotlin/String? = ...) // com.letta.mobile.data.model/UiToolCall.<init>|<init>(kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.media.UiMediaAttachment>;kotlin.Long?;kotlin.String?;kotlin.Boolean;com.letta.mobile.data.model.UiToolApprovalDecision?;com.letta.mobile.data.model.UiSubagentDispatch?;com.letta.mobile.data.model.UiToolResultTruncation?;com.letta.mobile.data.messaging.AgentMessageProvenance?;kotlin.String?){}[0]
 
     final val agentMessageProvenance // com.letta.mobile.data.model/UiToolCall.agentMessageProvenance|{}agentMessageProvenance[0]
         final fun <get-agentMessageProvenance>(): com.letta.mobile.data.messaging/AgentMessageProvenance? // com.letta.mobile.data.model/UiToolCall.agentMessageProvenance.<get-agentMessageProvenance>|<get-agentMessageProvenance>(){}[0]
@@ -54845,7 +55003,7 @@ final class com.letta.mobile.data.model/UiToolCall { // com.letta.mobile.data.mo
     final val executionTimeMs // com.letta.mobile.data.model/UiToolCall.executionTimeMs|{}executionTimeMs[0]
         final fun <get-executionTimeMs>(): kotlin/Long? // com.letta.mobile.data.model/UiToolCall.executionTimeMs.<get-executionTimeMs>|<get-executionTimeMs>(){}[0]
     final val generatedImageAttachments // com.letta.mobile.data.model/UiToolCall.generatedImageAttachments|{}generatedImageAttachments[0]
-        final fun <get-generatedImageAttachments>(): kotlin.collections/List<com.letta.mobile.data.model/UiImageAttachment> // com.letta.mobile.data.model/UiToolCall.generatedImageAttachments.<get-generatedImageAttachments>|<get-generatedImageAttachments>(){}[0]
+        final fun <get-generatedImageAttachments>(): kotlin.collections/List<com.letta.mobile.data.media/UiMediaAttachment> // com.letta.mobile.data.model/UiToolCall.generatedImageAttachments.<get-generatedImageAttachments>|<get-generatedImageAttachments>(){}[0]
     final val name // com.letta.mobile.data.model/UiToolCall.name|{}name[0]
         final fun <get-name>(): kotlin/String // com.letta.mobile.data.model/UiToolCall.name.<get-name>|<get-name>(){}[0]
     final val result // com.letta.mobile.data.model/UiToolCall.result|{}result[0]
@@ -54873,11 +55031,11 @@ final class com.letta.mobile.data.model/UiToolCall { // com.letta.mobile.data.mo
     final fun component3(): kotlin/String? // com.letta.mobile.data.model/UiToolCall.component3|component3(){}[0]
     final fun component4(): kotlin/String? // com.letta.mobile.data.model/UiToolCall.component4|component4(){}[0]
     final fun component5(): kotlin/String? // com.letta.mobile.data.model/UiToolCall.component5|component5(){}[0]
-    final fun component6(): kotlin.collections/List<com.letta.mobile.data.model/UiImageAttachment> // com.letta.mobile.data.model/UiToolCall.component6|component6(){}[0]
+    final fun component6(): kotlin.collections/List<com.letta.mobile.data.media/UiMediaAttachment> // com.letta.mobile.data.model/UiToolCall.component6|component6(){}[0]
     final fun component7(): kotlin/Long? // com.letta.mobile.data.model/UiToolCall.component7|component7(){}[0]
     final fun component8(): kotlin/String? // com.letta.mobile.data.model/UiToolCall.component8|component8(){}[0]
     final fun component9(): kotlin/Boolean // com.letta.mobile.data.model/UiToolCall.component9|component9(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.model/UiImageAttachment> = ..., kotlin/Long? = ..., kotlin/String? = ..., kotlin/Boolean = ..., com.letta.mobile.data.model/UiToolApprovalDecision? = ..., com.letta.mobile.data.model/UiSubagentDispatch? = ..., com.letta.mobile.data.model/UiToolResultTruncation? = ..., com.letta.mobile.data.messaging/AgentMessageProvenance? = ..., kotlin/String? = ...): com.letta.mobile.data.model/UiToolCall // com.letta.mobile.data.model/UiToolCall.copy|copy(kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.model.UiImageAttachment>;kotlin.Long?;kotlin.String?;kotlin.Boolean;com.letta.mobile.data.model.UiToolApprovalDecision?;com.letta.mobile.data.model.UiSubagentDispatch?;com.letta.mobile.data.model.UiToolResultTruncation?;com.letta.mobile.data.messaging.AgentMessageProvenance?;kotlin.String?){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.media/UiMediaAttachment> = ..., kotlin/Long? = ..., kotlin/String? = ..., kotlin/Boolean = ..., com.letta.mobile.data.model/UiToolApprovalDecision? = ..., com.letta.mobile.data.model/UiSubagentDispatch? = ..., com.letta.mobile.data.model/UiToolResultTruncation? = ..., com.letta.mobile.data.messaging/AgentMessageProvenance? = ..., kotlin/String? = ...): com.letta.mobile.data.model/UiToolCall // com.letta.mobile.data.model/UiToolCall.copy|copy(kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.media.UiMediaAttachment>;kotlin.Long?;kotlin.String?;kotlin.Boolean;com.letta.mobile.data.model.UiToolApprovalDecision?;com.letta.mobile.data.model.UiSubagentDispatch?;com.letta.mobile.data.model.UiToolResultTruncation?;com.letta.mobile.data.messaging.AgentMessageProvenance?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/UiToolCall.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/UiToolCall.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.model/UiToolCall.toString|toString(){}[0]
@@ -79070,6 +79228,8 @@ sealed class com.letta.mobile.data.model/MessageContentPart { // com.letta.mobil
 
         final val base64 // com.letta.mobile.data.model/MessageContentPart.Image.base64|{}base64[0]
             final fun <get-base64>(): kotlin/String // com.letta.mobile.data.model/MessageContentPart.Image.base64.<get-base64>|<get-base64>(){}[0]
+        final val kind // com.letta.mobile.data.model/MessageContentPart.Image.kind|{}kind[0]
+            final fun <get-kind>(): com.letta.mobile.data.media/MediaKind // com.letta.mobile.data.model/MessageContentPart.Image.kind.<get-kind>|<get-kind>(){}[0]
         final val mediaType // com.letta.mobile.data.model/MessageContentPart.Image.mediaType|{}mediaType[0]
             final fun <get-mediaType>(): kotlin/String // com.letta.mobile.data.model/MessageContentPart.Image.mediaType.<get-mediaType>|<get-mediaType>(){}[0]
         final val storedByteSize // com.letta.mobile.data.model/MessageContentPart.Image.storedByteSize|{}storedByteSize[0]
@@ -81335,6 +81495,18 @@ final object com.letta.mobile.data.lens/WorkPlayLens { // com.letta.mobile.data.
     final fun modeLabel(com.letta.mobile.data.lens/WorkPlayMode): kotlin/String // com.letta.mobile.data.lens/WorkPlayLens.modeLabel|modeLabel(com.letta.mobile.data.lens.WorkPlayMode){}[0]
     final fun navDestinations(com.letta.mobile.data.lens/WorkPlayMode): kotlin.collections/List<com.letta.mobile.data.lens/LensDestination> // com.letta.mobile.data.lens/WorkPlayLens.navDestinations|navDestinations(com.letta.mobile.data.lens.WorkPlayMode){}[0]
     final fun newConversationLabel(com.letta.mobile.data.lens/WorkPlayMode): kotlin/String // com.letta.mobile.data.lens/WorkPlayLens.newConversationLabel|newConversationLabel(com.letta.mobile.data.lens.WorkPlayMode){}[0]
+}
+
+final object com.letta.mobile.data.media/MediaLimits { // com.letta.mobile.data.media/MediaLimits|null[0]
+    final const val MAX_BUFFERED_REMOTE_BYTES // com.letta.mobile.data.media/MediaLimits.MAX_BUFFERED_REMOTE_BYTES|{}MAX_BUFFERED_REMOTE_BYTES[0]
+        final fun <get-MAX_BUFFERED_REMOTE_BYTES>(): kotlin/Long // com.letta.mobile.data.media/MediaLimits.MAX_BUFFERED_REMOTE_BYTES.<get-MAX_BUFFERED_REMOTE_BYTES>|<get-MAX_BUFFERED_REMOTE_BYTES>(){}[0]
+    final const val MAX_INLINE_PLAYBACK_BYTES // com.letta.mobile.data.media/MediaLimits.MAX_INLINE_PLAYBACK_BYTES|{}MAX_INLINE_PLAYBACK_BYTES[0]
+        final fun <get-MAX_INLINE_PLAYBACK_BYTES>(): kotlin/Long // com.letta.mobile.data.media/MediaLimits.MAX_INLINE_PLAYBACK_BYTES.<get-MAX_INLINE_PLAYBACK_BYTES>|<get-MAX_INLINE_PLAYBACK_BYTES>(){}[0]
+    final const val SEEK_STEP_MS // com.letta.mobile.data.media/MediaLimits.SEEK_STEP_MS|{}SEEK_STEP_MS[0]
+        final fun <get-SEEK_STEP_MS>(): kotlin/Long // com.letta.mobile.data.media/MediaLimits.SEEK_STEP_MS.<get-SEEK_STEP_MS>|<get-SEEK_STEP_MS>(){}[0]
+
+    final fun decodedBytes(kotlin/Int): kotlin/Long // com.letta.mobile.data.media/MediaLimits.decodedBytes|decodedBytes(kotlin.Int){}[0]
+    final fun inlinePlayable(kotlin/Int): kotlin/Boolean // com.letta.mobile.data.media/MediaLimits.inlinePlayable|inlinePlayable(kotlin.Int){}[0]
 }
 
 final object com.letta.mobile.data.memory.graph.forces/Variation { // com.letta.mobile.data.memory.graph.forces/Variation|null[0]
@@ -84342,6 +84514,7 @@ final fun (com.letta.mobile.data.model/McpServer).com.letta.mobile.data.model/ef
 final fun (com.letta.mobile.data.model/McpServer).com.letta.mobile.data.model/effectiveEnv(): kotlin.collections/Map<kotlin/String, kotlin/String>? // com.letta.mobile.data.model/effectiveEnv|effectiveEnv@com.letta.mobile.data.model.McpServer(){}[0]
 final fun (com.letta.mobile.data.model/McpServer).com.letta.mobile.data.model/effectiveServerType(): kotlin/String? // com.letta.mobile.data.model/effectiveServerType|effectiveServerType@com.letta.mobile.data.model.McpServer(){}[0]
 final fun (com.letta.mobile.data.model/McpServer).com.letta.mobile.data.model/effectiveServerUrl(): kotlin/String? // com.letta.mobile.data.model/effectiveServerUrl|effectiveServerUrl@com.letta.mobile.data.model.McpServer(){}[0]
+final fun (com.letta.mobile.data.model/MessageContentPart.Image).com.letta.mobile.data.model/toUiMediaAttachment(): com.letta.mobile.data.media/UiMediaAttachment // com.letta.mobile.data.model/toUiMediaAttachment|toUiMediaAttachment@com.letta.mobile.data.model.MessageContentPart.Image(){}[0]
 final fun (com.letta.mobile.data.model/MessageSearchResult).com.letta.mobile.data.model/toParsed(): com.letta.mobile.data.model/ParsedSearchMessage // com.letta.mobile.data.model/toParsed|toParsed@com.letta.mobile.data.model.MessageSearchResult(){}[0]
 final fun (com.letta.mobile.data.model/ProjectSummary).com.letta.mobile.data.projects/lastActivity(): kotlin/String // com.letta.mobile.data.projects/lastActivity|lastActivity@com.letta.mobile.data.model.ProjectSummary(){}[0]
 final fun (com.letta.mobile.data.model/ScheduledMessage).com.letta.mobile.data.schedules/toScheduleLibraryItem(): com.letta.mobile.data.schedules/ScheduleLibraryItem // com.letta.mobile.data.schedules/toScheduleLibraryItem|toScheduleLibraryItem@com.letta.mobile.data.model.ScheduledMessage(){}[0]
@@ -84546,6 +84719,7 @@ final fun com.letta.mobile.data.home/preferredComposerConversationId(kotlin.coll
 final fun com.letta.mobile.data.home/resolvePinnedItems(kotlin.collections/List<kotlin/String>, com.letta.mobile.data.home/PinnedAgentNames, kotlin.collections/Set<com.letta.mobile.data.home.shortcut/HomeShortcut> = ...): kotlin.collections/List<com.letta.mobile.data.home/HomePinnedItem> // com.letta.mobile.data.home/resolvePinnedItems|resolvePinnedItems(kotlin.collections.List<kotlin.String>;com.letta.mobile.data.home.PinnedAgentNames;kotlin.collections.Set<com.letta.mobile.data.home.shortcut.HomeShortcut>){}[0]
 final fun com.letta.mobile.data.home/searchHomeCatalog(com.letta.mobile.data.home/HomeSearchCatalog, kotlin/String): com.letta.mobile.data.home/HomeSearchState // com.letta.mobile.data.home/searchHomeCatalog|searchHomeCatalog(com.letta.mobile.data.home.HomeSearchCatalog;kotlin.String){}[0]
 final fun com.letta.mobile.data.home/sortFleet(kotlin.collections/List<com.letta.mobile.data.home/FleetAgentStat>, com.letta.mobile.data.home/FleetSort): kotlin.collections/List<com.letta.mobile.data.home/FleetAgentStat> // com.letta.mobile.data.home/sortFleet|sortFleet(kotlin.collections.List<com.letta.mobile.data.home.FleetAgentStat>;com.letta.mobile.data.home.FleetSort){}[0]
+final fun com.letta.mobile.data.media/formatMediaClock(kotlin/Long): kotlin/String // com.letta.mobile.data.media/formatMediaClock|formatMediaClock(kotlin.Long){}[0]
 final fun com.letta.mobile.data.messaging/agentMessageDisplayLabel(kotlin/String, kotlin/String?): kotlin/String // com.letta.mobile.data.messaging/agentMessageDisplayLabel|agentMessageDisplayLabel(kotlin.String;kotlin.String?){}[0]
 final fun com.letta.mobile.data.model/backendConnectionStatus(com.letta.mobile.data.model/LettaConfig?, kotlin/Throwable?, kotlin/Boolean): com.letta.mobile.data.model/BackendConnectionStatus // com.letta.mobile.data.model/backendConnectionStatus|backendConnectionStatus(com.letta.mobile.data.model.LettaConfig?;kotlin.Throwable?;kotlin.Boolean){}[0]
 final fun com.letta.mobile.data.model/buildContentParts(kotlin/String, kotlin.collections/List<com.letta.mobile.data.model/MessageContentPart.Image>): kotlin.collections/List<com.letta.mobile.data.model/MessageContentPart> // com.letta.mobile.data.model/buildContentParts|buildContentParts(kotlin.String;kotlin.collections.List<com.letta.mobile.data.model.MessageContentPart.Image>){}[0]

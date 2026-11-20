@@ -21,7 +21,7 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiGeneratedComponent
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.shell.FocusAvailability
@@ -246,7 +246,7 @@ fun DesktopChatSurfaceState.sendLocalMessage(draft: ChatComposerSendDraft): Desk
         content = text,
         timestamp = "2026-06-07T16:${(currentMessages.size + 10).toString().padStart(2, '0')}:00Z",
         isPending = true,
-        attachments = attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType) },
+        attachments = attachments.map { UiMediaAttachment(base64 = it.base64, mediaType = it.mediaType) },
     )
 
     return withRuntimeState(

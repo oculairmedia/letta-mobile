@@ -6,7 +6,7 @@ import androidx.compose.runtime.State
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.chat.render.ChatRenderItemState
 import com.letta.mobile.ui.chat.session.ChatActions
@@ -65,7 +65,7 @@ internal class ChatRowCallbacks(
     val actions: ChatActions,
     val host: ChatSurfaceHost,
     /** Opens the full-screen image viewer on [index] of [images]. */
-    val onImageTap: (images: List<UiImageAttachment>, index: Int) -> Unit,
+    val onImageTap: (images: List<UiMediaAttachment>, index: Int) -> Unit,
     /**
      * Display name for an agent id in inter-agent provenance labels; null falls back to the
      * short id label. Desktop's `LocalDesktopAgentMessageContext.resolveName`, as an input.

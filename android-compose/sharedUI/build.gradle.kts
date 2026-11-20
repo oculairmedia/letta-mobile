@@ -151,6 +151,10 @@ kotlin {
                 implementation(libs.androidx.lifecycle.runtime.compose)
                 // letta-mobile-y5q9z: Back folds the canvas bubble's open card.
                 implementation(libs.androidx.activity.compose)
+                // Inline audio and video in the chat: the Android adapter behind the shared MediaPlayer
+                // port (ExoMediaPlayer). Seeking, data: URIs, audio focus and container coverage the
+                // platform MediaPlayer lacks; media3-ui is not used (the surface is a plain SurfaceView).
+                implementation(libs.androidx.media3.exoplayer)
             }
         }
 

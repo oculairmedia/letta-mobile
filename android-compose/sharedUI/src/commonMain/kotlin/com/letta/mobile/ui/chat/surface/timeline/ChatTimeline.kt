@@ -28,7 +28,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatActions
@@ -133,7 +133,7 @@ internal fun ChatTimeline(
 
 /** An open image viewer: which images, starting where. */
 @Immutable
-private class ImageViewerRequest(val images: List<UiImageAttachment>, val initialIndex: Int)
+private class ImageViewerRequest(val images: List<UiMediaAttachment>, val initialIndex: Int)
 
 @Suppress("LongParameterList") // Private carrier for the distinct values the shared body renders.
 @Immutable
