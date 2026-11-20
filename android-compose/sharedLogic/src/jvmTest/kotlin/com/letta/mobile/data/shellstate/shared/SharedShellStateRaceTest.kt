@@ -31,7 +31,11 @@ class SharedShellStateRaceTest {
             val shared = SharedShellState(link)
             scope.launch { shared.run() }
             withTimeout(TIMEOUT_MS) { while (!link.collecting()) Thread.yield() }
-            val pushed = scope.launch { link.pushes.emit(frame(NEWER)) }
+            val pushed = scope.launch {
+                link.pushes.emit(frame(NEWER))
+                // Unbuffered: this second emit only returns once the collector finished handling the first push.
+                link.pushes.emit(frame(IGNORED))
+            }
             link.releaseReply()
             pushed.join()
             withTimeout(TIMEOUT_MS) { while (!shared.state.value.live) Thread.yield() }
@@ -53,7 +57,7 @@ class SharedShellStateRaceTest {
     /** A connected host whose `shell.state.get` answers the stale revision once released. */
     private inner class RacingLink : ShellStateLink {
         private val release = CompletableDeferred<Unit>()
-        override val pushes = MutableSharedFlow<JsonObject>(extraBufferCapacity = 4)
+        override val pushes = MutableSharedFlow<JsonObject>()
         override val hostCapabilities: Set<String> = setOf(ShellStateWire.CAPABILITY)
         override val isConnected: Boolean = true
         override val connection: Flow<Boolean> = flowOf(true)
@@ -73,5 +77,6 @@ class SharedShellStateRaceTest {
         const val TIMEOUT_MS = 5_000L
         const val STALE = 2L
         const val NEWER = 3L
+        const val IGNORED = 1L
     }
 }
