@@ -706,8 +706,10 @@ class CanonicalTimelineEngine(
         mutableLive.value?.takeIf { it.settlementRevision != null }?.let { mutableLive.value = it.withoutTurnFailureNotices() }
     }
 
-    suspend fun advanceToolSweep(selection: TimelineEngineSelection): Long = mutex.withLock {
+    /** [advance] false reads the generation turnStarted committed: no write, so no revision or redraw. */
+    suspend fun advanceToolSweep(selection: TimelineEngineSelection, advance: Boolean = true): Long = mutex.withLock {
         check(selection === mutablePublication.value.selection)
+        if (!advance) return@withLock store.read(selection.scope) { toolSweepGeneration() }
         val (sweepGeneration, revision) = store.transaction(selection.scope) {
             CanonicalToolIndex.advanceGeneration(this) to nextRevision()
         }
