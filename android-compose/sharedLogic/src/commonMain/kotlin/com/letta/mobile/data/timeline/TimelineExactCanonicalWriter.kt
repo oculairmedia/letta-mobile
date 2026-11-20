@@ -75,8 +75,12 @@ class TimelineExactCanonicalWriter(
             if (deferred.size > DEFERRED_RETURN_MAX_BYTES) {
                 throw TimelineMergeUnavailable(TimelineMessageId(returned.id), "deferred_tool_return_budget")
             }
-            transaction.putEvidence(deferredReturnKey(callId), deferred)
-            return CanonicalToolIndex.observe(transaction, callId, null, true)
+            // The same return read again changes nothing, and a write must report itself: a write
+            // with no revision behind it fails the whole transaction.
+            val key = deferredReturnKey(callId)
+            val held = transaction.evidence(key, DEFERRED_RETURN_MAX_BYTES)?.contentEquals(deferred) == true
+            if (!held) transaction.putEvidence(key, deferred)
+            return CanonicalToolIndex.observe(transaction, callId, null, true) || !held
         }
         val ownerKey = transaction.locate(owner) ?: throw TimelineMergeUnavailable(owner, "tool_owner_missing")
         val metadata = transaction.metadata(TimelineReadPosition.Around(ownerKey), 1)
