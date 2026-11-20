@@ -5,6 +5,7 @@ package com.letta.mobile.ui.shell.workspace
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -72,9 +73,7 @@ class ShellWorkspaceNoteModuleTest {
                     }
                     // The board loads off the test clock: click the Note option only once it is laid out.
                     val option = canvasViewerOptionTag(NOTEBOOK_NOTE_VIEWER_ID)
-                    waitUntil(timeoutMillis = Timeout) {
-                        onAllNodesWithTag(option).fetchSemanticsNodes().singleOrNull()?.let { it.size.width > 0 && it.size.height > 0 } == true
-                    }
+                    waitUntilLaidOut(option)
                     onNodeWithTag(option).performClick()
                     waitUntil(timeoutMillis = Timeout) { onAllNodesWithTag(Markdown).fetchSemanticsNodes().size == 2 }
                     onAllNodesWithTag(Markdown)[1].performTextReplacement("one retained draft")
@@ -96,6 +95,11 @@ class ShellWorkspaceNoteModuleTest {
         } finally {
             path.toFile().deleteRecursively()
         }
+    }
+
+    private fun ComposeUiTest.waitUntilLaidOut(tag: String) = waitUntil(timeoutMillis = Timeout) {
+        val laidOut = onAllNodesWithTag(tag).fetchSemanticsNodes().singleOrNull()
+        laidOut != null && laidOut.size.width > 0 && laidOut.size.height > 0
     }
 
     private fun navigation() = ShellWorkspaceNavigation(
