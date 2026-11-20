@@ -32,9 +32,11 @@ interface ShellStateLink {
     val isConnected: Boolean
 
     /**
-     * The identity of the connection that is up (its session id), or null while there is none. It is the
-     * identity, not a yes or no, that is observed: a drop and a reconnect queued before a collector runs
-     * leave no null in between, but the session differs, and any change of it is a new connection.
+     * The identity of the connection that is up, or null while there is none: its session id and its connection
+     * epoch. A session id is the endpoint's, shared by every reconnect to it, so the epoch (which goes up on each
+     * connect) is what tells two connections apart. It is the identity, not a yes or no, that is observed: a drop
+     * and a reconnect queued before a collector runs leave no null in between, but the identity differs, and any
+     * change of it is a new connection.
      */
     val connection: Flow<String?>
 
@@ -63,5 +65,6 @@ private class ChannelShellStateLink(private val transport: IChannelTransport) : 
 
     override val hostCapabilities: Set<String> get() = transport.hostCapabilities
 
-    private fun sessionOf(state: ChannelTransportState): String? = (state as? ChannelTransportState.Connected)?.sessionId
+    private fun sessionOf(state: ChannelTransportState): String? =
+        (state as? ChannelTransportState.Connected)?.let { "${it.sessionId}#${it.connectionEpoch}" }
 }

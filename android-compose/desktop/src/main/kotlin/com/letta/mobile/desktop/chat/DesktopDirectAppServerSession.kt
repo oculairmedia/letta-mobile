@@ -141,11 +141,28 @@ internal class DesktopDirectAppServerSession private constructor(
                 dial.releaseSteps.forEach { release -> runCatching { release() } }
                 throw settled.firstDialFailure()
             }
+            val epochs = ConnectionEpochs()
             val status = client.state
-                .map { it.toChannelTransportState(serverId = serverId) }
-                .stateIn(scope, SharingStarted.Eagerly, client.state.value.toChannelTransportState(serverId))
+                .map { epochs.project(it, serverId) }
+                .stateIn(scope, SharingStarted.Eagerly, epochs.project(client.state.value, serverId))
             return DesktopDirectAppServerSession(client, status, supervisor, dial.releaseSteps)
         }
+    }
+}
+
+/**
+ * Numbers this session's connections for [toChannelTransportState]: each entry into Ready is a new one, so a
+ * redial of the same server still reads as a different connection to a collector that never saw the drop.
+ */
+private class ConnectionEpochs {
+    private var epoch = 0L
+    private var wasReady = false
+
+    fun project(state: ReconnectingClientState, serverId: String): ChannelTransportState {
+        val ready = state is ReconnectingClientState.Ready
+        if (ready && !wasReady) epoch += 1
+        wasReady = ready
+        return state.toChannelTransportState(serverId = serverId, connectionEpoch = epoch)
     }
 }
 

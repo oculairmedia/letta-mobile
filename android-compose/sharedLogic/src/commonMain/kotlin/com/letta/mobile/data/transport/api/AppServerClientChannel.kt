@@ -65,8 +65,11 @@ class AppServerClientChannel(
         }
     }
 
+    /** Counts this channel's connections: every time the client reports up is a new one. Touched only by the state flow's one collector. */
+    private var connectionEpoch = 0L
+
     override val state: StateFlow<ChannelTransportState> = client.isConnected
-        .map { connected -> if (connected) CONNECTED else DISCONNECTED }
+        .map { connected -> if (connected) connectedState(++connectionEpoch) else DISCONNECTED }
         .stateIn(scope, SharingStarted.WhileSubscribed(), ChannelTransportState.Connecting())
 
     /**
@@ -95,7 +98,10 @@ class AppServerClientChannel(
         /** Host pushes with no typed frame; the shared pins and shell state decode their own raw body. */
         private val UNTYPED_HOST_PUSH_TYPES = setOf(AgentPinsWire.FRAME_TYPE, ShellStateWire.FRAME_TYPE)
 
-        val CONNECTED = ChannelTransportState.Connected(serverId = "app-server", sessionId = "app-server", deviceId = null)
+        fun connectedState(connectionEpoch: Long) = ChannelTransportState.Connected(
+            serverId = "app-server", sessionId = "app-server", deviceId = null, connectionEpoch = connectionEpoch,
+        )
+
         val DISCONNECTED = ChannelTransportState.Disconnected(code = 1000, reason = "App Server session closed")
     }
 }
