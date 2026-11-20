@@ -18,10 +18,12 @@ import com.letta.mobile.data.voice.engine.SpeechAudioMeter
 import com.letta.mobile.data.voice.engine.SpeechSegment
 import com.letta.mobile.data.voice.engine.SpeechSegmentId
 import com.letta.mobile.data.voice.tone.ToneCue
+import io.ktor.client.engine.callContext
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.content.TextContent
 import io.ktor.utils.io.ByteChannel
+import io.ktor.utils.io.InternalAPI
 import io.ktor.utils.io.close
 import io.ktor.utils.io.writeFully
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -30,6 +32,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -37,7 +40,6 @@ import kotlinx.coroutines.plus
 import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -45,13 +47,13 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * The mouth with two requests in flight and segments prefetched ahead, over a mock endpoint whose
  * responses the test writes per segment (requests are matched by their text, since concurrent
  * requests may arrive in either order).
  */
+@OptIn(InternalAPI::class)
 class ConcurrentSpeechTest {
     private val base = SpeechEndpointUrl("https://tts.example.net")
     private val settings = VoiceEndpointSettings(baseUrl = base)
@@ -66,6 +68,12 @@ class ConcurrentSpeechTest {
     private val arrivals = Channel<Pair<String, ByteChannel>>(Channel.UNLIMITED)
     private val arrived = mutableMapOf<String, ByteChannel>()
 
+    /** Completed when a request's caller cancels it, after its body was closed (what a real engine does to the connection). */
+    private val cancellations = mutableMapOf<ByteChannel, CompletableDeferred<Unit>>()
+
+    /** When set, the engine holds every speech response back until it completes (a handler thread the scheduler has not run yet). */
+    private var responseHold: CompletableDeferred<Unit>? = null
+
     private val client = SpeechEndpointClient(
         MockEngine { request ->
             val text = (request.body as? TextContent)?.text.orEmpty()
@@ -75,7 +83,18 @@ class ConcurrentSpeechTest {
             }
             if (!request.url.encodedPath.endsWith("/speech")) return@MockEngine respond("""{"data":[]}""")
             val body = ByteChannel(autoFlush = true)
+            val cancelled = CompletableDeferred<Unit>()
+            synchronized(lock) { cancellations[body] = cancelled }
+            // A real engine drops the connection however early its request is cancelled. ktor's own
+            // cleanup only reaches this body once the response has been handed over, and the test sees
+            // the request (arrivals) before that, so a stop in between would leave the body open here.
+            callContext().job.invokeOnCompletion { cause ->
+                if (cause == null) return@invokeOnCompletion
+                body.cancel(cause)
+                cancelled.complete(Unit)
+            }
             arrivals.send(text to body)
+            responseHold?.await()
             respond(body)
         },
         SpeechEndpointConfig(base),
@@ -97,13 +116,19 @@ class ConcurrentSpeechTest {
     private fun segment(id: Long) = SpeechSegment(SpeechSegmentId(id), VoiceText("Sentence $id."))
 
     /** The body of segment [id]'s request, waiting for it to arrive. */
-    private suspend fun bodyOf(id: Long): ByteChannel = withTimeout(WAIT) {
+    private suspend fun bodyOf(id: Long): ByteChannel {
         val key = "Sentence $id."
         while (arrived.keys.none { key in it }) {
             val (text, body) = arrivals.receive()
             arrived[text] = body
         }
-        arrived.entries.first { key in it.key }.value
+        return arrived.entries.first { key in it.key }.value
+    }
+
+    /** Suspends until the caller of [body]'s request cancelled it, which closes [body]. */
+    private suspend fun awaitCancelled(body: ByteChannel) {
+        val cancelled = synchronized(lock) { cancellations.getValue(body) }
+        cancelled.await()
     }
 
     private fun speechRequests(): Int = synchronized(lock) { requestBodies.size }
@@ -145,9 +170,24 @@ class ConcurrentSpeechTest {
         mouth.stop()
         val atStop = speechRequests()
         assertTrue(player.cancelled.isCompleted, "playback was cut, not left to finish")
-        withTimeout(WAIT) { while (!second.isClosedForWrite) delay(PAUSE) }
+        awaitCancelled(second)
+        assertTrue(second.isClosedForWrite, "the request in flight was closed, not left open")
         delay(SETTLE)
         assertEquals(atStop, speechRequests(), "no request starts after the stop")
+    }
+
+    @Test
+    fun stoppingBeforeTheEngineHandsBackTheResponseStillClosesTheRequest() = streamTest { scope ->
+        val hold = CompletableDeferred<Unit>().also { responseHold = it }
+        val player = HoldingPlayer()
+        val mouth = EndpointVoiceMouth(synthesizer, player, scope)
+        mouth.speak(segment(1))
+        val only = bodyOf(1)
+        mouth.stop()
+        hold.complete(Unit)
+        awaitCancelled(only)
+        assertTrue(only.isClosedForWrite, "a request stopped before its response arrived is closed too")
+        assertTrue(player.streams.tryReceive().isFailure, "nothing played")
     }
 
     @Test
@@ -159,13 +199,10 @@ class ConcurrentSpeechTest {
         val mouth = EndpointVoiceMouth(synthesizer, player, scope, options)
         mouth.speak(segment(1))
         bodyOf(1).answer(ShortArray(RATE / 2))
-        val final = withTimeout(WAIT) {
-            var last: Measured
-            do {
-                last = measured.receive()
-            } while (!last.complete)
-            last
-        }
+        var final: Measured
+        do {
+            final = measured.receive()
+        } while (!final.complete)
         assertEquals(Measured(SpeechSegmentId(1), 500.milliseconds, complete = true), final)
         assertTrue(synchronized(lock) { requestBodies.single() }.contains("\"speed\":1.25"), "the speed goes to the endpoint")
         mouth.stop()
@@ -226,7 +263,7 @@ class ConcurrentSpeechTest {
 
         fun release() = gate.complete(Unit)
 
-        suspend fun nextStream(): ShortArray = withTimeout(WAIT) { streams.receive() }
+        suspend fun nextStream(): ShortArray = streams.receive()
 
         override suspend fun play(chunks: Flow<PcmChunk>, onLevel: (AudioLevel) -> Unit) {
             var finished = false
@@ -244,8 +281,6 @@ class ConcurrentSpeechTest {
 
     private companion object {
         const val RATE = 24_000
-        val WAIT = 5.seconds
-        val PAUSE = 10.milliseconds
         val SETTLE = 150.milliseconds
 
         fun samplesOf(segment: Int) = ShortArray(120) { (segment * 1_000 + it).toShort() }
