@@ -1,6 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh.shellstate
 
-import com.letta.mobile.data.controller.node.iroh.HostStateFileLocks
+import com.letta.mobile.data.hoststate.HostStateFileLocks
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStores
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.shellstate.ShellStateActor

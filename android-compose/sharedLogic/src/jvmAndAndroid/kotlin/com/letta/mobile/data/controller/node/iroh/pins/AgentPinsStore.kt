@@ -1,7 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh.pins
 
 import com.letta.mobile.data.controller.node.iroh.AtomicJsonFile
-import com.letta.mobile.data.controller.node.iroh.HostStateFileLocks
+import com.letta.mobile.data.hoststate.HostStateFileLocks
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.pins.shared.AgentPinsSnapshot
 import com.letta.mobile.data.pins.wire.AgentPinsWire

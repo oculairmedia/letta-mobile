@@ -4,7 +4,7 @@ import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
 import com.letta.mobile.data.controller.node.iroh.AgentScopeGuard
-import com.letta.mobile.data.controller.node.iroh.HostStateFileLocks
+import com.letta.mobile.data.hoststate.HostStateFileLocks
 import com.letta.mobile.data.controller.node.iroh.adminError
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.shellstate.ShellStateActor
