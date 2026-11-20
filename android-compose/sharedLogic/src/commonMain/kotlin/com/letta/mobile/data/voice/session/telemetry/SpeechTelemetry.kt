@@ -8,6 +8,7 @@ import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointException
 import com.letta.mobile.data.voice.endpoint.SpeechSpeed
 import com.letta.mobile.data.voice.endpoint.StreamingSpeechSynthesizer
+import com.letta.mobile.data.voice.tone.ToneCue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -29,12 +30,15 @@ internal class TelemetrySynthesizer(
     @Volatile
     private var requests = 0
 
-    override fun stream(text: VoiceText, speed: SpeechSpeed): Flow<PcmChunk> = flow {
+    override fun stream(text: VoiceText, speed: SpeechSpeed): Flow<PcmChunk> = stream(text, speed, null)
+
+    /** As [stream], passing [tone] on to [delegate] so its `instructions` reach the speech server. */
+    override fun stream(text: VoiceText, speed: SpeechSpeed, tone: ToneCue?): Flow<PcmChunk> = flow {
         val request = ++requests
         telemetry.event("speech.request.opened", "request" attr request, "characters" attr text.value.length)
         var frames = 0
         try {
-            delegate.stream(text, speed).collect { chunk ->
+            delegate.stream(text, speed, tone).collect { chunk ->
                 if (frames == 0) firstFrame(request, chunk)
                 frames++
                 emit(chunk)
