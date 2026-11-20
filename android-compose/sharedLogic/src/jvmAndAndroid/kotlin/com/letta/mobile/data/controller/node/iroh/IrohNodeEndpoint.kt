@@ -140,6 +140,15 @@ class IrohNodeEndpoint(
         )
     }
 
+    /**
+     * Delivers the host's `pins_updated` frames (the whole pinned-agents list) to every live connection
+     * allowed to read agents across the whole host ([ViewerHandle.receivesPinsEvents]); agent-scoped peers get none.
+     */
+    suspend fun broadcastPinsUpdated(frame: String) {
+        val result = connectionRegistry.broadcast(frame) { it.receivesPinsEvents() }
+        Telemetry.event("IrohNode", "pins_updated.broadcast", "recipients" attr result.recipients, "delivered" attr result.delivered)
+    }
+
     /** Broadcasts inbox activity without changing any viewer subscription. Old clients receive nothing. */
     fun conversationActivityTarget(): ConversationChangeTarget = ConversationChangeTarget { frame ->
         val activity = kotlinx.serialization.json.Json.decodeFromString(

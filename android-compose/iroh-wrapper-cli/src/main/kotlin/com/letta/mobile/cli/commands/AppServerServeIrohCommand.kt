@@ -607,6 +607,9 @@ class AppServerServeIrohCommand : CliktCommand(
         var subagentPublisher: com.letta.mobile.data.controller.node.iroh.SubagentRegistryPublisher? = null
         // letta-mobile-a4tm7: a confirmed permission_mode.set reaches every viewer's chip.
         val permissionModes = com.letta.mobile.data.controller.node.iroh.PermissionModePublisher(scope)
+        // The pinned agents every device shares; each accepted change is pushed to all of them.
+        val pinsPublisher = com.letta.mobile.data.controller.node.iroh.pins.AgentPinsPublisher(scope)
+        val hostStateDirectory = java.io.File(resolvedModelExposureFile()).absoluteFile.parentFile.toPath()
         val adminRpcRouter = buildProductionAdminRouter(
             controller = admin.controller,
             pairingService = admin.pairingService,
@@ -635,9 +638,8 @@ class AppServerServeIrohCommand : CliktCommand(
             pluginRoutes = pluginRoutes,
             canvasMountRoutes = canvasMountRoutes,
             // The shared speech setup lives beside the model exposure decisions; its key in an owner-only file.
-            voiceRoutes = com.letta.mobile.data.controller.node.iroh.voice.VoiceEndpointRoutes.forHost(
-                java.io.File(resolvedModelExposureFile()).absoluteFile.parentFile.toPath(),
-            ),
+            voiceRoutes = com.letta.mobile.data.controller.node.iroh.voice.VoiceEndpointRoutes.forHost(hostStateDirectory),
+            pinsRoutes = com.letta.mobile.data.controller.node.iroh.pins.AgentPinsRoutes.forHost(hostStateDirectory, pinsPublisher),
         )
         notebookGrantsFile?.let { file ->
             val store = requireNotNull(notebooks) { "Notebook grants require a notebook store" }
@@ -659,6 +661,7 @@ class AppServerServeIrohCommand : CliktCommand(
         )
         agentChanges.attach(endpoint.agentChangeTarget())
         conversationChanges.attach(endpoint.conversationChangeTarget())
+        pinsPublisher.attach(endpoint::broadcastPinsUpdated)
         println(
             "[iroh-app-server] admin_rpc handlers registered " +
                 "(methods: ${adminRpcRouter.methodCount}, " +
