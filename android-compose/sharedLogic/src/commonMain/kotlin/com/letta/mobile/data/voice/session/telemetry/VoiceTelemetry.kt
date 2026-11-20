@@ -139,13 +139,22 @@ internal class VoiceTelemetry(
     )
 
     /**
-     * The loop's own decisions: `speech.skipped` with its reason and how many segments, and
-     * `speech.stopped` with its reason and `silentMs`, the time from the stop request until the
-     * speaker was released.
+     * The loop's own decisions: `speech.skipped` with its reason and how many segments,
+     * `reply.segments` with how an answer was cut up (segment count, shortest and median length in
+     * characters, tone changes between segments), and `speech.stopped` with its reason and
+     * `silentMs`, the time from the stop request until the speaker was released.
      */
     val loop: VoiceLoopObserver = object : VoiceLoopObserver {
         override fun speechSkipped(reason: SpeechSkipReason, segments: Int) =
             event("speech.skipped", "reason" attr reason.name, "segments" attr segments)
+
+        override fun replySegmented(segments: Int, minChars: Int, medianChars: Int, moodChanges: Int) = event(
+            "reply.segments",
+            "segments" attr segments,
+            "minChars" attr minChars,
+            "medianChars" attr medianChars,
+            "moodChanges" attr moodChanges,
+        )
 
         override fun speechStopped(reason: SpeechStopReason, silentAfter: Duration) =
             event("speech.stopped", "reason" attr reason.name, "silentMs" attr silentAfter.inWholeMilliseconds)

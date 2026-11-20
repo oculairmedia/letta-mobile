@@ -14,9 +14,16 @@ import com.letta.mobile.data.voice.VoiceText
  * With [firstClauseMinLength] set, the chunker's first segment is released early, at the first
  * clause break (a comma, semicolon, colon or dash followed by whitespace) once that clause is at
  * least that long, or at the first sentence end, whichever comes first; speech then starts before
- * the first sentence is complete. Every later segment is sentence-sized as usual. The sentence-end
- * guards (abbreviations, initials, list numbers) still apply, and a clause break never splits a
- * number (`1,000`, `10:30`) or follows an abbreviation (`e.g.,`).
+ * the first sentence is complete. The sentence-end guards (abbreviations, initials, list numbers)
+ * still apply, and a clause break never splits a number (`1,000`, `10:30`) or follows an
+ * abbreviation (`e.g.,`).
+ *
+ * With [minSegmentLength] set, every segment after the first (or after [startNewPart]) merges the sentences that follow it
+ * (joined with a space) until it is at least that long, so a speech server gets fewer, longer
+ * requests and its voice drifts less from one segment to the next. The first segment is never held
+ * for this, nothing waits for text that has not arrived (a merged segment goes out the moment it
+ * reaches the minimum, or at [flush]), a merged segment never exceeds [maxSegmentLength], and
+ * nothing merges across a fenced code block or a [flush] (the caller flushes where the mood changes).
  *
  * Not thread-safe: one chunker serves one reply.
  */
@@ -30,6 +37,8 @@ class SentenceChunker(
     private var dropUntil: Char? = null
     private val softCut = SoftCut(maxSegmentLength)
     private var released = false
+    private val merging = StringBuilder()
+    private var partSpoken = false
 
     init {
         require(maxSegmentLength >= MIN_SEGMENT_LENGTH) { "maxSegmentLength too small" }
@@ -50,9 +59,19 @@ class SentenceChunker(
         return segments
     }
 
+    /**
+     * The next segment starts a new stretch of speech (a late reply after the answer paused): it is
+     * released on its own, as the first one was, and merging resumes after it. Whatever is held
+     * should be taken with [flush] first.
+     */
+    fun startNewPart() {
+        partSpoken = false
+    }
+
     /** Drops everything buffered; the first segment, once released, stays released. */
     fun reset() {
         pending.clear()
+        merging.clear()
         inCodeBlock = false
         dropUntil = null
     }
@@ -72,6 +91,7 @@ class SentenceChunker(
                     else -> splitProse()
                 }
             } while (progressed)
+            if (mode == ScanMode.FINAL) emitMerged()
             return out
         }
 
@@ -170,6 +190,7 @@ class SentenceChunker(
 
         private fun openCodeBlock(cut: Cut): Boolean {
             release(cut)
+            emitMerged()
             inCodeBlock = true
             return true
         }
@@ -189,11 +210,30 @@ class SentenceChunker(
             val raw = pending.substring(0, cut.length)
             pending.deleteRange(0, cut.length + cut.skip)
             val spoken = SpeakableText.clean(raw)
-            if (spoken.isNotEmpty()) {
-                out += splitLong(spoken).map(::VoiceText)
-                released = true
-            }
+            if (spoken.isNotEmpty()) splitLong(spoken).forEach(::accept)
             return true
+        }
+
+        /** The first segment, and every segment while merging is off, goes out as it is; later ones are merged. */
+        private fun accept(piece: String) {
+            val minimum = minSegmentLength
+            if (minimum == null || !partSpoken) return emit(piece)
+            if (merging.isNotEmpty() && merging.length + 1 + piece.length > maxSegmentLength) emitMerged()
+            if (merging.isNotEmpty()) merging.append(' ')
+            merging.append(piece)
+            if (merging.length >= minimum) emitMerged()
+        }
+
+        private fun emit(segment: String) {
+            out += VoiceText(segment)
+            released = true
+            partSpoken = true
+        }
+
+        private fun emitMerged() {
+            if (merging.isEmpty()) return
+            emit(merging.toString())
+            merging.clear()
         }
 
         private fun splitLong(text: String): List<String> {

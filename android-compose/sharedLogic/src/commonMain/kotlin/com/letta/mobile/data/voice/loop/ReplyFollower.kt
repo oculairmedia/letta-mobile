@@ -106,7 +106,7 @@ internal class ReplyFollower(private val wiring: LoopWiring) {
 
     private suspend fun follow(turn: TurnKey, reply: VoiceReply) {
         val chunker = SentenceChunker(wiring.config.maxSegmentLength, wiring.config.firstClauseMinLength, wiring.config.minSegmentLength)
-        val forwarder = ReplyForwarder(turn, chunker, wiring.config.maxSegmentLength, wiring.inputs)
+        val forwarder = ReplyForwarder(turn, chunker, wiring.config.maxSegmentLength, wiring.inputs, wiring.observer)
         val outcome = runCatching { reply.events.collect(forwarder::forward) }
         val error = outcome.exceptionOrNull()
         if (error is CancellationException) throw error
@@ -121,14 +121,19 @@ internal class ReplyFollower(private val wiring: LoopWiring) {
  * always goes alone so first audio never waits for a batch. Tone cues are read out of the text
  * first ([ToneCueStream]): no cue is ever spoken, and each segment carries the cue in force for it
  * in the cue syntax ([ToneCues.tag]), which the loop reads back when it hands the segment to the
- * mouth.
+ * mouth. A cue takes effect at the next segment boundary (the chunker is flushed first, so no
+ * segment, merged or not, spans two moods) and the mood stays until the next cue: only an explicit
+ * `[neutral]` clears it. When the answer ends, its segment shape goes to the [observer]
+ * ([ReplyShape]).
  */
 private class ReplyForwarder(
     private val turn: TurnKey,
     private val chunker: SentenceChunker,
     private val maxSegmentLength: Int,
     private val inputs: SendChannel<LoopInput>,
+    private val observer: VoiceLoopObserver = VoiceLoopObserver.None,
 ) {
+    private val shape = ReplyShape()
     private var ended = false
     private var started = false
     private var segmented = false
@@ -139,7 +144,7 @@ private class ReplyForwarder(
         when (event) {
             is VoiceReplyEvent.Text -> text(event)
             VoiceReplyEvent.PartEnded -> flush()
-            VoiceReplyEvent.AwaitingLateReply -> flush(ReplySignal.Delegated)
+            VoiceReplyEvent.AwaitingLateReply -> flush(ReplySignal.Delegated).also { chunker.startNewPart() }
             VoiceReplyEvent.Completed -> end(ReplySignal.Completed)
             is VoiceReplyEvent.Failed -> end(ReplySignal.Failed(event.error))
         }
@@ -176,6 +181,13 @@ private class ReplyForwarder(
         ended = true
         send(spoken(tones.finish()))
         flush(signal)
+        report()
+    }
+
+    /** Tells the observer how the answer was segmented; an observer that throws is ignored (diagnostics never stop the loop). */
+    private fun report() {
+        val error = runCatching { shape.report(observer) }.exceptionOrNull()
+        if (error is CancellationException) throw error
     }
 
     private suspend fun flush(then: ReplySignal? = null) {
@@ -185,10 +197,36 @@ private class ReplyForwarder(
     private fun segments(released: List<VoiceText>): List<ReplySignal> {
         val batches = batchSegments(released, firstAlone = !segmented, maxLength = maxSegmentLength)
         if (batches.isNotEmpty()) segmented = true
-        return batches.map { ReplySignal.Segment(VoiceText(ToneCues.tag(tone, it.value))) }
+        return batches.map {
+            shape.add(it.value.length, tone)
+            ReplySignal.Segment(VoiceText(ToneCues.tag(tone, it.value)))
+        }
     }
 
     private suspend fun send(signals: List<ReplySignal>) {
         signals.forEach { inputs.send(LoopInput.FromReply(turn, it)) }
+    }
+}
+
+/**
+ * The segments one answer was spoken in: how many, how long (characters, words only) and how often
+ * the tone changed between neighbouring segments. Counts only, never text.
+ */
+private class ReplyShape {
+    private val lengths = mutableListOf<Int>()
+    private val tones = mutableListOf<ToneCue?>()
+
+    fun add(length: Int, tone: ToneCue?) {
+        lengths += length
+        tones += tone
+    }
+
+    /** Tells [observer] the shape; an answer with no segment reports nothing. */
+    fun report(observer: VoiceLoopObserver) {
+        if (lengths.isEmpty()) return
+        val sorted = lengths.sorted()
+        val median = (sorted[(sorted.size - 1) / 2] + sorted[sorted.size / 2]) / 2
+        val moodChanges = tones.zipWithNext().count { (before, after) -> before != after }
+        observer.replySegmented(sorted.size, sorted.first(), median, moodChanges)
     }
 }

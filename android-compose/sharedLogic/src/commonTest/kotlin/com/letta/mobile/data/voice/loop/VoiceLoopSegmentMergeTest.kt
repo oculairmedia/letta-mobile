@@ -115,6 +115,20 @@ class VoiceLoopSegmentMergeTest {
         assertEquals(emptyList(), h.segmented)
     }
 
+    @Test
+    fun aLateReplyStartsWithItsFirstSentenceAtOnce() = runTest {
+        val h = LoopHarness(this, merging)
+        h.speaking(VoiceText("On it. "))
+        h.reply(VoiceReplyEvent.AwaitingLateReply)
+        h.finishSpeech()
+
+        h.replyText(VoiceText("Research done. It found two things. "))
+        assertEquals(listOf("On it.", "Research done."), h.mouth.spokenTexts, "first sentence of the late reply is not held")
+        h.reply(VoiceReplyEvent.Completed)
+        h.finishSpeech()
+        assertEquals(listOf("On it.", "Research done.", "It found two things."), h.mouth.spokenTexts)
+    }
+
     private companion object {
         const val MIN = 30
     }
