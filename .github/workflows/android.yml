@@ -719,6 +719,17 @@ jobs:
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
           cache-cleanup: on-success
+      - name: Restore Konan (Kotlin/Native) toolchain
+        id: konan
+        # Dokka configures :plugin-api:kotlinNativeBundleConfiguration and downloaded
+        # kotlin-native-prebuilt live from Maven Central (HTTP 429, PR #2573). Restore
+        # only: android.yml shared-multiplatform owns the main-push save of this key.
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-konan-v2-${{ hashFiles('android-compose/gradle/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-konan-
       - name: Verify documentation tooling
         env:
           DOCS_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
