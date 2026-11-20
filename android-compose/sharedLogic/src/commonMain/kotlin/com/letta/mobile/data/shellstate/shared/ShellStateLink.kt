@@ -5,9 +5,8 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -43,20 +42,22 @@ interface ShellStateLink {
 }
 
 /** The shared shell state link over a session's channel transport: one Iroh `admin_rpc` per request. */
-fun channelShellStateLink(transport: IChannelTransport): ShellStateLink = object : ShellStateLink {
+fun channelShellStateLink(transport: IChannelTransport): ShellStateLink = ChannelShellStateLink(transport)
+
+private class ChannelShellStateLink(private val transport: IChannelTransport) : ShellStateLink {
+    override suspend fun call(method: String, params: JsonObject): ShellStateReply =
+        transport.adminRpc(method = method, path = "", body = params.toString())
+            .let { ShellStateReply(success = it.success, result = it.result, error = it.error) }
+
+    override val pushes: Flow<JsonObject> = transport.events.mapNotNull { frame ->
+        (frame as? ServerFrame.Unknown)?.takeIf { it.type == ShellStateWire.FRAME_TYPE }?.raw
+    }
+
+    override val connection: Flow<Boolean> = transport.state.map(::isUp)
+
+    override val isConnected: Boolean get() = isUp(transport.state.value)
+
     override val hostCapabilities: Set<String> get() = transport.hostCapabilities
 
-    override val isConnected: Boolean get() = transport.state.value is ChannelTransportState.Connected
-
-    override val connection: Flow<Boolean> = transport.state.map { it is ChannelTransportState.Connected }
-
-    override val pushes: Flow<JsonObject> = transport.events
-        .filterIsInstance<ServerFrame.Unknown>()
-        .filter { it.type == ShellStateWire.FRAME_TYPE }
-        .map { it.raw }
-
-    override suspend fun call(method: String, params: JsonObject): ShellStateReply {
-        val response = transport.adminRpc(method = method, path = "", body = params.toString())
-        return ShellStateReply(response.success, response.result, response.error)
-    }
+    private fun isUp(state: ChannelTransportState): Boolean = state is ChannelTransportState.Connected
 }

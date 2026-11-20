@@ -36,15 +36,13 @@ class ShellStatePublisher(
         val target = sink ?: return
         val frame = frame(snapshot)
         scope.launch {
-            try {
-                target(frame)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (expectedFailure: Exception) {
-                Telemetry.event(TAG, "failed", "class" attr expectedFailure::class.simpleName, level = Telemetry.Level.WARN)
-                return@launch
+            val failure = runCatching { target(frame) }.exceptionOrNull()
+            if (failure is CancellationException) throw failure
+            if (failure == null) {
+                Telemetry.event(TAG, "published", "revision" attr snapshot.documentRevision, "count" attr snapshot.entries.size)
+            } else {
+                Telemetry.event(TAG, "failed", "class" attr failure::class.simpleName, level = Telemetry.Level.WARN)
             }
-            Telemetry.event(TAG, "published", "revision" attr snapshot.documentRevision, "count" attr snapshot.entries.size)
         }
     }
 

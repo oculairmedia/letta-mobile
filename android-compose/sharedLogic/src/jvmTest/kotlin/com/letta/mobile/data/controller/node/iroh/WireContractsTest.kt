@@ -53,6 +53,8 @@ class WireContractsTest {
         }
     }
 
+    private val contextKeys = setOf("authenticated", "authorized_conversation_ids", "authorized_agent_ids", "authenticated_endpoint_id")
+
     @Test
     fun everyFixtureMatchesTheRealHandlerExactly() = runTest {
         for (fixture in fixtures()) {
@@ -83,7 +85,7 @@ class WireContractsTest {
                 withRouter(state, host) { router ->
                     assertTrue(fixture.method in router.registeredMethods, "Fixture names unregistered method ${fixture.method}")
                     val context = case.getValue("context").jsonObject
-                    require(context.keys.all { it in setOf("authenticated", "authorized_conversation_ids", "authorized_agent_ids", "authenticated_endpoint_id") })
+                    require(context.keys.all { it in contextKeys })
                     val invocation = AdminRpcInvocation(
                         "contract", fixture.method, case.getValue("params").jsonObject,
                         AdminRpcRequestContext(

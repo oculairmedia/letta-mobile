@@ -16,8 +16,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
@@ -92,20 +93,25 @@ class SharedShellState(
 
     /** Follows the connection and the host's pushes until cancelled: reads again on every reconnect. */
     suspend fun run() = coroutineScope {
-        launch { link.pushes.collect(::onPush) }
-        link.connection.distinctUntilChanged().collect { connected ->
-            if (connected) refresh() else mutableState.update { it.copy(live = false) }
-        }
+        link.pushes.onEach(::onPush).launchIn(this)
+        link.connection.distinctUntilChanged().collect { up -> if (up) refresh() else markStale() }
     }
 
     /** Reads the host's document; a host without the contract leaves [state] unsupported. */
     suspend fun refresh(): ShellStateState {
-        if (!supported) return mutableState.updateAndGet { it.copy(supported = false, live = false) }
+        if (!supported) {
+            mutableState.update { it.copy(supported = false, live = false) }
+            return mutableState.value
+        }
         mutableState.update { it.copy(supported = true) }
-        val read = request(ShellStateWire.GET, JsonObject(emptyMap()))
-        if (read == null) mutableState.update { it.copy(live = false) } else adopt(read, live = true)
+        when (val read = request(ShellStateWire.GET, JsonObject(emptyMap()))) {
+            null -> markStale()
+            else -> adopt(read, live = true)
+        }
         return mutableState.value
     }
+
+    private fun markStale() = mutableState.update { it.copy(live = false) }
 
     /** Sets [key] to [value]. */
     suspend fun set(key: String, value: JsonElement): ShellStateEditOutcome = propose(listOf(Edit(key, value)))
@@ -157,39 +163,32 @@ class SharedShellState(
 
     private fun onPush(frame: JsonObject) {
         val pushed = decode(frame) ?: return
-        val current = mutableState.value.snapshot
-        if (current != null && pushed.documentRevision <= current.documentRevision) return
-        adopt(pushed, live = mutableState.value.live)
+        val shown = mutableState.value
+        if (pushed.documentRevision > (shown.snapshot?.documentRevision ?: -1L)) adopt(pushed, live = shown.live)
     }
 
     /** Takes [snapshot] unless a newer one is already shown live. */
     private fun adopt(snapshot: ShellStateSnapshot, live: Boolean) {
         mutableState.update { current ->
-            val shown = current.snapshot
-            val keep = shown != null && current.live && shown.documentRevision > snapshot.documentRevision
-            current.copy(snapshot = if (keep) shown else snapshot, live = live || current.live, error = null)
+            val newerShown = current.live && (current.snapshot?.documentRevision ?: -1L) > snapshot.documentRevision
+            current.copy(snapshot = if (newerShown) current.snapshot else snapshot, live = live || current.live, error = null)
         }
     }
 
     /** One request whose result is the document; null on any failure, with its code in [state]. */
     private suspend fun request(method: String, params: JsonObject): ShellStateSnapshot? {
-        val reply = runCatching { link.call(method, params) }
-        reply.exceptionOrNull()?.let { if (it is CancellationException) throw it }
-        val answer = reply.getOrNull()
-        val snapshot = answer?.takeIf { it.success }?.result?.let(::decode)
-        if (snapshot == null) mutableState.update { it.copy(error = ShellStateError.fromWire(answer?.error)) }
-        return snapshot
+        val outcome = runCatching { link.call(method, params) }
+        (outcome.exceptionOrNull() as? CancellationException)?.let { throw it }
+        val reply = outcome.getOrNull()
+        val document = reply?.takeIf { it.success }?.result?.let(::decode)
+        if (document == null) mutableState.update { it.copy(error = ShellStateError.fromWire(reply?.error)) }
+        return document
     }
 
     /** The document in [element], or null when it is unreadable or of a newer schema than this build reads. */
     private fun decode(element: JsonElement): ShellStateSnapshot? =
         runCatching { LettaJson.wire.decodeFromJsonElement(ShellStateSnapshot.serializer(), element) }.getOrNull()
             ?.takeIf { it.schemaVersion <= ShellStateSchema.VERSION }
-
-    private fun MutableStateFlow<ShellStateState>.updateAndGet(transform: (ShellStateState) -> ShellStateState): ShellStateState {
-        update(transform)
-        return value
-    }
 
     private companion object {
         const val TAG = "SharedShellState"

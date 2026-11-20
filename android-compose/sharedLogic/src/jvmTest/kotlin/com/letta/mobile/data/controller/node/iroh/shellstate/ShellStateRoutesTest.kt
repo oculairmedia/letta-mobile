@@ -170,7 +170,8 @@ class ShellStateRoutesTest {
         assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("", JsonPrimitive(1), 0))))
         assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(1), -1))))
         assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(1), 0), change("a", JsonPrimitive(2), 0))))
-        assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("k".repeat(ShellStateWire.MAX_KEY_CHARS + 1), JsonPrimitive(1), 0))))
+        val longKey = "k".repeat(ShellStateWire.MAX_KEY_CHARS + 1)
+        assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change(longKey, JsonPrimitive(1), 0))))
         val tooMany = (0..ShellStateWire.MAX_CHANGES).map { change("key-$it", JsonPrimitive(it), 0) }
         assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(*tooMany.toTypedArray())))
         val notAnObject = JsonObject(mapOf(ShellStateWire.CHANGES to JsonArray(listOf(JsonPrimitive("a")))))
@@ -201,7 +202,8 @@ class ShellStateRoutesTest {
     @Test
     fun agentScopedPeersAreRefusedBothMethods() = runBlocking {
         val scoped = AdminRpcRequestContext(authenticated = true, authorizedAgentIds = setOf("agent-a"))
-        listOf(ShellStateWire.GET to null, ShellStateWire.PROPOSE to propose(change("a", JsonPrimitive(1), 0))).forEach { (method, params) ->
+        val proposal = propose(change("a", JsonPrimitive(1), 0))
+        listOf(ShellStateWire.GET to null, ShellStateWire.PROPOSE to proposal).forEach { (method, params) ->
             val response = Json.parseToJsonElement(router.dispatch(AdminRpcInvocation("r", method, params, scoped))).jsonObject
             assertFalse(response.getValue("success").jsonPrimitive.boolean)
             assertEquals(AgentScopeGuard.DENIED, response["error"]?.jsonPrimitive?.content)
@@ -221,7 +223,8 @@ class ShellStateRoutesTest {
         if ("posix" in path.fileSystem.supportedFileAttributeViews()) {
             assertEquals(setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE), Files.getPosixFilePermissions(path))
         }
-        assertEquals(listOf(path.fileName.toString()), Files.list(path.parent).use { stream -> stream.map { it.fileName.toString() }.toList() })
+        val leftovers = Files.list(path.parent).use { stream -> stream.map { it.fileName.toString() }.toList() }
+        assertEquals(listOf(path.fileName.toString()), leftovers, "no temp file is left behind")
     }
 
     @Test
