@@ -1,0 +1,155 @@
+{
+  "method": "shell.state.get",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/shellstate/ShellStateRoutes.kt",
+  "contract": "shell-state",
+  "capability": "shell_state_v1",
+  "required_capability": "chat.read",
+  "streamed": false,
+  "spec": "docs/reference/contracts/shell-state-v1.md",
+  "note": "Synthetic keys and values only. The host clock is fixed at updated_at_ms 1700000000000. context.authenticated_endpoint_id is the serving connection's authenticated endpoint, recorded as the actor's client_id.",
+  "cases": [
+    {
+      "name": "nothing stored",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": null
+        }
+      },
+      "params": {},
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "schema_version": 1,
+          "document_revision": 0,
+          "entries": {}
+        }
+      }
+    },
+    {
+      "name": "a stored document",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "layout.sidebar_open": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {},
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "schema_version": 1,
+          "document_revision": 4,
+          "entries": {
+            "appearance.theme": {
+              "value": {
+                "mode": "dark"
+              },
+              "revision": 3,
+              "updated_by": {
+                "type": "user",
+                "client_id": "endpoint-b"
+              },
+              "updated_at_ms": 1700000000000
+            },
+            "layout.sidebar_open": {
+              "value": true,
+              "revision": 4,
+              "updated_by": {
+                "type": "user",
+                "client_id": "endpoint-b"
+              },
+              "updated_at_ms": 1700000000000
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "agent-scoped peer",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a",
+        "authorized_agent_ids": [
+          "agent-a"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "layout.sidebar_open": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {},
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "forbidden: agent not in this device's scope"
+      }
+    }
+  ]
+}

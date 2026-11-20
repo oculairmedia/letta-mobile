@@ -308,11 +308,22 @@ class IrohChannelTransport(
 
     override val toolsetStates get() = connectionSession.toolsetStates
 
+    /** Counts this transport's connections: every Ready is a new one, even to the same endpoint and session id. */
+    private val connectionEpochs = java.util.concurrent.atomic.AtomicLong()
+
+    /**
+     * A published `Connected` always has its host capabilities: on Ready the session installs them first and the
+     * state is published after, so a collector that reads [hostCapabilities] the instant it sees the connection
+     * never finds them empty. Any other state is published first and the session cleared after, so a collector
+     * never reads capabilities as present on a connection that is already gone from the state.
+     */
     private fun handleSupervisorStateChange(state: IrohConnectionState) {
-        _state.value = state.toChannelTransportState()
+        if (state is IrohConnectionState.Ready) connectionSession.onReady(state.handle)
+        _state.value = state.toChannelTransportState(
+            connectionEpoch = if (state is IrohConnectionState.Ready) connectionEpochs.incrementAndGet() else connectionEpochs.get(),
+        )
         if (state is IrohConnectionState.Ready) {
             notifyRedialIfTurnActive()
-            connectionSession.onReady(state.handle)
             // A direct socket reports its own close; its admin_rpc is in process, so a probe proves nothing.
             if (directDialer == null) livenessProbe.start(state.handle)
         } else {
@@ -818,7 +829,7 @@ class IrohChannelTransport(
     }
 
 
-    private fun IrohConnectionState.toChannelTransportState(): ChannelTransportState = when (this) {
+    private fun IrohConnectionState.toChannelTransportState(connectionEpoch: Long): ChannelTransportState = when (this) {
         IrohConnectionState.Disconnected -> ChannelTransportState.Idle
         IrohConnectionState.Dialing,
         IrohConnectionState.Handshaking -> ChannelTransportState.Connecting()
@@ -829,6 +840,7 @@ class IrohChannelTransport(
             a2uiEnabled = false,
             a2uiCatalog = null,
             canonicalLiveTransport = "iroh",
+            connectionEpoch = connectionEpoch,
         )
         is IrohConnectionState.Degraded -> ChannelTransportState.Disconnected(0, reason, willReconnect = true)
         is IrohConnectionState.AuthFailed -> ChannelTransportState.Disconnected(4001, reason, isAuthFailure = true, willReconnect = false)

@@ -42,7 +42,16 @@ interface ViewerHandle {
      * the host: the peer must be authenticated, allowed to read agents, and not bounded to some agents (the
      * same peers `pins.get` answers). Evaluated at send time. Default: only through those two checks.
      */
-    fun receivesPinsEvents(): Boolean {
+    fun receivesPinsEvents(): Boolean = receivesHostWideEvents()
+
+    /**
+     * Whether this connection may receive the host's `shell_state_updated` pushes, which carry the whole shell
+     * state document: exactly the peers `shell.state.get` answers and `pins_updated` reaches (authenticated,
+     * allowed to read agents, not bounded to some agents). Evaluated at send time.
+     */
+    fun receivesShellStateEvents(): Boolean = receivesHostWideEvents()
+
+    private fun receivesHostWideEvents(): Boolean {
         val context = adminContext() ?: return false
         return context.authenticated && context.authorizedAgentIds == null && receivesAgentEvents()
     }

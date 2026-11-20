@@ -37,6 +37,7 @@ class ToolsetChannelTest {
             when (method.name) {
                 "getEvents" -> MutableSharedFlow<AppServerReceivedFrame>()
                 "isConnected" -> MutableStateFlow(true)
+                "getConnectionEpoch" -> null
                 "adminRpc" -> {
                     calls += args[0] as AppServerCommand.AdminRpc
                     response
@@ -57,6 +58,7 @@ class ToolsetChannelTest {
             when (method.name) {
                 "getEvents" -> events
                 "isConnected" -> connected
+                "getConnectionEpoch" -> null
                 else -> error("Unexpected call: ${method.name}")
             }
         } as AppServerClient

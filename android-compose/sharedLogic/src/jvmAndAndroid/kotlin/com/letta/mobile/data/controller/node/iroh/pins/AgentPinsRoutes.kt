@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller.node.iroh.pins
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
 import com.letta.mobile.data.controller.node.iroh.AgentScopeGuard
+import com.letta.mobile.data.hoststate.HostStateFileLocks
 import com.letta.mobile.data.controller.node.iroh.adminError
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.pins.shared.AgentPinsSnapshot
@@ -27,8 +28,10 @@ import kotlinx.serialization.json.longOrNull
  */
 object AgentPinsRoutes {
     /** The routes for a host keeping its list in `pinned-agents.json` in [stateDirectory], pushing through [publisher]. */
-    fun forHost(stateDirectory: Path, publisher: AgentPinsPublisher): AdminRpcRoutes =
-        AgentPinsRouteSet(AgentPinsStore(FileAgentPinsPersistence(stateDirectory.resolve(STATE_FILE))), publisher)
+    fun forHost(stateDirectory: Path, publisher: AgentPinsPublisher): AdminRpcRoutes {
+        val file = stateDirectory.resolve(STATE_FILE)
+        return AgentPinsRouteSet(AgentPinsStore(FileAgentPinsPersistence(file), HostStateFileLocks.forFile(file)), publisher)
+    }
 
     /**
      * The routes of the on-device runtime host, whose in-process router serves this device alone: the

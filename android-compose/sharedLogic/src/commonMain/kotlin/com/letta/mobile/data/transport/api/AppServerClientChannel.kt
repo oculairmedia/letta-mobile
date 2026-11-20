@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport.api
 
 import com.letta.mobile.data.pins.wire.AgentPinsWire
+import com.letta.mobile.data.shellstate.wire.ShellStateWire
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -16,6 +17,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.shareIn
@@ -64,8 +66,7 @@ class AppServerClientChannel(
         }
     }
 
-    override val state: StateFlow<ChannelTransportState> = client.isConnected
-        .map { connected -> if (connected) CONNECTED else DISCONNECTED }
+    override val state: StateFlow<ChannelTransportState> = connectionStates(client)
         .stateIn(scope, SharingStarted.WhileSubscribed(), ChannelTransportState.Connecting())
 
     /**
@@ -88,10 +89,31 @@ class AppServerClientChannel(
                 ?.takeIf {
                     it is ServerFrame.PendingApprovalsUpdated || it is ServerFrame.PermissionModeUpdated ||
                         it is ServerFrame.ConversationActivity || it is ServerFrame.ConversationUpdated ||
-                        (it is ServerFrame.Unknown && it.type == AgentPinsWire.FRAME_TYPE)
+                        (it is ServerFrame.Unknown && it.type in UNTYPED_HOST_PUSH_TYPES)
                 }
 
-        val CONNECTED = ChannelTransportState.Connected(serverId = "app-server", sessionId = "app-server", deviceId = null)
+        /** Host pushes with no typed frame; the shared pins and shell state decode their own raw body. */
+        private val UNTYPED_HOST_PUSH_TYPES = setOf(AgentPinsWire.FRAME_TYPE, ShellStateWire.FRAME_TYPE)
+
+        /**
+         * The client's connection as a transport state. A client whose reconnect owner numbers its connections
+         * ([AppServerClient.connectionEpoch]) is projected from that number, upstream of any state-flow
+         * conflation, so a drop and redial never looks like staying connected. A client with no such owner (a
+         * plain single-socket client) has no identity to read, so the connections are counted here instead: every
+         * time it reports up is a new one.
+         */
+        private fun connectionStates(client: AppServerClient): Flow<ChannelTransportState> {
+            client.connectionEpoch?.let { epochs ->
+                return epochs.map { epoch -> epoch?.let(::connectedState) ?: DISCONNECTED }
+            }
+            var counted = 0L
+            return client.isConnected.map { up -> if (up) connectedState(++counted) else DISCONNECTED }
+        }
+
+        fun connectedState(connectionEpoch: Long) = ChannelTransportState.Connected(
+            serverId = "app-server", sessionId = "app-server", deviceId = null, connectionEpoch = connectionEpoch,
+        )
+
         val DISCONNECTED = ChannelTransportState.Disconnected(code = 1000, reason = "App Server session closed")
     }
 }

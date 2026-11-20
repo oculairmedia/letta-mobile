@@ -14,6 +14,7 @@ import java.lang.reflect.Proxy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
@@ -27,17 +28,22 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.put
 
 class ToolsetDeviceStatusRelayTest {
+    /** A client that answers only what the relay reads: its frames and connectivity; it has no reconnect owner. */
+    private fun strictClient(frames: Flow<AppServerReceivedFrame>, connected: Flow<Boolean>) =
+        Proxy.newProxyInstance(AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java)) { _, method, _ ->
+            when (method.name) {
+                "getEvents" -> frames
+                "isConnected" -> connected
+                "getConnectionEpoch" -> null
+                else -> error("Unexpected call: ${method.name}")
+            }
+        } as AppServerClient
+
     @Test
     fun forwardsAndReplaysOnlyToAuthorizedViewersAndClearsOnDisconnect() = runTest {
         val frames = MutableSharedFlow<AppServerReceivedFrame>()
         val connected = MutableStateFlow(true)
-        val client = Proxy.newProxyInstance(AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java)) { _, method, _ ->
-            when (method.name) {
-                "getEvents" -> frames
-                "isConnected" -> connected
-                else -> error("Unexpected call: ${method.name}")
-            }
-        } as AppServerClient
+        val client = strictClient(frames, connected)
         val registry = ConnectionRegistry().also { bindToolsetDeviceStatuses(backgroundScope, client, it) }
         val delivered = mutableListOf<String>()
         var allowedContext = AdminRpcRequestContext(true, grantedCapabilities = setOf(IrohPeerCapabilities.CHAT_READ))
@@ -93,13 +99,7 @@ class ToolsetDeviceStatusRelayTest {
     fun stalledViewerDoesNotBlockOtherViewersOrDisconnectClearing() = runTest {
         val frames = MutableSharedFlow<AppServerReceivedFrame>()
         val connected = MutableStateFlow(true)
-        val client = Proxy.newProxyInstance(AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java)) { _, method, _ ->
-            when (method.name) {
-                "getEvents" -> frames
-                "isConnected" -> connected
-                else -> error("Unexpected call: ${method.name}")
-            }
-        } as AppServerClient
+        val client = strictClient(frames, connected)
         val registry = ConnectionRegistry().also { bindToolsetDeviceStatuses(backgroundScope, client, it) }
         val neverReads = object : ViewerHandle by viewer("never-reads", mutableListOf()) {
             override suspend fun writeFrame(frame: String): Boolean = kotlinx.coroutines.awaitCancellation()

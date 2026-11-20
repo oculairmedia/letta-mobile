@@ -31,6 +31,16 @@ class ConnectionRegistryTest {
 
     @Test
     fun pinsPushesSkipAgentScopedAndUnauthenticatedViewers() = runTest {
+        assertHostWidePushReachesOnlyTheOwner("pins_updated") { it.receivesPinsEvents() }
+    }
+
+    @Test
+    fun shellStatePushesSkipAgentScopedAndUnauthenticatedViewers() = runTest {
+        assertHostWidePushReachesOnlyTheOwner("shell_state_updated") { it.receivesShellStateEvents() }
+    }
+
+    /** A host-wide push goes to the authenticated, unscoped agent reader only, never to a scoped, signed-out or non-reading peer. */
+    private suspend fun assertHostWidePushReachesOnlyTheOwner(type: String, gate: (ViewerHandle) -> Boolean) {
         val registry = ConnectionRegistry()
         val read = setOf(IrohPeerCapabilities.CHAT_READ)
         val owner = BroadcastViewer("endpoint-owner", read)
@@ -41,13 +51,24 @@ class ConnectionRegistryTest {
         val noRead = BroadcastViewer("endpoint-no-read", emptySet())
         listOf(owner, scoped, signedOut, noRead).forEach { registry.claim(it) }
 
-        val result = registry.broadcast("""{"type":"pins_updated"}""") { it.receivesPinsEvents() }
+        val result = registry.broadcast("""{"type":"$type"}""", gate)
 
         assertEquals(BroadcastResult(recipients = 1, delivered = 1), result)
         assertEquals(1, owner.frames.size)
-        assertTrue(scoped.frames.isEmpty(), "an agent-scoped peer must not learn the host's pinned ids")
+        assertTrue(scoped.frames.isEmpty(), "an agent-scoped peer must not learn host-wide state from $type")
         assertTrue(signedOut.frames.isEmpty())
         assertTrue(noRead.frames.isEmpty())
+    }
+
+    @Test
+    fun theShellStateGateEqualsThePinsGate() {
+        val read = setOf(IrohPeerCapabilities.CHAT_READ)
+        val scoped = AdminRpcRequestContext(authenticated = true, authorizedAgentIds = setOf("agent-a"))
+        val unauthenticated = AdminRpcRequestContext(authenticated = false)
+        listOf(
+            BroadcastViewer("a", read), BroadcastViewer("b", read, context = scoped), BroadcastViewer("c", read, context = null),
+            BroadcastViewer("d", emptySet()), BroadcastViewer("e", read, context = unauthenticated),
+        ).forEach { viewer -> assertEquals(viewer.receivesPinsEvents(), viewer.receivesShellStateEvents(), viewer.connectionId) }
     }
 
     @Test

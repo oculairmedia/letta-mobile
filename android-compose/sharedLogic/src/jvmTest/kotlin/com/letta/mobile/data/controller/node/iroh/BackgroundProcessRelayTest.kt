@@ -89,6 +89,7 @@ class BackgroundProcessRelayTest {
             when (method.name) {
                 "getEvents" -> frames
                 "isConnected" -> MutableStateFlow(true)
+                "getConnectionEpoch" -> null
                 else -> error("Unexpected call: ${method.name}")
             }
         } as AppServerClient

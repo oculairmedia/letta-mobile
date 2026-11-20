@@ -3413,6 +3413,41 @@ final enum class com.letta.mobile.data.shell/ShellSkillsSection : kotlin/Enum<co
     final fun values(): kotlin/Array<com.letta.mobile.data.shell/ShellSkillsSection> // com.letta.mobile.data.shell/ShellSkillsSection.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome : kotlin/Enum<com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome> { // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome|null[0]
+    enum entry APPLIED // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.APPLIED|null[0]
+    enum entry CONFLICT // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.CONFLICT|null[0]
+    enum entry OFFLINE // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.OFFLINE|null[0]
+    enum entry REFUSED // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.REFUSED|null[0]
+    enum entry UNSUPPORTED // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.UNSUPPORTED|null[0]
+
+    final val entries // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome> // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome> // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.values|values#static(){}[0]
+}
+
+final enum class com.letta.mobile.data.shellstate.wire/ShellStateError : kotlin/Enum<com.letta.mobile.data.shellstate.wire/ShellStateError> { // com.letta.mobile.data.shellstate.wire/ShellStateError|null[0]
+    enum entry FORBIDDEN // com.letta.mobile.data.shellstate.wire/ShellStateError.FORBIDDEN|null[0]
+    enum entry INVALID_REQUEST // com.letta.mobile.data.shellstate.wire/ShellStateError.INVALID_REQUEST|null[0]
+    enum entry REVISION_CONFLICT // com.letta.mobile.data.shellstate.wire/ShellStateError.REVISION_CONFLICT|null[0]
+    enum entry STATE_UNREADABLE // com.letta.mobile.data.shellstate.wire/ShellStateError.STATE_UNREADABLE|null[0]
+    enum entry TOO_LARGE // com.letta.mobile.data.shellstate.wire/ShellStateError.TOO_LARGE|null[0]
+    enum entry UNKNOWN // com.letta.mobile.data.shellstate.wire/ShellStateError.UNKNOWN|null[0]
+    enum entry UNREACHABLE // com.letta.mobile.data.shellstate.wire/ShellStateError.UNREACHABLE|null[0]
+    enum entry UNSUPPORTED // com.letta.mobile.data.shellstate.wire/ShellStateError.UNSUPPORTED|null[0]
+
+    final val entries // com.letta.mobile.data.shellstate.wire/ShellStateError.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.shellstate.wire/ShellStateError> // com.letta.mobile.data.shellstate.wire/ShellStateError.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.shellstate.wire/ShellStateError // com.letta.mobile.data.shellstate.wire/ShellStateError.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.shellstate.wire/ShellStateError> // com.letta.mobile.data.shellstate.wire/ShellStateError.values|values#static(){}[0]
+
+    final object Companion { // com.letta.mobile.data.shellstate.wire/ShellStateError.Companion|null[0]
+        final fun fromWire(kotlin/String?): com.letta.mobile.data.shellstate.wire/ShellStateError // com.letta.mobile.data.shellstate.wire/ShellStateError.Companion.fromWire|fromWire(kotlin.String?){}[0]
+    }
+}
+
 final enum class com.letta.mobile.data.shellstate/ShellStateImportPolicy : kotlin/Enum<com.letta.mobile.data.shellstate/ShellStateImportPolicy> { // com.letta.mobile.data.shellstate/ShellStateImportPolicy|null[0]
     enum entry IntoEmpty // com.letta.mobile.data.shellstate/ShellStateImportPolicy.IntoEmpty|null[0]
     enum entry Replace // com.letta.mobile.data.shellstate/ShellStateImportPolicy.Replace|null[0]
@@ -7138,6 +7173,21 @@ abstract interface com.letta.mobile.data.shell/ShellChatPort { // com.letta.mobi
     abstract fun startNewChat(com.letta.mobile.data.model/AgentId?) // com.letta.mobile.data.shell/ShellChatPort.startNewChat|startNewChat(com.letta.mobile.data.model.AgentId?){}[0]
 }
 
+abstract interface com.letta.mobile.data.shellstate.shared/ShellStateLink { // com.letta.mobile.data.shellstate.shared/ShellStateLink|null[0]
+    abstract val connection // com.letta.mobile.data.shellstate.shared/ShellStateLink.connection|{}connection[0]
+        abstract fun <get-connection>(): kotlinx.coroutines.flow/Flow<kotlin/String?> // com.letta.mobile.data.shellstate.shared/ShellStateLink.connection.<get-connection>|<get-connection>(){}[0]
+    abstract val currentConnection // com.letta.mobile.data.shellstate.shared/ShellStateLink.currentConnection|{}currentConnection[0]
+        abstract fun <get-currentConnection>(): kotlin/String? // com.letta.mobile.data.shellstate.shared/ShellStateLink.currentConnection.<get-currentConnection>|<get-currentConnection>(){}[0]
+    abstract val hostCapabilities // com.letta.mobile.data.shellstate.shared/ShellStateLink.hostCapabilities|{}hostCapabilities[0]
+        abstract fun <get-hostCapabilities>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.shellstate.shared/ShellStateLink.hostCapabilities.<get-hostCapabilities>|<get-hostCapabilities>(){}[0]
+    abstract val pushes // com.letta.mobile.data.shellstate.shared/ShellStateLink.pushes|{}pushes[0]
+        abstract fun <get-pushes>(): kotlinx.coroutines.flow/Flow<kotlinx.serialization.json/JsonObject> // com.letta.mobile.data.shellstate.shared/ShellStateLink.pushes.<get-pushes>|<get-pushes>(){}[0]
+    open val isConnected // com.letta.mobile.data.shellstate.shared/ShellStateLink.isConnected|{}isConnected[0]
+        open fun <get-isConnected>(): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/ShellStateLink.isConnected.<get-isConnected>|<get-isConnected>(){}[0]
+
+    abstract suspend fun call(kotlin/String, kotlinx.serialization.json/JsonObject): com.letta.mobile.data.shellstate.shared/ShellStateReply // com.letta.mobile.data.shellstate.shared/ShellStateLink.call|call(kotlin.String;kotlinx.serialization.json.JsonObject){}[0]
+}
+
 abstract interface com.letta.mobile.data.shellstate/ShellStateDocument { // com.letta.mobile.data.shellstate/ShellStateDocument|null[0]
     abstract val snapshot // com.letta.mobile.data.shellstate/ShellStateDocument.snapshot|{}snapshot[0]
         abstract fun <get-snapshot>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.shellstate/ShellStateSnapshot> // com.letta.mobile.data.shellstate/ShellStateDocument.snapshot.<get-snapshot>|<get-snapshot>(){}[0]
@@ -7443,6 +7493,8 @@ abstract interface com.letta.mobile.data.transport.api/SubagentScopeAwareChannel
 abstract interface com.letta.mobile.data.transport.appserver/AppServerClient { // com.letta.mobile.data.transport.appserver/AppServerClient|null[0]
     abstract val events // com.letta.mobile.data.transport.appserver/AppServerClient.events|{}events[0]
         abstract fun <get-events>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.transport.appserver/AppServerReceivedFrame> // com.letta.mobile.data.transport.appserver/AppServerClient.events.<get-events>|<get-events>(){}[0]
+    open val connectionEpoch // com.letta.mobile.data.transport.appserver/AppServerClient.connectionEpoch|{}connectionEpoch[0]
+        open fun <get-connectionEpoch>(): kotlinx.coroutines.flow/Flow<kotlin/Long?>? // com.letta.mobile.data.transport.appserver/AppServerClient.connectionEpoch.<get-connectionEpoch>|<get-connectionEpoch>(){}[0]
     open val isConnected // com.letta.mobile.data.transport.appserver/AppServerClient.isConnected|{}isConnected[0]
         open fun <get-isConnected>(): kotlinx.coroutines.flow/Flow<kotlin/Boolean> // com.letta.mobile.data.transport.appserver/AppServerClient.isConnected.<get-isConnected>|<get-isConnected>(){}[0]
     open val serverInfo // com.letta.mobile.data.transport.appserver/AppServerClient.serverInfo|{}serverInfo[0]
@@ -11732,7 +11784,14 @@ sealed interface com.letta.mobile.data.controller.reconnect/ReconnectingClientSt
         final fun toString(): kotlin/String // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.GaveUp.toString|toString(){}[0]
     }
 
-    final object Ready : com.letta.mobile.data.controller.reconnect/ReconnectingClientState { // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready|null[0]
+    final class Ready : com.letta.mobile.data.controller.reconnect/ReconnectingClientState { // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready|null[0]
+        constructor <init>(kotlin/Long) // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.<init>|<init>(kotlin.Long){}[0]
+
+        final val connectionEpoch // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.connectionEpoch|{}connectionEpoch[0]
+            final fun <get-connectionEpoch>(): kotlin/Long // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.connectionEpoch.<get-connectionEpoch>|<get-connectionEpoch>(){}[0]
+
+        final fun component1(): kotlin/Long // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.component1|component1(){}[0]
+        final fun copy(kotlin/Long = ...): com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.copy|copy(kotlin.Long){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.controller.reconnect/ReconnectingClientState.Ready.toString|toString(){}[0]
@@ -24086,7 +24145,7 @@ sealed interface com.letta.mobile.data.transport/BridgeTurnStatus { // com.letta
 
 sealed interface com.letta.mobile.data.transport/ChannelTransportState { // com.letta.mobile.data.transport/ChannelTransportState|null[0]
     final class Connected : com.letta.mobile.data.transport/ChannelTransportState { // com.letta.mobile.data.transport/ChannelTransportState.Connected|null[0]
-        constructor <init>(kotlin/String, kotlin/String, kotlin/String?, kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ...) // com.letta.mobile.data.transport/ChannelTransportState.Connected.<init>|<init>(kotlin.String;kotlin.String;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>){}[0]
+        constructor <init>(kotlin/String, kotlin/String, kotlin/String?, kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/Long = ...) // com.letta.mobile.data.transport/ChannelTransportState.Connected.<init>|<init>(kotlin.String;kotlin.String;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.Long){}[0]
 
         final val a2uiCatalog // com.letta.mobile.data.transport/ChannelTransportState.Connected.a2uiCatalog|{}a2uiCatalog[0]
             final fun <get-a2uiCatalog>(): kotlin/String? // com.letta.mobile.data.transport/ChannelTransportState.Connected.a2uiCatalog.<get-a2uiCatalog>|<get-a2uiCatalog>(){}[0]
@@ -24100,6 +24159,8 @@ sealed interface com.letta.mobile.data.transport/ChannelTransportState { // com.
             final fun <get-a2uiVersion>(): kotlin/String? // com.letta.mobile.data.transport/ChannelTransportState.Connected.a2uiVersion.<get-a2uiVersion>|<get-a2uiVersion>(){}[0]
         final val canonicalLiveTransport // com.letta.mobile.data.transport/ChannelTransportState.Connected.canonicalLiveTransport|{}canonicalLiveTransport[0]
             final fun <get-canonicalLiveTransport>(): kotlin/String? // com.letta.mobile.data.transport/ChannelTransportState.Connected.canonicalLiveTransport.<get-canonicalLiveTransport>|<get-canonicalLiveTransport>(){}[0]
+        final val connectionEpoch // com.letta.mobile.data.transport/ChannelTransportState.Connected.connectionEpoch|{}connectionEpoch[0]
+            final fun <get-connectionEpoch>(): kotlin/Long // com.letta.mobile.data.transport/ChannelTransportState.Connected.connectionEpoch.<get-connectionEpoch>|<get-connectionEpoch>(){}[0]
         final val deviceId // com.letta.mobile.data.transport/ChannelTransportState.Connected.deviceId|{}deviceId[0]
             final fun <get-deviceId>(): kotlin/String? // com.letta.mobile.data.transport/ChannelTransportState.Connected.deviceId.<get-deviceId>|<get-deviceId>(){}[0]
         final val serverId // com.letta.mobile.data.transport/ChannelTransportState.Connected.serverId|{}serverId[0]
@@ -24108,6 +24169,7 @@ sealed interface com.letta.mobile.data.transport/ChannelTransportState { // com.
             final fun <get-sessionId>(): kotlin/String // com.letta.mobile.data.transport/ChannelTransportState.Connected.sessionId.<get-sessionId>|<get-sessionId>(){}[0]
 
         final fun component1(): kotlin/String // com.letta.mobile.data.transport/ChannelTransportState.Connected.component1|component1(){}[0]
+        final fun component10(): kotlin/Long // com.letta.mobile.data.transport/ChannelTransportState.Connected.component10|component10(){}[0]
         final fun component2(): kotlin/String // com.letta.mobile.data.transport/ChannelTransportState.Connected.component2|component2(){}[0]
         final fun component3(): kotlin/String? // com.letta.mobile.data.transport/ChannelTransportState.Connected.component3|component3(){}[0]
         final fun component4(): kotlin/Boolean // com.letta.mobile.data.transport/ChannelTransportState.Connected.component4|component4(){}[0]
@@ -24116,7 +24178,7 @@ sealed interface com.letta.mobile.data.transport/ChannelTransportState { // com.
         final fun component7(): kotlin/String? // com.letta.mobile.data.transport/ChannelTransportState.Connected.component7|component7(){}[0]
         final fun component8(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.transport/ChannelTransportState.Connected.component8|component8(){}[0]
         final fun component9(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.transport/ChannelTransportState.Connected.component9|component9(){}[0]
-        final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ...): com.letta.mobile.data.transport/ChannelTransportState.Connected // com.letta.mobile.data.transport/ChannelTransportState.Connected.copy|copy(kotlin.String;kotlin.String;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/Long = ...): com.letta.mobile.data.transport/ChannelTransportState.Connected // com.letta.mobile.data.transport/ChannelTransportState.Connected.copy|copy(kotlin.String;kotlin.String;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.Long){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.transport/ChannelTransportState.Connected.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.transport/ChannelTransportState.Connected.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.transport/ChannelTransportState.Connected.toString|toString(){}[0]
@@ -40819,6 +40881,8 @@ final class com.letta.mobile.data.controller.reconnect/ReconnectResult { // com.
 final class com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient : com.letta.mobile.data.controller.reconnect/ForwardingAppServerClient { // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient|null[0]
     constructor <init>(kotlin.coroutines/SuspendFunction0<com.letta.mobile.data.controller.reconnect/AppServerClientGeneration>, com.letta.mobile.data.controller.reconnect/ReconnectingClientListener = ..., kotlin/String = ..., com.letta.mobile.data.controller.reconnect/FullJitterBackoff = ..., kotlin/Int = ..., kotlin.random/Random = ..., kotlin.coroutines/SuspendFunction1<kotlin/Long, kotlin/Unit> = ..., kotlin.coroutines/SuspendFunction0<com.letta.mobile.data.transport.appserver/AppServerProbeResult>? = ..., kotlin/Boolean = ...) // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient.<init>|<init>(kotlin.coroutines.SuspendFunction0<com.letta.mobile.data.controller.reconnect.AppServerClientGeneration>;com.letta.mobile.data.controller.reconnect.ReconnectingClientListener;kotlin.String;com.letta.mobile.data.controller.reconnect.FullJitterBackoff;kotlin.Int;kotlin.random.Random;kotlin.coroutines.SuspendFunction1<kotlin.Long,kotlin.Unit>;kotlin.coroutines.SuspendFunction0<com.letta.mobile.data.transport.appserver.AppServerProbeResult>?;kotlin.Boolean){}[0]
 
+    final val connectionEpoch // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient.connectionEpoch|{}connectionEpoch[0]
+        final fun <get-connectionEpoch>(): kotlinx.coroutines.flow/Flow<kotlin/Long?> // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient.connectionEpoch.<get-connectionEpoch>|<get-connectionEpoch>(){}[0]
     final val events // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient.events|{}events[0]
         final fun <get-events>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.transport.appserver/AppServerReceivedFrame> // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient.events.<get-events>|<get-events>(){}[0]
     final val isConnected // com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClient.isConnected|{}isConnected[0]
@@ -64456,6 +64520,93 @@ final class com.letta.mobile.data.shell/ShellWorkspaceState { // com.letta.mobil
     final fun snapshotOrPending(): com.letta.mobile.data.shell/CurrentFocusSnapshot? // com.letta.mobile.data.shell/ShellWorkspaceState.snapshotOrPending|snapshotOrPending(){}[0]
 }
 
+final class com.letta.mobile.data.shellstate.shared/SharedShellState { // com.letta.mobile.data.shellstate.shared/SharedShellState|null[0]
+    constructor <init>(com.letta.mobile.data.shellstate.shared/ShellStateLink) // com.letta.mobile.data.shellstate.shared/SharedShellState.<init>|<init>(com.letta.mobile.data.shellstate.shared.ShellStateLink){}[0]
+
+    final val state // com.letta.mobile.data.shellstate.shared/SharedShellState.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.shellstate.shared/ShellStateState> // com.letta.mobile.data.shellstate.shared/SharedShellState.state.<get-state>|<get-state>(){}[0]
+    final val supported // com.letta.mobile.data.shellstate.shared/SharedShellState.supported|{}supported[0]
+        final fun <get-supported>(): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/SharedShellState.supported.<get-supported>|<get-supported>(){}[0]
+
+    final suspend fun propose(kotlin.collections/List<com.letta.mobile.data.shellstate.shared/SharedShellState.Edit>): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.shellstate.shared/SharedShellState.propose|propose(kotlin.collections.List<com.letta.mobile.data.shellstate.shared.SharedShellState.Edit>){}[0]
+    final suspend fun refresh(): com.letta.mobile.data.shellstate.shared/ShellStateState // com.letta.mobile.data.shellstate.shared/SharedShellState.refresh|refresh(){}[0]
+    final suspend fun remove(kotlin/String): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.shellstate.shared/SharedShellState.remove|remove(kotlin.String){}[0]
+    final suspend fun run() // com.letta.mobile.data.shellstate.shared/SharedShellState.run|run(){}[0]
+    final suspend fun set(kotlin/String, kotlinx.serialization.json/JsonElement): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.shellstate.shared/SharedShellState.set|set(kotlin.String;kotlinx.serialization.json.JsonElement){}[0]
+
+    final class Edit { // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit|null[0]
+        constructor <init>(kotlin/String, kotlinx.serialization.json/JsonElement?) // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit.<init>|<init>(kotlin.String;kotlinx.serialization.json.JsonElement?){}[0]
+
+        final val key // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit.key|{}key[0]
+            final fun <get-key>(): kotlin/String // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit.key.<get-key>|<get-key>(){}[0]
+        final val value // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit.value|{}value[0]
+            final fun <get-value>(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit.component1|component1(){}[0]
+        final fun component2(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., kotlinx.serialization.json/JsonElement? = ...): com.letta.mobile.data.shellstate.shared/SharedShellState.Edit // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit.copy|copy(kotlin.String;kotlinx.serialization.json.JsonElement?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit.toString|toString(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.shellstate.shared/ShellStateReply { // com.letta.mobile.data.shellstate.shared/ShellStateReply|null[0]
+    constructor <init>(kotlin/Boolean, kotlinx.serialization.json/JsonElement? = ..., kotlin/String? = ...) // com.letta.mobile.data.shellstate.shared/ShellStateReply.<init>|<init>(kotlin.Boolean;kotlinx.serialization.json.JsonElement?;kotlin.String?){}[0]
+
+    final val error // com.letta.mobile.data.shellstate.shared/ShellStateReply.error|{}error[0]
+        final fun <get-error>(): kotlin/String? // com.letta.mobile.data.shellstate.shared/ShellStateReply.error.<get-error>|<get-error>(){}[0]
+    final val result // com.letta.mobile.data.shellstate.shared/ShellStateReply.result|{}result[0]
+        final fun <get-result>(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.shellstate.shared/ShellStateReply.result.<get-result>|<get-result>(){}[0]
+    final val success // com.letta.mobile.data.shellstate.shared/ShellStateReply.success|{}success[0]
+        final fun <get-success>(): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/ShellStateReply.success.<get-success>|<get-success>(){}[0]
+}
+
+final class com.letta.mobile.data.shellstate.shared/ShellStateState { // com.letta.mobile.data.shellstate.shared/ShellStateState|null[0]
+    constructor <init>(kotlin/Boolean = ..., com.letta.mobile.data.shellstate/ShellStateSnapshot? = ..., kotlin/Boolean = ..., com.letta.mobile.data.shellstate.wire/ShellStateError? = ...) // com.letta.mobile.data.shellstate.shared/ShellStateState.<init>|<init>(kotlin.Boolean;com.letta.mobile.data.shellstate.ShellStateSnapshot?;kotlin.Boolean;com.letta.mobile.data.shellstate.wire.ShellStateError?){}[0]
+
+    final val editable // com.letta.mobile.data.shellstate.shared/ShellStateState.editable|{}editable[0]
+        final fun <get-editable>(): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/ShellStateState.editable.<get-editable>|<get-editable>(){}[0]
+    final val entries // com.letta.mobile.data.shellstate.shared/ShellStateState.entries|{}entries[0]
+        final fun <get-entries>(): kotlin.collections/Map<kotlin/String, com.letta.mobile.data.shellstate/ShellStateEntry> // com.letta.mobile.data.shellstate.shared/ShellStateState.entries.<get-entries>|<get-entries>(){}[0]
+    final val error // com.letta.mobile.data.shellstate.shared/ShellStateState.error|{}error[0]
+        final fun <get-error>(): com.letta.mobile.data.shellstate.wire/ShellStateError? // com.letta.mobile.data.shellstate.shared/ShellStateState.error.<get-error>|<get-error>(){}[0]
+    final val live // com.letta.mobile.data.shellstate.shared/ShellStateState.live|{}live[0]
+        final fun <get-live>(): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/ShellStateState.live.<get-live>|<get-live>(){}[0]
+    final val snapshot // com.letta.mobile.data.shellstate.shared/ShellStateState.snapshot|{}snapshot[0]
+        final fun <get-snapshot>(): com.letta.mobile.data.shellstate/ShellStateSnapshot? // com.letta.mobile.data.shellstate.shared/ShellStateState.snapshot.<get-snapshot>|<get-snapshot>(){}[0]
+    final val supported // com.letta.mobile.data.shellstate.shared/ShellStateState.supported|{}supported[0]
+        final fun <get-supported>(): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/ShellStateState.supported.<get-supported>|<get-supported>(){}[0]
+
+    final fun component1(): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/ShellStateState.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.shellstate/ShellStateSnapshot? // com.letta.mobile.data.shellstate.shared/ShellStateState.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/ShellStateState.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.data.shellstate.wire/ShellStateError? // com.letta.mobile.data.shellstate.shared/ShellStateState.component4|component4(){}[0]
+    final fun copy(kotlin/Boolean = ..., com.letta.mobile.data.shellstate/ShellStateSnapshot? = ..., kotlin/Boolean = ..., com.letta.mobile.data.shellstate.wire/ShellStateError? = ...): com.letta.mobile.data.shellstate.shared/ShellStateState // com.letta.mobile.data.shellstate.shared/ShellStateState.copy|copy(kotlin.Boolean;com.letta.mobile.data.shellstate.ShellStateSnapshot?;kotlin.Boolean;com.letta.mobile.data.shellstate.wire.ShellStateError?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/ShellStateState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shellstate.shared/ShellStateState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shellstate.shared/ShellStateState.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.shellstate.wire/ShellStateChange { // com.letta.mobile.data.shellstate.wire/ShellStateChange|null[0]
+    constructor <init>(kotlin/String, kotlinx.serialization.json/JsonElement?, kotlin/Long) // com.letta.mobile.data.shellstate.wire/ShellStateChange.<init>|<init>(kotlin.String;kotlinx.serialization.json.JsonElement?;kotlin.Long){}[0]
+
+    final val expectedRevision // com.letta.mobile.data.shellstate.wire/ShellStateChange.expectedRevision|{}expectedRevision[0]
+        final fun <get-expectedRevision>(): kotlin/Long // com.letta.mobile.data.shellstate.wire/ShellStateChange.expectedRevision.<get-expectedRevision>|<get-expectedRevision>(){}[0]
+    final val key // com.letta.mobile.data.shellstate.wire/ShellStateChange.key|{}key[0]
+        final fun <get-key>(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateChange.key.<get-key>|<get-key>(){}[0]
+    final val value // com.letta.mobile.data.shellstate.wire/ShellStateChange.value|{}value[0]
+        final fun <get-value>(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.shellstate.wire/ShellStateChange.value.<get-value>|<get-value>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateChange.component1|component1(){}[0]
+    final fun component2(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.shellstate.wire/ShellStateChange.component2|component2(){}[0]
+    final fun component3(): kotlin/Long // com.letta.mobile.data.shellstate.wire/ShellStateChange.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlinx.serialization.json/JsonElement? = ..., kotlin/Long = ...): com.letta.mobile.data.shellstate.wire/ShellStateChange // com.letta.mobile.data.shellstate.wire/ShellStateChange.copy|copy(kotlin.String;kotlinx.serialization.json.JsonElement?;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shellstate.wire/ShellStateChange.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shellstate.wire/ShellStateChange.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateChange.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.shellstate/ShellStateEntry { // com.letta.mobile.data.shellstate/ShellStateEntry|null[0]
     constructor <init>(kotlinx.serialization.json/JsonElement, kotlin/Long, com.letta.mobile.data.shellstate/ShellStateActor, kotlin/Long) // com.letta.mobile.data.shellstate/ShellStateEntry.<init>|<init>(kotlinx.serialization.json.JsonElement;kotlin.Long;com.letta.mobile.data.shellstate.ShellStateActor;kotlin.Long){}[0]
 
@@ -71056,6 +71207,8 @@ final class com.letta.mobile.data.transport.appserver/DefaultAppServerClient : c
 final class com.letta.mobile.data.transport.appserver/DualLaneAppServerClient : com.letta.mobile.data.transport.appserver/AppServerClient { // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient|null[0]
     constructor <init>(com.letta.mobile.data.transport.appserver/AppServerClient, com.letta.mobile.data.transport.appserver/AppServerClient) // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.<init>|<init>(com.letta.mobile.data.transport.appserver.AppServerClient;com.letta.mobile.data.transport.appserver.AppServerClient){}[0]
 
+    final val connectionEpoch // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.connectionEpoch|{}connectionEpoch[0]
+        final fun <get-connectionEpoch>(): kotlinx.coroutines.flow/Flow<kotlin/Long?>? // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.connectionEpoch.<get-connectionEpoch>|<get-connectionEpoch>(){}[0]
     final val events // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.events|{}events[0]
         final fun <get-events>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.transport.appserver/AppServerReceivedFrame> // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.events.<get-events>|<get-events>(){}[0]
     final val isConnected // com.letta.mobile.data.transport.appserver/DualLaneAppServerClient.isConnected|{}isConnected[0]
@@ -82484,6 +82637,50 @@ final object com.letta.mobile.data.shell/ShellRoute { // com.letta.mobile.data.s
     final fun encode(com.letta.mobile.data.shell/ShellDestination): kotlin/String // com.letta.mobile.data.shell/ShellRoute.encode|encode(com.letta.mobile.data.shell.ShellDestination){}[0]
 }
 
+final object com.letta.mobile.data.shellstate.wire/ShellStateWire { // com.letta.mobile.data.shellstate.wire/ShellStateWire|null[0]
+    final const val CAPABILITY // com.letta.mobile.data.shellstate.wire/ShellStateWire.CAPABILITY|{}CAPABILITY[0]
+        final fun <get-CAPABILITY>(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateWire.CAPABILITY.<get-CAPABILITY>|<get-CAPABILITY>(){}[0]
+    final const val CHANGES // com.letta.mobile.data.shellstate.wire/ShellStateWire.CHANGES|{}CHANGES[0]
+        final fun <get-CHANGES>(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateWire.CHANGES.<get-CHANGES>|<get-CHANGES>(){}[0]
+    final const val EXPECTED_REVISION // com.letta.mobile.data.shellstate.wire/ShellStateWire.EXPECTED_REVISION|{}EXPECTED_REVISION[0]
+        final fun <get-EXPECTED_REVISION>(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateWire.EXPECTED_REVISION.<get-EXPECTED_REVISION>|<get-EXPECTED_REVISION>(){}[0]
+    final const val FRAME_TYPE // com.letta.mobile.data.shellstate.wire/ShellStateWire.FRAME_TYPE|{}FRAME_TYPE[0]
+        final fun <get-FRAME_TYPE>(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateWire.FRAME_TYPE.<get-FRAME_TYPE>|<get-FRAME_TYPE>(){}[0]
+    final const val GET // com.letta.mobile.data.shellstate.wire/ShellStateWire.GET|{}GET[0]
+        final fun <get-GET>(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateWire.GET.<get-GET>|<get-GET>(){}[0]
+    final const val INVALID_REQUEST // com.letta.mobile.data.shellstate.wire/ShellStateWire.INVALID_REQUEST|{}INVALID_REQUEST[0]
+        final fun <get-INVALID_REQUEST>(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateWire.INVALID_REQUEST.<get-INVALID_REQUEST>|<get-INVALID_REQUEST>(){}[0]
+    final const val KEY // com.letta.mobile.data.shellstate.wire/ShellStateWire.KEY|{}KEY[0]
+        final fun <get-KEY>(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateWire.KEY.<get-KEY>|<get-KEY>(){}[0]
+    final const val LOCAL_CLIENT_ID // com.letta.mobile.data.shellstate.wire/ShellStateWire.LOCAL_CLIENT_ID|{}LOCAL_CLIENT_ID[0]
+        final fun <get-LOCAL_CLIENT_ID>(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateWire.LOCAL_CLIENT_ID.<get-LOCAL_CLIENT_ID>|<get-LOCAL_CLIENT_ID>(){}[0]
+    final const val MAX_CHANGES // com.letta.mobile.data.shellstate.wire/ShellStateWire.MAX_CHANGES|{}MAX_CHANGES[0]
+        final fun <get-MAX_CHANGES>(): kotlin/Int // com.letta.mobile.data.shellstate.wire/ShellStateWire.MAX_CHANGES.<get-MAX_CHANGES>|<get-MAX_CHANGES>(){}[0]
+    final const val MAX_DOCUMENT_BYTES // com.letta.mobile.data.shellstate.wire/ShellStateWire.MAX_DOCUMENT_BYTES|{}MAX_DOCUMENT_BYTES[0]
+        final fun <get-MAX_DOCUMENT_BYTES>(): kotlin/Int // com.letta.mobile.data.shellstate.wire/ShellStateWire.MAX_DOCUMENT_BYTES.<get-MAX_DOCUMENT_BYTES>|<get-MAX_DOCUMENT_BYTES>(){}[0]
+    final const val MAX_ENTRIES // com.letta.mobile.data.shellstate.wire/ShellStateWire.MAX_ENTRIES|{}MAX_ENTRIES[0]
+        final fun <get-MAX_ENTRIES>(): kotlin/Int // com.letta.mobile.data.shellstate.wire/ShellStateWire.MAX_ENTRIES.<get-MAX_ENTRIES>|<get-MAX_ENTRIES>(){}[0]
+    final const val MAX_KEY_CHARS // com.letta.mobile.data.shellstate.wire/ShellStateWire.MAX_KEY_CHARS|{}MAX_KEY_CHARS[0]
+        final fun <get-MAX_KEY_CHARS>(): kotlin/Int // com.letta.mobile.data.shellstate.wire/ShellStateWire.MAX_KEY_CHARS.<get-MAX_KEY_CHARS>|<get-MAX_KEY_CHARS>(){}[0]
+    final const val MAX_VALUE_BYTES // com.letta.mobile.data.shellstate.wire/ShellStateWire.MAX_VALUE_BYTES|{}MAX_VALUE_BYTES[0]
+        final fun <get-MAX_VALUE_BYTES>(): kotlin/Int // com.letta.mobile.data.shellstate.wire/ShellStateWire.MAX_VALUE_BYTES.<get-MAX_VALUE_BYTES>|<get-MAX_VALUE_BYTES>(){}[0]
+    final const val PROPOSE // com.letta.mobile.data.shellstate.wire/ShellStateWire.PROPOSE|{}PROPOSE[0]
+        final fun <get-PROPOSE>(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateWire.PROPOSE.<get-PROPOSE>|<get-PROPOSE>(){}[0]
+    final const val REVISION_CONFLICT // com.letta.mobile.data.shellstate.wire/ShellStateWire.REVISION_CONFLICT|{}REVISION_CONFLICT[0]
+        final fun <get-REVISION_CONFLICT>(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateWire.REVISION_CONFLICT.<get-REVISION_CONFLICT>|<get-REVISION_CONFLICT>(){}[0]
+    final const val STATE_UNREADABLE // com.letta.mobile.data.shellstate.wire/ShellStateWire.STATE_UNREADABLE|{}STATE_UNREADABLE[0]
+        final fun <get-STATE_UNREADABLE>(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateWire.STATE_UNREADABLE.<get-STATE_UNREADABLE>|<get-STATE_UNREADABLE>(){}[0]
+    final const val TOO_LARGE // com.letta.mobile.data.shellstate.wire/ShellStateWire.TOO_LARGE|{}TOO_LARGE[0]
+        final fun <get-TOO_LARGE>(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateWire.TOO_LARGE.<get-TOO_LARGE>|<get-TOO_LARGE>(){}[0]
+    final const val VALUE // com.letta.mobile.data.shellstate.wire/ShellStateWire.VALUE|{}VALUE[0]
+        final fun <get-VALUE>(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateWire.VALUE.<get-VALUE>|<get-VALUE>(){}[0]
+
+    final val KEY_PATTERN // com.letta.mobile.data.shellstate.wire/ShellStateWire.KEY_PATTERN|{}KEY_PATTERN[0]
+        final fun <get-KEY_PATTERN>(): kotlin.text/Regex // com.letta.mobile.data.shellstate.wire/ShellStateWire.KEY_PATTERN.<get-KEY_PATTERN>|<get-KEY_PATTERN>(){}[0]
+    final val METHODS // com.letta.mobile.data.shellstate.wire/ShellStateWire.METHODS|{}METHODS[0]
+        final fun <get-METHODS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.shellstate.wire/ShellStateWire.METHODS.<get-METHODS>|<get-METHODS>(){}[0]
+}
+
 final object com.letta.mobile.data.shellstate/ShellStateSchema { // com.letta.mobile.data.shellstate/ShellStateSchema|null[0]
     final const val VERSION // com.letta.mobile.data.shellstate/ShellStateSchema.VERSION|{}VERSION[0]
         final fun <get-VERSION>(): kotlin/Int // com.letta.mobile.data.shellstate/ShellStateSchema.VERSION.<get-VERSION>|<get-VERSION>(){}[0]
@@ -83723,6 +83920,7 @@ final fun (com.letta.mobile.data.session/SessionRepositoryGraph).com.letta.mobil
 final fun (com.letta.mobile.data.session/SessionRepositoryGraph).com.letta.mobile.data.session/llmModelsOrEmpty(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/LlmModel>> // com.letta.mobile.data.session/llmModelsOrEmpty|llmModelsOrEmpty@com.letta.mobile.data.session.SessionRepositoryGraph(){}[0]
 final fun (com.letta.mobile.data.session/SessionRepositoryGraphProvider<out com.letta.mobile.data.session/SessionRepositoryGraph>).com.letta.mobile.data.session.pins/pinSource(): kotlinx.coroutines.flow/StateFlow<kotlin/String?> // com.letta.mobile.data.session.pins/pinSource|pinSource@com.letta.mobile.data.session.SessionRepositoryGraphProvider<out|com.letta.mobile.data.session.SessionRepositoryGraph>(){}[0]
 final fun (com.letta.mobile.data.shell/ShellWorkspaceState).com.letta.mobile.data.shell/projectFocus(kotlin.collections/List<com.letta.mobile.data.shell/ShellConversationRef>, kotlin/Function1<com.letta.mobile.data.model/ConversationId, kotlin/Unit>) // com.letta.mobile.data.shell/projectFocus|projectFocus@com.letta.mobile.data.shell.ShellWorkspaceState(kotlin.collections.List<com.letta.mobile.data.shell.ShellConversationRef>;kotlin.Function1<com.letta.mobile.data.model.ConversationId,kotlin.Unit>){}[0]
+final fun (com.letta.mobile.data.shellstate.wire/ShellStateChange).com.letta.mobile.data.shellstate.wire/toJson(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.shellstate.wire/toJson|toJson@com.letta.mobile.data.shellstate.wire.ShellStateChange(){}[0]
 final fun (com.letta.mobile.data.storage/SecureSettingsStore).com.letta.mobile.data.objectverbs.binding/withDevicePins(): com.letta.mobile.data.storage/SecureSettingsStore // com.letta.mobile.data.objectverbs.binding/withDevicePins|withDevicePins@com.letta.mobile.data.storage.SecureSettingsStore(){}[0]
 final fun (com.letta.mobile.data.subagents/SubagentChipObservation).com.letta.mobile.data.subagents/withNativeTodos(kotlinx.serialization.json/JsonObject): com.letta.mobile.data.subagents/SubagentChipObservation // com.letta.mobile.data.subagents/withNativeTodos|withNativeTodos@com.letta.mobile.data.subagents.SubagentChipObservation(kotlinx.serialization.json.JsonObject){}[0]
 final fun (com.letta.mobile.data.subagents/SubagentRosterItem).com.letta.mobile.data.subagents/toSubagentView(): com.letta.mobile.data.subagents/SubagentView? // com.letta.mobile.data.subagents/toSubagentView|toSubagentView@com.letta.mobile.data.subagents.SubagentRosterItem(){}[0]
@@ -83927,6 +84125,7 @@ final fun com.letta.mobile.data.session.graph/unservedBrowserSessionStatus(com.l
 final fun com.letta.mobile.data.session.graph/webSessionCapabilities(com.letta.mobile.data.model/LettaConfig): com.letta.mobile.data.backend/SessionCapabilities // com.letta.mobile.data.session.graph/webSessionCapabilities|webSessionCapabilities(com.letta.mobile.data.model.LettaConfig){}[0]
 final fun com.letta.mobile.data.session/remoteLettaBackendDescriptor(com.letta.mobile.data.model/LettaConfig?, kotlin/String, kotlin/String = ...): com.letta.mobile.runtime/BackendDescriptor // com.letta.mobile.data.session/remoteLettaBackendDescriptor|remoteLettaBackendDescriptor(com.letta.mobile.data.model.LettaConfig?;kotlin.String;kotlin.String){}[0]
 final fun com.letta.mobile.data.shell/initialCurrentFocus(com.letta.mobile.data.shell/CurrentFocusInputs): com.letta.mobile.data.shell/CurrentFocusSnapshot // com.letta.mobile.data.shell/initialCurrentFocus|initialCurrentFocus(com.letta.mobile.data.shell.CurrentFocusInputs){}[0]
+final fun com.letta.mobile.data.shellstate.shared/channelShellStateLink(com.letta.mobile.data.transport.api/IChannelTransport): com.letta.mobile.data.shellstate.shared/ShellStateLink // com.letta.mobile.data.shellstate.shared/channelShellStateLink|channelShellStateLink(com.letta.mobile.data.transport.api.IChannelTransport){}[0]
 final fun com.letta.mobile.data.subagents/projectSubagentRoster(kotlin.collections/List<com.letta.mobile.data.model/SubagentEntry>, kotlin/Long, kotlin.collections/Set<kotlin/String> = ...): com.letta.mobile.data.subagents/SubagentRoster // com.letta.mobile.data.subagents/projectSubagentRoster|projectSubagentRoster(kotlin.collections.List<com.letta.mobile.data.model.SubagentEntry>;kotlin.Long;kotlin.collections.Set<kotlin.String>){}[0]
 final fun com.letta.mobile.data.subagents/subagentIdentityOf(kotlin/String?, kotlin.collections/List<kotlin/String?> = ...): com.letta.mobile.data.subagents/SubagentIdentity // com.letta.mobile.data.subagents/subagentIdentityOf|subagentIdentityOf(kotlin.String?;kotlin.collections.List<kotlin.String?>){}[0]
 final fun com.letta.mobile.data.subagents/subagentViewOf(com.letta.mobile.data.model/AgentId?, com.letta.mobile.data.model/ConversationId?, com.letta.mobile.data.subagents/SubagentViewLabel): com.letta.mobile.data.subagents/SubagentView? // com.letta.mobile.data.subagents/subagentViewOf|subagentViewOf(com.letta.mobile.data.model.AgentId?;com.letta.mobile.data.model.ConversationId?;com.letta.mobile.data.subagents.SubagentViewLabel){}[0]

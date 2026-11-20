@@ -148,7 +148,6 @@ internal class DesktopDirectAppServerSession private constructor(
         }
     }
 }
-
 /** The exception a failed first dial surfaces with; probe verdicts keep their summary() prefix. */
 private fun ReconnectingClientState.firstDialFailure(): Exception = when (this) {
     is ReconnectingClientState.GaveUp -> when (kind) {
