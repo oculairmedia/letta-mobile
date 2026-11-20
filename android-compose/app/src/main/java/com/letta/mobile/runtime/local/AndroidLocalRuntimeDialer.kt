@@ -52,13 +52,9 @@ class AndroidLocalRuntimeDialer @Inject constructor(
                 requestTimeoutMs = LOCAL_REQUEST_TIMEOUT_MS,
             ),
             scope = scope,
-            router = directDialRouter(
-                backendDir.absolutePath,
-                listOf(
-                    AgentPinsRoutes.forOnDeviceHost(backendDir.toPath(), scope),
-                    ShellStateRoutes.forOnDeviceHost(backendDir.toPath(), scope),
-                ),
-            ),
+            router = directDialRouter(backendDir.absolutePath, backendDir.toPath().let { storage ->
+                listOf(AgentPinsRoutes.forOnDeviceHost(storage, scope), ShellStateRoutes.forOnDeviceHost(storage, scope))
+            }),
             release = lease::close,
         )
         config?.let(EmbeddedLettaCodeModelSelection::from)?.let { followDeviceModel(dial, it) }
