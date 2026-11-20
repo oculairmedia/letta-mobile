@@ -6,7 +6,7 @@ import java.net.URI
 /**
  * The address rules of a service credential, on the host: a plain http(s) base URL (no user info,
  * query, fragment or whitespace), its origin, and whether a secret may travel to it (https, or plain
- * http to a loopback host).
+ * http to a loopback literal: `127.0.0.0/8` or `::1`).
  */
 internal object ServiceAddress {
     /** The origin (`scheme://host:port`) of [baseUrl], or null when it is not a plain http(s) URL. */
@@ -16,7 +16,7 @@ internal object ServiceAddress {
         return "${uri.scheme}://${uri.host.lowercase()}:$port"
     }
 
-    /** Whether a secret may be sent to [baseUrl]: https, or http to a loopback host. */
+    /** Whether a secret may be sent to [baseUrl]: https, or http to a loopback literal. */
     fun protectsSecret(baseUrl: String): Boolean {
         val uri = parse(baseUrl) ?: return false
         return uri.scheme == HTTPS || isLoopback(uri.host)
@@ -30,10 +30,12 @@ internal object ServiceAddress {
         return uri.takeIf { plain }
     }
 
-    /** `localhost` or a loopback literal; never resolves a name. */
+    /**
+     * A loopback IP literal (`127.0.0.0/8`, `::1`). A name such as `localhost` never counts: a name can
+     * resolve elsewhere, so only a literal proves the secret stays on this machine. Never resolves a name.
+     */
     private fun isLoopback(host: String): Boolean {
         val bare = host.removePrefix("[").removeSuffix("]").lowercase()
-        if (bare == "localhost") return true
         val literal = bare.all { it.isDigit() || it == '.' } || ':' in bare
         return literal && runCatching { InetAddress.getByName(bare).isLoopbackAddress }.getOrDefault(false)
     }

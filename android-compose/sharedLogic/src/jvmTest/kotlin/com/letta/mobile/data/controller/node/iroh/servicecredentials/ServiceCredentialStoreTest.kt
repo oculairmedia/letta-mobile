@@ -48,6 +48,17 @@ class ServiceCredentialStoreTest {
     }
 
     @Test
+    fun movingToANewHttpsAddressTakesTheNewKeyOnly() = runTest {
+        val secrets = InMemoryServiceSecretStore()
+        val store = store(secrets = secrets)
+        store.write(write("https://one.example.invalid", replace("old-key")))
+        val moved = store.write(write("https://two.example.invalid", replace("new-key")))
+        assertTrue(moved.hasSecret)
+        assertEquals("new-key", store.snapshot(serviceId).target.secret)
+        assertEquals(null, secrets.read(serviceId, "https://one.example.invalid:443"))
+    }
+
+    @Test
     fun aWriteOnTheSameOriginKeepsTheSecretAndResetsTheTest() = runTest {
         val store = store()
         val first = store.write(write("https://one.example.invalid", replace()))
@@ -59,12 +70,14 @@ class ServiceCredentialStoreTest {
     }
 
     @Test
-    fun aSecretTravelsOnlyOverHttpsOrToLoopback() = runTest {
+    fun aSecretTravelsOnlyOverHttpsOrToALoopbackLiteral() = runTest {
         val store = store()
-        val refused = assertFailsWith<ServiceRefusal> { store.write(write("http://lan-host.example.invalid", replace())) }
-        assertEquals(ServiceCredentialErrorCode.INSECURE_TRANSPORT, refused.code)
+        listOf("http://lan-host.example.invalid", "http://localhost:9000").forEach { url ->
+            val refused = assertFailsWith<ServiceRefusal> { store.write(write(url, replace())) }
+            assertEquals(ServiceCredentialErrorCode.INSECURE_TRANSPORT, refused.code, url)
+        }
         assertTrue(store.write(write("http://127.0.0.1:9000", replace())).hasSecret)
-        assertTrue(store.write(write("http://localhost:9000", replace())).hasSecret)
+        assertTrue(store.write(write("http://[::1]:9000", replace())).hasSecret)
     }
 
     @Test

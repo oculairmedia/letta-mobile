@@ -65,7 +65,13 @@ strings of at most 256 characters; replaces the stored settings), `expected_revi
 
 - A write without `secret` keeps the stored secret only while the address's origin is unchanged; a
   write to a new origin drops it.
-- A secret is kept only for https, or plain http to a loopback host (`service.insecure_transport`).
+- Moving a service: where `base_url_editable` is true, an admin may point the service at a different
+  https address and enter a key there in the same write (or a later one). The old key is never carried
+  to the new address: it is bound to the origin it was entered for, a write to a new origin deletes it,
+  and the status shows `has_secret: false` until a key is entered for the new address.
+- A secret is kept only for https, or plain http to a loopback IP literal (`127.0.0.0/8` or `::1`;
+  the name `localhost` does not count, since a name can resolve elsewhere), else
+  `service.insecure_transport`.
 - The write does not contact the service.
 
 ## Test (`service.credential.test`)
