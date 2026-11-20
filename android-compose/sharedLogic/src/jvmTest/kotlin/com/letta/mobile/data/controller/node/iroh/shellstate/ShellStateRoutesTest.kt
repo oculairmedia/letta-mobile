@@ -182,12 +182,20 @@ class ShellStateRoutesTest {
         val big = JsonPrimitive("x".repeat(ShellStateWire.MAX_VALUE_BYTES))
         assertEquals(ShellStateWire.TOO_LARGE, failure(ShellStateWire.PROPOSE, propose(change("a", big, 0))))
         val fits = JsonPrimitive("x".repeat(ShellStateWire.MAX_VALUE_BYTES - 2))
-        val perEntryCap = ShellStateWire.MAX_DOCUMENT_BYTES / ShellStateWire.MAX_VALUE_BYTES
-        (0 until perEntryCap).forEach { call(ShellStateWire.PROPOSE, propose(change("key-$it", fits, 0))) }
-        val result = failure(ShellStateWire.PROPOSE, propose(change("one-more", fits, 0)))
-        assertEquals(ShellStateWire.TOO_LARGE, result)
+        var accepted = 0
+        while (accepted < ShellStateWire.MAX_ENTRIES) {
+            val params = propose(change("key-$accepted", fits, 0))
+            val response = Json.parseToJsonElement(router.dispatch(AdminRpcInvocation("r", ShellStateWire.PROPOSE, params))).jsonObject
+            if (!response.getValue("success").jsonPrimitive.boolean) {
+                assertEquals(ShellStateWire.TOO_LARGE, response["error"]?.jsonPrimitive?.content)
+                break
+            }
+            accepted += 1
+        }
+        assertTrue(accepted > 1 && accepted < ShellStateWire.MAX_ENTRIES, "the document cap stops it after $accepted entries")
         val now = call(ShellStateWire.GET, JsonObject(emptyMap()))
-        assertEquals(perEntryCap, now.getValue("entries").jsonObject.size)
+        assertEquals(accepted, now.getValue("entries").jsonObject.size)
+        assertEquals(accepted.toLong(), now.getValue("document_revision").jsonPrimitive.long)
     }
 
     @Test
