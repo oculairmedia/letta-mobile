@@ -59,10 +59,9 @@ compose-bom = "2026.03.01"
 compose-material3 = "1.5.0-alpha25"
 camerax = "1.4.2"
 exifinterface = "1.4.2"
-# Inline audio/video playback in the chat on every target, behind the MediaPlayer SPI (sharedUI
-# ComposeMediaEngine). MIT. Android drives Media3 ExoPlayer (Apache-2.0, transitive); desktop uses the OS
-# engines through bundled JNI: Media Foundation (Windows), AVFoundation (macOS), GStreamer (Linux, LGPL,
-# system-installed and dynamically linked); the web uses an HTML video element.
+# Inline audio/video playback in the chat on Android and the web, behind the MediaPlayer SPI (sharedUI
+# composeMediaMain ComposeMediaEngine). MIT. Android drives Media3 ExoPlayer (Apache-2.0, transitive); the
+# web uses an HTML video element. Not on desktop: upstream #249 (crash on release) and #267 (audio-only).
 composemediaplayer = "0.11.4"
 work = "2.11.2"
 sentry = "8.42.0"
