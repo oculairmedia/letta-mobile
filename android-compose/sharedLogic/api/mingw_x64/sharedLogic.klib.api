@@ -1594,6 +1594,17 @@ final enum class com.letta.mobile.data.lens/WorkPlayMode : kotlin/Enum<com.letta
     final fun values(): kotlin/Array<com.letta.mobile.data.lens/WorkPlayMode> // com.letta.mobile.data.lens/WorkPlayMode.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.media/MediaEngineFailure : kotlin/Enum<com.letta.mobile.data.media/MediaEngineFailure> { // com.letta.mobile.data.media/MediaEngineFailure|null[0]
+    enum entry Failed // com.letta.mobile.data.media/MediaEngineFailure.Failed|null[0]
+    enum entry Unsupported // com.letta.mobile.data.media/MediaEngineFailure.Unsupported|null[0]
+
+    final val entries // com.letta.mobile.data.media/MediaEngineFailure.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.media/MediaEngineFailure> // com.letta.mobile.data.media/MediaEngineFailure.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.media/MediaEngineFailure // com.letta.mobile.data.media/MediaEngineFailure.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.media/MediaEngineFailure> // com.letta.mobile.data.media/MediaEngineFailure.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.media/MediaKind : kotlin/Enum<com.letta.mobile.data.media/MediaKind> { // com.letta.mobile.data.media/MediaKind|null[0]
     enum entry Audio // com.letta.mobile.data.media/MediaKind.Audio|null[0]
     enum entry File // com.letta.mobile.data.media/MediaKind.File|null[0]
@@ -6071,6 +6082,16 @@ abstract interface com.letta.mobile.data.home/HomePinStore { // com.letta.mobile
 
     abstract fun setOrder(kotlin.collections/List<kotlin/String>) // com.letta.mobile.data.home/HomePinStore.setOrder|setOrder(kotlin.collections.List<kotlin.String>){}[0]
     abstract fun setPinned(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.home/HomePinStore.setPinned|setPinned(kotlin.String;kotlin.Boolean){}[0]
+}
+
+abstract interface com.letta.mobile.data.media/MediaEngine { // com.letta.mobile.data.media/MediaEngine|null[0]
+    abstract fun dispose() // com.letta.mobile.data.media/MediaEngine.dispose|dispose(){}[0]
+    abstract fun open(com.letta.mobile.data.media/MediaSource) // com.letta.mobile.data.media/MediaEngine.open|open(com.letta.mobile.data.media.MediaSource){}[0]
+    abstract fun pause() // com.letta.mobile.data.media/MediaEngine.pause|pause(){}[0]
+    abstract fun play() // com.letta.mobile.data.media/MediaEngine.play|play(){}[0]
+    abstract fun read(): com.letta.mobile.data.media/MediaEngineReading // com.letta.mobile.data.media/MediaEngine.read|read(){}[0]
+    abstract fun seekTo(kotlin/Long) // com.letta.mobile.data.media/MediaEngine.seekTo|seekTo(kotlin.Long){}[0]
+    abstract fun setOutputVolume(kotlin/Float) // com.letta.mobile.data.media/MediaEngine.setOutputVolume|setOutputVolume(kotlin.Float){}[0]
 }
 
 abstract interface com.letta.mobile.data.media/MediaPlayer { // com.letta.mobile.data.media/MediaPlayer|null[0]
@@ -42468,6 +42489,60 @@ final class com.letta.mobile.data.lanes/LaneArrival { // com.letta.mobile.data.l
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.lanes/LaneArrival.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.lanes/LaneArrival.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.lanes/LaneArrival.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.media/EngineMediaPlayer : com.letta.mobile.data.media/MediaPlayer { // com.letta.mobile.data.media/EngineMediaPlayer|null[0]
+    constructor <init>(com.letta.mobile.data.media/MediaEngine, kotlinx.coroutines/CoroutineScope, kotlin/Long = ...) // com.letta.mobile.data.media/EngineMediaPlayer.<init>|<init>(com.letta.mobile.data.media.MediaEngine;kotlinx.coroutines.CoroutineScope;kotlin.Long){}[0]
+
+    final val engine // com.letta.mobile.data.media/EngineMediaPlayer.engine|{}engine[0]
+        final fun <get-engine>(): com.letta.mobile.data.media/MediaEngine // com.letta.mobile.data.media/EngineMediaPlayer.engine.<get-engine>|<get-engine>(){}[0]
+    final val state // com.letta.mobile.data.media/EngineMediaPlayer.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.media/MediaPlaybackState> // com.letta.mobile.data.media/EngineMediaPlayer.state.<get-state>|<get-state>(){}[0]
+
+    final fun load(com.letta.mobile.data.media/MediaSource) // com.letta.mobile.data.media/EngineMediaPlayer.load|load(com.letta.mobile.data.media.MediaSource){}[0]
+    final fun pause() // com.letta.mobile.data.media/EngineMediaPlayer.pause|pause(){}[0]
+    final fun play() // com.letta.mobile.data.media/EngineMediaPlayer.play|play(){}[0]
+    final fun release() // com.letta.mobile.data.media/EngineMediaPlayer.release|release(){}[0]
+    final fun seekTo(kotlin/Long) // com.letta.mobile.data.media/EngineMediaPlayer.seekTo|seekTo(kotlin.Long){}[0]
+    final fun setMuted(kotlin/Boolean) // com.letta.mobile.data.media/EngineMediaPlayer.setMuted|setMuted(kotlin.Boolean){}[0]
+    final fun setVolume(kotlin/Float) // com.letta.mobile.data.media/EngineMediaPlayer.setVolume|setVolume(kotlin.Float){}[0]
+}
+
+final class com.letta.mobile.data.media/MediaEngineReading { // com.letta.mobile.data.media/MediaEngineReading|null[0]
+    constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long? = ..., com.letta.mobile.data.media/MediaEngineFailure? = ..., kotlin/Boolean = ..., kotlin/Int? = ..., kotlin/Int? = ...) // com.letta.mobile.data.media/MediaEngineReading.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Long;kotlin.Long?;com.letta.mobile.data.media.MediaEngineFailure?;kotlin.Boolean;kotlin.Int?;kotlin.Int?){}[0]
+
+    final val atEnd // com.letta.mobile.data.media/MediaEngineReading.atEnd|{}atEnd[0]
+        final fun <get-atEnd>(): kotlin/Boolean // com.letta.mobile.data.media/MediaEngineReading.atEnd.<get-atEnd>|<get-atEnd>(){}[0]
+    final val durationMs // com.letta.mobile.data.media/MediaEngineReading.durationMs|{}durationMs[0]
+        final fun <get-durationMs>(): kotlin/Long? // com.letta.mobile.data.media/MediaEngineReading.durationMs.<get-durationMs>|<get-durationMs>(){}[0]
+    final val failure // com.letta.mobile.data.media/MediaEngineReading.failure|{}failure[0]
+        final fun <get-failure>(): com.letta.mobile.data.media/MediaEngineFailure? // com.letta.mobile.data.media/MediaEngineReading.failure.<get-failure>|<get-failure>(){}[0]
+    final val hasMedia // com.letta.mobile.data.media/MediaEngineReading.hasMedia|{}hasMedia[0]
+        final fun <get-hasMedia>(): kotlin/Boolean // com.letta.mobile.data.media/MediaEngineReading.hasMedia.<get-hasMedia>|<get-hasMedia>(){}[0]
+    final val isLoading // com.letta.mobile.data.media/MediaEngineReading.isLoading|{}isLoading[0]
+        final fun <get-isLoading>(): kotlin/Boolean // com.letta.mobile.data.media/MediaEngineReading.isLoading.<get-isLoading>|<get-isLoading>(){}[0]
+    final val isPlaying // com.letta.mobile.data.media/MediaEngineReading.isPlaying|{}isPlaying[0]
+        final fun <get-isPlaying>(): kotlin/Boolean // com.letta.mobile.data.media/MediaEngineReading.isPlaying.<get-isPlaying>|<get-isPlaying>(){}[0]
+    final val positionMs // com.letta.mobile.data.media/MediaEngineReading.positionMs|{}positionMs[0]
+        final fun <get-positionMs>(): kotlin/Long // com.letta.mobile.data.media/MediaEngineReading.positionMs.<get-positionMs>|<get-positionMs>(){}[0]
+    final val videoHeight // com.letta.mobile.data.media/MediaEngineReading.videoHeight|{}videoHeight[0]
+        final fun <get-videoHeight>(): kotlin/Int? // com.letta.mobile.data.media/MediaEngineReading.videoHeight.<get-videoHeight>|<get-videoHeight>(){}[0]
+    final val videoWidth // com.letta.mobile.data.media/MediaEngineReading.videoWidth|{}videoWidth[0]
+        final fun <get-videoWidth>(): kotlin/Int? // com.letta.mobile.data.media/MediaEngineReading.videoWidth.<get-videoWidth>|<get-videoWidth>(){}[0]
+
+    final fun component1(): kotlin/Boolean // com.letta.mobile.data.media/MediaEngineReading.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.letta.mobile.data.media/MediaEngineReading.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.media/MediaEngineReading.component3|component3(){}[0]
+    final fun component4(): kotlin/Long // com.letta.mobile.data.media/MediaEngineReading.component4|component4(){}[0]
+    final fun component5(): kotlin/Long? // com.letta.mobile.data.media/MediaEngineReading.component5|component5(){}[0]
+    final fun component6(): com.letta.mobile.data.media/MediaEngineFailure? // com.letta.mobile.data.media/MediaEngineReading.component6|component6(){}[0]
+    final fun component7(): kotlin/Boolean // com.letta.mobile.data.media/MediaEngineReading.component7|component7(){}[0]
+    final fun component8(): kotlin/Int? // com.letta.mobile.data.media/MediaEngineReading.component8|component8(){}[0]
+    final fun component9(): kotlin/Int? // com.letta.mobile.data.media/MediaEngineReading.component9|component9(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long? = ..., com.letta.mobile.data.media/MediaEngineFailure? = ..., kotlin/Boolean = ..., kotlin/Int? = ..., kotlin/Int? = ...): com.letta.mobile.data.media/MediaEngineReading // com.letta.mobile.data.media/MediaEngineReading.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Long;kotlin.Long?;com.letta.mobile.data.media.MediaEngineFailure?;kotlin.Boolean;kotlin.Int?;kotlin.Int?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.media/MediaEngineReading.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.media/MediaEngineReading.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.media/MediaEngineReading.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.data.media/MediaPlaybackCoordinator { // com.letta.mobile.data.media/MediaPlaybackCoordinator|null[0]

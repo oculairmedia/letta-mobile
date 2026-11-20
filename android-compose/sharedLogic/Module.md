@@ -49,7 +49,7 @@ Shared image-ingress policy and attachment budgets. Platform decoders supply ima
 
 # Package com.letta.mobile.data.media
 
-Media kinds, playback limits and the one playback port shared by every platform. `MediaKind.of` classifies a parsed attachment (image, audio, video, file) from its MIME type and file extension; `MediaPlayer` is the engine SPI audio and video share, with platform adapters (Media3 on Android, Java Sound on desktop) behind it and a contract test suite each must pass; `MediaPlaybackCoordinator` keeps one item playing at a time. Keep rendering in `sharedUI` and never log a source: URLs may carry tokens.
+Media kinds, playback limits and the one playback port shared by every platform. `MediaKind.of` classifies a parsed attachment (image, audio, video, file) from its MIME type and file extension; `MediaPlayer` is the playback port audio and video share, with a contract test suite every implementation must pass; `EngineMediaPlayer` implements it once over the narrower `MediaEngine` SPI, so a third-party engine (ComposeMediaPlayer, bound in `sharedUI`) only translates commands and readings, and `JavaSoundMediaPlayer` plays desktop audio; `MediaPlaybackCoordinator` keeps one item playing at a time. Keep rendering in `sharedUI` and never log a source: URLs may carry tokens.
 
 # Package com.letta.mobile.data.beads
 

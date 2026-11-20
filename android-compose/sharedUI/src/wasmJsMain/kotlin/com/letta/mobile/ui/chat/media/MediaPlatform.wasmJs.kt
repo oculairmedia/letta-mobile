@@ -1,10 +1,12 @@
 package com.letta.mobile.ui.chat.media
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import com.letta.mobile.data.media.MediaPlayerFactory
-import com.letta.mobile.data.media.UnsupportedMediaPlayer
+import com.letta.mobile.data.media.MediaKind
+import com.letta.mobile.data.media.MediaPlayer
+import com.letta.mobile.data.media.MediaSource
+import kotlinx.coroutines.CoroutineScope
 
-/** The web has no player yet: every item offers to open elsewhere. */
-@Composable
-internal actual fun rememberPlatformMediaPlayerFactory(): MediaPlayerFactory = remember { MediaPlayerFactory { UnsupportedMediaPlayer() } }
+/** An HTML video element plays every kind, audio-only sources included. */
+internal actual fun platformMediaPlayer(kind: MediaKind, scope: CoroutineScope): MediaPlayer? = null
+
+/** The browser reads `data:` URIs directly, so nothing is written. */
+internal actual fun inlineMediaUri(source: MediaSource.Inline): InlineMediaUri? = source.dataUri()

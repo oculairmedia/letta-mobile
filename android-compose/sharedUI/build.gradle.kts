@@ -109,6 +109,10 @@ kotlin {
                 // letta-mobile-c3np7.3.11: the shared Home page's drag-to-reorder pinned grid - the
                 // library both hosts already use for it. KMP: android, jvm and wasm.
                 implementation(libs.reorderable)
+                // Inline audio and video in the chat on every target: the one engine behind the sharedLogic
+                // MediaPlayer port (ComposeMediaEngine). Media3 on Android, the OS engines on desktop,
+                // an HTML video element on the web.
+                implementation(libs.composemediaplayer)
                 // DrawBoxController inherits from androidx.lifecycle.ViewModel; exposed as api so consumers resolve ViewModel hierarchy.
                 api(libs.androidx.lifecycle.viewmodel)
             }
@@ -151,10 +155,6 @@ kotlin {
                 implementation(libs.androidx.lifecycle.runtime.compose)
                 // letta-mobile-y5q9z: Back folds the canvas bubble's open card.
                 implementation(libs.androidx.activity.compose)
-                // Inline audio and video in the chat: the Android adapter behind the shared MediaPlayer
-                // port (ExoMediaPlayer). Seeking, data: URIs, audio focus and container coverage the
-                // platform MediaPlayer lacks; media3-ui is not used (the surface is a plain SurfaceView).
-                implementation(libs.androidx.media3.exoplayer)
             }
         }
 
