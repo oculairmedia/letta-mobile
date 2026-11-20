@@ -63,7 +63,8 @@ internal object VoiceUpstreamWire {
             put("voice", request.voice)
             put("input", request.text)
             put("response_format", WAV)
-            request.instructions?.let { put("instructions", it) }
+            request.voiceCore?.let { put("voice_core", it) }
+            request.instructions?.let { put("instructions", it.wireName) }
         }.toString()
     }
 

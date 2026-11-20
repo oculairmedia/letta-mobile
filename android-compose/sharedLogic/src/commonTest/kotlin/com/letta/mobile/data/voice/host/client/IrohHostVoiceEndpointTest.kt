@@ -22,7 +22,9 @@ import com.letta.mobile.data.voice.host.HostVoiceGrants
 import com.letta.mobile.data.voice.host.HostVoiceKeyChange
 import com.letta.mobile.data.voice.host.HostVoiceSetupCommand
 import com.letta.mobile.data.voice.host.HostVoiceWire
+import com.letta.mobile.data.voice.host.SpeechContext
 import com.letta.mobile.data.voice.tone.ToneCue
+import com.letta.mobile.data.voice.tone.ToneModule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
@@ -203,17 +205,34 @@ class IrohHostVoiceEndpointTest {
     }
 
     @Test
+    fun theSpeakingAgentIsNamedButItsVoiceCoreIsNeverSent() = runTest {
+        val case = VoiceFixtures.case(HostVoiceWire.SPEECH, "streamed reply")
+        link.frames = { case.stream() }
+
+        endpoint.synthesize(VoiceText("Placeholder reply."), SpeechContext(agentId = "agent-a")).toList()
+        endpoint.synthesize(VoiceText("Placeholder reply.")).toList()
+
+        val (named, unnamed) = link.calls.map { it.second }
+        assertEquals(JsonPrimitive("agent-a"), named["agent_id"])
+        assertEquals(null, named["voice_core"], "the host reads the core from the agent's memory")
+        assertEquals(null, unnamed["agent_id"])
+    }
+
+    @Test
     fun aToneGoesToTheHostAsInstructionsAndNoToneSendsNone() = runTest {
         val case = VoiceFixtures.case(HostVoiceWire.SPEECH, "streamed reply")
         link.frames = { case.stream() }
 
-        endpoint.synthesize(VoiceText("Placeholder reply."), ToneCue("excited")).toList()
-        endpoint.synthesize(VoiceText("Placeholder reply."), null).toList()
+        val excited = SpeechContext(tone = ToneCue(ToneModule.EXCITED), agentId = "agent-a")
+        endpoint.synthesize(VoiceText("Placeholder reply."), excited).toList()
+        endpoint.synthesize(VoiceText("Placeholder reply."), SpeechContext()).toList()
 
         val (toned, plain) = link.calls.map { it.second }
         assertEquals(JsonPrimitive("excited"), toned["instructions"])
+        assertEquals(JsonPrimitive("agent-a"), toned["agent_id"])
         assertEquals(JsonPrimitive("Placeholder reply."), toned["text"])
         assertEquals(null, plain["instructions"])
+        assertEquals(null, plain["agent_id"])
     }
 
     @Test

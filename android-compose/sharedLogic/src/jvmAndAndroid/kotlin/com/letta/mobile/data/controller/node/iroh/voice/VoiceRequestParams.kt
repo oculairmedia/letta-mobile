@@ -1,11 +1,13 @@
 package com.letta.mobile.data.controller.node.iroh.voice
 
+import com.letta.mobile.data.controller.node.iroh.isSafeMemfsSegment
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.voice.audio.pcm.WavCodec
 import com.letta.mobile.data.voice.audio.pcm.WavParse
 import com.letta.mobile.data.voice.host.HostTranscriptionParams
 import com.letta.mobile.data.voice.host.HostVoiceErrorCode
 import com.letta.mobile.data.voice.host.HostVoiceWire
-import com.letta.mobile.data.voice.tone.ToneCues
+import com.letta.mobile.data.voice.tone.ToneModule
 import kotlin.io.encoding.Base64
 import kotlinx.serialization.json.JsonObject
 
@@ -47,11 +49,19 @@ internal object VoiceRequestParams {
     }
 
     /**
+     * `voice.speech` params' optional `agent_id`: the speaking agent, kept only when it is a single
+     * safe path segment (it names the agent whose memory the host reads). A request's own
+     * `voice_core`, if it sends one, is never read: the core comes only from that agent's memory.
+     */
+    fun speechAgent(params: JsonObject?): AgentId? =
+        params?.voiceString("agent_id")?.trim()?.takeIf(::isSafeMemfsSegment)?.let(::AgentId)
+
+    /**
      * `voice.speech` params' optional `instructions` (the reply's mood module): passed on only when it
-     * names a module by [ToneCues.accepts]; anything else, a free-form description included, is dropped
+     * names a module ([ToneModule.named]); anything else, a free-form description included, is dropped
      * and the text is spoken plainly.
      */
-    fun speechInstructions(params: JsonObject?): String? = params?.voiceString("instructions")?.trim()?.takeIf(ToneCues::accepts)
+    fun speechInstructions(params: JsonObject?): ToneModule? = params?.voiceString("instructions")?.trim()?.let(ToneModule::named)
 
     /** Base64 of the largest accepted clip, rounded up to whole groups. */
     private const val MAX_AUDIO_BASE64_CHARS = (HostVoiceWire.MAX_TRANSCRIPTION_AUDIO_BYTES + 2) / 3 * 4

@@ -61,15 +61,18 @@ internal data class HostTranscriptionResult(
 }
 
 /**
- * `voice.speech` params: the text and, when the reply set a tone cue, the speech server's
- * `instructions` for it (omitted when null). Prints no words.
+ * `voice.speech` params: the text and, when known, the speaking agent (whose voice core the host reads
+ * from that agent's own memory; the request never carries the core itself) and, when the reply set a tone
+ * cue, the speech server's `instructions` for it. Each is omitted when null. Prints no words.
  */
 @Serializable
 internal data class HostSpeechParams(
     @SerialName("text") val text: String,
+    @SerialName("agent_id") val agentId: String? = null,
     @SerialName("instructions") val instructions: String? = null,
 ) {
-    override fun toString(): String = "HostSpeechParams(textLength=${text.length}, instructed=${instructions != null})"
+    override fun toString(): String =
+        "HostSpeechParams(textLength=${text.length}, agentNamed=${agentId != null}, instructed=${instructions != null})"
 }
 
 /** What one streamed speech frame carries. */

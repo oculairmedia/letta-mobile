@@ -3,6 +3,7 @@ package com.letta.mobile.data.agenteditor
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.CompactAgentProfile
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.voice.core.VoiceCore
 import com.letta.mobile.ui.chat.session.ChatModelOption
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.JsonElement
@@ -57,10 +58,12 @@ data class AgentEditorForm(
     val metadata: Map<String, JsonElement> = emptyMap(),
     /** The compact profile ([CompactAgentProfile]) as the user set it; null follows the model's recommendation. */
     val compactProfile: Boolean? = null,
+    /** The agent's voice core description, as its `voice` memory block holds it ([VoiceCore]); blank for none. */
+    val voiceDescription: String = "",
 )
 
 /** A field the validation can fault. */
-enum class AgentEditorField { Name, Model, ContextLimit }
+enum class AgentEditorField { Name, Model, ContextLimit, VoiceDescription }
 
 /** A tool the agent can have; [mcp] tools come from an MCP server and are listed apart. */
 data class AgentToolOption(val id: String, val name: String, val description: String? = null, val mcp: Boolean = false)

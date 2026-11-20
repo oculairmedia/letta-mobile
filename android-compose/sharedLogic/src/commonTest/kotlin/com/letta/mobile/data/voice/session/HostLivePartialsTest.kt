@@ -24,6 +24,7 @@ import com.letta.mobile.data.voice.host.HostVoiceSetupCommand
 import com.letta.mobile.data.voice.host.HostVoiceSetupStatus
 import com.letta.mobile.data.voice.host.HostVoiceTestResult
 import com.letta.mobile.data.voice.host.HostVoiceWire
+import com.letta.mobile.data.voice.host.SpeechContext
 import com.letta.mobile.data.voice.host.client.VoiceRoute
 import com.letta.mobile.data.voice.local.LocalSpeechRecognizer
 import com.letta.mobile.data.voice.responder.ClientMessageId
@@ -153,7 +154,7 @@ class HostLivePartialsTest {
         override suspend fun transcribe(audio: AudioClip, language: SpeechLanguage?): SpeechTranscript =
             SpeechTranscript(VoiceText("hello there"))
 
-        override fun synthesize(text: VoiceText): Flow<PcmChunk> = emptyFlow()
+        override fun synthesize(text: VoiceText, context: SpeechContext): Flow<PcmChunk> = emptyFlow()
     }
 
     private companion object {

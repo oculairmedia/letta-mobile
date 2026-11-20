@@ -194,6 +194,10 @@ request bi-stream:
 
 1. Client opens a bi-stream and writes one `admin_rpc` frame: `{"method": "voice.speech", "params": {"text": "..."}}`.
    It does **not** finish its send half: that half stays open as the cancel channel.
+   Optional `agent_id` names the speaking agent (a single path segment; anything else is ignored).
+   The host reads that agent's voice core from its own `voice` memory block (sanitised, at most 200
+   characters, cached until the block changes) and sends it as `voice_core` beside `voice`; an agent
+   without the block speaks in the stored `voice` alone. A `voice_core` in the params is never read.
 2. Host validates (grant, model, voice, text at most 4096 characters, one synthesis in flight),
    then calls `POST {base}/v1/audio/speech` with `response_format: "wav"` and reads the body as it
    streams. A failure before any audio is a single final response with the code.

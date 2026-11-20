@@ -9,6 +9,17 @@ import com.letta.mobile.data.voice.tone.ToneCue
 import kotlinx.coroutines.flow.Flow
 
 /**
+ * What shapes one spoken segment beyond its words: the [agentId] of the speaking agent (null speaks in the
+ * stored voice) and the reply's [tone] cue (null for none). Prints no words.
+ */
+data class SpeechContext(
+    val tone: ToneCue? = null,
+    val agentId: String? = null,
+) {
+    override fun toString(): String = "SpeechContext(toned=${tone != null}, agentNamed=${agentId != null})"
+}
+
+/**
  * The speech endpoint as the host keeps it: one setup shared by every device, with the API key held
  * only by the host, and speech requests sent through the host, which calls the speech server.
  *
@@ -50,15 +61,12 @@ interface HostVoiceEndpoint {
     suspend fun transcribe(audio: AudioClip, language: SpeechLanguage? = null): SpeechTranscript
 
     /**
-     * [text] spoken in the stored voice, as 16-bit PCM emitted while it streams in. Collecting sends
-     * the request; cancelling the collector cancels it on the host and at the speech server.
+     * [text] spoken as [context] asks, as 16-bit PCM emitted while it streams in: the speaking agent,
+     * whose voice core the host reads from that agent's own memory (falling back to the stored voice
+     * when it has none), and the reply's tone cue, which goes in the request as `instructions` for the
+     * host to pass to the speech server. The default context speaks in the stored voice with no cue.
+     * Collecting sends the request; cancelling the collector cancels it on the host and at the speech
+     * server.
      */
-    fun synthesize(text: VoiceText): Flow<PcmChunk>
-
-    /**
-     * [text] spoken as [tone] asks: the cue goes in the request as `instructions` for the host to pass
-     * to the speech server (nothing is sent for null). An endpoint that cannot carry it speaks as
-     * [synthesize] does; the default does.
-     */
-    fun synthesize(text: VoiceText, tone: ToneCue?): Flow<PcmChunk> = synthesize(text)
+    fun synthesize(text: VoiceText, context: SpeechContext = SpeechContext()): Flow<PcmChunk>
 }

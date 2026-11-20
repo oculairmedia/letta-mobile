@@ -2,6 +2,7 @@ package com.letta.mobile.data.voice.responder.chat
 
 import com.letta.mobile.data.chat.projection.chronologicalMessages
 import com.letta.mobile.data.chat.sentruns.IdentifiedChatSend
+import com.letta.mobile.data.chat.sentruns.SentMessageId
 import com.letta.mobile.data.flow.DerivedStateFlow
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UiMessage
@@ -51,15 +52,34 @@ class ChatVoiceChatSession(
         voiceChatState(withLiveRows(ui.messages, liveRows.value), sender.sentRuns.value, conversation.value, ui.sendQueue)
     }
 
-    /** Sends [text]; throws [ChatSendRefusedException] when the session refused it before enqueuing. */
+    /** The agent answering the latest send, captured when that send started its reply; null before any. */
+    private val answering = MutableStateFlow<String?>(null)
+
+    /**
+     * Sends [text]; throws [ChatSendRefusedException] when the session refused it before enqueuing.
+     * The page's agent is captured as the one answering before the send goes out, so the reply is
+     * spoken in that agent's voice even if the page moves to another agent while it plays. A send
+     * that returns no id or throws started no reply (a started send always returns its id, per
+     * [IdentifiedChatSend.sendIdentified]), so the agent answering before it is put back.
+     */
     override suspend fun send(text: VoiceText): SentUtterance {
-        val id = sender.sendIdentified(text.value) ?: throw ChatSendRefusedException()
-        return SentUtterance(ClientMessageId(id.value))
+        val previous = answering.value
+        answering.value = page.uiState.value.agentId?.takeIf { it.isNotBlank() }
+        var id: SentMessageId? = null
+        try {
+            id = sender.sendIdentified(text.value)
+        } finally {
+            if (id == null) answering.value = previous
+        }
+        return SentUtterance(ClientMessageId((id ?: throw ChatSendRefusedException()).value))
     }
 
     override fun stopRun() {
         page.actions.stopRun()
     }
+
+    /** The agent answering the reply in progress, as captured by its [send]; never the page's agent read now. */
+    override val agentId: String? get() = answering.value
 }
 
 /**

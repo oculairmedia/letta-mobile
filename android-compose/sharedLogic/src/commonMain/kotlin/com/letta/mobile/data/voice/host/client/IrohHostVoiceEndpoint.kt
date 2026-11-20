@@ -20,7 +20,7 @@ import com.letta.mobile.data.voice.host.HostVoiceSetupCommand
 import com.letta.mobile.data.voice.host.HostVoiceSetupStatus
 import com.letta.mobile.data.voice.host.HostVoiceTestResult
 import com.letta.mobile.data.voice.host.HostVoiceWire
-import com.letta.mobile.data.voice.tone.ToneCue
+import com.letta.mobile.data.voice.host.SpeechContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
@@ -99,11 +99,9 @@ class IrohHostVoiceEndpoint(
         return SpeechTranscript(VoiceText(words), parts.flatMap { it.segments })
     }
 
-    override fun synthesize(text: VoiceText): Flow<PcmChunk> = synthesize(text, null)
-
-    override fun synthesize(text: VoiceText, tone: ToneCue?): Flow<PcmChunk> = channelFlow {
+    override fun synthesize(text: VoiceText, context: SpeechContext): Flow<PcmChunk> = channelFlow {
         if (text.value.length > HostVoiceWire.MAX_SPEECH_TEXT_CHARS) throw HostVoiceException(HostVoiceErrorCode.PAYLOAD_TOO_LARGE)
-        val request = HostSpeechParams(text.value, tone?.instructions)
+        val request = HostSpeechParams(text.value, context.agentId, context.tone?.instructions)
         val params = json.encodeToJsonElement(HostSpeechParams.serializer(), request) as JsonObject
         var attempt = 1
         while (speakOnce(this, params) == SpeechAttempt.BUSY) {

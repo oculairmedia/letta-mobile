@@ -22,6 +22,7 @@ import com.letta.mobile.data.voice.host.HostVoiceSetupCommand
 import com.letta.mobile.data.voice.host.HostVoiceSetupStatus
 import com.letta.mobile.data.voice.host.HostVoiceTestResult
 import com.letta.mobile.data.voice.host.HostVoiceWire
+import com.letta.mobile.data.voice.host.SpeechContext
 import com.letta.mobile.data.voice.host.client.FakeHostVoiceLink
 import com.letta.mobile.data.voice.host.client.HostVoiceReply
 import com.letta.mobile.data.voice.host.client.SharedVoiceSetup
@@ -235,7 +236,7 @@ class HostVoiceRoutingTest {
         override suspend fun transcribe(audio: AudioClip, language: com.letta.mobile.data.voice.SpeechLanguage?): SpeechTranscript =
             error("unused")
 
-        override fun synthesize(text: VoiceText): Flow<PcmChunk> {
+        override fun synthesize(text: VoiceText, context: SpeechContext): Flow<PcmChunk> {
             spoken += text.value
             return emptyFlow()
         }

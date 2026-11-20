@@ -783,6 +783,10 @@ What a speech server offers, for the Voice settings' model and voice pickers, on
 
 Per-destination consent for remote speech endpoints: a grant names one exact origin (scheme, host and port) and what may be sent there, audio for transcription or text for synthesis. Grants are a stored value of their own, apart from the voice settings, so an export or backup never carries them; endpoint engines check them before every request.
 
+# Package com.letta.mobile.data.voice.core
+
+An agent's voice core: one short description of how the agent sounds, kept in the agent's memory as its `voice` block and edited by the agent or the person through the agent editor's typed Voice description. The host reads it from that block when it speaks for the agent and sends it to the speech server as `voice_core`; it never comes from a reply or a client's request. Sanitised to one line of at most 200 characters; an agent without the block speaks in the configured named voice.
+
 # Package com.letta.mobile.data.voice.endpoint
 
 An OpenAI-compatible speech client for `POST /v1/audio/transcriptions` (multipart) and `POST /v1/audio/speech` (JSON, streamed audio), built on a caller-supplied Ktor engine with no logging and a redacted bearer key. Failures carry fixed codes (unreachable, unauthorized, rejected, bad response, timed out); diagnostics carry operation, code and status only. The transcriber and the synthesising mouth check a destination grant for the exact endpoint and payload before every request and fail with permission required rather than falling back.

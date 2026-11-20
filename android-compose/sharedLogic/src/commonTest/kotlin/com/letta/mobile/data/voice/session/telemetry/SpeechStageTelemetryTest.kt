@@ -12,6 +12,7 @@ import com.letta.mobile.data.voice.endpoint.SpeechOperation
 import com.letta.mobile.data.voice.endpoint.SpeechSpeed
 import com.letta.mobile.data.voice.endpoint.StreamingSpeechSynthesizer
 import com.letta.mobile.data.voice.tone.ToneCue
+import com.letta.mobile.data.voice.tone.ToneModule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
@@ -77,7 +78,7 @@ class SpeechStageTelemetryTest {
             telemetry,
         )
 
-        wrapped.stream(words, SpeechSpeed.Normal, ToneCue("warm")).toList()
+        wrapped.stream(words, SpeechSpeed.Normal, ToneCue(ToneModule.WARM)).toList()
         wrapped.stream(words, SpeechSpeed.Normal).toList()
 
         assertEquals(listOf("warm", null), tones.map { it?.instructions })

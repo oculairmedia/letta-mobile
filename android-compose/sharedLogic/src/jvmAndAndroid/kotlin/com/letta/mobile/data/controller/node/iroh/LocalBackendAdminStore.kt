@@ -156,6 +156,10 @@ open class LocalBackendAdminStore(
     /** See [LocalBackendBlockReader.blocksForAgent]. */
     fun blocksForAgentProjected(agentId: String): JsonArray = blockReader.blocksForAgent(agentId)
 
+    /** The file holding [agentId]'s [label] block (read-only use; it need not exist); null for an unsafe name. */
+    internal fun agentBlockFile(agentId: AgentId, label: String): File? =
+        runCatching { blockReader.blockFile(agentId, label) }.getOrNull()
+
     /** See [LocalBackendRunReader.listRuns]. */
     internal fun listRunsProjected(query: RunQuery): JsonArray? = runReader.listRuns(query)
 

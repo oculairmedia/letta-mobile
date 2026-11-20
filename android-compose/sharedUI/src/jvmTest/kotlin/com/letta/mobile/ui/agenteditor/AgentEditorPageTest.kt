@@ -6,16 +6,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -23,6 +27,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.agenteditor.AgentCreated
 import com.letta.mobile.data.agenteditor.AgentEditorBackend
@@ -34,6 +39,8 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
@@ -82,6 +89,10 @@ class AgentEditorPageTest {
         override suspend fun attachTool(agentId: AgentId, toolId: ToolId) { attached += toolId.value }
         override suspend fun detachTool(agentId: AgentId, toolId: ToolId) = Unit
         override suspend fun delete(agentId: AgentId) { deleted += agentId.value }
+
+        /** Each voice block write: the value and whether the block already existed. */
+        val voiceWrites = mutableListOf<Pair<String, Boolean>>()
+        override suspend fun writeVoiceCore(agentId: AgentId, value: String, exists: Boolean) { voiceWrites += value to exists }
     }
 
     private class Outcome {
@@ -95,12 +106,13 @@ class AgentEditorPageTest {
         mode: AgentEditorMode,
         outcome: Outcome = Outcome(),
         agentDefaults: AgentDefaultsRepository? = StoredAgentDefaults(InMemorySecureSettingsStore()),
+        width: State<Dp> = mutableStateOf(720.dp),
     ) {
         setContent {
             ProvideLettaHost(LettaHost.Pointer) {
                 CompositionLocalProvider(LocalAgentDefaults provides agentDefaults) {
                     SharedMaterialTheme {
-                        Box(Modifier.size(720.dp, 1400.dp)) { Editor(backend, mode, outcome) }
+                        Box(Modifier.size(width.value, 1400.dp)) { Editor(backend, mode, outcome) }
                     }
                 }
             }
@@ -264,6 +276,88 @@ class AgentEditorPageTest {
         onNodeWithText("Could not open the agent").assertExists()
         onNodeWithTag(SettingsSectionTags.ACTION_PREFIX + "retry").assertIsEnabled()
         onNodeWithTag(AgentEditorPageTags.SAVE).assertIsNotEnabled()
+    }
+
+    private val voiced = ada.copy(
+        blocks = persistentListOf(Block(id = BlockId("b-voice"), label = "voice", value = "A calm, low voice.")),
+    )
+
+    @Test
+    fun theVoiceDescriptionComesFromTheVoiceBlockAndSavesThroughIt() = runComposeUiTest {
+        val backend = RecordingBackend(voiced, listOf(search))
+        editor(backend, AgentEditorMode.Edit("a-1"))
+
+        val row = row("voice-description").performScrollTo()
+        row.assertTextContains("A calm, low voice.")
+        row.performTextClearance()
+        row.performTextInput("A bright,\nquick voice.")
+        onNodeWithTag(AgentEditorPageTags.SAVE).assertIsEnabled().performClick()
+        waitForIdle()
+
+        assertEquals(listOf("A bright, quick voice." to true), backend.voiceWrites)
+        assertTrue(backend.updates.isEmpty(), "only the voice block changed")
+    }
+
+    @Test
+    fun savingTheDescriptionKeepsTheBlocksFrontMatter() = runComposeUiTest {
+        val frontMatter = "---\ndescription: How this agent sounds\n---\n"
+        val block = Block(id = BlockId("b-voice"), label = "voice", value = frontMatter + "A calm voice.")
+        val agent = ada.copy(blocks = persistentListOf(block))
+        val backend = RecordingBackend(agent, listOf(search))
+        editor(backend, AgentEditorMode.Edit("a-1"))
+
+        val row = row("voice-description").performScrollTo()
+        row.assertTextContains("A calm voice.")
+        row.performTextClearance()
+        row.performTextInput("A warm voice.")
+        onNodeWithTag(AgentEditorPageTags.SAVE).performClick()
+        waitForIdle()
+
+        assertEquals(listOf(frontMatter + "A warm voice." to true), backend.voiceWrites)
+    }
+
+    @Test
+    fun aFirstDescriptionCreatesTheVoiceBlock() = runComposeUiTest {
+        val backend = RecordingBackend(ada, listOf(search))
+        editor(backend, AgentEditorMode.Edit("a-1"))
+
+        row("voice-description").performScrollTo().performTextInput("A warm voice.")
+        onNodeWithTag(AgentEditorPageTags.SAVE).performClick()
+        waitForIdle()
+
+        assertEquals(listOf("A warm voice." to false), backend.voiceWrites)
+    }
+
+    @Test
+    fun aDescriptionTooLongCannotBeSaved() = runComposeUiTest {
+        val backend = RecordingBackend(ada, listOf(search))
+        editor(backend, AgentEditorMode.Edit("a-1"))
+
+        row("voice-description").performScrollTo().performTextInput("a".repeat(201))
+
+        onNodeWithText("Keep the voice description to 200 characters.").assertExists()
+        onNodeWithTag(AgentEditorPageTags.SAVE).assertIsNotEnabled()
+        assertTrue(backend.voiceWrites.isEmpty())
+    }
+
+    @Test
+    fun aNewAgentHasNoVoiceSectionYet() = runComposeUiTest {
+        editor(RecordingBackend(ada, listOf(search)), AgentEditorMode.Create)
+        section(AgentEditorSectionKeys.VOICE).assertDoesNotExist()
+    }
+
+    @Test
+    fun theVoiceSectionFitsAtEveryViewport() = runComposeUiTest {
+        val width = mutableStateOf(360.dp)
+        editor(RecordingBackend(voiced, listOf(search)), AgentEditorMode.Edit("a-1"), width = width)
+
+        listOf(360.dp, 700.dp, 760.dp, 1200.dp).forEach { viewport ->
+            width.value = viewport
+            waitForIdle()
+            val field = row("voice-description").performScrollTo().assertIsDisplayed().getBoundsInRoot()
+            assertTrue(field.left >= 0.dp && field.right <= viewport, "the field fits at $viewport: $field")
+            section(AgentEditorSectionKeys.VOICE).assertIsDisplayed()
+        }
     }
 
     @Test
