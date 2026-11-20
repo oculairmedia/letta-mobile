@@ -95,30 +95,43 @@ internal class ShellStateStore(
      */
     suspend fun propose(changes: List<ShellStateChange>, actor: ShellStateActor): ShellStateWrite = lock.withLock {
         val stored = persistence.read()
-        if (changes.any { stored.entries[it.key]?.revision.orZero() != it.expectedRevision }) {
-            throw ShellStateRefusal(ShellStateWire.REVISION_CONFLICT)
-        }
+        requireCurrent(stored, changes)
         val effective = changes.filter { stored.entries[it.key]?.value != it.value }
         if (effective.isEmpty()) return@withLock ShellStateWrite(stored, changed = false)
-        val revision = stored.documentRevision + 1
-        val entries = stored.entries.toSortedMap()
-        val writtenAt = clock()
-        effective.forEach { change ->
-            val value = change.value
-            if (value == null) entries.remove(change.key) else entries[change.key] = ShellStateEntry(value, revision, actor, writtenAt)
-        }
-        val next = ShellStateSnapshot(ShellStateSchema.VERSION, revision, entries)
-        if (entries.size > ShellStateWire.MAX_ENTRIES || encodedBytes(next) > ShellStateWire.MAX_DOCUMENT_BYTES) {
-            throw ShellStateRefusal(ShellStateWire.TOO_LARGE)
-        }
+        val next = apply(stored, effective, actor)
+        requireWithinLimits(next)
         persistence.write(next)
         ShellStateWrite(next, changed = true)
     }
 
+    /** Refuses with a revision conflict unless every change was based on its entry's current revision. */
+    private fun requireCurrent(stored: ShellStateSnapshot, changes: List<ShellStateChange>) {
+        if (changes.any { currentRevision(stored, it.key) != it.expectedRevision }) {
+            throw ShellStateRefusal(ShellStateWire.REVISION_CONFLICT)
+        }
+    }
+
+    private fun currentRevision(stored: ShellStateSnapshot, key: String): Long = stored.entries[key]?.revision ?: 0L
+
+    /** The document after [changes]: the revision goes up once and every written entry takes it. */
+    private fun apply(stored: ShellStateSnapshot, changes: List<ShellStateChange>, actor: ShellStateActor): ShellStateSnapshot {
+        val revision = stored.documentRevision + 1
+        val writtenAt = clock()
+        val entries = stored.entries.toSortedMap()
+        changes.forEach { change ->
+            val value = change.value
+            if (value == null) entries.remove(change.key) else entries[change.key] = ShellStateEntry(value, revision, actor, writtenAt)
+        }
+        return ShellStateSnapshot(ShellStateSchema.VERSION, revision, entries)
+    }
+
+    private fun requireWithinLimits(next: ShellStateSnapshot) {
+        val tooMany = next.entries.size > ShellStateWire.MAX_ENTRIES
+        if (tooMany || encodedBytes(next) > ShellStateWire.MAX_DOCUMENT_BYTES) throw ShellStateRefusal(ShellStateWire.TOO_LARGE)
+    }
+
     private fun encodedBytes(state: ShellStateSnapshot): Int =
         LettaJson.persisted.encodeToString(ShellStateSnapshot.serializer(), state).toByteArray(Charsets.UTF_8).size
-
-    private fun Long?.orZero(): Long = this ?: 0L
 
     internal companion object {
         /** The document of a host that never stored one. */
