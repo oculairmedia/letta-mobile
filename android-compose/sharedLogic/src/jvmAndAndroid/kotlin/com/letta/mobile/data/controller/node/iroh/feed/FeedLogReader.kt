@@ -19,19 +19,31 @@ internal object FeedLogReader {
         val lines = text.split('\n')
         val torn = lines.last().takeIf { it.isNotBlank() }
         val complete = lines.dropLast(1)
-        val header = FeedLineParser.parseObject(complete.firstOrNull() ?: torn.orEmpty()) ?: corrupt("empty or unreadable header")
-        if (header.number(FeedLogCodec.VERSION_FIELD) != FeedLogCodec.VERSION) corrupt("unknown journal version")
+        val header = readHeader(complete.firstOrNull() ?: torn.orEmpty())
         val log = FeedLog(key, file)
         log.baseSeq = FeedSeq(header.number(FeedLogCodec.BASE_FIELD) ?: 0)
         log.headSeq = log.baseSeq
-        val tornAfterHeader = torn.takeIf { complete.isNotEmpty() }
-        // A header with no newline after it is itself a torn write: cut it off before anything is appended to it.
-        if (complete.isEmpty() && torn != null) log.tornTail = true
-        complete.drop(1).forEach { line -> apply(log, FeedLineParser.parse(line)) }
-        tornAfterHeader?.let { line -> readTornTail(log, line) }
+        replay(log, complete, torn)
         log.headSeq = maxOf(log.headSeq, FeedSeq(header.number(FeedLogCodec.HEAD_FIELD) ?: 0))
         log.fileBytes = ByteCount(text.toByteArray(Charsets.UTF_8).size.toLong())
         return log
+    }
+
+    /** The journal's first line, decoded and checked to be a version this reader understands. */
+    private fun readHeader(line: String) =
+        (FeedLineParser.parseObject(line) ?: corrupt("empty or unreadable header")).also { header ->
+            if (header.number(FeedLogCodec.VERSION_FIELD) != FeedLogCodec.VERSION) corrupt("unknown journal version")
+        }
+
+    /** Applies every complete line after the header, then the torn last line if there is one. */
+    private fun replay(log: FeedLog, complete: List<String>, torn: String?) {
+        // A header with no newline after it is itself a torn write: cut it off before anything is appended to it.
+        if (complete.isEmpty()) {
+            if (torn != null) log.tornTail = true
+            return
+        }
+        complete.drop(1).forEach { line -> apply(log, FeedLineParser.parse(line)) }
+        torn?.let { line -> readTornTail(log, line) }
     }
 
     private fun readTornTail(log: FeedLog, line: String) {
