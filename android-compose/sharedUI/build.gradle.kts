@@ -132,6 +132,17 @@ kotlin {
             }
         }
 
+        // Inline audio and video on Android and the web: ComposeMediaPlayer behind the sharedLogic
+        // MediaPlayer port (ComposeMediaEngine). Not on desktop, which keeps Java Sound for audio and the
+        // open-elsewhere card for video until the library's Windows and macOS engines are fixed
+        // (a crash on release, and no audio-only sources), so no native library ships with it.
+        val composeMediaMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(libs.composemediaplayer)
+            }
+        }
+
         jvmMain {
             dependsOn(skikoMain)
             dependencies {
@@ -141,9 +152,11 @@ kotlin {
 
         wasmJsMain {
             dependsOn(skikoMain)
+            dependsOn(composeMediaMain)
         }
 
         androidMain {
+            dependsOn(composeMediaMain)
             dependencies {
                 // Turning picked photos upright before they go on a canvas.
                 implementation(libs.androidx.exifinterface)
@@ -151,10 +164,6 @@ kotlin {
                 implementation(libs.androidx.lifecycle.runtime.compose)
                 // letta-mobile-y5q9z: Back folds the canvas bubble's open card.
                 implementation(libs.androidx.activity.compose)
-                // Inline audio and video in the chat: the Android adapter behind the shared MediaPlayer
-                // port (ExoMediaPlayer). Seeking, data: URIs, audio focus and container coverage the
-                // platform MediaPlayer lacks; media3-ui is not used (the surface is a plain SurfaceView).
-                implementation(libs.androidx.media3.exoplayer)
             }
         }
 

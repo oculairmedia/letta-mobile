@@ -24091,8 +24091,69 @@ public final class com/letta/mobile/data/mapper/MessageMappingState {
 	public fun <init> ()V
 }
 
+public final class com/letta/mobile/data/media/EngineMediaPlayer : com/letta/mobile/data/media/MediaPlayer {
+	public fun <init> (Lcom/letta/mobile/data/media/MediaEngine;Lkotlinx/coroutines/CoroutineScope;J)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/media/MediaEngine;Lkotlinx/coroutines/CoroutineScope;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getEngine ()Lcom/letta/mobile/data/media/MediaEngine;
+	public fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun load (Lcom/letta/mobile/data/media/MediaSource;)V
+	public fun pause ()V
+	public fun play ()V
+	public fun release ()V
+	public fun seekTo (J)V
+	public fun setMuted (Z)V
+	public fun setVolume (F)V
+}
+
 public final class com/letta/mobile/data/media/MediaClockKt {
 	public static final fun formatMediaClock (J)Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/media/MediaEngine {
+	public abstract fun dispose ()V
+	public abstract fun open (Lcom/letta/mobile/data/media/MediaSource;)V
+	public abstract fun pause ()V
+	public abstract fun play ()V
+	public abstract fun read ()Lcom/letta/mobile/data/media/MediaEngineReading;
+	public abstract fun seekTo (J)V
+	public abstract fun setOutputVolume (F)V
+}
+
+public final class com/letta/mobile/data/media/MediaEngineFailure : java/lang/Enum {
+	public static final field Failed Lcom/letta/mobile/data/media/MediaEngineFailure;
+	public static final field Unsupported Lcom/letta/mobile/data/media/MediaEngineFailure;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/media/MediaEngineFailure;
+	public static fun values ()[Lcom/letta/mobile/data/media/MediaEngineFailure;
+}
+
+public final class com/letta/mobile/data/media/MediaEngineReading {
+	public fun <init> ()V
+	public fun <init> (ZZZJLjava/lang/Long;Lcom/letta/mobile/data/media/MediaEngineFailure;ZLjava/lang/Integer;Ljava/lang/Integer;)V
+	public synthetic fun <init> (ZZZJLjava/lang/Long;Lcom/letta/mobile/data/media/MediaEngineFailure;ZLjava/lang/Integer;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Z
+	public final fun component3 ()Z
+	public final fun component4 ()J
+	public final fun component5 ()Ljava/lang/Long;
+	public final fun component6 ()Lcom/letta/mobile/data/media/MediaEngineFailure;
+	public final fun component7 ()Z
+	public final fun component8 ()Ljava/lang/Integer;
+	public final fun component9 ()Ljava/lang/Integer;
+	public final fun copy (ZZZJLjava/lang/Long;Lcom/letta/mobile/data/media/MediaEngineFailure;ZLjava/lang/Integer;Ljava/lang/Integer;)Lcom/letta/mobile/data/media/MediaEngineReading;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/media/MediaEngineReading;ZZZJLjava/lang/Long;Lcom/letta/mobile/data/media/MediaEngineFailure;ZLjava/lang/Integer;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/data/media/MediaEngineReading;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAtEnd ()Z
+	public final fun getDurationMs ()Ljava/lang/Long;
+	public final fun getFailure ()Lcom/letta/mobile/data/media/MediaEngineFailure;
+	public final fun getHasMedia ()Z
+	public final fun getPositionMs ()J
+	public final fun getVideoHeight ()Ljava/lang/Integer;
+	public final fun getVideoWidth ()Ljava/lang/Integer;
+	public fun hashCode ()I
+	public final fun isLoading ()Z
+	public final fun isPlaying ()Z
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/media/MediaKind : java/lang/Enum {

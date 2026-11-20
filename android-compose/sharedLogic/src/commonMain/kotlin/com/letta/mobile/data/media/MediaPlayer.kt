@@ -68,8 +68,8 @@ data class MediaPlaybackState(
 }
 
 /**
- * The one playback engine port. Audio and video share it; platform adapters (Media3 on Android,
- * Java Sound on desktop) implement it and must pass the shared contract suite. It only plays: it does
+ * The one playback port. Audio and video share it; every implementation ([EngineMediaPlayer] over
+ * ComposeMediaPlayer, Java Sound for desktop audio) must pass the shared contract suite. It only plays: it does
  * not choose which item plays (see [MediaPlaybackCoordinator]) and never logs its source.
  *
  * Contract:

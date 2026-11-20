@@ -5,7 +5,7 @@ import androidx.compose.ui.Modifier
 import com.letta.mobile.data.media.MediaPlayer
 import com.letta.mobile.data.media.MediaPlayerFactory
 
-/** This platform's player factory: Media3 on Android, Java Sound on desktop, none on the web. */
+/** This platform's player factory: ComposeMediaPlayer on Android and the web, Java Sound for desktop audio. */
 @Composable
 internal expect fun rememberPlatformMediaPlayerFactory(): MediaPlayerFactory
 
