@@ -59,6 +59,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
+import com.letta.mobile.data.voice.tone.ToneCues
 import com.letta.mobile.ui.chat.surface.timeline.rememberTimelineFadeAlphas
 import com.letta.mobile.ui.chat.surface.timeline.timelineFadingEdges
 import androidx.compose.ui.unit.LayoutDirection
@@ -488,7 +489,9 @@ internal fun BubbleText(
     fadeLength: Dp? = null,
 ) {
     // Seeded with the reply as it stands, so a bubble that fades back in does not type it out again.
-    val shown = rememberSmoothedStreamingText(rawText = turn.text, isStreaming = turn.streaming, seedText = turn.text)
+    // Tone cues are for the voice, never shown; an unfinished one is held while it streams.
+    val text = ToneCues.strip(turn.text, streaming = turn.streaming)
+    val shown = rememberSmoothedStreamingText(rawText = text, isStreaming = turn.streaming, seedText = text)
     val scroll = rememberScrollState()
     LaunchedEffect(scroll, turn.streaming) {
         if (turn.streaming) snapshotFlow { scroll.maxValue }.collect { scroll.scrollTo(it) }

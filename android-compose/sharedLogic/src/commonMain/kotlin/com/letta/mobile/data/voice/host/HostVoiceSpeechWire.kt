@@ -60,12 +60,16 @@ internal data class HostTranscriptionResult(
     )
 }
 
-/** `voice.speech` params. Prints no words. */
+/**
+ * `voice.speech` params: the text and, when the reply set a tone cue, the speech server's
+ * `instructions` for it (omitted when null). Prints no words.
+ */
 @Serializable
 internal data class HostSpeechParams(
     @SerialName("text") val text: String,
+    @SerialName("instructions") val instructions: String? = null,
 ) {
-    override fun toString(): String = "HostSpeechParams(textLength=${text.length})"
+    override fun toString(): String = "HostSpeechParams(textLength=${text.length}, instructed=${instructions != null})"
 }
 
 /** What one streamed speech frame carries. */

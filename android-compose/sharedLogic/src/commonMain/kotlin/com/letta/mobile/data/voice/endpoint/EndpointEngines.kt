@@ -9,6 +9,7 @@ import com.letta.mobile.data.voice.audio.PcmChunk
 import com.letta.mobile.data.voice.audio.pcm.WavStreamDecoder
 import com.letta.mobile.data.voice.consent.VoiceEndpointGrantSource
 import com.letta.mobile.data.voice.consent.VoiceEndpointPayload
+import com.letta.mobile.data.voice.tone.ToneCue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 
@@ -67,10 +68,13 @@ class EndpointSpeechSynthesizer(
      * closes it. A response that is not 16-bit PCM WAVE fails with a [SpeechEndpointException]
      * carrying BAD_RESPONSE or UNSUPPORTED_FORMAT.
      */
-    override fun stream(text: VoiceText, speed: SpeechSpeed): Flow<PcmChunk> = channelFlow {
+    override fun stream(text: VoiceText, speed: SpeechSpeed): Flow<PcmChunk> = stream(text, speed, null)
+
+    /** As [stream], with [tone] sent as the request's `instructions` when there is one. */
+    override fun stream(text: VoiceText, speed: SpeechSpeed, tone: ToneCue?): Flow<PcmChunk> = channelFlow {
         client.requireGrant(grants, VoiceEndpointPayload.TEXT_FOR_SYNTHESIS, SpeechOperation.SPEECH)
         val decoder = WavStreamDecoder()
-        val request = SpeechRequest(text, settings.speechModel, settings.voice, AudioEncoding.WAV, speed)
+        val request = SpeechRequest(text, settings.speechModel, settings.voice, AudioEncoding.WAV, speed, tone)
         client.synthesize(request) { chunk -> decoder.push(chunk.bytes)?.let { send(it) } }
         if (!decoder.started) throw SpeechEndpointException(SpeechOperation.SPEECH, VoiceErrorCode.BAD_RESPONSE)
     }

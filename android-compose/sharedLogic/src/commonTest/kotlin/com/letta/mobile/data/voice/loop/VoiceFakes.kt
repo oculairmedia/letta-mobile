@@ -92,6 +92,9 @@ internal class FakeMouth(private val log: EngineLog) : VoiceMouth {
     private val emitted = MutableSharedFlow<VoiceMouthEvent>(extraBufferCapacity = 64)
     val queued = mutableListOf<SpeechSegment>()
     val spokenTexts = mutableListOf<String>()
+
+    /** Every segment it was asked to say, in order, tone included. */
+    val segments = mutableListOf<SpeechSegment>()
     var stops = 0
         private set
     var hangOnStop = false
@@ -104,6 +107,7 @@ internal class FakeMouth(private val log: EngineLog) : VoiceMouth {
     override fun speak(segment: SpeechSegment) {
         check(!throwOnSpeak) { "speaker gone" }
         queued += segment
+        segments += segment
         spokenTexts += segment.text.value
         log.add("mouth:speak")
     }

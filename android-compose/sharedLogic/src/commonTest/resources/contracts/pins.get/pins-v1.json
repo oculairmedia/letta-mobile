@@ -1,0 +1,94 @@
+{
+  "method": "pins.get",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/pins/AgentPinsRoutes.kt",
+  "contract": "pins",
+  "capability": "pinned_agents_v1",
+  "required_capability": "chat.read",
+  "streamed": false,
+  "spec": "docs/reference/contracts/pins-v1.md",
+  "note": "Synthetic agent ids only. pushed_frame lists the deterministic fields of the pins_updated push an accepted change sends; id (pins-updated-<uuid>) and ts (ISO-8601) vary per push. A case without pushed_frame sends no push.",
+  "cases": [
+    {
+      "name": "nothing stored",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "pins": {
+          "stored": null
+        }
+      },
+      "params": {},
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "revision": 0,
+          "agent_ids": []
+        }
+      }
+    },
+    {
+      "name": "a stored list",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "pins": {
+          "stored": {
+            "revision": 3,
+            "agent_ids": [
+              "agent-b",
+              "agent-a"
+            ]
+          }
+        }
+      },
+      "params": {},
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "revision": 3,
+          "agent_ids": [
+            "agent-b",
+            "agent-a"
+          ]
+        }
+      }
+    },
+    {
+      "name": "agent-scoped peer",
+      "context": {
+        "authenticated": true,
+        "authorized_agent_ids": [
+          "agent-a"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "pins": {
+          "stored": {
+            "revision": 3,
+            "agent_ids": [
+              "agent-b",
+              "agent-a"
+            ]
+          }
+        }
+      },
+      "params": {},
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "forbidden: agent not in this device's scope"
+      }
+    }
+  ]
+}

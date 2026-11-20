@@ -118,7 +118,38 @@ class DirectAppServerDialTest {
         }
     }
 
-    private fun directTransport(port: Int, releases: AtomicInteger) = IrohChannelTransport(
+    @Test
+    fun theOnDeviceHostServesSharedPinsThroughTheSameContract() = runBlocking {
+        val port = startStockServer()
+        val stateDir = java.nio.file.Files.createTempDirectory("local-host-state")
+        val routes = listOf(
+            com.letta.mobile.data.controller.node.iroh.pins.AgentPinsRoutes.forHost(
+                stateDir, com.letta.mobile.data.controller.node.iroh.pins.AgentPinsPublisher(scope),
+            ),
+        )
+        val transport = directTransport(port, AtomicInteger(), routes)
+        try {
+            withTimeout(TIMEOUT) { transport.adminRpc("agent.list", "/v1/agents", null) }
+            val pins = com.letta.mobile.data.pins.shared.SharedAgentPins(
+                com.letta.mobile.data.pins.shared.channelAgentPinsLink(transport),
+            )
+            assertTrue(com.letta.mobile.data.pins.wire.AgentPinsWire.CAPABILITY in transport.hostCapabilities)
+            assertTrue(pins.refresh().editable)
+            val agent = com.letta.mobile.data.model.AgentId("agent-1")
+            assertEquals(com.letta.mobile.data.pins.shared.AgentPinsEditOutcome.APPLIED, pins.setPinned(agent, true))
+            assertEquals(listOf(agent), pins.refresh().agentIds)
+            assertTrue(java.nio.file.Files.exists(stateDir.resolve("pinned-agents.json")), "the host keeps the list")
+            assertFalse(received.any { it == "admin_rpc" }, "the stock server never sees the pins calls")
+        } finally {
+            transport.close()
+        }
+    }
+
+    private fun directTransport(
+        port: Int,
+        releases: AtomicInteger,
+        hostRoutes: List<com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes> = emptyList(),
+    ) = IrohChannelTransport(
         scope = scope,
         activeConfigProvider = { IrohConnectConfig("ws://127.0.0.1:$port", "", "test-device", "test") },
         directDialer = { _ ->
@@ -129,6 +160,7 @@ class DirectAppServerDialTest {
                     readiness = AppServerReadinessExpectation.LocalBackend,
                 ),
                 scope = scope,
+                router = directDialRouter(hostRoutes = hostRoutes),
                 release = { releases.incrementAndGet() },
             )
         },

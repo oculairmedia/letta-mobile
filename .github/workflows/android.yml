@@ -15,8 +15,10 @@ on:
       - "*.md"
       - "scripts/bootstrap-branch-protection.sh"
   pull_request:
-    # edited: a PR-body change (approval lines, test-change reasons) must re-run the body checks.
-    types: [opened, synchronize, reopened, edited]
+    # Not triggered by a description change: that (CodeRabbit rewrites, the shared-search line) used to re-run
+    # this ~40 min graph and cancel the run in progress. Body checks live in pr-body-policy.yml
+    # (fast feedback on edit) and the `pr-body-gate` job below (merge gate, part of `test`).
+    types: [opened, synchronize, reopened]
     # Required contexts (test / build-apk-pass / shared-multiplatform) must report
     # on stacked letta/**, feat/**, cursor/** and codex/** PRs as well as main.
     # pull_request.branches filters the PR *base*, not the head — Cloud Agent
@@ -33,7 +35,9 @@ on:
 
 concurrency:
   group: android-apk-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push supersedes an older PR run, but a main run is never cancelled mid-flight:
+  # cancelling it left most main commits without any verdict.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   # Gradle's launcher JVM loads native-platform before project gradle.properties
@@ -110,10 +114,8 @@ jobs:
     name: test-workload
     runs-on: ubuntu-latest
     timeout-minutes: 75
-    # pull-requests: read lets the shared-search check read the PR's current description.
     permissions:
       contents: read
-      pull-requests: read
     defaults:
       run:
         working-directory: android-compose
@@ -282,52 +284,9 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: python3 scripts/ci/tree-hygiene.py --diff-base "$BASE_SHA"
 
-      - name: Guard web bundle ceiling raises
-        if: github.event_name == 'pull_request'
-        working-directory: ${{ github.workspace }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          set -euo pipefail
-          PR_BODY="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.body // ""')"
-          export PR_BODY
-          python3 scripts/ci/web-bundle-raise-guard.py --diff-base "$BASE_SHA"
-
-      # Reads the description live (not the event payload), so editing it and re-running the
-      # job is enough. Only a dependabot[bot] PR, whose body is generated, is exempt.
-      - name: Require "Shared implementation searched" in the PR description
-        if: github.event_name == 'pull_request'
-        working-directory: ${{ github.workspace }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-        run: |
-          set -euo pipefail
-          PR_BODY="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.body // ""')"
-          export PR_BODY
-          bash scripts/ci/agents-policy-check.sh --require-shared-search
-
       - name: Test the test-weakening guard
         working-directory: ${{ github.workspace }}
         run: python3 -m unittest discover -s scripts/tests -p test_test_weakening_guard.py -v
-
-      # Fetch the current body just like the shared-search check so editing it and
-      # rerunning the job can explain a deliberate test change.
-      - name: Guard against test weakening
-        if: github.event_name == 'pull_request'
-        working-directory: ${{ github.workspace }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          set -euo pipefail
-          PR_BODY="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.body // ""')"
-          export PR_BODY
-          python3 scripts/ci/test-weakening-guard.py --diff-base "$BASE_SHA"
 
       # Every push to main runs the full additive set; a PR runs the changed modules and,
       # transitively, every module that depends on them (letta-mobile-l8lcn).
@@ -475,6 +434,7 @@ jobs:
     # capacity first; it still reports wherever they report.
     needs: [test, shared-multiplatform, build-apk-pass]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: android-compose
@@ -533,6 +493,7 @@ jobs:
     name: row goldens (advisory)
     needs: [test]
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     continue-on-error: true
     defaults:
       run:
@@ -681,16 +642,45 @@ jobs:
           path: ~/.konan
           key: ${{ steps.konan.outputs.cache-primary-key }}
 
+  # The PR-description checks (shared-search line, web-bundle approval, test-weakening reason).
+  # They moved out of test-workload so a description edit re-runs pr-body-policy.yml (~1 min)
+  # instead of this graph; the same script runs here so the required `test` still blocks merge
+  # on a missing line. On an edit, pr-body-policy.yml re-runs this job on the same head.
+  pr-body-gate:
+    name: pr-body-gate
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run the PR description checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_REF: ${{ github.base_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bash scripts/ci/pr-body-policy.sh
+
   required-test:
     name: test
     runs-on: ubuntu-latest
-    needs: [test, api-docs, api-contract-windows, web-wasm]
+    needs: [test, api-docs, api-contract-windows, web-wasm, pr-body-gate]
     if: always()
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:
       - name: Require tests and documentation contract
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          BODY_RESULT: ${{ needs.pr-body-gate.result }}
           TEST_RESULT: ${{ needs.test.result }}
           DOCS_RESULT: ${{ needs.api-docs.result }}
           WINDOWS_API_RESULT: ${{ needs.api-contract-windows.result }}
@@ -700,6 +690,12 @@ jobs:
           test "$DOCS_RESULT" = success
           test "$WINDOWS_API_RESULT" = success
           test "$WEB_RESULT" = success
+          # The description checks only exist on pull_request; anywhere else the job is skipped.
+          if [ "$EVENT_NAME" = pull_request ]; then
+            test "$BODY_RESULT" = success
+          else
+            test "$BODY_RESULT" = skipped
+          fi
 
   api-docs:
     runs-on: ubuntu-latest
@@ -719,6 +715,17 @@ jobs:
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
           cache-cleanup: on-success
+      - name: Restore Konan (Kotlin/Native) toolchain
+        id: konan
+        # Dokka configures :plugin-api:kotlinNativeBundleConfiguration and downloaded
+        # kotlin-native-prebuilt live from Maven Central (HTTP 429, PR #2573). Restore
+        # only: android.yml shared-multiplatform owns the main-push save of this key.
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-konan-v2-${{ hashFiles('android-compose/gradle/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-konan-
       - name: Verify documentation tooling
         env:
           DOCS_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
@@ -889,6 +896,7 @@ jobs:
     needs: [web-wasm, api-docs, test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       actions: read
@@ -916,6 +924,7 @@ jobs:
     needs: assemble-web-pages
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       pages: write
       id-token: write
@@ -929,6 +938,7 @@ jobs:
 
   build-apk:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     # Deliberately independent of `test`: GitHub can fan out test, shared KMP
     # verification, and both APK variants as soon as the workflow starts. The
     # jobs restore warm state from prior trusted runs instead of serializing the
@@ -1043,6 +1053,7 @@ jobs:
   # /opt/meridian/iroh-wrapper/releases/<sha>/ via the deployment runbook.
   build-iroh-wrapper:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: android-compose
@@ -1088,6 +1099,7 @@ jobs:
   # script.
   build-apk-pass:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: build-apk
     if: always()
     steps:
@@ -1103,6 +1115,7 @@ jobs:
   # Stable status check for branch protection that the shared KMP gate passed.
   shared-multiplatform-pass:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: shared-multiplatform
     if: always()
     steps:
@@ -1121,6 +1134,7 @@ jobs:
   # mismatch at device runtime instead of at merge time.
   build-iroh-wrapper-pass:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: build-iroh-wrapper
     if: always()
     steps:
