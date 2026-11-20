@@ -716,7 +716,7 @@ class CanonicalTimelineEngine(
      * start advances the generation and so still fences this sweep; the settlement itself
      * advances the revision only when it repairs a row ([settleToolSweep]).
      */
-    suspend fun currentToolSweep(selection: TimelineEngineSelection): Long = mutex.withLock {
+    internal suspend fun currentToolSweep(selection: TimelineEngineSelection): Long = mutex.withLock {
         check(selection === mutablePublication.value.selection)
         store.read(selection.scope) { toolSweepGeneration() }
     }

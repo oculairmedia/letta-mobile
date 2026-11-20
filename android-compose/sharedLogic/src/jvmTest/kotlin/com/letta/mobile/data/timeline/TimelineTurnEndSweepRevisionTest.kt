@@ -60,7 +60,9 @@ class TimelineTurnEndSweepRevisionTest {
 
     private suspend fun TestScope.turn(page: List<String>): TurnRun {
         val store = InMemoryTimelineStore()
-        val transport = StaticPageTransport { page.map { decode(it) }.reversed().map { TimelineRemoteRecord(TimelineMessageId(it.id), it, 0) } }
+        val transport = StaticPageTransport {
+            page.map { decode(it) }.reversed().map { TimelineRemoteRecord(TimelineMessageId(it.id), it, 0) }
+        }
         val coordinator = CanonicalTimelineCoordinator(store, transport)
         val failures = mutableListOf<Throwable>()
         val maintenance = IndexedCanonicalTimelineMaintenance(coordinator, this, { _, _, _ -> }, { failures += it })
