@@ -61,9 +61,11 @@ internal class FakeIdentifiedSend(
 ) : IdentifiedChatSend {
     val texts = mutableListOf<String>()
     var refuse = false
+    var failure: Exception? = null
     override val sentRuns: StateFlow<SentMessageRuns> = runs
 
     override suspend fun sendIdentified(text: String): SentMessageId? {
+        failure?.let { throw it }
         if (refuse) return null
         texts += text
         return SentMessageId("c${texts.size}").also(onSend)

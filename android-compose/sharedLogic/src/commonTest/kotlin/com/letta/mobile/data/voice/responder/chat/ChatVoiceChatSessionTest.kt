@@ -49,8 +49,12 @@ class ChatVoiceChatSessionTest {
         sender.refuse = true
         assertFailsWith<ChatSendRefusedException> { session.send(VoiceText("refused")) }
         assertEquals("agent-a", session.agentId, "a refused send starts no reply")
-
         sender.refuse = false
+        sender.failure = IllegalStateException("offline")
+        assertFailsWith<IllegalStateException> { session.send(VoiceText("thrown")) }
+        assertEquals("agent-a", session.agentId, "a send that throws starts no reply")
+
+        sender.failure = null
         session.send(VoiceText("again"))
         assertEquals("agent-b", session.agentId)
     }

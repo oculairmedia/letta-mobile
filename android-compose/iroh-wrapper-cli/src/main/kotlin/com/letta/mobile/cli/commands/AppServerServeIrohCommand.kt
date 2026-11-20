@@ -1250,8 +1250,9 @@ internal fun effectiveA2aBackendDir(explicit: String?, ownAppServer: Boolean, ho
  * else `LETTA_LOCAL_BACKEND_DIR` ([environmentDir]); null when neither names one, so no voice cores
  * are read.
  */
-internal fun voiceMemoryDir(
-    effectiveBackendDir: java.io.File?,
-    environmentDir: String? = System.getenv("LETTA_LOCAL_BACKEND_DIR"),
-): java.io.File? =
+internal fun voiceMemoryDir(effectiveBackendDir: java.io.File?, environmentDir: String?): java.io.File? =
     effectiveBackendDir ?: environmentDir?.takeIf { it.isNotBlank() }?.let { java.io.File(it) }
+
+/** [voiceMemoryDir] with this process's `LETTA_LOCAL_BACKEND_DIR`. */
+internal fun voiceMemoryDir(effectiveBackendDir: java.io.File?): java.io.File? =
+    voiceMemoryDir(effectiveBackendDir, System.getenv("LETTA_LOCAL_BACKEND_DIR"))
