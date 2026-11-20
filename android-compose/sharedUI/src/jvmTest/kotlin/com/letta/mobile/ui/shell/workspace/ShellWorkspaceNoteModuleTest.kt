@@ -70,7 +70,12 @@ class ShellWorkspaceNoteModuleTest {
                             )
                         }
                     }
-                    onNodeWithTag(canvasViewerOptionTag(NOTEBOOK_NOTE_VIEWER_ID)).performClick()
+                    // The board loads off the test clock: click the Note option only once it is laid out.
+                    val option = canvasViewerOptionTag(NOTEBOOK_NOTE_VIEWER_ID)
+                    waitUntil(timeoutMillis = Timeout) {
+                        onAllNodesWithTag(option).fetchSemanticsNodes().singleOrNull()?.let { it.size.width > 0 && it.size.height > 0 } == true
+                    }
+                    onNodeWithTag(option).performClick()
                     waitUntil(timeoutMillis = Timeout) { onAllNodesWithTag(Markdown).fetchSemanticsNodes().size == 2 }
                     onAllNodesWithTag(Markdown)[1].performTextReplacement("one retained draft")
                     onAllNodesWithTag(Markdown)[0].assertTextContains("one retained draft")
