@@ -107,7 +107,7 @@ private fun ServiceCard(service: ServiceCredentialStatus, binding: ServiceCreden
             if (service.summary.isNotBlank()) ServiceHint(service.summary)
             if (state.canManage && !editing) CardActions(service, binding)
             if (!editing && state.failedService == service.serviceId) state.error?.let { ServiceErrorLine(it) }
-            if (editing) ServiceCredentialForm(service, binding)
+            if (editing && state.canManage) ServiceCredentialForm(service, binding)
         }
     }
 }

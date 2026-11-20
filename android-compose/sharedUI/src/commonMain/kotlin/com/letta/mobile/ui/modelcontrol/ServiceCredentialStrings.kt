@@ -22,7 +22,7 @@ internal object ServiceCredentialStrings {
     const val CANCEL = "Cancel"
     const val REMOVE = "Remove"
     const val ADDRESS = "Address"
-    const val SECRET_KEPT_HINT = "Leave empty to keep the saved key."
+    const val SECRET_KEPT_HINT = "Leave empty to keep the saved key. It is kept only for the same address; a new address needs a new key."
     const val TEST_NOTE = "Test sends one fixed made-up sentence, never your conversations."
 
     fun replaceSecret(label: String) = "Replace $label"

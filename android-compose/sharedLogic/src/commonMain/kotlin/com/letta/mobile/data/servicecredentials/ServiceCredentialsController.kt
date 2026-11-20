@@ -97,19 +97,9 @@ class ServiceCredentialsController(
             return
         }
         mutableState.update { it.copy(supported = true, loading = true) }
-        val outcome = runCatching { client.list() }
-        val failure = outcome.exceptionOrNull()
-        if (failure != null && failure !is ServiceCredentialException) throw failure
-        val list = outcome.getOrNull()
-        mutableState.update { current ->
-            current.copy(
-                loading = false,
-                canManage = list?.canManage ?: current.canManage,
-                services = list?.services ?: current.services,
-                error = (failure as? ServiceCredentialException)?.code ?: keep,
-                failedService = if (failure == null && keep != null) current.failedService else null,
-            )
-        }
+        val read = attempt { client.list() }
+        mutableState.update { current -> current.afterRead(read, keep) }
+        read.escaped?.let { throw it }
     }
 
     private fun run(
@@ -121,26 +111,58 @@ class ServiceCredentialsController(
         if (mutableState.value.busy != null) return
         mutableState.update { it.copy(busy = serviceId, error = null, failedService = null) }
         scope.launch {
-            val outcome = runCatching { request(status) }
-            val failure = outcome.exceptionOrNull()
-            if (failure != null && failure !is ServiceCredentialException) {
-                mutableState.update { it.copy(busy = null) }
-                throw failure
-            }
-            val updated = outcome.getOrNull()
-            mutableState.update { current ->
-                current.copy(
-                    busy = null,
-                    services = updated?.let { fresh -> current.services.replacing(fresh) } ?: current.services,
-                    editing = if (updated != null && closeOnSuccess) null else current.editing,
-                    error = (failure as? ServiceCredentialException)?.code,
-                    failedService = serviceId.takeIf { failure != null },
-                )
-            }
-            val code = (failure as? ServiceCredentialException)?.code
-            if (code == ServiceCredentialErrorCode.REVISION_CONFLICT) reload(keep = code)
+            val done = attempt { request(status) }
+            mutableState.update { current -> current.afterRequest(serviceId, done, closeOnSuccess) }
+            done.escaped?.let { throw it }
+            if (done.failure == ServiceCredentialErrorCode.REVISION_CONFLICT) reload(keep = done.failure)
         }
     }
+}
+
+/**
+ * What a request returned: its [value], or the [failure] code a refused request ended with, or the
+ * [escaped] exception that is not a refusal (cancellation included), which the caller rethrows once the
+ * state no longer shows the request as running.
+ */
+private class Attempt<T>(val value: T?, val failure: ServiceCredentialErrorCode?, val escaped: Throwable?)
+
+/** Runs [request], keeping a refusal as its failure code and any other throwable as [Attempt.escaped]. */
+private suspend fun <T> attempt(request: suspend () -> T): Attempt<T> {
+    val outcome = runCatching { request() }
+    val thrown = outcome.exceptionOrNull()
+    val refusal = thrown as? ServiceCredentialException
+    return Attempt(outcome.getOrNull(), refusal?.code, thrown.takeIf { refusal == null })
+}
+
+/** This state after a list read: the list and rights it brought, and the failure to show ([keep] after a good read). */
+private fun ServiceCredentialsState.afterRead(
+    read: Attempt<ServiceCredentialList>,
+    keep: ServiceCredentialErrorCode?,
+): ServiceCredentialsState {
+    val list = read.value
+    return copy(
+        loading = false,
+        canManage = list?.canManage ?: canManage,
+        services = list?.services ?: services,
+        error = read.failure ?: keep,
+        failedService = if (read.failure == null && keep != null) failedService else null,
+    )
+}
+
+/** This state after a write, test or removal for [serviceId] ended as [done]. */
+private fun ServiceCredentialsState.afterRequest(
+    serviceId: ServiceId,
+    done: Attempt<ServiceCredentialStatus>,
+    closeOnSuccess: Boolean,
+): ServiceCredentialsState {
+    val fresh = done.value
+    return copy(
+        busy = null,
+        services = fresh?.let(services::replacing) ?: services,
+        editing = if (fresh != null && closeOnSuccess) null else editing,
+        error = done.failure,
+        failedService = serviceId.takeIf { done.failure != null },
+    )
 }
 
 /** This list with [fresh] in place of the status of the same service. */

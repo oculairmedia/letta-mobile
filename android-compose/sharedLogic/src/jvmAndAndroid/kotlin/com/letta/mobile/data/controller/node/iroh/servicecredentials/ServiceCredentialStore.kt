@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh.servicecredentials
 
+import com.letta.mobile.data.hoststate.HostStateFileLocks
 import com.letta.mobile.data.servicecredentials.ServiceCredentialErrorCode
 import com.letta.mobile.data.servicecredentials.ServiceCredentialSetCommand
 import com.letta.mobile.data.servicecredentials.ServiceCredentialStatus
@@ -19,14 +20,16 @@ internal class ServiceSnapshot(val revision: Long, val target: ServiceTarget) {
  * The host's service credentials: settings without secrets ([persistence]) and secrets in the host's
  * secret store ([secrets]), for the services [adapters] serve. Every write takes a new revision and
  * resets the last test; a write to a new origin drops the secret unless it brings a new one. All access
- * is serialised. Contacts no service.
+ * is serialised under [lock]: stores over one settings file must share it (see [HostStateFileLocks]), or two
+ * of them could accept writes against the same revision. Contacts no service.
  */
 internal class ServiceCredentialStore(
     private val adapters: List<ServiceAdapter>,
     private val persistence: ServiceCredentialPersistence,
     private val secrets: ServiceSecretStore,
+    private val lock: Mutex = Mutex(),
 ) {
-    private val lock = Mutex()
+    private val recovery = SecretRecovery(secrets)
 
     /** The adapter of [serviceId]; `service.unknown_service` when there is none. */
     fun adapter(serviceId: ServiceId): ServiceAdapter =
@@ -35,12 +38,16 @@ internal class ServiceCredentialStore(
     /** Every known service's status, in adapter order. */
     suspend fun list(): List<ServiceCredentialStatus> = lock.withLock {
         val state = persistence.read()
-        adapters.map { statusOf(it.descriptor, state) }
+        adapters.map { adapter ->
+            recovery.recover(adapter.descriptor.id)
+            statusOf(adapter.descriptor, state)
+        }
     }
 
     /** Applies [command] and returns the service's new status. Throws [ServiceRefusal]. */
     suspend fun write(command: ServiceCredentialSetCommand): ServiceCredentialStatus = lock.withLock {
         val descriptor = adapter(command.serviceId).descriptor
+        recovery.requireRecovered(descriptor.id)
         val state = persistence.read()
         val stored = state.services[descriptor.id.value]
         requireRevision(stored, command.expectedRevision)
@@ -53,7 +60,7 @@ internal class ServiceCredentialStore(
         }
         val next = StoredServiceCredential(state.revision + 1, command.baseUrl, command.config)
         val written = state.copy(revision = next.revision, services = state.services + (descriptor.id.value to next))
-        withSecretRollback(descriptor, stored) {
+        recovery.guarded(descriptor.id, stored?.let { previousOrigin(descriptor, it) }) {
             applySecret(descriptor.id, command.secret, origin, keepable)
             persistence.write(written)
         }
@@ -63,11 +70,12 @@ internal class ServiceCredentialStore(
     /** Deletes [serviceId]'s settings, secret and last test; its empty status. Throws [ServiceRefusal]. */
     suspend fun remove(serviceId: ServiceId, expectedRevision: String?): ServiceCredentialStatus = lock.withLock {
         val descriptor = adapter(serviceId).descriptor
+        recovery.requireRecovered(serviceId)
         val state = persistence.read()
         val stored = state.services[serviceId.value]
         requireRevision(stored, expectedRevision)
         val next = if (stored == null) state else state.copy(revision = state.revision + 1, services = state.services - serviceId.value)
-        withSecretRollback(descriptor, stored) {
+        recovery.guarded(descriptor.id, stored?.let { previousOrigin(descriptor, it) }) {
             secrets.delete(serviceId)
             persistence.write(next)
         }
@@ -77,6 +85,7 @@ internal class ServiceCredentialStore(
     /** [serviceId]'s stored credential for a test; `service.not_configured` without settings or secret. */
     suspend fun snapshot(serviceId: ServiceId): ServiceSnapshot = lock.withLock {
         val descriptor = adapter(serviceId).descriptor
+        recovery.requireRecovered(serviceId)
         val stored = persistence.read().services[serviceId.value] ?: serviceRefuse(ServiceCredentialErrorCode.NOT_CONFIGURED)
         val address = stored.baseUrl ?: descriptor.defaultBaseUrl ?: serviceRefuse(ServiceCredentialErrorCode.NOT_CONFIGURED)
         val origin = ServiceAddress.originOf(address) ?: serviceRefuse(ServiceCredentialErrorCode.NOT_CONFIGURED)
@@ -88,6 +97,7 @@ internal class ServiceCredentialStore(
     /** Records [test] against [serviceId] at [revision] (ignored when it changed since); the current status. */
     suspend fun recordTest(serviceId: ServiceId, revision: Long, test: ServiceTestStatus): ServiceCredentialStatus = lock.withLock {
         val descriptor = adapter(serviceId).descriptor
+        recovery.recover(serviceId)
         val state = persistence.read()
         val stored = state.services[serviceId.value]
         val next = if (stored?.revision == revision) {
@@ -126,29 +136,9 @@ internal class ServiceCredentialStore(
     /** Stores, deletes or keeps the secret, bound to [origin]; it is written before the settings file. */
     private fun applySecret(serviceId: ServiceId, change: ServiceSecretChange, origin: String, keepable: Boolean) {
         when (change) {
-            is ServiceSecretChange.Replace -> secrets.write(serviceId, origin, change.secret.revealForEncoding())
+            is ServiceSecretChange.Replace -> secrets.write(serviceId, BoundSecret(origin, change.secret.revealForEncoding()))
             ServiceSecretChange.Remove -> secrets.delete(serviceId)
             ServiceSecretChange.Keep -> if (!keepable) secrets.delete(serviceId)
-        }
-    }
-
-    /**
-     * Runs [change]; if it fails, puts the secret store back as it was for the service (the earlier
-     * secret, or none) and rethrows the original failure, so a secret never changes without its settings.
-     */
-    private fun withSecretRollback(descriptor: ServiceDescriptor, stored: StoredServiceCredential?, change: () -> Unit) {
-        val origin = stored?.let { previousOrigin(descriptor, it) }
-        val before = origin?.let { secrets.read(descriptor.id, it) }
-        var done = false
-        try {
-            change()
-            done = true
-        } finally {
-            if (!done) {
-                runCatching {
-                    if (origin == null || before == null) secrets.delete(descriptor.id) else secrets.write(descriptor.id, origin, before)
-                }
-            }
         }
     }
 
@@ -163,7 +153,7 @@ internal class ServiceCredentialStore(
             defaultBaseUrl = descriptor.defaultBaseUrl,
             baseUrl = stored?.baseUrl,
             baseUrlEditable = descriptor.baseUrlEditable,
-            hasSecret = origin != null && secrets.read(descriptor.id, origin) != null,
+            hasSecret = origin != null && !recovery.pending(descriptor.id) && secrets.read(descriptor.id, origin) != null,
             secretLabel = descriptor.secretLabel,
             configFields = descriptor.configFields,
             config = stored?.config.orEmpty(),
@@ -171,7 +161,58 @@ internal class ServiceCredentialStore(
             lastTest = stored?.lastTest ?: ServiceTestStatus(),
         )
     }
+}
 
+/**
+ * Puts a service's secret back after a failed write. The earlier secret is read before the write; when
+ * the write fails the store restores it. When that restore fails too, the earlier secret stays here as
+ * the service's recovery state: the service is unusable (no saved key reported, no test, no write) until
+ * a later access restores it. A secret file that cannot be decoded refuses the write before writing
+ * anything, so there is nothing to restore. Prints no secret.
+ */
+private class SecretRecovery(private val secrets: ServiceSecretStore) {
+    private val unrecovered = mutableMapOf<ServiceId, Earlier>()
+
+    /** The secret [serviceId] had, bound to [origin]; none when either is null. */
+    private class Earlier(val origin: String?, val secret: String?) {
+        override fun toString(): String = "Earlier(hasSecret=${secret != null})"
+    }
+
+    /** Runs [change] on [serviceId]'s secret and settings; a failure restores the earlier secret, then rethrows. */
+    fun guarded(serviceId: ServiceId, origin: String?, change: () -> Unit) {
+        val earlier = Earlier(origin, origin?.let { secrets.read(serviceId, it) })
+        var needsRestore = true
+        try {
+            change()
+            needsRestore = false
+        } catch (untouched: SecretFileUnreadable) {
+            needsRestore = false
+            throw untouched
+        } finally {
+            if (needsRestore && runCatching { restore(serviceId, earlier) }.isFailure) unrecovered[serviceId] = earlier
+        }
+    }
+
+    /** Whether [serviceId]'s secret still awaits a restore. */
+    fun pending(serviceId: ServiceId): Boolean = serviceId in unrecovered
+
+    /** Retries a pending restore of [serviceId]'s secret; it is forgotten once it succeeds. */
+    fun recover(serviceId: ServiceId) {
+        val earlier = unrecovered[serviceId] ?: return
+        if (runCatching { restore(serviceId, earlier) }.isSuccess) unrecovered.remove(serviceId)
+    }
+
+    /** A service whose secret cannot be restored is refused (`internal`) rather than used inconsistently. */
+    fun requireRecovered(serviceId: ServiceId) {
+        recover(serviceId)
+        if (pending(serviceId)) serviceRefuse(ServiceCredentialErrorCode.INTERNAL)
+    }
+
+    private fun restore(serviceId: ServiceId, earlier: Earlier) {
+        val origin = earlier.origin
+        val secret = earlier.secret
+        if (origin == null || secret == null) secrets.delete(serviceId) else secrets.write(serviceId, BoundSecret(origin, secret))
+    }
 }
 
 /** The origin [stored]'s secret is bound to: of its address override, else of the service's default. */

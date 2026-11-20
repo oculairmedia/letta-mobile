@@ -11,6 +11,7 @@ import com.letta.mobile.data.servicecredentials.ServiceTestState
 import com.letta.mobile.data.servicecredentials.ServiceTestStatus
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.readText
+import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -110,6 +111,39 @@ class ServiceCredentialStoreTest {
     }
 
     @Test
+    fun aFailedRestoreKeepsTheInconsistentSecretUnusableUntilItIsRestored() = runTest {
+        val secrets = FailingSecrets()
+        val persistence = FailingPersistence()
+        val store = store(persistence, secrets)
+        store.write(write("https://one.example.invalid", replace("earlier")))
+        persistence.failNext = true
+        secrets.failWritesAfter = 1
+        assertFailsWith<IllegalStateException> { store.write(write("https://one.example.invalid", replace("later"))) }
+
+        val refused = assertFailsWith<ServiceRefusal> { store.snapshot(serviceId) }
+        assertEquals(ServiceCredentialErrorCode.INTERNAL, refused.code)
+        assertFalse(store.list().single().hasSecret, "A secret that does not match its settings is not reported as saved")
+        assertFailsWith<ServiceRefusal> { store.write(write("https://one.example.invalid", revision = "rev-1")) }
+
+        secrets.failWritesAfter = null
+        assertEquals("earlier", store.snapshot(serviceId).target.secret)
+        assertTrue(store.list().single().hasSecret)
+    }
+
+    @Test
+    fun aMalformedSecretFileIsRefusedAndLeftUntouched() = runTest {
+        val dir = createTempDirectory("service-credentials")
+        val secretFile = dir.resolve("service-credential-secrets")
+        val garbage = "{not json, but maybe someone's only copy of the keys"
+        secretFile.writeText(garbage)
+        val store = store(FileServiceCredentialPersistence(dir.resolve("service-credentials.json")), FileServiceSecretStore(secretFile))
+        assertFailsWith<IllegalStateException> { store.write(write("https://one.example.invalid", replace())) }
+        assertEquals(garbage, secretFile.readText())
+        assertFailsWith<IllegalStateException> { store.remove(serviceId, null) }
+        assertEquals(garbage, secretFile.readText())
+    }
+
+    @Test
     fun theListNeverCarriesTheSecret() = runTest {
         val store = store()
         store.write(write("https://one.example.invalid", replace()))
@@ -139,6 +173,24 @@ class ServiceCredentialStoreTest {
         assertTrue(SECRET in secretFile.readText())
         store.remove(serviceId, null)
         assertFalse(secretFile.toFile().exists())
+    }
+
+    /** Secrets in memory whose writes start failing after [failWritesAfter] more succeed (null: never). */
+    private class FailingSecrets : ServiceSecretStore {
+        private val inner = InMemoryServiceSecretStore()
+        var failWritesAfter: Int? = null
+
+        override fun read(serviceId: ServiceId, origin: String) = inner.read(serviceId, origin)
+
+        override fun write(serviceId: ServiceId, secret: BoundSecret) {
+            failWritesAfter?.let { left ->
+                check(left > 0) { "secret file unwritable" }
+                failWritesAfter = left - 1
+            }
+            inner.write(serviceId, secret)
+        }
+
+        override fun delete(serviceId: ServiceId) = inner.delete(serviceId)
     }
 
     private class FailingPersistence : ServiceCredentialPersistence {

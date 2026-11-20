@@ -246,7 +246,7 @@ class ModelControlUiTest {
         val state: ProviderManagementState = ModelControlUiFixtures.managementState().copy(
             form = ProviderConnectForm(anthropic).withValue("apiKey", "sk-ant-secret"),
         )
-        setContent { Frame { ProviderSettingsPane(state, recorder.actions, initialPage = ProviderSettingsPage.API_KEYS) } }
+        setContent { Frame { ProviderSettingsPane(state, recorder.actions, pages = ProviderSettingsPages(ProviderSettingsPage.API_KEYS)) } }
 
         onNodeWithTag(ProviderSettingsTags.INLINE_FORM).assertIsDisplayed()
         val field = onNodeWithTag("provider_field_apiKey")

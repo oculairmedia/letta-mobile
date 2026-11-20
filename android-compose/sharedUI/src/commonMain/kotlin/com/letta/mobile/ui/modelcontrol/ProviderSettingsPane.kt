@@ -52,6 +52,16 @@ enum class ProviderSettingsPage(val label: String) {
 }
 
 /**
+ * Where [ProviderSettingsPane] starts and what it offers beyond the provider pages: the page shown
+ * first, and the [services] binding (null while the host keeps no service credentials, which hides
+ * the Services page).
+ */
+class ProviderSettingsPages(
+    val initial: ProviderSettingsPage = ProviderSettingsPage.ACCOUNTS,
+    val services: ServiceCredentialsBinding? = null,
+)
+
+/**
  * Callbacks of [ProviderSettingsPane]: the management ones, the sign-in
  * (in-app, or the terminal steps with "Check again") and endpoint edit.
  */
@@ -94,19 +104,20 @@ object ProviderSettingsTags {
  * Providers: a left navigation (Accounts, API keys, Custom Endpoints, Services, Models)
  * on wide windows, tabs on a phone. Everything comes from one
  * [ProviderManagementState]; the desktop destination and the Android screen
- * only host it. The Services page shows only with a [services] binding (a host
- * that keeps service credentials).
+ * only host it. The Services page shows only with a [pages] services binding (a host
+ * that keeps service credentials); a selected page that is not offered falls back to Accounts.
  */
 @Composable
 fun ProviderSettingsPane(
     state: ProviderManagementState,
     actions: ProviderSettingsActions,
     modifier: Modifier = Modifier,
-    initialPage: ProviderSettingsPage = ProviderSettingsPage.ACCOUNTS,
-    services: ServiceCredentialsBinding? = null,
+    pages: ProviderSettingsPages = ProviderSettingsPages(),
 ) {
-    var page by rememberSaveable { mutableStateOf(initialPage) }
-    val context = ProviderPageContext(state, actions, onPageChange = { page = it }, services = services)
+    var selected by rememberSaveable { mutableStateOf(pages.initial) }
+    val context = ProviderPageContext(state, actions, onPageChange = { selected = it }, services = pages.services)
+    // The selection is kept as the person made it (Services returns with its binding); what shows is what is offered.
+    val page = context.resolve(selected)
     BoxWithConstraints(modifier = modifier.fillMaxSize().testTag(ProviderSettingsTags.PANE)) {
         if (maxWidth >= LettaDimens.Pane.wideBreakpoint) {
             Row(modifier = Modifier.fillMaxSize()) {
@@ -134,6 +145,9 @@ internal class ProviderPageContext(
     /** The pages offered: Services only when the host keeps service credentials. */
     val pages: List<ProviderSettingsPage>
         get() = ProviderSettingsPage.entries.filter { it != ProviderSettingsPage.SERVICES || services != null }
+
+    /** [page] if it is offered, else Accounts. */
+    fun resolve(page: ProviderSettingsPage): ProviderSettingsPage = page.takeIf { it in pages } ?: ProviderSettingsPage.ACCOUNTS
 }
 
 @Composable

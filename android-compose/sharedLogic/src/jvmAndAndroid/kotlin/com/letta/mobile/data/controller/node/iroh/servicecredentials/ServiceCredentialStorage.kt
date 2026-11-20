@@ -38,6 +38,11 @@ internal interface ServiceCredentialPersistence {
     fun write(state: ServiceCredentialState)
 }
 
+/** A service [secret] together with the [origin] it was entered for. Prints no secret. */
+internal class BoundSecret(val origin: String, val secret: String) {
+    override fun toString(): String = "BoundSecret"
+}
+
 /**
  * The host's store for service secrets. A secret is stored with the origin it was entered for and is
  * only ever returned for that origin, so settings that moved to another address can never hand the
@@ -47,12 +52,15 @@ internal interface ServiceSecretStore {
     /** The secret of [serviceId] stored for [origin], or null. */
     fun read(serviceId: ServiceId, origin: String): String?
 
-    /** Stores [secret] of [serviceId] for [origin], replacing any stored one. */
-    fun write(serviceId: ServiceId, origin: String, secret: String)
+    /** Stores [secret] for [serviceId], replacing any stored one. */
+    fun write(serviceId: ServiceId, secret: BoundSecret)
 
     /** Deletes the secret of [serviceId]. */
     fun delete(serviceId: ServiceId)
 }
+
+/** The secret file exists but cannot be decoded; nothing was written, and its bytes are untouched. */
+internal class SecretFileUnreadable : IllegalStateException("The service secret file cannot be decoded; it is left untouched")
 
 /** The settings in memory: tests. */
 internal class InMemoryServiceCredentialPersistence(
@@ -67,12 +75,12 @@ internal class InMemoryServiceCredentialPersistence(
 
 /** Secrets in memory: tests only. */
 internal class InMemoryServiceSecretStore : ServiceSecretStore {
-    private val stored = mutableMapOf<ServiceId, Pair<String, String>>()
+    private val stored = mutableMapOf<ServiceId, BoundSecret>()
 
-    override fun read(serviceId: ServiceId, origin: String): String? = stored[serviceId]?.takeIf { it.first == origin }?.second
+    override fun read(serviceId: ServiceId, origin: String): String? = stored[serviceId]?.takeIf { it.origin == origin }?.secret
 
-    override fun write(serviceId: ServiceId, origin: String, secret: String) {
-        stored[serviceId] = origin to secret
+    override fun write(serviceId: ServiceId, secret: BoundSecret) {
+        stored[serviceId] = secret
     }
 
     override fun delete(serviceId: ServiceId) {
@@ -95,13 +103,15 @@ internal class FileServiceCredentialPersistence(private val path: Path) : Servic
 /**
  * Every service secret in one file only the host's user may read, written through
  * [IrohSecretKeyStores.writeOwnerOnly] like the speech server key. Removing the last secret deletes it.
+ * A file that cannot be decoded is never overwritten: a write or delete fails and leaves its bytes
+ * alone (an operator repairs or removes it), while a read sees no usable secret.
  */
 internal class FileServiceSecretStore(private val path: Path) : ServiceSecretStore {
     override fun read(serviceId: ServiceId, origin: String): String? =
-        readAll()[serviceId.value]?.takeIf { it.origin == origin }?.secret
+        readAllOrEmpty()[serviceId.value]?.takeIf { it.origin == origin }?.secret
 
-    override fun write(serviceId: ServiceId, origin: String, secret: String) {
-        writeAll(readAll() + (serviceId.value to StoredSecret(origin, secret)))
+    override fun write(serviceId: ServiceId, secret: BoundSecret) {
+        writeAll(readAll() + (serviceId.value to StoredSecret(secret.origin, secret.secret)))
     }
 
     override fun delete(serviceId: ServiceId) {
@@ -111,10 +121,18 @@ internal class FileServiceSecretStore(private val path: Path) : ServiceSecretSto
 
     override fun toString(): String = "FileServiceSecretStore"
 
+    /** Every stored secret; empty only when there is no file. A file that cannot be decoded is never treated as empty. */
     private fun readAll(): Map<String, StoredSecret> {
         val text = AtomicJsonFile.readOrNull(path) ?: return emptyMap()
-        return runCatching { storeJson.decodeFromString(StoredSecrets.serializer(), text).secrets }.getOrDefault(emptyMap())
+        return decode(text) ?: throw SecretFileUnreadable()
     }
+
+    /** What a read (a status, a test) sees: a file that cannot be decoded holds no usable secret; a write refuses it. */
+    private fun readAllOrEmpty(): Map<String, StoredSecret> =
+        AtomicJsonFile.readOrNull(path)?.let(::decode).orEmpty()
+
+    private fun decode(text: String): Map<String, StoredSecret>? =
+        runCatching { storeJson.decodeFromString(StoredSecrets.serializer(), text).secrets }.getOrNull()
 
     private fun writeAll(secrets: Map<String, StoredSecret>) {
         if (secrets.isEmpty()) {

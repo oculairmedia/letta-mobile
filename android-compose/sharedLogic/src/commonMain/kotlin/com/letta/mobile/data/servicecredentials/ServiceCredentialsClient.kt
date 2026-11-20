@@ -1,6 +1,7 @@
 package com.letta.mobile.data.servicecredentials
 
 import com.letta.mobile.data.serialization.LettaJson
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -29,7 +30,7 @@ fun interface ServiceCredentialLink {
 /**
  * The host's service credentials over [link]: every method is one request, so secrets stay on the
  * host. [hostCapabilities] is what the connected host advertised.
- * Every failure is a [ServiceCredentialException]; nothing here logs, and a secret a write carries is
+ * Every failure, a failed connection included, is a [ServiceCredentialException]; nothing here logs, and a secret a write carries is
  * never kept.
  */
 class ServiceCredentialsClient(
@@ -63,9 +64,18 @@ class ServiceCredentialsClient(
         decode(ServiceCredentialStatus.serializer(), call(method, params as JsonObject))
 
     private suspend fun call(method: String, params: JsonObject): JsonElement? {
-        val reply = link.call(method, params)
+        val reply = reached(method, params)
         if (!reply.success) throw ServiceCredentialException(ServiceCredentialErrorCode.fromWire(reply.error))
         return reply.result
+    }
+
+    /** The host's reply; the link failing (a dropped connection) is a recoverable request failure, cancellation is not caught. */
+    private suspend fun reached(method: String, params: JsonObject): ServiceCredentialReply = try {
+        link.call(method, params)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (expectedFailure: Exception) {
+        throw ServiceCredentialException(ServiceCredentialErrorCode.INTERNAL)
     }
 
     private fun <T> decode(serializer: KSerializer<T>, result: JsonElement?): T {

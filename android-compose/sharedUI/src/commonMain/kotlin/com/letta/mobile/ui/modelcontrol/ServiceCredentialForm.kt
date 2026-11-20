@@ -26,6 +26,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.letta.mobile.data.servicecredentials.ServiceCredentialDraft
 import com.letta.mobile.data.servicecredentials.ServiceCredentialStatus
+import com.letta.mobile.data.servicecredentials.ServiceId
 import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.icons.LettaIcons
@@ -55,78 +56,87 @@ private class ServiceFormState(service: ServiceCredentialStatus) {
 /** The inline form under a service card: address (where it may change), the write-only secret, the settings. */
 @Composable
 internal fun ServiceCredentialForm(service: ServiceCredentialStatus, binding: ServiceCredentialsBinding) {
-    val form = remember(service.serviceId, service.revision) { ServiceFormState(service) }
-    val busy = binding.state.busy != null
+    // Keyed on the actions too: they are rebuilt when the host connection changes, and a typed secret must not follow.
+    val form = remember(binding.actions, service.serviceId, service.revision) { ServiceFormState(service) }
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = LettaDimens.Space.sm).testTag(ServiceCredentialTags.FORM),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        if (service.baseUrlEditable) {
-            FormField("base_url", ServiceCredentialStrings.ADDRESS, form.baseUrl, KeyboardType.Uri) { form.baseUrl = it }
-        }
-        SecretField(service, form.secret) { form.secret = it }
-        if (service.hasSecret) ServiceHint(ServiceCredentialStrings.SECRET_KEPT_HINT)
-        service.configFields.forEach { field ->
-            FormField(field.key, field.label, form.config[field.key].orEmpty(), KeyboardType.Text, placeholder = field.defaultValue) {
-                form.config[field.key] = it
-            }
-            if (field.help.isNotBlank()) ServiceHint(field.help)
-        }
+        FormFields(service, form)
         ServiceHint(ServiceCredentialStrings.TEST_NOTE)
         if (binding.state.failedService == service.serviceId) binding.state.error?.let { ServiceErrorLine(it) }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-            Button(
-                onClick = {
-                    binding.actions.onSave(service.serviceId, form.draft())
-                    form.secret = ""
-                },
-                enabled = form.canSave(service) && !busy,
-                modifier = Modifier.testTag(ServiceCredentialTags.SAVE),
-            ) { Text(ServiceCredentialStrings.SAVE) }
-            TextButton(onClick = binding.actions.onCloseEdit) { Text(ServiceCredentialStrings.CANCEL) }
-            if (service.configured) {
-                TextButton(
-                    onClick = { form.confirmRemove = true },
-                    enabled = !busy,
-                    modifier = Modifier.testTag(ServiceCredentialTags.REMOVE),
-                ) { Text(ServiceCredentialStrings.REMOVE) }
-            }
-        }
+        FormButtons(service, form, binding)
     }
-    if (form.confirmRemove) {
-        val request = LettaConfirmRequest(
-            title = ServiceCredentialStrings.removeTitle(service.displayName),
-            message = ServiceCredentialStrings.REMOVE_MESSAGE,
-            confirmLabel = ServiceCredentialStrings.REMOVE,
-        )
-        LettaConfirmPane(
-            request,
-            onConfirm = {
-                form.confirmRemove = false
-                binding.actions.onRemove(service.serviceId)
-            },
-            onDismiss = { form.confirmRemove = false },
-        )
+    if (form.confirmRemove) RemoveConfirmation(service, form, binding.actions.onRemove)
+}
+
+@Composable
+private fun FormFields(service: ServiceCredentialStatus, form: ServiceFormState) {
+    if (service.baseUrlEditable) {
+        FormField(FieldSpec("base_url", ServiceCredentialStrings.ADDRESS, KeyboardType.Uri), form.baseUrl) { form.baseUrl = it }
+    }
+    SecretField(service, form.secret) { form.secret = it }
+    if (service.hasSecret) ServiceHint(ServiceCredentialStrings.SECRET_KEPT_HINT)
+    service.configFields.forEach { field ->
+        val spec = FieldSpec(field.key, field.label, KeyboardType.Text, placeholder = field.defaultValue)
+        FormField(spec, form.config[field.key].orEmpty()) { form.config[field.key] = it }
+        if (field.help.isNotBlank()) ServiceHint(field.help)
     }
 }
 
 @Composable
-private fun FormField(
-    key: String,
-    label: String,
-    value: String,
-    keyboard: KeyboardType,
-    placeholder: String? = null,
-    onChange: (String) -> Unit,
-) {
+private fun FormButtons(service: ServiceCredentialStatus, form: ServiceFormState, binding: ServiceCredentialsBinding) {
+    val busy = binding.state.busy != null
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+        Button(
+            onClick = {
+                binding.actions.onSave(service.serviceId, form.draft())
+                form.secret = ""
+            },
+            enabled = form.canSave(service) && !busy,
+            modifier = Modifier.testTag(ServiceCredentialTags.SAVE),
+        ) { Text(ServiceCredentialStrings.SAVE) }
+        TextButton(onClick = binding.actions.onCloseEdit) { Text(ServiceCredentialStrings.CANCEL) }
+        if (service.configured) {
+            TextButton(
+                onClick = { form.confirmRemove = true },
+                enabled = !busy,
+                modifier = Modifier.testTag(ServiceCredentialTags.REMOVE),
+            ) { Text(ServiceCredentialStrings.REMOVE) }
+        }
+    }
+}
+
+@Composable
+private fun RemoveConfirmation(service: ServiceCredentialStatus, form: ServiceFormState, onRemove: (ServiceId) -> Unit) {
+    val request = LettaConfirmRequest(
+        title = ServiceCredentialStrings.removeTitle(service.displayName),
+        message = ServiceCredentialStrings.REMOVE_MESSAGE,
+        confirmLabel = ServiceCredentialStrings.REMOVE,
+    )
+    LettaConfirmPane(
+        request,
+        onConfirm = {
+            form.confirmRemove = false
+            onRemove(service.serviceId)
+        },
+        onDismiss = { form.confirmRemove = false },
+    )
+}
+
+/** What a text field of the form is: its key (for tests), label, keyboard and the placeholder showing a default. */
+private class FieldSpec(val key: String, val label: String, val keyboard: KeyboardType, val placeholder: String? = null)
+
+@Composable
+private fun FormField(spec: FieldSpec, value: String, onChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text(label) },
-        placeholder = placeholder?.let { { Text(it) } },
+        label = { Text(spec.label) },
+        placeholder = spec.placeholder?.let { { Text(it) } },
         singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboard),
-        modifier = Modifier.fillMaxWidth().testTag("${ServiceCredentialTags.FIELD_PREFIX}$key"),
+        keyboardOptions = KeyboardOptions(keyboardType = spec.keyboard),
+        modifier = Modifier.fillMaxWidth().testTag("${ServiceCredentialTags.FIELD_PREFIX}${spec.key}"),
     )
 }
 

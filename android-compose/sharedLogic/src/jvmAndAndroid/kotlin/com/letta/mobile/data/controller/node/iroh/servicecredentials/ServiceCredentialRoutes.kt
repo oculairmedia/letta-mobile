@@ -4,6 +4,7 @@ import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
 import com.letta.mobile.data.controller.node.iroh.adminError
+import com.letta.mobile.data.hoststate.HostStateFileLocks
 import com.letta.mobile.data.servicecredentials.ServiceCredentialWire
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
@@ -25,14 +26,16 @@ object ServiceCredentialRoutes {
      * `service-credentials.json` and the secrets in `service-credential-secrets`, a file only the
      * host's user may read. Serves TypeSafe Jev.
      */
-    fun forHost(stateDirectory: Path, clock: () -> Long = System::currentTimeMillis): AdminRpcRoutes = ServiceCredentialRouteSet(
-        ServiceCredentialStore(
+    fun forHost(stateDirectory: Path, clock: () -> Long = System::currentTimeMillis): AdminRpcRoutes {
+        val settings = stateDirectory.resolve(SETTINGS_FILE)
+        val store = ServiceCredentialStore(
             adapters = listOf(TypeSafeJevAdapter(CIO.create())),
-            persistence = FileServiceCredentialPersistence(stateDirectory.resolve(SETTINGS_FILE)),
+            persistence = FileServiceCredentialPersistence(settings),
             secrets = FileServiceSecretStore(stateDirectory.resolve(SECRETS_FILE)),
-        ),
-        clock,
-    )
+            lock = HostStateFileLocks.forFile(settings),
+        )
+        return ServiceCredentialRouteSet(store, clock)
+    }
 
     private const val SETTINGS_FILE = "service-credentials.json"
     private const val SECRETS_FILE = "service-credential-secrets"

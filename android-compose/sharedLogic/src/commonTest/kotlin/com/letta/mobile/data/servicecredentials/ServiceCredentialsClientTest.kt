@@ -9,6 +9,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonElement
@@ -115,5 +116,42 @@ class ServiceCredentialsClientTest {
         advanceUntilIdle()
         assertEquals(ServiceCredentialErrorCode.REVISION_CONFLICT, controller.state.value.error)
         assertEquals("rev-5", controller.state.value.services.single().revision)
+    }
+
+    @Test
+    fun aFailedConnectionIsARecoverableRequestErrorNotAnEscapedException() = runTest {
+        val broken = ServiceCredentialLink { _, _ -> throw IllegalStateException("the host connection dropped") }
+        val client = ServiceCredentialsClient(broken) { setOf(ServiceCredentialWire.CAPABILITY) }
+        assertEquals(ServiceCredentialErrorCode.INTERNAL, assertFailsWith<ServiceCredentialException> { client.list() }.code)
+        assertEquals(ServiceCredentialErrorCode.INTERNAL, assertFailsWith<ServiceCredentialException> { client.test(jev) }.code)
+    }
+
+    @Test
+    fun cancellingARequestStaysACancellation() = runTest {
+        val cancelled = ServiceCredentialLink { _, _ -> throw CancellationException("scope closed") }
+        val client = ServiceCredentialsClient(cancelled) { setOf(ServiceCredentialWire.CAPABILITY) }
+        assertFailsWith<CancellationException> { client.list() }
+    }
+
+    @Test
+    fun aDroppedConnectionClearsTheBusyAndLoadingMarksAndShowsAnError() = runTest {
+        val broken = ServiceCredentialLink { method, _ ->
+            if (method == ServiceCredentialWire.LIST) ServiceCredentialReply(true, list(status)) else error("dropped")
+        }
+        val controller = ServiceCredentialsController(ServiceCredentialsClient(broken) { setOf(ServiceCredentialWire.CAPABILITY) }, this)
+        controller.refresh()
+        advanceUntilIdle()
+        controller.test(jev)
+        advanceUntilIdle()
+        assertNull(controller.state.value.busy)
+        assertEquals(ServiceCredentialErrorCode.INTERNAL, controller.state.value.error)
+        assertEquals(jev, controller.state.value.failedService)
+
+        val offline = ServiceCredentialLink { _, _ -> throw IllegalStateException("dropped") }
+        val fresh = ServiceCredentialsController(ServiceCredentialsClient(offline) { setOf(ServiceCredentialWire.CAPABILITY) }, this)
+        fresh.refresh()
+        advanceUntilIdle()
+        assertFalse(fresh.state.value.loading)
+        assertEquals(ServiceCredentialErrorCode.INTERNAL, fresh.state.value.error)
     }
 }

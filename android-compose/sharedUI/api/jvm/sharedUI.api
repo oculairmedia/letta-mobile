@@ -5774,9 +5774,9 @@ public final class com/letta/mobile/ui/modelcontrol/ComposableSingletons$Provide
 public final class com/letta/mobile/ui/modelcontrol/ComposableSingletons$ServiceCredentialFormKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/modelcontrol/ComposableSingletons$ServiceCredentialFormKt;
 	public fun <init> ()V
-	public final fun getLambda$-1119192834$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-5800989$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$143363990$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1169552112$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1682977813$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$683271805$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/modelcontrol/ComposableSingletons$ServicesPageKt {
@@ -6136,8 +6136,17 @@ public final class com/letta/mobile/ui/modelcontrol/ProviderSettingsPage : java/
 	public static fun values ()[Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsPage;
 }
 
+public final class com/letta/mobile/ui/modelcontrol/ProviderSettingsPages {
+	public static final field $stable I
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsPage;Lcom/letta/mobile/ui/modelcontrol/ServiceCredentialsBinding;)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsPage;Lcom/letta/mobile/ui/modelcontrol/ServiceCredentialsBinding;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getInitial ()Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsPage;
+	public final fun getServices ()Lcom/letta/mobile/ui/modelcontrol/ServiceCredentialsBinding;
+}
+
 public final class com/letta/mobile/ui/modelcontrol/ProviderSettingsPaneKt {
-	public static final fun ProviderSettingsPane (Lcom/letta/mobile/data/repository/modelcontrol/ProviderManagementState;Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsActions;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsPage;Lcom/letta/mobile/ui/modelcontrol/ServiceCredentialsBinding;Landroidx/compose/runtime/Composer;II)V
+	public static final fun ProviderSettingsPane (Lcom/letta/mobile/data/repository/modelcontrol/ProviderManagementState;Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsActions;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/modelcontrol/ProviderSettingsPages;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/modelcontrol/ProviderSettingsTags {

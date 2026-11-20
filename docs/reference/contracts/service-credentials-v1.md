@@ -28,7 +28,9 @@ for optimistic concurrency; the capability matrix in `IrohPeerCapabilities.forAd
 
 - Every method is one `admin_rpc` request over the authenticated Iroh channel; no streaming.
 - A host serving every v1 method advertises the feature capability `service_credentials_v1`. A
-  client without it shows no Services page. Every list, status and write carries `contract_version: 1`.
+  client without it shows no Services page. The `service.credential.list` result and the `service.credential.set`
+  params carry `contract_version: 1`; a status payload (the `set`, `test` and `remove` results and each entry of the
+  list) does not, and `test` and `remove` params do not.
 
 ## Methods and authorisation
 

@@ -1,6 +1,5 @@
 package com.letta.mobile.data.controller.node.iroh.servicecredentials
 
-import java.net.InetAddress
 import java.net.URI
 
 /**
@@ -31,17 +30,34 @@ internal object ServiceAddress {
     }
 
     /**
-     * A loopback IP literal (`127.0.0.0/8`, `::1`). A name such as `localhost` never counts: a name can
-     * resolve elsewhere, so only a literal proves the secret stays on this machine. Never resolves a name.
+     * A loopback IP literal, parsed strictly and never resolved: a dotted-quad IPv4 address in
+     * `127.0.0.0/8`, or exactly `::1`. A name (`localhost`), a short or numeric spelling the system
+     * resolver would expand (`2130706433`, `127.1`, `0x7f000001`) or look up (`9999999999`), and every
+     * other IPv6 spelling are not literals, so none of them can resolve elsewhere than the secret's host.
      */
     private fun isLoopback(host: String): Boolean {
-        val bare = host.removePrefix("[").removeSuffix("]").lowercase()
-        val literal = bare.all { it.isDigit() || it == '.' } || ':' in bare
-        return literal && runCatching { InetAddress.getByName(bare).isLoopbackAddress }.getOrDefault(false)
+        val bare = host.removePrefix("[").removeSuffix("]")
+        return bare == IPV6_LOOPBACK || ipv4Octets(bare)?.first() == IPV4_LOOPBACK_FIRST_OCTET
+    }
+
+    /** The four octets of a canonical dotted-quad IPv4 literal, or null for any other text. */
+    private fun ipv4Octets(text: String): List<Int>? {
+        val parts = text.split('.')
+        if (parts.size != IPV4_OCTETS) return null
+        val octets = parts.map { part ->
+            part.takeIf { it.length in 1..MAX_OCTET_DIGITS && it.all { char -> char in '0'..'9' } && (it.length == 1 || it[0] != '0') }
+                ?.toInt()?.takeIf { it <= MAX_OCTET }
+        }
+        return octets.takeIf { null !in it }?.filterNotNull()
     }
 
     private const val HTTP = "http"
     private const val HTTPS = "https"
+    private const val IPV6_LOOPBACK = "::1"
+    private const val IPV4_LOOPBACK_FIRST_OCTET = 127
+    private const val IPV4_OCTETS = 4
+    private const val MAX_OCTET_DIGITS = 3
+    private const val MAX_OCTET = 255
     private const val HTTP_PORT = 80
     private const val HTTPS_PORT = 443
 }

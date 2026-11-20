@@ -89,7 +89,7 @@ internal object ServiceCredentialContractHarness {
             )
             if (fields["has_secret"]?.jsonPrimitive?.content == "true") {
                 val address = credential.baseUrl ?: requireNotNull(adapter.descriptor.defaultBaseUrl)
-                secrets.write(ServiceId(id), requireNotNull(ServiceAddress.originOf(address)), PLACEHOLDER_SECRET)
+                secrets.write(ServiceId(id), BoundSecret(requireNotNull(ServiceAddress.originOf(address)), PLACEHOLDER_SECRET))
             }
             credential
         }

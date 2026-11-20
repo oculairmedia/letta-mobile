@@ -56,7 +56,7 @@ class ServicesPageSnapshotTest {
     private fun ServicesPane(state: com.letta.mobile.data.servicecredentials.ServiceCredentialsState) {
         val binding = ServiceCredentialsBinding(state, ServiceCredentialsUiFixtures.Recorder().actions)
         val providers = ModelControlUiFixtures.managementState()
-        ProviderSettingsPane(providers, noSettings, initialPage = ProviderSettingsPage.SERVICES, services = binding)
+        ProviderSettingsPane(providers, noSettings, pages = ProviderSettingsPages(ProviderSettingsPage.SERVICES, binding))
     }
 
     private fun renderAll(name: String, content: @Composable () -> Unit) {

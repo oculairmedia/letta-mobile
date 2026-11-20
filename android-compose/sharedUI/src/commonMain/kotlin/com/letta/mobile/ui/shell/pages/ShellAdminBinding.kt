@@ -28,9 +28,11 @@ import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellPageErrors
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.templates.AgentTemplatesController
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.ui.modelcontrol.ProviderSettingsActions
 import com.letta.mobile.ui.modelcontrol.ProviderSettingsPane
+import com.letta.mobile.ui.modelcontrol.ProviderSettingsPages
 import com.letta.mobile.ui.modelcontrol.ServiceCredentialActions
 import com.letta.mobile.ui.modelcontrol.ServiceCredentialsBinding
 import com.letta.mobile.ui.shell.ShellAdminPages
@@ -153,12 +155,16 @@ fun shellProvidersPage(
     val state by controller.state.collectAsState()
     val actions = remember(controller) { ProviderSettingsActions.bind(controller) }
     val services = rememberServiceCredentials(transport)
-    ProviderSettingsPane(state = state, actions = actions, modifier = modifier, services = services)
+    ProviderSettingsPane(state = state, actions = actions, modifier = modifier, pages = ProviderSettingsPages(services = services))
 }
 
-/** The Services page over [transport], or null while the connected host keeps no service credentials. */
+/**
+ * The Services page over [transport], or null while the connected host keeps no service credentials.
+ * The list is read again each time the host connection becomes ready, so a page opened before the
+ * host was ready shows Services without being left and re-entered.
+ */
 @Composable
-private fun rememberServiceCredentials(transport: IChannelTransport): ServiceCredentialsBinding? {
+internal fun rememberServiceCredentials(transport: IChannelTransport): ServiceCredentialsBinding? {
     val scope = rememberCoroutineScope()
     val controller = remember(transport) {
         val link = ServiceCredentialLink { method, params ->
@@ -168,7 +174,8 @@ private fun rememberServiceCredentials(transport: IChannelTransport): ServiceCre
         val client = ServiceCredentialsClient(link) { transport.hostCapabilities }
         ServiceCredentialsController(client, scope)
     }
-    LaunchedEffect(controller) { controller.refresh() }
+    val connected = transport.state.collectAsState().value is ChannelTransportState.Connected
+    LaunchedEffect(controller, connected) { if (connected) controller.refresh() }
     val state by controller.state.collectAsState()
     val actions = remember(controller) { ServiceCredentialActions.bind(controller) }
     return if (state.supported) ServiceCredentialsBinding(state, actions) else null
