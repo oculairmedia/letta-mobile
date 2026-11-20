@@ -52,6 +52,7 @@ object ModelControlStrings {
     const val PAGE_ACCOUNTS = "Accounts"
     const val PAGE_API_KEYS = "API keys"
     const val PAGE_ENDPOINTS = "Custom Endpoints"
+    const val PAGE_SERVICES = "Services"
     const val PAGE_MODELS = "Models"
     const val REFRESH_PROVIDERS = "Refresh providers and models"
 

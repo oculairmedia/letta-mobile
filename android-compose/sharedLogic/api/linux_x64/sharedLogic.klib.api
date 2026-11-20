@@ -3253,6 +3253,53 @@ final enum class com.letta.mobile.data.secrets.request/TransitionRefusal : kotli
     final fun values(): kotlin/Array<com.letta.mobile.data.secrets.request/TransitionRefusal> // com.letta.mobile.data.secrets.request/TransitionRefusal.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode : kotlin/Enum<com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode> { // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode|null[0]
+    enum entry INSECURE_TRANSPORT // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.INSECURE_TRANSPORT|null[0]
+    enum entry INTERNAL // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.INTERNAL|null[0]
+    enum entry INVALID_REQUEST // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.INVALID_REQUEST|null[0]
+    enum entry NOT_AUTHORIZED // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.NOT_AUTHORIZED|null[0]
+    enum entry NOT_CONFIGURED // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.NOT_CONFIGURED|null[0]
+    enum entry RATE_LIMITED // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.RATE_LIMITED|null[0]
+    enum entry REVISION_CONFLICT // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.REVISION_CONFLICT|null[0]
+    enum entry UNAUTHORIZED // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.UNAUTHORIZED|null[0]
+    enum entry UNKNOWN_SERVICE // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.UNKNOWN_SERVICE|null[0]
+    enum entry UNREACHABLE // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.UNREACHABLE|null[0]
+    enum entry UNSUPPORTED // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.UNSUPPORTED|null[0]
+    enum entry UPSTREAM_ERROR // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.UPSTREAM_ERROR|null[0]
+    enum entry UPSTREAM_TIMEOUT // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.UPSTREAM_TIMEOUT|null[0]
+
+    final val entries // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode> // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val wire // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.wire|{}wire[0]
+        final fun <get-wire>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.wire.<get-wire>|<get-wire>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode> // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.Companion|null[0]
+        final fun fromWire(kotlin/String?): com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.Companion.fromWire|fromWire(kotlin.String?){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode> // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.data.servicecredentials/ServiceTestState : kotlin/Enum<com.letta.mobile.data.servicecredentials/ServiceTestState> { // com.letta.mobile.data.servicecredentials/ServiceTestState|null[0]
+    enum entry FAILED // com.letta.mobile.data.servicecredentials/ServiceTestState.FAILED|null[0]
+    enum entry PASSED // com.letta.mobile.data.servicecredentials/ServiceTestState.PASSED|null[0]
+    enum entry UNKNOWN // com.letta.mobile.data.servicecredentials/ServiceTestState.UNKNOWN|null[0]
+
+    final val entries // com.letta.mobile.data.servicecredentials/ServiceTestState.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.servicecredentials/ServiceTestState> // com.letta.mobile.data.servicecredentials/ServiceTestState.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.servicecredentials/ServiceTestState // com.letta.mobile.data.servicecredentials/ServiceTestState.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.servicecredentials/ServiceTestState> // com.letta.mobile.data.servicecredentials/ServiceTestState.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.servicecredentials/ServiceTestState.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.servicecredentials/ServiceTestState> // com.letta.mobile.data.servicecredentials/ServiceTestState.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.servicecredentials/ServiceTestState.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 final enum class com.letta.mobile.data.session.graph/SubagentListing : kotlin/Enum<com.letta.mobile.data.session.graph/SubagentListing> { // com.letta.mobile.data.session.graph/SubagentListing|null[0]
     enum entry ACTIVE // com.letta.mobile.data.session.graph/SubagentListing.ACTIVE|null[0]
     enum entry ALL // com.letta.mobile.data.session.graph/SubagentListing.ALL|null[0]
@@ -5221,6 +5268,10 @@ abstract fun interface com.letta.mobile.data.schedules/CronScheduleSource { // c
 
 abstract fun interface com.letta.mobile.data.search/ConversationMessageReader { // com.letta.mobile.data.search/ConversationMessageReader|null[0]
     abstract suspend fun recentMessages(kotlin/String, kotlin/Int): kotlin.collections/List<com.letta.mobile.data.model/LettaMessage> // com.letta.mobile.data.search/ConversationMessageReader.recentMessages|recentMessages(kotlin.String;kotlin.Int){}[0]
+}
+
+abstract fun interface com.letta.mobile.data.servicecredentials/ServiceCredentialLink { // com.letta.mobile.data.servicecredentials/ServiceCredentialLink|null[0]
+    abstract suspend fun call(kotlin/String, kotlinx.serialization.json/JsonObject): com.letta.mobile.data.servicecredentials/ServiceCredentialReply // com.letta.mobile.data.servicecredentials/ServiceCredentialLink.call|call(kotlin.String;kotlinx.serialization.json.JsonObject){}[0]
 }
 
 abstract fun interface com.letta.mobile.data.session.graph/HostAppServerClients { // com.letta.mobile.data.session.graph/HostAppServerClients|null[0]
@@ -15975,6 +16026,29 @@ sealed interface com.letta.mobile.data.secrets/AgentVaultLoad { // com.letta.mob
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets/AgentVaultLoad.Loading.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets/AgentVaultLoad.Loading.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.secrets/AgentVaultLoad.Loading.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.servicecredentials/ServiceSecretChange { // com.letta.mobile.data.servicecredentials/ServiceSecretChange|null[0]
+    final class Replace : com.letta.mobile.data.servicecredentials/ServiceSecretChange { // com.letta.mobile.data.servicecredentials/ServiceSecretChange.Replace|null[0]
+        constructor <init>(com.letta.mobile.data.rpcwire/SecretWriteValue) // com.letta.mobile.data.servicecredentials/ServiceSecretChange.Replace.<init>|<init>(com.letta.mobile.data.rpcwire.SecretWriteValue){}[0]
+
+        final val secret // com.letta.mobile.data.servicecredentials/ServiceSecretChange.Replace.secret|{}secret[0]
+            final fun <get-secret>(): com.letta.mobile.data.rpcwire/SecretWriteValue // com.letta.mobile.data.servicecredentials/ServiceSecretChange.Replace.secret.<get-secret>|<get-secret>(){}[0]
+
+        final fun toString(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceSecretChange.Replace.toString|toString(){}[0]
+    }
+
+    final object Keep : com.letta.mobile.data.servicecredentials/ServiceSecretChange { // com.letta.mobile.data.servicecredentials/ServiceSecretChange.Keep|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceSecretChange.Keep.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceSecretChange.Keep.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceSecretChange.Keep.toString|toString(){}[0]
+    }
+
+    final object Remove : com.letta.mobile.data.servicecredentials/ServiceSecretChange { // com.letta.mobile.data.servicecredentials/ServiceSecretChange.Remove|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceSecretChange.Remove.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceSecretChange.Remove.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceSecretChange.Remove.toString|toString(){}[0]
     }
 }
 
@@ -63434,6 +63508,343 @@ final class com.letta.mobile.data.secrets/VaultAgent { // com.letta.mobile.data.
     final fun toString(): kotlin/String // com.letta.mobile.data.secrets/VaultAgent.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.servicecredentials/ServiceConfigField { // com.letta.mobile.data.servicecredentials/ServiceConfigField|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String = ..., kotlin/String? = ...) // com.letta.mobile.data.servicecredentials/ServiceConfigField.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String?){}[0]
+
+    final val defaultValue // com.letta.mobile.data.servicecredentials/ServiceConfigField.defaultValue|{}defaultValue[0]
+        final fun <get-defaultValue>(): kotlin/String? // com.letta.mobile.data.servicecredentials/ServiceConfigField.defaultValue.<get-defaultValue>|<get-defaultValue>(){}[0]
+    final val help // com.letta.mobile.data.servicecredentials/ServiceConfigField.help|{}help[0]
+        final fun <get-help>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceConfigField.help.<get-help>|<get-help>(){}[0]
+    final val key // com.letta.mobile.data.servicecredentials/ServiceConfigField.key|{}key[0]
+        final fun <get-key>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceConfigField.key.<get-key>|<get-key>(){}[0]
+    final val label // com.letta.mobile.data.servicecredentials/ServiceConfigField.label|{}label[0]
+        final fun <get-label>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceConfigField.label.<get-label>|<get-label>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceConfigField.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceConfigField.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceConfigField.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.data.servicecredentials/ServiceConfigField.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ...): com.letta.mobile.data.servicecredentials/ServiceConfigField // com.letta.mobile.data.servicecredentials/ServiceConfigField.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceConfigField.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceConfigField.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceConfigField.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.servicecredentials/ServiceConfigField> { // com.letta.mobile.data.servicecredentials/ServiceConfigField.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.servicecredentials/ServiceConfigField.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.servicecredentials/ServiceConfigField.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.servicecredentials/ServiceConfigField.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.servicecredentials/ServiceConfigField // com.letta.mobile.data.servicecredentials/ServiceConfigField.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.servicecredentials/ServiceConfigField) // com.letta.mobile.data.servicecredentials/ServiceConfigField.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.servicecredentials.ServiceConfigField){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.servicecredentials/ServiceConfigField.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.servicecredentials/ServiceConfigField> // com.letta.mobile.data.servicecredentials/ServiceConfigField.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.servicecredentials/ServiceCredentialDraft { // com.letta.mobile.data.servicecredentials/ServiceCredentialDraft|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/String>) // com.letta.mobile.data.servicecredentials/ServiceCredentialDraft.<init>|<init>(kotlin.String;kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+
+    final val baseUrl // com.letta.mobile.data.servicecredentials/ServiceCredentialDraft.baseUrl|{}baseUrl[0]
+        final fun <get-baseUrl>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialDraft.baseUrl.<get-baseUrl>|<get-baseUrl>(){}[0]
+    final val config // com.letta.mobile.data.servicecredentials/ServiceCredentialDraft.config|{}config[0]
+        final fun <get-config>(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.letta.mobile.data.servicecredentials/ServiceCredentialDraft.config.<get-config>|<get-config>(){}[0]
+    final val secret // com.letta.mobile.data.servicecredentials/ServiceCredentialDraft.secret|{}secret[0]
+        final fun <get-secret>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialDraft.secret.<get-secret>|<get-secret>(){}[0]
+
+    final fun commandFor(com.letta.mobile.data.servicecredentials/ServiceCredentialStatus): com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand // com.letta.mobile.data.servicecredentials/ServiceCredentialDraft.commandFor|commandFor(com.letta.mobile.data.servicecredentials.ServiceCredentialStatus){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialDraft.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.servicecredentials/ServiceCredentialException : kotlin/Exception { // com.letta.mobile.data.servicecredentials/ServiceCredentialException|null[0]
+    constructor <init>(com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode) // com.letta.mobile.data.servicecredentials/ServiceCredentialException.<init>|<init>(com.letta.mobile.data.servicecredentials.ServiceCredentialErrorCode){}[0]
+
+    final val code // com.letta.mobile.data.servicecredentials/ServiceCredentialException.code|{}code[0]
+        final fun <get-code>(): com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode // com.letta.mobile.data.servicecredentials/ServiceCredentialException.code.<get-code>|<get-code>(){}[0]
+}
+
+final class com.letta.mobile.data.servicecredentials/ServiceCredentialList { // com.letta.mobile.data.servicecredentials/ServiceCredentialList|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Boolean = ..., kotlin.collections/List<com.letta.mobile.data.servicecredentials/ServiceCredentialStatus> = ...) // com.letta.mobile.data.servicecredentials/ServiceCredentialList.<init>|<init>(kotlin.Int;kotlin.Boolean;kotlin.collections.List<com.letta.mobile.data.servicecredentials.ServiceCredentialStatus>){}[0]
+
+    final val canManage // com.letta.mobile.data.servicecredentials/ServiceCredentialList.canManage|{}canManage[0]
+        final fun <get-canManage>(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialList.canManage.<get-canManage>|<get-canManage>(){}[0]
+    final val contractVersion // com.letta.mobile.data.servicecredentials/ServiceCredentialList.contractVersion|{}contractVersion[0]
+        final fun <get-contractVersion>(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceCredentialList.contractVersion.<get-contractVersion>|<get-contractVersion>(){}[0]
+    final val services // com.letta.mobile.data.servicecredentials/ServiceCredentialList.services|{}services[0]
+        final fun <get-services>(): kotlin.collections/List<com.letta.mobile.data.servicecredentials/ServiceCredentialStatus> // com.letta.mobile.data.servicecredentials/ServiceCredentialList.services.<get-services>|<get-services>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceCredentialList.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialList.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<com.letta.mobile.data.servicecredentials/ServiceCredentialStatus> // com.letta.mobile.data.servicecredentials/ServiceCredentialList.component3|component3(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Boolean = ..., kotlin.collections/List<com.letta.mobile.data.servicecredentials/ServiceCredentialStatus> = ...): com.letta.mobile.data.servicecredentials/ServiceCredentialList // com.letta.mobile.data.servicecredentials/ServiceCredentialList.copy|copy(kotlin.Int;kotlin.Boolean;kotlin.collections.List<com.letta.mobile.data.servicecredentials.ServiceCredentialStatus>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialList.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceCredentialList.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialList.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.servicecredentials/ServiceCredentialList> { // com.letta.mobile.data.servicecredentials/ServiceCredentialList.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.servicecredentials/ServiceCredentialList.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.servicecredentials/ServiceCredentialList.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.servicecredentials/ServiceCredentialList.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.servicecredentials/ServiceCredentialList // com.letta.mobile.data.servicecredentials/ServiceCredentialList.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.servicecredentials/ServiceCredentialList) // com.letta.mobile.data.servicecredentials/ServiceCredentialList.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.servicecredentials.ServiceCredentialList){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.servicecredentials/ServiceCredentialList.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.servicecredentials/ServiceCredentialList.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.servicecredentials/ServiceCredentialList> // com.letta.mobile.data.servicecredentials/ServiceCredentialList.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams { // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams|null[0]
+    constructor <init>(com.letta.mobile.data.servicecredentials/ServiceId, kotlin/String? = ...) // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.<init>|<init>(com.letta.mobile.data.servicecredentials.ServiceId;kotlin.String?){}[0]
+
+    final val expectedRevision // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.expectedRevision|{}expectedRevision[0]
+        final fun <get-expectedRevision>(): kotlin/String? // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.expectedRevision.<get-expectedRevision>|<get-expectedRevision>(){}[0]
+    final val serviceId // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.serviceId|{}serviceId[0]
+        final fun <get-serviceId>(): com.letta.mobile.data.servicecredentials/ServiceId // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.serviceId.<get-serviceId>|<get-serviceId>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.servicecredentials/ServiceId // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.servicecredentials/ServiceId = ..., kotlin/String? = ...): com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.copy|copy(com.letta.mobile.data.servicecredentials.ServiceId;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams> { // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams) // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.servicecredentials.ServiceCredentialRemoveParams){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams> // com.letta.mobile.data.servicecredentials/ServiceCredentialRemoveParams.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.servicecredentials/ServiceCredentialReply { // com.letta.mobile.data.servicecredentials/ServiceCredentialReply|null[0]
+    constructor <init>(kotlin/Boolean, kotlinx.serialization.json/JsonElement? = ..., kotlin/String? = ...) // com.letta.mobile.data.servicecredentials/ServiceCredentialReply.<init>|<init>(kotlin.Boolean;kotlinx.serialization.json.JsonElement?;kotlin.String?){}[0]
+
+    final val error // com.letta.mobile.data.servicecredentials/ServiceCredentialReply.error|{}error[0]
+        final fun <get-error>(): kotlin/String? // com.letta.mobile.data.servicecredentials/ServiceCredentialReply.error.<get-error>|<get-error>(){}[0]
+    final val result // com.letta.mobile.data.servicecredentials/ServiceCredentialReply.result|{}result[0]
+        final fun <get-result>(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.servicecredentials/ServiceCredentialReply.result.<get-result>|<get-result>(){}[0]
+    final val success // com.letta.mobile.data.servicecredentials/ServiceCredentialReply.success|{}success[0]
+        final fun <get-success>(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialReply.success.<get-success>|<get-success>(){}[0]
+
+    final fun toString(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialReply.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand { // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand|null[0]
+    constructor <init>(com.letta.mobile.data.servicecredentials/ServiceId, kotlin/String? = ..., com.letta.mobile.data.servicecredentials/ServiceSecretChange = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin/String? = ...) // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand.<init>|<init>(com.letta.mobile.data.servicecredentials.ServiceId;kotlin.String?;com.letta.mobile.data.servicecredentials.ServiceSecretChange;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.String?){}[0]
+
+    final val baseUrl // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand.baseUrl|{}baseUrl[0]
+        final fun <get-baseUrl>(): kotlin/String? // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand.baseUrl.<get-baseUrl>|<get-baseUrl>(){}[0]
+    final val config // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand.config|{}config[0]
+        final fun <get-config>(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand.config.<get-config>|<get-config>(){}[0]
+    final val expectedRevision // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand.expectedRevision|{}expectedRevision[0]
+        final fun <get-expectedRevision>(): kotlin/String? // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand.expectedRevision.<get-expectedRevision>|<get-expectedRevision>(){}[0]
+    final val secret // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand.secret|{}secret[0]
+        final fun <get-secret>(): com.letta.mobile.data.servicecredentials/ServiceSecretChange // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand.secret.<get-secret>|<get-secret>(){}[0]
+    final val serviceId // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand.serviceId|{}serviceId[0]
+        final fun <get-serviceId>(): com.letta.mobile.data.servicecredentials/ServiceId // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand.serviceId.<get-serviceId>|<get-serviceId>(){}[0]
+
+    final fun toString(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand> // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.servicecredentials/ServiceCredentialStatus { // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus|null[0]
+    constructor <init>(com.letta.mobile.data.servicecredentials/ServiceId, kotlin/String, kotlin/String = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String = ..., kotlin.collections/List<com.letta.mobile.data.servicecredentials/ServiceConfigField> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin/String? = ..., com.letta.mobile.data.servicecredentials/ServiceTestStatus = ...) // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.<init>|<init>(com.letta.mobile.data.servicecredentials.ServiceId;kotlin.String;kotlin.String;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.String;kotlin.collections.List<com.letta.mobile.data.servicecredentials.ServiceConfigField>;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.String?;com.letta.mobile.data.servicecredentials.ServiceTestStatus){}[0]
+
+    final val baseUrl // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.baseUrl|{}baseUrl[0]
+        final fun <get-baseUrl>(): kotlin/String? // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.baseUrl.<get-baseUrl>|<get-baseUrl>(){}[0]
+    final val baseUrlEditable // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.baseUrlEditable|{}baseUrlEditable[0]
+        final fun <get-baseUrlEditable>(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.baseUrlEditable.<get-baseUrlEditable>|<get-baseUrlEditable>(){}[0]
+    final val config // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.config|{}config[0]
+        final fun <get-config>(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.config.<get-config>|<get-config>(){}[0]
+    final val configFields // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.configFields|{}configFields[0]
+        final fun <get-configFields>(): kotlin.collections/List<com.letta.mobile.data.servicecredentials/ServiceConfigField> // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.configFields.<get-configFields>|<get-configFields>(){}[0]
+    final val configured // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.configured|{}configured[0]
+        final fun <get-configured>(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.configured.<get-configured>|<get-configured>(){}[0]
+    final val defaultBaseUrl // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.defaultBaseUrl|{}defaultBaseUrl[0]
+        final fun <get-defaultBaseUrl>(): kotlin/String? // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.defaultBaseUrl.<get-defaultBaseUrl>|<get-defaultBaseUrl>(){}[0]
+    final val displayName // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.displayName|{}displayName[0]
+        final fun <get-displayName>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.displayName.<get-displayName>|<get-displayName>(){}[0]
+    final val hasSecret // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.hasSecret|{}hasSecret[0]
+        final fun <get-hasSecret>(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.hasSecret.<get-hasSecret>|<get-hasSecret>(){}[0]
+    final val lastTest // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.lastTest|{}lastTest[0]
+        final fun <get-lastTest>(): com.letta.mobile.data.servicecredentials/ServiceTestStatus // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.lastTest.<get-lastTest>|<get-lastTest>(){}[0]
+    final val revision // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.revision|{}revision[0]
+        final fun <get-revision>(): kotlin/String? // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.revision.<get-revision>|<get-revision>(){}[0]
+    final val secretLabel // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.secretLabel|{}secretLabel[0]
+        final fun <get-secretLabel>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.secretLabel.<get-secretLabel>|<get-secretLabel>(){}[0]
+    final val serviceId // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.serviceId|{}serviceId[0]
+        final fun <get-serviceId>(): com.letta.mobile.data.servicecredentials/ServiceId // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.serviceId.<get-serviceId>|<get-serviceId>(){}[0]
+    final val summary // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.summary|{}summary[0]
+        final fun <get-summary>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.summary.<get-summary>|<get-summary>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.servicecredentials/ServiceId // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.component1|component1(){}[0]
+    final fun component10(): kotlin.collections/List<com.letta.mobile.data.servicecredentials/ServiceConfigField> // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.component10|component10(){}[0]
+    final fun component11(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.component11|component11(){}[0]
+    final fun component12(): kotlin/String? // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.component12|component12(){}[0]
+    final fun component13(): com.letta.mobile.data.servicecredentials/ServiceTestStatus // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.component13|component13(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.component4|component4(){}[0]
+    final fun component5(): kotlin/String? // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.component5|component5(){}[0]
+    final fun component6(): kotlin/String? // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.component6|component6(){}[0]
+    final fun component7(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.component7|component7(){}[0]
+    final fun component8(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.component8|component8(){}[0]
+    final fun component9(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.component9|component9(){}[0]
+    final fun copy(com.letta.mobile.data.servicecredentials/ServiceId = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String = ..., kotlin.collections/List<com.letta.mobile.data.servicecredentials/ServiceConfigField> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin/String? = ..., com.letta.mobile.data.servicecredentials/ServiceTestStatus = ...): com.letta.mobile.data.servicecredentials/ServiceCredentialStatus // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.copy|copy(com.letta.mobile.data.servicecredentials.ServiceId;kotlin.String;kotlin.String;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.String;kotlin.collections.List<com.letta.mobile.data.servicecredentials.ServiceConfigField>;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.String?;com.letta.mobile.data.servicecredentials.ServiceTestStatus){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.servicecredentials/ServiceCredentialStatus> { // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.servicecredentials/ServiceCredentialStatus // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.servicecredentials/ServiceCredentialStatus) // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.servicecredentials.ServiceCredentialStatus){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.servicecredentials/ServiceCredentialStatus> // com.letta.mobile.data.servicecredentials/ServiceCredentialStatus.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams { // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams|null[0]
+    constructor <init>(com.letta.mobile.data.servicecredentials/ServiceId) // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.<init>|<init>(com.letta.mobile.data.servicecredentials.ServiceId){}[0]
+
+    final val serviceId // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.serviceId|{}serviceId[0]
+        final fun <get-serviceId>(): com.letta.mobile.data.servicecredentials/ServiceId // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.serviceId.<get-serviceId>|<get-serviceId>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.servicecredentials/ServiceId // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.component1|component1(){}[0]
+    final fun copy(com.letta.mobile.data.servicecredentials/ServiceId = ...): com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.copy|copy(com.letta.mobile.data.servicecredentials.ServiceId){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams> { // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams) // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.servicecredentials.ServiceCredentialTestParams){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams> // com.letta.mobile.data.servicecredentials/ServiceCredentialTestParams.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.servicecredentials/ServiceCredentialsClient { // com.letta.mobile.data.servicecredentials/ServiceCredentialsClient|null[0]
+    constructor <init>(com.letta.mobile.data.servicecredentials/ServiceCredentialLink, kotlin/Function0<kotlin.collections/Set<kotlin/String>>) // com.letta.mobile.data.servicecredentials/ServiceCredentialsClient.<init>|<init>(com.letta.mobile.data.servicecredentials.ServiceCredentialLink;kotlin.Function0<kotlin.collections.Set<kotlin.String>>){}[0]
+
+    final val supported // com.letta.mobile.data.servicecredentials/ServiceCredentialsClient.supported|{}supported[0]
+        final fun <get-supported>(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialsClient.supported.<get-supported>|<get-supported>(){}[0]
+
+    final suspend fun list(): com.letta.mobile.data.servicecredentials/ServiceCredentialList // com.letta.mobile.data.servicecredentials/ServiceCredentialsClient.list|list(){}[0]
+    final suspend fun remove(com.letta.mobile.data.servicecredentials/ServiceId, kotlin/String?): com.letta.mobile.data.servicecredentials/ServiceCredentialStatus // com.letta.mobile.data.servicecredentials/ServiceCredentialsClient.remove|remove(com.letta.mobile.data.servicecredentials.ServiceId;kotlin.String?){}[0]
+    final suspend fun set(com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand): com.letta.mobile.data.servicecredentials/ServiceCredentialStatus // com.letta.mobile.data.servicecredentials/ServiceCredentialsClient.set|set(com.letta.mobile.data.servicecredentials.ServiceCredentialSetCommand){}[0]
+    final suspend fun test(com.letta.mobile.data.servicecredentials/ServiceId): com.letta.mobile.data.servicecredentials/ServiceCredentialStatus // com.letta.mobile.data.servicecredentials/ServiceCredentialsClient.test|test(com.letta.mobile.data.servicecredentials.ServiceId){}[0]
+}
+
+final class com.letta.mobile.data.servicecredentials/ServiceCredentialsController { // com.letta.mobile.data.servicecredentials/ServiceCredentialsController|null[0]
+    constructor <init>(com.letta.mobile.data.servicecredentials/ServiceCredentialsClient, kotlinx.coroutines/CoroutineScope) // com.letta.mobile.data.servicecredentials/ServiceCredentialsController.<init>|<init>(com.letta.mobile.data.servicecredentials.ServiceCredentialsClient;kotlinx.coroutines.CoroutineScope){}[0]
+
+    final val state // com.letta.mobile.data.servicecredentials/ServiceCredentialsController.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.servicecredentials/ServiceCredentialsState> // com.letta.mobile.data.servicecredentials/ServiceCredentialsController.state.<get-state>|<get-state>(){}[0]
+
+    final fun closeEdit() // com.letta.mobile.data.servicecredentials/ServiceCredentialsController.closeEdit|closeEdit(){}[0]
+    final fun openEdit(com.letta.mobile.data.servicecredentials/ServiceId) // com.letta.mobile.data.servicecredentials/ServiceCredentialsController.openEdit|openEdit(com.letta.mobile.data.servicecredentials.ServiceId){}[0]
+    final fun refresh() // com.letta.mobile.data.servicecredentials/ServiceCredentialsController.refresh|refresh(){}[0]
+    final fun remove(com.letta.mobile.data.servicecredentials/ServiceId) // com.letta.mobile.data.servicecredentials/ServiceCredentialsController.remove|remove(com.letta.mobile.data.servicecredentials.ServiceId){}[0]
+    final fun save(com.letta.mobile.data.servicecredentials/ServiceId, com.letta.mobile.data.servicecredentials/ServiceCredentialDraft) // com.letta.mobile.data.servicecredentials/ServiceCredentialsController.save|save(com.letta.mobile.data.servicecredentials.ServiceId;com.letta.mobile.data.servicecredentials.ServiceCredentialDraft){}[0]
+    final fun test(com.letta.mobile.data.servicecredentials/ServiceId) // com.letta.mobile.data.servicecredentials/ServiceCredentialsController.test|test(com.letta.mobile.data.servicecredentials.ServiceId){}[0]
+}
+
+final class com.letta.mobile.data.servicecredentials/ServiceCredentialsState { // com.letta.mobile.data.servicecredentials/ServiceCredentialsState|null[0]
+    constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin.collections/List<com.letta.mobile.data.servicecredentials/ServiceCredentialStatus> = ..., com.letta.mobile.data.servicecredentials/ServiceId? = ..., com.letta.mobile.data.servicecredentials/ServiceId? = ..., com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode? = ..., com.letta.mobile.data.servicecredentials/ServiceId? = ...) // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.collections.List<com.letta.mobile.data.servicecredentials.ServiceCredentialStatus>;com.letta.mobile.data.servicecredentials.ServiceId?;com.letta.mobile.data.servicecredentials.ServiceId?;com.letta.mobile.data.servicecredentials.ServiceCredentialErrorCode?;com.letta.mobile.data.servicecredentials.ServiceId?){}[0]
+
+    final val busy // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.busy|{}busy[0]
+        final fun <get-busy>(): com.letta.mobile.data.servicecredentials/ServiceId? // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.busy.<get-busy>|<get-busy>(){}[0]
+    final val canManage // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.canManage|{}canManage[0]
+        final fun <get-canManage>(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.canManage.<get-canManage>|<get-canManage>(){}[0]
+    final val editing // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.editing|{}editing[0]
+        final fun <get-editing>(): com.letta.mobile.data.servicecredentials/ServiceId? // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.editing.<get-editing>|<get-editing>(){}[0]
+    final val error // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.error|{}error[0]
+        final fun <get-error>(): com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode? // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.error.<get-error>|<get-error>(){}[0]
+    final val failedService // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.failedService|{}failedService[0]
+        final fun <get-failedService>(): com.letta.mobile.data.servicecredentials/ServiceId? // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.failedService.<get-failedService>|<get-failedService>(){}[0]
+    final val loading // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.loading|{}loading[0]
+        final fun <get-loading>(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.loading.<get-loading>|<get-loading>(){}[0]
+    final val services // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.services|{}services[0]
+        final fun <get-services>(): kotlin.collections/List<com.letta.mobile.data.servicecredentials/ServiceCredentialStatus> // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.services.<get-services>|<get-services>(){}[0]
+    final val supported // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.supported|{}supported[0]
+        final fun <get-supported>(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.supported.<get-supported>|<get-supported>(){}[0]
+
+    final fun component1(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/List<com.letta.mobile.data.servicecredentials/ServiceCredentialStatus> // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.component4|component4(){}[0]
+    final fun component5(): com.letta.mobile.data.servicecredentials/ServiceId? // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.component5|component5(){}[0]
+    final fun component6(): com.letta.mobile.data.servicecredentials/ServiceId? // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.component6|component6(){}[0]
+    final fun component7(): com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode? // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.component7|component7(){}[0]
+    final fun component8(): com.letta.mobile.data.servicecredentials/ServiceId? // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.component8|component8(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin.collections/List<com.letta.mobile.data.servicecredentials/ServiceCredentialStatus> = ..., com.letta.mobile.data.servicecredentials/ServiceId? = ..., com.letta.mobile.data.servicecredentials/ServiceId? = ..., com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode? = ..., com.letta.mobile.data.servicecredentials/ServiceId? = ...): com.letta.mobile.data.servicecredentials/ServiceCredentialsState // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.collections.List<com.letta.mobile.data.servicecredentials.ServiceCredentialStatus>;com.letta.mobile.data.servicecredentials.ServiceId?;com.letta.mobile.data.servicecredentials.ServiceId?;com.letta.mobile.data.servicecredentials.ServiceCredentialErrorCode?;com.letta.mobile.data.servicecredentials.ServiceId?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialsState.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.servicecredentials/ServiceTestStatus { // com.letta.mobile.data.servicecredentials/ServiceTestStatus|null[0]
+    constructor <init>(com.letta.mobile.data.servicecredentials/ServiceTestState = ..., kotlin/Long? = ..., com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode? = ...) // com.letta.mobile.data.servicecredentials/ServiceTestStatus.<init>|<init>(com.letta.mobile.data.servicecredentials.ServiceTestState;kotlin.Long?;com.letta.mobile.data.servicecredentials.ServiceCredentialErrorCode?){}[0]
+
+    final val checkedAtMs // com.letta.mobile.data.servicecredentials/ServiceTestStatus.checkedAtMs|{}checkedAtMs[0]
+        final fun <get-checkedAtMs>(): kotlin/Long? // com.letta.mobile.data.servicecredentials/ServiceTestStatus.checkedAtMs.<get-checkedAtMs>|<get-checkedAtMs>(){}[0]
+    final val error // com.letta.mobile.data.servicecredentials/ServiceTestStatus.error|{}error[0]
+        final fun <get-error>(): com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode? // com.letta.mobile.data.servicecredentials/ServiceTestStatus.error.<get-error>|<get-error>(){}[0]
+    final val state // com.letta.mobile.data.servicecredentials/ServiceTestStatus.state|{}state[0]
+        final fun <get-state>(): com.letta.mobile.data.servicecredentials/ServiceTestState // com.letta.mobile.data.servicecredentials/ServiceTestStatus.state.<get-state>|<get-state>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.servicecredentials/ServiceTestState // com.letta.mobile.data.servicecredentials/ServiceTestStatus.component1|component1(){}[0]
+    final fun component2(): kotlin/Long? // com.letta.mobile.data.servicecredentials/ServiceTestStatus.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode? // com.letta.mobile.data.servicecredentials/ServiceTestStatus.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.data.servicecredentials/ServiceTestState = ..., kotlin/Long? = ..., com.letta.mobile.data.servicecredentials/ServiceCredentialErrorCode? = ...): com.letta.mobile.data.servicecredentials/ServiceTestStatus // com.letta.mobile.data.servicecredentials/ServiceTestStatus.copy|copy(com.letta.mobile.data.servicecredentials.ServiceTestState;kotlin.Long?;com.letta.mobile.data.servicecredentials.ServiceCredentialErrorCode?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceTestStatus.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceTestStatus.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceTestStatus.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.servicecredentials/ServiceTestStatus> { // com.letta.mobile.data.servicecredentials/ServiceTestStatus.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.servicecredentials/ServiceTestStatus.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.servicecredentials/ServiceTestStatus.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.servicecredentials/ServiceTestStatus.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.servicecredentials/ServiceTestStatus // com.letta.mobile.data.servicecredentials/ServiceTestStatus.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.servicecredentials/ServiceTestStatus) // com.letta.mobile.data.servicecredentials/ServiceTestStatus.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.servicecredentials.ServiceTestStatus){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.servicecredentials/ServiceTestStatus.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.servicecredentials/ServiceTestStatus.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.servicecredentials/ServiceTestStatus> // com.letta.mobile.data.servicecredentials/ServiceTestStatus.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.session.graph/AdminRemoteRoutes { // com.letta.mobile.data.session.graph/AdminRemoteRoutes|null[0]
     constructor <init>(com.letta.mobile.data.backend/RemoteRoute<com.letta.mobile.data.repository.api/McpServerRemoteSource> = ..., com.letta.mobile.data.backend/RemoteRoute<com.letta.mobile.data.repository.api/ModelRemoteSource> = ..., com.letta.mobile.data.backend/RemoteRoute<com.letta.mobile.data.repository.api/PassageRemoteSource> = ..., com.letta.mobile.data.backend/RemoteRoute<com.letta.mobile.data.repository.api/ProjectRemoteSource> = ..., com.letta.mobile.data.backend/RemoteRoute<com.letta.mobile.data.repository.api/ProviderRemoteSource> = ..., com.letta.mobile.data.backend/RemoteRoute<com.letta.mobile.data.repository.api/RunRemoteSource> = ..., com.letta.mobile.data.backend/RemoteRoute<com.letta.mobile.data.repository.api/ToolRemoteSource> = ..., com.letta.mobile.data.backend/RemoteRoute<com.letta.mobile.data.repository.api/BlockRemoteSource> = ...) // com.letta.mobile.data.session.graph/AdminRemoteRoutes.<init>|<init>(com.letta.mobile.data.backend.RemoteRoute<com.letta.mobile.data.repository.api.McpServerRemoteSource>;com.letta.mobile.data.backend.RemoteRoute<com.letta.mobile.data.repository.api.ModelRemoteSource>;com.letta.mobile.data.backend.RemoteRoute<com.letta.mobile.data.repository.api.PassageRemoteSource>;com.letta.mobile.data.backend.RemoteRoute<com.letta.mobile.data.repository.api.ProjectRemoteSource>;com.letta.mobile.data.backend.RemoteRoute<com.letta.mobile.data.repository.api.ProviderRemoteSource>;com.letta.mobile.data.backend.RemoteRoute<com.letta.mobile.data.repository.api.RunRemoteSource>;com.letta.mobile.data.backend.RemoteRoute<com.letta.mobile.data.repository.api.ToolRemoteSource>;com.letta.mobile.data.backend.RemoteRoute<com.letta.mobile.data.repository.api.BlockRemoteSource>){}[0]
 
@@ -76959,6 +77370,28 @@ final value class com.letta.mobile.data.secrets/SecretKey { // com.letta.mobile.
     final fun toString(): kotlin/String // com.letta.mobile.data.secrets/SecretKey.toString|toString(){}[0]
 }
 
+final value class com.letta.mobile.data.servicecredentials/ServiceId { // com.letta.mobile.data.servicecredentials/ServiceId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.servicecredentials/ServiceId.<init>|<init>(kotlin.String){}[0]
+
+    final val valid // com.letta.mobile.data.servicecredentials/ServiceId.valid|{}valid[0]
+        final fun <get-valid>(): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceId.valid.<get-valid>|<get-valid>(){}[0]
+    final val value // com.letta.mobile.data.servicecredentials/ServiceId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.servicecredentials/ServiceId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.servicecredentials/ServiceId> { // com.letta.mobile.data.servicecredentials/ServiceId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.servicecredentials/ServiceId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.servicecredentials/ServiceId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.servicecredentials/ServiceId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.servicecredentials/ServiceId // com.letta.mobile.data.servicecredentials/ServiceId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.servicecredentials/ServiceId) // com.letta.mobile.data.servicecredentials/ServiceId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.servicecredentials.ServiceId){}[0]
+    }
+}
+
 final value class com.letta.mobile.data.subagents/SubagentViewKey { // com.letta.mobile.data.subagents/SubagentViewKey|null[0]
     constructor <init>(kotlin/String) // com.letta.mobile.data.subagents/SubagentViewKey.<init>|<init>(kotlin.String){}[0]
 
@@ -82479,6 +82912,36 @@ final object com.letta.mobile.data.serialization/LettaJson { // com.letta.mobile
         final fun <get-persisted>(): kotlinx.serialization.json/Json // com.letta.mobile.data.serialization/LettaJson.persisted.<get-persisted>|<get-persisted>(){}[0]
     final val wire // com.letta.mobile.data.serialization/LettaJson.wire|{}wire[0]
         final fun <get-wire>(): kotlinx.serialization.json/Json // com.letta.mobile.data.serialization/LettaJson.wire.<get-wire>|<get-wire>(){}[0]
+}
+
+final object com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommandSerializer : kotlinx.serialization/KSerializer<com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand> { // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommandSerializer|null[0]
+    final val descriptor // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommandSerializer.descriptor|{}descriptor[0]
+        final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommandSerializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+    final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommandSerializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+    final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommand) // com.letta.mobile.data.servicecredentials/ServiceCredentialSetCommandSerializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.servicecredentials.ServiceCredentialSetCommand){}[0]
+}
+
+final object com.letta.mobile.data.servicecredentials/ServiceCredentialWire { // com.letta.mobile.data.servicecredentials/ServiceCredentialWire|null[0]
+    final const val CAPABILITY // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.CAPABILITY|{}CAPABILITY[0]
+        final fun <get-CAPABILITY>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.CAPABILITY.<get-CAPABILITY>|<get-CAPABILITY>(){}[0]
+    final const val CONTRACT_VERSION // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.CONTRACT_VERSION|{}CONTRACT_VERSION[0]
+        final fun <get-CONTRACT_VERSION>(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.CONTRACT_VERSION.<get-CONTRACT_VERSION>|<get-CONTRACT_VERSION>(){}[0]
+    final const val LIST // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.LIST|{}LIST[0]
+        final fun <get-LIST>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.LIST.<get-LIST>|<get-LIST>(){}[0]
+    final const val MAX_CONFIG_VALUE_CHARS // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.MAX_CONFIG_VALUE_CHARS|{}MAX_CONFIG_VALUE_CHARS[0]
+        final fun <get-MAX_CONFIG_VALUE_CHARS>(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.MAX_CONFIG_VALUE_CHARS.<get-MAX_CONFIG_VALUE_CHARS>|<get-MAX_CONFIG_VALUE_CHARS>(){}[0]
+    final const val MAX_SECRET_CHARS // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.MAX_SECRET_CHARS|{}MAX_SECRET_CHARS[0]
+        final fun <get-MAX_SECRET_CHARS>(): kotlin/Int // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.MAX_SECRET_CHARS.<get-MAX_SECRET_CHARS>|<get-MAX_SECRET_CHARS>(){}[0]
+    final const val REMOVE // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.REMOVE|{}REMOVE[0]
+        final fun <get-REMOVE>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.REMOVE.<get-REMOVE>|<get-REMOVE>(){}[0]
+    final const val SET // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.SET|{}SET[0]
+        final fun <get-SET>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.SET.<get-SET>|<get-SET>(){}[0]
+    final const val TEST // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.TEST|{}TEST[0]
+        final fun <get-TEST>(): kotlin/String // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.TEST.<get-TEST>|<get-TEST>(){}[0]
+
+    final val METHODS // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.METHODS|{}METHODS[0]
+        final fun <get-METHODS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.servicecredentials/ServiceCredentialWire.METHODS.<get-METHODS>|<get-METHODS>(){}[0]
 }
 
 final object com.letta.mobile.data.session.graph/SharedSessionGraph { // com.letta.mobile.data.session.graph/SharedSessionGraph|null[0]

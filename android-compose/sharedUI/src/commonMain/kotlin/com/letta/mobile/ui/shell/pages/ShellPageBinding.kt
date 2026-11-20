@@ -130,7 +130,7 @@ fun shellPageDeps(
         skills = skillsPage(controllers, host),
         settings = settings,
         agentEditor = shellAgentEditorBinding(graph, host),
-        providers = host.modelControl?.let(::shellProvidersPage),
+        providers = host.modelControl?.let { shellProvidersPage(it, graph.channelTransport) },
         admin = shellAdminPages(graph, host),
         fallback = host.pages.fallback,
     )

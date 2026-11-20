@@ -47,8 +47,19 @@ enum class ProviderSettingsPage(val label: String) {
     ACCOUNTS(ModelControlStrings.PAGE_ACCOUNTS),
     API_KEYS(ModelControlStrings.PAGE_API_KEYS),
     ENDPOINTS(ModelControlStrings.PAGE_ENDPOINTS),
+    SERVICES(ModelControlStrings.PAGE_SERVICES),
     MODELS(ModelControlStrings.PAGE_MODELS),
 }
+
+/**
+ * Where [ProviderSettingsPane] starts and what it offers beyond the provider pages: the page shown
+ * first, and the [services] binding (null while the host keeps no service credentials, which hides
+ * the Services page).
+ */
+class ProviderSettingsPages(
+    val initial: ProviderSettingsPage = ProviderSettingsPage.ACCOUNTS,
+    val services: ServiceCredentialsBinding? = null,
+)
 
 /**
  * Callbacks of [ProviderSettingsPane]: the management ones, the sign-in
@@ -90,30 +101,33 @@ object ProviderSettingsTags {
 
 /**
  * Providers settings, modelled on Hermes' Settings ->
- * Providers: a left navigation (Accounts, API keys, Custom Endpoints, Models)
+ * Providers: a left navigation (Accounts, API keys, Custom Endpoints, Services, Models)
  * on wide windows, tabs on a phone. Everything comes from one
  * [ProviderManagementState]; the desktop destination and the Android screen
- * only host it.
+ * only host it. The Services page shows only with a [pages] services binding (a host
+ * that keeps service credentials); a selected page that is not offered falls back to Accounts.
  */
 @Composable
 fun ProviderSettingsPane(
     state: ProviderManagementState,
     actions: ProviderSettingsActions,
     modifier: Modifier = Modifier,
-    initialPage: ProviderSettingsPage = ProviderSettingsPage.ACCOUNTS,
+    pages: ProviderSettingsPages = ProviderSettingsPages(),
 ) {
-    var page by rememberSaveable { mutableStateOf(initialPage) }
-    val context = ProviderPageContext(state, actions, onPageChange = { page = it })
+    var selected by rememberSaveable { mutableStateOf(pages.initial) }
+    val context = ProviderPageContext(state, actions, onPageChange = { selected = it }, services = pages.services)
+    // The selection is kept as the person made it (Services returns with its binding); what shows is what is offered.
+    val page = context.resolve(selected)
     BoxWithConstraints(modifier = modifier.fillMaxSize().testTag(ProviderSettingsTags.PANE)) {
         if (maxWidth >= LettaDimens.Pane.wideBreakpoint) {
             Row(modifier = Modifier.fillMaxSize()) {
-                SettingsNav(page, context.onPageChange, modifier = Modifier.width(LettaDimens.Pane.navWidth).fillMaxHeight())
+                SettingsNav(context.pages, page, context.onPageChange, modifier = Modifier.width(LettaDimens.Pane.navWidth).fillMaxHeight())
                 VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 PageColumn(context, page, modifier = Modifier.weight(1f))
             }
         } else {
             Column(modifier = Modifier.fillMaxSize()) {
-                SettingsTabs(page, context.onPageChange)
+                SettingsTabs(context.pages, page, context.onPageChange)
                 PageColumn(context, page, modifier = Modifier.weight(1f))
             }
         }
@@ -126,12 +140,20 @@ internal class ProviderPageContext(
     val state: ProviderManagementState,
     val actions: ProviderSettingsActions,
     val onPageChange: (ProviderSettingsPage) -> Unit,
-)
+    val services: ServiceCredentialsBinding? = null,
+) {
+    /** The pages offered: Services only when the host keeps service credentials. */
+    val pages: List<ProviderSettingsPage>
+        get() = ProviderSettingsPage.entries.filter { it != ProviderSettingsPage.SERVICES || services != null }
+
+    /** [page] if it is offered, else Accounts. */
+    fun resolve(page: ProviderSettingsPage): ProviderSettingsPage = page.takeIf { it in pages } ?: ProviderSettingsPage.ACCOUNTS
+}
 
 @Composable
-private fun SettingsTabs(page: ProviderSettingsPage, onPageChange: (ProviderSettingsPage) -> Unit) {
-    PrimaryScrollableTabRow(selectedTabIndex = page.ordinal, edgePadding = LettaDimens.Space.lg) {
-        ProviderSettingsPage.entries.forEach { entry ->
+private fun SettingsTabs(pages: List<ProviderSettingsPage>, page: ProviderSettingsPage, onPageChange: (ProviderSettingsPage) -> Unit) {
+    PrimaryScrollableTabRow(selectedTabIndex = pages.indexOf(page).coerceAtLeast(0), edgePadding = LettaDimens.Space.lg) {
+        pages.forEach { entry ->
             Tab(
                 selected = entry == page,
                 onClick = { onPageChange(entry) },
@@ -143,7 +165,12 @@ private fun SettingsTabs(page: ProviderSettingsPage, onPageChange: (ProviderSett
 }
 
 @Composable
-private fun SettingsNav(page: ProviderSettingsPage, onPageChange: (ProviderSettingsPage) -> Unit, modifier: Modifier) {
+private fun SettingsNav(
+    pages: List<ProviderSettingsPage>,
+    page: ProviderSettingsPage,
+    onPageChange: (ProviderSettingsPage) -> Unit,
+    modifier: Modifier,
+) {
     Column(
         modifier = modifier.padding(vertical = LettaDimens.Space.md, horizontal = LettaDimens.Space.sm).selectableGroup(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
@@ -153,7 +180,7 @@ private fun SettingsNav(page: ProviderSettingsPage, onPageChange: (ProviderSetti
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm).semantics { heading() },
         )
-        ProviderSettingsPage.entries.forEach { entry -> NavEntry(entry, selected = entry == page, onClick = { onPageChange(entry) }) }
+        pages.forEach { entry -> NavEntry(entry, selected = entry == page, onClick = { onPageChange(entry) }) }
     }
 }
 
@@ -178,12 +205,15 @@ private fun NavEntry(entry: ProviderSettingsPage, selected: Boolean, onClick: ()
 
 @Composable
 private fun PageColumn(context: ProviderPageContext, page: ProviderSettingsPage, modifier: Modifier) {
+    val services = context.services
     Column(modifier = modifier.fillMaxHeight()) {
-        if (page == ProviderSettingsPage.MODELS) {
+        if (page == ProviderSettingsPage.SERVICES && services != null) {
+            ServicesColumn(services)
+        } else if (page == ProviderSettingsPage.MODELS) {
             // The full Providers & Models pane already has its own toolbar, progress and dialogs.
             ProviderManagementPane(state = context.state, actions = context.actions.management)
         } else {
-            PageHeader(page, context.state, context.actions.management.onRefresh)
+            PageHeader(page, context.state.loading, context.actions.management.onRefresh)
             PageStatus(context.state)
             PageBody(context, page)
         }
@@ -209,13 +239,23 @@ private fun PageBody(context: ProviderPageContext, page: ProviderSettingsPage) {
             ProviderSettingsPage.ACCOUNTS -> AccountsPage(lists, context, pageModifier)
             ProviderSettingsPage.API_KEYS -> CredentialsPage(CredentialsKind.API_KEYS, lists.apiKeys, context, pageModifier)
             ProviderSettingsPage.ENDPOINTS -> CredentialsPage(CredentialsKind.ENDPOINTS, lists.endpoints, context, pageModifier)
-            ProviderSettingsPage.MODELS -> Unit
+            ProviderSettingsPage.SERVICES, ProviderSettingsPage.MODELS -> Unit
         }
     }
 }
 
+/** The Services page: its header and progress over the host's service credentials. */
 @Composable
-private fun PageHeader(page: ProviderSettingsPage, state: ProviderManagementState, onRefresh: () -> Unit) {
+private fun ServicesColumn(services: ServiceCredentialsBinding) {
+    PageHeader(ProviderSettingsPage.SERVICES, services.state.loading, services.actions.onRefresh)
+    if (services.state.loading || services.state.busy != null) LettaBusyBar()
+    LettaRefreshable(refreshing = false, onRefresh = services.actions.onRefresh, modifier = Modifier.fillMaxSize()) {
+        ServicesPage(services, modifier = Modifier.widthIn(max = LettaDimens.Pane.contentMaxWidth).fillMaxSize())
+    }
+}
+
+@Composable
+private fun PageHeader(page: ProviderSettingsPage, refreshing: Boolean, onRefresh: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.sm, top = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -227,7 +267,7 @@ private fun PageHeader(page: ProviderSettingsPage, state: ProviderManagementStat
         )
         // Pointer only: touch pulls the page body (PageBody's LettaRefreshable).
         LettaRefreshAction(
-            refreshing = state.loading,
+            refreshing = refreshing,
             onRefresh = onRefresh,
             modifier = Modifier.testTag(ProviderSettingsTags.REFRESH),
         )

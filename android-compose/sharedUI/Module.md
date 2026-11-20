@@ -227,7 +227,7 @@ Memory page, graph and block editing components. Use the page/controller and con
 
 # Package com.letta.mobile.ui.modelcontrol
 
-Model/provider pickers, settings and sign-in/connection panes. Supply picker models, controller actions and provider forms; authentication, credential persistence and model routing remain outside presentation.
+Model/provider pickers, settings and sign-in/connection panes, and the Services page (service credentials the host keeps, with forms built from the host's description of each service). Supply picker models, controller actions and provider forms; authentication, credential persistence and model routing remain outside presentation.
 
 # Package com.letta.mobile.ui.notify
 

@@ -7,6 +7,12 @@ import com.letta.mobile.data.storage.InMemoryAssetStore
 import com.letta.mobile.data.runtime.ConversationRowsSource
 import com.letta.mobile.data.runtime.TurnIdentityLedger
 import com.letta.mobile.data.runtime.TurnIdentityStore
+import com.letta.mobile.data.controller.node.iroh.servicecredentials.FileServiceCredentialPersistence
+import com.letta.mobile.data.controller.node.iroh.servicecredentials.FileServiceSecretStore
+import com.letta.mobile.data.controller.node.iroh.servicecredentials.ServiceCredentialContractHarness
+import com.letta.mobile.data.controller.node.iroh.servicecredentials.ServiceCredentialRouteSet
+import com.letta.mobile.data.controller.node.iroh.servicecredentials.ServiceCredentialStore
+import com.letta.mobile.data.controller.node.iroh.servicecredentials.TypeSafeJevAdapter
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.iroh.WireContractFixture
 import java.io.File
@@ -65,18 +71,11 @@ class WireContractsTest {
                 val known = setOf(
                     "controller_state", "conversations", "hidden_agent_ids", "visibility_index",
                     "reflection_settings", "monitor_success", "toolset_response", "cron_control", "execute_command_response", "voice",
-                    "pins", "shell_state",
+                    "pins", "shell_state", "service_credentials",
                 )
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
-                if ("voice" in host) {
-                    // Voice cases run through the real stream server, capability gate and voice routes
-                    // (one is streamed, and several are refusals of the transport's gate).
-                    val expected = case["server_frames"]?.jsonArray?.map { it.jsonObject }.orEmpty() + fixture.response(name)
-                    val frames = com.letta.mobile.data.controller.node.iroh.voice.VoiceContractHarness.run(fixture.method, case)
-                    assertEquals(expected, frames, "${fixture.method}/$name wire frames")
-                    continue
-                }
+                if (runsThroughStreamServer(fixture, case, host)) continue
                 val state = when (host.getValue("controller_state").jsonPrimitive.content) {
                     "connected" -> AppServerControllerState.Connected
                     "disconnected" -> AppServerControllerState.Disconnected()
@@ -101,6 +100,28 @@ class WireContractsTest {
                 }
             }
         }
+    }
+
+    /**
+     * Voice and service credential cases run through the real stream server, capability gate and routes
+     * (one voice method is streamed, and several cases are refusals of the transport's gate). True when
+     * [case] was one of them and has been checked.
+     */
+    private suspend fun runsThroughStreamServer(fixture: WireContractFixture, case: JsonObject, host: JsonObject): Boolean {
+        val name = case.getValue("name").jsonPrimitive.content
+        when {
+            "voice" in host -> {
+                val expected = case["server_frames"]?.jsonArray?.map { it.jsonObject }.orEmpty() + fixture.response(name)
+                val frames = com.letta.mobile.data.controller.node.iroh.voice.VoiceContractHarness.run(fixture.method, case)
+                assertEquals(expected, frames, "${fixture.method}/$name wire frames")
+            }
+            "service_credentials" in host -> {
+                val response = ServiceCredentialContractHarness.run(fixture.method, case)
+                assertEquals(fixture.response(name), response, "${fixture.method}/$name wire response")
+            }
+            else -> return false
+        }
+        return true
     }
 
     @Test
@@ -346,8 +367,8 @@ class WireContractsTest {
                     permissionModes = PermissionModePublisher(plugins.scope),
                 ),
             )
-            // The production wrapper registers the voice and pins routes on the built router; so does this host.
-            listOf(voiceRoutes(dir), pinsRoutes(host), shellStateRoutes(host)).forEach { it.register(router) }
+            // The production wrapper registers the voice, pins, shell state and service credential routes on the built router; so does this host.
+            listOf(voiceRoutes(dir), pinsRoutes(host), shellStateRoutes(host), serviceCredentialRoutes(dir)).forEach { it.register(router) }
             block(router)
         } finally {
             runtime.close()
@@ -417,6 +438,15 @@ class WireContractsTest {
         ),
         com.letta.mobile.data.controller.node.iroh.voice.VoiceInFlight(),
     ) { 0L }
+    /** The real service credential routes over file stores in the test's directory; any TypeSafe call fails the test. */
+    private fun serviceCredentialRoutes(dir: File): AdminRpcRoutes = ServiceCredentialRouteSet(
+        ServiceCredentialStore(
+            listOf(TypeSafeJevAdapter(io.ktor.client.engine.mock.MockEngine { error("Unexpected TypeSafe call") })),
+            FileServiceCredentialPersistence(File(dir, "services/service-credentials.json").toPath()),
+            FileServiceSecretStore(File(dir, "services/service-credential-secrets").toPath()),
+        ),
+    ) { 0L }
+
     /** The real canvas mount routes under a secure policy; no fixture may reach the host's records. */
     private fun canvasMountRoutes(dir: File): AdminRpcRoutes = com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountRoutes(
         com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy.PairedPeersOnly,

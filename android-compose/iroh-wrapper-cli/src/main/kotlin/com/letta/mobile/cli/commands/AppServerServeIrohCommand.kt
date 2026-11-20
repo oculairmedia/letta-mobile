@@ -645,6 +645,10 @@ class AppServerServeIrohCommand : CliktCommand(
             shellStateRoutes = com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateRoutes.forHost(
                 hostStateDirectory, shellStatePublisher,
             ),
+            // Non-LLM service credentials live beside them too; the secrets in an owner-only file.
+            serviceCredentialRoutes = com.letta.mobile.data.controller.node.iroh.servicecredentials.ServiceCredentialRoutes.forHost(
+                hostStateDirectory,
+            ),
         )
         notebookGrantsFile?.let { file ->
             val store = requireNotNull(notebooks) { "Notebook grants require a notebook store" }

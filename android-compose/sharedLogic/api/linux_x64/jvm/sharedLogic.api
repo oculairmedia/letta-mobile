@@ -21604,6 +21604,12 @@ public final class com/letta/mobile/data/controller/node/iroh/secrets/SecretRequ
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/controller/node/iroh/servicecredentials/ServiceCredentialRoutes {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/servicecredentials/ServiceCredentialRoutes;
+	public final fun forHost (Ljava/nio/file/Path;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
+	public static synthetic fun forHost$default (Lcom/letta/mobile/data/controller/node/iroh/servicecredentials/ServiceCredentialRoutes;Ljava/nio/file/Path;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
+}
+
 public final class com/letta/mobile/data/controller/node/iroh/shellstate/ShellStatePublisher {
 	public fun <init> (Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;)V
 	public synthetic fun <init> (Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -53362,6 +53368,415 @@ public final class com/letta/mobile/data/serialization/LettaJson {
 	public final fun getAdminRpc ()Lkotlinx/serialization/json/Json;
 	public final fun getPersisted ()Lkotlinx/serialization/json/Json;
 	public final fun getWire ()Lkotlinx/serialization/json/Json;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceConfigField {
+	public static final field Companion Lcom/letta/mobile/data/servicecredentials/ServiceConfigField$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/servicecredentials/ServiceConfigField;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/servicecredentials/ServiceConfigField;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/servicecredentials/ServiceConfigField;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDefaultValue ()Ljava/lang/String;
+	public final fun getHelp ()Ljava/lang/String;
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getLabel ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/servicecredentials/ServiceConfigField$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/servicecredentials/ServiceConfigField$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/servicecredentials/ServiceConfigField;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/servicecredentials/ServiceConfigField;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceConfigField$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialDraft {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V
+	public final fun commandFor (Lcom/letta/mobile/data/servicecredentials/ServiceCredentialStatus;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialSetCommand;
+	public final fun getBaseUrl ()Ljava/lang/String;
+	public final fun getConfig ()Ljava/util/Map;
+	public final fun getSecret ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode$Companion;
+	public static final field INSECURE_TRANSPORT Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public static final field INTERNAL Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public static final field INVALID_REQUEST Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public static final field NOT_AUTHORIZED Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public static final field NOT_CONFIGURED Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public static final field RATE_LIMITED Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public static final field REVISION_CONFLICT Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public static final field UNAUTHORIZED Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public static final field UNKNOWN_SERVICE Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public static final field UNREACHABLE Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public static final field UNSUPPORTED Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public static final field UPSTREAM_ERROR Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public static final field UPSTREAM_TIMEOUT Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getWire ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public static fun values ()[Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode$Companion {
+	public final fun fromWire (Ljava/lang/String;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialException : java/lang/Exception {
+	public fun <init> (Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;)V
+	public final fun getCode ()Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+}
+
+public abstract interface class com/letta/mobile/data/servicecredentials/ServiceCredentialLink {
+	public abstract fun call (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialList {
+	public static final field Companion Lcom/letta/mobile/data/servicecredentials/ServiceCredentialList$Companion;
+	public fun <init> ()V
+	public fun <init> (IZLjava/util/List;)V
+	public synthetic fun <init> (IZLjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Z
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (IZLjava/util/List;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialList;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/servicecredentials/ServiceCredentialList;IZLjava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialList;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCanManage ()Z
+	public final fun getContractVersion ()I
+	public final fun getServices ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/servicecredentials/ServiceCredentialList$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/servicecredentials/ServiceCredentialList$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialList;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/servicecredentials/ServiceCredentialList;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialList$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialRemoveParams {
+	public static final field Companion Lcom/letta/mobile/data/servicecredentials/ServiceCredentialRemoveParams$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-y9V2mms ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy-ztdLaOw (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialRemoveParams;
+	public static synthetic fun copy-ztdLaOw$default (Lcom/letta/mobile/data/servicecredentials/ServiceCredentialRemoveParams;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialRemoveParams;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExpectedRevision ()Ljava/lang/String;
+	public final fun getServiceId-y9V2mms ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/servicecredentials/ServiceCredentialRemoveParams$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/servicecredentials/ServiceCredentialRemoveParams$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialRemoveParams;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/servicecredentials/ServiceCredentialRemoveParams;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialRemoveParams$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialReply {
+	public fun <init> (ZLkotlinx/serialization/json/JsonElement;Ljava/lang/String;)V
+	public synthetic fun <init> (ZLkotlinx/serialization/json/JsonElement;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getError ()Ljava/lang/String;
+	public final fun getResult ()Lkotlinx/serialization/json/JsonElement;
+	public final fun getSuccess ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialSetCommand {
+	public static final field Companion Lcom/letta/mobile/data/servicecredentials/ServiceCredentialSetCommand$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/servicecredentials/ServiceSecretChange;Ljava/util/Map;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/servicecredentials/ServiceSecretChange;Ljava/util/Map;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBaseUrl ()Ljava/lang/String;
+	public final fun getConfig ()Ljava/util/Map;
+	public final fun getExpectedRevision ()Ljava/lang/String;
+	public final fun getSecret ()Lcom/letta/mobile/data/servicecredentials/ServiceSecretChange;
+	public final fun getServiceId-y9V2mms ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialSetCommand$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialSetCommandSerializer : kotlinx/serialization/KSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/servicecredentials/ServiceCredentialSetCommandSerializer;
+	public fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialSetCommand;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/servicecredentials/ServiceCredentialSetCommand;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialStatus {
+	public static final field Companion Lcom/letta/mobile/data/servicecredentials/ServiceCredentialStatus$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;ZZLjava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/lang/String;Lcom/letta/mobile/data/servicecredentials/ServiceTestStatus;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;ZZLjava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/lang/String;Lcom/letta/mobile/data/servicecredentials/ServiceTestStatus;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-y9V2mms ()Ljava/lang/String;
+	public final fun component10 ()Ljava/util/List;
+	public final fun component11 ()Ljava/util/Map;
+	public final fun component12 ()Ljava/lang/String;
+	public final fun component13 ()Lcom/letta/mobile/data/servicecredentials/ServiceTestStatus;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Z
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Z
+	public final fun component8 ()Z
+	public final fun component9 ()Ljava/lang/String;
+	public final fun copy-P34Oimc (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;ZZLjava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/lang/String;Lcom/letta/mobile/data/servicecredentials/ServiceTestStatus;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialStatus;
+	public static synthetic fun copy-P34Oimc$default (Lcom/letta/mobile/data/servicecredentials/ServiceCredentialStatus;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;ZZLjava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/lang/String;Lcom/letta/mobile/data/servicecredentials/ServiceTestStatus;ILjava/lang/Object;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialStatus;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBaseUrl ()Ljava/lang/String;
+	public final fun getBaseUrlEditable ()Z
+	public final fun getConfig ()Ljava/util/Map;
+	public final fun getConfigFields ()Ljava/util/List;
+	public final fun getConfigured ()Z
+	public final fun getDefaultBaseUrl ()Ljava/lang/String;
+	public final fun getDisplayName ()Ljava/lang/String;
+	public final fun getHasSecret ()Z
+	public final fun getLastTest ()Lcom/letta/mobile/data/servicecredentials/ServiceTestStatus;
+	public final fun getRevision ()Ljava/lang/String;
+	public final fun getSecretLabel ()Ljava/lang/String;
+	public final fun getServiceId-y9V2mms ()Ljava/lang/String;
+	public final fun getSummary ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/servicecredentials/ServiceCredentialStatus$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/servicecredentials/ServiceCredentialStatus$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialStatus;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/servicecredentials/ServiceCredentialStatus;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialStatus$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialTestParams {
+	public static final field Companion Lcom/letta/mobile/data/servicecredentials/ServiceCredentialTestParams$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-y9V2mms ()Ljava/lang/String;
+	public final fun copy-CUEaAVo (Ljava/lang/String;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialTestParams;
+	public static synthetic fun copy-CUEaAVo$default (Lcom/letta/mobile/data/servicecredentials/ServiceCredentialTestParams;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialTestParams;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getServiceId-y9V2mms ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/servicecredentials/ServiceCredentialTestParams$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/servicecredentials/ServiceCredentialTestParams$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialTestParams;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/servicecredentials/ServiceCredentialTestParams;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialTestParams$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialWire {
+	public static final field CAPABILITY Ljava/lang/String;
+	public static final field CONTRACT_VERSION I
+	public static final field INSTANCE Lcom/letta/mobile/data/servicecredentials/ServiceCredentialWire;
+	public static final field LIST Ljava/lang/String;
+	public static final field MAX_CONFIG_VALUE_CHARS I
+	public static final field MAX_SECRET_CHARS I
+	public static final field REMOVE Ljava/lang/String;
+	public static final field SET Ljava/lang/String;
+	public static final field TEST Ljava/lang/String;
+	public final fun getMETHODS ()Ljava/util/Set;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialsClient {
+	public fun <init> (Lcom/letta/mobile/data/servicecredentials/ServiceCredentialLink;Lkotlin/jvm/functions/Function0;)V
+	public final fun getSupported ()Z
+	public final fun list (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun remove-gYUgrSM (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun set (Lcom/letta/mobile/data/servicecredentials/ServiceCredentialSetCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun test-ztdLaOw (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialsController {
+	public fun <init> (Lcom/letta/mobile/data/servicecredentials/ServiceCredentialsClient;Lkotlinx/coroutines/CoroutineScope;)V
+	public final fun closeEdit ()V
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun openEdit-CUEaAVo (Ljava/lang/String;)V
+	public final fun refresh ()V
+	public final fun remove-CUEaAVo (Ljava/lang/String;)V
+	public final fun save-ztdLaOw (Ljava/lang/String;Lcom/letta/mobile/data/servicecredentials/ServiceCredentialDraft;)V
+	public final fun test-CUEaAVo (Ljava/lang/String;)V
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceCredentialsState {
+	public synthetic fun <init> (ZZZLjava/util/List;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (ZZZLjava/util/List;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Z
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5-Wg7nhcU ()Ljava/lang/String;
+	public final fun component6-Wg7nhcU ()Ljava/lang/String;
+	public final fun component7 ()Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public final fun component8-Wg7nhcU ()Ljava/lang/String;
+	public final fun copy-ubu0lFA (ZZZLjava/util/List;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;Ljava/lang/String;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialsState;
+	public static synthetic fun copy-ubu0lFA$default (Lcom/letta/mobile/data/servicecredentials/ServiceCredentialsState;ZZZLjava/util/List;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/servicecredentials/ServiceCredentialsState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBusy-Wg7nhcU ()Ljava/lang/String;
+	public final fun getCanManage ()Z
+	public final fun getEditing-Wg7nhcU ()Ljava/lang/String;
+	public final fun getError ()Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public final fun getFailedService-Wg7nhcU ()Ljava/lang/String;
+	public final fun getLoading ()Z
+	public final fun getServices ()Ljava/util/List;
+	public final fun getSupported ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceId {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/servicecredentials/ServiceId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public static final fun getValid-impl (Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/servicecredentials/ServiceId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/servicecredentials/ServiceId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-wakiHV8 (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-MJJj8OA (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/data/servicecredentials/ServiceSecretChange {
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceSecretChange$Keep : com/letta/mobile/data/servicecredentials/ServiceSecretChange {
+	public static final field INSTANCE Lcom/letta/mobile/data/servicecredentials/ServiceSecretChange$Keep;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceSecretChange$Remove : com/letta/mobile/data/servicecredentials/ServiceSecretChange {
+	public static final field INSTANCE Lcom/letta/mobile/data/servicecredentials/ServiceSecretChange$Remove;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceSecretChange$Replace : com/letta/mobile/data/servicecredentials/ServiceSecretChange {
+	public fun <init> (Lcom/letta/mobile/data/rpcwire/SecretWriteValue;)V
+	public final fun getSecret ()Lcom/letta/mobile/data/rpcwire/SecretWriteValue;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceTestState : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/data/servicecredentials/ServiceTestState$Companion;
+	public static final field FAILED Lcom/letta/mobile/data/servicecredentials/ServiceTestState;
+	public static final field PASSED Lcom/letta/mobile/data/servicecredentials/ServiceTestState;
+	public static final field UNKNOWN Lcom/letta/mobile/data/servicecredentials/ServiceTestState;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/servicecredentials/ServiceTestState;
+	public static fun values ()[Lcom/letta/mobile/data/servicecredentials/ServiceTestState;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceTestState$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceTestStatus {
+	public static final field Companion Lcom/letta/mobile/data/servicecredentials/ServiceTestStatus$Companion;
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/servicecredentials/ServiceTestState;Ljava/lang/Long;Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/servicecredentials/ServiceTestState;Ljava/lang/Long;Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/servicecredentials/ServiceTestState;
+	public final fun component2 ()Ljava/lang/Long;
+	public final fun component3 ()Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public final fun copy (Lcom/letta/mobile/data/servicecredentials/ServiceTestState;Ljava/lang/Long;Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;)Lcom/letta/mobile/data/servicecredentials/ServiceTestStatus;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/servicecredentials/ServiceTestStatus;Lcom/letta/mobile/data/servicecredentials/ServiceTestState;Ljava/lang/Long;Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;ILjava/lang/Object;)Lcom/letta/mobile/data/servicecredentials/ServiceTestStatus;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCheckedAtMs ()Ljava/lang/Long;
+	public final fun getError ()Lcom/letta/mobile/data/servicecredentials/ServiceCredentialErrorCode;
+	public final fun getState ()Lcom/letta/mobile/data/servicecredentials/ServiceTestState;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/servicecredentials/ServiceTestStatus$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/servicecredentials/ServiceTestStatus$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/servicecredentials/ServiceTestStatus;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/servicecredentials/ServiceTestStatus;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/servicecredentials/ServiceTestStatus$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class com/letta/mobile/data/session/BackendConnectionKey {

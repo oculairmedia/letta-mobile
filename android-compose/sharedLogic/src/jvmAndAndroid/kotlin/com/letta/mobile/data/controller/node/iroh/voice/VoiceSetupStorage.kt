@@ -9,8 +9,6 @@ import com.letta.mobile.data.voice.host.HostVoiceGrants
 import com.letta.mobile.data.voice.host.HostVoiceReachability
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
-import java.nio.file.attribute.PosixFilePermissions
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -106,8 +104,7 @@ internal class FileVoiceSetupPersistence(private val path: Path) : VoiceSetupPer
 
 /**
  * The key in a file of its own that only the host's user may read (POSIX `rw-------`, or an owner-only
- * ACL on Windows), the way the host keeps its Iroh identity key. The file is restricted before the key
- * is written into it, and replaced by a rename.
+ * ACL on Windows), written through [IrohSecretKeyStores.writeOwnerOnly] like every host secret file.
  */
 internal class FileVoiceKeyStore(private val path: Path) : VoiceKeyStore {
     override fun read(origin: String): String? {
@@ -117,18 +114,7 @@ internal class FileVoiceKeyStore(private val path: Path) : VoiceKeyStore {
     }
 
     override fun write(origin: String, key: String) {
-        path.parent?.let(Files::createDirectories)
-        val temp = path.resolveSibling(".${path.fileName}.tmp-${java.util.UUID.randomUUID()}")
-        try {
-            Files.createFile(temp)
-            restrictToOwner(temp)
-            Files.write(temp, storeJson.encodeToString(StoredKey.serializer(), StoredKey(origin, key)).toByteArray(Charsets.UTF_8))
-            runCatching { Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE) }
-                .getOrElse { Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING) }
-            restrictToOwner(path)
-        } finally {
-            Files.deleteIfExists(temp)
-        }
+        IrohSecretKeyStores.writeOwnerOnly(path, storeJson.encodeToString(StoredKey.serializer(), StoredKey(origin, key)))
     }
 
     override fun delete() {
@@ -136,21 +122,6 @@ internal class FileVoiceKeyStore(private val path: Path) : VoiceKeyStore {
     }
 
     override fun toString(): String = "FileVoiceKeyStore"
-
-    /**
-     * Owner-only access (POSIX `rw-------`, else an ACL naming only the owner), or a thrown error so the
-     * key is never written into a file others may read. Unlike the identity key's helper, this has no
-     * best-effort fallback.
-     */
-    private fun restrictToOwner(file: Path) {
-        val posix = runCatching { Files.setPosixFilePermissions(file, PosixFilePermissions.fromString(OWNER_ONLY)) }
-        if (posix.isSuccess) return
-        IrohSecretKeyStores.restrictToOwnerAcl(file)
-    }
-
-    private companion object {
-        const val OWNER_ONLY = "rw-------"
-    }
 
     @Serializable
     private class StoredKey(

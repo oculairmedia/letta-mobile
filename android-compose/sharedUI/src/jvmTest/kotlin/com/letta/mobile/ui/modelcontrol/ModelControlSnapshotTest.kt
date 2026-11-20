@@ -123,12 +123,13 @@ class ModelControlSnapshotTest {
     fun providersApiKeys() = renderAll("providers-apikeys") {
         val anthropic = ModelControlUiFixtures.providers.single { it.id == "anthropic" }
         val state = ModelControlUiFixtures.managementState().copy(form = ProviderConnectForm(anthropic).withValue("apiKey", "sk-ant-api03"))
-        ProviderSettingsPane(state, noSettings, initialPage = ProviderSettingsPage.API_KEYS)
+        ProviderSettingsPane(state, noSettings, pages = ProviderSettingsPages(ProviderSettingsPage.API_KEYS))
     }
 
     @Test
     fun providersEndpoints() = renderAll("providers-endpoints") {
-        ProviderSettingsPane(ModelControlUiFixtures.managementState(), noSettings, initialPage = ProviderSettingsPage.ENDPOINTS)
+        val pages = ProviderSettingsPages(ProviderSettingsPage.ENDPOINTS)
+        ProviderSettingsPane(ModelControlUiFixtures.managementState(), noSettings, pages = pages)
     }
 
     private fun renderAll(name: String, content: @Composable (Form) -> Unit) {
