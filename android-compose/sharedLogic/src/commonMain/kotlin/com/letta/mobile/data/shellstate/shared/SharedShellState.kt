@@ -100,7 +100,11 @@ enum class ShellStateEditOutcome {
  * - [ShellStateState.live] turns on only through a successful read or write of the current generation, and
  *   off through a failure of the current generation or any transition. A push never touches it and nothing
  *   restores a value captured earlier.
- * All of it changes under one lock, so deciding and applying are a single step.
+ * - A failure is judged the same way as a success: a refusal that arrives from a generation or connection that is
+ *   no longer current says nothing about the host now, so the edit reports [ShellStateEditOutcome.OFFLINE]
+ *   (never a conflict or a refusal) and nothing is refreshed or recorded.
+ * All of it changes under one lock, so deciding and applying are a single step. The bookkeeping itself lives in
+ * [ConnectionLedger]; this class orchestrates the link, the lock and the state flow.
  */
 class SharedShellState(
     private val link: ShellStateLink,
@@ -108,20 +112,9 @@ class SharedShellState(
     private val edits = Mutex()
     private val mutableState = MutableStateFlow(ShellStateState())
 
-    /** Held across every change of the state, [generation] and [shownGeneration]. */
+    /** Held across every change of the state and of [ledger]. */
     private val model = Mutex()
-
-    /** The connection epoch: bumped by every [transition]. Guarded by [model]. */
-    private var generation = 0L
-
-    /** The [generation] the shown snapshot was adopted under; no generation equals [NO_GENERATION]. Guarded by [model]. */
-    private var shownGeneration = NO_GENERATION
-
-    /** The link's connection identity the shown snapshot was read on; null while none is shown. Guarded by [model]. */
-    private var shownConnection: String? = null
-
-    /** Where a request was issued: the [generation] and the link's connection identity at that moment. */
-    private class Issue(val generation: Long, val connection: String?)
+    private val ledger = ConnectionLedger { link.currentConnection }
 
     /** What this device knows now. */
     val state: StateFlow<ShellStateState> = mutableState.asStateFlow()
@@ -146,35 +139,38 @@ class SharedShellState(
 
     /** Reads the host's document; a host without the contract leaves [state] unsupported. */
     suspend fun refresh(): ShellStateState {
-        if (!supported) {
-            // While disconnected the link advertises nothing, which says nothing about the host: keep the last
-            // document for offline display. A connected host without the contract has no state to show, and
-            // another host's document must not linger.
-            val connected = link.isConnected
-            transition { if (connected) it.copy(supported = false, live = false, snapshot = null) else it.copy(live = false) }
-            return mutableState.value
-        }
+        if (supported) readDocument() else noteUnsupported()
+        return mutableState.value
+    }
+
+    private suspend fun readDocument() {
         val issued = model.withLock {
             mutableState.update { it.copy(supported = true) }
-            Issue(generation, link.currentConnection)
+            ledger.issue()
         }
         request(issued, ShellStateWire.GET, JsonObject(emptyMap())).document?.let { adopt(it, issued, live = true) }
-        return mutableState.value
+    }
+
+    /**
+     * While disconnected the link advertises nothing, which says nothing about the host: keep the last document
+     * for offline display. A connected host without the contract has no state to show, and another host's
+     * document must not linger.
+     */
+    private suspend fun noteUnsupported() {
+        val connected = link.isConnected
+        transition { if (connected) it.copy(supported = false, live = false, snapshot = null) else it.copy(live = false) }
     }
 
     /** Starts a new generation and applies [change] with it: the one place the connection epoch moves. */
     private suspend fun transition(change: (ShellStateState) -> ShellStateState) = model.withLock {
-        generation += 1
         mutableState.update(change)
-        if (mutableState.value.snapshot == null) shownConnection = null
+        ledger.advance(documentShown = mutableState.value.snapshot != null)
     }
 
-    /** Applies [change] only while [issued] is still the current generation and connection. */
-    private suspend fun settle(issued: Issue, change: (ShellStateState) -> ShellStateState) = model.withLock {
-        if (isCurrent(issued)) mutableState.update(change)
+    /** Applies [change] only while [issued] is still current; whether it was. */
+    private suspend fun settle(issued: Issue, change: (ShellStateState) -> ShellStateState): Boolean = model.withLock {
+        ledger.isCurrent(issued).also { current -> if (current) mutableState.update(change) }
     }
-
-    private fun isCurrent(issued: Issue): Boolean = issued.generation == generation && issued.connection == link.currentConnection
 
     /** Sets [key] to [value]. */
     suspend fun set(key: String, value: JsonElement): ShellStateEditOutcome = propose(listOf(Edit(key, value)))
@@ -192,31 +188,42 @@ class SharedShellState(
      * the state read-only until a reconnect.
      */
     suspend fun propose(edits: List<Edit>): ShellStateEditOutcome = this.edits.withLock {
-        if (!link.isConnected) return@withLock ShellStateEditOutcome.OFFLINE
-        if (!supported) return@withLock ShellStateEditOutcome.UNSUPPORTED
+        when {
+            !link.isConnected -> ShellStateEditOutcome.OFFLINE
+            !supported -> ShellStateEditOutcome.UNSUPPORTED
+            else -> proposeOnCurrentBaseline(edits)
+        }
+    }
+
+    private suspend fun proposeOnCurrentBaseline(edits: List<Edit>): ShellStateEditOutcome {
         if (!baselineIsCurrent()) refresh()
-        val (known, issued) = model.withLock { mutableState.value to Issue(generation, link.currentConnection) }
+        val (known, issued) = model.withLock { mutableState.value to ledger.issue() }
         val base = known.snapshot
-        if (!known.editable || base == null || !baselineIsCurrent()) ShellStateEditOutcome.OFFLINE else send(base, issued, edits)
+        val sendable = base != null && known.editable && baselineIsCurrent()
+        return if (sendable) send(base, issued, edits) else ShellStateEditOutcome.OFFLINE
     }
 
     /** Whether the shown document is live and was read on the connection that is up now. */
     private suspend fun baselineIsCurrent(): Boolean =
-        model.withLock { mutableState.value.editable && shownConnection == link.currentConnection }
+        model.withLock { mutableState.value.editable && ledger.shownOnCurrentConnection() }
 
     private suspend fun send(base: ShellStateSnapshot, issued: Issue, edits: List<Edit>): ShellStateEditOutcome {
         val changes = edits.map { ShellStateChange(it.key, it.value, base.entries[it.key]?.revision ?: 0L) }
         val params = buildJsonObject { put(ShellStateWire.CHANGES, JsonArray(changes.map(ShellStateChange::toJson))) }
         val reply = request(issued, ShellStateWire.PROPOSE, params)
-        reply.document?.let { return if (adopt(it, issued, live = true)) ShellStateEditOutcome.APPLIED else ShellStateEditOutcome.OFFLINE }
-        val error = reply.error
+        return when {
+            reply.document != null -> if (adopt(reply.document, issued, live = true)) ShellStateEditOutcome.APPLIED else ShellStateEditOutcome.OFFLINE
+            !reply.current -> ShellStateEditOutcome.OFFLINE
+            else -> refused(reply.error, base)
+        }
+    }
+
+    /** How a refusal of the current connection ends the edit. */
+    private suspend fun refused(error: ShellStateError, base: ShellStateSnapshot): ShellStateEditOutcome {
         Telemetry.event(TAG, "edit.failed", "error" attr error.name, "revision" attr base.documentRevision)
         return when (error) {
             ShellStateError.UNREACHABLE -> ShellStateEditOutcome.OFFLINE
-            ShellStateError.REVISION_CONFLICT -> {
-                refresh()
-                ShellStateEditOutcome.CONFLICT
-            }
+            ShellStateError.REVISION_CONFLICT -> ShellStateEditOutcome.CONFLICT.also { refresh() }
             else -> ShellStateEditOutcome.REFUSED
         }
     }
@@ -228,35 +235,39 @@ class SharedShellState(
     }
 
     /**
-     * Applies [snapshot] unless it is out of date; whether it was applied or kept out by recency. [issued] is
-     * where its request was issued (null for a push, which takes the current generation and connection): a reply
-     * of another generation or connection is dropped, and so reports false. Within the current generation and
-     * connection a document that is not newer than the shown one is kept out, whether the shown one was read or
-     * pushed; a shown one read on another connection is replaced whatever its revision.
+     * Applies [snapshot] unless it is out of date; whether it was applied or kept out by recency (a dropped reply
+     * reports false). [issued] is where its request was issued, null for a push. [ConnectionLedger.admit] decides.
      * [live] only ever turns on, and only for a successful read or write; a push passes false and leaves the
      * value as it is.
      */
     private suspend fun adopt(snapshot: ShellStateSnapshot, issued: Issue?, live: Boolean): Boolean = model.withLock {
-        if (issued != null && !isCurrent(issued)) return@withLock false
-        val shownRevision = mutableState.value.snapshot?.documentRevision ?: -1L
-        val shownHere = shownGeneration == generation && shownConnection == link.currentConnection
-        val keepShown = shownHere && shownRevision >= snapshot.documentRevision
-        if (!keepShown) {
-            shownGeneration = generation
-            shownConnection = link.currentConnection
+        val shownRevision = mutableState.value.snapshot?.documentRevision ?: NO_REVISION
+        when (ledger.admit(issued, snapshot.documentRevision, shownRevision)) {
+            Admission.DROP -> false
+            Admission.KEEP_SHOWN -> true.also { show(newSnapshot = null, live) }
+            Admission.REPLACE -> true.also {
+                ledger.recordShown()
+                show(snapshot, live)
+            }
         }
-        mutableState.update { current ->
-            current.copy(snapshot = if (keepShown) current.snapshot else snapshot, live = live || current.live, error = null)
-        }
-        true
     }
 
-    /** What one request came to: the [document] it answered, or else the [error] it failed with. */
-    private class Reply(val document: ShellStateSnapshot?, val error: ShellStateError)
+    /** Takes [newSnapshot] if there is one, turns `live` on if [live], and clears the last error. */
+    private fun show(newSnapshot: ShellStateSnapshot?, live: Boolean) {
+        mutableState.update { current ->
+            current.copy(snapshot = newSnapshot ?: current.snapshot, live = live || current.live, error = null)
+        }
+    }
+
+    /**
+     * What one request came to: the [document] it answered, or else the [error] it failed with. [current] is
+     * whether the request was still current when it came back.
+     */
+    private class Reply(val document: ShellStateSnapshot?, val error: ShellStateError, val current: Boolean)
 
     /**
      * One request. A failure of the current generation and connection records its code and turns `live` off;
-     * one issued on an earlier one changes nothing.
+     * one issued on an earlier one changes nothing and says so in [Reply.current].
      */
     private suspend fun request(issued: Issue, method: String, params: JsonObject): Reply {
         val outcome = runCatching { link.call(method, params) }
@@ -264,8 +275,8 @@ class SharedShellState(
         val reply = outcome.getOrNull()
         val document = reply?.takeIf { it.success }?.result?.let(::decode)
         val error = ShellStateError.fromWire(reply?.error)
-        if (document == null) settle(issued) { it.copy(error = error, live = false) }
-        return Reply(document, error)
+        val current = document != null || settle(issued) { it.copy(error = error, live = false) }
+        return Reply(document, error, current)
     }
 
     /** The document in [element], or null when it is unreadable or of a newer schema than this build reads. */
@@ -275,6 +286,6 @@ class SharedShellState(
 
     private companion object {
         const val TAG = "SharedShellState"
-        const val NO_GENERATION = -1L
+        const val NO_REVISION = -1L
     }
 }

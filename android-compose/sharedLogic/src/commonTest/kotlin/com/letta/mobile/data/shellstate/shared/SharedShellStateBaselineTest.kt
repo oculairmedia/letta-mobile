@@ -59,6 +59,26 @@ class SharedShellStateBaselineTest {
         assertEquals(5L, shared.state.value.snapshot?.documentRevision, "the earlier connection's reply is not applied")
     }
 
+    @Test
+    fun aRefusalFromAnotherConnectionIsOfflineNotConflictOrRefusedAndLeavesTheDocumentAlone() = runTest(StandardTestDispatcher()) {
+        listOf(ShellStateWire.REVISION_CONFLICT, ShellStateWire.TOO_LARGE, ShellStateWire.INVALID_REQUEST).forEach { refusal ->
+            val link = IdentityLink()
+            val shared = SharedShellState(link)
+            link.answerNext(document(5, "from-A"))
+            shared.refresh()
+            val reply = link.holdNext()
+            var outcome: ShellStateEditOutcome? = null
+            val edit = launch { outcome = shared.set("a", JsonPrimitive("edited")) }
+            runCurrent()
+            link.identity.value = "B"
+            reply.complete(ShellStateReply(false, error = refusal))
+            edit.join()
+            assertEquals(ShellStateEditOutcome.OFFLINE, outcome, "$refusal came from the connection that is gone")
+            assertEquals(5L, shared.state.value.snapshot?.documentRevision, "the document is unchanged")
+            assertEquals(listOf(ShellStateWire.GET, ShellStateWire.PROPOSE), link.methods, "$refusal triggered no refresh")
+        }
+    }
+
     private fun document(revision: Long, value: String) = ShellStateSnapshot(
         1, revision, mapOf("a" to ShellStateEntry(JsonPrimitive(value), revision, ShellStateActor.User("endpoint-b"), 1)),
     )
