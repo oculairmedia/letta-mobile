@@ -22,7 +22,7 @@ on:
 
 concurrency:
   group: iroh-probe-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   GRADLE_OPTS: --enable-native-access=ALL-UNNAMED
