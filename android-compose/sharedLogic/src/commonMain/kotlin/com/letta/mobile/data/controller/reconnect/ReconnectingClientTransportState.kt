@@ -60,3 +60,21 @@ fun AppServerProbeResult.summary(): String = when (this) {
     is AppServerProbeResult.Incompatible -> "Incompatible server: $reason"
     is AppServerProbeResult.Unavailable -> "Server unavailable: $detail"
 }
+
+/**
+ * Numbers one session's connections for [toChannelTransportState]: each entry into Ready is a new one, so a
+ * redial of the same server still reads as a different connection to a collector that never saw the drop.
+ * Not thread-safe: feed it from one collector.
+ */
+class ReconnectingConnectionEpochs {
+    private var epoch = 0L
+    private var wasReady = false
+
+    /** [state] as a channel transport state, with this session's current connection epoch. */
+    fun project(state: ReconnectingClientState, serverId: String): ChannelTransportState {
+        val ready = state is ReconnectingClientState.Ready
+        if (ready && !wasReady) epoch += 1
+        wasReady = ready
+        return state.toChannelTransportState(serverId = serverId, connectionEpoch = epoch)
+    }
+}

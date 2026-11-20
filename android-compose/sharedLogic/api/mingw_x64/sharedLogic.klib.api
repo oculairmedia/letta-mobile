@@ -40888,6 +40888,12 @@ final class com.letta.mobile.data.controller.reconnect/ReconnectingAppServerClie
     }
 }
 
+final class com.letta.mobile.data.controller.reconnect/ReconnectingConnectionEpochs { // com.letta.mobile.data.controller.reconnect/ReconnectingConnectionEpochs|null[0]
+    constructor <init>() // com.letta.mobile.data.controller.reconnect/ReconnectingConnectionEpochs.<init>|<init>(){}[0]
+
+    final fun project(com.letta.mobile.data.controller.reconnect/ReconnectingClientState, kotlin/String): com.letta.mobile.data.transport/ChannelTransportState // com.letta.mobile.data.controller.reconnect/ReconnectingConnectionEpochs.project|project(com.letta.mobile.data.controller.reconnect.ReconnectingClientState;kotlin.String){}[0]
+}
+
 final class com.letta.mobile.data.controller.reconnect/SessionSurvivingReconnectListener : com.letta.mobile.data.controller.reconnect/ReconnectingClientListener { // com.letta.mobile.data.controller.reconnect/SessionSurvivingReconnectListener|null[0]
     constructor <init>(com.letta.mobile.data.controller.fanout/AppServerRuntimeEventRouter, kotlin.coroutines/SuspendFunction0<kotlin/Unit> = ..., kotlin.coroutines/SuspendFunction2<com.letta.mobile.data.transport.appserver/AppServerClient, kotlin.collections/List<com.letta.mobile.data.transport.appserver/AppServerRuntimeScope>, kotlin/Unit> = ...) // com.letta.mobile.data.controller.reconnect/SessionSurvivingReconnectListener.<init>|<init>(com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter;kotlin.coroutines.SuspendFunction0<kotlin.Unit>;kotlin.coroutines.SuspendFunction2<com.letta.mobile.data.transport.appserver.AppServerClient,kotlin.collections.List<com.letta.mobile.data.transport.appserver.AppServerRuntimeScope>,kotlin.Unit>){}[0]
 

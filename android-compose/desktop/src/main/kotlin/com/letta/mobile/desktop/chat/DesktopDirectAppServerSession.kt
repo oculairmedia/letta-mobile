@@ -6,7 +6,7 @@ import com.letta.mobile.data.controller.reconnect.GiveUpKind
 import com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient
 import com.letta.mobile.data.controller.reconnect.ReconnectingClientListener
 import com.letta.mobile.data.controller.reconnect.ReconnectingClientState
-import com.letta.mobile.data.controller.reconnect.toChannelTransportState
+import com.letta.mobile.data.controller.reconnect.ReconnectingConnectionEpochs
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.data.transport.appserver.AppServerReadinessExpectation
@@ -141,7 +141,7 @@ internal class DesktopDirectAppServerSession private constructor(
                 dial.releaseSteps.forEach { release -> runCatching { release() } }
                 throw settled.firstDialFailure()
             }
-            val epochs = ConnectionEpochs()
+            val epochs = ReconnectingConnectionEpochs()
             val status = client.state
                 .map { epochs.project(it, serverId) }
                 .stateIn(scope, SharingStarted.Eagerly, epochs.project(client.state.value, serverId))
@@ -149,23 +149,6 @@ internal class DesktopDirectAppServerSession private constructor(
         }
     }
 }
-
-/**
- * Numbers this session's connections for [toChannelTransportState]: each entry into Ready is a new one, so a
- * redial of the same server still reads as a different connection to a collector that never saw the drop.
- */
-private class ConnectionEpochs {
-    private var epoch = 0L
-    private var wasReady = false
-
-    fun project(state: ReconnectingClientState, serverId: String): ChannelTransportState {
-        val ready = state is ReconnectingClientState.Ready
-        if (ready && !wasReady) epoch += 1
-        wasReady = ready
-        return state.toChannelTransportState(serverId = serverId, connectionEpoch = epoch)
-    }
-}
-
 /** The exception a failed first dial surfaces with; probe verdicts keep their summary() prefix. */
 private fun ReconnectingClientState.firstDialFailure(): Exception = when (this) {
     is ReconnectingClientState.GaveUp -> when (kind) {

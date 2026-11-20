@@ -21886,6 +21886,11 @@ public final class com/letta/mobile/data/controller/reconnect/ReconnectingClient
 	public static synthetic fun toChannelTransportState$default (Lcom/letta/mobile/data/controller/reconnect/ReconnectingClientState;Ljava/lang/String;Ljava/lang/String;JILjava/lang/Object;)Lcom/letta/mobile/data/transport/ChannelTransportState;
 }
 
+public final class com/letta/mobile/data/controller/reconnect/ReconnectingConnectionEpochs {
+	public fun <init> ()V
+	public final fun project (Lcom/letta/mobile/data/controller/reconnect/ReconnectingClientState;Ljava/lang/String;)Lcom/letta/mobile/data/transport/ChannelTransportState;
+}
+
 public abstract interface class com/letta/mobile/data/controller/reconnect/ResumeSyncResult {
 }
 
