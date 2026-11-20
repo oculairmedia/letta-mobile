@@ -36,9 +36,7 @@ class SentenceChunker(
     private var inCodeBlock = false
     private var dropUntil: Char? = null
     private val softCut = SoftCut(maxSegmentLength)
-    private var released = false
-    private val merging = StringBuilder()
-    private var partSpoken = false
+    private val merger = SegmentMerger(minSegmentLength, maxSegmentLength)
 
     init {
         require(maxSegmentLength >= MIN_SEGMENT_LENGTH) { "maxSegmentLength too small" }
@@ -65,13 +63,13 @@ class SentenceChunker(
      * should be taken with [flush] first.
      */
     fun startNewPart() {
-        partSpoken = false
+        merger.startNewPart()
     }
 
     /** Drops everything buffered; the first segment, once released, stays released. */
     fun reset() {
         pending.clear()
-        merging.clear()
+        merger.clear()
         inCodeBlock = false
         dropUntil = null
     }
@@ -145,7 +143,7 @@ class SentenceChunker(
         /** Where the first segment may end early, while nothing has been released yet. */
         private fun earlyClause(scan: SentenceScan): TextIndex? {
             val minimum = firstClauseMinLength ?: return null
-            return if (released) null else scan.firstClauseEnd(minimum)
+            return if (merger.released) null else scan.firstClauseEnd(minimum)
         }
 
         /**
@@ -210,30 +208,12 @@ class SentenceChunker(
             val raw = pending.substring(0, cut.length)
             pending.deleteRange(0, cut.length + cut.skip)
             val spoken = SpeakableText.clean(raw)
-            if (spoken.isNotEmpty()) splitLong(spoken).forEach(::accept)
+            if (spoken.isNotEmpty()) splitLong(spoken).forEach { out += merger.add(it).map(::VoiceText) }
             return true
         }
 
-        /** The first segment, and every segment while merging is off, goes out as it is; later ones are merged. */
-        private fun accept(piece: String) {
-            val minimum = minSegmentLength
-            if (minimum == null || !partSpoken) return emit(piece)
-            if (merging.isNotEmpty() && merging.length + 1 + piece.length > maxSegmentLength) emitMerged()
-            if (merging.isNotEmpty()) merging.append(' ')
-            merging.append(piece)
-            if (merging.length >= minimum) emitMerged()
-        }
-
-        private fun emit(segment: String) {
-            out += VoiceText(segment)
-            released = true
-            partSpoken = true
-        }
-
         private fun emitMerged() {
-            if (merging.isEmpty()) return
-            emit(merging.toString())
-            merging.clear()
+            out += merger.take().map(::VoiceText)
         }
 
         private fun splitLong(text: String): List<String> {
@@ -256,5 +236,48 @@ class SentenceChunker(
         private const val MIN_SEGMENT_LENGTH = 16
         private const val FENCE = "```"
         private const val HARD_LIMIT_FACTOR = 4
+    }
+}
+
+/**
+ * Merges the pieces after a part's first into segments of at least [minimum] characters (never
+ * more than [maximum]); with no [minimum] every piece is its own segment. A part's first piece is
+ * never held: it goes out at once, and merging starts after it.
+ */
+private class SegmentMerger(private val minimum: Int?, private val maximum: Int) {
+    private val held = StringBuilder()
+    private var partSpoken = false
+
+    /** Whether any segment has been released yet. */
+    var released = false
+        private set
+
+    /** Takes [piece]; returns the segments that are complete now. */
+    fun add(piece: String): List<String> {
+        val goal = minimum
+        if (goal == null || !partSpoken) return listOf(release(piece))
+        val full = if (held.isNotEmpty() && held.length + 1 + piece.length > maximum) take() else emptyList()
+        if (held.isNotEmpty()) held.append(' ')
+        held.append(piece)
+        return full + if (held.length >= goal) take() else emptyList()
+    }
+
+    /** Takes whatever is held as one segment, if anything is. */
+    fun take(): List<String> {
+        if (held.isEmpty()) return emptyList()
+        return listOf(release(held.toString())).also { held.clear() }
+    }
+
+    /** The next piece is a new part's first: released alone, then merging resumes. */
+    fun startNewPart() {
+        partSpoken = false
+    }
+
+    fun clear() = held.clear()
+
+    private fun release(segment: String): String {
+        released = true
+        partSpoken = true
+        return segment
     }
 }
