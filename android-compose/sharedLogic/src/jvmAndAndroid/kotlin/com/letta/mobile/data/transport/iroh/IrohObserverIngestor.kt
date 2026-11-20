@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.pins.wire.AgentPinsWire
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.subagent.ParentContext
@@ -169,7 +170,8 @@ internal class IrohObserverIngestor(
     private fun isDevicePushFrame(frame: ServerFrame): Boolean =
         frame is ServerFrame.ConversationActivity || frame is ServerFrame.AgentUpdated ||
             frame is ServerFrame.ConversationUpdated || frame is ServerFrame.SubagentsUpdated ||
-            frame is ServerFrame.PendingApprovalsUpdated || frame is ServerFrame.PermissionModeUpdated
+            frame is ServerFrame.PendingApprovalsUpdated || frame is ServerFrame.PermissionModeUpdated ||
+            (frame is ServerFrame.Unknown && frame.type == AgentPinsWire.FRAME_TYPE)
 
     suspend fun ingestObserverFrame(request: ObserverFrameRequest) {
         if (request.expectedGeneration != null && connectionGeneration() != request.expectedGeneration) return
@@ -677,6 +679,8 @@ internal class IrohObserverIngestor(
             com.letta.mobile.data.runtime.ApprovalRelay.FRAME_TYPE,
             // letta-mobile-a4tm7: another client changed a conversation's permission mode.
             com.letta.mobile.data.runtime.PermissionModeRpc.FRAME_TYPE,
+            // The host's pinned-agents push: no typed frame, it stays ServerFrame.Unknown for the shared pins.
+            AgentPinsWire.FRAME_TYPE,
         )
 
         /** Longer than the engine's settle window (1.5 s), so a healthy engine always wins. */

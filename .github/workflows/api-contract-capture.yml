@@ -39,6 +39,15 @@ jobs:
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
         with:
           cache-read-only: true
+      - name: Restore Konan (Kotlin/Native) toolchain
+        # apiDump compiles the klib targets, which need the K/N toolchain; restore the
+        # main-written cache (android.yml savers) instead of downloading from Maven Central.
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-konan-v2-${{ hashFiles('android-compose/gradle/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-konan-
       - name: Generate actual signatures without accepting them
         run: ./gradlew --no-daemon --no-parallel --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process apiDump
       - name: Record capture source

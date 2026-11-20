@@ -8,6 +8,7 @@ import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioEncoding
+import com.letta.mobile.data.voice.tone.ToneCue
 import kotlin.jvm.JvmInline
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -110,6 +111,8 @@ data class SpeechRequest(
     val encoding: AudioEncoding = AudioEncoding.MP3,
     /** How fast to speak; sent as `speed` unless it is [SpeechSpeed.Normal]. */
     val speed: SpeechSpeed = SpeechSpeed.Normal,
+    /** How to say it, sent as `instructions`; omitted when null. */
+    val tone: ToneCue? = null,
 )
 
 /**

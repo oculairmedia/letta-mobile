@@ -63,6 +63,7 @@ class WireContractsTest {
                 val known = setOf(
                     "controller_state", "conversations", "hidden_agent_ids", "visibility_index",
                     "reflection_settings", "monitor_success", "toolset_response", "cron_control", "execute_command_response", "voice",
+                    "pins",
                 )
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
@@ -342,8 +343,8 @@ class WireContractsTest {
                     permissionModes = PermissionModePublisher(plugins.scope),
                 ),
             )
-            // The production wrapper registers the voice routes on the built router; so does this host.
-            voiceRoutes(dir).register(router)
+            // The production wrapper registers the voice and pins routes on the built router; so does this host.
+            listOf(voiceRoutes(dir), pinsRoutes(host)).forEach { it.register(router) }
             block(router)
         } finally {
             runtime.close()
@@ -366,6 +367,23 @@ class WireContractsTest {
         canvasMountRoutes = canvasMountRoutes(dir),
         secretRequestRoutes = secretRequestRoutes(),
     )
+
+    /** The real pins routes over the case's stored list (`host_state.pins.stored`, absent or null: nothing stored). */
+    private fun pinsRoutes(host: JsonObject?): AdminRpcRoutes {
+        val stored = host?.get("pins")?.jsonObject?.get("stored")?.takeUnless { it is kotlinx.serialization.json.JsonNull }
+        val seed = stored?.let {
+            Json.decodeFromJsonElement(com.letta.mobile.data.pins.shared.AgentPinsSnapshot.serializer(), it)
+        } ?: com.letta.mobile.data.pins.shared.AgentPinsSnapshot()
+        return com.letta.mobile.data.controller.node.iroh.pins.AgentPinsRouteSet(
+            com.letta.mobile.data.controller.node.iroh.pins.AgentPinsStore(
+                com.letta.mobile.data.controller.node.iroh.pins.InMemoryAgentPinsPersistence(seed),
+            ),
+            // Never attached: the push is covered by AgentPinsRoutesTest and ConnectionRegistryTest.
+            com.letta.mobile.data.controller.node.iroh.pins.AgentPinsPublisher(
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
+            ),
+        )
+    }
 
     /** The real voice routes over file stores in the test's directory; any speech server call fails the test. */
     private fun voiceRoutes(dir: File): AdminRpcRoutes = com.letta.mobile.data.controller.node.iroh.voice.VoiceRoutes(

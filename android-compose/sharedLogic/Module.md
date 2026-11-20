@@ -839,6 +839,10 @@ Voice mode's diagnostics, as `VoiceMode` events timed from the session's start: 
 
 Turns streamed reply text into speakable sentences so speech starts before the reply is complete. Sentence ends respect abbreviations, initials, decimals and list numbers; fenced code is skipped; markdown, links, URLs and HTML are stripped; overlong text is cut at a clause break and the remainder is flushed when the reply completes. Sentences released together (a reply that arrives as a burst) are joined into fewer synthesis requests, except a reply's first segment, which always goes to speech alone.
 
+# Package com.letta.mobile.data.voice.tone
+
+Inline tone cues in a reply: `[module]` at the start of a sentence, where `module` is one of a closed set of mood modules (`neutral`, `warm`, `excited`, `sombre`, `quiet`, `fast`, `slow`); it applies to that sentence and every later one until the next cue (`[neutral]` resets). A cue only selects a module and never carries a voice description. Anything else in brackets stays text. The one reader of cues: the chat timeline and the dock show the text with every cue removed (an unfinished cue is held back while the reply streams), and voice mode passes each module to the speech server as the `instructions` of the segments it covers, through the host as well, which accepts only a module name. Citations, links, task boxes, mid-sentence brackets and code are never cues. Cue names are never logged.
+
 # Package com.letta.mobile.data.voice.vad
 
 Voice-activity detection for the voice ear: the [SpeechDetector](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad/-speech-detector/index.html) seam (one hop of PCM in, a speech probability out) so a model-based detector can replace the built-in [EnergySpeechDetector](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad/-energy-speech-detector/index.html) (energy and zero-crossing rate over a calibrated, slowly tracked noise floor, with a separate floor for the app's own echo and a low/normal/high sensitivity), and the [EndOfTurnPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.vad/-end-of-turn-policy/index.html) with hysteresis, a sustained onset, a minimum of voiced audio below which a sound is dropped untranscribed, trailing silence, pre-roll, a hard cap and an echo guard, all measured in audio time from sample positions.
@@ -949,6 +953,10 @@ Streamed admin_rpc: a method registered with `AdminRpcRouter.registerStreamed` w
 
 The host side of the voice-endpoint v1 contract: one speech server setup shared by every paired device, and speech through the host. `VoiceEndpointRoutes.forHost` builds the `AdminRpcRoutes` a host registers on its built admin router; it registers the seven `voice.*` methods and advertises `voice_endpoint_v1`. The setup (server, model and voice names, the shared grant record per origin, the last reachability check and a revision for optimistic concurrency) lives in a JSON file; the key lives in a separate file only the host's user may read, bound to the origin it was entered for, and is write-only over the wire (status says only `has_api_key`). A write to a new origin drops the key and the grants it does not restate. The speech server is reached only through the `VoiceSpeechUpstream` seam, whose Ktor implementation refuses to send a key over plain http off loopback and maps every failure to the contract's closed codes. `voice.speech` is a streamed admin_rpc method: a format frame, then PCM audio frames of at most 64 KiB as they decode, then the final response; the client's cancel frame, its send half finishing or resetting, a failed write or a dropped connection cancel the upstream request. At most one transcription and one synthesis run per connection and four syntheses per host. Nothing here logs or reports audio, transcript or reply text, the key or the server address. The package depends on the iroh router package, never the reverse.
 
+# Package com.letta.mobile.data.controller.node.iroh.pins
+
+The host side of the pinned-agents v1 contract: one ordered list of pinned agents shared by every paired device. `AgentPinsRoutes.forHost` builds the `AdminRpcRoutes` a host registers on its built admin router; it registers `pins.get` and `pins.set` and advertises `pinned_agents_v1`. The list and its revision live in `pinned-agents.json`, replaced atomically; a host that never stored one answers an empty list at revision 0. `pins.set` is a compare-and-set against the caller's expected revision. `AgentPinsPublisher` pushes each accepted change as a `pins_updated` frame with the whole list to every connection allowed to read agents. Telemetry carries methods, outcomes, revisions and counts, never agent names. The package depends on the iroh router package, never the reverse.
+
 # Package com.letta.mobile.data.controller.node.iroh.errors
 
 The one exception type whose message the admin RPC router returns to a remote client. Handlers raise it for deliberate, safe refusals built from the caller's own request; every other exception answers a fixed internal-error text so host paths and state never cross the wire. This leaf package imports nothing from the handlers or the router.
@@ -984,6 +992,14 @@ The device settings facade owns one pin journal for its lifecycle, with no proce
 # Package com.letta.mobile.data.pins
 
 Device-local scoped pin membership/order, explicit-unpin tombstones and recoverable legacy import journal. Snapshot every available backing before union, retain raw/opaque entries and read/decode failures, verify persisted state before per-source checkpoints, and resume idempotently. Unfinished sources are reread with every distinct raw/parse snapshot retained; completed sources are never reread. Initialization failures preserve legacy data and expose unavailable or disabled pin actions while allowing the host to open. Only trusted ownership evidence may resolve pending domain entries; active backend alone is never evidence.
+
+# Package com.letta.mobile.data.pins.wire
+
+The dependency-free names of the pinned-agents v1 contract (`docs/reference/contracts/pins-v1.md`): `AgentPinsWire` holds the capability, method names, the `pins_updated` frame type, limits and error codes, and `AgentPinsError` maps a host's error string to a closed enum with an unknown fallback. Transport packages read the frame type from here without depending on the pins client.
+
+# Package com.letta.mobile.data.pins.shared
+
+The client of the pinned-agents v1 contract and the wire it shares with the host. `SharedAgentPins` is the one list of pinned agents every surface reads and edits: it reads the host's list over `AgentPinsLink` (bound to the channel transport by `channelAgentPinsLink`), applies edits optimistically with compare-and-set and rolls them back on a conflict, adopts newer `pins_updated` pushes, refuses edits while the host is out of reach (nothing is queued) and meanwhile shows the last list it read, held in memory only. Nothing is stored on the device: without the host's capability there are no pins. `AgentPinsSnapshot` is the list with its revision, the same shape the host stores and a host-state export carries. Nothing here logs an agent name.
 
 # Package com.letta.mobile.data.objectverbs.refs
 

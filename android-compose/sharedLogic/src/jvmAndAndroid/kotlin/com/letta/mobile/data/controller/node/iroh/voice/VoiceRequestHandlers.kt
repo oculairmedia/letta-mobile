@@ -85,7 +85,7 @@ internal class VoiceRequestHandlers(
     private suspend fun synthesize(call: AdminRpcStreamedCall): AdminRpcStreamOutcome {
         val text = VoiceRequestParams.speechText(call.params)
         val snapshot = configured()
-        val request = speechCall(snapshot.setup, text)
+        val request = speechCall(snapshot.setup, text, VoiceRequestParams.speechInstructions(call.params))
         requireGrant(snapshot.setup.grants.textForSynthesis)
         // The slot is released before the exchange writes the final response, so the next request never races it.
         return holding(connectionKey(null), VoiceRequestKind.SPEECH) {
@@ -98,10 +98,10 @@ internal class VoiceRequestHandlers(
 
     private suspend fun configured(): VoiceSetupSnapshot = store.snapshot() ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
 
-    private fun speechCall(setup: StoredVoiceSetup, text: String): VoiceSpeechCall {
+    private fun speechCall(setup: StoredVoiceSetup, text: String, instructions: String?): VoiceSpeechCall {
         val model = setup.speechModel ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
         val voice = setup.voice ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
-        return VoiceSpeechCall(text, model, voice)
+        return VoiceSpeechCall(text, model, voice, instructions)
     }
 
     private fun requireGrant(granted: Boolean) {

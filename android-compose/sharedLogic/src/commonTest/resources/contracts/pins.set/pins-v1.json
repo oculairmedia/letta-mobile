@@ -1,0 +1,234 @@
+{
+  "method": "pins.set",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/pins/AgentPinsRoutes.kt",
+  "contract": "pins",
+  "capability": "pinned_agents_v1",
+  "required_capability": "conversation.manage",
+  "streamed": false,
+  "spec": "docs/reference/contracts/pins-v1.md",
+  "note": "Synthetic agent ids only. pushed_frame lists the deterministic fields of the pins_updated push an accepted change sends; id (pins-updated-<uuid>) and ts (ISO-8601) vary per push. A case without pushed_frame sends no push.",
+  "cases": [
+    {
+      "name": "first write",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "pins": {
+          "stored": null
+        }
+      },
+      "params": {
+        "agent_ids": [
+          "agent-b",
+          "agent-a",
+          "agent-b"
+        ],
+        "expected_revision": 0
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "revision": 1,
+          "agent_ids": [
+            "agent-b",
+            "agent-a"
+          ]
+        }
+      },
+      "pushed_frame": {
+        "v": 1,
+        "type": "pins_updated",
+        "revision": 1,
+        "agent_ids": [
+          "agent-b",
+          "agent-a"
+        ]
+      }
+    },
+    {
+      "name": "unpin at the current revision",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "pins": {
+          "stored": {
+            "revision": 4,
+            "agent_ids": [
+              "agent-a",
+              "agent-c"
+            ]
+          }
+        }
+      },
+      "params": {
+        "agent_ids": [
+          "agent-c"
+        ],
+        "expected_revision": 4
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "revision": 5,
+          "agent_ids": [
+            "agent-c"
+          ]
+        }
+      },
+      "pushed_frame": {
+        "v": 1,
+        "type": "pins_updated",
+        "revision": 5,
+        "agent_ids": [
+          "agent-c"
+        ]
+      }
+    },
+    {
+      "name": "unchanged list keeps the revision",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "pins": {
+          "stored": {
+            "revision": 2,
+            "agent_ids": [
+              "agent-a"
+            ]
+          }
+        }
+      },
+      "params": {
+        "agent_ids": [
+          "agent-a"
+        ],
+        "expected_revision": 2
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "revision": 2,
+          "agent_ids": [
+            "agent-a"
+          ]
+        }
+      }
+    },
+    {
+      "name": "stale revision",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "pins": {
+          "stored": {
+            "revision": 2,
+            "agent_ids": [
+              "agent-a"
+            ]
+          }
+        }
+      },
+      "params": {
+        "agent_ids": [
+          "agent-b"
+        ],
+        "expected_revision": 1
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "revision_conflict"
+      }
+    },
+    {
+      "name": "missing expected revision",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "pins": {
+          "stored": null
+        }
+      },
+      "params": {
+        "agent_ids": [
+          "agent-a"
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "invalid_request"
+      }
+    },
+    {
+      "name": "blank agent id",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "pins": {
+          "stored": null
+        }
+      },
+      "params": {
+        "agent_ids": [
+          " "
+        ],
+        "expected_revision": 0
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "invalid_request"
+      }
+    },
+    {
+      "name": "agent-scoped peer",
+      "context": {
+        "authenticated": true,
+        "authorized_agent_ids": [
+          "agent-a"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "pins": {
+          "stored": null
+        }
+      },
+      "params": {
+        "agent_ids": [
+          "agent-a"
+        ],
+        "expected_revision": 0
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "forbidden: agent not in this device's scope"
+      }
+    }
+  ]
+}

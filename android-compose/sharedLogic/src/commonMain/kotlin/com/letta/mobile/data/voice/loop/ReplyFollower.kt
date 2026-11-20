@@ -13,6 +13,10 @@ import com.letta.mobile.data.voice.loop.machine.ReplySignal
 import com.letta.mobile.data.voice.loop.machine.TurnKey
 import com.letta.mobile.data.voice.speech.SentenceChunker
 import com.letta.mobile.data.voice.speech.batchSegments
+import com.letta.mobile.data.voice.tone.ToneCue
+import com.letta.mobile.data.voice.tone.ToneCueStream
+import com.letta.mobile.data.voice.tone.ToneCues
+import com.letta.mobile.data.voice.tone.TonePiece
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.SendChannel
@@ -114,7 +118,10 @@ internal class ReplyFollower(private val wiring: LoopWiring) {
  * Chunks one answer's text into segments and forwards its events under its generation token. Each
  * segment goes out the moment the chunker releases it; segments released together (text that
  * arrived as a burst) are joined up to [maxSegmentLength], except the answer's first segment, which
- * always goes alone so first audio never waits for a batch.
+ * always goes alone so first audio never waits for a batch. Tone cues are read out of the text
+ * first ([ToneCueStream]): no cue is ever spoken, and each segment carries the cue in force for it
+ * in the cue syntax ([ToneCues.tag]), which the loop reads back when it hands the segment to the
+ * mouth.
  */
 private class ReplyForwarder(
     private val turn: TurnKey,
@@ -125,6 +132,8 @@ private class ReplyForwarder(
     private var ended = false
     private var started = false
     private var segmented = false
+    private val tones = ToneCueStream()
+    private var tone: ToneCue? = null
 
     suspend fun forward(event: VoiceReplyEvent) {
         when (event) {
@@ -142,7 +151,18 @@ private class ReplyForwarder(
             started = true
             send(listOf(ReplySignal.TextStarted))
         }
-        send(segments(chunker.push(event.delta)))
+        send(spoken(tones.push(event.delta.value)))
+    }
+
+    /**
+     * The reply's words go to the chunker; a change of tone first releases what is pending (it was
+     * said in the tone before), so every segment carries exactly the tone in force for it.
+     */
+    private fun spoken(pieces: List<TonePiece>): List<ReplySignal> = pieces.flatMap { piece ->
+        when (piece) {
+            is TonePiece.Words -> segments(chunker.push(VoiceText(piece.text)))
+            is TonePiece.Cue -> segments(chunker.flush()).also { tone = piece.cue }
+        }
     }
 
     /** The answer's flow ended; [crashed] when it threw. An answer that just stopped counts as complete. */
@@ -154,6 +174,7 @@ private class ReplyForwarder(
 
     private suspend fun end(signal: ReplySignal) {
         ended = true
+        send(spoken(tones.finish()))
         flush(signal)
     }
 
@@ -164,7 +185,7 @@ private class ReplyForwarder(
     private fun segments(released: List<VoiceText>): List<ReplySignal> {
         val batches = batchSegments(released, firstAlone = !segmented, maxLength = maxSegmentLength)
         if (batches.isNotEmpty()) segmented = true
-        return batches.map(ReplySignal::Segment)
+        return batches.map { ReplySignal.Segment(VoiceText(ToneCues.tag(tone, it.value))) }
     }
 
     private suspend fun send(signals: List<ReplySignal>) {

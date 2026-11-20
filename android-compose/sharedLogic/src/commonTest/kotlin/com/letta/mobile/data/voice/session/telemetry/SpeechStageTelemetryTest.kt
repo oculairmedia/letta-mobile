@@ -11,6 +11,7 @@ import com.letta.mobile.data.voice.endpoint.SpeechEndpointException
 import com.letta.mobile.data.voice.endpoint.SpeechOperation
 import com.letta.mobile.data.voice.endpoint.SpeechSpeed
 import com.letta.mobile.data.voice.endpoint.StreamingSpeechSynthesizer
+import com.letta.mobile.data.voice.tone.ToneCue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
@@ -59,6 +60,28 @@ class SpeechStageTelemetryTest {
         assertEquals(VoiceTelemetryValue.Text("UNREACHABLE"), failed["code"])
         assertEquals(VoiceTelemetryValue.Numeric(0), failed["frames"])
         assertEquals(emptyList(), named("speech.firstFrame"))
+    }
+
+    @Test
+    fun theWrapperPassesTheToneOnSoItsInstructionsReachTheServer() = runTest {
+        val tones = mutableListOf<ToneCue?>()
+        val wrapped = TelemetrySynthesizer(
+            object : StreamingSpeechSynthesizer {
+                override fun stream(text: VoiceText, speed: SpeechSpeed): Flow<PcmChunk> = flowOf(chunk)
+
+                override fun stream(text: VoiceText, speed: SpeechSpeed, tone: ToneCue?): Flow<PcmChunk> {
+                    tones += tone
+                    return flowOf(chunk)
+                }
+            },
+            telemetry,
+        )
+
+        wrapped.stream(words, SpeechSpeed.Normal, ToneCue("warm")).toList()
+        wrapped.stream(words, SpeechSpeed.Normal).toList()
+
+        assertEquals(listOf("warm", null), tones.map { it?.instructions })
+        assertTrue(events.flatMap { it.second.values }.none { it == VoiceTelemetryValue.Text("warm") }, "the module is never reported")
     }
 
     @Test
