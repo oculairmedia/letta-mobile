@@ -125,6 +125,7 @@ class ChatSelectionToolbarTest {
         advanceClockUntil { onAllNodesWithText(REPLY, substring = true, useUnmergedTree = true).fetchSemanticsNodes().size == 1 }
         onAllNodesWithTag(ChatRowTestTags.AGENT_TEXT)[0].performTouchInput { longClick(center) }
         advanceClockUntil { toolbar.status == TextToolbarStatus.Shown }
+        mainClock.advanceTimeBy(SETTLE_MILLIS)
         assertEquals(TextToolbarStatus.Shown, toolbar.status, "the long press selects and shows the toolbar")
         val shows = toolbar.shows
         val hides = toolbar.hides
