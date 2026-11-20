@@ -43,7 +43,7 @@ internal class FileAgentPinsPersistence(private val path: Path) : AgentPinsPersi
     override fun read(): AgentPinsSnapshot {
         if (!Files.exists(path)) return AgentPinsSnapshot()
         return try {
-            LettaJson.persisted.decodeFromString<AgentPinsSnapshot>(Files.readString(path))
+            LettaJson.persisted.decodeFromString<AgentPinsSnapshot>(String(Files.readAllBytes(path), Charsets.UTF_8))
         } catch (expectedCorruption: IllegalArgumentException) {
             // SerializationException is an IllegalArgumentException: a truncated or hand-edited file.
             val kind = expectedCorruption::class.simpleName
