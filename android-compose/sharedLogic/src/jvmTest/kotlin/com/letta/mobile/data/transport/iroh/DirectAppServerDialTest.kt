@@ -120,11 +120,15 @@ class DirectAppServerDialTest {
 
     @Test
     fun theOnDeviceHostServesSharedPinsThroughTheSameContract() = runBlocking {
-        val stateDir = java.nio.file.Files.createTempDirectory("local-host-state")
-        val routes = com.letta.mobile.data.controller.node.iroh.pins.AgentPinsRoutes.forHost(
-            stateDir, com.letta.mobile.data.controller.node.iroh.pins.AgentPinsPublisher(scope),
-        )
-        serveHostState(routes, com.letta.mobile.data.pins.wire.AgentPinsWire.CAPABILITY) { transport ->
+        serveHostState(
+            capability = com.letta.mobile.data.pins.wire.AgentPinsWire.CAPABILITY,
+            stateFile = "pinned-agents.json",
+            routesIn = { dir ->
+                com.letta.mobile.data.controller.node.iroh.pins.AgentPinsRoutes.forHost(
+                    dir, com.letta.mobile.data.controller.node.iroh.pins.AgentPinsPublisher(scope),
+                )
+            },
+        ) { transport ->
             val pins = com.letta.mobile.data.pins.shared.SharedAgentPins(
                 com.letta.mobile.data.pins.shared.channelAgentPinsLink(transport),
             )
@@ -132,17 +136,20 @@ class DirectAppServerDialTest {
             val agent = com.letta.mobile.data.model.AgentId("agent-1")
             assertEquals(com.letta.mobile.data.pins.shared.AgentPinsEditOutcome.APPLIED, pins.setPinned(agent, true))
             assertEquals(listOf(agent), pins.refresh().agentIds)
-            assertTrue(java.nio.file.Files.exists(stateDir.resolve("pinned-agents.json")), "the host keeps the list")
         }
     }
 
     @Test
     fun theOnDeviceHostServesSharedShellStateThroughTheSameContract() = runBlocking {
-        val stateDir = java.nio.file.Files.createTempDirectory("local-shell-state")
-        val routes = com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateRoutes.forHost(
-            stateDir, com.letta.mobile.data.controller.node.iroh.shellstate.ShellStatePublisher(scope),
-        )
-        serveHostState(routes, com.letta.mobile.data.shellstate.wire.ShellStateWire.CAPABILITY) { transport ->
+        serveHostState(
+            capability = com.letta.mobile.data.shellstate.wire.ShellStateWire.CAPABILITY,
+            stateFile = "shell-state.json",
+            routesIn = { dir ->
+                com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateRoutes.forHost(
+                    dir, com.letta.mobile.data.controller.node.iroh.shellstate.ShellStatePublisher(scope),
+                )
+            },
+        ) { transport ->
             val shared = com.letta.mobile.data.shellstate.shared.SharedShellState(
                 com.letta.mobile.data.shellstate.shared.channelShellStateLink(transport),
             )
@@ -150,24 +157,27 @@ class DirectAppServerDialTest {
             val theme = kotlinx.serialization.json.JsonPrimitive("dark")
             assertEquals(com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome.APPLIED, shared.set("appearance.theme", theme))
             assertEquals(theme, shared.refresh().entries.getValue("appearance.theme").value)
-            assertTrue(java.nio.file.Files.exists(stateDir.resolve("shell-state.json")), "the host keeps the document")
         }
     }
 
     /**
-     * Dials the stock server with [routes] as the in-process host routes and runs [body] on the transport once the
-     * host advertises [capability]; the stock server must never see an `admin_rpc` for what the routes answer.
+     * Serves the stock server's in-process host with the routes [routesIn] builds over a fresh state directory and
+     * runs [body] on the transport once the host advertises [capability]. Afterwards the host must have written
+     * [stateFile] and the stock server must never have seen an `admin_rpc` for what the routes answer.
      */
     private suspend fun serveHostState(
-        routes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes,
         capability: String,
+        stateFile: String,
+        routesIn: (java.nio.file.Path) -> com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes,
         body: suspend (IrohChannelTransport) -> Unit,
     ) {
-        val transport = directTransport(startStockServer(), AtomicInteger(), listOf(routes))
+        val stateDir = java.nio.file.Files.createTempDirectory("local-host-state")
+        val transport = directTransport(startStockServer(), AtomicInteger(), listOf(routesIn(stateDir)))
         try {
             withTimeout(TIMEOUT) { transport.adminRpc("agent.list", "/v1/agents", null) }
             assertTrue(capability in transport.hostCapabilities)
             body(transport)
+            assertTrue(java.nio.file.Files.exists(stateDir.resolve(stateFile)), "the host keeps $stateFile")
             assertFalse(received.any { it == "admin_rpc" }, "the stock server never sees the shared state calls")
         } finally {
             transport.close()
