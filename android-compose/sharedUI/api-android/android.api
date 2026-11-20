@@ -4966,6 +4966,7 @@ public final class com/letta/mobile/ui/markdown/ComposableSingletons$SharedMarkd
 	public static final field INSTANCE Lcom/letta/mobile/ui/markdown/ComposableSingletons$SharedMarkdownCodeFenceKt;
 	public fun <init> ()V
 	public final fun getLambda$1076291206$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1476909305$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/markdown/MarkdownBlock {
@@ -12772,6 +12773,8 @@ public final class com/letta/mobile/ui/theme/tokens/LettaSurfaceSizes {
 	public final fun getSidePaneMinWidth-D9Ej5fM ()F
 	public final fun getSidePaneWidth-D9Ej5fM ()F
 	public final fun getSnackbarMaxWidth-D9Ej5fM ()F
+	public final fun getWideContentGutter-D9Ej5fM ()F
+	public final fun getWideContentMaxWidth-D9Ej5fM ()F
 }
 
 public final class com/letta/mobile/ui/theme/tokens/LettaTextAccents {

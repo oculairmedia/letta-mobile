@@ -27,6 +27,15 @@ object LettaSurfaceSizes {
     /** How far a roster row slides before a swipe commits its action (RosterListRow). */
     val rosterSwipeThreshold: Dp = 72.dp
 
+    /**
+     * The widest a wide block in a chat reply (a table) grows when it breaks out of the reading column
+     * into the spare width beside it on a wide window. Past this it scrolls sideways instead.
+     */
+    val wideContentMaxWidth: Dp = 1440.dp
+
+    /** The margin a broken-out block keeps from each side of the timeline, beyond the list's own gutter. */
+    val wideContentGutter: Dp = 16.dp
+
     /** The widest a snackbar grows on a wide window (the overlay layer). */
     val snackbarMaxWidth: Dp = 600.dp
 

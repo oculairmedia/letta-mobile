@@ -18,6 +18,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +55,8 @@ import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
+import com.letta.mobile.ui.markdown.LocalMarkdownBreakoutLane
+import com.letta.mobile.ui.markdown.LocalTimelineBreakoutLane
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.theme.ChatBubbleShapes
 import com.letta.mobile.ui.theme.ChatRowAlpha
@@ -327,13 +330,16 @@ internal fun AgentText(params: AgentTextParams) {
     Box(modifier = Modifier.agentTextRoot(hoverSource, params.isStreaming)) {
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = ChatRowSpacing.bubblePaddingVertical)) {
             SelectionContainer {
-                SharedMarkdownText(
-                    text = displayText,
-                    textColor = if (params.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                    // A rich host renderer owns the streaming reveal (cursor, committed blocks,
-                    // settle) itself; the default renderer ignores the flag.
-                    isStreaming = params.isStreaming,
-                )
+                // A reply's wide table may break out of the reading column into the timeline's spare width.
+                CompositionLocalProvider(LocalMarkdownBreakoutLane provides LocalTimelineBreakoutLane.current) {
+                    SharedMarkdownText(
+                        text = displayText,
+                        textColor = if (params.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                        // A rich host renderer owns the streaming reveal (cursor, committed blocks,
+                        // settle) itself; the default renderer ignores the flag.
+                        isStreaming = params.isStreaming,
+                    )
+                }
             }
             if (pointer) {
                 PointerActionsLine(params, hovered)

@@ -47,7 +47,10 @@ private fun shouldRenderMermaidDiagram(
     return true
 }
 
-/** Code blocks as the renderer draws them; code fences too, but a complete Mermaid fence as a diagram. */
+/**
+ * Code blocks as the renderer draws them; code fences too, but a complete Mermaid fence as a diagram;
+ * tables as the renderer draws them, free to break out of the column ([SharedMarkdownTable]).
+ */
 @Composable
 internal fun rememberSharedMarkdownComponents(text: String): MarkdownComponents {
     val deferIncompleteMermaid = remember(text) { hasOpenMarkdownCodeFence(text) }
@@ -61,6 +64,7 @@ internal fun rememberSharedMarkdownComponents(text: String): MarkdownComponents 
                 )
             },
             codeFence = { SharedCodeFence(it, mermaidRenderer, deferIncompleteMermaid) },
+            table = { SharedMarkdownTable(it) },
         )
     }
 }

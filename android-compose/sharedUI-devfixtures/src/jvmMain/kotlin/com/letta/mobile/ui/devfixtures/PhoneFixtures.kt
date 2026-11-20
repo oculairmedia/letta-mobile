@@ -146,6 +146,26 @@ object PhoneFixtures {
         error = CanvasArtifactError("VALIDATION_FAILED", "a CARD holds at most 8 fields (got 11)", problemCount = 2),
     )
 
+    /** A reply carrying a six-column table, wider than the reading column, between two paragraphs. */
+    const val WIDE_TABLE_REPLY: String = "Here is how the four video models compare on the points you asked about:\n\n" +
+        "| Model | Max Clip | Max Res/FPS | Native Audio | Key Strengths | Pricing |\n" +
+        "| --- | --- | --- | --- | --- | --- |\n" +
+        "| Atlas Video 2 | 20 s | 4K / 60 | Yes | Physics, camera moves, long takes | From $0.40 per second |\n" +
+        "| Brightframe 4 | 10 s | 1080p / 30 | No | Stylised animation and fast drafts | Free tier, then $12 a month |\n" +
+        "| Cinder Pro | 15 s | 4K / 24 | Yes | Lip sync and dialogue scenes | $0.25 per second |\n" +
+        "| Dune Motion | 8 s | 720p / 24 | No | Runs on device, private by default | One-time licence |\n\n" +
+        "Atlas Video 2 is the strongest all-rounder; Dune Motion is the one to pick if clips must stay on your machine."
+
+    /** A prompt and the wide-table reply: the timeline's broken-out table on a wide window. */
+    val wideTableState: ChatUiState by lazy {
+        state.copy(
+            messages = persistentListOf(
+                messages[2].copy(id = "u-table", content = "Compare the video models in a table."),
+                messages[3].copy(id = "a-table", content = WIDE_TABLE_REPLY, toolCalls = null),
+            ),
+        )
+    }
+
     /** The canvas.compose cards (letta-mobile-bglj6.13): a published artifact, one being added, a refused one. */
     val canvasArtifactState: ChatUiState by lazy {
         val composeCall = UiToolCall(
