@@ -56089,7 +56089,8 @@ public final class com/letta/mobile/data/timeline/CanonicalTimelineEngine {
 	public fun <init> (Lcom/letta/mobile/data/timeline/TimelineBoundedStore;Lcom/letta/mobile/data/timeline/TimelineCanonicalWriter;Lcom/letta/mobile/data/timeline/TimelinePageBudget;Z)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/timeline/TimelineBoundedStore;Lcom/letta/mobile/data/timeline/TimelineCanonicalWriter;Lcom/letta/mobile/data/timeline/TimelinePageBudget;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun acknowledgeSettlement (Lcom/letta/mobile/data/timeline/TimelineLiveFence;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun advanceToolSweep (Lcom/letta/mobile/data/timeline/TimelineEngineSelection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun advanceToolSweep (Lcom/letta/mobile/data/timeline/TimelineEngineSelection;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun advanceToolSweep$default (Lcom/letta/mobile/data/timeline/CanonicalTimelineEngine;Lcom/letta/mobile/data/timeline/TimelineEngineSelection;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun applyPage (Lcom/letta/mobile/data/timeline/TimelineEngineRequest;Lcom/letta/mobile/data/timeline/TimelineRemotePageResult$Page;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun beginLive (Lcom/letta/mobile/data/timeline/TimelineEngineSelection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun beginPage (Lcom/letta/mobile/data/timeline/TimelineEngineSelection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;

@@ -29,7 +29,7 @@ class IndexedCanonicalTimelineMaintenance(
             jobs.remove(owner)?.cancel()
             // Fenced by the generation turnStarted committed; advancing it here would publish a
             // revision, and so redraw the list, with no row changed.
-            val generation = owner.session.engine.currentToolSweep(owner.selection)
+            val generation = owner.session.engine.advanceToolSweep(owner.selection, advance = false)
             // Successful terminal evidence supersedes the failure notices of earlier turns.
             if (clean) owner.session.engine.retireTurnFailureNotices(owner.selection)
             coordinator.retainRepair(owner)
