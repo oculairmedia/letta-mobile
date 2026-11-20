@@ -3,7 +3,7 @@ package com.letta.mobile.ui.chat.surface.timeline
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
@@ -188,7 +188,7 @@ class TimelineToolGroupsTest {
             single.copy(
                 message = single.message.copy(
                     toolCalls = single.message.toolCalls.orEmpty().map {
-                        it.copy(generatedImageAttachments = listOf(UiImageAttachment(base64 = "aGVsbG8=", mediaType = "image/png")))
+                        it.copy(generatedImageAttachments = listOf(UiMediaAttachment(base64 = "aGVsbG8=", mediaType = "image/png")))
                     },
                 ),
             )

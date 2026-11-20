@@ -59,6 +59,10 @@ compose-bom = "2026.03.01"
 compose-material3 = "1.5.0-alpha25"
 camerax = "1.4.2"
 exifinterface = "1.4.2"
+# Inline audio/video playback in the chat on Android and the web, behind the MediaPlayer SPI (sharedUI
+# composeMediaMain ComposeMediaEngine). MIT. Android drives Media3 ExoPlayer (Apache-2.0, transitive); the
+# web uses an HTML video element. Not on desktop: upstream #249 (crash on release) and #267 (audio-only).
+composemediaplayer = "0.11.4"
 work = "2.11.2"
 sentry = "8.42.0"
 startup = "1.2.0"
@@ -206,6 +210,7 @@ androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-ru
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "core-ktx" }
 androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "splashscreen" }
 androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "exifinterface" }
+composemediaplayer = { module = "io.github.kdroidfilter:composemediaplayer", version.ref = "composemediaplayer" }
 androidx-metrics-performance = { module = "androidx.metrics:metrics-performance", version.ref = "metrics" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
 androidx-startup-runtime = { module = "androidx.startup:startup-runtime", version.ref = "startup" }

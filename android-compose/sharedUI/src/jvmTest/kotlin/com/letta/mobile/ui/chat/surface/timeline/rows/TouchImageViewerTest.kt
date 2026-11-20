@@ -13,7 +13,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.ui.chat.surface.ChatImageActions
 import com.letta.mobile.ui.chat.surface.LocalChatImageActions
 import kotlin.test.Test
@@ -28,8 +28,8 @@ import com.letta.mobile.ui.host.LocalLettaHost
 class TouchImageViewerTest {
     private val container = Size(1000f, 2000f)
     private val images = listOf(
-        UiImageAttachment(base64 = "", mediaType = "image/png"),
-        UiImageAttachment(base64 = "", mediaType = "image/jpeg"),
+        UiMediaAttachment(base64 = "", mediaType = "image/png"),
+        UiMediaAttachment(base64 = "", mediaType = "image/jpeg"),
     )
 
     @Test
@@ -60,8 +60,8 @@ class TouchImageViewerTest {
 
     @Test
     fun theTopBarSharesAndSavesTheImageOnScreen() = runComposeUiTest {
-        val shared = mutableListOf<UiImageAttachment>()
-        val saved = mutableListOf<UiImageAttachment>()
+        val shared = mutableListOf<UiMediaAttachment>()
+        val saved = mutableListOf<UiMediaAttachment>()
         var dismissed = false
         setContent {
             MaterialTheme {

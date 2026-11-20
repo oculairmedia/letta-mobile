@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.model.CanvasId
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
@@ -253,7 +253,7 @@ private fun AccessibilityAuditMainColumn(modifier: Modifier = Modifier) {
                     role = "user",
                     content = "Audit prompt",
                     timestamp = "2026-07-19T12:00:00Z",
-                    attachments = listOf(UiImageAttachment(mediaType = "image/png", base64 = "")),
+                    attachments = listOf(UiMediaAttachment(mediaType = "image/png", base64 = "")),
                 ),
                 groupPosition = GroupPosition.None,
             ),

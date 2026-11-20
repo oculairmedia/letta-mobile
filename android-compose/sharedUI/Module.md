@@ -76,6 +76,10 @@ Reusable chat identity, orb/layout and queued-send components. Consume these com
 
 Branch/name dialogs and message menus. MessageMenuActions and dialog callbacks are the integration seams; menu code must not decide backend branch support independently of supplied capabilities.
 
+# Package com.letta.mobile.ui.chat.media
+
+Inline audio, video and file cards for attachments the agent shares, built from shared pieces: one frame, one transport row (play/pause, scrubber, elapsed and total time, mute), one status line and one open-elsewhere action, over the sharedLogic `MediaPlayer` port. The timeline rows reach it through their single attachment entry point, which keeps images on the existing grid and viewer. Android and the web play through ComposeMediaPlayer (`ComposeMediaEngine`, in the `composeMediaMain` source set they share) behind the port, and the video card draws its surface; desktop keeps Java Sound for audio and the open-elsewhere card for video. The player factory and the video surface are expect/actual; the page provides the coordinator that keeps one item playing and yields to voice mode.
+
 # Package com.letta.mobile.ui.chat.provenance
 
 Visual labels for structured inter-agent provenance. Consume the label composables directly with structured provenance; transport decoding and identity inference must stay upstream.

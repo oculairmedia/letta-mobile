@@ -32,7 +32,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
@@ -92,10 +92,10 @@ class ChatRowImageFitUiTest {
     }
 
     @Test
-    fun storedPointersKeepThePlaceholderHeight() = checkPlaceholder(UiImageAttachment("", "image/png", storedByteSize = 100))
+    fun storedPointersKeepThePlaceholderHeight() = checkPlaceholder(UiMediaAttachment("", "image/png", storedByteSize = 100))
 
     @Test
-    fun failedDecodesKeepThePlaceholderHeight() = checkPlaceholder(UiImageAttachment("invalid", "image/png"))
+    fun failedDecodesKeepThePlaceholderHeight() = checkPlaceholder(UiMediaAttachment("invalid", "image/png"))
 
     @Test
     fun resolutionAndEncodingDoNotChangeGeometryOnTheSameSurface() {
@@ -115,7 +115,7 @@ class ChatRowImageFitUiTest {
 
     @Test
     fun corruptImageHasAnExplicitFailureReasonInTheTimeline() = runDesktopComposeUiTest(width = 1100, height = 1600) {
-        show(desktop, RowKind.FoldedReadRun, listOf(UiImageAttachment("invalid", "image/png")))
+        show(desktop, RowKind.FoldedReadRun, listOf(UiMediaAttachment("invalid", "image/png")))
         waitUntil(timeoutMillis = 10_000) {
             onAllNodesWithText("Image unavailable: invalid image data").fetchSemanticsNodes().isNotEmpty()
         }
@@ -124,7 +124,7 @@ class ChatRowImageFitUiTest {
 
     @Test
     fun missingImageHasAnExplicitFailureReasonInTheTimeline() = runDesktopComposeUiTest(width = 1100, height = 1600) {
-        show(desktop, RowKind.FoldedReadRun, listOf(UiImageAttachment("", "image/png")))
+        show(desktop, RowKind.FoldedReadRun, listOf(UiMediaAttachment("", "image/png")))
         onNodeWithText("Image unavailable: image data is missing").assertExists()
     }
 
@@ -201,7 +201,7 @@ class ChatRowImageFitUiTest {
         }
     }
 
-    private fun checkPlaceholder(attachment: UiImageAttachment) {
+    private fun checkPlaceholder(attachment: UiMediaAttachment) {
         for (environment in listOf(phone, desktop)) {
             runDesktopComposeUiTest(width = 1100, height = 1600) {
                 show(environment, RowKind.Message, listOf(attachment))
@@ -225,10 +225,10 @@ class ChatRowImageFitUiTest {
     }
 
     private fun ComposeUiTest.show(
-        environment: Environment, kind: RowKind, attachments: List<UiImageAttachment>,
+        environment: Environment, kind: RowKind, attachments: List<UiMediaAttachment>,
     ): MutableState<Int?> {
         val tappedIndex = mutableStateOf<Int?>(null)
-        var viewer by mutableStateOf<Pair<List<UiImageAttachment>, Int>?>(null)
+        var viewer by mutableStateOf<Pair<List<UiMediaAttachment>, Int>?>(null)
         val callbacks = ChatRowCallbacks(
             actions = RecordingChatActions(), host = ChatSurfaceHost(),
             onImageTap = { images, index ->
@@ -253,7 +253,7 @@ class ChatRowImageFitUiTest {
         return tappedIndex
     }
 
-    private fun row(kind: RowKind, attachments: List<UiImageAttachment>): ChatRenderItem {
+    private fun row(kind: RowKind, attachments: List<UiMediaAttachment>): ChatRenderItem {
         val role = when (kind) {
             RowKind.Prompt -> "user"
             RowKind.ToolMessage -> "tool"
@@ -320,7 +320,7 @@ class ChatRowImageFitUiTest {
         assertTrue(abs(expected - actual) <= 1f, "$reason: expected $expected px, actual $actual px")
     }
 
-    private fun imageAttachment(width: Int, height: Int, format: String = "png"): UiImageAttachment {
+    private fun imageAttachment(width: Int, height: Int, format: String = "png"): UiMediaAttachment {
         val type = if (format == "png") BufferedImage.TYPE_INT_ARGB else BufferedImage.TYPE_INT_RGB
         val image = BufferedImage(width, height, type)
         // Inset colour markers avoid the surface's rounded corners and 1dp pointer border.
@@ -339,7 +339,7 @@ class ChatRowImageFitUiTest {
             assertTrue(ImageIO.write(image, format, output))
             output.toByteArray()
         }
-        val attachment = UiImageAttachment(Base64.encode(bytes), "image/$format")
+        val attachment = UiMediaAttachment(Base64.encode(bytes), "image/$format")
         val decoded = assertNotNull(com.letta.mobile.ui.chat.surface.ChatImageBitmaps.decode(attachment.base64))
         assertEquals(width, decoded.width)
         assertEquals(height, decoded.height)

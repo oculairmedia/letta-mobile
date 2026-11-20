@@ -1,6 +1,6 @@
 package com.letta.mobile.data.model
 
-import com.letta.mobile.data.attachment.ImageUnavailableReason
+import com.letta.mobile.data.media.UiMediaAttachment
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.messaging.AgentMessageProvenance
 import com.letta.mobile.data.runtime.PendingApprovalDetails
@@ -72,7 +72,7 @@ data class UiMessage(
      * messages hydrated from server history whose `content` is a multimodal
      * JSON array containing inline image parts.
      */
-    val attachments: List<UiImageAttachment> = emptyList(),
+    val attachments: List<UiMediaAttachment> = emptyList(),
     /**
      * Structured inter-agent (a2a) provenance for this
      * message, when it is a message this conversation's agent RECEIVED from
@@ -97,21 +97,13 @@ data class UiMessage(
     val isCompaction: Boolean = false,
 )
 
-@Immutable
-data class UiImageAttachment(
-    val base64: String,
-    val mediaType: String,
-    /**
-     * Round-tripped from a snapshot pointer whose inline thumbnail exceeded
-     * the 16 KB budget. Non-null + empty base64 means the attachment exists
-     * but the bytes were not rehydrated; renderers show a stored-pointer
-     * placeholder labelled with [storedByteSize].
-     */
-    val storedByteSize: Long? = null,
-    /** Explicit failure retained from the message attachment. */
-    val unavailableReason: ImageUnavailableReason? = null,
-    /** Remote source supported by the host image loader. */
-    val url: String? = null,
+/** The one mapping from a parsed or stored media part to the attachment the timeline draws. */
+fun MessageContentPart.Image.toUiMediaAttachment(): UiMediaAttachment = UiMediaAttachment(
+    base64 = base64,
+    mediaType = mediaType,
+    storedByteSize = storedByteSize,
+    unavailableReason = unavailableReason,
+    url = url,
 )
 
 @Immutable
@@ -122,7 +114,7 @@ data class UiToolCall(
     /** Optional compact target shown beside [name] without replacing expanded arguments. */
     val displayTarget: String? = null,
     val status: String? = null,
-    val generatedImageAttachments: List<UiImageAttachment> = emptyList(),
+    val generatedImageAttachments: List<UiMediaAttachment> = emptyList(),
     /**
      * Best-effort wall-clock execution duration for the tool call, measured
      * from the tool-call message timestamp to the matching tool-return

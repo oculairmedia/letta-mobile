@@ -83,7 +83,7 @@ class ChatRowRunBlockSummaryUiTest {
             toolCalls = listOf(UiToolCall(
                 name = "Read", arguments = """{"file_path":"/tmp/pixel.png"}""", result = "[Image: pixel.png]",
                 status = "success", toolCallId = "read-image",
-                generatedImageAttachments = listOf(com.letta.mobile.data.model.UiImageAttachment(
+                generatedImageAttachments = listOf(com.letta.mobile.data.media.UiMediaAttachment(
                     "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADUlEQVR42mNk+M9QDwADjgGAv7SktwAAAABJRU5ErkJggg==",
                     "image/png",
                 )),
@@ -113,7 +113,7 @@ class ChatRowRunBlockSummaryUiTest {
         toolCalls = listOf(UiToolCall(
             name = "Read", arguments = """{"file_path":"/tmp/pixel.png"}""", result = "[Image: pixel.png]",
             status = "success", toolCallId = callId,
-            generatedImageAttachments = listOf(com.letta.mobile.data.model.UiImageAttachment(
+            generatedImageAttachments = listOf(com.letta.mobile.data.media.UiMediaAttachment(
                 "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADUlEQVR42mNk+M9QDwADjgGAv7SktwAAAABJRU5ErkJggg==",
                 "image/png",
             )),

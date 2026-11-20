@@ -4,7 +4,7 @@ import com.letta.mobile.util.attr
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.letta.mobile.data.model.UiGeneratedComponent
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolCall
@@ -330,7 +330,7 @@ private fun UiGeneratedComponent?.geometryGeneratedUiHash(): Int {
     return hash
 }
 
-private fun List<UiImageAttachment>.geometryAttachmentsHash(): Int {
+private fun List<UiMediaAttachment>.geometryAttachmentsHash(): Int {
     if (isEmpty()) return 0
     var hash = size
     for (attachment in this) {

@@ -5,7 +5,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import com.letta.mobile.data.chat.projection.ChatRenderItem
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.toChatRenderItemState
@@ -121,7 +121,7 @@ internal fun rememberRowContexts(
 internal fun rememberRowCallbacks(
     actions: ChatActions,
     host: ChatSurfaceHost,
-    onImageTap: (images: List<UiImageAttachment>, index: Int) -> Unit,
+    onImageTap: (images: List<UiMediaAttachment>, index: Int) -> Unit,
 ): ChatRowCallbacks {
     val currentTap = rememberUpdatedState(onImageTap)
     return remember(actions, host) {
@@ -136,7 +136,7 @@ internal fun rememberRowCallbacks(
 internal fun rowCallbacksFor(
     actions: ChatActions,
     host: ChatSurfaceHost,
-    onImageTap: (images: List<UiImageAttachment>, index: Int) -> Unit,
+    onImageTap: (images: List<UiMediaAttachment>, index: Int) -> Unit,
 ): ChatRowCallbacks {
     val resolveName = host.resolveAgentName
     val open = host.openSubagent

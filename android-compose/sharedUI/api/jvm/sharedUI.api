@@ -1328,6 +1328,36 @@ public final class com/letta/mobile/ui/chat/commands/SlashCommandSessionKt {
 	public static final fun rememberSlashCommandSessionPort (Lcom/letta/mobile/ui/chat/session/ChatSessionPort;Lcom/letta/mobile/data/chat/routing/SlashCommandBinding;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/chat/session/ChatSessionPort;
 }
 
+public final class com/letta/mobile/ui/chat/media/ComposableSingletons$AudioMediaCardKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/media/ComposableSingletons$AudioMediaCardKt;
+	public fun <init> ()V
+	public final fun getLambda$-1908202866$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+}
+
+public final class com/letta/mobile/ui/chat/media/ComposableSingletons$MediaFileCardKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/media/ComposableSingletons$MediaFileCardKt;
+	public fun <init> ()V
+	public final fun getLambda$1978247740$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+}
+
+public final class com/letta/mobile/ui/chat/media/ComposableSingletons$MediaFrameKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/media/ComposableSingletons$MediaFrameKt;
+	public fun <init> ()V
+	public final fun getLambda$1616493512$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+}
+
+public final class com/letta/mobile/ui/chat/media/ComposableSingletons$MediaTransportKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/media/ComposableSingletons$MediaTransportKt;
+	public fun <init> ()V
+	public final fun getLambda$-188338298$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+}
+
+public final class com/letta/mobile/ui/chat/media/ComposableSingletons$VideoMediaCardKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/media/ComposableSingletons$VideoMediaCardKt;
+	public fun <init> ()V
+	public final fun getLambda$-826328914$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+}
+
 public final class com/letta/mobile/ui/chat/provenance/AgentMessageProvenanceLabelKt {
 	public static final fun AgentMessageProvenanceLabel-FV1VA1c (Lcom/letta/mobile/data/messaging/AgentMessageProvenance;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/graphics/Color;Landroidx/compose/runtime/Composer;II)V
 	public static final fun AgentMessageProvenanceMetadata-RPmYEkk (Lcom/letta/mobile/data/messaging/AgentMessageProvenance;JLandroidx/compose/runtime/Composer;I)V
@@ -2359,6 +2389,12 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSing
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowImageViewerKt;
 	public fun <init> ()V
 	public final fun getLambda$-270745944$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+}
+
+public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowMediaKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowMediaKt;
+	public fun <init> ()V
+	public final fun getLambda$2112660809$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
 public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowMessageActionsKt {
@@ -4869,6 +4905,7 @@ public final class com/letta/mobile/ui/icons/LettaIcons {
 	public final fun getMenu ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getMic ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getMicOff ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getMinimize ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getMoreVert ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getMousePointer ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getNoneSet ()Landroidx/compose/ui/graphics/vector/ImageVector;
@@ -4877,6 +4914,7 @@ public final class com/letta/mobile/ui/icons/LettaIcons {
 	public final fun getPalette ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getPanelLeftClose ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getPanelLeftOpen ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getPause ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getPenLine ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getPenTool ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getPeople ()Landroidx/compose/ui/graphics/vector/ImageVector;
@@ -4923,6 +4961,7 @@ public final class com/letta/mobile/ui/icons/LettaIcons {
 	public final fun getUnarchive ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getUnderline ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getUndo2 ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getVideo ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getViewModule ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getVisibility ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getVisibilityOff ()Landroidx/compose/ui/graphics/vector/ImageVector;
@@ -12853,6 +12892,7 @@ public final class com/letta/mobile/ui/theme/tokens/LettaSurfaceSizes {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaSurfaceSizes;
 	public static final field dropScrimAlpha F
+	public static final field inlineVideoAspectRatio F
 	public static final field mascotLoadingTrackAlpha F
 	public static final field mascotTileAlpha F
 	public static final field mascotTileSelectedAlpha F
@@ -12860,6 +12900,7 @@ public final class com/letta/mobile/ui/theme/tokens/LettaSurfaceSizes {
 	public final fun getAgentPickerListMaxHeight-D9Ej5fM ()F
 	public final fun getBannerMaxWidth-D9Ej5fM ()F
 	public final fun getDropGlyph-D9Ej5fM ()F
+	public final fun getInlineMediaMaxHeight-D9Ej5fM ()F
 	public final fun getMascotGazeMinReach-D9Ej5fM ()F
 	public final fun getMascotPickerTile-D9Ej5fM ()F
 	public final fun getPairingResultGlyph-D9Ej5fM ()F

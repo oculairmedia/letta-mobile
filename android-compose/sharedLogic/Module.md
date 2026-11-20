@@ -47,6 +47,10 @@ Portable API failures and project request payloads retained by repository contra
 
 Shared image-ingress policy and attachment budgets. Platform decoders supply image data; these policies constrain turn attachment counts, dimensions and payload size. Keep decoding behind platform adapters and attachment rendering in `sharedUI`; apply [ImageIngressPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.attachment/-image-ingress-policy/index.html) and [AttachmentLimits](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.attachment/-attachment-limits/index.html) before admitting image results.
 
+# Package com.letta.mobile.data.media
+
+Media kinds, playback limits and the one playback port shared by every platform. `MediaKind.of` classifies a parsed attachment (image, audio, video, file) from its MIME type and file extension; `MediaPlayer` is the playback port audio and video share, with a contract test suite every implementation must pass; `EngineMediaPlayer` implements it once over the narrower `MediaEngine` SPI, so a third-party engine (ComposeMediaPlayer on Android and the web, bound in `sharedUI`) only translates commands and readings, and `JavaSoundMediaPlayer` plays desktop audio; `MediaPlaybackCoordinator` keeps one item playing at a time. Keep rendering in `sharedUI` and never log a source: URLs may carry tokens.
+
 # Package com.letta.mobile.data.beads
 
 Portable bd serve HTTP client, capability handshake, event stream and typed failures. Supply a Ktor engine and credentials at connection time; the client has no wrapper route or host integration.

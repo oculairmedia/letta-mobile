@@ -75,7 +75,7 @@ class ToolImagePipelineUiTest {
                 setContent {
                     MaterialTheme {
                         ChatRemoteImage(
-                            com.letta.mobile.data.model.UiImageAttachment("", "image/png", url = "https://example.invalid/image"),
+                            com.letta.mobile.data.media.UiMediaAttachment("", "image/png", url = "https://example.invalid/image"),
                         )
                     }
                 }
@@ -136,7 +136,7 @@ class ToolImagePipelineUiTest {
             runDesktopComposeUiTest(width = 1000, height = 1600) {
                 setContent {
                     MaterialTheme {
-                        ChatAttachmentImage(com.letta.mobile.data.model.UiImageAttachment(
+                        ChatAttachmentImage(com.letta.mobile.data.media.UiMediaAttachment(
                             parsed.base64, parsed.mediaType, url = parsed.url,
                         ))
                     }

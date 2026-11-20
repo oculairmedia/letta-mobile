@@ -11,7 +11,7 @@ import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.chat.surface.timeline.timelineLeadingSpace
 import com.letta.mobile.ui.common.GroupPosition
@@ -26,7 +26,7 @@ import com.letta.mobile.ui.host.LocalLettaHost
 
 /** letta-mobile-bglj6.1.23: the Touch rows' parity with the legacy Android timeline. */
 class TouchRowPolishTest {
-    private val image = UiImageAttachment(base64 = "", mediaType = "image/png")
+    private val image = UiMediaAttachment(base64 = "", mediaType = "image/png")
 
     @Test
     fun aPromptTheNextBubbleContinuesTightensAndOnlyTheFirstIsLabelled() {

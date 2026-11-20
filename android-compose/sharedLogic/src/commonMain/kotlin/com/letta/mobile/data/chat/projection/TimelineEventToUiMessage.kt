@@ -1,7 +1,9 @@
 package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.messaging.AgentMessageProvenanceProjection
-import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.media.UiMediaAttachment
+import com.letta.mobile.data.model.toUiMediaAttachment
+import com.letta.mobile.data.media.MediaKind
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
@@ -296,15 +298,14 @@ private fun TimelineEvent.Confirmed.confirmedUiToolCall(
 private fun messageAttachments(
     attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
     uiToolCalls: List<UiToolCall>?,
-): List<UiImageAttachment> {
-    return if (uiToolCalls.orEmpty().any { it.generatedImageAttachments.isNotEmpty() }) {
-        emptyList()
-    } else {
-        attachments.map { UiImageAttachment(
-            base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize,
-            unavailableReason = it.unavailableReason, url = it.url,
-        ) }
-    }
+): List<UiMediaAttachment> {
+    val all = attachments.map { it.toUiMediaAttachment() }
+    val rendered = uiToolCalls.orEmpty().flatMap { it.generatedImageAttachments }
+    if (rendered.isEmpty()) return all
+    // A tool card that draws an image leaves the message no image of its own (as before). A card
+    // with only audio, video or files suppresses nothing else, and media no card drew stays here.
+    val cardDrawsImage = rendered.any { it.kind == MediaKind.Image }
+    return all.filter { it !in rendered && !(cardDrawsImage && it.kind == MediaKind.Image) }
 }
 
 /** The approval buttons for [toolCalls] while request [requestId] is undecided; null once decided or with no request. */

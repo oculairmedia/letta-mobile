@@ -74,7 +74,7 @@ class ToolStepUiTest {
         val call = UiToolCall(
             name = "Read", arguments = """{"file_path":"/tmp/pixel.png"}""", result = "[Image: pixel.png]",
             status = "success", toolCallId = "call-1",
-            generatedImageAttachments = listOf(com.letta.mobile.data.model.UiImageAttachment(image, "image/png")),
+            generatedImageAttachments = listOf(com.letta.mobile.data.media.UiMediaAttachment(image, "image/png")),
         )
         val files = WorkspaceFiles(WorkspaceFileOpener { }, MutableStateFlow(WorkspaceFileViewerState()), NoViewer)
         setContent {
