@@ -65390,12 +65390,11 @@ final class com.letta.mobile.data.shellstate.appearance/AppearanceValues { // co
 }
 
 final class com.letta.mobile.data.shellstate.appearance/HostAppearance { // com.letta.mobile.data.shellstate.appearance/HostAppearance|null[0]
-    constructor <init>(com.letta.mobile.data.shellstate.shared/SharedShellState, com.letta.mobile.data.shellstate.appearance/LegacyAppearance = ...) // com.letta.mobile.data.shellstate.appearance/HostAppearance.<init>|<init>(com.letta.mobile.data.shellstate.shared.SharedShellState;com.letta.mobile.data.shellstate.appearance.LegacyAppearance){}[0]
+    constructor <init>(com.letta.mobile.data.shellstate.shared/SharedShellState, com.letta.mobile.data.shellstate.shared/ShellStateSnapshotCache = ..., com.letta.mobile.data.shellstate.appearance/LegacyAppearance = ...) // com.letta.mobile.data.shellstate.appearance/HostAppearance.<init>|<init>(com.letta.mobile.data.shellstate.shared.SharedShellState;com.letta.mobile.data.shellstate.shared.ShellStateSnapshotCache;com.letta.mobile.data.shellstate.appearance.LegacyAppearance){}[0]
 
     final val values // com.letta.mobile.data.shellstate.appearance/HostAppearance.values|{}values[0]
         final fun <get-values>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.shellstate.appearance/AppearanceValues> // com.letta.mobile.data.shellstate.appearance/HostAppearance.values.<get-values>|<get-values>(){}[0]
 
-    final fun clearCache() // com.letta.mobile.data.shellstate.appearance/HostAppearance.clearCache|clearCache(){}[0]
     final suspend fun clearLocal() // com.letta.mobile.data.shellstate.appearance/HostAppearance.clearLocal|clearLocal(){}[0]
     final suspend fun run() // com.letta.mobile.data.shellstate.appearance/HostAppearance.run|run(){}[0]
     final suspend fun setDynamicColor(kotlin/Boolean): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.shellstate.appearance/HostAppearance.setDynamicColor|setDynamicColor(kotlin.Boolean){}[0]
@@ -65411,7 +65410,6 @@ final class com.letta.mobile.data.shellstate.shared/SharedShellState { // com.le
     final val supported // com.letta.mobile.data.shellstate.shared/SharedShellState.supported|{}supported[0]
         final fun <get-supported>(): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/SharedShellState.supported.<get-supported>|<get-supported>(){}[0]
 
-    final fun clearCache() // com.letta.mobile.data.shellstate.shared/SharedShellState.clearCache|clearCache(){}[0]
     final suspend fun propose(kotlin.collections/List<com.letta.mobile.data.shellstate.shared/SharedShellState.Edit>): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.shellstate.shared/SharedShellState.propose|propose(kotlin.collections.List<com.letta.mobile.data.shellstate.shared.SharedShellState.Edit>){}[0]
     final suspend fun refresh(): com.letta.mobile.data.shellstate.shared/ShellStateState // com.letta.mobile.data.shellstate.shared/SharedShellState.refresh|refresh(){}[0]
     final suspend fun remove(kotlin/String): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.shellstate.shared/SharedShellState.remove|remove(kotlin.String){}[0]
