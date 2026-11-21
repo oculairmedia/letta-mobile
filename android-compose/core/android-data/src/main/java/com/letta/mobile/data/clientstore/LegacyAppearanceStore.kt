@@ -1,7 +1,8 @@
-package com.letta.mobile.data.storage
+package com.letta.mobile.data.clientstore
 
 import com.letta.mobile.data.shellstate.AppearanceValues
 import com.letta.mobile.data.shellstate.LegacyAppearance
+import com.letta.mobile.data.storage.SettingsPreferencesStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 

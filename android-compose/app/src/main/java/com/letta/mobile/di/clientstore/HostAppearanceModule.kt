@@ -1,4 +1,4 @@
-package com.letta.mobile.di
+package com.letta.mobile.di.clientstore
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -8,7 +8,7 @@ import com.letta.mobile.data.shellstate.appearance.SharedShellAppearance
 import com.letta.mobile.data.shellstate.channel.channelShellStateLink
 import com.letta.mobile.data.shellstate.shared.SharedShellState
 import com.letta.mobile.data.storage.DataStoreSettingsPreferencesStore
-import com.letta.mobile.data.storage.LegacyAppearanceStore
+import com.letta.mobile.data.clientstore.LegacyAppearanceStore
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.api.IChannelTransport
 import dagger.Module
