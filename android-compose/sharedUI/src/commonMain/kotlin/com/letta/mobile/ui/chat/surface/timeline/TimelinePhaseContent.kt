@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
+import com.letta.mobile.ui.components.foundation.LettaCard
 import com.letta.mobile.ui.chat.surface.timeline.rows.TimelineStatusGlyph
 import com.letta.mobile.ui.components.line.StatusTone
 import com.letta.mobile.ui.theme.ChatRowCardShape
@@ -21,7 +22,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -245,7 +245,7 @@ private fun WelcomeHeadline(agentName: String, hasConversation: Boolean) {
 
 @Composable
 private fun StarterPromptCard(text: String, icon: ImageVector, onClick: (String) -> Unit) {
-    Card(onClick = { onClick(text) }, modifier = Modifier.fillMaxWidth()) {
+    LettaCard(onClick = { onClick(text) }, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
             verticalAlignment = Alignment.CenterVertically,

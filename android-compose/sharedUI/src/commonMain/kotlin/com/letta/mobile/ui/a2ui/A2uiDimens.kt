@@ -5,8 +5,9 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Default sizes for agent-authored widgets: what a widget uses when the payload names no size of its
- * own. A size the payload does name (`spacing: 6`, `cornerRadius: 20`, `height: 200`) is data and is
- * drawn as given; these are only the fallbacks and the renderer's own placeholders.
+ * own. A size the payload does name (`spacing: 6`, `height: 200`) is data and is drawn as given; these
+ * are only the fallbacks and the renderer's own placeholders. Containers (Card, Accordion) are the
+ * theme's LettaCard, so their corner and fill are the app's, not the payload's.
  */
 internal object A2uiDimens {
     /** A placeholder line standing in for one line of body text. */
@@ -26,9 +27,6 @@ internal object A2uiDimens {
 
     /** The narrowest an approve or deny button draws, so short labels still read as buttons. */
     val affordanceButtonMinWidth: Dp = 64.dp
-
-    /** A Card's or Accordion's corner when the payload names none. */
-    val defaultCornerRadius: Dp = 12.dp
 
     /** How strongly a placeholder line or glyph tints `onSurface`: a quiet shape, not content. */
     const val skeletonFillAlpha: Float = 0.16f

@@ -1,13 +1,12 @@
 package com.letta.mobile.ui.chat.subagents
 
-import androidx.compose.foundation.BorderStroke
+import com.letta.mobile.ui.components.foundation.LettaPanel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,14 +51,11 @@ internal fun RunningCard(
     }
     val orbActivity = if (item.status == SubagentRosterStatus.QUIET) AgentActivity.Idle else AgentActivity.Working
     val visibleLines = if (expanded) item.activity else item.activity.takeLast(1)
-    Surface(
+    LettaPanel(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = LettaDimens.Space.lg * item.depth)
             .testTag(SubagentRosterTag.RUNNING.of(item.key)),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
         LettaHangingRow(
             leading = { AgentActivityOrb(size = LettaDimens.Orb.sm, activity = orbActivity) },

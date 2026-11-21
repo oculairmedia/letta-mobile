@@ -10,6 +10,7 @@ private const val FEATURE = "sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/
 private const val COMPONENT = "sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/components/Shared.kt"
 private const val THEME = "sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/theme/Tokens.kt"
 private const val TEST = "sharedUI/src/commonTest/kotlin/com/letta/mobile/ui/chat/RowTest.kt"
+private const val FOUNDATION = "sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/components/foundation/LettaCard.kt"
 private const val PREVIEW = "sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/RowPreview.kt"
 private const val NOT_UI = "sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/Model.kt"
 
@@ -234,5 +235,26 @@ class MobileDesignSystemRulesTest {
         assertEquals(2, ComponentInExemptPath().lintAt(root, tokens, code).size)
         assertEquals(0, ComponentInExemptPath().lintAt(root, COMPONENT, code).size)
         assertEquals(0, ComponentInExemptPath().lintAt(root, FEATURE, code).size)
+    }
+
+    @Test
+    fun `raw material cards fail outside the foundation package`(@TempDir root: File) {
+        val explicit = """
+            import androidx.compose.material3.Card
+            import androidx.compose.material3.OutlinedCard as Outlined
+            fun a() = Card(modifier = Modifier) {}
+            fun b() = Outlined {}
+        """.trimIndent()
+        val wildcard = "import androidx.compose.material3.*\nfun a() = ElevatedCard {}\nfun b() = Card {}\n"
+        val qualified = "fun a() = androidx.compose.material3.Card {}\n"
+        val projectType = "import com.letta.mobile.data.canvas.Card\nfun a() = Card(label = \"x\")\nfun b() = LettaCard {}\n"
+        assertEquals(2, RawMaterialCard().lintAt(root, FEATURE, explicit).size)
+        assertEquals(2, RawMaterialCard().lintAt(root, FEATURE, wildcard).size)
+        assertEquals(1, RawMaterialCard().lintAt(root, FEATURE, qualified).size)
+        assertEquals(0, RawMaterialCard().lintAt(root, FEATURE, projectType).size)
+        assertEquals(2, RawMaterialCard().lintAt(root, COMPONENT, explicit).size)
+        assertEquals(0, RawMaterialCard().lintAt(root, FOUNDATION, explicit).size)
+        assertEquals(0, RawMaterialCard().lintAt(root, TEST, explicit).size)
+        assertEquals(0, RawMaterialCard().lintAt(root, NOT_UI, explicit).size)
     }
 }
