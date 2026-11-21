@@ -1,5 +1,7 @@
 package com.letta.mobile.data.voice.speech
 
+import com.letta.mobile.data.voice.VoiceText
+
 /**
  * How a [SentenceChunker] sizes its segments, in characters; every limit is checked here, once.
  *
@@ -27,6 +29,9 @@ data class SegmentSizing(
 
     /** The merge goal: [minSegmentLength] capped by [maxSegmentLength]; null when sentences are not merged. */
     internal val mergeGoal: Int? get() = minSegmentLength?.coerceAtMost(maxSegmentLength)
+
+    /** Whether [piece] is shorter than [tailAbsorbLength], so it should join the segment before it rather than stand alone. */
+    internal fun isShortTail(piece: VoiceText): Boolean = tailAbsorbLength != null && piece.value.length < tailAbsorbLength
 
     /** Limits. */
     companion object {
