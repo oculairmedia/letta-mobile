@@ -2,16 +2,17 @@ package com.letta.mobile.ui.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.letta.mobile.ui.components.foundation.LettaCard
 import com.letta.mobile.ui.shell.header.HeaderControls
 import com.letta.mobile.ui.shell.header.HeaderNav
 import com.letta.mobile.ui.shell.header.HeaderTitle
@@ -57,15 +58,17 @@ fun AdaptiveDialog(
             }
         } else {
             Dialog(onDismissRequest = onDismiss) {
-                Card(
+                LettaCard(
                     modifier = modifier
                         .widthIn(max = com.letta.mobile.ui.theme.AdaptiveDialogMaxWidth)
                         .fillMaxWidth()
                         .padding(LettaDimens.Orb.lg),
                 ) {
-                    AdaptiveDialogHeader(title, onDismiss)
-                    Box(modifier = Modifier.padding(LettaDimens.Space.lg)) {
-                        content()
+                    Column {
+                        AdaptiveDialogHeader(title, onDismiss)
+                        Box(modifier = Modifier.padding(LettaDimens.Space.lg)) {
+                            content()
+                        }
                     }
                 }
             }

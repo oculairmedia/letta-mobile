@@ -207,6 +207,7 @@ class MobileDesignSystemProvider : RuleSetProvider {
             RawStatusGlyph(config),
             BareClickable(config),
             ComponentInExemptPath(config),
+            RawMaterialCard(config),
         ),
     )
 }

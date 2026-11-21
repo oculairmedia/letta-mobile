@@ -18,8 +18,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import com.letta.mobile.ui.components.foundation.LettaCard
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -997,14 +996,7 @@ internal fun A2uiCard(
     actionResolutionToken: Int,
     renderScope: A2uiRenderScope,
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = component.cornerShape(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = component.elevation()),
-    ) {
+    LettaCard(modifier = modifier.fillMaxWidth()) {
         val child = component.child ?: component.children.firstOrNull()
         Box(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             A2uiFirstChild(child, surface, visited, onAction, surfaceSubmitting, onPendingActionDelta, actionResolutionToken, renderScope)

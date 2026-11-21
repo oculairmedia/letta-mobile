@@ -17,7 +17,13 @@ object LettaShapes {
     /** Fully rounded ends: pills, chips drawn as capsules, status capsules. Replaces `RoundedCornerShape(percent = 50)`. */
     val pill: Shape = RoundedCornerShape(percent = PILL_PERCENT)
 
-    /** A bordered or filled container (LettaPanel, inline notices, cards on a page): `MaterialTheme.shapes.medium`. */
+    /** A card of content on a page (LettaCard, the Settings sections): `MaterialTheme.shapes.large`. */
+    val card: Shape
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.shapes.large
+
+    /** A panel or a surface nested in a card (LettaPanel, LettaNestedCard, inline notices): `MaterialTheme.shapes.medium`. */
     val panel: Shape
         @Composable
         @ReadOnlyComposable

@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.canvas.references
 
+import com.letta.mobile.ui.components.foundation.LettaPanel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -106,7 +106,7 @@ private fun ReferenceBranch(node: NotebookReferenceNode, onOpenTarget: (Notebook
     // Cap visual indentation independently of traversal depth so compact previews remain readable.
     val indent = (node.path.size - 1).coerceIn(0, 3)
     Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-        OutlinedCard(Modifier.fillMaxWidth().padding(start = LettaDimens.Space.sm * indent)) {
+        LettaPanel(Modifier.fillMaxWidth().padding(start = LettaDimens.Space.sm * indent)) {
             Column(
                 Modifier.padding(LettaDimens.Space.sm),
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),

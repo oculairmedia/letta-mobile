@@ -56,7 +56,7 @@ public final class com/letta/mobile/ui/a2ui/ComposableSingletons$A2uiRenderLimit
 	public static final field INSTANCE Lcom/letta/mobile/ui/a2ui/ComposableSingletons$A2uiRenderLimitsKt;
 	public fun <init> ()V
 	public final fun getLambda$-386173872$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-561405875$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-740693146$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-97354482$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1042241129$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
@@ -64,14 +64,14 @@ public final class com/letta/mobile/ui/a2ui/ComposableSingletons$A2uiRenderLimit
 public final class com/letta/mobile/ui/a2ui/ComposableSingletons$A2uiRendererSupportKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/a2ui/ComposableSingletons$A2uiRendererSupportKt;
 	public fun <init> ()V
-	public final fun getLambda$-846782052$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1026069323$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/a2ui/ComposableSingletons$A2uiScheduleWidgetsKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/a2ui/ComposableSingletons$A2uiScheduleWidgetsKt;
 	public fun <init> ()V
-	public final fun getLambda$-1397227380$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-466200415$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$2129216889$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$524462852$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$84865706$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
@@ -2800,6 +2800,12 @@ public final class com/letta/mobile/ui/components/foundation/LettaButtonIcon {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/components/foundation/LettaCardKt {
+	public static final fun LettaCard (Landroidx/compose/ui/Modifier;Landroidx/compose/foundation/BorderStroke;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaCard (Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;ZLkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaNestedCard (Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+}
+
 public final class com/letta/mobile/ui/components/foundation/LettaChipSlots {
 	public static final field $stable I
 	public static final field Companion Lcom/letta/mobile/ui/components/foundation/LettaChipSlots$Companion;
@@ -5504,9 +5510,9 @@ public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryBlockDi
 public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphOverlaysKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphOverlaysKt;
 	public fun <init> ()V
-	public final fun getLambda$-2056150377$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-774473774$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$284266688$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-1656263779$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-353545397$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-521963930$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphTuningPanelKt {
@@ -6284,10 +6290,10 @@ public final class com/letta/mobile/ui/pairing/ComposableSingletons$PairedDevice
 	public static final field INSTANCE Lcom/letta/mobile/ui/pairing/ComposableSingletons$PairedDevicesListKt;
 	public fun <init> ()V
 	public final fun getLambda$-1224566512$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-198833712$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-286644337$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-358692765$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1737967135$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$714823080$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/pairing/ComposableSingletons$PairingScanScreenKt {
@@ -12713,6 +12719,7 @@ public final class com/letta/mobile/ui/theme/tokens/LettaRowDimens {
 public final class com/letta/mobile/ui/theme/tokens/LettaShapes {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaShapes;
+	public final fun getCard (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/graphics/Shape;
 	public final fun getField (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/graphics/Shape;
 	public final fun getPanel (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/graphics/Shape;
 	public final fun getPill ()Landroidx/compose/ui/graphics/Shape;

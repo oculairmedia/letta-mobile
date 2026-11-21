@@ -3,8 +3,7 @@ package com.letta.mobile.ui.a2ui
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import com.letta.mobile.ui.components.foundation.LettaCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -101,10 +100,7 @@ internal fun A2uiRenderLimitPlaceholder(modifier: Modifier = Modifier) {
 /** A surface whose update broke [A2uiSurfaceLimits] and was refused. */
 @Composable
 internal fun A2uiSurfaceTooLarge(modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier.fillMaxWidth().testTag(A2uiTestTags.SURFACE_TOO_LARGE),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-    ) {
+    LettaCard(modifier = modifier.fillMaxWidth().testTag(A2uiTestTags.SURFACE_TOO_LARGE)) {
         Text(
             text = "This surface is too large to display.",
             modifier = Modifier.padding(LettaDimens.Space.lg),

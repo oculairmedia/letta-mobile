@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.modelcontrol
 
+import com.letta.mobile.ui.components.foundation.LettaCard
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,7 +15,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -223,16 +223,9 @@ private fun CardSurface(
     val modifier = Modifier.fillMaxWidth().testTag("${ProviderSettingsTags.CARD_PREFIX}${provider.id}")
     val inner: @Composable () -> Unit = { Column(modifier = Modifier.padding(LettaDimens.Space.md)) { content() } }
     if (onClick != null) {
-        Surface(
-            onClick = onClick,
-            enabled = enabled,
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            modifier = modifier,
-            content = inner,
-        )
+        LettaCard(onClick = onClick, modifier = modifier, enabled = enabled, content = inner)
     } else {
-        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer, modifier = modifier, content = inner)
+        LettaCard(modifier = modifier, content = inner)
     }
 }
 

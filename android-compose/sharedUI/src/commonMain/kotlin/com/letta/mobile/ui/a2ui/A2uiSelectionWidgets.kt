@@ -27,7 +27,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,7 +47,7 @@ import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import kotlinx.serialization.json.JsonPrimitive
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.components.foundation.lettaPanelBorder
+import com.letta.mobile.ui.components.foundation.LettaCard
 import androidx.compose.ui.semantics.Role
 
 
@@ -228,12 +227,7 @@ internal fun A2uiAccordion(
     ) {
         items.forEach { item ->
             val expandedState = rememberA2uiLocalBooleanState("expanded_${item.key}", item.defaultOpen)
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = component.cornerShape(),
-                tonalElevation = component.elevation(),
-                border = lettaPanelBorder(),
-            ) {
+            LettaCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()

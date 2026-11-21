@@ -8,9 +8,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CornerSize
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import com.letta.mobile.ui.components.foundation.LettaCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
@@ -53,12 +50,7 @@ import kotlin.time.Instant
 
 @Composable
 internal fun A2uiSkeletonCard(modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-    ) {
+    LettaCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(LettaDimens.Space.lg),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -396,19 +388,6 @@ internal fun A2uiComponent.weightRowChildren(): Boolean =
         "spaceAround",
         "spaceEvenly",
     ))
-
-/**
- * The container shape on the theme's shape family: the payload's own `cornerRadius` (data, drawn as
- * given), or [A2uiDimens.defaultCornerRadius] when the payload names none.
- */
-@Composable
-internal fun A2uiComponent.cornerShape(): Shape {
-    val radius = raw.dpValue("cornerRadius", "corner_radius") ?: A2uiDimens.defaultCornerRadius
-    return MaterialTheme.shapes.medium.copy(all = CornerSize(radius))
-}
-
-internal fun A2uiComponent.elevation(): Dp =
-    raw.dpValue("elevation") ?: 1.dp
 
 internal fun A2uiComponent.height(): Dp? =
     raw.dpValue("height")

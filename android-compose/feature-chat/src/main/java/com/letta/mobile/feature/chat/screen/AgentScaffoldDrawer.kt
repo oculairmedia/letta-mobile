@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -44,10 +42,15 @@ import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MarkdownText
+import com.letta.mobile.ui.components.foundation.LettaCard
+import com.letta.mobile.ui.components.foundation.LettaNestedCard
+import com.letta.mobile.ui.components.foundation.LettaPanel
+import com.letta.mobile.ui.components.foundation.LettaStatusDot
 import com.letta.mobile.ui.components.disclosure.LettaDisclosureHeader
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaMotion
 import com.letta.mobile.ui.theme.listItemHeadline
+import com.letta.mobile.ui.theme.tokens.LettaPanelTone
 import com.letta.mobile.util.formatRelativeTime
 import kotlinx.collections.immutable.toImmutableList
 import com.letta.mobile.ui.chat.render.BugSeverity
@@ -66,12 +69,7 @@ internal fun ProjectAgentsCard(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-    ) {
+    LettaCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(LettaDimens.Space.lg),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
@@ -108,7 +106,7 @@ internal fun ProjectAgentsCard(
             }
 
             state.error?.let { error ->
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                LettaPanel(tone = LettaPanelTone.Error, border = false) {
                     Column(
                         modifier = Modifier.padding(LettaDimens.Space.md),
                         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -134,7 +132,7 @@ internal fun ProjectAgentsCard(
             }
 
             state.agents.forEach { agent ->
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceBright)) {
+                LettaNestedCard {
                     Column(
                         modifier = Modifier.padding(LettaDimens.Space.md),
                         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -162,10 +160,7 @@ internal fun ProjectAgentsCard(
                                         modifier = Modifier.size(LettaDimens.Control.iconSm),
                                         contentAlignment = Alignment.Center,
                                     ) {
-                                        Card(
-                                            modifier = Modifier.size(LettaDimens.Control.iconSm),
-                                            colors = CardDefaults.cardColors(containerColor = toneColor(agent.statusTone)),
-                                        ) {}
+                                        LettaStatusDot(color = toneColor(agent.statusTone))
                                     }
                                 },
                             )
@@ -209,12 +204,7 @@ internal fun ProjectBugReportSummaryCard(
     onCreateReport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        ),
-    ) {
+    LettaPanel(modifier = modifier.fillMaxWidth(), tone = LettaPanelTone.Info, border = false) {
         Column(
             modifier = Modifier.padding(LettaDimens.Space.lg),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
@@ -240,7 +230,7 @@ internal fun ProjectBugReportSummaryCard(
             }
 
             state.recentReports.take(3).forEach { report ->
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceBright)) {
+                LettaNestedCard {
                     Column(
                         modifier = Modifier.padding(LettaDimens.Space.md),
                         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
@@ -444,12 +434,7 @@ internal fun ProjectBriefCard(
     val editingState = remember { mutableStateMapOf<ProjectBriefSectionKey, Boolean>() }
     var expanded by rememberSaveable { mutableStateOf(true) }
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-    ) {
+    LettaCard(modifier = modifier.fillMaxWidth()) {
         Accordions(
             title = stringResource(R.string.screen_project_brief_title),
             subtitle = stringResource(R.string.screen_project_brief_subtitle),
@@ -478,11 +463,7 @@ internal fun ProjectBriefCard(
                 }
 
                 brief.error?.let { error ->
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                        ),
-                    ) {
+                    LettaPanel(tone = LettaPanelTone.Error, border = false) {
                         Column(
                             modifier = Modifier.padding(LettaDimens.Space.md),
                             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -512,11 +493,7 @@ internal fun ProjectBriefCard(
                     val isEditing = editingState[key] == true
                     val draft = editableState[key] ?: section.content
 
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceBright,
-                        ),
-                    ) {
+                    LettaNestedCard {
                         Column(
                             modifier = Modifier.padding(LettaDimens.Space.md),
                             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
@@ -615,13 +592,10 @@ internal fun ProjectInfoTray(
     onCreateBugReport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    LettaCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),

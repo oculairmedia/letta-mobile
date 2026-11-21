@@ -717,3 +717,9 @@ letta-mobile-design-system:
     active: true
     includes:
       - "**/design-system-scope-not-yet-cleared/**"
+  # Every UI source, with no ratchet: raw Material cards pick their own colours (a bare Card is
+  # surfaceContainerHighest with no border), so every container uses the foundation primitives.
+  # One finding is left (ui/pairing/InstallAndPairCard.kt), held by an open restyle of that card; this
+  # rule checks the file whenever it changes, so it migrates with that change.
+  RawMaterialCard:
+    active: true
