@@ -1,6 +1,7 @@
 package com.letta.mobile.macrobenchmark
 
 import androidx.benchmark.macro.CompilationMode
+import android.content.Intent
 import androidx.benchmark.macro.ExperimentalMacrobenchmarkApi
 import androidx.benchmark.macro.ExperimentalMetricApi
 import androidx.benchmark.macro.MacrobenchmarkScope
@@ -83,7 +84,7 @@ class TimelineOpenBenchmark {
                 pressHome()
             },
         ) {
-            startActivityAndWait {
+            startMainActivity {
                 it.putExtra("notification_agent_id", benchmarkArgument("agentId"))
                 it.putExtra("notification_conversation_id", benchmarkArgument("conversationId"))
             }
@@ -103,10 +104,11 @@ class TimelineOpenBenchmark {
             setupBlock = {
                 enableOpenTrace()
                 if (cold) killProcess()
-                startActivityAndWait()
+                startMainActivity()
                 showConversationList(title)
             },
         ) {
+            armTraceSections()
             val rows = device.findObjects(By.text(title))
             val index = (InstrumentationArguments.optional("conversationIndex") ?: "0").toInt()
             check(index in rows.indices) { "Conversation row $index named $title was not found" }
@@ -115,6 +117,22 @@ class TimelineOpenBenchmark {
         }
     }
 
+    /**
+     * Launches `MainActivity` by name. The debug build also registers LeakCanary's launcher activity,
+     * so the default launcher-intent lookup can start that screen instead of the app.
+     */
+    private fun MacrobenchmarkScope.startMainActivity(configure: (Intent) -> Unit = {}) {
+        startActivityAndWait(Intent().setClassName(targetPackage(), MAIN_ACTIVITY).also(configure))
+    }
+
+    /**
+     * Gives the app time to notice that tracing just started. An app process learns of a new trace
+     * through a system property callback, so a section marked in the first moments of the measured
+     * block is dropped from the trace; the stages are timed from `open.requested`, so this wait is
+     * not part of what is reported.
+     */
+    private fun armTraceSections() = Thread.sleep(TRACE_ARM_MS)
+
     /** Makes the logcat/trace gate for the stage events true before the process under test starts. */
     private fun MacrobenchmarkScope.enableOpenTrace() {
         device.executeShellCommand("setprop log.tag.LettaTimelineOpenTrace VERBOSE")
@@ -122,11 +140,17 @@ class TimelineOpenBenchmark {
 
     /**
      * Brings [title]'s list row on screen. The app restores the last open conversation, so after a
-     * launch the list is usually behind the navigation drawer: open it from the left edge.
+     * launch (and after a previous iteration) the chat is showing: open the navigation drawer with
+     * the chat header's "Agents and conversations" button and go Home, whose Recent list holds the
+     * conversation rows.
      */
     private fun MacrobenchmarkScope.showConversationList(title: String) {
-        if (device.wait(Until.hasObject(By.text(title)), LIST_WAIT_MS)) return
-        device.swipe(0, device.displayHeight / 2, device.displayWidth * 3 / 4, device.displayHeight / 2, DRAWER_SWIPE_STEPS)
+        if (!device.wait(Until.hasObject(By.text(title)), LIST_WAIT_MS)) {
+            val opener = device.wait(Until.findObject(By.desc(LIST_OPENER_DESC)), CONVERSATION_WAIT_MS)
+            checkNotNull(opener) { "The \"$LIST_OPENER_DESC\" button was not found" }.click()
+            val home = device.wait(Until.findObject(By.desc(HOME_DESC)), LIST_WAIT_MS)
+            checkNotNull(home) { "The drawer's \"$HOME_DESC\" entry was not found" }.click()
+        }
         check(device.wait(Until.hasObject(By.text(title)), LIST_WAIT_MS)) {
             "Conversation \"$title\" is not listed; the device needs a signed-in account with that conversation"
         }
@@ -170,6 +194,7 @@ class TimelineOpenBenchmark {
 
     private companion object {
         const val DEV_PACKAGE = "com.letta.mobile.dev"
+        const val MAIN_ACTIVITY = "com.letta.mobile.MainActivity"
         const val DEFAULT_ITERATIONS = 10
         const val SECTION_PREFIX = "TimelineOpen/"
         const val NANOS_PER_MILLI = 1_000_000.0
@@ -177,7 +202,9 @@ class TimelineOpenBenchmark {
         const val LIST_WAIT_MS = 5_000L
         const val CONVERSATION_WAIT_MS = 30_000L
         const val SETTLE_WINDOW_MS = 3_000L
-        const val DRAWER_SWIPE_STEPS = 20
+        const val TRACE_ARM_MS = 1_500L
+        const val LIST_OPENER_DESC = "Agents and conversations"
+        const val HOME_DESC = "Home"
 
         /** Wire names of `TimelineOpenTrace.Stage`, in open order. */
         val STAGES = listOf(
