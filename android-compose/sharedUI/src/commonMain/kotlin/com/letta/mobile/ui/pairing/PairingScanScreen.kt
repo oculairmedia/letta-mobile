@@ -142,7 +142,8 @@ fun PairingScanContent(
     }
 }
 
-private fun PairingState.acceptsInput() = this is PairingState.Idle || this is PairingState.Failed
+/** Whether the link field takes a new link: before one is read, or after a failure. */
+internal fun PairingState.acceptsInput() = this is PairingState.Idle || this is PairingState.Failed
 
 @Composable
 private fun CameraSection(camera: ScanCamera, onDecoded: (String) -> Unit, onPaste: () -> Unit) {

@@ -6437,6 +6437,7 @@ public final class com/letta/mobile/ui/pairing/ComposableSingletons$PairingStatu
 	public fun <init> ()V
 	public final fun getLambda$-1077681765$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-1577390378$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1672006158$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-1703171410$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-1734902377$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-1965794558$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
@@ -6444,6 +6445,7 @@ public final class com/letta/mobile/ui/pairing/ComposableSingletons$PairingStatu
 	public final fun getLambda$1469395528$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1695830272$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$29106858$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$48932947$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$712836895$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
@@ -6464,7 +6466,6 @@ public final class com/letta/mobile/ui/pairing/InstallAndPairBindings {
 }
 
 public final class com/letta/mobile/ui/pairing/InstallAndPairCardKt {
-	public static final fun InstallAndPairCard (Lcom/letta/mobile/ui/pairing/InstallAndPairBindings;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun pairingScanActions (Lcom/letta/mobile/data/pairing/PairingFlow;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/pairing/PairingScanActions;
 }
 
@@ -6700,6 +6701,7 @@ public final class com/letta/mobile/ui/pairing/PairingTags {
 	public static final field INVITE_TOGGLE_LINK Ljava/lang/String;
 	public static final field OPEN_CHAT Ljava/lang/String;
 	public static final field OPEN_SETTINGS Ljava/lang/String;
+	public static final field PASTE_CLIPBOARD Ljava/lang/String;
 	public static final field PASTE_FIELD Ljava/lang/String;
 	public static final field PASTE_SUBMIT Ljava/lang/String;
 	public static final field PASTE_TOGGLE Ljava/lang/String;
@@ -7819,12 +7821,6 @@ public final class com/letta/mobile/ui/settings/ComposableSingletons$SettingsRow
 	public static final field INSTANCE Lcom/letta/mobile/ui/settings/ComposableSingletons$SettingsRowPartsKt;
 	public fun <init> ()V
 	public final fun getLambda$888226594$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-}
-
-public final class com/letta/mobile/ui/settings/ComposableSingletons$SettingsSectionKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/settings/ComposableSingletons$SettingsSectionKt;
-	public fun <init> ()V
-	public final fun getLambda$212232604$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public abstract interface class com/letta/mobile/ui/settings/ConnectionTest {
@@ -12083,6 +12079,12 @@ public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceSearch {
 	public fun <init> (Lcom/letta/mobile/data/home/HomePageActions;Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;)V
 	public final fun getHome ()Lcom/letta/mobile/data/home/HomePageActions;
 	public final fun getSources ()Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;
+}
+
+public final class com/letta/mobile/ui/text/ComposableSingletons$ClipboardPasteButtonKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/text/ComposableSingletons$ClipboardPasteButtonKt;
+	public fun <init> ()V
+	public final fun getLambda$-41266349$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/text/QuoteSink {

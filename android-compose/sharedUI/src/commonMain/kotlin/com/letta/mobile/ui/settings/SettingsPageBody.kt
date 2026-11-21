@@ -39,7 +39,10 @@ import com.letta.mobile.data.settings.SettingsContribution
 import com.letta.mobile.data.settings.SettingsGroup
 import com.letta.mobile.data.shell.ShellSettingsSection
 import com.letta.mobile.ui.chat.voice.LocalVoiceSetup
-import com.letta.mobile.ui.pairing.InstallAndPairCard
+import com.letta.mobile.ui.host.LocalOverlayHost
+import com.letta.mobile.ui.host.showPasteBlockedHint
+import com.letta.mobile.ui.pairing.InstallAndPairContent
+import com.letta.mobile.ui.pairing.PairingStrings
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.math.roundToInt
 
@@ -258,15 +261,24 @@ internal class StandardSectionInputs(
         }
     }
 
-    /** The Backend form, then (after the first frame) the pairing card, which the Pairing anchor scrolls to. */
+    /**
+     * The Backend form, then (after the first frame) the pairing card, which the Pairing anchor scrolls to.
+     * The pairing card is one more [SettingsSection], titled by the join step and its paste hint.
+     */
     @Composable
     private fun BackendGroup(anchor: BringIntoViewRequester) {
         BackendSettingsSection(backend, services.backend)
         services.pairing?.takeIf { afterFirstFrame }?.let { pairing ->
-            InstallAndPairCard(
-                pairing,
-                Modifier.testTag(SettingsPageTags.PAIRING).anchoredTo(anchor, state.section == ShellSettingsSection.Pairing),
-            )
+            val overlays = LocalOverlayHost.current
+            // The section tags itself by its key; the page's Pairing tag and anchor sit on this wrapper.
+            Box(Modifier.testTag(SettingsPageTags.PAIRING).anchoredTo(anchor, state.section == ShellSettingsSection.Pairing)) {
+                SettingsSection(SettingsHeader(PAIRING_SECTION_KEY, PairingStrings.JOIN_TITLE, PairingStrings.PASTE_ONLY_HINT)) {
+                    InstallAndPairContent(pairing, onPasteBlocked = { overlays?.showPasteBlockedHint() })
+                }
+            }
         }
     }
 }
+
+/** The pairing card's section key (its test tag is the section prefix plus this). */
+private const val PAIRING_SECTION_KEY = "pairing"

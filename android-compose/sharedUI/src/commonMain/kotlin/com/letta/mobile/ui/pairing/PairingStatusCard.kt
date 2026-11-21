@@ -24,14 +24,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.pairing.PairingState
 import com.letta.mobile.data.pairing.QrModules
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.text.ClipboardPasteButton
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.components.foundation.LettaSpinner
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
@@ -66,23 +70,30 @@ fun PairingStatusCard(
     modifier: Modifier = Modifier,
 ) {
     if (state is PairingState.Idle) return
-    Surface(
-        modifier = modifier.fillMaxWidth().testTag(PairingTags.STATUS),
-        shape = MaterialTheme.shapes.large,
-        tonalElevation = LettaDimens.Space.hair,
+    val tagged = modifier.fillMaxWidth().testTag(PairingTags.STATUS)
+    if (inSettingsCard) {
+        // The Settings card is already the surface: the status sits in its flow rather than on a third one.
+        StatusContent(state, actions, nowMs, tagged.padding(vertical = LettaDimens.Space.sm))
+    } else {
+        Surface(modifier = tagged, shape = MaterialTheme.shapes.large, tonalElevation = LettaDimens.Space.hair) {
+            StatusContent(state, actions, nowMs, Modifier.padding(LettaDimens.Space.lg))
+        }
+    }
+}
+
+@Composable
+private fun StatusContent(state: PairingState, actions: PairingScanActions, nowMs: Long, modifier: Modifier) {
+    Column(
+        modifier = modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        Column(
-            modifier = Modifier.padding(LettaDimens.Space.lg).semantics { liveRegion = LiveRegionMode.Polite },
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-        ) {
-            when (state) {
-                is PairingState.ConfirmHost -> TrustPrompt(state, actions, nowMs)
-                is PairingState.Pairing -> VerifyingContent(actions.onCancel)
-                is PairingState.Paired -> PairedContent(state, actions.onOpenChat)
-                is PairingState.Failed -> FailedContent(state, actions)
-                PairingState.Idle -> Unit
-            }
+        when (state) {
+            is PairingState.ConfirmHost -> TrustPrompt(state, actions, nowMs)
+            is PairingState.Pairing -> VerifyingContent(actions.onCancel)
+            is PairingState.Paired -> PairedContent(state, actions.onOpenChat)
+            is PairingState.Failed -> FailedContent(state, actions)
+            PairingState.Idle -> Unit
         }
     }
 }
@@ -93,7 +104,7 @@ private fun TrustPrompt(state: PairingState.ConfirmHost, actions: PairingScanAct
         modifier = Modifier.testTag(PairingTags.TRUST_PROMPT),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        Text(PairingStrings.trustTitle(state), style = MaterialTheme.typography.titleMedium)
+        Text(PairingStrings.trustTitle(state), style = pairingHeading(MaterialTheme.typography.titleMedium))
         Text(PairingStrings.trustHostLine(state), style = MaterialTheme.typography.bodyMedium)
         Text(PairingStrings.TRUST_ACCESS, style = MaterialTheme.typography.bodyMedium)
         Text(PairingStrings.trustExpiresLine(TimeLeft(state.expiresAtMs - nowMs)), style = MaterialTheme.typography.bodyMedium)
@@ -118,7 +129,7 @@ private fun VerifyingContent(onCancel: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
-        Text(PairingStrings.VERIFYING_TITLE, style = MaterialTheme.typography.titleMedium)
+        Text(PairingStrings.VERIFYING_TITLE, style = pairingHeading(MaterialTheme.typography.titleMedium))
         Text(PairingStrings.VERIFYING_STEP_CONTACT)
         Text(PairingStrings.VERIFYING_STEP_SECURE)
         Text(
@@ -137,7 +148,7 @@ private fun PairedContent(state: PairingState.Paired, onOpenChat: () -> Unit) {
         contentDescription = null,
         style = LettaIconStyle(LettaSurfaceSizes.pairingResultGlyph, MaterialTheme.colorScheme.primary),
     )
-    Text(PairingStrings.pairedTitle(state), style = MaterialTheme.typography.titleMedium)
+    Text(PairingStrings.pairedTitle(state), style = pairingHeading(MaterialTheme.typography.titleMedium))
     Text(
         text = if (state.alreadyPaired) PairingStrings.ALREADY_PAIRED_BODY else PairingStrings.PAIRED_BODY,
         textAlign = TextAlign.Center,
@@ -206,6 +217,48 @@ fun PairCodeEntry(onSubmit: (String) -> Unit, modifier: Modifier = Modifier, ena
             modifier = Modifier.testTag(PairingTags.PASTE_SUBMIT),
         ) { Text(PairingStrings.PASTE_ACTION) }
     }
+}
+
+/**
+ * The pairing-link field in the Settings field anatomy, for the Settings pairing card: its label above a
+ * full-width field with a trailing Paste, and Continue under it as the section's button. The value is the
+ * one-time invite; it lives only in this field's state until submitted. A Paste the clipboard refused
+ * focuses the field and calls [onPasteBlocked].
+ */
+@Composable
+internal fun PairLinkField(enabled: Boolean, onSubmit: (String) -> Unit, onPasteBlocked: () -> Unit) {
+    var value by remember { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.xs),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+    ) {
+        Text(PairingStrings.PASTE_LABEL, style = MaterialTheme.typography.labelLarge)
+        OutlinedTextField(
+            value = value,
+            onValueChange = { value = it },
+            enabled = enabled,
+            placeholder = { Text(PairingStrings.PASTE_HINT, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            singleLine = true,
+            trailingIcon = {
+                ClipboardPasteButton(
+                    onPaste = { value = it },
+                    onBlocked = {
+                        focus.requestFocus()
+                        onPasteBlocked()
+                    },
+                    modifier = Modifier.testTag(PairingTags.PASTE_CLIPBOARD),
+                    enabled = enabled,
+                )
+            },
+            modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag(PairingTags.PASTE_FIELD),
+        )
+    }
+    Button(
+        onClick = { onSubmit(value.trim()).also { value = "" } },
+        enabled = enabled && value.isNotBlank(),
+        modifier = Modifier.padding(vertical = LettaDimens.Space.xs).testTag(PairingTags.PASTE_SUBMIT),
+    ) { Text(PairingStrings.PASTE_ACTION) }
 }
 
 /**

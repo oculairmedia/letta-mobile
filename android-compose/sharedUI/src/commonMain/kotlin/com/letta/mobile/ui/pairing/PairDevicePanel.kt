@@ -81,7 +81,7 @@ fun PairDevicePanel(
 ) {
     val state = view.state
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg)) {
-        Text(PairingStrings.INVITE_TITLE, style = MaterialTheme.typography.titleLarge)
+        Text(PairingStrings.INVITE_TITLE, style = pairingHeading(MaterialTheme.typography.titleLarge))
         if (state.busy) LettaBusyBar()
         state.error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag(PairingTags.INVITE_ERROR))

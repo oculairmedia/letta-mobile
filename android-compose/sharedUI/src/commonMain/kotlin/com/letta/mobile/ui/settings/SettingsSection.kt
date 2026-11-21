@@ -26,19 +26,16 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -69,11 +66,9 @@ import com.letta.mobile.ui.host.LocalOverlayHost
 import com.letta.mobile.ui.host.PaneAnchor
 import com.letta.mobile.ui.host.showPasteBlockedHint
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.text.ClipboardTextRead
-import com.letta.mobile.ui.text.readPlainText
+import com.letta.mobile.ui.text.ClipboardPasteButton
 import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
-import kotlinx.coroutines.launch
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.components.foundation.LettaNavChevron
 
@@ -427,23 +422,10 @@ private fun fieldTrailing(row: SettingsRow.Text, extras: FieldExtras): (@Composa
     }
 }
 
-/** Pastes the clipboard's trimmed text; an empty clipboard leaves the field as it is, a refused read calls [onBlocked]. */
+/** The field's Paste, tagged with the row's key; a refused read calls [onBlocked]. */
 @Composable
 private fun PasteButton(key: String, onPaste: (String) -> Unit, onBlocked: () -> Unit) {
-    val clipboard = LocalClipboard.current
-    val scope = rememberCoroutineScope()
-    TextButton(
-        onClick = { scope.launch { pasteInto(clipboard.readPlainText(), onPaste, onBlocked) } },
-        modifier = Modifier.testTag(SettingsSectionTags.PASTE_PREFIX + key),
-    ) { Text(PASTE_LABEL) }
-}
-
-private fun pasteInto(read: ClipboardTextRead, onPaste: (String) -> Unit, onBlocked: () -> Unit) {
-    when (read) {
-        is ClipboardTextRead.Readable -> read.text.trim().takeIf { it.isNotEmpty() }?.let(onPaste)
-        ClipboardTextRead.Empty -> Unit
-        ClipboardTextRead.Blocked -> onBlocked()
-    }
+    ClipboardPasteButton(onPaste = onPaste, onBlocked = onBlocked, modifier = Modifier.testTag(SettingsSectionTags.PASTE_PREFIX + key))
 }
 
 @Composable
@@ -497,4 +479,3 @@ internal fun SettingsRow.Choice.segmentedOn(input: LettaInput): Boolean {
 }
 
 private const val COPY_LABEL = "Copy"
-private const val PASTE_LABEL = "Paste"
