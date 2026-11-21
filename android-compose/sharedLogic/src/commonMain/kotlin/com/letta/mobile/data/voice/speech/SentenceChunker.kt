@@ -8,52 +8,44 @@ import com.letta.mobile.data.voice.VoiceText
  *
  * A segment ends at a sentence terminator followed by whitespace (not after a known abbreviation,
  * a single initial or a list number), or at a line break. Fenced code blocks are skipped; markdown,
- * links, URLs and HTML are stripped by [SpeakableText]. A segment never exceeds [maxSegmentLength]:
+ * links, URLs and HTML are stripped by [SpeakableText]. A segment never exceeds [SegmentSizing.maxSegmentLength]:
  * longer text is cut at the last clause break or space. [flush] releases whatever is left.
  *
- * With [firstClauseMinLength] set, the chunker's first segment is released early, at the first
+ * With [SegmentSizing.firstClauseMinLength] set, the chunker's first segment is released early, at the first
  * clause break (a comma, semicolon, colon or dash followed by whitespace) once that clause is at
  * least that long, or at the first sentence end, whichever comes first; speech then starts before
  * the first sentence is complete. The sentence-end guards (abbreviations, initials, list numbers)
  * still apply, and a clause break never splits a number (`1,000`, `10:30`) or follows an
  * abbreviation (`e.g.,`).
  *
- * With [minSegmentLength] set, every segment after the first (or after [startNewPart]) merges the sentences that follow it
+ * With [SegmentSizing.minSegmentLength] set, every segment after the first (or after [startNewPart]) merges the sentences that follow it
  * (joined with a space) until it is at least that long, so a speech server gets fewer, longer
  * requests and its voice drifts less from one segment to the next. The first segment is never held
  * for this, a merged segment goes out the moment it reaches the minimum (or at [flush]) unless
- * [tailAbsorbLength] is set, a merged segment never exceeds [maxSegmentLength], and nothing merges
+ * [SegmentSizing.tailAbsorbLength] is set, a merged segment never exceeds [SegmentSizing.maxSegmentLength], and nothing merges
  * across a fenced code block or a [flush] (the caller flushes where the mood changes).
  *
- * With [tailAbsorbLength] as well, a segment that has reached the minimum waits for the next
- * sentence before it goes out: when that sentence is shorter than [tailAbsorbLength] and fits within
- * [maxSegmentLength] it joins the segment ([tailsAbsorbed] counts these), so a reply does not end on
+ * With [SegmentSizing.tailAbsorbLength] as well, a segment that has reached the minimum waits for the next
+ * sentence before it goes out: when that sentence is shorter than [SegmentSizing.tailAbsorbLength] and fits within
+ * [SegmentSizing.maxSegmentLength] it joins the segment ([tailsAbsorbed] counts these), so a reply does not end on
  * a tiny segment, the one the voice drifts on most. The wait ends at the next sentence, a code
  * block or a [flush], so nothing waits on a pause in the reply beyond one sentence.
  *
+ * Tail absorption belongs to merging: with no [SegmentSizing.minSegmentLength] every sentence is
+ * its own segment and [SegmentSizing.tailAbsorbLength] has no effect.
+ *
  * Not thread-safe: one chunker serves one reply.
  */
-class SentenceChunker(
-    private val maxSegmentLength: Int = DEFAULT_MAX_SEGMENT_LENGTH,
-    private val firstClauseMinLength: Int? = null,
-    private val minSegmentLength: Int? = null,
-    private val tailAbsorbLength: Int? = null,
-) {
+class SentenceChunker(private val sizing: SegmentSizing = SegmentSizing()) {
+    private val maxSegmentLength = sizing.maxSegmentLength
     private val pending = StringBuilder()
     private var inCodeBlock = false
     private var dropUntil: Char? = null
     private val softCut = SoftCut(maxSegmentLength)
-    private val merger = SegmentMerger(minSegmentLength, maxSegmentLength, tailAbsorbLength)
+    private val merger = SegmentMerger(sizing)
 
     /** How many short tails were joined to the segment before them (over the whole reply). */
     val tailsAbsorbed: Int get() = merger.tailsAbsorbed
-
-    init {
-        require(maxSegmentLength >= MIN_SEGMENT_LENGTH) { "maxSegmentLength too small" }
-        require(firstClauseMinLength == null || firstClauseMinLength > 0) { "firstClauseMinLength must be positive" }
-        require(minSegmentLength == null || minSegmentLength > 0) { "minSegmentLength must be positive" }
-        require(tailAbsorbLength == null || tailAbsorbLength > 0) { "tailAbsorbLength must be positive" }
-    }
 
     /** Appends [delta] and returns every segment that is now complete. */
     fun push(delta: VoiceText): List<VoiceText> {
@@ -153,7 +145,7 @@ class SentenceChunker(
 
         /** Where the first segment may end early, while nothing has been released yet. */
         private fun earlyClause(scan: SentenceScan): TextIndex? {
-            val minimum = firstClauseMinLength ?: return null
+            val minimum = sizing.firstClauseMinLength ?: return null
             return if (merger.released) null else scan.firstClauseEnd(minimum)
         }
 
@@ -244,23 +236,26 @@ class SentenceChunker(
     companion object {
         /** The default longest segment, in characters. */
         const val DEFAULT_MAX_SEGMENT_LENGTH: Int = 400
-        private const val MIN_SEGMENT_LENGTH = 16
         private const val FENCE = "```"
         private const val HARD_LIMIT_FACTOR = 4
     }
 }
 
 /**
- * Merges the pieces after a part's first into segments of at least [minimum] characters (never
- * more than [maximum], which also caps a larger [minimum]); with no [minimum] every piece is its own segment. A part's first piece is
+ * Merges the pieces after a part's first into segments of at least [goal] characters (never
+ * more than [maximum]; the goal is the sizing's minimum capped by it); with no [goal] every piece is its own segment. A part's first piece is
  * never held: it goes out at once, and merging starts after it.
  *
- * With a [tail] length, a segment that has reached [minimum] is kept one piece longer, so a piece
+ * With a [tail] length (only while merging is on), a segment that has reached [goal] is kept one piece longer, so a piece
  * shorter than [tail] that follows it (the end of a reply, usually) joins it instead of going out as
  * a tiny segment of its own; the join never takes the segment past [maximum]. Without it, a segment
- * goes out the moment it reaches [minimum], and a tiny last piece can only follow it alone.
+ * goes out the moment it reaches [goal], and a tiny last piece can only follow it alone.
  */
-private class SegmentMerger(private val minimum: Int?, private val maximum: Int, private val tail: Int?) {
+private class SegmentMerger(sizing: SegmentSizing) {
+    private val goal = sizing.mergeGoal
+    private val maximum = sizing.maxSegmentLength
+    private val tail = sizing.tailAbsorbLength
+
     private val held = StringBuilder()
     private var partSpoken = false
 
@@ -274,7 +269,6 @@ private class SegmentMerger(private val minimum: Int?, private val maximum: Int,
 
     /** Takes [piece]; returns the segments that are complete now. */
     fun add(piece: String): List<String> {
-        val goal = minimum?.coerceAtMost(maximum)
         if (goal == null || !partSpoken) return listOf(release(piece))
         if (isTail(goal, piece)) return absorb(piece)
         val out = if (mustRelease(goal, piece)) take() else emptyList()

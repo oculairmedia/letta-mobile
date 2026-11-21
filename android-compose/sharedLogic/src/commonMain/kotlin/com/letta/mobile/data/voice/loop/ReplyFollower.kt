@@ -11,6 +11,7 @@ import com.letta.mobile.data.voice.loop.machine.LoopEffect
 import com.letta.mobile.data.voice.loop.machine.LoopInput
 import com.letta.mobile.data.voice.loop.machine.ReplySignal
 import com.letta.mobile.data.voice.loop.machine.TurnKey
+import com.letta.mobile.data.voice.speech.SegmentSizing
 import com.letta.mobile.data.voice.speech.SentenceChunker
 import com.letta.mobile.data.voice.speech.batchSegments
 import com.letta.mobile.data.voice.tone.ToneCue
@@ -105,12 +106,9 @@ internal class ReplyFollower(private val wiring: LoopWiring) {
     }
 
     private suspend fun follow(turn: TurnKey, reply: VoiceReply) {
-        val chunker = SentenceChunker(
-            wiring.config.maxSegmentLength,
-            wiring.config.firstClauseMinLength,
-            wiring.config.minSegmentLength,
-            wiring.config.tailAbsorbLength,
-        )
+        val config = wiring.config
+        val sizing = SegmentSizing(config.maxSegmentLength, config.firstClauseMinLength, config.minSegmentLength, config.tailAbsorbLength)
+        val chunker = SentenceChunker(sizing)
         val forwarder = ReplyForwarder(turn, chunker, wiring.config.maxSegmentLength, wiring.inputs, wiring.observer)
         try {
             val outcome = runCatching { reply.events.collect(forwarder::forward) }

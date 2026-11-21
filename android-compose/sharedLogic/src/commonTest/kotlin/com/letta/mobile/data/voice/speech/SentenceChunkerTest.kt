@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 class SentenceChunkerTest {
     private fun chunk(vararg deltas: String, max: Int = SentenceChunker.DEFAULT_MAX_SEGMENT_LENGTH): List<String> {
-        val chunker = SentenceChunker(max)
+        val chunker = SentenceChunker(SegmentSizing(max))
         val pushed = deltas.flatMap { chunker.push(VoiceText(it)) }
         return (pushed + chunker.flush()).map { it.value }
     }

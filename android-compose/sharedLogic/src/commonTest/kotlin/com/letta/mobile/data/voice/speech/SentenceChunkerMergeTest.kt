@@ -13,7 +13,7 @@ class SentenceChunkerMergeTest {
         minimum: Int? = MIN,
         max: Int = SentenceChunker.DEFAULT_MAX_SEGMENT_LENGTH,
         tail: Int? = null,
-    ): List<String> = mergedWith(SentenceChunker(max, null, minimum, tail), *deltas)
+    ): List<String> = mergedWith(SentenceChunker(SegmentSizing(max, null, minimum, tail)), *deltas)
 
     private fun mergedWith(chunker: SentenceChunker, vararg deltas: String): List<String> {
         val pushed = deltas.flatMap { chunker.push(VoiceText(it)) }
@@ -34,20 +34,20 @@ class SentenceChunkerMergeTest {
         assertEquals(merged(text, minimum = null).first(), merged(text).first())
         val early = "Here is the short answer to your question, and then the rest of it. Then a second sentence."
         assertEquals(
-            mergedWith(SentenceChunker(DEFAULT_MAX, 20, null), early).first(),
-            mergedWith(SentenceChunker(DEFAULT_MAX, 20, MIN), early).first(),
+            mergedWith(SentenceChunker(SegmentSizing(DEFAULT_MAX, 20, null)), early).first(),
+            mergedWith(SentenceChunker(SegmentSizing(DEFAULT_MAX, 20, MIN)), early).first(),
         )
     }
 
     @Test
     fun theFirstSentenceIsReleasedAloneAsSoonAsItEnds() {
-        val chunker = SentenceChunker(minSegmentLength = MIN)
+        val chunker = SentenceChunker(SegmentSizing(minSegmentLength = MIN))
         assertEquals(listOf("Hi there."), chunker.push(VoiceText("Hi there. Next")).map { it.value })
     }
 
     @Test
     fun aMergedSegmentIsReleasedAsSoonAsItReachesTheMinimumNotLater() {
-        val chunker = SentenceChunker(minSegmentLength = MIN)
+        val chunker = SentenceChunker(SegmentSizing(minSegmentLength = MIN))
         chunker.push(VoiceText("Hi there. "))
         assertTrue(chunker.push(VoiceText("Second is short. ")).isEmpty(), "below the minimum: held for more sentences")
         assertEquals(
@@ -58,7 +58,7 @@ class SentenceChunkerMergeTest {
 
     @Test
     fun flushReleasesWhatIsHeldBelowTheMinimum() {
-        val chunker = SentenceChunker(minSegmentLength = MIN)
+        val chunker = SentenceChunker(SegmentSizing(minSegmentLength = MIN))
         chunker.push(VoiceText("Hi there. Second is short. "))
         assertEquals(listOf("Second is short."), chunker.flush().map { it.value })
         assertTrue(chunker.flush().isEmpty())
@@ -84,7 +84,7 @@ class SentenceChunkerMergeTest {
     @Test
     fun aFullSizeSentenceIsReleasedEvenWhenTheMinimumIsAboveTheMaximum() {
         val full = "z".repeat(89) + "."
-        val chunker = SentenceChunker(maxSegmentLength = 90, minSegmentLength = 500)
+        val chunker = SentenceChunker(SegmentSizing(maxSegmentLength = 90, minSegmentLength = 500))
         chunker.push(VoiceText("Hi there. "))
         assertEquals(listOf(full), chunker.push(VoiceText("$full Next")).map { it.value }, "a segment at the maximum goes out at once")
     }
@@ -104,7 +104,7 @@ class SentenceChunkerMergeTest {
 
     @Test
     fun resetDropsWhatWasHeld() {
-        val chunker = SentenceChunker(minSegmentLength = MIN)
+        val chunker = SentenceChunker(SegmentSizing(minSegmentLength = MIN))
         chunker.push(VoiceText("Hi there. Second is short. "))
         chunker.reset()
         assertTrue(chunker.flush().isEmpty())
@@ -130,7 +130,7 @@ class SentenceChunkerMergeTest {
 
     @Test
     fun aTailJoinsAsItStreamsInAndTheSegmentWaitsForIt() {
-        val chunker = SentenceChunker(minSegmentLength = MIN, tailAbsorbLength = TAIL)
+        val chunker = SentenceChunker(SegmentSizing(minSegmentLength = MIN, tailAbsorbLength = TAIL))
         assertEquals(listOf("Hi there."), chunker.push(VoiceText("Hi there. $LONG_SECOND ")).map { it.value })
         assertEquals(listOf("$LONG_SECOND Ok."), chunker.push(VoiceText("Ok. ")).map { it.value })
         assertTrue(chunker.flush().isEmpty())
@@ -139,7 +139,7 @@ class SentenceChunkerMergeTest {
 
     @Test
     fun aSegmentAtTheMinimumIsReleasedByTheFlushWhenNoTailComes() {
-        val chunker = SentenceChunker(minSegmentLength = MIN, tailAbsorbLength = TAIL)
+        val chunker = SentenceChunker(SegmentSizing(minSegmentLength = MIN, tailAbsorbLength = TAIL))
         chunker.push(VoiceText("Hi there. $LONG_SECOND "))
         assertEquals(listOf(LONG_SECOND), chunker.flush().map { it.value })
         assertEquals(0, chunker.tailsAbsorbed)
@@ -175,7 +175,7 @@ class SentenceChunkerMergeTest {
 
     @Test
     fun aTailNeverJoinsAcrossAFlush() {
-        val chunker = SentenceChunker(minSegmentLength = MIN, tailAbsorbLength = TAIL)
+        val chunker = SentenceChunker(SegmentSizing(minSegmentLength = MIN, tailAbsorbLength = TAIL))
         val before = chunker.push(VoiceText("Hi there. $LONG_SECOND ")) + chunker.flush()
         val after = chunker.push(VoiceText("Ok. ")) + chunker.flush()
         assertEquals(listOf("Hi there.", LONG_SECOND), before.map { it.value })
@@ -189,14 +189,14 @@ class SentenceChunkerMergeTest {
         }
         val early = "Here is the short answer to your question, and then the rest of it. $LONG_SECOND Ok."
         assertEquals(
-            mergedWith(SentenceChunker(DEFAULT_MAX, 20, MIN, null), early).first(),
-            mergedWith(SentenceChunker(DEFAULT_MAX, 20, MIN, TAIL), early).first(),
+            mergedWith(SentenceChunker(SegmentSizing(DEFAULT_MAX, 20, MIN, null)), early).first(),
+            mergedWith(SentenceChunker(SegmentSizing(DEFAULT_MAX, 20, MIN, TAIL)), early).first(),
         )
     }
 
     @Test
     fun aTailAfterALateReplysFirstSentenceStillJoinsTheSegmentBeforeIt() {
-        val chunker = SentenceChunker(minSegmentLength = MIN, tailAbsorbLength = TAIL)
+        val chunker = SentenceChunker(SegmentSizing(minSegmentLength = MIN, tailAbsorbLength = TAIL))
         chunker.push(VoiceText("Hi there. "))
         chunker.flush()
         chunker.startNewPart()
@@ -205,8 +205,23 @@ class SentenceChunkerMergeTest {
     }
 
     @Test
-    fun aNonPositiveTailLengthIsRejected() {
-        assertFailsWith<IllegalArgumentException> { SentenceChunker(tailAbsorbLength = 0) }
+    fun aTailLengthWithoutAMinimumChangesNothingBecauseThereIsNoMerging() {
+        val text = "Hi there. $LONG_SECOND Ok. Another short one."
+        val without = merged(text, minimum = null, tail = null)
+        assertEquals(listOf("Hi there.", LONG_SECOND, "Ok.", "Another short one."), without, "one sentence per segment")
+        assertEquals(without, merged(text, minimum = null, tail = TAIL))
+        val chunker = SentenceChunker(SegmentSizing(minSegmentLength = null, tailAbsorbLength = TAIL))
+        assertEquals(without, mergedWith(chunker, text))
+        assertEquals(0, chunker.tailsAbsorbed)
+    }
+
+    @Test
+    fun segmentSizingRejectsEveryNonPositiveLimit() {
+        assertFailsWith<IllegalArgumentException> { SegmentSizing(maxSegmentLength = SegmentSizing.MIN_SEGMENT_LENGTH - 1) }
+        assertFailsWith<IllegalArgumentException> { SegmentSizing(firstClauseMinLength = 0) }
+        assertFailsWith<IllegalArgumentException> { SegmentSizing(minSegmentLength = 0) }
+        assertFailsWith<IllegalArgumentException> { SegmentSizing(tailAbsorbLength = 0) }
+        assertEquals(SegmentSizing(), SegmentSizing(SentenceChunker.DEFAULT_MAX_SEGMENT_LENGTH, null, null, null))
     }
 
     private companion object {

@@ -172,6 +172,22 @@ class VoiceLoopSegmentMergeTest {
     }
 
     @Test
+    fun aTailLengthWithoutAMinimumLengthKeepsOneSentencePerSegment() = runTest {
+        val h = LoopHarness(this, merging.copy(minSegmentLength = null, tailAbsorbLength = TAIL))
+        h.listening()
+        h.turn()
+
+        // One delta per sentence: sentences released from the same delta are joined by the burst batching, which is separate.
+        h.replyText(VoiceText("It is noon. "))
+        h.replyText(VoiceText("$LONG_SECOND "))
+        h.replyText(VoiceText("Ok. "))
+        h.reply(VoiceReplyEvent.Completed)
+
+        assertEquals(listOf("It is noon.", LONG_SECOND, "Ok."), h.mouth.spokenTexts)
+        assertEquals(listOf(0), h.absorbed)
+    }
+
+    @Test
     fun aTailAfterAMoodCueIsNotJoinedAcrossTheMoodChange() = runTest {
         val h = LoopHarness(this, absorbing)
         h.listening()

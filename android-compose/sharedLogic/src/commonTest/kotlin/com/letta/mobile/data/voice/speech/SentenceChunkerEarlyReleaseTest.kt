@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 /** The first segment released at its first long-enough clause, later ones sentence-sized. */
 class SentenceChunkerEarlyReleaseTest {
     private fun early(vararg deltas: String, minimum: Int = MIN): List<String> {
-        val chunker = SentenceChunker(firstClauseMinLength = minimum)
+        val chunker = SentenceChunker(SegmentSizing(firstClauseMinLength = minimum))
         val pushed = deltas.flatMap { chunker.push(VoiceText(it)) }
         return (pushed + chunker.flush()).map { it.value }
     }
@@ -29,7 +29,7 @@ class SentenceChunkerEarlyReleaseTest {
 
     @Test
     fun theClauseIsReleasedAsSoonAsTheTextAfterItArrives() {
-        val chunker = SentenceChunker(firstClauseMinLength = MIN)
+        val chunker = SentenceChunker(SegmentSizing(firstClauseMinLength = MIN))
         assertTrue(chunker.push(VoiceText("Here is the short answer to your question,")).isEmpty(), "the break needs its whitespace")
         assertEquals(listOf("Here is the short answer to your question"), chunker.push(VoiceText(" and")).map { it.value })
     }
@@ -83,7 +83,7 @@ class SentenceChunkerEarlyReleaseTest {
 
     @Test
     fun onlyTheFirstSegmentIsReleasedEarlyEvenAcrossFlushes() {
-        val chunker = SentenceChunker(firstClauseMinLength = MIN)
+        val chunker = SentenceChunker(SegmentSizing(firstClauseMinLength = MIN))
         val first = chunker.push(VoiceText("Here is the short answer to your question, more")) + chunker.flush()
         val second = chunker.push(VoiceText("Another long part follows here after the flush, with a comma.")) + chunker.flush()
         assertEquals(listOf("Here is the short answer to your question", "more"), first.map { it.value })
@@ -107,7 +107,7 @@ class SentenceChunkerEarlyReleaseTest {
 
     @Test
     fun aMinimumMustBePositive() {
-        assertFailsWith<IllegalArgumentException> { SentenceChunker(firstClauseMinLength = 0) }
+        assertFailsWith<IllegalArgumentException> { SentenceChunker(SegmentSizing(firstClauseMinLength = 0)) }
     }
 
     private companion object {

@@ -73788,8 +73788,35 @@ final class com.letta.mobile.data.voice.session/VoiceTuning { // com.letta.mobil
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.session/VoiceTuning.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.voice.speech/SegmentSizing { // com.letta.mobile.data.voice.speech/SegmentSizing|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Int? = ..., kotlin/Int? = ..., kotlin/Int? = ...) // com.letta.mobile.data.voice.speech/SegmentSizing.<init>|<init>(kotlin.Int;kotlin.Int?;kotlin.Int?;kotlin.Int?){}[0]
+
+    final val firstClauseMinLength // com.letta.mobile.data.voice.speech/SegmentSizing.firstClauseMinLength|{}firstClauseMinLength[0]
+        final fun <get-firstClauseMinLength>(): kotlin/Int? // com.letta.mobile.data.voice.speech/SegmentSizing.firstClauseMinLength.<get-firstClauseMinLength>|<get-firstClauseMinLength>(){}[0]
+    final val maxSegmentLength // com.letta.mobile.data.voice.speech/SegmentSizing.maxSegmentLength|{}maxSegmentLength[0]
+        final fun <get-maxSegmentLength>(): kotlin/Int // com.letta.mobile.data.voice.speech/SegmentSizing.maxSegmentLength.<get-maxSegmentLength>|<get-maxSegmentLength>(){}[0]
+    final val minSegmentLength // com.letta.mobile.data.voice.speech/SegmentSizing.minSegmentLength|{}minSegmentLength[0]
+        final fun <get-minSegmentLength>(): kotlin/Int? // com.letta.mobile.data.voice.speech/SegmentSizing.minSegmentLength.<get-minSegmentLength>|<get-minSegmentLength>(){}[0]
+    final val tailAbsorbLength // com.letta.mobile.data.voice.speech/SegmentSizing.tailAbsorbLength|{}tailAbsorbLength[0]
+        final fun <get-tailAbsorbLength>(): kotlin/Int? // com.letta.mobile.data.voice.speech/SegmentSizing.tailAbsorbLength.<get-tailAbsorbLength>|<get-tailAbsorbLength>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.data.voice.speech/SegmentSizing.component1|component1(){}[0]
+    final fun component2(): kotlin/Int? // com.letta.mobile.data.voice.speech/SegmentSizing.component2|component2(){}[0]
+    final fun component3(): kotlin/Int? // com.letta.mobile.data.voice.speech/SegmentSizing.component3|component3(){}[0]
+    final fun component4(): kotlin/Int? // com.letta.mobile.data.voice.speech/SegmentSizing.component4|component4(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int? = ..., kotlin/Int? = ..., kotlin/Int? = ...): com.letta.mobile.data.voice.speech/SegmentSizing // com.letta.mobile.data.voice.speech/SegmentSizing.copy|copy(kotlin.Int;kotlin.Int?;kotlin.Int?;kotlin.Int?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.speech/SegmentSizing.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.speech/SegmentSizing.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.speech/SegmentSizing.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.voice.speech/SegmentSizing.Companion|null[0]
+        final const val MIN_SEGMENT_LENGTH // com.letta.mobile.data.voice.speech/SegmentSizing.Companion.MIN_SEGMENT_LENGTH|{}MIN_SEGMENT_LENGTH[0]
+            final fun <get-MIN_SEGMENT_LENGTH>(): kotlin/Int // com.letta.mobile.data.voice.speech/SegmentSizing.Companion.MIN_SEGMENT_LENGTH.<get-MIN_SEGMENT_LENGTH>|<get-MIN_SEGMENT_LENGTH>(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.voice.speech/SentenceChunker { // com.letta.mobile.data.voice.speech/SentenceChunker|null[0]
-    constructor <init>(kotlin/Int = ..., kotlin/Int? = ..., kotlin/Int? = ..., kotlin/Int? = ...) // com.letta.mobile.data.voice.speech/SentenceChunker.<init>|<init>(kotlin.Int;kotlin.Int?;kotlin.Int?;kotlin.Int?){}[0]
+    constructor <init>(com.letta.mobile.data.voice.speech/SegmentSizing = ...) // com.letta.mobile.data.voice.speech/SentenceChunker.<init>|<init>(com.letta.mobile.data.voice.speech.SegmentSizing){}[0]
 
     final val tailsAbsorbed // com.letta.mobile.data.voice.speech/SentenceChunker.tailsAbsorbed|{}tailsAbsorbed[0]
         final fun <get-tailsAbsorbed>(): kotlin/Int // com.letta.mobile.data.voice.speech/SentenceChunker.tailsAbsorbed.<get-tailsAbsorbed>|<get-tailsAbsorbed>(){}[0]

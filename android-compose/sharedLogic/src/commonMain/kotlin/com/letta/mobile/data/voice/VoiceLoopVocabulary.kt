@@ -111,8 +111,8 @@ data class VoiceLoopConfig(
     /**
      * The length after which the chunker releases a segment: sentences after the first are merged
      * until they reach it, so the speech server gets fewer, longer requests (steadier voice from one
-     * chunk to the next). Never more than [maxSegmentLength]; null keeps one sentence per segment.
-     * See [com.letta.mobile.data.voice.speech.SentenceChunker].
+     * chunk to the next). Never more than [maxSegmentLength]; null keeps one sentence per segment
+     * and turns [tailAbsorbLength] off too (tail absorption is part of merging). See [com.letta.mobile.data.voice.speech.SentenceChunker].
      */
     val minSegmentLength: Int? = DEFAULT_MIN_SEGMENT_LENGTH,
     /** The most late reply segments held while the person speaks; older ones are dropped. */
@@ -126,7 +126,8 @@ data class VoiceLoopConfig(
      * A tail shorter than this many characters (what is left when the answer ends or a code block
      * opens) is joined to the segment before it when that segment has not gone out yet and the two
      * fit in [maxSegmentLength], so no answer ends on a tiny segment (the least steady one for the
-     * voice); null never joins. See [com.letta.mobile.data.voice.speech.SentenceChunker].
+     * voice); null never joins. Only applies while [minSegmentLength] is set: with a null
+     * [minSegmentLength] every sentence is its own segment and this has no effect. See [com.letta.mobile.data.voice.speech.SentenceChunker].
      */
     val tailAbsorbLength: Int? = DEFAULT_TAIL_ABSORB_LENGTH,
 ) {
