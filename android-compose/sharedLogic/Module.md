@@ -643,7 +643,15 @@ Portable shell destinations, routes, workspace navigation and page errors. Entry
 
 # Package com.letta.mobile.data.shellstate
 
-The shell state document contract: the host-held, versioned document of shell and user state that the user and their agent both read and change, synced to every client. The host is the on-device runtime or a remote server host. Writes are revision-checked proposals in the style of the voice endpoint contract; a host-to-host move is one export and one import of the whole document under an explicit import policy, and never carries client store values or secrets. The schema and interface live here; `wire` holds the v1 contract's names, limits and codes, `shared` the in-memory client, and the host store and routes sit in the iroh `shellstate` package. No client area uses it yet; agent tools come later.
+The shell state document contract: the host-held, versioned document of shell and user state that the user and their agent both read and change, synced to every client. The host is the on-device runtime or a remote server host. Writes are revision-checked proposals in the style of the voice endpoint contract; a host-to-host move is one export and one import of the whole document under an explicit import policy, and never carries client store values or secrets. The schema and interface live here; `wire` holds the v1 contract's names, limits and codes, `shared` the in-memory client, and the host store and routes sit in the iroh `shellstate` package. Appearance (`appearance`) is the first client area on it; agent tools come later.
+
+# Package com.letta.mobile.data.shellstate.appearance
+
+The first client area kept on the host shell state document: the person's appearance (theme mode, colour preset, dynamic colour) under the `appearance.` namespace, the only namespace the host accepts. `SharedShellAppearance` implements the model-free `HostAppearance` port over `SharedShellState`; the device holds only a disposable mirror of the host's last document, an edit made while the host cannot apply it is refused rather than queued, and a one-time migration proposes the device's old local choice only where the host has none yet.
+
+# Package com.letta.mobile.data.shellstate.channel
+
+The link from `SharedShellState` to the channel transport: `ChannelShellStateLink` sends `shell.state.get` and `shell.state.propose` over the connected host's admin RPC and feeds pushed document revisions back to the shared client, so the shell state code itself depends on no transport.
 
 # Package com.letta.mobile.data.shell.layout
 
