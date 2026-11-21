@@ -60,8 +60,15 @@ class MascotIdentityRegistry {
         composerKeystrokes++
     }
 
+    /**
+     * Adds [all] and refreshes the identities it names; an agent it does not name keeps the identity it
+     * had. A roster snapshot is not proof an agent is gone: the repository publishes each page of a
+     * refresh as it lands (CachedAgentRepository.publishRosterLocked), so for a moment the roster is the
+     * first page alone. Forgetting the agents past it turned every avatar of one of them into its letter
+     * tile until its page arrived - a flash on whatever screen was opening. An identity left behind by a
+     * deleted agent is never drawn, so keeping it costs nothing.
+     */
     fun update(all: Map<String, MascotIdentity>) {
-        identities.keys.retainAll(all.keys)
         identities.putAll(all)
     }
 

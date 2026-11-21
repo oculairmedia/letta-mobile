@@ -151,6 +151,11 @@ fun MascotLive(
     val entry = remember(host, sceneKey, identity) { host.entry(sceneKey, identity) } ?: return
     val presence = registry.presence[agentId] ?: AgentPresence.IDLE
     LaunchedEffect(entry, presence) { entry.ensureLoaded(); entry.apply(presence) }
+    // The still is made while the character moves, so the moment it stops - its run ends, or another
+    // screen draws it at rest - the image is already in memory. Asked for only when a tile first draws
+    // an agent at rest, a long run never had one and the tile stood empty for the disk read.
+    val stills = host.stills
+    LaunchedEffect(stills, identity) { stills?.ensure(identity) }
     val cursor = registry.cursor.value
     val pointerPresent = cursor != null
     // Reduced motion holds one look per state (the content at work, the input at rest): no
