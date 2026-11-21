@@ -102,6 +102,7 @@ private fun PagedTimelineContent(params: PagedTimelineParams, modifier: Modifier
     val live by presentation.live.collectForChatSurface()
     val visibleLive = remember(live, queued) { live.filterNot(queued::containsQueuedPrompt) }
     val rows = rememberPagedRows(visibleLive, settled, if (params.thinking) 1 else 0, queued)
+    TimelineOpenSettleEffect(presentation, rows)
     ObserveResidentRows(presentation, settled) {
         residentReport(settled.itemSnapshotList.items, settled.loadState.refresh)
     }
@@ -142,7 +143,7 @@ private fun PagedTimelineBody(
     val bindings = rememberPagedRowBindings(params.bindings, rows)
     val motion = rememberTimelineRowMotionGate(listState, rows.liveCount > 0 || params.state.isRunInFlight)
 
-    Box(modifier) {
+    Box(modifier.then(rememberFirstFrameMarker(presentation, hasRows = rows.size > rows.leading))) {
         TimelineListFrame(
             listState = listState,
             bindings = bindings,
