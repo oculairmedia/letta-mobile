@@ -68216,6 +68216,8 @@ final class com.letta.mobile.data.timeline/CanonicalTimelineEngine { // com.lett
 }
 
 final class com.letta.mobile.data.timeline/CanonicalTimelinePresentation { // com.letta.mobile.data.timeline/CanonicalTimelinePresentation|null[0]
+    final val isOpenTraced // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.isOpenTraced|{}isOpenTraced[0]
+        final fun <get-isOpenTraced>(): kotlin/Boolean // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.isOpenTraced.<get-isOpenTraced>|<get-isOpenTraced>(){}[0]
     final val live // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.live|{}live[0]
         final fun <get-live>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>> // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.live.<get-live>|<get-live>(){}[0]
     final val missingTarget // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.missingTarget|{}missingTarget[0]
@@ -68230,6 +68232,7 @@ final class com.letta.mobile.data.timeline/CanonicalTimelinePresentation { // co
         final fun <set-viewport>(kotlin/Pair<kotlin/String, kotlin/Int>?) // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.viewport.<set-viewport>|<set-viewport>(kotlin.Pair<kotlin.String,kotlin.Int>?){}[0]
 
     final fun onResidentRows(kotlin.collections/List<com.letta.mobile.data.timeline/CanonicalTimelinePresentation.Row>) // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.onResidentRows|onResidentRows(kotlin.collections.List<com.letta.mobile.data.timeline.CanonicalTimelinePresentation.Row>){}[0]
+    final fun traceFirstFrame(kotlin/Boolean) // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.traceFirstFrame|traceFirstFrame(kotlin.Boolean){}[0]
     final suspend fun close() // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.close|close(){}[0]
     final suspend fun dismiss(com.letta.mobile.data.model/MessageId): kotlin/Boolean // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.dismiss|dismiss(com.letta.mobile.data.model.MessageId){}[0]
     final suspend fun navigate(kotlin/String?): kotlin/Boolean // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.navigate|navigate(kotlin.String?){}[0]
@@ -68237,6 +68240,7 @@ final class com.letta.mobile.data.timeline/CanonicalTimelinePresentation { // co
     final suspend fun readTextWindow(com.letta.mobile.data.timeline/CanonicalTimelinePresentation.Row, com.letta.mobile.data.timeline/TimelineSemanticField, kotlin/Long, kotlinx.coroutines/CoroutineDispatcher): com.letta.mobile.data.timeline/TimelineSemanticWindowResult // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.readTextWindow|readTextWindow(com.letta.mobile.data.timeline.CanonicalTimelinePresentation.Row;com.letta.mobile.data.timeline.TimelineSemanticField;kotlin.Long;kotlinx.coroutines.CoroutineDispatcher){}[0]
     final suspend fun readTextWindow(com.letta.mobile.data.timeline/TimelineBodyReference, com.letta.mobile.data.timeline/TimelineSemanticField, kotlin/Long, kotlinx.coroutines/CoroutineDispatcher): com.letta.mobile.data.timeline/TimelineSemanticWindowResult // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.readTextWindow|readTextWindow(com.letta.mobile.data.timeline.TimelineBodyReference;com.letta.mobile.data.timeline.TimelineSemanticField;kotlin.Long;kotlinx.coroutines.CoroutineDispatcher){}[0]
     final suspend fun retry(com.letta.mobile.data.model/MessageId): kotlin/Boolean // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.retry|retry(com.letta.mobile.data.model.MessageId){}[0]
+    final suspend fun traceOpenUntilSettled() // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.traceOpenUntilSettled|traceOpenUntilSettled(){}[0]
 
     final class Row { // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.Row|null[0]
         constructor <init>(com.letta.mobile.data.timeline/TimelineMessageId, kotlin/Long, com.letta.mobile.data.chat.projection/ChatRenderItem, com.letta.mobile.data.timeline/TimelineBodyReference? = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<com.letta.mobile.data.timeline/TimelineResidentEvent> = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin.collections/Map<kotlin/String, com.letta.mobile.data.timeline/TimelineBodyReference> = ...) // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.Row.<init>|<init>(com.letta.mobile.data.timeline.TimelineMessageId;kotlin.Long;com.letta.mobile.data.chat.projection.ChatRenderItem;com.letta.mobile.data.timeline.TimelineBodyReference?;kotlin.String;kotlin.String;kotlin.collections.List<com.letta.mobile.data.timeline.TimelineResidentEvent>;kotlin.collections.Set<kotlin.String>;kotlin.collections.Map<kotlin.String,com.letta.mobile.data.timeline.TimelineBodyReference>){}[0]
@@ -84481,6 +84485,8 @@ final object com.letta.mobile.util/Telemetry { // com.letta.mobile.util/Telemetr
         final fun <get-rosterCompletenessProbeEnabled>(): com.letta.mobile.util/TelemetryFlag // com.letta.mobile.util/Telemetry.rosterCompletenessProbeEnabled.<get-rosterCompletenessProbeEnabled>|<get-rosterCompletenessProbeEnabled>(){}[0]
     final val timelineDumpEnabled // com.letta.mobile.util/Telemetry.timelineDumpEnabled|{}timelineDumpEnabled[0]
         final fun <get-timelineDumpEnabled>(): com.letta.mobile.util/TelemetryFlag // com.letta.mobile.util/Telemetry.timelineDumpEnabled.<get-timelineDumpEnabled>|<get-timelineDumpEnabled>(){}[0]
+    final val timelineOpenTraceEnabled // com.letta.mobile.util/Telemetry.timelineOpenTraceEnabled|{}timelineOpenTraceEnabled[0]
+        final fun <get-timelineOpenTraceEnabled>(): com.letta.mobile.util/TelemetryFlag // com.letta.mobile.util/Telemetry.timelineOpenTraceEnabled.<get-timelineOpenTraceEnabled>|<get-timelineOpenTraceEnabled>(){}[0]
     final val timelineSyncGateDebugEnabled // com.letta.mobile.util/Telemetry.timelineSyncGateDebugEnabled|{}timelineSyncGateDebugEnabled[0]
         final fun <get-timelineSyncGateDebugEnabled>(): com.letta.mobile.util/TelemetryFlag // com.letta.mobile.util/Telemetry.timelineSyncGateDebugEnabled.<get-timelineSyncGateDebugEnabled>|<get-timelineSyncGateDebugEnabled>(){}[0]
 
@@ -84502,6 +84508,7 @@ final object com.letta.mobile.util/Telemetry { // com.letta.mobile.util/Telemetr
     final fun isFrameFlowDiagEnabled(): kotlin/Boolean // com.letta.mobile.util/Telemetry.isFrameFlowDiagEnabled|isFrameFlowDiagEnabled(){}[0]
     final fun isRenderDiagEnabled(): kotlin/Boolean // com.letta.mobile.util/Telemetry.isRenderDiagEnabled|isRenderDiagEnabled(){}[0]
     final fun isTimelineDumpEnabled(): kotlin/Boolean // com.letta.mobile.util/Telemetry.isTimelineDumpEnabled|isTimelineDumpEnabled(){}[0]
+    final fun isTimelineOpenTraceEnabled(): kotlin/Boolean // com.letta.mobile.util/Telemetry.isTimelineOpenTraceEnabled|isTimelineOpenTraceEnabled(){}[0]
     final fun isTimelineSyncGateDebugEnabled(): kotlin/Boolean // com.letta.mobile.util/Telemetry.isTimelineSyncGateDebugEnabled|isTimelineSyncGateDebugEnabled(){}[0]
     final fun nowEpochMillis(): kotlin/Long // com.letta.mobile.util/Telemetry.nowEpochMillis|nowEpochMillis(){}[0]
     final fun snapshot(): kotlin.collections/List<com.letta.mobile.util/Telemetry.Event> // com.letta.mobile.util/Telemetry.snapshot|snapshot(){}[0]
@@ -84557,6 +84564,59 @@ final object com.letta.mobile.util/Telemetry { // com.letta.mobile.util/Telemetr
     final class Timer { // com.letta.mobile.util/Telemetry.Timer|null[0]
         final fun stop(kotlin/Array<out kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue>>...) // com.letta.mobile.util/Telemetry.Timer.stop|stop(kotlin.Array<out|kotlin.Pair<kotlin.String,com.letta.mobile.util.TelemetryValue>>...){}[0]
         final fun stopError(kotlin/Throwable, kotlin/Array<out kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue>>...) // com.letta.mobile.util/Telemetry.Timer.stopError|stopError(kotlin.Throwable;kotlin.Array<out|kotlin.Pair<kotlin.String,com.letta.mobile.util.TelemetryValue>>...){}[0]
+    }
+}
+
+final object com.letta.mobile.util/TimelineOpenTrace { // com.letta.mobile.util/TimelineOpenTrace|null[0]
+    final const val SETTLE_QUIET_MS // com.letta.mobile.util/TimelineOpenTrace.SETTLE_QUIET_MS|{}SETTLE_QUIET_MS[0]
+        final fun <get-SETTLE_QUIET_MS>(): kotlin/Long // com.letta.mobile.util/TimelineOpenTrace.SETTLE_QUIET_MS.<get-SETTLE_QUIET_MS>|<get-SETTLE_QUIET_MS>(){}[0]
+    final const val TAG // com.letta.mobile.util/TimelineOpenTrace.TAG|{}TAG[0]
+        final fun <get-TAG>(): kotlin/String // com.letta.mobile.util/TimelineOpenTrace.TAG.<get-TAG>|<get-TAG>(){}[0]
+
+    final fun enabled(): kotlin/Boolean // com.letta.mobile.util/TimelineOpenTrace.enabled|enabled(){}[0]
+    final fun isActive(com.letta.mobile.data.model/ConversationId): kotlin/Boolean // com.letta.mobile.util/TimelineOpenTrace.isActive|isActive(com.letta.mobile.data.model.ConversationId){}[0]
+    final fun listReplaced(com.letta.mobile.data.model/ConversationId) // com.letta.mobile.util/TimelineOpenTrace.listReplaced|listReplaced(com.letta.mobile.data.model.ConversationId){}[0]
+    final fun mark(com.letta.mobile.data.model/ConversationId, com.letta.mobile.util/TimelineOpenTrace.Stage, kotlin/Int? = ..., kotlin/Long? = ...): kotlin/Boolean // com.letta.mobile.util/TimelineOpenTrace.mark|mark(com.letta.mobile.data.model.ConversationId;com.letta.mobile.util.TimelineOpenTrace.Stage;kotlin.Int?;kotlin.Long?){}[0]
+    final fun requested(com.letta.mobile.data.model/ConversationId): com.letta.mobile.util/TimelineOpenTrace.OpenId? // com.letta.mobile.util/TimelineOpenTrace.requested|requested(com.letta.mobile.data.model.ConversationId){}[0]
+    final fun requestedIfAbsent(com.letta.mobile.data.model/ConversationId): com.letta.mobile.util/TimelineOpenTrace.OpenId? // com.letta.mobile.util/TimelineOpenTrace.requestedIfAbsent|requestedIfAbsent(com.letta.mobile.data.model.ConversationId){}[0]
+    final fun settleIfQuiet(com.letta.mobile.data.model/ConversationId) // com.letta.mobile.util/TimelineOpenTrace.settleIfQuiet|settleIfQuiet(com.letta.mobile.data.model.ConversationId){}[0]
+    final fun tracking(): kotlin/Boolean // com.letta.mobile.util/TimelineOpenTrace.tracking|tracking(){}[0]
+
+    final enum class Stage : kotlin/Enum<com.letta.mobile.util/TimelineOpenTrace.Stage> { // com.letta.mobile.util/TimelineOpenTrace.Stage|null[0]
+        enum entry CacheReadEnd // com.letta.mobile.util/TimelineOpenTrace.Stage.CacheReadEnd|null[0]
+        enum entry CacheReadStart // com.letta.mobile.util/TimelineOpenTrace.Stage.CacheReadStart|null[0]
+        enum entry FirstFrameWithRows // com.letta.mobile.util/TimelineOpenTrace.Stage.FirstFrameWithRows|null[0]
+        enum entry NetworkPageEnd // com.letta.mobile.util/TimelineOpenTrace.Stage.NetworkPageEnd|null[0]
+        enum entry NetworkPageStart // com.letta.mobile.util/TimelineOpenTrace.Stage.NetworkPageStart|null[0]
+        enum entry OpenRequested // com.letta.mobile.util/TimelineOpenTrace.Stage.OpenRequested|null[0]
+        enum entry PresentationBound // com.letta.mobile.util/TimelineOpenTrace.Stage.PresentationBound|null[0]
+        enum entry ReconcileEnd // com.letta.mobile.util/TimelineOpenTrace.Stage.ReconcileEnd|null[0]
+        enum entry Settled // com.letta.mobile.util/TimelineOpenTrace.Stage.Settled|null[0]
+
+        final val entries // com.letta.mobile.util/TimelineOpenTrace.Stage.entries|#static{}entries[0]
+            final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.util/TimelineOpenTrace.Stage> // com.letta.mobile.util/TimelineOpenTrace.Stage.entries.<get-entries>|<get-entries>#static(){}[0]
+        final val eventName // com.letta.mobile.util/TimelineOpenTrace.Stage.eventName|{}eventName[0]
+            final fun <get-eventName>(): kotlin/String // com.letta.mobile.util/TimelineOpenTrace.Stage.eventName.<get-eventName>|<get-eventName>(){}[0]
+
+        final fun valueOf(kotlin/String): com.letta.mobile.util/TimelineOpenTrace.Stage // com.letta.mobile.util/TimelineOpenTrace.Stage.valueOf|valueOf#static(kotlin.String){}[0]
+        final fun values(): kotlin/Array<com.letta.mobile.util/TimelineOpenTrace.Stage> // com.letta.mobile.util/TimelineOpenTrace.Stage.values|values#static(){}[0]
+    }
+
+    final class FirstFrameGate { // com.letta.mobile.util/TimelineOpenTrace.FirstFrameGate|null[0]
+        constructor <init>(com.letta.mobile.data.model/ConversationId) // com.letta.mobile.util/TimelineOpenTrace.FirstFrameGate.<init>|<init>(com.letta.mobile.data.model.ConversationId){}[0]
+
+        final fun onDraw(kotlin/Boolean) // com.letta.mobile.util/TimelineOpenTrace.FirstFrameGate.onDraw|onDraw(kotlin.Boolean){}[0]
+    }
+
+    final value class OpenId { // com.letta.mobile.util/TimelineOpenTrace.OpenId|null[0]
+        constructor <init>(kotlin/Long) // com.letta.mobile.util/TimelineOpenTrace.OpenId.<init>|<init>(kotlin.Long){}[0]
+
+        final val value // com.letta.mobile.util/TimelineOpenTrace.OpenId.value|{}value[0]
+            final fun <get-value>(): kotlin/Long // com.letta.mobile.util/TimelineOpenTrace.OpenId.value.<get-value>|<get-value>(){}[0]
+
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.util/TimelineOpenTrace.OpenId.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.util/TimelineOpenTrace.OpenId.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.util/TimelineOpenTrace.OpenId.toString|toString(){}[0]
     }
 }
 
