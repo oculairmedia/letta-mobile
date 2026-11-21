@@ -21,7 +21,6 @@ import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDefaultConfig
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
-import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.InMemorySecureSettingsStore

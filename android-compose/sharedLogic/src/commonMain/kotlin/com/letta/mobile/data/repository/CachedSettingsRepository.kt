@@ -230,7 +230,8 @@ open class CachedSettingsRepository(
         }
     }
 
-    override suspend fun setTheme(theme: AppTheme): ShellStateEditOutcome = hostAppearance.setTheme(theme).also { resetChatBackgroundIfApplied(it) }
+    override suspend fun setTheme(theme: AppTheme): ShellStateEditOutcome =
+        hostAppearance.setTheme(theme).also { resetChatBackgroundIfApplied(it) }
 
     override suspend fun setThemePreset(themePreset: ThemePreset): ShellStateEditOutcome =
         hostAppearance.setThemePreset(themePreset).also { resetChatBackgroundIfApplied(it) }

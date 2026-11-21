@@ -102,7 +102,8 @@ class ShellStateRoutesTest {
         // b is still at revision 1 for a writer who last saw it there, whatever happened to a.
         val b = call(ShellStateWire.PROPOSE, propose(change("appearance.b", JsonPrimitive(9), 1)))
         assertEquals(3L, b.getValue("document_revision").jsonPrimitive.long)
-        assertEquals(ShellStateWire.REVISION_CONFLICT, failure(ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(3), 1))))
+        val stale = propose(change("appearance.a", JsonPrimitive(3), 1))
+        assertEquals(ShellStateWire.REVISION_CONFLICT, failure(ShellStateWire.PROPOSE, stale))
     }
 
     @Test
@@ -210,7 +211,8 @@ class ShellStateRoutesTest {
         assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("appearance.Upper", JsonPrimitive(1), 0))))
         assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("", JsonPrimitive(1), 0))))
         assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(1), -1))))
-        assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(1), 0), change("appearance.a", JsonPrimitive(2), 0))))
+        val repeated = propose(change("appearance.a", JsonPrimitive(1), 0), change("appearance.a", JsonPrimitive(2), 0))
+        assertEquals(invalid, failure(ShellStateWire.PROPOSE, repeated))
         val longKey = "appearance." + "k".repeat(ShellStateWire.MAX_KEY_CHARS)
         assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change(longKey, JsonPrimitive(1), 0))))
         val tooMany = (0..ShellStateWire.MAX_CHANGES).map { change("appearance.key-$it", JsonPrimitive(it), 0) }
@@ -222,7 +224,11 @@ class ShellStateRoutesTest {
     @Test
     fun aKeyOutsideTheAllowedNamespacesIsRefusedWholeAndWritesNothing() = runBlocking {
         val invalid = ShellStateWire.INVALID_REQUEST
-        listOf("layout.sidebar_open", "secrets.hf_token", "huggingface.token", "a", "appearance", "appearance.", "appearances.x", "x.appearance.theme").forEach { key ->
+        val outside = listOf(
+            "layout.sidebar_open", "secrets.hf_token", "huggingface.token", "a", "appearance", "appearance.", "appearances.x",
+            "x.appearance.theme",
+        )
+        outside.forEach { key ->
             assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change(key, JsonPrimitive(1), 0))), key)
         }
         // One stray key refuses the whole proposal, even beside an allowed one; removal is held to the same list.

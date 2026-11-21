@@ -27,7 +27,13 @@ class ShellStateCacheStoreTest {
 
     @Test
     fun onlyEntriesInAnAllowedNamespaceAreEverKept() {
-        cache.save(snapshot("appearance.theme" to JsonPrimitive("DARK"), "secrets.token" to JsonPrimitive("hf_secret"), "voice.x" to JsonPrimitive(1)))
+        cache.save(
+            snapshot(
+                "appearance.theme" to JsonPrimitive("DARK"),
+                "secrets.token" to JsonPrimitive("hf_secret"),
+                "voice.x" to JsonPrimitive(1),
+            ),
+        )
 
         val raw = store.getString(cache.entry.storageKey).orEmpty()
         assertEquals(setOf("appearance.theme"), cache.load()?.entries?.keys)

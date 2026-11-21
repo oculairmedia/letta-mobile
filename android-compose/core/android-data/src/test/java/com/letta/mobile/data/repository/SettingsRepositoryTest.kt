@@ -7,7 +7,22 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
+import com.letta.mobile.data.controller.node.iroh.AdminRpcInvocation
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
+import com.letta.mobile.data.controller.node.iroh.shellstate.ShellStatePublisher
+import com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateRoutes
+import com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.testutil.FakeChannelTransport
+import java.nio.file.Files
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import com.letta.mobile.data.session.BackendSwitchClearResult
+import com.letta.mobile.data.session.BackendSwitchInvalidator
 import com.letta.mobile.testutil.InMemorySecureSettingsStore
 import com.letta.mobile.testutil.createTestPreferencesDataStore
 import kotlinx.coroutines.channels.Channel
@@ -308,6 +323,33 @@ class SettingsRepositoryTest {
         assertEquals("c1", repository.activeConfig.value?.id)
     }
 
+    /** A repository whose host is the production shell-state routes over a real state file, behind a connected transport. */
+    private fun repositoryOnARealHost(): SettingsRepository {
+        val publisher = ShellStatePublisher(CoroutineScope(Dispatchers.Unconfined))
+        val router = AdminRpcRouter().also {
+            ShellStateRoutes.forHost(Files.createTempDirectory("settings-host"), publisher).register(it)
+        }
+        val transport = FakeChannelTransport().apply {
+            advertisedCapabilities = router.featureCapabilities
+            adminRpcHandler = { method, _, body ->
+                val params = body?.let { Json.parseToJsonElement(it).jsonObject }
+                val reply = Json.parseToJsonElement(router.dispatch(AdminRpcInvocation("r", method, params))).jsonObject
+                AppServerInboundFrame.AdminRpcResponse(
+                    requestId = "r",
+                    success = reply.getValue("success").jsonPrimitive.boolean,
+                    result = reply["result"],
+                    error = reply["error"]?.jsonPrimitive?.content,
+                )
+            }
+        }
+        return SettingsRepository(
+            dataStore = createTestPreferencesDataStore(),
+            secureSettingsStore = InMemorySecureSettingsStore().withDevicePins(),
+            backendSwitchInvalidator = { BackendSwitchInvalidator(emptySet()) },
+            channelTransport = { transport },
+        )
+    }
+
     @Test
     fun `getTheme returns SYSTEM by default`() = runTest {
         val theme = repository.getTheme().first()
@@ -316,11 +358,31 @@ class SettingsRepositoryTest {
 
     @Test
     fun `setTheme persists theme`() = runTest {
-        repository.setChatBackgroundKey("solid_charcoal")
-        repository.setTheme(AppTheme.DARK)
-        val theme = repository.getTheme().first()
+        val onHost = repositoryOnARealHost()
+        onHost.setChatBackgroundKey("solid_charcoal")
+        assertEquals(ShellStateEditOutcome.APPLIED, onHost.setTheme(AppTheme.DARK))
+        val theme = onHost.getTheme().first()
         assertEquals(AppTheme.DARK, theme)
-        assertEquals("default", repository.getChatBackgroundKey().first())
+        assertEquals("default", onHost.getChatBackgroundKey().first())
+    }
+
+    @Test
+    fun `setTheme without a host is refused and leaves the theme and the chat background alone`() = runTest {
+        repository.setChatBackgroundKey("solid_charcoal")
+
+        val outcome = repository.setTheme(AppTheme.DARK)
+
+        assertTrue(outcome == ShellStateEditOutcome.OFFLINE || outcome == ShellStateEditOutcome.UNSUPPORTED)
+        assertEquals(AppTheme.SYSTEM, repository.getTheme().first())
+        assertEquals("solid_charcoal", repository.getChatBackgroundKey().first())
+    }
+
+    @Test
+    fun `appearance is the hosts and a second device on the same host shows it`() = runTest {
+        val first = repositoryOnARealHost()
+        assertEquals(ShellStateEditOutcome.APPLIED, first.setThemePreset(ThemePreset.SAKURA))
+        assertEquals(ShellStateEditOutcome.APPLIED, first.setDynamicColor(false))
+        assertEquals(ThemePreset.SAKURA, first.getThemePreset().first())
     }
 
     @Test
@@ -331,12 +393,13 @@ class SettingsRepositoryTest {
 
     @Test
     fun `setThemePreset persists preset`() = runTest {
-        repository.setChatBackgroundKey("gradient_night_sky")
-        repository.setThemePreset(ThemePreset.AMOLED_BLACK)
+        val onHost = repositoryOnARealHost()
+        onHost.setChatBackgroundKey("gradient_night_sky")
+        assertEquals(ShellStateEditOutcome.APPLIED, onHost.setThemePreset(ThemePreset.AMOLED_BLACK))
 
-        val preset = repository.getThemePreset().first()
+        val preset = onHost.getThemePreset().first()
         assertEquals(ThemePreset.AMOLED_BLACK, preset)
-        assertEquals("default", repository.getChatBackgroundKey().first())
+        assertEquals("default", onHost.getChatBackgroundKey().first())
     }
 
     @Test
@@ -347,10 +410,11 @@ class SettingsRepositoryTest {
 
     @Test
     fun `setDynamicColor persists selection`() = runTest {
-        repository.setDynamicColor(false)
+        val onHost = repositoryOnARealHost()
+        assertEquals(ShellStateEditOutcome.APPLIED, onHost.setDynamicColor(true))
 
-        val dynamicColor = repository.getDynamicColor().first()
-        assertEquals(false, dynamicColor)
+        val dynamicColor = onHost.getDynamicColor().first()
+        assertEquals(true, dynamicColor)
     }
 
     // Retain the name regression coverage for owner-confirmed writes, with source fencing.

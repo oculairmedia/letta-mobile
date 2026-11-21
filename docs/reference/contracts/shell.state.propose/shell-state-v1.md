@@ -9,6 +9,8 @@
   entry with it and the serving connection as `updated_by`, and pushes `shell_state_updated` (`v`, `type`,
   `id`, `ts`, then the document) to every authenticated, agent-reading, unscoped connection; a proposal
   that changes nothing keeps the revision and pushes nothing.
+- Keys: only under an allowed namespace (`appearance.` today); any other key is `invalid_request` for the whole
+  proposal and nothing changes. No secret is ever a shell state entry.
 - Errors: `revision_conflict` when any `expected_revision` is stale (nothing changes, all or nothing);
   `invalid_request` for a malformed proposal; `too_large` over a size limit; `state_unreadable`;
   agent-scoped peers are refused (`forbidden: agent not in this device's scope`); the transport refuses a

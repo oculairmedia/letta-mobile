@@ -126,9 +126,6 @@ class SharedShellState(
     /** Whether the connected host serves the contract right now. */
     val supported: Boolean get() = ShellStateWire.CAPABILITY in link.hostCapabilities
 
-    /** Forgets the document kept for offline display; the one in memory stays until the host answers. */
-    fun clearCache() = cache.clear()
-
     /**
      * Follows the connection and the host's pushes until cancelled: reads again on every reconnect. A
      * connection change is handled at once, never behind a pending read: the previous connection's read is

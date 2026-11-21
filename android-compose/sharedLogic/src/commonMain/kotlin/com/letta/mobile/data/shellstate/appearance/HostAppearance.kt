@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome
 import com.letta.mobile.data.shellstate.shared.SharedShellState
+import com.letta.mobile.data.shellstate.shared.ShellStateSnapshotCache
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -39,6 +40,9 @@ interface LegacyAppearance {
  * The person's appearance (theme, colour preset, dynamic colour), kept on the host in the shell state document so
  * every paired device shows the same one, and edited through the same [SharedShellState] every other area uses.
  *
+ * [mirror] is the cache [shell] restores from and mirrors into; it is held here only so that wiping this device's
+ * local state wipes it too.
+ *
  * Shown, per field: the host's entry in the document [SharedShellState] holds (a push from another device
  * replaces it; while the host is out of reach it is the last document read, restored from the device's disposable
  * cache, never an edit); else a device-local choice made before the move, until it is migrated; else nothing, and
@@ -55,6 +59,7 @@ interface LegacyAppearance {
  */
 class HostAppearance(
     private val shell: SharedShellState,
+    private val mirror: ShellStateSnapshotCache = ShellStateSnapshotCache.None,
     private val legacy: LegacyAppearance = LegacyAppearance.None,
 ) {
     /** The appearance to show now; changes whenever any source above does. */
@@ -80,12 +85,9 @@ class HostAppearance(
         migrate()
     }
 
-    /** Wipes the copy of the host's document this device kept for offline display. */
-    fun clearCache() = shell.clearCache()
-
-    /** Wipes everything this device kept: that copy, and any device-local choice not yet migrated. */
+    /** Wipes everything this device kept: the mirror of the host's document, and any device-local choice not yet migrated. */
     suspend fun clearLocal() {
-        shell.clearCache()
+        mirror.clear()
         legacy.clear()
     }
 

@@ -98,10 +98,14 @@ private fun hostAppearanceOver(
     preferences: SettingsPreferencesStore,
     secureSettingsStore: SecureSettingsStore,
     channelTransport: Provider<IChannelTransport>,
-): HostAppearance = HostAppearance(
-    shell = SharedShellState(channelShellStateLink { channelTransport.get() }, ShellStateCacheStore(secureSettingsStore)),
-    legacy = LegacyAppearanceStore(preferences),
-)
+): HostAppearance {
+    val mirror = ShellStateCacheStore(secureSettingsStore)
+    return HostAppearance(
+        shell = SharedShellState(channelShellStateLink { channelTransport.get() }, mirror),
+        mirror = mirror,
+        legacy = LegacyAppearanceStore(preferences),
+    )
+}
 
 private fun BackendSwitchClearResult.toSettingsResult(): SettingsBackendCacheClearResult =
     SettingsBackendCacheClearResult(

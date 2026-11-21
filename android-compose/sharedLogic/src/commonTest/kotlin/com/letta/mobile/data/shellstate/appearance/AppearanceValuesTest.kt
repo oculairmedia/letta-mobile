@@ -44,7 +44,8 @@ class AppearanceValuesTest {
         val device = AppearanceValues(AppTheme.DARK, ThemePreset.OCEAN, dynamicColor = false)
         val host = AppearanceValues(theme = AppTheme.LIGHT)
         assertEquals(AppearanceValues(AppTheme.LIGHT, ThemePreset.OCEAN, false), host.orElse(device))
-        assertEquals(listOf(AppearanceKeys.THEME_PRESET, AppearanceKeys.DYNAMIC_COLOR), device.editsExcept(setOf(AppearanceKeys.THEME)).map { it.key })
+        val proposed = device.editsExcept(setOf(AppearanceKeys.THEME)).map { it.key }
+        assertEquals(listOf(AppearanceKeys.THEME_PRESET, AppearanceKeys.DYNAMIC_COLOR), proposed)
         assertTrue(device.editsExcept(AppearanceKeys.all).isEmpty())
     }
 

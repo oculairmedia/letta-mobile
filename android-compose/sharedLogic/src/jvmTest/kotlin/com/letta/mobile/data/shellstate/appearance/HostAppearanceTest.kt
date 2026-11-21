@@ -183,7 +183,8 @@ class HostAppearanceTest {
     fun noSecretAndNoKeyOutsideAppearanceEverReachesTheHostOrTheDevice() = runBlocking {
         val host = RouterShellStateHost()
         val store = RecordingStore()
-        val phone = following(host.device("phone"), ShellStateCacheStore(store), FakeLegacy(AppearanceValues(AppTheme.DARK, dynamicColor = true)))
+        val legacy = FakeLegacy(AppearanceValues(AppTheme.DARK, dynamicColor = true))
+        val phone = following(host.device("phone"), ShellStateCacheStore(store), legacy)
         within { phone.shell.state.first { it.editable } }
 
         // A chat-role device cannot write a secret, or any key outside the allowed namespace, even by hand.
@@ -212,7 +213,7 @@ class HostAppearanceTest {
         legacy: LegacyAppearance = LegacyAppearance.None,
     ): Following {
         val shell = SharedShellState(link, cache)
-        val appearance = HostAppearance(shell, legacy)
+        val appearance = HostAppearance(shell, cache, legacy)
         scope.launch { appearance.run() }
         if (link.isConnected) runBlocking { within { shell.state.first { it.editable } } }
         return Following(shell, appearance)

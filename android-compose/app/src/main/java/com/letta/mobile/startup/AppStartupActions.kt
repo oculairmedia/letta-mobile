@@ -31,11 +31,7 @@ interface AppStartupActions {
      */
     suspend fun prewarmSettings()
 
-    /**
-     * Follows the host's shell state (the person's appearance today) for the life of the process: reads it on
-     * every connection, mirrors it for offline display and migrates the old device-local choices. Never returns
-     * until cancelled, so it runs beside the startup tasks, not among them.
-     */
+    /** Follows the host's shell state until cancelled ([ISettingsRepository.followHostSettings]); runs beside the startup tasks. */
     suspend fun followHostSettings()
 }
 
@@ -77,10 +73,7 @@ class DefaultAppStartupActions @Inject constructor(
         }
     }
 
-    override suspend fun followHostSettings() {
-        val settings = withContext(Dispatchers.IO) { settingsRepository.get() }
-        settings.followHostSettings()
-    }
+    override suspend fun followHostSettings() = withContext(Dispatchers.IO) { settingsRepository.get() }.followHostSettings()
 
     override suspend fun prewarmDatabase() {
         // letta-mobile-g2ff0: Room DB init is expensive (~700ms). Pre-warm it on IO

@@ -19,8 +19,10 @@ canvas edits and the like) is **one document held by the host for its single own
 client. A host (an iroh-wrapper-cli server, or the on-device runtime when the phone runs locally) serves
 one person and that person's paired devices, so there is no per-user or per-device document: every device
 the owner pairs reads and proposes changes to the same document, and a change on one device reaches the
-others at once. Clients keep no copy on the device. This contract is the store and the wire only: no
-client area moves onto it yet, and nothing is migrated from device storage. The same store is the
+others at once. Clients keep no authoritative copy: at most a disposable mirror of the last document the host answered (see
+Client behaviour). The first area to live on it is **appearance** (the theme mode, the colour preset and dynamic colour;
+keys under `appearance.`); every other area still keeps its client copy until it moves, and nothing in the document is
+ever a secret. The same store is the
 storage layer later work (a host turn journal, export and import between hosts) builds on.
 
 ## Transport, discovery and versioning
@@ -59,7 +61,7 @@ learn, or could change, state that spans every agent on the host, so both method
 - Every entry a proposal writes takes that proposal's new `document_revision` as its own `revision`, so
   an entry's revision only grows and is never reused, even when the entry is removed and set again.
 - A key is 1 to 128 characters of lowercase `a-z`, digits, `.`, `_` and `-`, starting with a letter or
-  digit (for example `appearance.theme`).
+  digit (for example `appearance.theme`), **and lies in an allowed namespace** (below).
 - `updated_by` records who made the change, as a tagged object: `{"type":"user","client_id":"..."}` for a
   person or `{"type":"agent","agent_id":"..."}` for an agent. **Over `admin_rpc` the actor is always
   `user`**, with `client_id` set to the serving connection's authenticated endpoint (or `host-local` for
@@ -68,6 +70,23 @@ learn, or could change, state that spans every agent on the host, so both method
 - `updated_at_ms` is the host clock when the entry was written.
 - The host stores exactly this object (`shell-state.json`), so a host-state export can carry it unchanged.
   The file is replaced by a rename and readable only by the host's user.
+
+### Allowed key namespaces
+
+A paired chat device may propose a key only under a namespace of an area that has moved onto the document:
+the allowlist is `ShellStateWire.KEY_NAMESPACES`, enforced by the host before anything else is read. Any other key
+(a typo, an area that has not moved, a name that looks like a secret) refuses the **whole** proposal with
+`invalid_request` and changes nothing, so a chat-role device cannot write arbitrary keys. Removing an entry is
+held to the same list. A namespace is added only in the change that moves its area, with the area's keys, value
+shapes and migration documented here.
+
+| Namespace | Area | Keys (value) |
+| --- | --- | --- |
+| `appearance.` | Look of the app: per person, so it follows them to every device | `appearance.theme` (string: `LIGHT`, `DARK` or `SYSTEM`), `appearance.theme_preset` (string: a colour preset's name, Android only today), `appearance.dynamic_color` (boolean: wallpaper colours, Android only) |
+
+**No secret is ever a shell state entry.** Tokens, API keys, pairing material and anything else that grants access
+live in the services secret store or the device's own secure storage, never in the document, its mirror on a device,
+or an export. A client mirrors only entries inside the allowed namespaces, whatever a host sent.
 
 ### Limits
 
@@ -101,7 +120,7 @@ learn, or could change, state that spans every agent on the host, so both method
 | `error` | When |
 | --- | --- |
 | `revision_conflict` | Some change's `expected_revision` is no longer its entry's revision. |
-| `invalid_request` | Missing, empty, non-array or overlong `changes`, a non-object change, a key that is not valid or is repeated in the proposal, or a missing, negative or non-integer `expected_revision`. |
+| `invalid_request` | Missing, empty, non-array or overlong `changes`, a non-object change, a key that is not valid, **outside the allowed namespaces**, or repeated in the proposal, or a missing, negative or non-integer `expected_revision`. |
 | `too_large` | A value or the resulting document would pass a limit above. |
 | `state_unreadable` | The host cannot decode its stored document, or it is of a newer schema. The file is kept and nothing is written; the owner must repair or remove it, after which the host serves again without a restart. |
 | `forbidden: agent not in this device's scope` | An agent-scoped peer. |
@@ -125,11 +144,34 @@ authenticated, may read agents (`chat.read`) and is not agent-scoped:
 
 ## Client behaviour (normative for this repository's clients)
 
-- The last document read is kept in memory only, never on the device. Without the capability there is
-  no state and edits are refused.
+- The last document read is held in memory. A client may also keep a **disposable mirror** of it on the device
+  (the client store's `shell_state_mirror_v1` cache, entries in the allowed namespaces only) so a cold start
+  while the host is out of reach still shows the last known document: the mirror is shown as not live, is
+  replaced by whatever the host answers first, is never a base for an edit and is wiped with the other caches.
+  Without the capability there is no state and edits are refused; a connected host without the contract drops
+  the mirror.
 - A proposal sends each touched entry with the revision the client last saw of it. Success adopts the
   host's answer; `revision_conflict` reads the document again; any other refusal changes nothing shown.
 - While the host is unreachable or the document has not been read on this connection, edits are refused
   and nothing is queued; the last document read keeps showing. A connected client whose last read or
   write failed (for any reason, including a refusal) reads again before its next edit, so one failed call
   never leaves it read-only until a reconnect. The document is read again on every reconnect.
+
+## Appearance (the first area)
+
+- **One choice per person**, held on the host: a theme change on one paired device shows on the others through
+  the push, and a device that was offline reads it on reconnect.
+- **Reads:** the shown value of each field is the host's entry; while the host is out of reach it is the mirror's
+  (the last document read); until the first host answer on a device that never had one, the device's own choice from
+  before the move; else the platform default (`SYSTEM` theme, `DEFAULT` preset).
+- **Edits** are proposals (`appearance.theme`, `appearance.theme_preset`, `appearance.dynamic_color`). While the host
+  is unreachable, does not serve the contract, answers a conflict or refuses, the edit is **refused with the reason on
+  screen** and not queued; the shown value does not change. A new theme or preset also resets the chat background to
+  the theme's own, which is a per-device choice and stays on the device.
+- **One-time migration** of a device's old local choices: whenever the document has been read on a connection, the
+  device proposes the choices **the host has no entry for yet**, each as a compare-and-set against "absent"; an entry
+  another device already set is never overwritten, and a choice another device writes between the read and the
+  proposal wins (`revision_conflict`, then the remainder is retried once). Once the host holds an answer for every
+  local choice the device forgets them, so each is proposed at most once per device.
+- Per device and therefore **not** in the document: the chat background, the chat text size, window layout and
+  high-contrast (see the client-state inventory in the pull request that moved this area).

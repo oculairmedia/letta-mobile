@@ -41,8 +41,10 @@ class AppearanceSettings(
 fun ShellStateEditOutcome.toSettingsStatus(): SettingsStatus? = when (this) {
     ShellStateEditOutcome.APPLIED -> null
     ShellStateEditOutcome.CONFLICT -> SettingsStatus("Another device changed this at the same time. Try again.", SettingsTone.Warning)
-    ShellStateEditOutcome.OFFLINE -> SettingsStatus("Can't reach your host, so this was not changed. Try again when it is connected.", SettingsTone.Error)
-    ShellStateEditOutcome.UNSUPPORTED -> SettingsStatus("This host doesn't keep shared appearance yet. Update it to change this.", SettingsTone.Error)
+    ShellStateEditOutcome.OFFLINE ->
+        SettingsStatus("Can't reach your host, so this was not changed. Try again when it is connected.", SettingsTone.Error)
+    ShellStateEditOutcome.UNSUPPORTED ->
+        SettingsStatus("This host doesn't keep shared appearance yet. Update it to change this.", SettingsTone.Error)
     ShellStateEditOutcome.REFUSED -> SettingsStatus("The host refused this change.", SettingsTone.Error)
 }
 
