@@ -108,6 +108,13 @@ data class VoiceLoopConfig(
      * keeps the first segment sentence-sized too. See [com.letta.mobile.data.voice.speech.SentenceChunker].
      */
     val firstClauseMinLength: Int? = DEFAULT_FIRST_CLAUSE_MIN_LENGTH,
+    /**
+     * The length after which the chunker releases a segment: sentences after the first are merged
+     * until they reach it, so the speech server gets fewer, longer requests (steadier voice from one
+     * chunk to the next). Never more than [maxSegmentLength]; null keeps one sentence per segment.
+     * See [com.letta.mobile.data.voice.speech.SentenceChunker].
+     */
+    val minSegmentLength: Int? = DEFAULT_MIN_SEGMENT_LENGTH,
     /** The most late reply segments held while the person speaks; older ones are dropped. */
     val maxHeldLateSegments: Int = DEFAULT_MAX_HELD,
     /**
@@ -116,10 +123,15 @@ data class VoiceLoopConfig(
      */
     val maxPendingReplies: Int = DEFAULT_MAX_PENDING,
 ) {
+    init {
+        require(minSegmentLength == null || minSegmentLength > 0) { "minSegmentLength must be positive or null" }
+    }
+
     private companion object {
         const val DEFAULT_MAX_HELD = 16
         const val DEFAULT_MAX_PENDING = 4
         const val DEFAULT_MAX_SEGMENT_LENGTH = 240
         const val DEFAULT_FIRST_CLAUSE_MIN_LENGTH = 40
+        const val DEFAULT_MIN_SEGMENT_LENGTH = 120
     }
 }

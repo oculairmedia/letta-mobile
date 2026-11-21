@@ -201,11 +201,11 @@ internal class ChatVoiceLiveOverlayLoopTest : ChatSendCoordinatorConversationFix
 
         rig.overlay("It is noon. It is sunny. Bye", runs)
         advanceUntilIdle()
-        assertEquals(listOf("It is noon.", "It is sunny."), rig.mouth.spokenTexts.map { it.trim() })
+        assertEquals(listOf("It is noon."), rig.mouth.spokenTexts.map { it.trim() }, "later sentences are merged until the minimum length")
 
         rig.coordinator.handleEvent(WsTimelineEvent.TurnDone(TURN, "local-run-544", BridgeTurnStatus.Completed))
         advanceUntilIdle()
-        assertEquals(listOf("It is noon.", "It is sunny.", "Bye"), rig.mouth.spokenTexts.map { it.trim() })
+        assertEquals(listOf("It is noon.", "It is sunny. Bye"), rig.mouth.spokenTexts.map { it.trim() })
     }
 
     private companion object {

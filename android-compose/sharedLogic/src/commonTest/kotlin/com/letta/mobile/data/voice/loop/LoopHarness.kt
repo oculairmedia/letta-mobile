@@ -25,6 +25,9 @@ internal class LoopHarness(
     /** Every speech.skipped decision the loop reported, as "REASON:segments". */
     val skipped = mutableListOf<String>()
 
+    /** Every reply.segments report the loop made, as "segments/min/median/moodChanges". */
+    val segmented = mutableListOf<String>()
+
     /** Every confirmed stop of the mouth the loop reported, by reason. */
     val stopped = mutableListOf<SpeechStopReason>()
     val log = EngineLog()
@@ -40,6 +43,10 @@ internal class LoopHarness(
         VoiceLoopRuntime(owner, StandardTestDispatcher(test.testScheduler), clock, observer = object : VoiceLoopObserver {
             override fun speechSkipped(reason: SpeechSkipReason, segments: Int) {
                 skipped += "${reason.name}:$segments"
+            }
+
+            override fun replySegmented(segments: Int, minChars: Int, medianChars: Int, moodChanges: Int) {
+                segmented += "$segments/$minChars/$medianChars/$moodChanges"
             }
 
             override fun speechStopped(reason: SpeechStopReason, silentAfter: Duration) {

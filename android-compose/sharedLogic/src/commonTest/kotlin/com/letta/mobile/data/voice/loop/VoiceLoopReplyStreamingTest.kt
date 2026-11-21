@@ -23,10 +23,10 @@ class VoiceLoopReplyStreamingTest {
         assertEquals(VoicePhase.SPEAKING, h.state.phase)
 
         h.replyText(VoiceText(" sunny. And"))
-        assertEquals(listOf("It is noon.", "It is sunny."), h.mouth.spokenTexts, "each later sentence as soon as it ends")
+        assertEquals(listOf("It is noon."), h.mouth.spokenTexts, "later sentences are merged until the minimum length")
 
         h.reply(VoiceReplyEvent.Completed)
-        assertEquals(listOf("It is noon.", "It is sunny.", "And"), h.mouth.spokenTexts)
+        assertEquals(listOf("It is noon.", "It is sunny. And"), h.mouth.spokenTexts, "the end of the reply releases what is held")
     }
 
     @Test
@@ -36,7 +36,7 @@ class VoiceLoopReplyStreamingTest {
         h.turn()
 
         h.replyText(VoiceText("It is noon. It is sunny. It is warm. "))
-        assertEquals(listOf("It is noon.", "It is sunny. It is warm."), h.mouth.spokenTexts)
+        assertEquals(listOf("It is noon."), h.mouth.spokenTexts, "the rest is held to be merged")
 
         h.reply(VoiceReplyEvent.Completed)
         assertEquals(listOf("It is noon.", "It is sunny. It is warm."), h.mouth.spokenTexts)
@@ -49,9 +49,9 @@ class VoiceLoopReplyStreamingTest {
         h.turn()
 
         h.replyText(VoiceText("It is noon. It is sunny. It is warm."))
-        assertEquals(listOf("It is noon.", "It is sunny."), h.mouth.spokenTexts)
+        assertEquals(listOf("It is noon."), h.mouth.spokenTexts)
 
         h.reply(VoiceReplyEvent.Completed)
-        assertEquals(listOf("It is noon.", "It is sunny.", "It is warm."), h.mouth.spokenTexts)
+        assertEquals(listOf("It is noon.", "It is sunny. It is warm."), h.mouth.spokenTexts)
     }
 }
