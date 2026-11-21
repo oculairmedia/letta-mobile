@@ -21,6 +21,8 @@ import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDefaultConfig
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
+import com.letta.mobile.data.settings.SettingsTone
+import com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.InMemorySecureSettingsStore
 import com.letta.mobile.ui.common.UiState
@@ -457,6 +459,32 @@ class ConfigViewModelTest {
 
         assertEquals(false, successState.dynamicColor)
         assertEquals(false, fakeRepository.getDynamicColor().first())
+    }
+
+    @Test
+    fun aThemeTheHostDoesNotTakeLeavesTheFormAndTheSettingAndSaysWhy() = runTest {
+        fakeRepository.hostOutcome = ShellStateEditOutcome.OFFLINE
+        val form = loadedFormAfter { updateTheme(AppTheme.DARK) }
+
+        assertEquals(AppTheme.SYSTEM, form.theme)
+        assertEquals(AppTheme.SYSTEM, fakeRepository.getTheme().first())
+        val notice = viewModel.appearance.notice?.value
+        assertEquals(SettingsTone.Error, notice?.tone)
+
+        fakeRepository.hostOutcome = ShellStateEditOutcome.APPLIED
+        viewModel.updateTheme(AppTheme.DARK)
+        assertEquals(AppTheme.DARK, fakeRepository.getTheme().first())
+        assertEquals(null, viewModel.appearance.notice?.value)
+    }
+
+    @Test
+    fun aPresetTheHostDoesNotTakeAlsoLeavesDynamicColorAlone() = runTest {
+        fakeRepository.hostOutcome = ShellStateEditOutcome.CONFLICT
+        val form = loadedFormAfter { updateThemePreset(ThemePreset.SAKURA) }
+
+        assertEquals(ThemePreset.DEFAULT, form.themePreset)
+        assertEquals(true, fakeRepository.getDynamicColor().first())
+        assertEquals(SettingsTone.Warning, viewModel.appearance.notice?.value?.tone)
     }
 
     @Test

@@ -30,6 +30,13 @@ interface AppStartupActions {
      * composition finds the singleton already constructed (letta-mobile-wyo3p).
      */
     suspend fun prewarmSettings()
+
+    /**
+     * Follows the host's shell state (the person's appearance today) for the life of the process: reads it on
+     * every connection, mirrors it for offline display and migrates the old device-local choices. Never returns
+     * until cancelled, so it runs beside the startup tasks, not among them.
+     */
+    suspend fun followHostSettings()
 }
 
 @Singleton
@@ -68,6 +75,11 @@ class DefaultAppStartupActions @Inject constructor(
         withContext(Dispatchers.IO) {
             settingsRepository.get()
         }
+    }
+
+    override suspend fun followHostSettings() {
+        val settings = withContext(Dispatchers.IO) { settingsRepository.get() }
+        settings.followHostSettings()
     }
 
     override suspend fun prewarmDatabase() {

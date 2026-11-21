@@ -79,57 +79,57 @@ class ShellStateRoutesTest {
 
     @Test
     fun theActorIsTheServingConnectionNeverAValueTheCallerSent() = runBlocking {
-        val forged = propose(change("a", JsonPrimitive(1), 0)).toMutableMap().apply {
+        val forged = propose(change("appearance.a", JsonPrimitive(1), 0)).toMutableMap().apply {
             put("actor", buildJsonObject { put("type", "agent"); put("agent_id", "agent-evil") })
         }
         val reply = call(ShellStateWire.PROPOSE, JsonObject(forged), endpoint = "endpoint-a")
-        val actor = reply.getValue("entries").jsonObject.getValue("a").jsonObject.getValue("updated_by").jsonObject
+        val actor = reply.getValue("entries").jsonObject.getValue("appearance.a").jsonObject.getValue("updated_by").jsonObject
         assertEquals("user", actor.getValue("type").jsonPrimitive.content)
         assertEquals("endpoint-a", actor.getValue("client_id").jsonPrimitive.content)
     }
 
     @Test
     fun anInProcessCallerIsRecordedAsTheHostLocalClient() = runBlocking {
-        val reply = call(ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(1), 0)), endpoint = null)
-        val actor = reply.getValue("entries").jsonObject.getValue("a").jsonObject.getValue("updated_by").jsonObject
+        val reply = call(ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(1), 0)), endpoint = null)
+        val actor = reply.getValue("entries").jsonObject.getValue("appearance.a").jsonObject.getValue("updated_by").jsonObject
         assertEquals(ShellStateWire.LOCAL_CLIENT_ID, actor.getValue("client_id").jsonPrimitive.content)
     }
 
     @Test
     fun writersOfDifferentEntriesNeverConflictAndASameEntryStaleWriterDoes() = runBlocking {
-        call(ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(1), 0), change("b", JsonPrimitive(1), 0)))
-        call(ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(2), 1)))
+        call(ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(1), 0), change("appearance.b", JsonPrimitive(1), 0)))
+        call(ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(2), 1)))
         // b is still at revision 1 for a writer who last saw it there, whatever happened to a.
-        val b = call(ShellStateWire.PROPOSE, propose(change("b", JsonPrimitive(9), 1)))
+        val b = call(ShellStateWire.PROPOSE, propose(change("appearance.b", JsonPrimitive(9), 1)))
         assertEquals(3L, b.getValue("document_revision").jsonPrimitive.long)
-        assertEquals(ShellStateWire.REVISION_CONFLICT, failure(ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(3), 1))))
+        assertEquals(ShellStateWire.REVISION_CONFLICT, failure(ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(3), 1))))
     }
 
     @Test
     fun aProposalIsAllOrNothing() = runBlocking {
-        call(ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(1), 0)))
+        call(ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(1), 0)))
         val conflict = failure(
             ShellStateWire.PROPOSE,
-            propose(change("b", JsonPrimitive(1), 0), change("a", JsonPrimitive(2), 0)),
+            propose(change("appearance.b", JsonPrimitive(1), 0), change("appearance.a", JsonPrimitive(2), 0)),
         )
         assertEquals(ShellStateWire.REVISION_CONFLICT, conflict)
         val now = call(ShellStateWire.GET, JsonObject(emptyMap()))
-        assertEquals(setOf("a"), now.getValue("entries").jsonObject.keys)
+        assertEquals(setOf("appearance.a"), now.getValue("entries").jsonObject.keys)
         assertEquals(1, pushed.size)
     }
 
     @Test
     fun aRemovedEntryNeverReusesARevision() = runBlocking {
-        call(ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(1), 0)))
-        call(ShellStateWire.PROPOSE, propose(change("a", null, 1)))
-        val again = call(ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(1), 0)))
-        assertEquals(3L, again.getValue("entries").jsonObject.getValue("a").jsonObject.getValue("revision").jsonPrimitive.long)
+        call(ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(1), 0)))
+        call(ShellStateWire.PROPOSE, propose(change("appearance.a", null, 1)))
+        val again = call(ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(1), 0)))
+        assertEquals(3L, again.getValue("entries").jsonObject.getValue("appearance.a").jsonObject.getValue("revision").jsonPrimitive.long)
     }
 
     @Test
     fun anUnchangedProposalKeepsTheRevisionAndIsNotPushed() = runBlocking {
-        call(ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(1), 0)))
-        val same = call(ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(1), 1)))
+        call(ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(1), 0)))
+        val same = call(ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(1), 1)))
         assertEquals(1L, same.getValue("document_revision").jsonPrimitive.long)
         assertEquals(1, pushed.size)
     }
@@ -140,7 +140,7 @@ class ShellStateRoutesTest {
         val actor = ShellStateActor.User("endpoint-a")
         val results = (1..2).map { n ->
             async(Dispatchers.Default) {
-                runCatching { store.propose(listOf(ShellStateChange("a", JsonPrimitive(n), 0)), actor) }
+                runCatching { store.propose(listOf(ShellStateChange("appearance.a", JsonPrimitive(n), 0)), actor) }
             }
         }.awaitAll()
         assertEquals(1, results.count { it.isSuccess })
@@ -156,7 +156,7 @@ class ShellStateRoutesTest {
         fun dial() = AdminRpcRouter().also { ShellStateRoutes.forHost(dir, publisher).register(it) }
         val dials = listOf(dial(), dial())
         repeat(25) { round ->
-            val key = "round-$round"
+            val key = "appearance.round-$round"
             val replies = dials.map { dialRouter ->
                 async(Dispatchers.Default) {
                     Json.parseToJsonElement(
@@ -185,7 +185,7 @@ class ShellStateRoutesTest {
         val store = ShellStateStore(FileShellStatePersistence(path))
         val actor = ShellStateActor.User("endpoint-a")
         (1..20).map { n ->
-            async(Dispatchers.Default) { store.propose(listOf(ShellStateChange("key-$n", JsonPrimitive(n), 0)), actor) }
+            async(Dispatchers.Default) { store.propose(listOf(ShellStateChange("appearance.key-$n", JsonPrimitive(n), 0)), actor) }
         }.awaitAll()
         val now = store.snapshot()
         assertEquals(20L, now.documentRevision)
@@ -207,26 +207,49 @@ class ShellStateRoutesTest {
         val invalid = ShellStateWire.INVALID_REQUEST
         assertEquals(invalid, failure(ShellStateWire.PROPOSE, JsonObject(emptyMap())))
         assertEquals(invalid, failure(ShellStateWire.PROPOSE, JsonObject(mapOf(ShellStateWire.CHANGES to JsonArray(emptyList())))))
-        assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("Upper", JsonPrimitive(1), 0))))
+        assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("appearance.Upper", JsonPrimitive(1), 0))))
         assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("", JsonPrimitive(1), 0))))
-        assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(1), -1))))
-        assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(1), 0), change("a", JsonPrimitive(2), 0))))
-        val longKey = "k".repeat(ShellStateWire.MAX_KEY_CHARS + 1)
+        assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(1), -1))))
+        assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(1), 0), change("appearance.a", JsonPrimitive(2), 0))))
+        val longKey = "appearance." + "k".repeat(ShellStateWire.MAX_KEY_CHARS)
         assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change(longKey, JsonPrimitive(1), 0))))
-        val tooMany = (0..ShellStateWire.MAX_CHANGES).map { change("key-$it", JsonPrimitive(it), 0) }
+        val tooMany = (0..ShellStateWire.MAX_CHANGES).map { change("appearance.key-$it", JsonPrimitive(it), 0) }
         assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(*tooMany.toTypedArray())))
-        val notAnObject = JsonObject(mapOf(ShellStateWire.CHANGES to JsonArray(listOf(JsonPrimitive("a")))))
+        val notAnObject = JsonObject(mapOf(ShellStateWire.CHANGES to JsonArray(listOf(JsonPrimitive("appearance.a")))))
         assertEquals(invalid, failure(ShellStateWire.PROPOSE, notAnObject))
+    }
+
+    @Test
+    fun aKeyOutsideTheAllowedNamespacesIsRefusedWholeAndWritesNothing() = runBlocking {
+        val invalid = ShellStateWire.INVALID_REQUEST
+        listOf("layout.sidebar_open", "secrets.hf_token", "huggingface.token", "a", "appearance", "appearance.", "appearances.x", "x.appearance.theme").forEach { key ->
+            assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change(key, JsonPrimitive(1), 0))), key)
+        }
+        // One stray key refuses the whole proposal, even beside an allowed one; removal is held to the same list.
+        val mixed = propose(change("appearance.theme", JsonPrimitive("DARK"), 0), change("secrets.token", JsonPrimitive("x"), 0))
+        assertEquals(invalid, failure(ShellStateWire.PROPOSE, mixed))
+        assertEquals(invalid, failure(ShellStateWire.PROPOSE, propose(change("secrets.hf_token", null, 0))))
+        val now = call(ShellStateWire.GET, JsonObject(emptyMap()))
+        assertTrue(now.getValue("entries").jsonObject.isEmpty())
+        assertEquals(0L, now.getValue("document_revision").jsonPrimitive.long)
+        assertTrue(pushed.isEmpty())
+    }
+
+    @Test
+    fun everyAllowedNamespaceKeyIsAccepted() = runBlocking {
+        val keys = ShellStateWire.KEY_NAMESPACES.map { "${it}example" }
+        val reply = call(ShellStateWire.PROPOSE, propose(*keys.map { change(it, JsonPrimitive(1), 0) }.toTypedArray()))
+        assertEquals(keys.toSet(), reply.getValue("entries").jsonObject.keys)
     }
 
     @Test
     fun anOversizedValueOrDocumentIsTooLargeAndWritesNothing() = runBlocking {
         val big = JsonPrimitive("x".repeat(ShellStateWire.MAX_VALUE_BYTES))
-        assertEquals(ShellStateWire.TOO_LARGE, failure(ShellStateWire.PROPOSE, propose(change("a", big, 0))))
+        assertEquals(ShellStateWire.TOO_LARGE, failure(ShellStateWire.PROPOSE, propose(change("appearance.a", big, 0))))
         val fits = JsonPrimitive("x".repeat(ShellStateWire.MAX_VALUE_BYTES - 2))
         var accepted = 0
         while (accepted < ShellStateWire.MAX_ENTRIES) {
-            val params = propose(change("key-$accepted", fits, 0))
+            val params = propose(change("appearance.key-$accepted", fits, 0))
             val response = Json.parseToJsonElement(router.dispatch(AdminRpcInvocation("r", ShellStateWire.PROPOSE, params))).jsonObject
             if (!response.getValue("success").jsonPrimitive.boolean) {
                 assertEquals(ShellStateWire.TOO_LARGE, response["error"]?.jsonPrimitive?.content)
@@ -243,7 +266,7 @@ class ShellStateRoutesTest {
     @Test
     fun agentScopedPeersAreRefusedBothMethods() = runBlocking {
         val scoped = AdminRpcRequestContext(authenticated = true, authorizedAgentIds = setOf("agent-a"))
-        val proposal = propose(change("a", JsonPrimitive(1), 0))
+        val proposal = propose(change("appearance.a", JsonPrimitive(1), 0))
         listOf(ShellStateWire.GET to null, ShellStateWire.PROPOSE to proposal).forEach { (method, params) ->
             val response = Json.parseToJsonElement(router.dispatch(AdminRpcInvocation("r", method, params, scoped))).jsonObject
             assertFalse(response.getValue("success").jsonPrimitive.boolean)
@@ -256,10 +279,10 @@ class ShellStateRoutesTest {
     fun theFileKeepsTheDocumentAcrossARestartAndIsOwnerOnly() = runBlocking {
         val path = Files.createTempDirectory("shell-state").resolve("shell-state.json")
         val actor = ShellStateActor.User("endpoint-a")
-        ShellStateStore(FileShellStatePersistence(path)).propose(listOf(ShellStateChange("a", JsonPrimitive(1), 0)), actor)
+        ShellStateStore(FileShellStatePersistence(path)).propose(listOf(ShellStateChange("appearance.a", JsonPrimitive(1), 0)), actor)
         val reopened = ShellStateStore(FileShellStatePersistence(path))
         assertEquals(1L, reopened.snapshot().documentRevision)
-        val stale = runCatching { reopened.propose(listOf(ShellStateChange("a", JsonPrimitive(2), 0)), actor) }.exceptionOrNull()
+        val stale = runCatching { reopened.propose(listOf(ShellStateChange("appearance.a", JsonPrimitive(2), 0)), actor) }.exceptionOrNull()
         assertEquals(ShellStateWire.REVISION_CONFLICT, stale?.message)
         if ("posix" in path.fileSystem.supportedFileAttributeViews()) {
             assertEquals(setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE), Files.getPosixFilePermissions(path))
@@ -344,7 +367,7 @@ class ShellStateRoutesTest {
         assertEquals(ShellStateWire.STATE_UNREADABLE, failureOn(corrupt, ShellStateWire.GET, null))
         assertEquals(
             ShellStateWire.STATE_UNREADABLE,
-            failureOn(corrupt, ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(1), 0))),
+            failureOn(corrupt, ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(1), 0))),
         )
         assertEquals("{not json", String(Files.readAllBytes(path)))
         assertTrue(pushed.isEmpty())
@@ -375,7 +398,7 @@ class ShellStateRoutesTest {
     fun onDeviceHostKeepsItsDocumentInHostState() = runBlocking {
         val storage: Path = Files.createTempDirectory("runtime-storage")
         val local = AdminRpcRouter().also { ShellStateRoutes.forOnDeviceHost(storage, CoroutineScope(Dispatchers.Unconfined)).register(it) }
-        val response = local.dispatch(AdminRpcInvocation("r", ShellStateWire.PROPOSE, propose(change("a", JsonPrimitive(1), 0))))
+        val response = local.dispatch(AdminRpcInvocation("r", ShellStateWire.PROPOSE, propose(change("appearance.a", JsonPrimitive(1), 0))))
         assertTrue(Json.parseToJsonElement(response).jsonObject.getValue("success").jsonPrimitive.boolean)
         assertTrue(Files.exists(storage.resolve("host-state").resolve("shell-state.json")))
     }

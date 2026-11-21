@@ -9,6 +9,7 @@ import com.letta.mobile.data.repository.LastChatSelectionStorage
 import com.letta.mobile.data.repository.mergeLastChatSelection
 import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome
 import com.letta.mobile.data.repository.api.backendIdentity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -211,18 +212,27 @@ class FakeSettingsRepository(
     private fun featureFlagState(flag: FeatureFlag): MutableStateFlow<Boolean> =
         featureFlagStates.getOrPut(flag) { MutableStateFlow(flag.defaultEnabled) }
 
-    override suspend fun setTheme(theme: AppTheme) {
+    /** What the fake host answers to a host-held appearance edit; anything but APPLIED changes nothing. */
+    var hostOutcome: ShellStateEditOutcome = ShellStateEditOutcome.APPLIED
+
+    override suspend fun setTheme(theme: AppTheme): ShellStateEditOutcome {
+        if (hostOutcome != ShellStateEditOutcome.APPLIED) return hostOutcome
         themeState.value = theme
         chatBackgroundKeyState.value = "default"
+        return ShellStateEditOutcome.APPLIED
     }
 
-    override suspend fun setThemePreset(themePreset: ThemePreset) {
+    override suspend fun setThemePreset(themePreset: ThemePreset): ShellStateEditOutcome {
+        if (hostOutcome != ShellStateEditOutcome.APPLIED) return hostOutcome
         themePresetState.value = themePreset
         chatBackgroundKeyState.value = "default"
+        return ShellStateEditOutcome.APPLIED
     }
 
-    override suspend fun setDynamicColor(enabled: Boolean) {
+    override suspend fun setDynamicColor(enabled: Boolean): ShellStateEditOutcome {
+        if (hostOutcome != ShellStateEditOutcome.APPLIED) return hostOutcome
         dynamicColorState.value = enabled
+        return ShellStateEditOutcome.APPLIED
     }
 
     override suspend fun setEnableProjects(enabled: Boolean) {

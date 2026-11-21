@@ -31,9 +31,9 @@ import kotlinx.serialization.json.put
 
 /**
  * What this device knows of the host's shell state. [snapshot] is the last document read from the host
- * while this repository lives (kept in memory across a failed read or a disconnect, never stored on the
- * device); [live] is whether it was read from the connected host since the connection came up. Edits
- * need [editable].
+ * (kept in memory across a failed read or a disconnect; a [ShellStateSnapshotCache] may restore it at the next
+ * start so something shows before the host answers, but it is only ever a mirror of the host); [live] is whether
+ * it was read from the connected host since the connection came up. Edits need [editable].
  */
 data class ShellStateState(
     /** Whether the connected host serves the shell-state contract. */
@@ -108,9 +108,13 @@ enum class ShellStateEditOutcome {
  */
 class SharedShellState(
     private val link: ShellStateLink,
+    private val cache: ShellStateSnapshotCache = ShellStateSnapshotCache.None,
 ) {
     private val edits = Mutex()
-    private val mutableState = MutableStateFlow(ShellStateState())
+
+    // The cached document (a mirror of the last one the host answered, restored for offline display) is shown, never
+    // live: [ShellStateState.editable] needs a read on the current connection, so no edit is ever based on it.
+    private val mutableState = MutableStateFlow(ShellStateState(snapshot = cache.load()))
 
     /** Held across every change of the state and of [ledger]. */
     private val model = Mutex()
@@ -121,6 +125,9 @@ class SharedShellState(
 
     /** Whether the connected host serves the contract right now. */
     val supported: Boolean get() = ShellStateWire.CAPABILITY in link.hostCapabilities
+
+    /** Forgets the document kept for offline display; the one in memory stays until the host answers. */
+    fun clearCache() = cache.clear()
 
     /**
      * Follows the connection and the host's pushes until cancelled: reads again on every reconnect. A
@@ -165,6 +172,7 @@ class SharedShellState(
     private suspend fun noteUnsupported() {
         val connected = link.isConnected
         transition { if (connected) it.copy(supported = false, live = false, snapshot = null) else it.copy(live = false) }
+        if (connected) cache.clear()
     }
 
     /** Starts a new generation and applies [change] with it: the one place the connection epoch moves. */
@@ -235,7 +243,10 @@ class SharedShellState(
     private suspend fun adopt(snapshot: ShellStateSnapshot, issued: Issue, live: Boolean): Boolean = model.withLock {
         val shownRevision = mutableState.value.snapshot?.documentRevision ?: NO_REVISION
         val admission = ledger.admit(issued, snapshot.documentRevision, shownRevision)
-        if (admission == Admission.REPLACE) ledger.recordShown(issued)
+        if (admission == Admission.REPLACE) {
+            ledger.recordShown(issued)
+            cache.save(snapshot)
+        }
         if (admission != Admission.DROP) {
             mutableState.update { current ->
                 val shown = if (admission == Admission.REPLACE) snapshot else current.snapshot

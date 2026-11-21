@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.LastChatSelection
+import com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -95,9 +96,18 @@ interface ISettingsRepository {
     fun getFeatureFlag(flag: FeatureFlag): Flow<Boolean> = flowOf(flag.defaultEnabled)
     suspend fun setFeatureFlag(flag: FeatureFlag, enabled: Boolean) = Unit
 
-    suspend fun setTheme(theme: AppTheme)
-    suspend fun setThemePreset(themePreset: ThemePreset)
-    suspend fun setDynamicColor(enabled: Boolean)
+
+    /**
+     * Appearance is the host's, one choice for every paired device (the shell state document), so each setter
+     * says whether the host took the change; nothing is queued while it is out of reach. The getters show what the
+     * host holds, and what this device last saw of it when the host is out of reach.
+     */
+    suspend fun setTheme(theme: AppTheme): ShellStateEditOutcome
+    suspend fun setThemePreset(themePreset: ThemePreset): ShellStateEditOutcome
+    suspend fun setDynamicColor(enabled: Boolean): ShellStateEditOutcome
+
+    /** Follows the host's shell state for as long as the caller runs: the settings it holds are read and migrated. */
+    suspend fun followHostSettings() = Unit
     suspend fun setEnableProjects(enabled: Boolean)
     suspend fun setHapticsEnabled(enabled: Boolean)
 }

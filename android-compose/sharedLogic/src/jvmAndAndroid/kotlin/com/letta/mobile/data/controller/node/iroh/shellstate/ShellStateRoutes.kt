@@ -104,7 +104,10 @@ internal class ShellStateRouteSet(
     }
 }
 
-/** Reads and checks the params of `shell.state.propose`; anything malformed is an invalid request, anything oversized too large. */
+/**
+ * Reads and checks the params of `shell.state.propose`; anything malformed (a key outside [ShellStateWire.KEY_NAMESPACES]
+ * included) is an invalid request, anything oversized too large.
+ */
 internal object ShellStateParams {
     /** The changes of [params]; refuses a missing, empty or overlong list, a repeated key, or a bad change. */
     fun changes(params: JsonObject?): List<ShellStateChange> {
@@ -128,6 +131,8 @@ internal object ShellStateParams {
         val primitive = fields[ShellStateWire.KEY] as? JsonPrimitive
         val text = primitive?.takeIf { it.isString }?.content.orEmpty()
         if (text.length > ShellStateWire.MAX_KEY_CHARS || !ShellStateWire.KEY_PATTERN.matches(text)) invalid()
+        // A chat-role device may only write the namespaces of the areas that live on the document.
+        if (!ShellStateWire.isAllowedKey(text)) invalid()
         return text
     }
 

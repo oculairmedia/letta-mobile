@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.runtime.PermissionModeSettings
+import com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import kotlinx.coroutines.flow.StateFlow
 
@@ -26,9 +27,23 @@ class AppearanceSettings(
     /** Null where the OS offers no wallpaper colours (desktop, Android before 12). */
     val dynamicColor: SettingValue<Boolean>? = null,
     val haptics: SettingValue<Boolean>? = null,
+    /** Why the last change to a host-held setting here was not made; null while there is nothing to say. */
+    val notice: StateFlow<SettingsStatus?>? = null,
 ) {
     /** True when the platform binds none of these, so the page leaves the section out. */
     val isEmpty: Boolean get() = listOfNotNull(theme, themePreset, dynamicColor, haptics).isEmpty()
+}
+
+/**
+ * What the Settings page says about an edit of a host-held setting: nothing when the host took it; otherwise why
+ * it was not made. Nothing is queued, so the setting still shows what the host holds.
+ */
+fun ShellStateEditOutcome.toSettingsStatus(): SettingsStatus? = when (this) {
+    ShellStateEditOutcome.APPLIED -> null
+    ShellStateEditOutcome.CONFLICT -> SettingsStatus("Another device changed this at the same time. Try again.", SettingsTone.Warning)
+    ShellStateEditOutcome.OFFLINE -> SettingsStatus("Can't reach your host, so this was not changed. Try again when it is connected.", SettingsTone.Error)
+    ShellStateEditOutcome.UNSUPPORTED -> SettingsStatus("This host doesn't keep shared appearance yet. Update it to change this.", SettingsTone.Error)
+    ShellStateEditOutcome.REFUSED -> SettingsStatus("The host refused this change.", SettingsTone.Error)
 }
 
 /** Chat: whether a conversation opens on the canvas, and the default permission mode new conversations start in. */

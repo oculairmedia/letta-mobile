@@ -2,9 +2,6 @@ package com.letta.mobile.data.repository
 
 /** Non-secret preference keys persisted via [com.letta.mobile.data.storage.SettingsPreferencesStore]. */
 internal object SettingsPreferenceKeys {
-    const val THEME = "theme"
-    const val THEME_PRESET = "theme_preset"
-    const val DYNAMIC_COLOR = "dynamic_color"
     const val CHAT_BACKGROUND = "chat_background"
     const val PINNED_CONVERSATION_IDS = "pinned_conversation_ids"
     const val PINNED_PROJECT_IDS = "pinned_project_ids"

@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.backendIdentity
+import com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -67,9 +68,9 @@ class ActiveConfigSettingsRepository(
     override suspend fun setChatFontScale(scale: Float) = Unit
     override fun getEnableProjects(): Flow<Boolean> = flowOf(true)
     override fun getHapticsEnabled(): Flow<Boolean> = flowOf(true)
-    override suspend fun setTheme(theme: AppTheme) = Unit
-    override suspend fun setThemePreset(themePreset: ThemePreset) = Unit
-    override suspend fun setDynamicColor(enabled: Boolean) = Unit
+    override suspend fun setTheme(theme: AppTheme) = ShellStateEditOutcome.UNSUPPORTED
+    override suspend fun setThemePreset(themePreset: ThemePreset) = ShellStateEditOutcome.UNSUPPORTED
+    override suspend fun setDynamicColor(enabled: Boolean) = ShellStateEditOutcome.UNSUPPORTED
     override suspend fun setEnableProjects(enabled: Boolean) = Unit
     override suspend fun setHapticsEnabled(enabled: Boolean) = Unit
     override fun getOpenChatsOnCanvas(): Flow<Boolean> = flowOf(OPEN_CHATS_ON_CANVAS_DEFAULT)
