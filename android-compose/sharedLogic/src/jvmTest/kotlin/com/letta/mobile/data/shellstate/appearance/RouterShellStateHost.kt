@@ -145,7 +145,9 @@ internal class RouterShellStateHost(private val directory: Path = Files.createTe
                 return AppServerInboundFrame.AdminRpcResponse(requestId = "r", success = false, error = "forbidden")
             }
             val reply = dispatch(method, appServerAdminRpcParams(path, body), endpoint)
-            return AppServerInboundFrame.AdminRpcResponse(requestId = "r", success = reply.success, result = reply.result, error = reply.error)
+            return AppServerInboundFrame.AdminRpcResponse(
+                requestId = "r", success = reply.success, result = reply.result, error = reply.error,
+            )
         }
     }
 }

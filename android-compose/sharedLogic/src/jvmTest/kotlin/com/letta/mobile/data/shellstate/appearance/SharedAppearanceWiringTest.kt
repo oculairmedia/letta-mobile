@@ -57,7 +57,8 @@ class SharedAppearanceWiringTest {
         val held = AppearanceValues("DARK", "OCEAN")
         assertEquals(held, within { desktop.values.first { it == held } })
         assertEquals(held, within { web.values.first { it == held } })
-        assertEquals(mapOf(AppearanceKeys.THEME to JsonPrimitive("DARK"), AppearanceKeys.THEME_PRESET to JsonPrimitive("OCEAN")), host.entries())
+        val onHost = mapOf(AppearanceKeys.THEME to JsonPrimitive("DARK"), AppearanceKeys.THEME_PRESET to JsonPrimitive("OCEAN"))
+        assertEquals(onHost, host.entries())
         assertEquals(desktop.current, web.current, "both read the host's document on their first frame")
     }
 
@@ -65,8 +66,8 @@ class SharedAppearanceWiringTest {
     fun aDesktopThatSwitchesBackendShowsTheNewHostsAppearanceNotTheOldOnes() = runBlocking {
         val first = RouterShellStateHost()
         val second = RouterShellStateHost()
-        assertEquals(ShellStateEditOutcome.APPLIED, desktopClient(MutableStateFlow(first.transport("setup"))).edit { setTheme("DARK") })
-        assertEquals(ShellStateEditOutcome.APPLIED, desktopClient(MutableStateFlow(second.transport("setup"))).edit { setTheme("LIGHT") })
+        seedTheme(first, "DARK")
+        seedTheme(second, "LIGHT")
         val transports = MutableStateFlow<IChannelTransport?>(first.transport("desktop"))
         val desktop = desktopClient(transports)
         within { desktop.values.first { it.theme == "DARK" } }
@@ -81,8 +82,8 @@ class SharedAppearanceWiringTest {
     fun aWebPageWhoseSessionIsRebuiltOverAnotherHostShowsThatHostsAppearance() = runBlocking {
         val first = RouterShellStateHost()
         val second = RouterShellStateHost()
-        assertEquals(ShellStateEditOutcome.APPLIED, desktopClient(MutableStateFlow(first.transport("setup"))).edit { setThemePreset("SAKURA") })
-        assertEquals(ShellStateEditOutcome.APPLIED, desktopClient(MutableStateFlow(second.transport("setup"))).edit { setThemePreset("SPRING") })
+        seed(first, "SAKURA")
+        seed(second, "SPRING")
         val channel = MutableStateFlow<IChannelTransport>(first.transport("browser", IrohPeerCapabilities.CHAT_ROLE))
         val graphs = graphsOver(channel)
         val web = hostAppearanceOver(channelShellStateLink(graphs.channelTransports()), InMemorySecureSettingsStore())
@@ -124,6 +125,18 @@ class SharedAppearanceWiringTest {
         assertEquals(AppearanceValues.NONE, none.values.first())
         assertEquals(ShellStateEditOutcome.OFFLINE, none.setTheme("DARK"))
         assertEquals(AppearanceValues.NONE, none.current)
+    }
+
+    /** Puts [theme] on [host] through a throwaway client, as another device would. */
+    private suspend fun seedTheme(host: RouterShellStateHost, theme: String) {
+        val applied = desktopClient(MutableStateFlow(host.transport("setup"))).edit { setTheme(theme) }
+        assertEquals(ShellStateEditOutcome.APPLIED, applied)
+    }
+
+    /** Puts the colour [preset] on [host] through a throwaway client, as another device would. */
+    private suspend fun seed(host: RouterShellStateHost, preset: String) {
+        val applied = desktopClient(MutableStateFlow(host.transport("setup"))).edit { setThemePreset(preset) }
+        assertEquals(ShellStateEditOutcome.APPLIED, applied)
     }
 
     /** Desktop's binding: the transport slot the shell publishes into, and the desktop's own key-value store. */

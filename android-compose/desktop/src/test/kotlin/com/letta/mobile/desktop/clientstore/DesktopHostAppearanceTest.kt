@@ -120,7 +120,8 @@ class DesktopHostAppearanceTest {
      */
     private class HostTransport : NoOpChannelTransport() {
         private val router = AdminRpcRouter().also {
-            ShellStateRoutes.forHost(Files.createTempDirectory("desktop-host-state"), ShellStatePublisher(CoroutineScope(Dispatchers.Unconfined))).register(it)
+            val publisher = ShellStatePublisher(CoroutineScope(Dispatchers.Unconfined))
+            ShellStateRoutes.forHost(Files.createTempDirectory("desktop-host-state"), publisher).register(it)
         }
         override val state: StateFlow<ChannelTransportState> = MutableStateFlow(
             ChannelTransportState.Connected(serverId = "iroh-app-server", sessionId = "host", deviceId = "desktop", connectionEpoch = 1),
