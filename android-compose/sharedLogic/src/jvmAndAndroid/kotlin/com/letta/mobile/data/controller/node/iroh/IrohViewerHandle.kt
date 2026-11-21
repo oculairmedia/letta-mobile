@@ -152,20 +152,26 @@ internal fun streamDeltaFrame(runtime: AppServerRuntimeScope, delta: JsonObject,
     }.toString()
 
 /**
- * Replays a redial's parked delta bodies ([parked], newline-separated) to the reconnecting
- * initiator's [viewer]. Each body is re-tagged and stamped at REPLAY time from the new
- * connection's counter, under the same lock as live writes. The
- * parked tail holds delta BODIES ([TurnFrameTracker] records them before any envelope), so
- * there is no original seq to keep, and one would be wrong anyway: it came from the dead
- * connection's counter, which the client's gap detector tracks as a separate generation.
- * Dedupe of replayed rows rides on their message ids and cm-stream tags, not on event_seq.
- * Throws when a write fails so the caller can re-park the tail for a later redial.
+ * Replays the journaled tail of a turn ([replay]) to the reconnecting initiator's [viewer]. Each body is re-tagged and
+ * stamped at REPLAY time from the new connection's counter, under the same lock as live writes. The journal holds delta
+ * BODIES, so there is no original seq to keep, and one would be wrong anyway: it came from the dead connection's counter,
+ * which the client's gap detector tracks as a separate generation. Dedupe of replayed rows rides on their message ids and
+ * cm-stream tags, not on event_seq. When the turn ended with no real terminal, [INTERRUPTED_TERMINAL] is appended for
+ * clients of this path that wait for one; the journal never holds it. Throws when a write fails so the tail stays owed.
  */
-internal suspend fun replayParkedDeltas(viewer: IrohViewerHandle, runtime: AppServerRuntimeScope, parked: String) {
-    parked.split("\n").filter { it.isNotBlank() }.forEach { frameJson ->
+internal suspend fun replayJournalDeltas(viewer: IrohViewerHandle, runtime: AppServerRuntimeScope, replay: InitiatorReplay) {
+    val stub = INTERRUPTED_TERMINAL.takeUnless { replay.terminalObserved }
+    (replay.deltas + listOfNotNull(stub)).forEach { frameJson ->
         val delta = AppServerProtocol.json.parseToJsonElement(frameJson).jsonObject
         check(viewer.writeBroadcastFrame(runtime, tagStreamDeltaForOptimisticDedup(delta))) {
-            "parked frame replay write failed"
+            "journal replay write failed"
         }
     }
 }
+
+/** The legacy redial stub for a turn that ended with no real terminal; for old clients only, never journaled. */
+internal val INTERRUPTED_TERMINAL: String = buildJsonObject {
+    put("message_type", "error_message")
+    put("message", "connection interrupted before the turn completed")
+    put("status", "cancelled")
+}.toString()

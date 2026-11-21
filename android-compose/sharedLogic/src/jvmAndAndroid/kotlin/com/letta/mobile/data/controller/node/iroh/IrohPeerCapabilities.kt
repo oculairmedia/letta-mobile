@@ -316,6 +316,9 @@ object IrohPeerCapabilities {
         // Service credentials v1: every service's status (never a secret), read like provider.list. Its
         // writes (service.credential.set / test / remove) stay admin.full via the else branch.
         "service.credential.list",
+        // Conversation feed v1: one conversation's turn journal, read like message.list (the handler applies the same
+        // conversation scope and the agent scope of its owner).
+        "feed.subscribe",
     )
 
     // Voice endpoint v1: speaking and listening through the host act for the device like a chat send.

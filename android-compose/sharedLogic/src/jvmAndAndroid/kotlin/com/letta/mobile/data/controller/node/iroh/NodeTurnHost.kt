@@ -11,8 +11,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -28,11 +26,13 @@ import java.util.concurrent.atomic.AtomicInteger
  * any connection. The connection only awaits it. When the connection goes away the turn is
  * DETACHED instead of cancelled: delivery to the dead initiator stops, and everything else keeps
  * going until the engine reaches a terminal (or its 300s idle watchdog fires): auto-approve and
- * external-tool answering, fanout to the remaining viewers, and parking of the finished turn for
+ * external-tool answering, fanout to the remaining viewers, and recording in the [journal] for
  * the initiator's redial replay.
  */
 class NodeTurnHost internal constructor(
     internal val scope: CoroutineScope,
+    /** The durable record of every turn this host runs. */
+    val journal: TurnJournal = NoTurnJournal,
 ) {
     /** Serialized writes to observer viewers; node-owned so a detached turn still reaches them. */
     internal val observerWrites = ObserverWriteQueue(scope)
@@ -67,7 +67,13 @@ class NodeTurnHost internal constructor(
      */
     internal suspend fun run(turn: NodeTurn) {
         live.incrementAndGet()
-        val job = scope.launch { turn.body() }
+        val job = scope.launch {
+            try {
+                turn.body()
+            } finally {
+                turn.journal.close(terminalObserved = turn.fanout.anyTerminalWritten)
+            }
+        }
         job.invokeOnCompletion { live.decrementAndGet() }
         try {
             job.join()
@@ -85,31 +91,23 @@ class NodeTurnHost internal constructor(
     private fun detach(turn: NodeTurn, job: Job) {
         if (job.isCompleted) return
         turn.fanout.detachInitiator()
+        // The initiator never saw this turn's tail: record that now, so a wrapper restart before the turn ends still owes it.
+        turn.journal.noteInitiatorMissedTail()
         Telemetry.event(
             "IrohNode", "turn.detached",
             "conversationId" attr turn.conversationId,
             "clientMessageId" attr (turn.clientMessageId ?: "<none>"),
             "liveTurns" attr live.get(),
         )
-        job.invokeOnCompletion { cause -> parkForRedial(turn, cause) }
-    }
-
-    /**
-     * The initiator never saw this turn's tail. Park it so the initiator's redial re-send of the
-     * same client message id replays it (see [ParkedTerminalStore]).
-     */
-    private fun parkForRedial(turn: NodeTurn, cause: Throwable?) {
-        val key = turn.clientMessageId ?: return
-        val terminal = if (turn.fanout.anyTerminalWritten) null else INTERRUPTED_TERMINAL
-        turn.tracker.parkFrames(turn.parkedTerminals, key, terminal)
-        Telemetry.event(
-            "IrohNode", "turn.detached_parked",
-            "conversationId" attr turn.conversationId,
-            "clientMessageId" attr key,
-            "frameCount" attr turn.tracker.frameCount(),
-            "serverTerminal" attr (terminal == null),
-            "cause" attr (cause?.let { it::class.simpleName } ?: ""),
-        )
+        job.invokeOnCompletion { cause ->
+            Telemetry.event(
+                "IrohNode", "turn.detached_journaled",
+                "conversationId" attr turn.conversationId,
+                "clientMessageId" attr (turn.clientMessageId ?: "<none>"),
+                "serverTerminal" attr turn.fanout.anyTerminalWritten,
+                "cause" attr (cause?.let { it::class.simpleName } ?: ""),
+            )
+        }
     }
 
     companion object {
@@ -122,12 +120,13 @@ class NodeTurnHost internal constructor(
             )
         }
 
-        /** A host whose turns are children of [parent] (the endpoint's scope) but of no connection. */
+        /** A host whose turns are children of [parent] (the endpoint's scope) but of no connection, recording in [journal]. */
         @Suppress("NoDetachedCoroutineLifecycle") // Node-owned scope tied to parent endpoint lifecycle.
-        fun childOf(parent: CoroutineScope): NodeTurnHost = NodeTurnHost(
+        fun childOf(parent: CoroutineScope, journal: TurnJournal = NoTurnJournal): NodeTurnHost = NodeTurnHost(
             CoroutineScope(
                 parent.coroutineContext + SupervisorJob(parent.coroutineContext[Job]) + handler,
             ),
+            journal,
         )
 
         /** Process-scoped fallback for constructions without an endpoint (legacy/tests). */
@@ -135,21 +134,14 @@ class NodeTurnHost internal constructor(
         internal val SHARED: NodeTurnHost by lazy {
             NodeTurnHost(CoroutineScope(SupervisorJob() + Dispatchers.Default + handler))
         }
-
-        internal val INTERRUPTED_TERMINAL: String = buildJsonObject {
-            put("message_type", "error_message")
-            put("message", "connection interrupted before the turn completed")
-            put("status", "cancelled")
-        }.toString()
     }
 }
 
-/** One turn handed to [NodeTurnHost]: its fanout, its initiator parking record, and its collector. */
+/** One turn handed to [NodeTurnHost]: its fanout, its journal writer, and its collector. */
 internal class NodeTurn(
     val conversationId: String,
     val clientMessageId: String?,
     val fanout: ConversationTurnFanout,
-    val tracker: TurnFrameTracker,
-    val parkedTerminals: ParkedTerminalStore,
+    val journal: TurnJournalWriter,
     val body: suspend () -> Unit,
 )

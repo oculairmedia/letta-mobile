@@ -1,0 +1,1021 @@
+{
+  "method": "feed.subscribe",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/feed/FeedRoutes.kt",
+  "contract": "conversation-feed",
+  "capability": "conversation_feed_v1",
+  "required_capability": "chat.read",
+  "streamed": false,
+  "spec": "docs/reference/contracts/conversation-feed-v1.md",
+  "note": "Synthetic ids only. The host's clock is fixed so its epoch is 1000. host_state.feed.turns are written through the journal's writer, in order; a delta {\"synthetic_tool_return_bytes\": n, \"tool_call_id\": id} stands for a tool_return_message whose tool_return is n bytes of 'z' (the file would otherwise be 300 KB). initiator_missed marks a turn whose initiator stopped receiving; terminal_observed is what the writer is told when it closes the turn.",
+  "cases": [
+    {
+      "name": "snapshot when the caller has no cursor",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "conv-1",
+              "turn": "cm-1",
+              "deltas": [
+                {
+                  "message_type": "tool_call_message",
+                  "tool_call_id": "t1"
+                },
+                {
+                  "message_type": "stop_reason",
+                  "stop_reason": "end_turn"
+                }
+              ],
+              "terminal_observed": true,
+              "initiator_missed": false
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "conv-1"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "mode": "snapshot",
+          "resync_reason": "no_cursor",
+          "cursor": {
+            "epoch": 1000,
+            "seq": 4
+          },
+          "base_seq": 0,
+          "head_seq": 4,
+          "has_more": false,
+          "entries": [
+            {
+              "epoch": 1000,
+              "seq": 1,
+              "kind": "turn_open",
+              "turn": "cm-1",
+              "payload": {}
+            },
+            {
+              "epoch": 1000,
+              "seq": 2,
+              "kind": "stream_delta",
+              "turn": "cm-1",
+              "payload": {
+                "message_type": "tool_call_message",
+                "tool_call_id": "t1"
+              }
+            },
+            {
+              "epoch": 1000,
+              "seq": 3,
+              "kind": "stream_delta",
+              "turn": "cm-1",
+              "payload": {
+                "message_type": "stop_reason",
+                "stop_reason": "end_turn"
+              }
+            },
+            {
+              "epoch": 1000,
+              "seq": 4,
+              "kind": "turn_closed",
+              "turn": "cm-1",
+              "payload": {
+                "terminal_observed": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "replay returns exactly what follows the cursor",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "conv-1",
+              "turn": "cm-1",
+              "deltas": [
+                {
+                  "message_type": "tool_call_message",
+                  "tool_call_id": "t1"
+                },
+                {
+                  "message_type": "stop_reason",
+                  "stop_reason": "end_turn"
+                }
+              ],
+              "terminal_observed": true,
+              "initiator_missed": false
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "conv-1",
+        "from": {
+          "epoch": 1000,
+          "seq": 2
+        }
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "mode": "replay",
+          "cursor": {
+            "epoch": 1000,
+            "seq": 4
+          },
+          "base_seq": 0,
+          "head_seq": 4,
+          "has_more": false,
+          "entries": [
+            {
+              "epoch": 1000,
+              "seq": 3,
+              "kind": "stream_delta",
+              "turn": "cm-1",
+              "payload": {
+                "message_type": "stop_reason",
+                "stop_reason": "end_turn"
+              }
+            },
+            {
+              "epoch": 1000,
+              "seq": 4,
+              "kind": "turn_closed",
+              "turn": "cm-1",
+              "payload": {
+                "terminal_observed": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "a caught-up caller gets zero deltas and the same cursor",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "conv-1",
+              "turn": "cm-1",
+              "deltas": [
+                {
+                  "message_type": "tool_call_message",
+                  "tool_call_id": "t1"
+                },
+                {
+                  "message_type": "stop_reason",
+                  "stop_reason": "end_turn"
+                }
+              ],
+              "terminal_observed": true,
+              "initiator_missed": false
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "conv-1",
+        "from": {
+          "epoch": 1000,
+          "seq": 4
+        }
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "mode": "replay",
+          "cursor": {
+            "epoch": 1000,
+            "seq": 4
+          },
+          "base_seq": 0,
+          "head_seq": 4,
+          "has_more": false,
+          "entries": []
+        }
+      }
+    },
+    {
+      "name": "a page by limit continues from its cursor",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "conv-1",
+              "turn": "cm-1",
+              "deltas": [
+                {
+                  "message_type": "tool_call_message",
+                  "tool_call_id": "t1"
+                },
+                {
+                  "message_type": "stop_reason",
+                  "stop_reason": "end_turn"
+                }
+              ],
+              "terminal_observed": true,
+              "initiator_missed": false
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "conv-1",
+        "from": {
+          "epoch": 1000,
+          "seq": 1
+        },
+        "limit": 1
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "mode": "replay",
+          "cursor": {
+            "epoch": 1000,
+            "seq": 2
+          },
+          "base_seq": 0,
+          "head_seq": 4,
+          "has_more": true,
+          "entries": [
+            {
+              "epoch": 1000,
+              "seq": 2,
+              "kind": "stream_delta",
+              "turn": "cm-1",
+              "payload": {
+                "message_type": "tool_call_message",
+                "tool_call_id": "t1"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "a cursor from another epoch is a resync with the retained journal",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "conv-1",
+              "turn": "cm-1",
+              "deltas": [
+                {
+                  "message_type": "tool_call_message",
+                  "tool_call_id": "t1"
+                },
+                {
+                  "message_type": "stop_reason",
+                  "stop_reason": "end_turn"
+                }
+              ],
+              "terminal_observed": true,
+              "initiator_missed": false
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "conv-1",
+        "from": {
+          "epoch": 999,
+          "seq": 4
+        }
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "mode": "snapshot",
+          "resync_reason": "epoch_changed",
+          "cursor": {
+            "epoch": 1000,
+            "seq": 4
+          },
+          "base_seq": 0,
+          "head_seq": 4,
+          "has_more": false,
+          "entries": [
+            {
+              "epoch": 1000,
+              "seq": 1,
+              "kind": "turn_open",
+              "turn": "cm-1",
+              "payload": {}
+            },
+            {
+              "epoch": 1000,
+              "seq": 2,
+              "kind": "stream_delta",
+              "turn": "cm-1",
+              "payload": {
+                "message_type": "tool_call_message",
+                "tool_call_id": "t1"
+              }
+            },
+            {
+              "epoch": 1000,
+              "seq": 3,
+              "kind": "stream_delta",
+              "turn": "cm-1",
+              "payload": {
+                "message_type": "stop_reason",
+                "stop_reason": "end_turn"
+              }
+            },
+            {
+              "epoch": 1000,
+              "seq": 4,
+              "kind": "turn_closed",
+              "turn": "cm-1",
+              "payload": {
+                "terminal_observed": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "a cursor beyond the head is a resync",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "conv-1",
+              "turn": "cm-1",
+              "deltas": [
+                {
+                  "message_type": "tool_call_message",
+                  "tool_call_id": "t1"
+                },
+                {
+                  "message_type": "stop_reason",
+                  "stop_reason": "end_turn"
+                }
+              ],
+              "terminal_observed": true,
+              "initiator_missed": false
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "conv-1",
+        "from": {
+          "epoch": 1000,
+          "seq": 99
+        }
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "mode": "snapshot",
+          "resync_reason": "ahead_of_head",
+          "cursor": {
+            "epoch": 1000,
+            "seq": 4
+          },
+          "base_seq": 0,
+          "head_seq": 4,
+          "has_more": false,
+          "entries": [
+            {
+              "epoch": 1000,
+              "seq": 1,
+              "kind": "turn_open",
+              "turn": "cm-1",
+              "payload": {}
+            },
+            {
+              "epoch": 1000,
+              "seq": 2,
+              "kind": "stream_delta",
+              "turn": "cm-1",
+              "payload": {
+                "message_type": "tool_call_message",
+                "tool_call_id": "t1"
+              }
+            },
+            {
+              "epoch": 1000,
+              "seq": 3,
+              "kind": "stream_delta",
+              "turn": "cm-1",
+              "payload": {
+                "message_type": "stop_reason",
+                "stop_reason": "end_turn"
+              }
+            },
+            {
+              "epoch": 1000,
+              "seq": 4,
+              "kind": "turn_closed",
+              "turn": "cm-1",
+              "payload": {
+                "terminal_observed": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "a turn the host saw no terminal for is closed with a fact, never a terminal",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "conv-2",
+              "turn": "cm-2",
+              "deltas": [
+                {
+                  "message_type": "assistant_message",
+                  "content": "partial"
+                }
+              ],
+              "terminal_observed": false,
+              "initiator_missed": true
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "conv-2"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "mode": "snapshot",
+          "resync_reason": "no_cursor",
+          "cursor": {
+            "epoch": 1000,
+            "seq": 3
+          },
+          "base_seq": 0,
+          "head_seq": 3,
+          "has_more": false,
+          "entries": [
+            {
+              "epoch": 1000,
+              "seq": 1,
+              "kind": "turn_open",
+              "turn": "cm-2",
+              "payload": {}
+            },
+            {
+              "epoch": 1000,
+              "seq": 2,
+              "kind": "stream_delta",
+              "turn": "cm-2",
+              "payload": {
+                "message_type": "assistant_message",
+                "content": "partial"
+              }
+            },
+            {
+              "epoch": 1000,
+              "seq": 3,
+              "kind": "turn_closed",
+              "turn": "cm-2",
+              "payload": {
+                "terminal_observed": false
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "an oversized payload is a pointer, not data",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "conv-big",
+              "turn": "cm-big",
+              "deltas": [
+                {
+                  "synthetic_tool_return_bytes": 300000,
+                  "tool_call_id": "t9"
+                },
+                {
+                  "message_type": "tool_call_message",
+                  "tool_call_id": "t1"
+                }
+              ],
+              "terminal_observed": true,
+              "initiator_missed": false
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "conv-big"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "mode": "snapshot",
+          "resync_reason": "no_cursor",
+          "cursor": {
+            "epoch": 1000,
+            "seq": 4
+          },
+          "base_seq": 0,
+          "head_seq": 4,
+          "has_more": false,
+          "entries": [
+            {
+              "epoch": 1000,
+              "seq": 1,
+              "kind": "turn_open",
+              "turn": "cm-big",
+              "payload": {}
+            },
+            {
+              "epoch": 1000,
+              "seq": 2,
+              "kind": "stream_delta",
+              "turn": "cm-big",
+              "pointer": {
+                "reason": "too_large",
+                "byte_len": 300075,
+                "message_type": "tool_return_message"
+              }
+            },
+            {
+              "epoch": 1000,
+              "seq": 3,
+              "kind": "stream_delta",
+              "turn": "cm-big",
+              "payload": {
+                "message_type": "tool_call_message",
+                "tool_call_id": "t1"
+              }
+            },
+            {
+              "epoch": 1000,
+              "seq": 4,
+              "kind": "turn_closed",
+              "turn": "cm-big",
+              "payload": {
+                "terminal_observed": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "the default conversation alias resolves its agent",
+      "context": {
+        "authenticated": true,
+        "authorized_agent_ids": [
+          "agent-a"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "default",
+              "turn": "cm-d",
+              "deltas": [
+                {
+                  "message_type": "tool_call_message",
+                  "tool_call_id": "t1"
+                },
+                {
+                  "message_type": "stop_reason",
+                  "stop_reason": "end_turn"
+                }
+              ],
+              "terminal_observed": true,
+              "initiator_missed": false
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "conv-default-agent-a"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "mode": "snapshot",
+          "resync_reason": "no_cursor",
+          "cursor": {
+            "epoch": 1000,
+            "seq": 4
+          },
+          "base_seq": 0,
+          "head_seq": 4,
+          "has_more": false,
+          "entries": [
+            {
+              "epoch": 1000,
+              "seq": 1,
+              "kind": "turn_open",
+              "turn": "cm-d",
+              "payload": {}
+            },
+            {
+              "epoch": 1000,
+              "seq": 2,
+              "kind": "stream_delta",
+              "turn": "cm-d",
+              "payload": {
+                "message_type": "tool_call_message",
+                "tool_call_id": "t1"
+              }
+            },
+            {
+              "epoch": 1000,
+              "seq": 3,
+              "kind": "stream_delta",
+              "turn": "cm-d",
+              "payload": {
+                "message_type": "stop_reason",
+                "stop_reason": "end_turn"
+              }
+            },
+            {
+              "epoch": 1000,
+              "seq": 4,
+              "kind": "turn_closed",
+              "turn": "cm-d",
+              "payload": {
+                "terminal_observed": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "an agent-scoped viewer reads its own agent's journal",
+      "context": {
+        "authenticated": true,
+        "authorized_agent_ids": [
+          "agent-a"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "conv-1",
+              "turn": "cm-1",
+              "deltas": [
+                {
+                  "message_type": "tool_call_message",
+                  "tool_call_id": "t1"
+                },
+                {
+                  "message_type": "stop_reason",
+                  "stop_reason": "end_turn"
+                }
+              ],
+              "terminal_observed": true,
+              "initiator_missed": false
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "conv-1"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "mode": "snapshot",
+          "resync_reason": "no_cursor",
+          "cursor": {
+            "epoch": 1000,
+            "seq": 4
+          },
+          "base_seq": 0,
+          "head_seq": 4,
+          "has_more": false,
+          "entries": [
+            {
+              "epoch": 1000,
+              "seq": 1,
+              "kind": "turn_open",
+              "turn": "cm-1",
+              "payload": {}
+            },
+            {
+              "epoch": 1000,
+              "seq": 2,
+              "kind": "stream_delta",
+              "turn": "cm-1",
+              "payload": {
+                "message_type": "tool_call_message",
+                "tool_call_id": "t1"
+              }
+            },
+            {
+              "epoch": 1000,
+              "seq": 3,
+              "kind": "stream_delta",
+              "turn": "cm-1",
+              "payload": {
+                "message_type": "stop_reason",
+                "stop_reason": "end_turn"
+              }
+            },
+            {
+              "epoch": 1000,
+              "seq": 4,
+              "kind": "turn_closed",
+              "turn": "cm-1",
+              "payload": {
+                "terminal_observed": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "an agent-scoped viewer cannot read another agent's journal",
+      "context": {
+        "authenticated": true,
+        "authorized_agent_ids": [
+          "agent-b"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "conv-1",
+              "turn": "cm-1",
+              "deltas": [
+                {
+                  "message_type": "tool_call_message",
+                  "tool_call_id": "t1"
+                },
+                {
+                  "message_type": "stop_reason",
+                  "stop_reason": "end_turn"
+                }
+              ],
+              "terminal_observed": true,
+              "initiator_missed": false
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "conv-1",
+        "agent_id": "agent-b"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "forbidden: agent not in this device's scope"
+      }
+    },
+    {
+      "name": "an agent-scoped viewer is refused a conversation whose owner is unknown",
+      "context": {
+        "authenticated": true,
+        "authorized_agent_ids": [
+          "agent-a"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "conv-1",
+              "turn": "cm-1",
+              "deltas": [
+                {
+                  "message_type": "tool_call_message",
+                  "tool_call_id": "t1"
+                },
+                {
+                  "message_type": "stop_reason",
+                  "stop_reason": "end_turn"
+                }
+              ],
+              "terminal_observed": true,
+              "initiator_missed": false
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "conv-nobody"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "forbidden: agent not in this device's scope"
+      }
+    },
+    {
+      "name": "a viewer bound to another conversation is refused",
+      "context": {
+        "authenticated": true,
+        "authorized_conversation_ids": [
+          "conv-other"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "conv-1",
+              "turn": "cm-1",
+              "deltas": [
+                {
+                  "message_type": "tool_call_message",
+                  "tool_call_id": "t1"
+                },
+                {
+                  "message_type": "stop_reason",
+                  "stop_reason": "end_turn"
+                }
+              ],
+              "terminal_observed": true,
+              "initiator_missed": false
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "conv-1"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "forbidden: conversation out of authorized scope"
+      }
+    },
+    {
+      "name": "a request with no conversation is invalid",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "conv-1",
+              "turn": "cm-1",
+              "deltas": [
+                {
+                  "message_type": "tool_call_message",
+                  "tool_call_id": "t1"
+                },
+                {
+                  "message_type": "stop_reason",
+                  "stop_reason": "end_turn"
+                }
+              ],
+              "terminal_observed": true,
+              "initiator_missed": false
+            }
+          ]
+        }
+      },
+      "params": {},
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "invalid_request"
+      }
+    },
+    {
+      "name": "a malformed cursor is invalid",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "feed": {
+          "turns": [
+            {
+              "agent_id": "agent-a",
+              "conversation_id": "conv-1",
+              "turn": "cm-1",
+              "deltas": [
+                {
+                  "message_type": "tool_call_message",
+                  "tool_call_id": "t1"
+                },
+                {
+                  "message_type": "stop_reason",
+                  "stop_reason": "end_turn"
+                }
+              ],
+              "terminal_observed": true,
+              "initiator_missed": false
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "conv-1",
+        "from": {
+          "epoch": -1,
+          "seq": 0
+        }
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "invalid_request"
+      }
+    }
+  ]
+}

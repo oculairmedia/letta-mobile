@@ -48,7 +48,9 @@ class IrohAdminOwnershipMatrixTest {
         val serviceMethods = com.letta.mobile.data.servicecredentials.ServiceCredentialWire.METHODS
         val pinsMethods = com.letta.mobile.data.pins.wire.AgentPinsWire.METHODS
         val shellStateMethods = com.letta.mobile.data.shellstate.wire.ShellStateWire.METHODS
-        val conditional = CanvasMountWire.METHODS + secretMethods + voiceMethods + pinsMethods + shellStateMethods + serviceMethods
+        val feedMethods = com.letta.mobile.data.feed.wire.ConversationFeedWire.METHODS
+        val conditional = CanvasMountWire.METHODS + secretMethods + voiceMethods + pinsMethods + shellStateMethods +
+            serviceMethods + feedMethods
         val declared = allDeclared.filterNot { it.startsWith("beads.") || it in conditional }.toSet()
 
         assertEquals(operations.size, allDeclared.size, "Duplicate method rows in the ownership matrix")
@@ -81,6 +83,15 @@ class IrohAdminOwnershipMatrixTest {
             emptySet(),
             declared - registered,
             "Ownership matrix declares methods the router no longer registers — prune stale rows",
+        )
+    }
+
+    @Test
+    fun conditionalFeedRoutesAllHaveOwnershipDecisions() {
+        assertEquals(
+            com.letta.mobile.data.feed.wire.ConversationFeedWire.METHODS,
+            operations.map { it.requiredString("method") }.filter { it.startsWith("feed.") }.toSet(),
+            "Conditional feed routes must all have ownership decisions",
         )
     }
 

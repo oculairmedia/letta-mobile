@@ -20095,6 +20095,13 @@ public final class com/letta/mobile/data/controller/node/iroh/InMemoryPairingInv
 	public fun remove-wbzLh-Y (Ljava/lang/String;)Z
 }
 
+public final class com/letta/mobile/data/controller/node/iroh/InitiatorReplay {
+	public fun <init> (Ljava/util/List;ZLkotlin/jvm/functions/Function0;)V
+	public final fun delivered ()V
+	public final fun getDeltas ()Ljava/util/List;
+	public final fun getTerminalObserved ()Z
+}
+
 public final class com/letta/mobile/data/controller/node/iroh/InviteId {
 	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/InviteId$Companion;
 	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/InviteId;
@@ -20225,8 +20232,8 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohNodeConnection
 	public static final field MAX_CONCURRENT_ADMIN_RPC_STREAMS I
 	public static final field MAX_FRAME_BYTES I
 	public static final field STREAM_JOB_DRAIN_TIMEOUT_MS J
-	public fun <init> (Lcomputer/iroh/Connection;Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/IrohConnectionAuthentication;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;Lcom/letta/mobile/data/controller/node/iroh/ProcessScopedClientMessageDedupe;Lcom/letta/mobile/data/controller/node/iroh/ParkedTerminalStore;Lcom/letta/mobile/data/controller/node/iroh/NodeTurnHost;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;)V
-	public synthetic fun <init> (Lcomputer/iroh/Connection;Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/IrohConnectionAuthentication;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;Lcom/letta/mobile/data/controller/node/iroh/ProcessScopedClientMessageDedupe;Lcom/letta/mobile/data/controller/node/iroh/ParkedTerminalStore;Lcom/letta/mobile/data/controller/node/iroh/NodeTurnHost;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcomputer/iroh/Connection;Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/IrohConnectionAuthentication;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;Lcom/letta/mobile/data/controller/node/iroh/ProcessScopedClientMessageDedupe;Lcom/letta/mobile/data/controller/node/iroh/NodeTurnHost;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;)V
+	public synthetic fun <init> (Lcomputer/iroh/Connection;Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/IrohConnectionAuthentication;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;Lcom/letta/mobile/data/controller/node/iroh/ProcessScopedClientMessageDedupe;Lcom/letta/mobile/data/controller/node/iroh/NodeTurnHost;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun isAuthenticated ()Z
 	public final fun revokeSession ()V
 	public final fun serve (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -20237,8 +20244,8 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohNodeConnection
 
 public final class com/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint {
 	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint$Companion;
-	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohEndpointBinding;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/iroh/IrohCanvasRelay;Ljava/util/List;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohEndpointBinding;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/iroh/IrohCanvasRelay;Ljava/util/List;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohEndpointBinding;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/iroh/IrohCanvasRelay;Ljava/util/List;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;Lcom/letta/mobile/data/controller/node/iroh/TurnJournal;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohEndpointBinding;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/iroh/IrohCanvasRelay;Ljava/util/List;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;Lcom/letta/mobile/data/controller/node/iroh/TurnJournal;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun addr ()Lcomputer/iroh/EndpointAddr;
 	public final fun agentChangeTarget ()Lcom/letta/mobile/data/controller/node/iroh/AgentChangeTarget;
 	public final fun attachAppToolRelay (Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayHost;)V
@@ -20702,14 +20709,26 @@ public final class com/letta/mobile/data/controller/node/iroh/NoOpPairQrSigner :
 	public fun sign (Ljava/lang/String;Ljava/lang/String;J)Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/controller/node/iroh/NoTurnJournal : com/letta/mobile/data/controller/node/iroh/TurnJournal, com/letta/mobile/data/controller/node/iroh/TurnJournalWriter {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/NoTurnJournal;
+	public fun append (Ljava/lang/String;)V
+	public fun close (Z)V
+	public fun knowsTurn-eAxutHE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z
+	public fun noteInitiatorMissedTail ()V
+	public fun openTurn-eAxutHE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/TurnJournalWriter;
+	public fun replayForInitiator-eAxutHE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/InitiatorReplay;
+}
+
 public final class com/letta/mobile/data/controller/node/iroh/NodeTurnHost {
 	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/NodeTurnHost$Companion;
+	public final fun getJournal ()Lcom/letta/mobile/data/controller/node/iroh/TurnJournal;
 	public final fun getLiveTurnCount ()I
 	public final fun shutdown ()V
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/NodeTurnHost$Companion {
-	public final fun childOf (Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/controller/node/iroh/NodeTurnHost;
+	public final fun childOf (Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/TurnJournal;)Lcom/letta/mobile/data/controller/node/iroh/NodeTurnHost;
+	public static synthetic fun childOf$default (Lcom/letta/mobile/data/controller/node/iroh/NodeTurnHost$Companion;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/TurnJournal;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/NodeTurnHost;
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/PairQrEnvelope {
@@ -20817,22 +20836,6 @@ public final class com/letta/mobile/data/controller/node/iroh/PairingQrConfig {
 	public final fun getDialHint ()Lkotlin/jvm/functions/Function0;
 	public final fun getNodeIdHex ()Ljava/lang/String;
 	public final fun getSigner ()Lcom/letta/mobile/data/controller/node/iroh/PairQrSigner;
-}
-
-public final class com/letta/mobile/data/controller/node/iroh/ParkedTerminalStore {
-	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/ParkedTerminalStore$Companion;
-	public static final field DEFAULT_MAX_ENTRIES I
-	public static final field DEFAULT_MAX_FRAMES_PER_ENTRY I
-	public fun <init> ()V
-	public fun <init> (II)V
-	public synthetic fun <init> (IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun contains (Ljava/lang/String;)Z
-	public final fun park (Ljava/lang/String;Ljava/lang/String;)V
-	public final fun size ()I
-	public final fun takeParked (Ljava/lang/String;)Ljava/lang/String;
-}
-
-public final class com/letta/mobile/data/controller/node/iroh/ParkedTerminalStore$Companion {
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/PendingApprovalsPublisher {
@@ -21079,6 +21082,18 @@ public final class com/letta/mobile/data/controller/node/iroh/ToolAdminHandlers 
 	public final fun getTOOL_WRITE_METHODS ()Ljava/util/Set;
 }
 
+public abstract interface class com/letta/mobile/data/controller/node/iroh/TurnJournal {
+	public abstract fun knowsTurn-eAxutHE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z
+	public abstract fun openTurn-eAxutHE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/TurnJournalWriter;
+	public abstract fun replayForInitiator-eAxutHE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/InitiatorReplay;
+}
+
+public abstract interface class com/letta/mobile/data/controller/node/iroh/TurnJournalWriter {
+	public abstract fun append (Ljava/lang/String;)V
+	public abstract fun close (Z)V
+	public abstract fun noteInitiatorMissedTail ()V
+}
+
 public abstract interface class com/letta/mobile/data/controller/node/iroh/ViewerFrameSink {
 	public abstract fun writeAll ([BLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -21220,6 +21235,72 @@ public final class com/letta/mobile/data/controller/node/iroh/beads/BeadsRoutes 
 	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/beads/BeadsRoutes;
 	public final fun getReads ()Ljava/util/Map;
 	public final fun getWrites ()Ljava/util/Map;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/feed/FeedJournalStore : com/letta/mobile/data/controller/node/iroh/TurnJournal {
+	public fun <init> (Ljava/nio/file/Path;Lcom/letta/mobile/data/controller/node/iroh/feed/FeedRetention;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Ljava/nio/file/Path;Lcom/letta/mobile/data/controller/node/iroh/feed/FeedRetention;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun emptyPage (Lcom/letta/mobile/data/feed/wire/FeedCursor;)Lcom/letta/mobile/data/feed/wire/FeedPage;
+	public final fun getEpoch ()J
+	public final fun getEpochPersisted ()Z
+	public fun knowsTurn-eAxutHE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z
+	public fun openTurn-eAxutHE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/TurnJournalWriter;
+	public final fun ownerOf-a2YFlvI (Ljava/lang/String;)Ljava/lang/String;
+	public final fun page (Lcom/letta/mobile/data/controller/node/iroh/feed/JournalKey;Lcom/letta/mobile/data/feed/wire/FeedCursor;I)Lcom/letta/mobile/data/feed/wire/FeedPage;
+	public fun replayForInitiator-eAxutHE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/InitiatorReplay;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/feed/FeedRetention {
+	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/feed/FeedRetention$Companion;
+	public static final field DEFAULT_DISK_CEILING_BYTES J
+	public static final field DEFAULT_MAX_BYTES J
+	public static final field DEFAULT_MAX_ENTRIES I
+	public static final field DEFAULT_MAX_LOADED_LOGS I
+	public static final field DEFAULT_TEXT_FLUSH_EVERY I
+	public fun <init> ()V
+	public fun <init> (IJJII)V
+	public synthetic fun <init> (IJJIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()I
+	public final fun component5 ()I
+	public final fun copy (IJJII)Lcom/letta/mobile/data/controller/node/iroh/feed/FeedRetention;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/feed/FeedRetention;IJJIIILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/feed/FeedRetention;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDiskCeilingBytes ()J
+	public final fun getMaxBytesPerConversation ()J
+	public final fun getMaxEntriesPerConversation ()I
+	public final fun getMaxLoadedLogs ()I
+	public final fun getTextFlushEvery ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/feed/FeedRetention$Companion {
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/feed/FeedRoutes {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/feed/FeedRoutes;
+	public final fun forHost (Lcom/letta/mobile/data/controller/node/iroh/feed/FeedJournalStore;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/feed/JournalKey {
+	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/feed/JournalKey$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-zqmzO_A ()Ljava/lang/String;
+	public final fun component2-nFOXY6g ()Ljava/lang/String;
+	public final fun copy-A7_tNwo (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/feed/JournalKey;
+	public static synthetic fun copy-A7_tNwo$default (Lcom/letta/mobile/data/controller/node/iroh/feed/JournalKey;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/feed/JournalKey;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId-zqmzO_A ()Ljava/lang/String;
+	public final fun getConversationId-nFOXY6g ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/feed/JournalKey$Companion {
+	public final fun of-A7_tNwo (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/feed/JournalKey;
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountCatalog {
@@ -23273,6 +23354,144 @@ public final class com/letta/mobile/data/dreaming/DreamingState {
 	public final fun getUnsupported ()Lcom/letta/mobile/data/dreaming/DreamUnsupportedReason;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/feed/wire/ConversationFeedWire {
+	public static final field AGENT_ID Ljava/lang/String;
+	public static final field CAPABILITY Ljava/lang/String;
+	public static final field CONVERSATION_ID Ljava/lang/String;
+	public static final field DEFAULT_LIMIT I
+	public static final field EPOCH Ljava/lang/String;
+	public static final field FRAME_TYPE Ljava/lang/String;
+	public static final field FROM Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/data/feed/wire/ConversationFeedWire;
+	public static final field INVALID_REQUEST Ljava/lang/String;
+	public static final field KIND_STREAM_DELTA Ljava/lang/String;
+	public static final field KIND_TURN_CLOSED Ljava/lang/String;
+	public static final field KIND_TURN_OPEN Ljava/lang/String;
+	public static final field LIMIT Ljava/lang/String;
+	public static final field MAX_INLINE_PAYLOAD_BYTES I
+	public static final field MAX_LIMIT I
+	public static final field MAX_PAGE_BYTES I
+	public static final field MODE_REPLAY Ljava/lang/String;
+	public static final field MODE_SNAPSHOT Ljava/lang/String;
+	public static final field POINTER_BYTE_LEN Ljava/lang/String;
+	public static final field POINTER_MESSAGE_ID Ljava/lang/String;
+	public static final field POINTER_MESSAGE_TYPE Ljava/lang/String;
+	public static final field RESYNC_AHEAD_OF_HEAD Ljava/lang/String;
+	public static final field RESYNC_BEHIND_HORIZON Ljava/lang/String;
+	public static final field RESYNC_EPOCH_CHANGED Ljava/lang/String;
+	public static final field RESYNC_NO_CURSOR Ljava/lang/String;
+	public static final field SEQ Ljava/lang/String;
+	public static final field SUBSCRIBE Ljava/lang/String;
+	public final fun getMETHODS ()Ljava/util/Set;
+}
+
+public final class com/letta/mobile/data/feed/wire/FeedCursor {
+	public static final field Companion Lcom/letta/mobile/data/feed/wire/FeedCursor$Companion;
+	public fun <init> (JJ)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun copy (JJ)Lcom/letta/mobile/data/feed/wire/FeedCursor;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/feed/wire/FeedCursor;JJILjava/lang/Object;)Lcom/letta/mobile/data/feed/wire/FeedCursor;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEpoch ()J
+	public final fun getSeq ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/feed/wire/FeedCursor$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/feed/wire/FeedCursor$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/feed/wire/FeedCursor;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/feed/wire/FeedCursor;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/feed/wire/FeedCursor$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/feed/wire/FeedDelta {
+	public static final field Companion Lcom/letta/mobile/data/feed/wire/FeedDelta$Companion;
+	public fun <init> (JJLjava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlinx/serialization/json/JsonObject;)V
+	public synthetic fun <init> (JJLjava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlinx/serialization/json/JsonObject;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component6 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun copy (JJLjava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlinx/serialization/json/JsonObject;)Lcom/letta/mobile/data/feed/wire/FeedDelta;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/feed/wire/FeedDelta;JJLjava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlinx/serialization/json/JsonObject;ILjava/lang/Object;)Lcom/letta/mobile/data/feed/wire/FeedDelta;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEpoch ()J
+	public final fun getKind ()Ljava/lang/String;
+	public final fun getPayload ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getPointer ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getSeq ()J
+	public final fun getTurn ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/feed/wire/FeedDelta$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/feed/wire/FeedDelta$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/feed/wire/FeedDelta;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/feed/wire/FeedDelta;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/feed/wire/FeedDelta$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/feed/wire/FeedPage {
+	public static final field Companion Lcom/letta/mobile/data/feed/wire/FeedPage$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/feed/wire/FeedCursor;JJZLjava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/feed/wire/FeedCursor;JJZLjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lcom/letta/mobile/data/feed/wire/FeedCursor;
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun component6 ()Z
+	public final fun component7 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/feed/wire/FeedCursor;JJZLjava/util/List;)Lcom/letta/mobile/data/feed/wire/FeedPage;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/feed/wire/FeedPage;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/feed/wire/FeedCursor;JJZLjava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/feed/wire/FeedPage;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBaseSeq ()J
+	public final fun getCursor ()Lcom/letta/mobile/data/feed/wire/FeedCursor;
+	public final fun getEntries ()Ljava/util/List;
+	public final fun getHasMore ()Z
+	public final fun getHeadSeq ()J
+	public final fun getMode ()Ljava/lang/String;
+	public final fun getResyncReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/feed/wire/FeedPage$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/feed/wire/FeedPage$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/feed/wire/FeedPage;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/feed/wire/FeedPage;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/feed/wire/FeedPage$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class com/letta/mobile/data/flow/CapturedSessionFlow : kotlinx/coroutines/flow/StateFlow {

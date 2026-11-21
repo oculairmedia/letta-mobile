@@ -42120,6 +42120,122 @@ final class com.letta.mobile.data.dreaming/DreamingState { // com.letta.mobile.d
     final fun toString(): kotlin/String // com.letta.mobile.data.dreaming/DreamingState.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.feed.wire/FeedCursor { // com.letta.mobile.data.feed.wire/FeedCursor|null[0]
+    constructor <init>(kotlin/Long, kotlin/Long) // com.letta.mobile.data.feed.wire/FeedCursor.<init>|<init>(kotlin.Long;kotlin.Long){}[0]
+
+    final val epoch // com.letta.mobile.data.feed.wire/FeedCursor.epoch|{}epoch[0]
+        final fun <get-epoch>(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedCursor.epoch.<get-epoch>|<get-epoch>(){}[0]
+    final val seq // com.letta.mobile.data.feed.wire/FeedCursor.seq|{}seq[0]
+        final fun <get-seq>(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedCursor.seq.<get-seq>|<get-seq>(){}[0]
+
+    final fun component1(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedCursor.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedCursor.component2|component2(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ...): com.letta.mobile.data.feed.wire/FeedCursor // com.letta.mobile.data.feed.wire/FeedCursor.copy|copy(kotlin.Long;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.feed.wire/FeedCursor.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.feed.wire/FeedCursor.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.feed.wire/FeedCursor.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.feed.wire/FeedCursor> { // com.letta.mobile.data.feed.wire/FeedCursor.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.feed.wire/FeedCursor.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.feed.wire/FeedCursor.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.feed.wire/FeedCursor.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.feed.wire/FeedCursor // com.letta.mobile.data.feed.wire/FeedCursor.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.feed.wire/FeedCursor) // com.letta.mobile.data.feed.wire/FeedCursor.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.feed.wire.FeedCursor){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.feed.wire/FeedCursor.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.feed.wire/FeedCursor> // com.letta.mobile.data.feed.wire/FeedCursor.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.feed.wire/FeedDelta { // com.letta.mobile.data.feed.wire/FeedDelta|null[0]
+    constructor <init>(kotlin/Long, kotlin/Long, kotlin/String, kotlin/String, kotlinx.serialization.json/JsonObject? = ..., kotlinx.serialization.json/JsonObject? = ...) // com.letta.mobile.data.feed.wire/FeedDelta.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.String;kotlin.String;kotlinx.serialization.json.JsonObject?;kotlinx.serialization.json.JsonObject?){}[0]
+
+    final val epoch // com.letta.mobile.data.feed.wire/FeedDelta.epoch|{}epoch[0]
+        final fun <get-epoch>(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedDelta.epoch.<get-epoch>|<get-epoch>(){}[0]
+    final val kind // com.letta.mobile.data.feed.wire/FeedDelta.kind|{}kind[0]
+        final fun <get-kind>(): kotlin/String // com.letta.mobile.data.feed.wire/FeedDelta.kind.<get-kind>|<get-kind>(){}[0]
+    final val payload // com.letta.mobile.data.feed.wire/FeedDelta.payload|{}payload[0]
+        final fun <get-payload>(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.feed.wire/FeedDelta.payload.<get-payload>|<get-payload>(){}[0]
+    final val pointer // com.letta.mobile.data.feed.wire/FeedDelta.pointer|{}pointer[0]
+        final fun <get-pointer>(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.feed.wire/FeedDelta.pointer.<get-pointer>|<get-pointer>(){}[0]
+    final val seq // com.letta.mobile.data.feed.wire/FeedDelta.seq|{}seq[0]
+        final fun <get-seq>(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedDelta.seq.<get-seq>|<get-seq>(){}[0]
+    final val turn // com.letta.mobile.data.feed.wire/FeedDelta.turn|{}turn[0]
+        final fun <get-turn>(): kotlin/String // com.letta.mobile.data.feed.wire/FeedDelta.turn.<get-turn>|<get-turn>(){}[0]
+
+    final fun component1(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedDelta.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedDelta.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.feed.wire/FeedDelta.component3|component3(){}[0]
+    final fun component4(): kotlin/String // com.letta.mobile.data.feed.wire/FeedDelta.component4|component4(){}[0]
+    final fun component5(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.feed.wire/FeedDelta.component5|component5(){}[0]
+    final fun component6(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.feed.wire/FeedDelta.component6|component6(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/String = ..., kotlin/String = ..., kotlinx.serialization.json/JsonObject? = ..., kotlinx.serialization.json/JsonObject? = ...): com.letta.mobile.data.feed.wire/FeedDelta // com.letta.mobile.data.feed.wire/FeedDelta.copy|copy(kotlin.Long;kotlin.Long;kotlin.String;kotlin.String;kotlinx.serialization.json.JsonObject?;kotlinx.serialization.json.JsonObject?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.feed.wire/FeedDelta.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.feed.wire/FeedDelta.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.feed.wire/FeedDelta.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.feed.wire/FeedDelta> { // com.letta.mobile.data.feed.wire/FeedDelta.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.feed.wire/FeedDelta.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.feed.wire/FeedDelta.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.feed.wire/FeedDelta.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.feed.wire/FeedDelta // com.letta.mobile.data.feed.wire/FeedDelta.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.feed.wire/FeedDelta) // com.letta.mobile.data.feed.wire/FeedDelta.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.feed.wire.FeedDelta){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.feed.wire/FeedDelta.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.feed.wire/FeedDelta> // com.letta.mobile.data.feed.wire/FeedDelta.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.feed.wire/FeedPage { // com.letta.mobile.data.feed.wire/FeedPage|null[0]
+    constructor <init>(kotlin/String, kotlin/String? = ..., com.letta.mobile.data.feed.wire/FeedCursor, kotlin/Long, kotlin/Long, kotlin/Boolean, kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta>) // com.letta.mobile.data.feed.wire/FeedPage.<init>|<init>(kotlin.String;kotlin.String?;com.letta.mobile.data.feed.wire.FeedCursor;kotlin.Long;kotlin.Long;kotlin.Boolean;kotlin.collections.List<com.letta.mobile.data.feed.wire.FeedDelta>){}[0]
+
+    final val baseSeq // com.letta.mobile.data.feed.wire/FeedPage.baseSeq|{}baseSeq[0]
+        final fun <get-baseSeq>(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedPage.baseSeq.<get-baseSeq>|<get-baseSeq>(){}[0]
+    final val cursor // com.letta.mobile.data.feed.wire/FeedPage.cursor|{}cursor[0]
+        final fun <get-cursor>(): com.letta.mobile.data.feed.wire/FeedCursor // com.letta.mobile.data.feed.wire/FeedPage.cursor.<get-cursor>|<get-cursor>(){}[0]
+    final val entries // com.letta.mobile.data.feed.wire/FeedPage.entries|{}entries[0]
+        final fun <get-entries>(): kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta> // com.letta.mobile.data.feed.wire/FeedPage.entries.<get-entries>|<get-entries>(){}[0]
+    final val hasMore // com.letta.mobile.data.feed.wire/FeedPage.hasMore|{}hasMore[0]
+        final fun <get-hasMore>(): kotlin/Boolean // com.letta.mobile.data.feed.wire/FeedPage.hasMore.<get-hasMore>|<get-hasMore>(){}[0]
+    final val headSeq // com.letta.mobile.data.feed.wire/FeedPage.headSeq|{}headSeq[0]
+        final fun <get-headSeq>(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedPage.headSeq.<get-headSeq>|<get-headSeq>(){}[0]
+    final val mode // com.letta.mobile.data.feed.wire/FeedPage.mode|{}mode[0]
+        final fun <get-mode>(): kotlin/String // com.letta.mobile.data.feed.wire/FeedPage.mode.<get-mode>|<get-mode>(){}[0]
+    final val resyncReason // com.letta.mobile.data.feed.wire/FeedPage.resyncReason|{}resyncReason[0]
+        final fun <get-resyncReason>(): kotlin/String? // com.letta.mobile.data.feed.wire/FeedPage.resyncReason.<get-resyncReason>|<get-resyncReason>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.feed.wire/FeedPage.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.feed.wire/FeedPage.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.feed.wire/FeedCursor // com.letta.mobile.data.feed.wire/FeedPage.component3|component3(){}[0]
+    final fun component4(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedPage.component4|component4(){}[0]
+    final fun component5(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedPage.component5|component5(){}[0]
+    final fun component6(): kotlin/Boolean // com.letta.mobile.data.feed.wire/FeedPage.component6|component6(){}[0]
+    final fun component7(): kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta> // com.letta.mobile.data.feed.wire/FeedPage.component7|component7(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String? = ..., com.letta.mobile.data.feed.wire/FeedCursor = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta> = ...): com.letta.mobile.data.feed.wire/FeedPage // com.letta.mobile.data.feed.wire/FeedPage.copy|copy(kotlin.String;kotlin.String?;com.letta.mobile.data.feed.wire.FeedCursor;kotlin.Long;kotlin.Long;kotlin.Boolean;kotlin.collections.List<com.letta.mobile.data.feed.wire.FeedDelta>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.feed.wire/FeedPage.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.feed.wire/FeedPage.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.feed.wire/FeedPage.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.feed.wire/FeedPage> { // com.letta.mobile.data.feed.wire/FeedPage.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.feed.wire/FeedPage.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.feed.wire/FeedPage.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.feed.wire/FeedPage.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.feed.wire/FeedPage // com.letta.mobile.data.feed.wire/FeedPage.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.feed.wire/FeedPage) // com.letta.mobile.data.feed.wire/FeedPage.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.feed.wire.FeedPage){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.feed.wire/FeedPage.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.feed.wire/FeedPage.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.feed.wire/FeedPage> // com.letta.mobile.data.feed.wire/FeedPage.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.health/ServerHealthProbe { // com.letta.mobile.data.health/ServerHealthProbe|null[0]
     constructor <init>(com.letta.mobile.data.health/AppServerReachability) // com.letta.mobile.data.health/ServerHealthProbe.<init>|<init>(com.letta.mobile.data.health.AppServerReachability){}[0]
 
@@ -81606,6 +81722,64 @@ final object com.letta.mobile.data.dreaming/DreamingRpc { // com.letta.mobile.da
         final fun <get-COMMAND_IDS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.dreaming/DreamingRpc.COMMAND_IDS.<get-COMMAND_IDS>|<get-COMMAND_IDS>(){}[0]
 
     final fun commandArgs(kotlin/String?): kotlin/String? // com.letta.mobile.data.dreaming/DreamingRpc.commandArgs|commandArgs(kotlin.String?){}[0]
+}
+
+final object com.letta.mobile.data.feed.wire/ConversationFeedWire { // com.letta.mobile.data.feed.wire/ConversationFeedWire|null[0]
+    final const val AGENT_ID // com.letta.mobile.data.feed.wire/ConversationFeedWire.AGENT_ID|{}AGENT_ID[0]
+        final fun <get-AGENT_ID>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.AGENT_ID.<get-AGENT_ID>|<get-AGENT_ID>(){}[0]
+    final const val CAPABILITY // com.letta.mobile.data.feed.wire/ConversationFeedWire.CAPABILITY|{}CAPABILITY[0]
+        final fun <get-CAPABILITY>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.CAPABILITY.<get-CAPABILITY>|<get-CAPABILITY>(){}[0]
+    final const val CONVERSATION_ID // com.letta.mobile.data.feed.wire/ConversationFeedWire.CONVERSATION_ID|{}CONVERSATION_ID[0]
+        final fun <get-CONVERSATION_ID>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.CONVERSATION_ID.<get-CONVERSATION_ID>|<get-CONVERSATION_ID>(){}[0]
+    final const val DEFAULT_LIMIT // com.letta.mobile.data.feed.wire/ConversationFeedWire.DEFAULT_LIMIT|{}DEFAULT_LIMIT[0]
+        final fun <get-DEFAULT_LIMIT>(): kotlin/Int // com.letta.mobile.data.feed.wire/ConversationFeedWire.DEFAULT_LIMIT.<get-DEFAULT_LIMIT>|<get-DEFAULT_LIMIT>(){}[0]
+    final const val EPOCH // com.letta.mobile.data.feed.wire/ConversationFeedWire.EPOCH|{}EPOCH[0]
+        final fun <get-EPOCH>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.EPOCH.<get-EPOCH>|<get-EPOCH>(){}[0]
+    final const val FRAME_TYPE // com.letta.mobile.data.feed.wire/ConversationFeedWire.FRAME_TYPE|{}FRAME_TYPE[0]
+        final fun <get-FRAME_TYPE>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.FRAME_TYPE.<get-FRAME_TYPE>|<get-FRAME_TYPE>(){}[0]
+    final const val FROM // com.letta.mobile.data.feed.wire/ConversationFeedWire.FROM|{}FROM[0]
+        final fun <get-FROM>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.FROM.<get-FROM>|<get-FROM>(){}[0]
+    final const val INVALID_REQUEST // com.letta.mobile.data.feed.wire/ConversationFeedWire.INVALID_REQUEST|{}INVALID_REQUEST[0]
+        final fun <get-INVALID_REQUEST>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.INVALID_REQUEST.<get-INVALID_REQUEST>|<get-INVALID_REQUEST>(){}[0]
+    final const val KIND_STREAM_DELTA // com.letta.mobile.data.feed.wire/ConversationFeedWire.KIND_STREAM_DELTA|{}KIND_STREAM_DELTA[0]
+        final fun <get-KIND_STREAM_DELTA>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.KIND_STREAM_DELTA.<get-KIND_STREAM_DELTA>|<get-KIND_STREAM_DELTA>(){}[0]
+    final const val KIND_TURN_CLOSED // com.letta.mobile.data.feed.wire/ConversationFeedWire.KIND_TURN_CLOSED|{}KIND_TURN_CLOSED[0]
+        final fun <get-KIND_TURN_CLOSED>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.KIND_TURN_CLOSED.<get-KIND_TURN_CLOSED>|<get-KIND_TURN_CLOSED>(){}[0]
+    final const val KIND_TURN_OPEN // com.letta.mobile.data.feed.wire/ConversationFeedWire.KIND_TURN_OPEN|{}KIND_TURN_OPEN[0]
+        final fun <get-KIND_TURN_OPEN>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.KIND_TURN_OPEN.<get-KIND_TURN_OPEN>|<get-KIND_TURN_OPEN>(){}[0]
+    final const val LIMIT // com.letta.mobile.data.feed.wire/ConversationFeedWire.LIMIT|{}LIMIT[0]
+        final fun <get-LIMIT>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.LIMIT.<get-LIMIT>|<get-LIMIT>(){}[0]
+    final const val MAX_INLINE_PAYLOAD_BYTES // com.letta.mobile.data.feed.wire/ConversationFeedWire.MAX_INLINE_PAYLOAD_BYTES|{}MAX_INLINE_PAYLOAD_BYTES[0]
+        final fun <get-MAX_INLINE_PAYLOAD_BYTES>(): kotlin/Int // com.letta.mobile.data.feed.wire/ConversationFeedWire.MAX_INLINE_PAYLOAD_BYTES.<get-MAX_INLINE_PAYLOAD_BYTES>|<get-MAX_INLINE_PAYLOAD_BYTES>(){}[0]
+    final const val MAX_LIMIT // com.letta.mobile.data.feed.wire/ConversationFeedWire.MAX_LIMIT|{}MAX_LIMIT[0]
+        final fun <get-MAX_LIMIT>(): kotlin/Int // com.letta.mobile.data.feed.wire/ConversationFeedWire.MAX_LIMIT.<get-MAX_LIMIT>|<get-MAX_LIMIT>(){}[0]
+    final const val MAX_PAGE_BYTES // com.letta.mobile.data.feed.wire/ConversationFeedWire.MAX_PAGE_BYTES|{}MAX_PAGE_BYTES[0]
+        final fun <get-MAX_PAGE_BYTES>(): kotlin/Int // com.letta.mobile.data.feed.wire/ConversationFeedWire.MAX_PAGE_BYTES.<get-MAX_PAGE_BYTES>|<get-MAX_PAGE_BYTES>(){}[0]
+    final const val MODE_REPLAY // com.letta.mobile.data.feed.wire/ConversationFeedWire.MODE_REPLAY|{}MODE_REPLAY[0]
+        final fun <get-MODE_REPLAY>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.MODE_REPLAY.<get-MODE_REPLAY>|<get-MODE_REPLAY>(){}[0]
+    final const val MODE_SNAPSHOT // com.letta.mobile.data.feed.wire/ConversationFeedWire.MODE_SNAPSHOT|{}MODE_SNAPSHOT[0]
+        final fun <get-MODE_SNAPSHOT>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.MODE_SNAPSHOT.<get-MODE_SNAPSHOT>|<get-MODE_SNAPSHOT>(){}[0]
+    final const val POINTER_BYTE_LEN // com.letta.mobile.data.feed.wire/ConversationFeedWire.POINTER_BYTE_LEN|{}POINTER_BYTE_LEN[0]
+        final fun <get-POINTER_BYTE_LEN>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.POINTER_BYTE_LEN.<get-POINTER_BYTE_LEN>|<get-POINTER_BYTE_LEN>(){}[0]
+    final const val POINTER_MESSAGE_ID // com.letta.mobile.data.feed.wire/ConversationFeedWire.POINTER_MESSAGE_ID|{}POINTER_MESSAGE_ID[0]
+        final fun <get-POINTER_MESSAGE_ID>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.POINTER_MESSAGE_ID.<get-POINTER_MESSAGE_ID>|<get-POINTER_MESSAGE_ID>(){}[0]
+    final const val POINTER_MESSAGE_TYPE // com.letta.mobile.data.feed.wire/ConversationFeedWire.POINTER_MESSAGE_TYPE|{}POINTER_MESSAGE_TYPE[0]
+        final fun <get-POINTER_MESSAGE_TYPE>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.POINTER_MESSAGE_TYPE.<get-POINTER_MESSAGE_TYPE>|<get-POINTER_MESSAGE_TYPE>(){}[0]
+    final const val RESYNC_AHEAD_OF_HEAD // com.letta.mobile.data.feed.wire/ConversationFeedWire.RESYNC_AHEAD_OF_HEAD|{}RESYNC_AHEAD_OF_HEAD[0]
+        final fun <get-RESYNC_AHEAD_OF_HEAD>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.RESYNC_AHEAD_OF_HEAD.<get-RESYNC_AHEAD_OF_HEAD>|<get-RESYNC_AHEAD_OF_HEAD>(){}[0]
+    final const val RESYNC_BEHIND_HORIZON // com.letta.mobile.data.feed.wire/ConversationFeedWire.RESYNC_BEHIND_HORIZON|{}RESYNC_BEHIND_HORIZON[0]
+        final fun <get-RESYNC_BEHIND_HORIZON>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.RESYNC_BEHIND_HORIZON.<get-RESYNC_BEHIND_HORIZON>|<get-RESYNC_BEHIND_HORIZON>(){}[0]
+    final const val RESYNC_EPOCH_CHANGED // com.letta.mobile.data.feed.wire/ConversationFeedWire.RESYNC_EPOCH_CHANGED|{}RESYNC_EPOCH_CHANGED[0]
+        final fun <get-RESYNC_EPOCH_CHANGED>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.RESYNC_EPOCH_CHANGED.<get-RESYNC_EPOCH_CHANGED>|<get-RESYNC_EPOCH_CHANGED>(){}[0]
+    final const val RESYNC_NO_CURSOR // com.letta.mobile.data.feed.wire/ConversationFeedWire.RESYNC_NO_CURSOR|{}RESYNC_NO_CURSOR[0]
+        final fun <get-RESYNC_NO_CURSOR>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.RESYNC_NO_CURSOR.<get-RESYNC_NO_CURSOR>|<get-RESYNC_NO_CURSOR>(){}[0]
+    final const val SEQ // com.letta.mobile.data.feed.wire/ConversationFeedWire.SEQ|{}SEQ[0]
+        final fun <get-SEQ>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.SEQ.<get-SEQ>|<get-SEQ>(){}[0]
+    final const val SUBSCRIBE // com.letta.mobile.data.feed.wire/ConversationFeedWire.SUBSCRIBE|{}SUBSCRIBE[0]
+        final fun <get-SUBSCRIBE>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.SUBSCRIBE.<get-SUBSCRIBE>|<get-SUBSCRIBE>(){}[0]
+
+    final val METHODS // com.letta.mobile.data.feed.wire/ConversationFeedWire.METHODS|{}METHODS[0]
+        final fun <get-METHODS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.feed.wire/ConversationFeedWire.METHODS.<get-METHODS>|<get-METHODS>(){}[0]
 }
 
 final object com.letta.mobile.data.home/HomePageReducer { // com.letta.mobile.data.home/HomePageReducer|null[0]

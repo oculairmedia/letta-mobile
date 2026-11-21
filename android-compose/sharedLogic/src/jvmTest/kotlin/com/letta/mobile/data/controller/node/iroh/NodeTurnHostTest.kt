@@ -1,5 +1,8 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.node.iroh.feed.FeedJournalStore
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
@@ -25,11 +28,13 @@ import kotlin.test.assertTrue
  * letta-mobile-qygvv.3: an initiator's Iroh connection closing must not cancel the server turn.
  * The turn runs on the node-owned [NodeTurnHost]; the connection only awaits it. When the
  * connection is cancelled the turn is detached: it keeps collecting to its terminal, keeps
- * reaching the remaining viewers, stops writing to the dead initiator, and parks its tail for
+ * reaching the remaining viewers, stops writing to the dead initiator, and journals its tail for
  * the initiator's redial.
  */
 class NodeTurnHostTest {
     private val runtime = AppServerRuntimeScope("agent-1", "conv-1")
+    private val agent = AgentId(runtime.agentId)
+    private val conversation = ConversationId(runtime.conversationId)
 
     private class RecordingViewer(override val connectionId: String) : ViewerHandle {
         val frames = mutableListOf<String>()
@@ -46,12 +51,13 @@ class NodeTurnHostTest {
     private fun TestScope.scriptedTurn(
         viewers: () -> Set<ViewerHandle>,
         initiator: ViewerHandle,
-        parked: ParkedTerminalStore,
+        journal: TurnJournal,
     ): ScriptedTurn {
         val host = NodeTurnHost(
             CoroutineScope(backgroundScope.coroutineContext + SupervisorJob(backgroundScope.coroutineContext[Job])),
+            journal,
         )
-        val tracker = TurnFrameTracker()
+        val writer = journal.openTurn(agent, conversation, CLIENT_MESSAGE_ID)
         val fanout = ConversationTurnFanout(
             conversationId = runtime.conversationId,
             runtime = runtime,
@@ -59,7 +65,7 @@ class NodeTurnHostTest {
                 viewersFor = { viewers() },
             ),
             initiatorViewer = initiator,
-            trackInitiatorFrame = { tracker.track(it) },
+            trackInitiatorFrame = writer::append,
         )
         val drafts = Channel<RuntimeEventPayload>(Channel.UNLIMITED)
         lateinit var scripted: ScriptedTurn
@@ -67,8 +73,7 @@ class NodeTurnHostTest {
             conversationId = runtime.conversationId,
             clientMessageId = CLIENT_MESSAGE_ID,
             fanout = fanout,
-            tracker = tracker,
-            parkedTerminals = parked,
+            journal = writer,
         ) {
             // Stands in for controller.runTurn(command).collect { fanout.onStampedDraft(...) }.
             try {
@@ -83,11 +88,11 @@ class NodeTurnHostTest {
     }
 
     @Test
-    fun closingTheInitiatorDetachesTheTurnAndParksItsTerminal() = runTest {
+    fun closingTheInitiatorDetachesTheTurnAndJournalsItsTerminal() = runTest {
         val initiator = RecordingViewer("peer-A")
         val observer = RecordingViewer("peer-B")
-        val parked = ParkedTerminalStore()
-        val scripted = scriptedTurn({ setOf(initiator, observer) }, initiator, parked)
+        val journal = FeedJournalStore()
+        val scripted = scriptedTurn({ setOf(initiator, observer) }, initiator, journal)
         val connection = launch { scripted.host.run(scripted.turn) }
         scripted.drafts.send(assistantFrame("hello"))
         runCurrent()
@@ -107,9 +112,11 @@ class NodeTurnHostTest {
         assertEquals(0, scripted.host.liveTurnCount)
         assertEquals(1, initiator.frames.size, "nothing more is written to the dead initiator")
         assertTrue(observer.frames.any { "stop_reason" in it }, "remaining viewers still get the terminal")
-        val parkedFrames = assertNotNull(parked.takeParked(CLIENT_MESSAGE_ID), "the tail is parked for redial")
-        assertTrue("stop_reason" in parkedFrames, "the real terminal is parked")
-        assertFalse("connection interrupted" in parkedFrames, "no synthetic terminal when the real one exists")
+        val replay = assertNotNull(journal.replayForInitiator(agent, conversation, CLIENT_MESSAGE_ID), "the tail is journaled for redial")
+        val journaled = replay.deltas.joinToString("\n")
+        assertTrue("stop_reason" in journaled, "the real terminal is journaled")
+        assertTrue(replay.terminalObserved, "the journal saw the real terminal")
+        assertFalse("connection interrupted" in journaled, "no synthetic terminal when the real one exists")
     }
 
     @Test
@@ -117,7 +124,7 @@ class NodeTurnHostTest {
         val initiator = RecordingViewer("peer-A")
         val redialed = RecordingViewer("peer-A")
         var viewers: Set<ViewerHandle> = setOf(initiator)
-        val scripted = scriptedTurn({ viewers }, initiator, ParkedTerminalStore())
+        val scripted = scriptedTurn({ viewers }, initiator, FeedJournalStore())
         val connection = launch { scripted.host.run(scripted.turn) }
         scripted.drafts.send(assistantFrame("hello"))
         runCurrent()
@@ -134,10 +141,10 @@ class NodeTurnHostTest {
     }
 
     @Test
-    fun turnThatFinishesWhileAttachedIsNotParked() = runTest {
+    fun turnThatFinishesWhileAttachedIsNotOwedToTheInitiator() = runTest {
         val initiator = RecordingViewer("peer-A")
-        val parked = ParkedTerminalStore()
-        val scripted = scriptedTurn({ setOf(initiator) }, initiator, parked)
+        val journal = FeedJournalStore()
+        val scripted = scriptedTurn({ setOf(initiator) }, initiator, journal)
         val connection = launch { scripted.host.run(scripted.turn) }
         scripted.drafts.send(RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Completed))
         scripted.drafts.close()
@@ -145,7 +152,60 @@ class NodeTurnHostTest {
 
         assertTrue(connection.isCompleted && !connection.isCancelled)
         assertTrue(initiator.frames.any { "stop_reason" in it })
-        assertNull(parked.takeParked(CLIENT_MESSAGE_ID))
+        assertNull(journal.replayForInitiator(agent, conversation, CLIENT_MESSAGE_ID))
+    }
+
+    @Test
+    fun aFinishedDetachedTurnIsStillOwedToItsInitiatorAfterASimulatedWrapperRestart() = runTest {
+        val directory = kotlin.io.path.createTempDirectory("turn-host-restart")
+        try {
+            val initiator = RecordingViewer("peer-A")
+            val scripted = scriptedTurn({ setOf(initiator) }, initiator, FeedJournalStore(directory))
+            val connection = launch { scripted.host.run(scripted.turn) }
+            scripted.drafts.send(assistantFrame("hello"))
+            runCurrent()
+            connection.cancel(CancellationException("iroh connection closed"))
+            runCurrent()
+            scripted.drafts.send(RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Completed))
+            scripted.drafts.close()
+            runCurrent()
+            assertEquals(0, scripted.host.liveTurnCount)
+
+            // The wrapper restarts: every object above is gone, only the state directory is left.
+            val afterRestart = FeedJournalStore(directory)
+
+            assertTrue(
+                afterRestart.knowsTurn(agent, conversation, CLIENT_MESSAGE_ID),
+                "the re-sent input is a duplicate, not a second turn",
+            )
+            val replay = assertNotNull(
+                afterRestart.replayForInitiator(agent, conversation, CLIENT_MESSAGE_ID),
+                "a finished turn must survive a wrapper restart",
+            )
+            assertTrue(replay.deltas.any { "stop_reason" in it }, "the real terminal is still replayable")
+            assertTrue(replay.terminalObserved)
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun aTurnThatEndsWithoutARealTerminalIsJournaledAsNotObservedAndNoTerminalIsInvented() = runTest {
+        val initiator = RecordingViewer("peer-A")
+        val journal = FeedJournalStore()
+        val scripted = scriptedTurn({ setOf(initiator) }, initiator, journal)
+        val connection = launch { scripted.host.run(scripted.turn) }
+        scripted.drafts.send(assistantFrame("partial"))
+        runCurrent()
+        connection.cancel(CancellationException("iroh connection closed"))
+        runCurrent()
+        scripted.drafts.close()
+        runCurrent()
+
+        val replay = assertNotNull(journal.replayForInitiator(agent, conversation, CLIENT_MESSAGE_ID))
+        assertFalse(replay.terminalObserved)
+        val terminals = replay.deltas.filter { "stop_reason" in it || "error_message" in it }
+        assertTrue(terminals.isEmpty(), "the host never synthesizes a terminal: $terminals")
     }
 
     private fun assistantFrame(text: String) = RuntimeEventPayload.RemoteStreamFrame(

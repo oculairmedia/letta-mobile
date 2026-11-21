@@ -5,6 +5,7 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.extras.relay.AppToolRelay
 import com.letta.mobile.data.controller.extras.relay.AppToolRelayLink
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId as ModelConversationId
 import com.letta.mobile.data.runtime.TurnInputAcknowledgement
 import com.letta.mobile.data.runtime.isTurnAlreadyActiveMessage
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -90,12 +91,7 @@ class IrohNodeConnection(
      */
     private val clientMessageDedupe: ProcessScopedClientMessageDedupe = SHARED_CLIENT_MESSAGE_DEDUPE,
     /**
-     * Server-process-scoped store of terminal frames dropped when a channel died
-     * mid-turn, replayed on redial re-send. Injectable for tests.
-     */
-    private val parkedTerminals: ParkedTerminalStore = SHARED_PARKED_TERMINALS,
-    /**
-     * Node-owned home of this connection's turns. A turn outlives its
+     * Node-owned home of this connection's turns, and of their durable journal. A turn outlives its
      * initiator's connection (it is detached, not cancelled), so it must not be a child of it.
      */
     private val turnHost: NodeTurnHost = NodeTurnHost.SHARED,
@@ -862,7 +858,7 @@ class IrohNodeConnection(
     private fun createTurnFanout(
         input: AppServerCommand.Input,
         streamSend: SendStream,
-        tracker: TurnFrameTracker?,
+        journal: TurnJournalWriter,
         clientMessageId: String?,
     ) = ConversationTurnFanout(
         conversationId = input.runtime.conversationId,
@@ -874,13 +870,48 @@ class IrohNodeConnection(
             initiatorWrites = observerWrites,
         ),
         initiatorViewer = ensureSelfViewer(streamSend),
-        trackInitiatorFrame = { deltaJson -> tracker?.track(deltaJson) },
+        trackInitiatorFrame = journal::append,
         turnId = firstUserMessage(input)?.clientMessageId,
         identity = turnIdentity?.let { TurnIdentityBinding(it, input.runtime.conversationId, clientMessageId) },
     )
 
+    private fun AppServerCommand.Input.owner() = AgentId(runtime.agentId)
+
+    private fun AppServerCommand.Input.conversation() = ModelConversationId(runtime.conversationId)
+
     private fun firstUserMessage(input: AppServerCommand.Input): AppServerInputMessage? =
         (input.payload as? AppServerInputPayload.CreateMessage)?.messages?.firstOrNull { it.role == "user" }
+
+    /** A re-sent input is a duplicate in this process (the dedupe set) or in an earlier one (the journal). */
+    private fun isResentInput(input: AppServerCommand.Input, message: AppServerInputMessage): Boolean {
+        val clientMsgId = message.clientMessageId ?: return false
+        return !clientMessageDedupe.markHandled(clientMsgId) ||
+            turnHost.journal.knowsTurn(input.owner(), input.conversation(), clientMsgId)
+    }
+
+    /**
+     * A duplicate re-delivery (typically a redial re-send). If the previous connection died before delivering this turn's
+     * tail, the journal still holds it: replay it now so the client's turn resolves instead of hanging forever. Otherwise
+     * the original turn is still in flight or already delivered, so drop silently.
+     */
+    private suspend fun serveResentInput(input: AppServerCommand.Input, message: AppServerInputMessage, streamSend: SendStream) {
+        val clientMsgId = message.clientMessageId ?: return
+        ackRedialResend(input)
+        val replay = turnHost.journal.replayForInitiator(input.owner(), input.conversation(), clientMsgId)
+        val event = if (replay != null) "input.duplicate_replayed_journal" else "input.duplicate_ignored"
+        Telemetry.event(
+            "IrohNode", event,
+            "clientMessageId" attr clientMsgId,
+            "agentId" attr input.runtime.agentId,
+            "conversationId" attr input.runtime.conversationId,
+        )
+        if (replay == null) return
+        // A write that fails leaves the replay undelivered, so a later redial is offered it again.
+        runCatching {
+            replayJournalDeltas(ensureSelfViewer(streamSend), input.runtime, replay)
+            replay.delivered()
+        }.onFailure { replayError -> if (replayError is CancellationException) throw replayError }
+    }
 
     private suspend fun handleInput(
         input: AppServerCommand.Input,
@@ -892,37 +923,8 @@ class IrohNodeConnection(
             ?.let { (it as? JsonPrimitive)?.contentOrNull ?: extractTextFromContentParts(contentParts) ?: it.toString() }
             ?: ""
         val clientMsgId = userMsg?.clientMessageId
-        if (clientMsgId != null && !clientMessageDedupe.markHandled(clientMsgId)) {
-            // Duplicate re-delivery (typically a redial re-send). If the previous
-            // connection died before delivering this turn's frames we parked
-            // them — replay them now so the client's turn resolves instead of
-            // hanging forever (q71yi + mid-turn redial fix). Otherwise the original
-            // turn is still in-flight or already completed, so drop silently.
-            ackRedialResend(input)
-            val parkedFrameSequence = parkedTerminals.takeParked(clientMsgId)
-            if (parkedFrameSequence != null) {
-                Telemetry.event(
-                    "IrohNode", "input.duplicate_replayed_parked_frames",
-                    "clientMessageId" attr clientMsgId,
-                    "agentId" attr input.runtime.agentId,
-                    "conversationId" attr input.runtime.conversationId,
-                )
-                runCatching {
-                    replayParkedDeltas(ensureSelfViewer(streamSend), input.runtime, parkedFrameSequence)
-                }.onFailure { replayError ->
-                    // Could not deliver on this stream either — re-park so a
-                    // later redial can still resolve the turn.
-                    parkedTerminals.park(clientMsgId, parkedFrameSequence)
-                    if (replayError is CancellationException) throw replayError
-                }
-            } else {
-                Telemetry.event(
-                    "IrohNode", "input.duplicate_ignored",
-                    "clientMessageId" attr clientMsgId,
-                    "agentId" attr input.runtime.agentId,
-                    "conversationId" attr input.runtime.conversationId,
-                )
-            }
+        if (userMsg != null && isResentInput(input, userMsg)) {
+            serveResentInput(input, userMsg, streamSend)
             return
         }
         val command = TurnCommand(
@@ -936,22 +938,20 @@ class IrohNodeConnection(
                 contentPartsJson = contentParts?.toString(),
             ),
         )
-        // Mid-turn redial fix: the INITIATOR-ONLY parking record for this turn.
-        val tracker = clientMsgId?.let { TurnFrameTracker() }
-        val fanout = createTurnFanout(input, streamSend, tracker, clientMsgId)
+        // The turn's durable record: the frames the initiator is sent are journaled, so its redial can be served the tail.
+        val journal = turnHost.journal.openTurn(input.owner(), input.conversation(), clientMsgId ?: "turn-${UUID.randomUUID()}")
+        val fanout = createTurnFanout(input, streamSend, journal, clientMsgId)
         val echo = clientMsgId?.let { RelayedUserEcho(it, text, contentParts) }
-        val turn = RelayedInputTurn(input, clientMsgId, fanout, relayedTurnProtocol(input, fanout, echo, ::writeControl), tracker)
-        // letta-mobile-qygvv.3: the collector runs on the node-owned host. If this
-        // connection closes first, the turn is detached, not cancelled: the server
-        // turn keeps its approvals, external tools and other viewers, and its tail
-        // is parked for this initiator's redial.
+        val turn = RelayedInputTurn(input, clientMsgId, fanout, relayedTurnProtocol(input, fanout, echo, ::writeControl), journal)
+        // The collector runs on the node-owned host. If this connection closes first, the turn is
+        // detached, not cancelled: the server turn keeps its approvals, external tools and other
+        // viewers, and its tail stays in the journal for this initiator's redial.
         turnHost.run(
             NodeTurn(
                 conversationId = input.runtime.conversationId,
                 clientMessageId = clientMsgId,
                 fanout = fanout,
-                tracker = tracker ?: TurnFrameTracker(),
-                parkedTerminals = parkedTerminals,
+                journal = journal,
             ) {
                 relayAndSettle(command, turn)
             },
@@ -995,7 +995,7 @@ class IrohNodeConnection(
             }
         }.isSuccess
         if (!wroteTerminal) {
-            parkInterruptedTerminal(error, turn.fanout, turn.clientMsgId, turn.input, turn.tracker)
+            noteTailUndelivered(error, turn)
         }
         if (error is CancellationException) throw error
     }
@@ -1020,13 +1020,8 @@ class IrohNodeConnection(
         )
     }
 
-    private fun parkInterruptedTerminal(
-        error: Throwable,
-        fanout: ConversationTurnFanout,
-        clientMsgId: String?,
-        input: AppServerCommand.Input,
-        tracker: TurnFrameTracker?,
-    ) {
+    /** The turn ended in a failure whose terminal never reached the initiator: its redial is owed the tail. */
+    private fun noteTailUndelivered(error: Throwable, turn: RelayedInputTurn) {
         Telemetry.event(
             "IrohNode", "stream.closed_before_terminal",
             "remoteEndpointId" attr remoteEndpointId,
@@ -1034,14 +1029,13 @@ class IrohNodeConnection(
             "class" attr error::class.simpleName,
             level = Telemetry.Level.WARN,
         )
-        if (clientMsgId == null || fanout.anyTerminalWritten) return
-        tracker?.parkFrames(parkedTerminals, clientMsgId, NodeTurnHost.INTERRUPTED_TERMINAL)
+        if (turn.clientMsgId == null || turn.fanout.anyTerminalWritten) return
+        turn.journal.noteInitiatorMissedTail()
         Telemetry.event(
-            "IrohNode", "stream.frames_parked",
+            "IrohNode", "stream.tail_journaled",
             "remoteEndpointId" attr remoteEndpointId,
-            "clientMessageId" attr clientMsgId,
-            "conversationId" attr input.runtime.conversationId,
-            "frameCount" attr (tracker?.frameCount() ?: 0),
+            "clientMessageId" attr turn.clientMsgId,
+            "conversationId" attr turn.input.runtime.conversationId,
         )
     }
 
@@ -1073,7 +1067,7 @@ class IrohNodeConnection(
         // stop_reason flush) can legitimately still be draining when the control
         // channel closes; the old 5s cap cancelled those turns before their
         // terminal reached the client, stranding "Thinking…". Undelivered
-        // terminals are additionally parked for redial replay (q71yi).
+        // terminals are additionally journaled for redial replay.
         const val STREAM_JOB_DRAIN_TIMEOUT_MS = 60_000L
         const val ADMIN_RPC_REQUEST_TIMEOUT_MS = 15_000L
         const val MAX_CONCURRENT_ADMIN_RPC_STREAMS = 16
@@ -1081,6 +1075,5 @@ class IrohNodeConnection(
         // Process-scoped so they persist across the per-connection lifecycle and
         // survive a redial (new IrohNodeConnection instance).
         internal val SHARED_CLIENT_MESSAGE_DEDUPE = ProcessScopedClientMessageDedupe()
-        internal val SHARED_PARKED_TERMINALS = ParkedTerminalStore()
     }
 }
