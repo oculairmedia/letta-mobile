@@ -95,6 +95,24 @@ class MascotNavigationFlashUiTest {
         val isMascot get() = this == LIVE || this == STILL
     }
 
+    /** The two screens of the transition; each tags its avatar so the oracle can find it. */
+    private enum class Screen(val avatarTag: String) {
+        FIRST("avatar-0"),
+        SECOND("avatar-1"),
+    }
+
+    /** One frame of the transition, counted from the first one advanced after the change. */
+    @JvmInline
+    private value class Frame(val index: Int)
+
+    /** How many frames a step advances. */
+    @JvmInline
+    private value class FrameCount(val value: Int) {
+        fun frames(from: Frame = Frame(0)): List<Frame> = (from.index until from.index + value).map(::Frame)
+    }
+
+    private enum class Motion { NORMAL, REDUCED }
+
     private val stillColor = Color(0xFFFF00FF)
     private val liveColor = Color(0xFF00FFFF)
     private val letterTileColor = Color(0xFF00FF00)
@@ -121,22 +139,28 @@ class MascotNavigationFlashUiTest {
 
         @Composable
         override fun Surface(entry: MascotEntry, modifier: Modifier, playing: Boolean) {
+            val drives = claimsLiveDrive(entry, playing)
+            var wasLive by remember { mutableStateOf(false) }
+            if (drives) wasLive = true
+            if (drives || wasLive) Box(modifier.background(liveColor)) else StillTile(entry.identity, modifier)
+        }
+
+        /** The first surface that asks to play owns the entry (AndroidMascotHost's one-live-driver rule). */
+        @Composable
+        private fun claimsLiveDrive(entry: MascotEntry, playing: Boolean): Boolean {
             val token = remember { Any() }
             val driver = liveDrivers[entry]
-            val drives = playing && (driver == null || driver === token)
             DisposableEffect(entry, playing) {
                 if (playing && liveDrivers[entry] == null) liveDrivers[entry] = token
                 onDispose { if (liveDrivers[entry] === token) liveDrivers.remove(entry) }
             }
-            var wasLive by remember { mutableStateOf(false) }
-            if (drives) wasLive = true
-            if (drives || wasLive) {
-                Box(modifier.background(liveColor))
-            } else {
-                val identity = entry.identity
-                LaunchedEffect(identity) { stills.ensure(identity) }
-                stills.get(identity)?.let { Image(it, contentDescription = null, modifier = modifier, contentScale = ContentScale.Fit) }
-            }
+            return playing && (driver == null || driver === token)
+        }
+
+        @Composable
+        private fun StillTile(identity: MascotIdentity, modifier: Modifier) {
+            LaunchedEffect(identity) { stills.ensure(identity) }
+            stills.get(identity)?.let { Image(it, contentDescription = null, modifier = modifier, contentScale = ContentScale.Fit) }
         }
     }
 
@@ -159,24 +183,24 @@ class MascotNavigationFlashUiTest {
         decode = { solid(stillColor) },
     )
 
-    private fun registryOf(vararg ids: String) = MascotIdentityRegistry().also { r -> r.update(ids.associateWith { identity }) }
+    private fun registryOf(agent: AgentId) = MascotIdentityRegistry().also { r -> r.update(mapOf(agent.value to identity)) }
 
     /** Two screens that each draw [agent]'s avatar, cross-sliding when [screen] changes. */
     private fun ComposeUiTest.mount(
         host: MascotHost,
         registry: MascotIdentityRegistry,
-        agent: String = AGENT,
-        reducedMotion: Boolean = false,
+        agent: AgentId = AGENT,
+        motion: Motion = Motion.NORMAL,
         beforeScreens: @Composable () -> Unit = {},
-    ): MutableState<Int> {
-        val screen = mutableStateOf(0)
+    ): MutableState<Screen> {
+        val screen = mutableStateOf(Screen.FIRST)
         mainClock.autoAdvance = false
         setContent {
             MaterialTheme(colorScheme = lightColorScheme(secondaryContainer = letterTileColor)) {
                 CompositionLocalProvider(
                     LocalMascotHost provides host,
                     LocalMascotRegistry provides registry,
-                    LocalReducedMotion provides reducedMotion,
+                    LocalReducedMotion provides (motion == Motion.REDUCED),
                 ) {
                     beforeScreens()
                     AnimatedContent(
@@ -188,7 +212,8 @@ class MascotNavigationFlashUiTest {
                         label = "screens",
                     ) { page ->
                         Column(Modifier.fillMaxSize()) {
-                            AgentAvatar(agentId = agent, name = "Meridian", size = TILE_DP.dp, modifier = Modifier.testTag("avatar-$page"))
+                            val tagged = Modifier.testTag(page.avatarTag)
+                            AgentAvatar(agentId = agent.value, name = "Meridian", size = TILE_DP.dp, modifier = tagged)
                         }
                     }
                 }
@@ -198,50 +223,53 @@ class MascotNavigationFlashUiTest {
     }
 
     /** Which branch drew each avatar tile that is on screen this frame. */
-    private fun ComposeUiTest.drawnBranches(): List<Pair<String, Branch>> {
+    private fun ComposeUiTest.drawnBranches(): List<Pair<Screen, Branch>> {
         val image = onRoot().captureToImage().toPixelMap()
-        return listOf("avatar-0", "avatar-1").flatMap { tag ->
-            onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.TestTag, tag), useUnmergedTree = true)
+        return Screen.entries.flatMap { screen ->
+            onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.TestTag, screen.avatarTag), useUnmergedTree = true)
                 .fetchSemanticsNodes()
                 // boundsInRoot is clipped to the window: a page still sliding in or already gone is empty.
                 .filter { !it.boundsInRoot.isEmpty }
                 .map { node ->
                     val centre = node.boundsInRoot.center
-                    tag to when (image[centre.x.toInt(), centre.y.toInt()].toArgb()) {
-                        stillColor.toArgb() -> Branch.STILL
-                        liveColor.toArgb() -> Branch.LIVE
-                        letterTileColor.toArgb() -> Branch.LETTER_TILE
-                        else -> Branch.BLANK
-                    }
+                    screen to classify(image[centre.x.toInt(), centre.y.toInt()])
                 }
         }
     }
 
-    /** Advances [frames] frames; every visible tile that is not the mascot, as "frame n tag -> branch". */
-    private fun ComposeUiTest.placeholders(frames: Int, from: Int = 0, beforeFrame: (Int) -> Unit = {}): List<String> =
-        (from until from + frames).flatMap { frame ->
+    /** The branch that painted [pixel], by the one colour each branch paints its tile with. */
+    private fun classify(pixel: Color): Branch = when (pixel.toArgb()) {
+        stillColor.toArgb() -> Branch.STILL
+        liveColor.toArgb() -> Branch.LIVE
+        letterTileColor.toArgb() -> Branch.LETTER_TILE
+        else -> Branch.BLANK
+    }
+
+    /** Advances [span] frames; every visible tile that is not the mascot, as "frame n tile -> branch". */
+    private fun ComposeUiTest.placeholders(span: FrameCount, beforeFrame: (Frame) -> Unit = {}): List<String> =
+        span.frames().flatMap { frame ->
             beforeFrame(frame)
             mainClock.advanceTimeByFrame()
-            drawnBranches().filter { !it.second.isMascot }.map { (tag, branch) -> "frame $frame $tag -> $branch" }
+            drawnBranches().filter { !it.second.isMascot }.map { (screen, branch) -> "frame ${frame.index} ${screen.avatarTag} -> $branch" }
         }
 
-    private fun ComposeUiTest.warmUp(frames: Int = WARM_FRAMES) = repeat(frames) { mainClock.advanceTimeByFrame() }
+    private fun ComposeUiTest.warmUp(span: FrameCount = WARM_FRAMES) = span.frames().forEach { _ -> mainClock.advanceTimeByFrame() }
 
     @Test
     fun anIdleAgentsAvatarSurvivesAScreenChange() = runComposeUiTest {
         val screen = mount(AndroidLikeHost(liveColor, stills()), registryOf(AGENT))
         warmUp()
         assertTrue(drawnBranches().all { it.second.isMascot }, "the mascot is up before the change")
-        screen.value = 1
+        screen.value = Screen.SECOND
         assertEquals(emptyList(), placeholders(TRANSITION_FRAMES))
     }
 
     @Test
     fun aWorkingAgentsAvatarSurvivesAScreenChange() = runComposeUiTest {
-        val registry = registryOf(AGENT).also { it.setPresence(AGENT, AgentPresence(activity = AgentActivityKind.THINKING)) }
+        val registry = registryOf(AGENT).also { it.setPresence(AGENT.value, AgentPresence(activity = AgentActivityKind.THINKING)) }
         val screen = mount(AndroidLikeHost(liveColor, stills()), registry)
         warmUp()
-        screen.value = 1
+        screen.value = Screen.SECOND
         assertEquals(emptyList(), placeholders(TRANSITION_FRAMES))
     }
 
@@ -252,12 +280,12 @@ class MascotNavigationFlashUiTest {
      */
     @Test
     fun anAvatarWhoseRunEndsNeverGoesBlankWaitingForItsStill() = runComposeUiTest {
-        val registry = registryOf(AGENT).also { it.setPresence(AGENT, AgentPresence(activity = AgentActivityKind.THINKING)) }
-        val screen = mount(AndroidLikeHost(liveColor, stills()), registry, reducedMotion = true)
+        val registry = registryOf(AGENT).also { it.setPresence(AGENT.value, AgentPresence(activity = AgentActivityKind.THINKING)) }
+        val screen = mount(AndroidLikeHost(liveColor, stills()), registry, motion = Motion.REDUCED)
         warmUp()
         assertTrue(drawnBranches().all { it.second == Branch.LIVE }, "the working agent is live: ${drawnBranches()}")
-        registry.setPresence(AGENT, AgentPresence(activity = AgentActivityKind.IDLE))
-        screen.value = 1
+        registry.setPresence(AGENT.value, AgentPresence(activity = AgentActivityKind.IDLE))
+        screen.value = Screen.SECOND
         assertEquals(emptyList(), placeholders(TRANSITION_FRAMES))
     }
 
@@ -316,7 +344,7 @@ class MascotNavigationFlashUiTest {
             // Navigate; the workspace refreshes the roster as it opens. The second page is slow.
             val secondPage = CompletableDeferred<Unit>()
             remote.heldPage = PAGE_SIZE to secondPage
-            screen.value = 1
+            screen.value = Screen.SECOND
             scope.launch { repository.refreshAgents() }
             assertEquals(PAGE_SIZE, repository.agents.value.size, "the first page is published alone")
 
@@ -329,17 +357,17 @@ class MascotNavigationFlashUiTest {
     }
 
     private companion object {
-        const val AGENT = "agent-nav"
         const val STILL_PX = 8
         const val SCREEN_DP = 300
         const val TILE_DP = 64
         const val TRANSITION_MS = 320
-        const val TRANSITION_FRAMES = 30
-        const val WARM_FRAMES = 40
+        val AGENT = AgentId("agent-nav")
+        val TRANSITION_FRAMES = FrameCount(30)
+        val WARM_FRAMES = FrameCount(40)
         const val DISK_READ_MS = 80L
         const val PAGE_SIZE = 50
         const val ROSTER_SIZE = 101
-        const val PAST_FIRST_PAGE = "agent-80"
-        const val PAGE_ARRIVES_AT_FRAME = 12
+        val PAST_FIRST_PAGE = AgentId("agent-80")
+        val PAGE_ARRIVES_AT_FRAME = Frame(12)
     }
 }
