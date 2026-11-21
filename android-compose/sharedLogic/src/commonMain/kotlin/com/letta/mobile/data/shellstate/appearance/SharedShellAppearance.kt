@@ -40,6 +40,9 @@ class SharedShellAppearance(
         AppearanceValues.of(state.snapshot?.entries).orElse(old)
     }.distinctUntilChanged()
 
+    /** The host's last document as it stands, without waiting for [values]. */
+    override val current: AppearanceValues get() = AppearanceValues.of(shell.state.value.snapshot?.entries)
+
     /** Records [theme] on the host. */
     override suspend fun setTheme(name: String): ShellStateEditOutcome =
         shell.set(AppearanceKeys.THEME, JsonPrimitive(name))

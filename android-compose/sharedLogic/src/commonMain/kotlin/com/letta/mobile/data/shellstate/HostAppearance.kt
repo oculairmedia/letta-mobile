@@ -17,6 +17,12 @@ interface HostAppearance {
     /** The appearance to show now: the host's, else what this device last saw of it, else a pre-move local choice, else none. */
     val values: Flow<AppearanceValues>
 
+    /**
+     * What is known without waiting: the host's last document (this device's mirror of it until the host answers),
+     * so a theme can draw the right colours on its first frame. A pre-move local choice is not in it; [values] has that.
+     */
+    val current: AppearanceValues
+
     /** Records the theme named [name] on the host. */
     suspend fun setTheme(name: String): ShellStateEditOutcome
 
@@ -36,6 +42,7 @@ interface HostAppearance {
         /** No host behind it (tests, previews): shows no choice and refuses every edit. */
         val None: HostAppearance = object : HostAppearance {
             override val values: Flow<AppearanceValues> = flowOf(AppearanceValues.NONE)
+            override val current: AppearanceValues = AppearanceValues.NONE
             override suspend fun setTheme(name: String) = ShellStateEditOutcome.OFFLINE
             override suspend fun setThemePreset(name: String) = ShellStateEditOutcome.OFFLINE
             override suspend fun setDynamicColor(enabled: Boolean) = ShellStateEditOutcome.OFFLINE

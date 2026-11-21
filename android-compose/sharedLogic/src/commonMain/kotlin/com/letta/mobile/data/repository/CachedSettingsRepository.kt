@@ -148,15 +148,12 @@ open class CachedSettingsRepository(
         }
     }
 
-    override fun getTheme(): Flow<AppTheme> =
-        hostAppearance.values.map { chosen -> AppTheme.entries.firstOrNull { it.name == chosen.theme } ?: AppTheme.SYSTEM }
+    override fun getTheme(): Flow<AppTheme> = hostAppearance.values.map { it.appTheme }
 
-    override fun getThemePreset(): Flow<ThemePreset> =
-        hostAppearance.values.map { chosen -> ThemePreset.entries.firstOrNull { it.name == chosen.themePreset } ?: ThemePreset.DEFAULT }
+    override fun getThemePreset(): Flow<ThemePreset> = hostAppearance.values.map { it.presetOrDefault }
 
     override fun getDynamicColor(): Flow<Boolean> = hostAppearance.values.map { chosen ->
-        val preset = ThemePreset.entries.firstOrNull { it.name == chosen.themePreset } ?: ThemePreset.DEFAULT
-        chosen.dynamicColor ?: (preset == ThemePreset.DEFAULT && platformDefaults.defaultDynamicColorWhenPresetUnset)
+        chosen.dynamicColor ?: (chosen.presetOrDefault == ThemePreset.DEFAULT && platformDefaults.defaultDynamicColorWhenPresetUnset)
     }
 
     override suspend fun followHostSettings() = hostAppearance.run()
