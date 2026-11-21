@@ -1,7 +1,5 @@
 package com.letta.mobile.data.shellstate
 
-import com.letta.mobile.data.shellstate.ShellStateSnapshot
-
 /**
  * Where a client keeps a disposable mirror of the last shell state document the host answered, so a cold start
  * with the host out of reach still shows the last known document. It is never authoritative and never a base for

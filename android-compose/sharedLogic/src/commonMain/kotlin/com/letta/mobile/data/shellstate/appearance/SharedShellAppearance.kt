@@ -78,7 +78,8 @@ class SharedShellAppearance(
         val old = legacy.values.first()
         if (old.isEmpty) return Migration.DONE
         val edits = old.editsExcept(shell.state.value.entries.keys)
-        val outcome = if (edits.isEmpty()) ShellStateEditOutcome.APPLIED else shell.propose(edits.map { SharedShellState.Edit(it.key, it.value) })
+        val proposal = edits.map { SharedShellState.Edit(it.key, it.value) }
+        val outcome = if (proposal.isEmpty()) ShellStateEditOutcome.APPLIED else shell.propose(proposal)
         return when (outcome) {
             ShellStateEditOutcome.APPLIED -> Migration.DONE.also { legacy.clear() }
             ShellStateEditOutcome.CONFLICT -> Migration.CONFLICT
