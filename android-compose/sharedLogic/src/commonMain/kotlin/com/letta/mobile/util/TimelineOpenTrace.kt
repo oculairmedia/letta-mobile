@@ -2,10 +2,7 @@ package com.letta.mobile.util
 
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.atomicfu.atomic
-import kotlinx.atomicfu.locks.SynchronizedObject
-import kotlinx.atomicfu.locks.synchronized
 import kotlin.jvm.JvmInline
-import kotlin.time.ComparableTimeMark
 import kotlin.time.TimeSource
 
 /**
@@ -72,10 +69,13 @@ object TimelineOpenTrace {
 
         /** Call from each draw of the list; [hasRows] is whether that frame shows at least one row. */
         fun onDraw(hasRows: Boolean) {
+            if (hasRows) markIfNewOpen()
+        }
+
+        // The ledger's id is 0 until some open exists, so a first draw before any open reads as "already marked".
+        private fun markIfNewOpen() {
             val open = ledger.opened.value
-            if (!hasRows || open == 0L || markedOpen.value == open) return
-            markedOpen.value = open
-            mark(conversation, Stage.FirstFrameWithRows)
+            if (markedOpen.getAndSet(open) != open) mark(conversation, Stage.FirstFrameWithRows)
         }
     }
 
@@ -135,110 +135,4 @@ object TimelineOpenTrace {
     }
 
     internal fun clearForTest() = ledger.clear()
-}
-
-private const val MAX_OPENS = 16
-private const val JOIN_WINDOW_MS = 5_000L
-private const val GIVE_UP_MS = 30_000L
-
-private class Open(val id: TimelineOpenTrace.OpenId, val startedAt: ComparableTimeMark) {
-    val fired = mutableSetOf<TimelineOpenTrace.Stage>()
-    var lastReplacement: ComparableTimeMark = startedAt
-    var replacements = 0
-}
-
-/**
- * The opens [TimelineOpenTrace] has seen, newest last and bounded. One instance serves the process;
- * every method takes the lock, and none is called unless tracing is on.
- */
-private class OpenLedger {
-    var clock: TimeSource.WithComparableMarks = TimeSource.Monotonic
-
-    /** The id of the newest open (0: none), readable without the lock. */
-    val opened = atomic(0L)
-    private val lock = SynchronizedObject()
-    private val opens = linkedMapOf<ConversationId, Open>()
-    private var nextId = 0L
-
-    fun begin(conversation: ConversationId): TimelineOpenTrace.OpenId = synchronized(lock) { start(conversation) }
-
-    fun beginUnlessJoinable(conversation: ConversationId): TimelineOpenTrace.OpenId = synchronized(lock) {
-        opens[conversation]?.takeIf { it.joinable() }?.id ?: start(conversation)
-    }
-
-    fun canSettle(conversation: ConversationId): Boolean = synchronized(lock) {
-        opens[conversation]?.let { TimelineOpenTrace.Stage.Settled !in it.fired && it.ageMs() < GIVE_UP_MS } ?: false
-    }
-
-    fun mark(conversation: ConversationId, stage: TimelineOpenTrace.Stage, count: Int?, bytes: Long?): Boolean =
-        synchronized(lock) {
-            val open = opens[conversation]
-            val first = open != null && open.fired.add(stage)
-            if (first) emit(conversation, requireNotNull(open), stage, count, bytes)
-            first
-        }
-
-    fun listReplaced(conversation: ConversationId) = synchronized(lock) {
-        val open = opens[conversation]
-        if (open != null && TimelineOpenTrace.Stage.Settled !in open.fired) {
-            open.lastReplacement = clock.markNow()
-            open.replacements++
-        }
-    }
-
-    fun settleIfQuiet(conversation: ConversationId) = synchronized(lock) {
-        val open = opens[conversation] ?: return@synchronized
-        val quiet = (clock.markNow() - open.lastReplacement).inWholeMilliseconds >= TimelineOpenTrace.SETTLE_QUIET_MS
-        val ready = TimelineOpenTrace.Stage.FirstFrameWithRows in open.fired &&
-            TimelineOpenTrace.Stage.NetworkPageEnd in open.fired
-        if (quiet && ready && open.fired.add(TimelineOpenTrace.Stage.Settled)) {
-            emit(conversation, open, TimelineOpenTrace.Stage.Settled, open.replacements, null, open.lastReplacement)
-        }
-    }
-
-    fun clear() = synchronized(lock) {
-        opens.clear()
-        opened.value = 0L
-        nextId = 0L
-        clock = TimeSource.Monotonic
-    }
-
-    private fun start(conversation: ConversationId): TimelineOpenTrace.OpenId {
-        val open = Open(TimelineOpenTrace.OpenId(++nextId), clock.markNow())
-        opens.remove(conversation)
-        opens[conversation] = open
-        opened.value = nextId
-        while (opens.size > MAX_OPENS) opens.remove(opens.keys.first())
-        open.fired += TimelineOpenTrace.Stage.OpenRequested
-        emit(conversation, open, TimelineOpenTrace.Stage.OpenRequested, null, null)
-        return open.id
-    }
-
-    private fun Open.ageMs(): Long = (clock.markNow() - startedAt).inWholeMilliseconds
-
-    /** An open still in flight and recent enough to be the one a late layer is learning about. */
-    private fun Open.joinable(): Boolean = TimelineOpenTrace.Stage.Settled !in fired && ageMs() < JOIN_WINDOW_MS
-
-    private fun emit(
-        conversation: ConversationId,
-        open: Open,
-        stage: TimelineOpenTrace.Stage,
-        count: Int?,
-        bytes: Long?,
-        lastReplacement: ComparableTimeMark? = null,
-    ) {
-        val elapsed = clock.markNow() - open.startedAt
-        // A zero-length section is how the macrobenchmark reads this stage out of a Perfetto trace.
-        if (Telemetry.beginTraceSection("${TimelineOpenTrace.TAG}/${stage.eventName}")) Telemetry.endTraceSection()
-        val attrs = buildList {
-            add("openId" attr open.id.value)
-            add("conversationId" attr conversation.value)
-            add("elapsedMs" attr elapsed.inWholeMilliseconds)
-            add("elapsedUs" attr elapsed.inWholeMicroseconds)
-            if (count != null) add("count" attr count)
-            if (bytes != null) add("bytes" attr bytes)
-            if (lastReplacement != null) add("lastReplacementMs" attr (lastReplacement - open.startedAt).inWholeMilliseconds)
-        }
-        Telemetry.event(TimelineOpenTrace.TAG, stage.eventName, attrs = attrs.toTypedArray())
-    }
 }
