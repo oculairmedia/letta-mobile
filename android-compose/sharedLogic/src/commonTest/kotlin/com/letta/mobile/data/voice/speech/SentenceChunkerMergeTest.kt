@@ -113,7 +113,9 @@ class SentenceChunkerMergeTest {
         val sentence = "w".repeat(59) + "."
         val text = (1..12).joinToString(" ") { sentence }
         val lengths = merged(text, minimum = 200, max = 400).map { it.length }
-        assertEquals(listOf(60, 365, 305), lengths, "first alone, then six sentences (365) fit in 400, a seventh would not")
+        assertEquals(listOf(60, 243, 243, 182), lengths, "first alone, then four sentences (243) reach the 200 minimum, well inside 400")
+        val wide = merged(text, minimum = 380, max = 400).map { it.length }
+        assertEquals(listOf(60, 365, 304), wide, "six sentences (365) fit in 400; a seventh (426) would not")
     }
 
     @Test
