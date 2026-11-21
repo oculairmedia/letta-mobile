@@ -49,7 +49,7 @@ fun PairedDevicesList(
     val onScreenInviteId = state.invite?.inviteId
     val groups = state.groups
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
-        Text(PairingStrings.DEVICES_TITLE, style = MaterialTheme.typography.titleMedium)
+        Text(PairingStrings.DEVICES_TITLE, style = pairingHeading(MaterialTheme.typography.titleMedium))
         if (state.devices.isEmpty()) {
             Text(PairingStrings.NO_DEVICES, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -157,7 +157,7 @@ private fun DestructiveConfirm(spec: ConfirmSpec, onConfirm: () -> Unit, onCance
 @Composable
 private fun PendingInvites(pending: List<PendingInvite>, cancelling: Set<String>, nowMs: Long, onCancel: (String) -> Unit) {
     if (pending.isEmpty()) return
-    Text(PairingStrings.PENDING_TITLE, style = MaterialTheme.typography.titleMedium)
+    Text(PairingStrings.PENDING_TITLE, style = pairingHeading(MaterialTheme.typography.titleMedium))
     pending.forEach { invite ->
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.weight(1f)) {

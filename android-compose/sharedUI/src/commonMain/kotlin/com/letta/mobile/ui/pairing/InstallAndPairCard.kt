@@ -5,11 +5,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -23,6 +23,7 @@ import com.letta.mobile.data.pairing.PairingState
 import com.letta.mobile.data.pairing.QrEncoder
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import kotlinx.coroutines.launch
 
 /**
@@ -48,25 +49,25 @@ class InstallAndPairBindings(
 )
 
 /**
- * Settings card for scan-to-connect:
+ * The body of the Settings card for scan-to-connect. The Settings card around it supplies the surface,
+ * the join title and the paste hint ([PairingStrings.JOIN_TITLE], [PairingStrings.PASTE_ONLY_HINT]):
  *  - Join: paste a pairing link (or open one — `meridian://pair` deep links land
  *    here); the trust prompt confirms the host before anything is dialled.
  *  - Invite: the install-and-pair QRs — one to get the phone app, one minted
  *    by the HOST for this pairing — plus the paired-device list with revoke.
+ * [onPasteBlocked] says how to paste when the link field's Paste could not read the clipboard.
  */
 @Composable
-fun InstallAndPairCard(
+internal fun InstallAndPairContent(
     bindings: InstallAndPairBindings,
+    onPasteBlocked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(modifier = modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(LettaDimens.Space.xl),
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
-        ) {
-            JoinHostSection(bindings)
+    CompositionLocalProvider(LocalPairingPlacement provides PairingPlacement.SETTINGS_CARD) {
+        Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+            JoinHostSection(bindings, onPasteBlocked)
             bindings.rpc?.let { rpc ->
-                HorizontalDivider()
+                HorizontalDivider(Modifier.padding(vertical = LettaDimens.Space.sm))
                 InstallAppSection(bindings.qrEncoder)
                 InviteSection(rpc, bindings)
             }
@@ -75,7 +76,7 @@ fun InstallAndPairCard(
 }
 
 @Composable
-private fun JoinHostSection(bindings: InstallAndPairBindings) {
+private fun JoinHostSection(bindings: InstallAndPairBindings, onPasteBlocked: () -> Unit) {
     val scope = rememberCoroutineScope()
     val flow = remember { bindings.joinFlow() }
     val state by flow.state.collectAsState()
@@ -85,9 +86,11 @@ private fun JoinHostSection(bindings: InstallAndPairBindings) {
         bindings.onPendingLinkConsumed()
         flow.submit(link)
     }
-    Text(PairingStrings.JOIN_TITLE, style = MaterialTheme.typography.titleMedium)
-    PairingScanContent(
-        scan = PairingScan(state, ScanCamera.Unavailable, pairingScanActions(flow, scope, bindings.onOpenChat)),
+    val actions = pairingScanActions(flow, scope, bindings.onOpenChat)
+    PairLinkField(enabled = state.acceptsInput(), onSubmit = actions.onSubmit, onPasteBlocked = onPasteBlocked)
+    PairingStatusCard(
+        state = state,
+        actions = actions,
         nowMs = rememberTickingNow(bindings.nowMs, active = state is PairingState.ConfirmHost),
     )
 }
@@ -105,8 +108,8 @@ fun pairingScanActions(flow: PairingFlow, scope: kotlinx.coroutines.CoroutineSco
 @Composable
 private fun InstallAppSection(qrEncoder: QrEncoder) {
     val qr = remember(qrEncoder) { runCatching { qrEncoder.encode(PairingStrings.APP_DOWNLOAD_URL) }.getOrNull() }
-    Text(PairingStrings.INSTALL_TITLE, style = MaterialTheme.typography.titleMedium)
-    Text(PairingStrings.INSTALL_BODY, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(PairingStrings.INSTALL_TITLE, style = LettaTextStyles.titleSemibold)
+    Text(PairingStrings.INSTALL_BODY, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     qr?.let { QrModulesImage(it, modifier = Modifier.widthIn(max = LettaDimens.Pane.qrCodeMaxWidth)) }
 }
 

@@ -221,6 +221,7 @@ object PairingTags {
     const val VERIFY_CANCEL = "pairing_verify_cancel"
     const val PASTE_FIELD = "pairing_paste_field"
     const val PASTE_SUBMIT = "pairing_paste_submit"
+    const val PASTE_CLIPBOARD = "pairing_paste_clipboard"
     const val PASTE_TOGGLE = "pairing_paste_toggle"
     const val CAMERA_AREA = "pairing_camera_area"
     const val CAMERA_RATIONALE = "pairing_camera_rationale"

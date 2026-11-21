@@ -290,7 +290,7 @@ private enum class EndedCode(val title: String, val body: String, val tag: Strin
 private fun EndedInvite(qr: QrModules?, ended: EndedCode, actions: PairDeviceActions) {
     // The secret is masked once the code is over: only a greyed QR, never the link.
     qr?.let { QrCard(it, remainingMs = null) }
-    Text(ended.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag(ended.tag))
+    Text(ended.title, style = pairingHeading(MaterialTheme.typography.titleMedium), modifier = Modifier.testTag(ended.tag))
     Text(ended.body, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Button(onClick = actions.onNewCode, modifier = Modifier.testTag(PairingTags.INVITE_NEW_CODE)) { Text(PairingStrings.NEW_CODE) }
@@ -307,7 +307,7 @@ private fun Redeemed(device: PairedDevice, onDone: () -> Unit) {
     )
     Text(
         PairingStrings.accepted(device),
-        style = MaterialTheme.typography.titleMedium,
+        style = pairingHeading(MaterialTheme.typography.titleMedium),
         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.testTag(PairingTags.INVITE_ACCEPTED),
     )
     Button(onClick = onDone) { Text(PairingStrings.DONE) }
