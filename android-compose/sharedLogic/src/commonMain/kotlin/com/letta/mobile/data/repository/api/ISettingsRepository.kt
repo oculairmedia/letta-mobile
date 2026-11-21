@@ -6,7 +6,7 @@ import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.LastChatSelection
-import com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome
+import com.letta.mobile.data.shellstate.ShellStateEditOutcome
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf

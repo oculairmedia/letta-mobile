@@ -1,12 +1,13 @@
 package com.letta.mobile.data.shellstate.appearance
 
 import com.letta.mobile.data.clientstore.ShellStateCacheStore
-import com.letta.mobile.data.model.AppTheme
-import com.letta.mobile.data.model.ThemePreset
+import com.letta.mobile.data.shellstate.AppearanceKeys
+import com.letta.mobile.data.shellstate.AppearanceValues
+import com.letta.mobile.data.shellstate.LegacyAppearance
 import com.letta.mobile.data.shellstate.ShellStateActor
 import com.letta.mobile.data.shellstate.ShellStateEntry
 import com.letta.mobile.data.shellstate.ShellStateSnapshot
-import com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome
+import com.letta.mobile.data.shellstate.ShellStateEditOutcome
 import com.letta.mobile.data.shellstate.shared.ShellStateLink
 import com.letta.mobile.data.shellstate.shared.ShellStateReply
 import com.letta.mobile.data.shellstate.shared.SharedShellState
@@ -48,15 +49,15 @@ class HostAppearanceTest {
         val phone = following(host.device("phone"))
         val desktop = following(host.device("desktop"))
 
-        assertEquals(ShellStateEditOutcome.APPLIED, phone.appearance.setTheme(AppTheme.DARK))
-        assertEquals(AppTheme.DARK, within { desktop.appearance.values.first { it.theme == AppTheme.DARK } }.theme)
+        assertEquals(ShellStateEditOutcome.APPLIED, phone.appearance.setTheme("DARK"))
+        assertEquals("DARK", within { desktop.appearance.values.first { it.theme == "DARK" } }.theme)
 
-        assertEquals(ShellStateEditOutcome.APPLIED, desktop.appearance.setThemePreset(ThemePreset.OCEAN))
-        assertEquals(ThemePreset.OCEAN, within { phone.appearance.values.first { it.themePreset == ThemePreset.OCEAN } }.themePreset)
+        assertEquals(ShellStateEditOutcome.APPLIED, desktop.appearance.setThemePreset("OCEAN"))
+        assertEquals("OCEAN", within { phone.appearance.values.first { it.themePreset == "OCEAN" } }.themePreset)
 
         assertEquals(ShellStateEditOutcome.APPLIED, phone.appearance.setDynamicColor(false))
         val seen = within { desktop.appearance.values.first { it.dynamicColor == false } }
-        assertEquals(AppearanceValues(AppTheme.DARK, ThemePreset.OCEAN, dynamicColor = false), seen)
+        assertEquals(AppearanceValues("DARK", "OCEAN", dynamicColor = false), seen)
         assertEquals(setOf(AppearanceKeys.THEME, AppearanceKeys.THEME_PRESET, AppearanceKeys.DYNAMIC_COLOR), host.entries().keys)
     }
 
@@ -67,7 +68,7 @@ class HostAppearanceTest {
         val phone = following(link)
 
         link.cut()
-        assertEquals(ShellStateEditOutcome.OFFLINE, phone.appearance.setTheme(AppTheme.DARK))
+        assertEquals(ShellStateEditOutcome.OFFLINE, phone.appearance.setTheme("DARK"))
         assertEquals(null, phone.appearance.values.first().theme, "the refused edit is not shown either")
 
         link.restore()
@@ -85,29 +86,29 @@ class HostAppearanceTest {
         val link = host.device("phone").also { it.cut() }
         val phone = following(link, cache)
 
-        assertEquals(AppearanceValues(AppTheme.DARK, ThemePreset.SAKURA), phone.appearance.values.first())
+        assertEquals(AppearanceValues("DARK", "SAKURA"), phone.appearance.values.first())
         assertFalse(phone.shell.state.value.editable)
-        assertEquals(ShellStateEditOutcome.OFFLINE, phone.appearance.setTheme(AppTheme.LIGHT))
+        assertEquals(ShellStateEditOutcome.OFFLINE, phone.appearance.setTheme("LIGHT"))
         assertTrue(host.entries().isEmpty())
     }
 
     @Test
     fun theHostsDocumentReplacesAStaleMirrorAndTheMirrorFollowsTheHost() = runBlocking {
         val host = RouterShellStateHost()
-        following(host.device("other")).appearance.setTheme(AppTheme.LIGHT)
+        following(host.device("other")).appearance.setTheme("LIGHT")
         val store = InMemorySecureSettingsStore()
         val cache = ShellStateCacheStore(store)
         cache.save(document(AppearanceKeys.THEME to JsonPrimitive("DARK")))
         val phone = following(host.device("phone"), cache)
 
-        assertEquals(AppTheme.LIGHT, within { phone.appearance.values.first { it.theme == AppTheme.LIGHT } }.theme)
+        assertEquals("LIGHT", within { phone.appearance.values.first { it.theme == "LIGHT" } }.theme)
         within { while (cache.load()?.entries?.get(AppearanceKeys.THEME)?.value != JsonPrimitive("LIGHT")) delay(POLL_MS) }
     }
 
     @Test
     fun migrationProposesTheDevicesChoicesOnceToAHostThatHasNone() = runBlocking {
         val host = RouterShellStateHost()
-        val legacy = FakeLegacy(AppearanceValues(AppTheme.DARK, ThemePreset.OCEAN, dynamicColor = false))
+        val legacy = FakeLegacy(AppearanceValues("DARK", "OCEAN", dynamicColor = false))
         val link = host.device("phone")
         val phone = following(link, legacy = legacy)
 
@@ -136,25 +137,25 @@ class HostAppearanceTest {
     @Test
     fun migrationNeverOverwritesAChoiceAnotherDeviceAlreadyMade() = runBlocking {
         val host = RouterShellStateHost()
-        following(host.device("desktop")).appearance.setTheme(AppTheme.LIGHT)
+        following(host.device("desktop")).appearance.setTheme("LIGHT")
         host.proposals.clear()
-        val legacy = FakeLegacy(AppearanceValues(AppTheme.DARK, ThemePreset.OCEAN))
+        val legacy = FakeLegacy(AppearanceValues("DARK", "OCEAN"))
         val phone = following(host.device("phone"), legacy = legacy)
 
         within { legacy.values.first { it.isEmpty } }
         assertEquals(listOf(listOf(AppearanceKeys.THEME_PRESET)), host.proposals, "only the preset the host lacked")
         assertEquals(JsonPrimitive("LIGHT"), host.entries().getValue(AppearanceKeys.THEME))
         assertEquals(JsonPrimitive("OCEAN"), host.entries().getValue(AppearanceKeys.THEME_PRESET))
-        val shown = within { phone.appearance.values.first { it.themePreset == ThemePreset.OCEAN } }
-        assertEquals(AppTheme.LIGHT, shown.theme)
+        val shown = within { phone.appearance.values.first { it.themePreset == "OCEAN" } }
+        assertEquals("LIGHT", shown.theme)
     }
 
     @Test
     fun aChoiceAnotherDeviceMakesBetweenTheReadAndTheMigrationStillWins() = runBlocking {
         val host = RouterShellStateHost()
         val desktop = following(host.device("desktop"))
-        val legacy = FakeLegacy(AppearanceValues(AppTheme.DARK, ThemePreset.OCEAN))
-        val interfering = InterferingLink(host.device("phone")) { desktop.appearance.setTheme(AppTheme.LIGHT) }
+        val legacy = FakeLegacy(AppearanceValues("DARK", "OCEAN"))
+        val interfering = InterferingLink(host.device("phone")) { desktop.appearance.setTheme("LIGHT") }
         following(interfering, legacy = legacy)
 
         within { legacy.values.first { it.isEmpty } }
@@ -165,11 +166,11 @@ class HostAppearanceTest {
     @Test
     fun anUnreachableHostKeepsTheDeviceChoicesForALaterAttempt() = runBlocking {
         val host = RouterShellStateHost()
-        val legacy = FakeLegacy(AppearanceValues(AppTheme.DARK))
+        val legacy = FakeLegacy(AppearanceValues("DARK"))
         val link = host.device("phone").also { it.cut() }
         val phone = following(link, legacy = legacy)
 
-        assertEquals(AppTheme.DARK, phone.appearance.values.first().theme, "shown from the device's own choice until the host answers")
+        assertEquals("DARK", phone.appearance.values.first().theme, "shown from the device's own choice until the host answers")
         delay(SETTLE_MS)
         assertFalse(legacy.values.first().isEmpty, "not forgotten before the host holds it")
         assertTrue(host.proposals.isEmpty())
@@ -183,7 +184,7 @@ class HostAppearanceTest {
     fun noSecretAndNoKeyOutsideAppearanceEverReachesTheHostOrTheDevice() = runBlocking {
         val host = RouterShellStateHost()
         val store = RecordingStore()
-        val legacy = FakeLegacy(AppearanceValues(AppTheme.DARK, dynamicColor = true))
+        val legacy = FakeLegacy(AppearanceValues("DARK", dynamicColor = true))
         val phone = following(host.device("phone"), ShellStateCacheStore(store), legacy)
         within { phone.shell.state.first { it.editable } }
 
@@ -191,8 +192,8 @@ class HostAppearanceTest {
         listOf("secrets.hf_token", "hugging_face_token", "appearance_x", "layout.sidebar", "voice.endpoint.apiKey").forEach { key ->
             assertEquals(ShellStateEditOutcome.REFUSED, phone.shell.set(key, JsonPrimitive("hf_secret")), key)
         }
-        phone.appearance.setThemePreset(ThemePreset.SPRING)
-        within { phone.appearance.values.first { it.themePreset == ThemePreset.SPRING } }
+        phone.appearance.setThemePreset("SPRING")
+        within { phone.appearance.values.first { it.themePreset == "SPRING" } }
         within { while (store.getString("shell_state_mirror_v1")?.contains("SPRING") != true) delay(POLL_MS) }
 
         assertTrue(host.entries().keys.all { it in AppearanceKeys.all }, "the host holds only the moved keys: ${host.entries().keys}")
@@ -204,7 +205,7 @@ class HostAppearanceTest {
 
     // --- harness -----------------------------------------------------------------------------------------------
 
-    private class Following(val shell: SharedShellState, val appearance: HostAppearance)
+    private class Following(val shell: SharedShellState, val appearance: SharedShellAppearance)
 
     /** A device that follows the host; when it can reach it, returns once the document is read (edits are refused before). */
     private fun following(
@@ -213,7 +214,7 @@ class HostAppearanceTest {
         legacy: LegacyAppearance = LegacyAppearance.None,
     ): Following {
         val shell = SharedShellState(link, cache)
-        val appearance = HostAppearance(shell, cache, legacy)
+        val appearance = SharedShellAppearance(shell, cache, legacy)
         scope.launch { appearance.run() }
         if (link.isConnected) runBlocking { within { shell.state.first { it.editable } } }
         return Following(shell, appearance)

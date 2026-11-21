@@ -1,8 +1,10 @@
 package com.letta.mobile.data.shellstate.shared
 
+import com.letta.mobile.data.shellstate.ShellStateEditOutcome
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.shellstate.ShellStateEntry
 import com.letta.mobile.data.shellstate.ShellStateSchema
+import com.letta.mobile.data.shellstate.ShellStateSnapshotCache
 import com.letta.mobile.data.shellstate.ShellStateSnapshot
 import com.letta.mobile.data.shellstate.wire.ShellStateChange
 import com.letta.mobile.data.shellstate.wire.ShellStateError
@@ -50,24 +52,6 @@ data class ShellStateState(
 
     /** Whether an edit may be sent now. */
     val editable: Boolean get() = supported && live && snapshot != null
-}
-
-/** How one proposal ended. */
-enum class ShellStateEditOutcome {
-    /** The host accepted it (or it changed nothing). */
-    APPLIED,
-
-    /** Another writer changed one of the entries first; the document was read again. */
-    CONFLICT,
-
-    /** The host is out of reach or the document is not read yet; nothing was sent or queued. */
-    OFFLINE,
-
-    /** The host does not keep shared shell state. */
-    UNSUPPORTED,
-
-    /** The host refused the proposal (malformed, too large, unreadable store or not allowed). */
-    REFUSED,
 }
 
 /**

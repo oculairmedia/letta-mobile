@@ -5,7 +5,7 @@ import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.runtime.PermissionModeSettings
-import com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome
+import com.letta.mobile.data.shellstate.ShellStateEditOutcome
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import kotlinx.coroutines.flow.StateFlow
 

@@ -9,7 +9,7 @@ import com.letta.mobile.data.repository.LastChatSelectionStorage
 import com.letta.mobile.data.repository.mergeLastChatSelection
 import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome
+import com.letta.mobile.data.shellstate.ShellStateEditOutcome
 import com.letta.mobile.data.repository.api.backendIdentity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

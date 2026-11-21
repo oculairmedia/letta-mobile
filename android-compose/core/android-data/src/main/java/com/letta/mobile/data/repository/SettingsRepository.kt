@@ -6,15 +6,9 @@ import androidx.datastore.preferences.core.Preferences
 import com.letta.mobile.core.BuildConfig
 import com.letta.mobile.data.session.BackendSwitchClearResult
 import com.letta.mobile.data.session.BackendSwitchInvalidator
-import com.letta.mobile.data.clientstore.LegacyAppearanceStore
-import com.letta.mobile.data.clientstore.ShellStateCacheStore
-import com.letta.mobile.data.shellstate.appearance.HostAppearance
-import com.letta.mobile.data.shellstate.shared.SharedShellState
-import com.letta.mobile.data.shellstate.shared.channelShellStateLink
-import com.letta.mobile.data.storage.DataStoreSettingsPreferencesStore
+import com.letta.mobile.data.shellstate.HostAppearance
 import com.letta.mobile.data.storage.SettingsPreferencesStore
-import com.letta.mobile.data.transport.api.IChannelTransport
-import com.letta.mobile.data.transport.api.NoOpChannelTransport
+import com.letta.mobile.data.storage.DataStoreSettingsPreferencesStore
 import com.letta.mobile.data.objectverbs.binding.withDevicePins
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.storage.SettingsPlatformDefaults
@@ -34,11 +28,11 @@ class SettingsRepository private constructor(
     preferences: SettingsPreferencesStore,
     secureSettingsStore: SecureSettingsStore,
     backendSwitchInvalidator: Provider<BackendSwitchInvalidator>,
-    channelTransport: Provider<IChannelTransport>,
+    hostAppearance: HostAppearance,
 ) : CachedSettingsRepository(
     preferencesStore = preferences,
     secureSettingsStore = secureSettingsStore.withDevicePins(),
-    hostAppearance = hostAppearanceOver(preferences, secureSettingsStore, channelTransport),
+    hostAppearance = hostAppearance,
     platformDefaults = SettingsPlatformDefaults(
         defaultResumeRecentConversation = BuildConfig.DEBUG,
         defaultDynamicColorWhenPresetUnset = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
@@ -48,20 +42,20 @@ class SettingsRepository private constructor(
     },
 ) {
     /**
-     * [channelTransport] is the session's transport, resolved on first use: it depends on the settings that own this
-     * repository, so resolving it here would be a cycle. Appearance is read from, and edited on, that transport's host.
+     * [hostAppearance] is the person's appearance on the host (the shell state document); the app binds it with the
+     * session's transport resolved lazily, so this repository does not depend on the transport it feeds.
      */
     @Inject
     constructor(
         dataStore: DataStore<Preferences>,
         secureSettingsStore: SecureSettingsStore,
         backendSwitchInvalidator: Provider<BackendSwitchInvalidator>,
-        channelTransport: Provider<IChannelTransport>,
+        hostAppearance: HostAppearance,
     ) : this(
         preferences = DataStoreSettingsPreferencesStore(dataStore),
         secureSettingsStore = secureSettingsStore,
         backendSwitchInvalidator = backendSwitchInvalidator,
-        channelTransport = channelTransport,
+        hostAppearance = hostAppearance,
     )
 
     /** A repository with no host behind it (tests): appearance shows the defaults and refuses edits. */
@@ -72,7 +66,7 @@ class SettingsRepository private constructor(
         dataStore = dataStore,
         secureSettingsStore = secureSettingsStore.withDevicePins(),
         backendSwitchInvalidator = Provider { BackendSwitchInvalidator(emptySet()) },
-        channelTransport = Provider { NoOpChannelTransport() },
+        hostAppearance = HostAppearance.None,
     )
 
     companion object {
@@ -88,23 +82,6 @@ class SettingsRepository private constructor(
             },
         )
     }
-}
-
-/**
- * The appearance kept on the host of [channelTransport]; this device keeps only a disposable mirror of the host's
- * document (in [secureSettingsStore], the client store's cache) and the old local choices until they are migrated.
- */
-private fun hostAppearanceOver(
-    preferences: SettingsPreferencesStore,
-    secureSettingsStore: SecureSettingsStore,
-    channelTransport: Provider<IChannelTransport>,
-): HostAppearance {
-    val mirror = ShellStateCacheStore(secureSettingsStore)
-    return HostAppearance(
-        shell = SharedShellState(channelShellStateLink { channelTransport.get() }, mirror),
-        mirror = mirror,
-        legacy = LegacyAppearanceStore(preferences),
-    )
 }
 
 private fun BackendSwitchClearResult.toSettingsResult(): SettingsBackendCacheClearResult =

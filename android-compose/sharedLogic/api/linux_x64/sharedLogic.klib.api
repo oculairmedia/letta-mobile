@@ -3510,20 +3510,6 @@ final enum class com.letta.mobile.data.shell/ShellSkillsSection : kotlin/Enum<co
     final fun values(): kotlin/Array<com.letta.mobile.data.shell/ShellSkillsSection> // com.letta.mobile.data.shell/ShellSkillsSection.values|values#static(){}[0]
 }
 
-final enum class com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome : kotlin/Enum<com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome> { // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome|null[0]
-    enum entry APPLIED // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.APPLIED|null[0]
-    enum entry CONFLICT // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.CONFLICT|null[0]
-    enum entry OFFLINE // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.OFFLINE|null[0]
-    enum entry REFUSED // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.REFUSED|null[0]
-    enum entry UNSUPPORTED // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.UNSUPPORTED|null[0]
-
-    final val entries // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome> // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.entries.<get-entries>|<get-entries>#static(){}[0]
-
-    final fun valueOf(kotlin/String): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome> // com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome.values|values#static(){}[0]
-}
-
 final enum class com.letta.mobile.data.shellstate.wire/ShellStateError : kotlin/Enum<com.letta.mobile.data.shellstate.wire/ShellStateError> { // com.letta.mobile.data.shellstate.wire/ShellStateError|null[0]
     enum entry FORBIDDEN // com.letta.mobile.data.shellstate.wire/ShellStateError.FORBIDDEN|null[0]
     enum entry INVALID_REQUEST // com.letta.mobile.data.shellstate.wire/ShellStateError.INVALID_REQUEST|null[0]
@@ -3543,6 +3529,20 @@ final enum class com.letta.mobile.data.shellstate.wire/ShellStateError : kotlin/
     final object Companion { // com.letta.mobile.data.shellstate.wire/ShellStateError.Companion|null[0]
         final fun fromWire(kotlin/String?): com.letta.mobile.data.shellstate.wire/ShellStateError // com.letta.mobile.data.shellstate.wire/ShellStateError.Companion.fromWire|fromWire(kotlin.String?){}[0]
     }
+}
+
+final enum class com.letta.mobile.data.shellstate/ShellStateEditOutcome : kotlin/Enum<com.letta.mobile.data.shellstate/ShellStateEditOutcome> { // com.letta.mobile.data.shellstate/ShellStateEditOutcome|null[0]
+    enum entry APPLIED // com.letta.mobile.data.shellstate/ShellStateEditOutcome.APPLIED|null[0]
+    enum entry CONFLICT // com.letta.mobile.data.shellstate/ShellStateEditOutcome.CONFLICT|null[0]
+    enum entry OFFLINE // com.letta.mobile.data.shellstate/ShellStateEditOutcome.OFFLINE|null[0]
+    enum entry REFUSED // com.letta.mobile.data.shellstate/ShellStateEditOutcome.REFUSED|null[0]
+    enum entry UNSUPPORTED // com.letta.mobile.data.shellstate/ShellStateEditOutcome.UNSUPPORTED|null[0]
+
+    final val entries // com.letta.mobile.data.shellstate/ShellStateEditOutcome.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.shellstate/ShellStateEditOutcome> // com.letta.mobile.data.shellstate/ShellStateEditOutcome.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate/ShellStateEditOutcome.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.shellstate/ShellStateEditOutcome> // com.letta.mobile.data.shellstate/ShellStateEditOutcome.values|values#static(){}[0]
 }
 
 final enum class com.letta.mobile.data.shellstate/ShellStateImportPolicy : kotlin/Enum<com.letta.mobile.data.shellstate/ShellStateImportPolicy> { // com.letta.mobile.data.shellstate/ShellStateImportPolicy|null[0]
@@ -6876,14 +6876,14 @@ abstract interface com.letta.mobile.data.repository.api/ISettingsRepository { //
     abstract suspend fun setChatBackgroundKey(kotlin/String) // com.letta.mobile.data.repository.api/ISettingsRepository.setChatBackgroundKey|setChatBackgroundKey(kotlin.String){}[0]
     abstract suspend fun setChatFontScale(kotlin/Float) // com.letta.mobile.data.repository.api/ISettingsRepository.setChatFontScale|setChatFontScale(kotlin.Float){}[0]
     abstract suspend fun setConversationPinned(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.repository.api/ISettingsRepository.setConversationPinned|setConversationPinned(kotlin.String;kotlin.Boolean){}[0]
-    abstract suspend fun setDynamicColor(kotlin/Boolean): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.repository.api/ISettingsRepository.setDynamicColor|setDynamicColor(kotlin.Boolean){}[0]
+    abstract suspend fun setDynamicColor(kotlin/Boolean): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.repository.api/ISettingsRepository.setDynamicColor|setDynamicColor(kotlin.Boolean){}[0]
     abstract suspend fun setEnableProjects(kotlin/Boolean) // com.letta.mobile.data.repository.api/ISettingsRepository.setEnableProjects|setEnableProjects(kotlin.Boolean){}[0]
     abstract suspend fun setHapticsEnabled(kotlin/Boolean) // com.letta.mobile.data.repository.api/ISettingsRepository.setHapticsEnabled|setHapticsEnabled(kotlin.Boolean){}[0]
     abstract suspend fun setHuggingFaceToken(kotlin/String?) // com.letta.mobile.data.repository.api/ISettingsRepository.setHuggingFaceToken|setHuggingFaceToken(kotlin.String?){}[0]
     abstract suspend fun setOpenChatsOnCanvas(kotlin/Boolean) // com.letta.mobile.data.repository.api/ISettingsRepository.setOpenChatsOnCanvas|setOpenChatsOnCanvas(kotlin.Boolean){}[0]
     abstract suspend fun setProjectPinned(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.repository.api/ISettingsRepository.setProjectPinned|setProjectPinned(kotlin.String;kotlin.Boolean){}[0]
-    abstract suspend fun setTheme(com.letta.mobile.data.model/AppTheme): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.repository.api/ISettingsRepository.setTheme|setTheme(com.letta.mobile.data.model.AppTheme){}[0]
-    abstract suspend fun setThemePreset(com.letta.mobile.data.model/ThemePreset): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.repository.api/ISettingsRepository.setThemePreset|setThemePreset(com.letta.mobile.data.model.ThemePreset){}[0]
+    abstract suspend fun setTheme(com.letta.mobile.data.model/AppTheme): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.repository.api/ISettingsRepository.setTheme|setTheme(com.letta.mobile.data.model.AppTheme){}[0]
+    abstract suspend fun setThemePreset(com.letta.mobile.data.model/ThemePreset): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.repository.api/ISettingsRepository.setThemePreset|setThemePreset(com.letta.mobile.data.model.ThemePreset){}[0]
     open fun getFeatureFlag(com.letta.mobile.data.repository.api/FeatureFlag): kotlinx.coroutines.flow/Flow<kotlin/Boolean> // com.letta.mobile.data.repository.api/ISettingsRepository.getFeatureFlag|getFeatureFlag(com.letta.mobile.data.repository.api.FeatureFlag){}[0]
     open fun lastChatSeed(kotlin/String): com.letta.mobile.data.repository/LastChatSelection? // com.letta.mobile.data.repository.api/ISettingsRepository.lastChatSeed|lastChatSeed(kotlin.String){}[0]
     open fun setLastChatSelection(kotlin/String, kotlin/String?, kotlin/String?) // com.letta.mobile.data.repository.api/ISettingsRepository.setLastChatSelection|setLastChatSelection(kotlin.String;kotlin.String?;kotlin.String?){}[0]
@@ -7325,18 +7325,6 @@ abstract interface com.letta.mobile.data.shell/ShellChatPort { // com.letta.mobi
     abstract fun startNewChat(com.letta.mobile.data.model/AgentId?) // com.letta.mobile.data.shell/ShellChatPort.startNewChat|startNewChat(com.letta.mobile.data.model.AgentId?){}[0]
 }
 
-abstract interface com.letta.mobile.data.shellstate.appearance/LegacyAppearance { // com.letta.mobile.data.shellstate.appearance/LegacyAppearance|null[0]
-    abstract val values // com.letta.mobile.data.shellstate.appearance/LegacyAppearance.values|{}values[0]
-        abstract fun <get-values>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.shellstate.appearance/AppearanceValues> // com.letta.mobile.data.shellstate.appearance/LegacyAppearance.values.<get-values>|<get-values>(){}[0]
-
-    abstract suspend fun clear() // com.letta.mobile.data.shellstate.appearance/LegacyAppearance.clear|clear(){}[0]
-
-    final object Companion { // com.letta.mobile.data.shellstate.appearance/LegacyAppearance.Companion|null[0]
-        final val None // com.letta.mobile.data.shellstate.appearance/LegacyAppearance.Companion.None|{}None[0]
-            final fun <get-None>(): com.letta.mobile.data.shellstate.appearance/LegacyAppearance // com.letta.mobile.data.shellstate.appearance/LegacyAppearance.Companion.None.<get-None>|<get-None>(){}[0]
-    }
-}
-
 abstract interface com.letta.mobile.data.shellstate.shared/ShellStateLink { // com.letta.mobile.data.shellstate.shared/ShellStateLink|null[0]
     abstract val connection // com.letta.mobile.data.shellstate.shared/ShellStateLink.connection|{}connection[0]
         abstract fun <get-connection>(): kotlinx.coroutines.flow/Flow<kotlin/String?> // com.letta.mobile.data.shellstate.shared/ShellStateLink.connection.<get-connection>|<get-connection>(){}[0]
@@ -7352,14 +7340,31 @@ abstract interface com.letta.mobile.data.shellstate.shared/ShellStateLink { // c
     abstract suspend fun call(kotlin/String, kotlinx.serialization.json/JsonObject): com.letta.mobile.data.shellstate.shared/ShellStateReply // com.letta.mobile.data.shellstate.shared/ShellStateLink.call|call(kotlin.String;kotlinx.serialization.json.JsonObject){}[0]
 }
 
-abstract interface com.letta.mobile.data.shellstate.shared/ShellStateSnapshotCache { // com.letta.mobile.data.shellstate.shared/ShellStateSnapshotCache|null[0]
-    abstract fun clear() // com.letta.mobile.data.shellstate.shared/ShellStateSnapshotCache.clear|clear(){}[0]
-    abstract fun load(): com.letta.mobile.data.shellstate/ShellStateSnapshot? // com.letta.mobile.data.shellstate.shared/ShellStateSnapshotCache.load|load(){}[0]
-    abstract fun save(com.letta.mobile.data.shellstate/ShellStateSnapshot) // com.letta.mobile.data.shellstate.shared/ShellStateSnapshotCache.save|save(com.letta.mobile.data.shellstate.ShellStateSnapshot){}[0]
+abstract interface com.letta.mobile.data.shellstate/HostAppearance { // com.letta.mobile.data.shellstate/HostAppearance|null[0]
+    abstract val values // com.letta.mobile.data.shellstate/HostAppearance.values|{}values[0]
+        abstract fun <get-values>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.shellstate/AppearanceValues> // com.letta.mobile.data.shellstate/HostAppearance.values.<get-values>|<get-values>(){}[0]
 
-    final object Companion { // com.letta.mobile.data.shellstate.shared/ShellStateSnapshotCache.Companion|null[0]
-        final val None // com.letta.mobile.data.shellstate.shared/ShellStateSnapshotCache.Companion.None|{}None[0]
-            final fun <get-None>(): com.letta.mobile.data.shellstate.shared/ShellStateSnapshotCache // com.letta.mobile.data.shellstate.shared/ShellStateSnapshotCache.Companion.None.<get-None>|<get-None>(){}[0]
+    abstract suspend fun clearLocal() // com.letta.mobile.data.shellstate/HostAppearance.clearLocal|clearLocal(){}[0]
+    abstract suspend fun run() // com.letta.mobile.data.shellstate/HostAppearance.run|run(){}[0]
+    abstract suspend fun setDynamicColor(kotlin/Boolean): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate/HostAppearance.setDynamicColor|setDynamicColor(kotlin.Boolean){}[0]
+    abstract suspend fun setTheme(kotlin/String): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate/HostAppearance.setTheme|setTheme(kotlin.String){}[0]
+    abstract suspend fun setThemePreset(kotlin/String): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate/HostAppearance.setThemePreset|setThemePreset(kotlin.String){}[0]
+
+    final object Companion { // com.letta.mobile.data.shellstate/HostAppearance.Companion|null[0]
+        final val None // com.letta.mobile.data.shellstate/HostAppearance.Companion.None|{}None[0]
+            final fun <get-None>(): com.letta.mobile.data.shellstate/HostAppearance // com.letta.mobile.data.shellstate/HostAppearance.Companion.None.<get-None>|<get-None>(){}[0]
+    }
+}
+
+abstract interface com.letta.mobile.data.shellstate/LegacyAppearance { // com.letta.mobile.data.shellstate/LegacyAppearance|null[0]
+    abstract val values // com.letta.mobile.data.shellstate/LegacyAppearance.values|{}values[0]
+        abstract fun <get-values>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.shellstate/AppearanceValues> // com.letta.mobile.data.shellstate/LegacyAppearance.values.<get-values>|<get-values>(){}[0]
+
+    abstract suspend fun clear() // com.letta.mobile.data.shellstate/LegacyAppearance.clear|clear(){}[0]
+
+    final object Companion { // com.letta.mobile.data.shellstate/LegacyAppearance.Companion|null[0]
+        final val None // com.letta.mobile.data.shellstate/LegacyAppearance.Companion.None|{}None[0]
+            final fun <get-None>(): com.letta.mobile.data.shellstate/LegacyAppearance // com.letta.mobile.data.shellstate/LegacyAppearance.Companion.None.<get-None>|<get-None>(){}[0]
     }
 }
 
@@ -7370,6 +7375,17 @@ abstract interface com.letta.mobile.data.shellstate/ShellStateDocument { // com.
     abstract suspend fun export(): com.letta.mobile.data.shellstate/ShellStateExport // com.letta.mobile.data.shellstate/ShellStateDocument.export|export(){}[0]
     abstract suspend fun import(com.letta.mobile.data.shellstate/ShellStateExport, com.letta.mobile.data.shellstate/ShellStateImportPolicy): com.letta.mobile.data.shellstate/ShellStateProposal // com.letta.mobile.data.shellstate/ShellStateDocument.import|import(com.letta.mobile.data.shellstate.ShellStateExport;com.letta.mobile.data.shellstate.ShellStateImportPolicy){}[0]
     abstract suspend fun propose(kotlin/String, kotlinx.serialization.json/JsonElement?, kotlin/Long?, com.letta.mobile.data.shellstate/ShellStateActor): com.letta.mobile.data.shellstate/ShellStateProposal // com.letta.mobile.data.shellstate/ShellStateDocument.propose|propose(kotlin.String;kotlinx.serialization.json.JsonElement?;kotlin.Long?;com.letta.mobile.data.shellstate.ShellStateActor){}[0]
+}
+
+abstract interface com.letta.mobile.data.shellstate/ShellStateSnapshotCache { // com.letta.mobile.data.shellstate/ShellStateSnapshotCache|null[0]
+    abstract fun clear() // com.letta.mobile.data.shellstate/ShellStateSnapshotCache.clear|clear(){}[0]
+    abstract fun load(): com.letta.mobile.data.shellstate/ShellStateSnapshot? // com.letta.mobile.data.shellstate/ShellStateSnapshotCache.load|load(){}[0]
+    abstract fun save(com.letta.mobile.data.shellstate/ShellStateSnapshot) // com.letta.mobile.data.shellstate/ShellStateSnapshotCache.save|save(com.letta.mobile.data.shellstate.ShellStateSnapshot){}[0]
+
+    final object Companion { // com.letta.mobile.data.shellstate/ShellStateSnapshotCache.Companion|null[0]
+        final val None // com.letta.mobile.data.shellstate/ShellStateSnapshotCache.Companion.None|{}None[0]
+            final fun <get-None>(): com.letta.mobile.data.shellstate/ShellStateSnapshotCache // com.letta.mobile.data.shellstate/ShellStateSnapshotCache.Companion.None.<get-None>|<get-None>(){}[0]
+    }
 }
 
 abstract interface com.letta.mobile.data.skills/SkillsApi : kotlin/AutoCloseable { // com.letta.mobile.data.skills/SkillsApi|null[0]
@@ -38889,16 +38905,7 @@ final class com.letta.mobile.data.clientstore/ClientStoreEntry { // com.letta.mo
     final fun toString(): kotlin/String // com.letta.mobile.data.clientstore/ClientStoreEntry.toString|toString(){}[0]
 }
 
-final class com.letta.mobile.data.clientstore/LegacyAppearanceStore : com.letta.mobile.data.shellstate.appearance/LegacyAppearance { // com.letta.mobile.data.clientstore/LegacyAppearanceStore|null[0]
-    constructor <init>(com.letta.mobile.data.storage/SettingsPreferencesStore) // com.letta.mobile.data.clientstore/LegacyAppearanceStore.<init>|<init>(com.letta.mobile.data.storage.SettingsPreferencesStore){}[0]
-
-    final val values // com.letta.mobile.data.clientstore/LegacyAppearanceStore.values|{}values[0]
-        final fun <get-values>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.shellstate.appearance/AppearanceValues> // com.letta.mobile.data.clientstore/LegacyAppearanceStore.values.<get-values>|<get-values>(){}[0]
-
-    final suspend fun clear() // com.letta.mobile.data.clientstore/LegacyAppearanceStore.clear|clear(){}[0]
-}
-
-final class com.letta.mobile.data.clientstore/ShellStateCacheStore : com.letta.mobile.data.clientstore/DisposableCache, com.letta.mobile.data.shellstate.shared/ShellStateSnapshotCache { // com.letta.mobile.data.clientstore/ShellStateCacheStore|null[0]
+final class com.letta.mobile.data.clientstore/ShellStateCacheStore : com.letta.mobile.data.clientstore/DisposableCache, com.letta.mobile.data.shellstate/ShellStateSnapshotCache { // com.letta.mobile.data.clientstore/ShellStateCacheStore|null[0]
     constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore) // com.letta.mobile.data.clientstore/ShellStateCacheStore.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore){}[0]
 
     final val entry // com.letta.mobile.data.clientstore/ShellStateCacheStore.entry|{}entry[0]
@@ -60632,14 +60639,14 @@ final class com.letta.mobile.data.repository/ActiveConfigSettingsRepository : co
     final suspend fun setChatBackgroundKey(kotlin/String) // com.letta.mobile.data.repository/ActiveConfigSettingsRepository.setChatBackgroundKey|setChatBackgroundKey(kotlin.String){}[0]
     final suspend fun setChatFontScale(kotlin/Float) // com.letta.mobile.data.repository/ActiveConfigSettingsRepository.setChatFontScale|setChatFontScale(kotlin.Float){}[0]
     final suspend fun setConversationPinned(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.repository/ActiveConfigSettingsRepository.setConversationPinned|setConversationPinned(kotlin.String;kotlin.Boolean){}[0]
-    final suspend fun setDynamicColor(kotlin/Boolean): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.repository/ActiveConfigSettingsRepository.setDynamicColor|setDynamicColor(kotlin.Boolean){}[0]
+    final suspend fun setDynamicColor(kotlin/Boolean): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.repository/ActiveConfigSettingsRepository.setDynamicColor|setDynamicColor(kotlin.Boolean){}[0]
     final suspend fun setEnableProjects(kotlin/Boolean) // com.letta.mobile.data.repository/ActiveConfigSettingsRepository.setEnableProjects|setEnableProjects(kotlin.Boolean){}[0]
     final suspend fun setHapticsEnabled(kotlin/Boolean) // com.letta.mobile.data.repository/ActiveConfigSettingsRepository.setHapticsEnabled|setHapticsEnabled(kotlin.Boolean){}[0]
     final suspend fun setHuggingFaceToken(kotlin/String?) // com.letta.mobile.data.repository/ActiveConfigSettingsRepository.setHuggingFaceToken|setHuggingFaceToken(kotlin.String?){}[0]
     final suspend fun setOpenChatsOnCanvas(kotlin/Boolean) // com.letta.mobile.data.repository/ActiveConfigSettingsRepository.setOpenChatsOnCanvas|setOpenChatsOnCanvas(kotlin.Boolean){}[0]
     final suspend fun setProjectPinned(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.repository/ActiveConfigSettingsRepository.setProjectPinned|setProjectPinned(kotlin.String;kotlin.Boolean){}[0]
-    final suspend fun setTheme(com.letta.mobile.data.model/AppTheme): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.repository/ActiveConfigSettingsRepository.setTheme|setTheme(com.letta.mobile.data.model.AppTheme){}[0]
-    final suspend fun setThemePreset(com.letta.mobile.data.model/ThemePreset): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.repository/ActiveConfigSettingsRepository.setThemePreset|setThemePreset(com.letta.mobile.data.model.ThemePreset){}[0]
+    final suspend fun setTheme(com.letta.mobile.data.model/AppTheme): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.repository/ActiveConfigSettingsRepository.setTheme|setTheme(com.letta.mobile.data.model.AppTheme){}[0]
+    final suspend fun setThemePreset(com.letta.mobile.data.model/ThemePreset): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.repository/ActiveConfigSettingsRepository.setThemePreset|setThemePreset(com.letta.mobile.data.model.ThemePreset){}[0]
 }
 
 final class com.letta.mobile.data.repository/ConversationInspectorMessage { // com.letta.mobile.data.repository/ConversationInspectorMessage|null[0]
@@ -65359,62 +65366,32 @@ final class com.letta.mobile.data.shell/ShellWorkspaceState { // com.letta.mobil
     final fun snapshotOrPending(): com.letta.mobile.data.shell/CurrentFocusSnapshot? // com.letta.mobile.data.shell/ShellWorkspaceState.snapshotOrPending|snapshotOrPending(){}[0]
 }
 
-final class com.letta.mobile.data.shellstate.appearance/AppearanceValues { // com.letta.mobile.data.shellstate.appearance/AppearanceValues|null[0]
-    constructor <init>(com.letta.mobile.data.model/AppTheme? = ..., com.letta.mobile.data.model/ThemePreset? = ..., kotlin/Boolean? = ...) // com.letta.mobile.data.shellstate.appearance/AppearanceValues.<init>|<init>(com.letta.mobile.data.model.AppTheme?;com.letta.mobile.data.model.ThemePreset?;kotlin.Boolean?){}[0]
+final class com.letta.mobile.data.shellstate.appearance/SharedShellAppearance : com.letta.mobile.data.shellstate/HostAppearance { // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance|null[0]
+    constructor <init>(com.letta.mobile.data.shellstate.shared/SharedShellState, com.letta.mobile.data.shellstate/ShellStateSnapshotCache = ..., com.letta.mobile.data.shellstate/LegacyAppearance = ...) // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance.<init>|<init>(com.letta.mobile.data.shellstate.shared.SharedShellState;com.letta.mobile.data.shellstate.ShellStateSnapshotCache;com.letta.mobile.data.shellstate.LegacyAppearance){}[0]
 
-    final val dynamicColor // com.letta.mobile.data.shellstate.appearance/AppearanceValues.dynamicColor|{}dynamicColor[0]
-        final fun <get-dynamicColor>(): kotlin/Boolean? // com.letta.mobile.data.shellstate.appearance/AppearanceValues.dynamicColor.<get-dynamicColor>|<get-dynamicColor>(){}[0]
-    final val isEmpty // com.letta.mobile.data.shellstate.appearance/AppearanceValues.isEmpty|{}isEmpty[0]
-        final fun <get-isEmpty>(): kotlin/Boolean // com.letta.mobile.data.shellstate.appearance/AppearanceValues.isEmpty.<get-isEmpty>|<get-isEmpty>(){}[0]
-    final val theme // com.letta.mobile.data.shellstate.appearance/AppearanceValues.theme|{}theme[0]
-        final fun <get-theme>(): com.letta.mobile.data.model/AppTheme? // com.letta.mobile.data.shellstate.appearance/AppearanceValues.theme.<get-theme>|<get-theme>(){}[0]
-    final val themePreset // com.letta.mobile.data.shellstate.appearance/AppearanceValues.themePreset|{}themePreset[0]
-        final fun <get-themePreset>(): com.letta.mobile.data.model/ThemePreset? // com.letta.mobile.data.shellstate.appearance/AppearanceValues.themePreset.<get-themePreset>|<get-themePreset>(){}[0]
+    final val values // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance.values|{}values[0]
+        final fun <get-values>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.shellstate/AppearanceValues> // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance.values.<get-values>|<get-values>(){}[0]
 
-    final fun component1(): com.letta.mobile.data.model/AppTheme? // com.letta.mobile.data.shellstate.appearance/AppearanceValues.component1|component1(){}[0]
-    final fun component2(): com.letta.mobile.data.model/ThemePreset? // com.letta.mobile.data.shellstate.appearance/AppearanceValues.component2|component2(){}[0]
-    final fun component3(): kotlin/Boolean? // com.letta.mobile.data.shellstate.appearance/AppearanceValues.component3|component3(){}[0]
-    final fun copy(com.letta.mobile.data.model/AppTheme? = ..., com.letta.mobile.data.model/ThemePreset? = ..., kotlin/Boolean? = ...): com.letta.mobile.data.shellstate.appearance/AppearanceValues // com.letta.mobile.data.shellstate.appearance/AppearanceValues.copy|copy(com.letta.mobile.data.model.AppTheme?;com.letta.mobile.data.model.ThemePreset?;kotlin.Boolean?){}[0]
-    final fun editsExcept(kotlin.collections/Set<kotlin/String>): kotlin.collections/List<com.letta.mobile.data.shellstate.shared/SharedShellState.Edit> // com.letta.mobile.data.shellstate.appearance/AppearanceValues.editsExcept|editsExcept(kotlin.collections.Set<kotlin.String>){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shellstate.appearance/AppearanceValues.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shellstate.appearance/AppearanceValues.hashCode|hashCode(){}[0]
-    final fun orElse(com.letta.mobile.data.shellstate.appearance/AppearanceValues): com.letta.mobile.data.shellstate.appearance/AppearanceValues // com.letta.mobile.data.shellstate.appearance/AppearanceValues.orElse|orElse(com.letta.mobile.data.shellstate.appearance.AppearanceValues){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.shellstate.appearance/AppearanceValues.toString|toString(){}[0]
-
-    final object Companion { // com.letta.mobile.data.shellstate.appearance/AppearanceValues.Companion|null[0]
-        final val NONE // com.letta.mobile.data.shellstate.appearance/AppearanceValues.Companion.NONE|{}NONE[0]
-            final fun <get-NONE>(): com.letta.mobile.data.shellstate.appearance/AppearanceValues // com.letta.mobile.data.shellstate.appearance/AppearanceValues.Companion.NONE.<get-NONE>|<get-NONE>(){}[0]
-
-        final fun of(kotlin.collections/Map<kotlin/String, com.letta.mobile.data.shellstate/ShellStateEntry>?): com.letta.mobile.data.shellstate.appearance/AppearanceValues // com.letta.mobile.data.shellstate.appearance/AppearanceValues.Companion.of|of(kotlin.collections.Map<kotlin.String,com.letta.mobile.data.shellstate.ShellStateEntry>?){}[0]
-    }
-}
-
-final class com.letta.mobile.data.shellstate.appearance/HostAppearance { // com.letta.mobile.data.shellstate.appearance/HostAppearance|null[0]
-    constructor <init>(com.letta.mobile.data.shellstate.shared/SharedShellState, com.letta.mobile.data.shellstate.shared/ShellStateSnapshotCache = ..., com.letta.mobile.data.shellstate.appearance/LegacyAppearance = ...) // com.letta.mobile.data.shellstate.appearance/HostAppearance.<init>|<init>(com.letta.mobile.data.shellstate.shared.SharedShellState;com.letta.mobile.data.shellstate.shared.ShellStateSnapshotCache;com.letta.mobile.data.shellstate.appearance.LegacyAppearance){}[0]
-
-    final val values // com.letta.mobile.data.shellstate.appearance/HostAppearance.values|{}values[0]
-        final fun <get-values>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.shellstate.appearance/AppearanceValues> // com.letta.mobile.data.shellstate.appearance/HostAppearance.values.<get-values>|<get-values>(){}[0]
-
-    final suspend fun clearLocal() // com.letta.mobile.data.shellstate.appearance/HostAppearance.clearLocal|clearLocal(){}[0]
-    final suspend fun run() // com.letta.mobile.data.shellstate.appearance/HostAppearance.run|run(){}[0]
-    final suspend fun setDynamicColor(kotlin/Boolean): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.shellstate.appearance/HostAppearance.setDynamicColor|setDynamicColor(kotlin.Boolean){}[0]
-    final suspend fun setTheme(com.letta.mobile.data.model/AppTheme): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.shellstate.appearance/HostAppearance.setTheme|setTheme(com.letta.mobile.data.model.AppTheme){}[0]
-    final suspend fun setThemePreset(com.letta.mobile.data.model/ThemePreset): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.shellstate.appearance/HostAppearance.setThemePreset|setThemePreset(com.letta.mobile.data.model.ThemePreset){}[0]
+    final suspend fun clearLocal() // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance.clearLocal|clearLocal(){}[0]
+    final suspend fun run() // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance.run|run(){}[0]
+    final suspend fun setDynamicColor(kotlin/Boolean): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance.setDynamicColor|setDynamicColor(kotlin.Boolean){}[0]
+    final suspend fun setTheme(kotlin/String): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance.setTheme|setTheme(kotlin.String){}[0]
+    final suspend fun setThemePreset(kotlin/String): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance.setThemePreset|setThemePreset(kotlin.String){}[0]
 }
 
 final class com.letta.mobile.data.shellstate.shared/SharedShellState { // com.letta.mobile.data.shellstate.shared/SharedShellState|null[0]
-    constructor <init>(com.letta.mobile.data.shellstate.shared/ShellStateLink, com.letta.mobile.data.shellstate.shared/ShellStateSnapshotCache = ...) // com.letta.mobile.data.shellstate.shared/SharedShellState.<init>|<init>(com.letta.mobile.data.shellstate.shared.ShellStateLink;com.letta.mobile.data.shellstate.shared.ShellStateSnapshotCache){}[0]
+    constructor <init>(com.letta.mobile.data.shellstate.shared/ShellStateLink, com.letta.mobile.data.shellstate/ShellStateSnapshotCache = ...) // com.letta.mobile.data.shellstate.shared/SharedShellState.<init>|<init>(com.letta.mobile.data.shellstate.shared.ShellStateLink;com.letta.mobile.data.shellstate.ShellStateSnapshotCache){}[0]
 
     final val state // com.letta.mobile.data.shellstate.shared/SharedShellState.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.shellstate.shared/ShellStateState> // com.letta.mobile.data.shellstate.shared/SharedShellState.state.<get-state>|<get-state>(){}[0]
     final val supported // com.letta.mobile.data.shellstate.shared/SharedShellState.supported|{}supported[0]
         final fun <get-supported>(): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/SharedShellState.supported.<get-supported>|<get-supported>(){}[0]
 
-    final suspend fun propose(kotlin.collections/List<com.letta.mobile.data.shellstate.shared/SharedShellState.Edit>): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.shellstate.shared/SharedShellState.propose|propose(kotlin.collections.List<com.letta.mobile.data.shellstate.shared.SharedShellState.Edit>){}[0]
+    final suspend fun propose(kotlin.collections/List<com.letta.mobile.data.shellstate.shared/SharedShellState.Edit>): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate.shared/SharedShellState.propose|propose(kotlin.collections.List<com.letta.mobile.data.shellstate.shared.SharedShellState.Edit>){}[0]
     final suspend fun refresh(): com.letta.mobile.data.shellstate.shared/ShellStateState // com.letta.mobile.data.shellstate.shared/SharedShellState.refresh|refresh(){}[0]
-    final suspend fun remove(kotlin/String): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.shellstate.shared/SharedShellState.remove|remove(kotlin.String){}[0]
+    final suspend fun remove(kotlin/String): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate.shared/SharedShellState.remove|remove(kotlin.String){}[0]
     final suspend fun run() // com.letta.mobile.data.shellstate.shared/SharedShellState.run|run(){}[0]
-    final suspend fun set(kotlin/String, kotlinx.serialization.json/JsonElement): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.shellstate.shared/SharedShellState.set|set(kotlin.String;kotlinx.serialization.json.JsonElement){}[0]
+    final suspend fun set(kotlin/String, kotlinx.serialization.json/JsonElement): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate.shared/SharedShellState.set|set(kotlin.String;kotlinx.serialization.json.JsonElement){}[0]
 
     final class Edit { // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit|null[0]
         constructor <init>(kotlin/String, kotlinx.serialization.json/JsonElement?) // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit.<init>|<init>(kotlin.String;kotlinx.serialization.json.JsonElement?){}[0]
@@ -65487,6 +65464,52 @@ final class com.letta.mobile.data.shellstate.wire/ShellStateChange { // com.lett
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shellstate.wire/ShellStateChange.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.shellstate.wire/ShellStateChange.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.shellstate.wire/ShellStateChange.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.shellstate/AppearanceEdit { // com.letta.mobile.data.shellstate/AppearanceEdit|null[0]
+    constructor <init>(kotlin/String, kotlinx.serialization.json/JsonElement) // com.letta.mobile.data.shellstate/AppearanceEdit.<init>|<init>(kotlin.String;kotlinx.serialization.json.JsonElement){}[0]
+
+    final val key // com.letta.mobile.data.shellstate/AppearanceEdit.key|{}key[0]
+        final fun <get-key>(): kotlin/String // com.letta.mobile.data.shellstate/AppearanceEdit.key.<get-key>|<get-key>(){}[0]
+    final val value // com.letta.mobile.data.shellstate/AppearanceEdit.value|{}value[0]
+        final fun <get-value>(): kotlinx.serialization.json/JsonElement // com.letta.mobile.data.shellstate/AppearanceEdit.value.<get-value>|<get-value>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.shellstate/AppearanceEdit.component1|component1(){}[0]
+    final fun component2(): kotlinx.serialization.json/JsonElement // com.letta.mobile.data.shellstate/AppearanceEdit.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlinx.serialization.json/JsonElement = ...): com.letta.mobile.data.shellstate/AppearanceEdit // com.letta.mobile.data.shellstate/AppearanceEdit.copy|copy(kotlin.String;kotlinx.serialization.json.JsonElement){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shellstate/AppearanceEdit.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shellstate/AppearanceEdit.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shellstate/AppearanceEdit.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.shellstate/AppearanceValues { // com.letta.mobile.data.shellstate/AppearanceValues|null[0]
+    constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean? = ...) // com.letta.mobile.data.shellstate/AppearanceValues.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.Boolean?){}[0]
+
+    final val dynamicColor // com.letta.mobile.data.shellstate/AppearanceValues.dynamicColor|{}dynamicColor[0]
+        final fun <get-dynamicColor>(): kotlin/Boolean? // com.letta.mobile.data.shellstate/AppearanceValues.dynamicColor.<get-dynamicColor>|<get-dynamicColor>(){}[0]
+    final val isEmpty // com.letta.mobile.data.shellstate/AppearanceValues.isEmpty|{}isEmpty[0]
+        final fun <get-isEmpty>(): kotlin/Boolean // com.letta.mobile.data.shellstate/AppearanceValues.isEmpty.<get-isEmpty>|<get-isEmpty>(){}[0]
+    final val theme // com.letta.mobile.data.shellstate/AppearanceValues.theme|{}theme[0]
+        final fun <get-theme>(): kotlin/String? // com.letta.mobile.data.shellstate/AppearanceValues.theme.<get-theme>|<get-theme>(){}[0]
+    final val themePreset // com.letta.mobile.data.shellstate/AppearanceValues.themePreset|{}themePreset[0]
+        final fun <get-themePreset>(): kotlin/String? // com.letta.mobile.data.shellstate/AppearanceValues.themePreset.<get-themePreset>|<get-themePreset>(){}[0]
+
+    final fun component1(): kotlin/String? // com.letta.mobile.data.shellstate/AppearanceValues.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.shellstate/AppearanceValues.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean? // com.letta.mobile.data.shellstate/AppearanceValues.component3|component3(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean? = ...): com.letta.mobile.data.shellstate/AppearanceValues // com.letta.mobile.data.shellstate/AppearanceValues.copy|copy(kotlin.String?;kotlin.String?;kotlin.Boolean?){}[0]
+    final fun editsExcept(kotlin.collections/Set<kotlin/String>): kotlin.collections/List<com.letta.mobile.data.shellstate/AppearanceEdit> // com.letta.mobile.data.shellstate/AppearanceValues.editsExcept|editsExcept(kotlin.collections.Set<kotlin.String>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shellstate/AppearanceValues.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shellstate/AppearanceValues.hashCode|hashCode(){}[0]
+    final fun orElse(com.letta.mobile.data.shellstate/AppearanceValues): com.letta.mobile.data.shellstate/AppearanceValues // com.letta.mobile.data.shellstate/AppearanceValues.orElse|orElse(com.letta.mobile.data.shellstate.AppearanceValues){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shellstate/AppearanceValues.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.shellstate/AppearanceValues.Companion|null[0]
+        final val NONE // com.letta.mobile.data.shellstate/AppearanceValues.Companion.NONE|{}NONE[0]
+            final fun <get-NONE>(): com.letta.mobile.data.shellstate/AppearanceValues // com.letta.mobile.data.shellstate/AppearanceValues.Companion.NONE.<get-NONE>|<get-NONE>(){}[0]
+
+        final fun of(kotlin.collections/Map<kotlin/String, com.letta.mobile.data.shellstate/ShellStateEntry>?): com.letta.mobile.data.shellstate/AppearanceValues // com.letta.mobile.data.shellstate/AppearanceValues.Companion.of|of(kotlin.collections.Map<kotlin.String,com.letta.mobile.data.shellstate.ShellStateEntry>?){}[0]
+    }
 }
 
 final class com.letta.mobile.data.shellstate/ShellStateEntry { // com.letta.mobile.data.shellstate/ShellStateEntry|null[0]
@@ -78935,7 +78958,7 @@ open class com.letta.mobile.data.repository/CachedRunRepository : com.letta.mobi
 }
 
 open class com.letta.mobile.data.repository/CachedSettingsRepository : com.letta.mobile.data.repository.api/ISettingsRepository { // com.letta.mobile.data.repository/CachedSettingsRepository|null[0]
-    constructor <init>(com.letta.mobile.data.storage/SettingsPreferencesStore, com.letta.mobile.data.storage/SecureSettingsStore, com.letta.mobile.data.storage/SettingsPlatformDefaults = ..., com.letta.mobile.data.repository/SettingsBackendCacheClearer = ..., com.letta.mobile.data.shellstate.appearance/HostAppearance = ...) // com.letta.mobile.data.repository/CachedSettingsRepository.<init>|<init>(com.letta.mobile.data.storage.SettingsPreferencesStore;com.letta.mobile.data.storage.SecureSettingsStore;com.letta.mobile.data.storage.SettingsPlatformDefaults;com.letta.mobile.data.repository.SettingsBackendCacheClearer;com.letta.mobile.data.shellstate.appearance.HostAppearance){}[0]
+    constructor <init>(com.letta.mobile.data.storage/SettingsPreferencesStore, com.letta.mobile.data.storage/SecureSettingsStore, com.letta.mobile.data.storage/SettingsPlatformDefaults = ..., com.letta.mobile.data.repository/SettingsBackendCacheClearer = ..., com.letta.mobile.data.shellstate/HostAppearance = ...) // com.letta.mobile.data.repository/CachedSettingsRepository.<init>|<init>(com.letta.mobile.data.storage.SettingsPreferencesStore;com.letta.mobile.data.storage.SecureSettingsStore;com.letta.mobile.data.storage.SettingsPlatformDefaults;com.letta.mobile.data.repository.SettingsBackendCacheClearer;com.letta.mobile.data.shellstate.HostAppearance){}[0]
 
     final val objectPins // com.letta.mobile.data.repository/CachedSettingsRepository.objectPins|{}objectPins[0]
         final fun <get-objectPins>(): com.letta.mobile.data.objectverbs.binding/PinBinding // com.letta.mobile.data.repository/CachedSettingsRepository.objectPins.<get-objectPins>|<get-objectPins>(){}[0]
@@ -78982,15 +79005,15 @@ open class com.letta.mobile.data.repository/CachedSettingsRepository : com.letta
     open suspend fun setChatBackgroundKey(kotlin/String) // com.letta.mobile.data.repository/CachedSettingsRepository.setChatBackgroundKey|setChatBackgroundKey(kotlin.String){}[0]
     open suspend fun setChatFontScale(kotlin/Float) // com.letta.mobile.data.repository/CachedSettingsRepository.setChatFontScale|setChatFontScale(kotlin.Float){}[0]
     open suspend fun setConversationPinned(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.repository/CachedSettingsRepository.setConversationPinned|setConversationPinned(kotlin.String;kotlin.Boolean){}[0]
-    open suspend fun setDynamicColor(kotlin/Boolean): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.repository/CachedSettingsRepository.setDynamicColor|setDynamicColor(kotlin.Boolean){}[0]
+    open suspend fun setDynamicColor(kotlin/Boolean): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.repository/CachedSettingsRepository.setDynamicColor|setDynamicColor(kotlin.Boolean){}[0]
     open suspend fun setEnableProjects(kotlin/Boolean) // com.letta.mobile.data.repository/CachedSettingsRepository.setEnableProjects|setEnableProjects(kotlin.Boolean){}[0]
     open suspend fun setFeatureFlag(com.letta.mobile.data.repository.api/FeatureFlag, kotlin/Boolean) // com.letta.mobile.data.repository/CachedSettingsRepository.setFeatureFlag|setFeatureFlag(com.letta.mobile.data.repository.api.FeatureFlag;kotlin.Boolean){}[0]
     open suspend fun setHapticsEnabled(kotlin/Boolean) // com.letta.mobile.data.repository/CachedSettingsRepository.setHapticsEnabled|setHapticsEnabled(kotlin.Boolean){}[0]
     open suspend fun setHuggingFaceToken(kotlin/String?) // com.letta.mobile.data.repository/CachedSettingsRepository.setHuggingFaceToken|setHuggingFaceToken(kotlin.String?){}[0]
     open suspend fun setOpenChatsOnCanvas(kotlin/Boolean) // com.letta.mobile.data.repository/CachedSettingsRepository.setOpenChatsOnCanvas|setOpenChatsOnCanvas(kotlin.Boolean){}[0]
     open suspend fun setProjectPinned(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.repository/CachedSettingsRepository.setProjectPinned|setProjectPinned(kotlin.String;kotlin.Boolean){}[0]
-    open suspend fun setTheme(com.letta.mobile.data.model/AppTheme): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.repository/CachedSettingsRepository.setTheme|setTheme(com.letta.mobile.data.model.AppTheme){}[0]
-    open suspend fun setThemePreset(com.letta.mobile.data.model/ThemePreset): com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome // com.letta.mobile.data.repository/CachedSettingsRepository.setThemePreset|setThemePreset(com.letta.mobile.data.model.ThemePreset){}[0]
+    open suspend fun setTheme(com.letta.mobile.data.model/AppTheme): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.repository/CachedSettingsRepository.setTheme|setTheme(com.letta.mobile.data.model.AppTheme){}[0]
+    open suspend fun setThemePreset(com.letta.mobile.data.model/ThemePreset): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.repository/CachedSettingsRepository.setThemePreset|setThemePreset(com.letta.mobile.data.model.ThemePreset){}[0]
 }
 
 open class com.letta.mobile.data.repository/CachedSlashCommandRepository : com.letta.mobile.data.repository.api/ISlashCommandRepository { // com.letta.mobile.data.repository/CachedSlashCommandRepository|null[0]
@@ -83753,18 +83776,6 @@ final object com.letta.mobile.data.shell/ShellRoute { // com.letta.mobile.data.s
     final fun encode(com.letta.mobile.data.shell/ShellDestination): kotlin/String // com.letta.mobile.data.shell/ShellRoute.encode|encode(com.letta.mobile.data.shell.ShellDestination){}[0]
 }
 
-final object com.letta.mobile.data.shellstate.appearance/AppearanceKeys { // com.letta.mobile.data.shellstate.appearance/AppearanceKeys|null[0]
-    final const val DYNAMIC_COLOR // com.letta.mobile.data.shellstate.appearance/AppearanceKeys.DYNAMIC_COLOR|{}DYNAMIC_COLOR[0]
-        final fun <get-DYNAMIC_COLOR>(): kotlin/String // com.letta.mobile.data.shellstate.appearance/AppearanceKeys.DYNAMIC_COLOR.<get-DYNAMIC_COLOR>|<get-DYNAMIC_COLOR>(){}[0]
-    final const val THEME // com.letta.mobile.data.shellstate.appearance/AppearanceKeys.THEME|{}THEME[0]
-        final fun <get-THEME>(): kotlin/String // com.letta.mobile.data.shellstate.appearance/AppearanceKeys.THEME.<get-THEME>|<get-THEME>(){}[0]
-    final const val THEME_PRESET // com.letta.mobile.data.shellstate.appearance/AppearanceKeys.THEME_PRESET|{}THEME_PRESET[0]
-        final fun <get-THEME_PRESET>(): kotlin/String // com.letta.mobile.data.shellstate.appearance/AppearanceKeys.THEME_PRESET.<get-THEME_PRESET>|<get-THEME_PRESET>(){}[0]
-
-    final val all // com.letta.mobile.data.shellstate.appearance/AppearanceKeys.all|{}all[0]
-        final fun <get-all>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.shellstate.appearance/AppearanceKeys.all.<get-all>|<get-all>(){}[0]
-}
-
 final object com.letta.mobile.data.shellstate.shared/NoShellStateLink : com.letta.mobile.data.shellstate.shared/ShellStateLink { // com.letta.mobile.data.shellstate.shared/NoShellStateLink|null[0]
     final val connection // com.letta.mobile.data.shellstate.shared/NoShellStateLink.connection|{}connection[0]
         final fun <get-connection>(): kotlinx.coroutines.flow/Flow<kotlin/String?> // com.letta.mobile.data.shellstate.shared/NoShellStateLink.connection.<get-connection>|<get-connection>(){}[0]
@@ -83824,6 +83835,18 @@ final object com.letta.mobile.data.shellstate.wire/ShellStateWire { // com.letta
         final fun <get-METHODS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.shellstate.wire/ShellStateWire.METHODS.<get-METHODS>|<get-METHODS>(){}[0]
 
     final fun isAllowedKey(kotlin/String): kotlin/Boolean // com.letta.mobile.data.shellstate.wire/ShellStateWire.isAllowedKey|isAllowedKey(kotlin.String){}[0]
+}
+
+final object com.letta.mobile.data.shellstate/AppearanceKeys { // com.letta.mobile.data.shellstate/AppearanceKeys|null[0]
+    final const val DYNAMIC_COLOR // com.letta.mobile.data.shellstate/AppearanceKeys.DYNAMIC_COLOR|{}DYNAMIC_COLOR[0]
+        final fun <get-DYNAMIC_COLOR>(): kotlin/String // com.letta.mobile.data.shellstate/AppearanceKeys.DYNAMIC_COLOR.<get-DYNAMIC_COLOR>|<get-DYNAMIC_COLOR>(){}[0]
+    final const val THEME // com.letta.mobile.data.shellstate/AppearanceKeys.THEME|{}THEME[0]
+        final fun <get-THEME>(): kotlin/String // com.letta.mobile.data.shellstate/AppearanceKeys.THEME.<get-THEME>|<get-THEME>(){}[0]
+    final const val THEME_PRESET // com.letta.mobile.data.shellstate/AppearanceKeys.THEME_PRESET|{}THEME_PRESET[0]
+        final fun <get-THEME_PRESET>(): kotlin/String // com.letta.mobile.data.shellstate/AppearanceKeys.THEME_PRESET.<get-THEME_PRESET>|<get-THEME_PRESET>(){}[0]
+
+    final val all // com.letta.mobile.data.shellstate/AppearanceKeys.all|{}all[0]
+        final fun <get-all>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.shellstate/AppearanceKeys.all.<get-all>|<get-all>(){}[0]
 }
 
 final object com.letta.mobile.data.shellstate/ShellStateSchema { // com.letta.mobile.data.shellstate/ShellStateSchema|null[0]
@@ -85066,8 +85089,8 @@ final fun (com.letta.mobile.data.session/SessionRepositoryGraph).com.letta.mobil
 final fun (com.letta.mobile.data.session/SessionRepositoryGraph).com.letta.mobile.data.session/llmModelsOrEmpty(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/LlmModel>> // com.letta.mobile.data.session/llmModelsOrEmpty|llmModelsOrEmpty@com.letta.mobile.data.session.SessionRepositoryGraph(){}[0]
 final fun (com.letta.mobile.data.session/SessionRepositoryGraphProvider<out com.letta.mobile.data.session/SessionRepositoryGraph>).com.letta.mobile.data.session.pins/pinSource(): kotlinx.coroutines.flow/StateFlow<kotlin/String?> // com.letta.mobile.data.session.pins/pinSource|pinSource@com.letta.mobile.data.session.SessionRepositoryGraphProvider<out|com.letta.mobile.data.session.SessionRepositoryGraph>(){}[0]
 final fun (com.letta.mobile.data.shell/ShellWorkspaceState).com.letta.mobile.data.shell/projectFocus(kotlin.collections/List<com.letta.mobile.data.shell/ShellConversationRef>, kotlin/Function1<com.letta.mobile.data.model/ConversationId, kotlin/Unit>) // com.letta.mobile.data.shell/projectFocus|projectFocus@com.letta.mobile.data.shell.ShellWorkspaceState(kotlin.collections.List<com.letta.mobile.data.shell.ShellConversationRef>;kotlin.Function1<com.letta.mobile.data.model.ConversationId,kotlin.Unit>){}[0]
-final fun (com.letta.mobile.data.shellstate.shared/ShellStateEditOutcome).com.letta.mobile.data.settings/toSettingsStatus(): com.letta.mobile.data.settings/SettingsStatus? // com.letta.mobile.data.settings/toSettingsStatus|toSettingsStatus@com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome(){}[0]
 final fun (com.letta.mobile.data.shellstate.wire/ShellStateChange).com.letta.mobile.data.shellstate.wire/toJson(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.shellstate.wire/toJson|toJson@com.letta.mobile.data.shellstate.wire.ShellStateChange(){}[0]
+final fun (com.letta.mobile.data.shellstate/ShellStateEditOutcome).com.letta.mobile.data.settings/toSettingsStatus(): com.letta.mobile.data.settings/SettingsStatus? // com.letta.mobile.data.settings/toSettingsStatus|toSettingsStatus@com.letta.mobile.data.shellstate.ShellStateEditOutcome(){}[0]
 final fun (com.letta.mobile.data.storage/SecureSettingsStore).com.letta.mobile.data.objectverbs.binding/withDevicePins(): com.letta.mobile.data.storage/SecureSettingsStore // com.letta.mobile.data.objectverbs.binding/withDevicePins|withDevicePins@com.letta.mobile.data.storage.SecureSettingsStore(){}[0]
 final fun (com.letta.mobile.data.subagents/SubagentChipObservation).com.letta.mobile.data.subagents/withNativeTodos(kotlinx.serialization.json/JsonObject): com.letta.mobile.data.subagents/SubagentChipObservation // com.letta.mobile.data.subagents/withNativeTodos|withNativeTodos@com.letta.mobile.data.subagents.SubagentChipObservation(kotlinx.serialization.json.JsonObject){}[0]
 final fun (com.letta.mobile.data.subagents/SubagentRosterItem).com.letta.mobile.data.subagents/toSubagentView(): com.letta.mobile.data.subagents/SubagentView? // com.letta.mobile.data.subagents/toSubagentView|toSubagentView@com.letta.mobile.data.subagents.SubagentRosterItem(){}[0]
@@ -85273,8 +85296,8 @@ final fun com.letta.mobile.data.session.graph/unservedBrowserSessionStatus(com.l
 final fun com.letta.mobile.data.session.graph/webSessionCapabilities(com.letta.mobile.data.model/LettaConfig): com.letta.mobile.data.backend/SessionCapabilities // com.letta.mobile.data.session.graph/webSessionCapabilities|webSessionCapabilities(com.letta.mobile.data.model.LettaConfig){}[0]
 final fun com.letta.mobile.data.session/remoteLettaBackendDescriptor(com.letta.mobile.data.model/LettaConfig?, kotlin/String, kotlin/String = ...): com.letta.mobile.runtime/BackendDescriptor // com.letta.mobile.data.session/remoteLettaBackendDescriptor|remoteLettaBackendDescriptor(com.letta.mobile.data.model.LettaConfig?;kotlin.String;kotlin.String){}[0]
 final fun com.letta.mobile.data.shell/initialCurrentFocus(com.letta.mobile.data.shell/CurrentFocusInputs): com.letta.mobile.data.shell/CurrentFocusSnapshot // com.letta.mobile.data.shell/initialCurrentFocus|initialCurrentFocus(com.letta.mobile.data.shell.CurrentFocusInputs){}[0]
-final fun com.letta.mobile.data.shellstate.shared/channelShellStateLink(com.letta.mobile.data.transport.api/IChannelTransport): com.letta.mobile.data.shellstate.shared/ShellStateLink // com.letta.mobile.data.shellstate.shared/channelShellStateLink|channelShellStateLink(com.letta.mobile.data.transport.api.IChannelTransport){}[0]
-final fun com.letta.mobile.data.shellstate.shared/channelShellStateLink(kotlin/Function0<com.letta.mobile.data.transport.api/IChannelTransport>): com.letta.mobile.data.shellstate.shared/ShellStateLink // com.letta.mobile.data.shellstate.shared/channelShellStateLink|channelShellStateLink(kotlin.Function0<com.letta.mobile.data.transport.api.IChannelTransport>){}[0]
+final fun com.letta.mobile.data.shellstate.channel/channelShellStateLink(com.letta.mobile.data.transport.api/IChannelTransport): com.letta.mobile.data.shellstate.shared/ShellStateLink // com.letta.mobile.data.shellstate.channel/channelShellStateLink|channelShellStateLink(com.letta.mobile.data.transport.api.IChannelTransport){}[0]
+final fun com.letta.mobile.data.shellstate.channel/channelShellStateLink(kotlin/Function0<com.letta.mobile.data.transport.api/IChannelTransport>): com.letta.mobile.data.shellstate.shared/ShellStateLink // com.letta.mobile.data.shellstate.channel/channelShellStateLink|channelShellStateLink(kotlin.Function0<com.letta.mobile.data.transport.api.IChannelTransport>){}[0]
 final fun com.letta.mobile.data.subagents/projectSubagentRoster(kotlin.collections/List<com.letta.mobile.data.model/SubagentEntry>, kotlin/Long, kotlin.collections/Set<kotlin/String> = ...): com.letta.mobile.data.subagents/SubagentRoster // com.letta.mobile.data.subagents/projectSubagentRoster|projectSubagentRoster(kotlin.collections.List<com.letta.mobile.data.model.SubagentEntry>;kotlin.Long;kotlin.collections.Set<kotlin.String>){}[0]
 final fun com.letta.mobile.data.subagents/subagentIdentityOf(kotlin/String?, kotlin.collections/List<kotlin/String?> = ...): com.letta.mobile.data.subagents/SubagentIdentity // com.letta.mobile.data.subagents/subagentIdentityOf|subagentIdentityOf(kotlin.String?;kotlin.collections.List<kotlin.String?>){}[0]
 final fun com.letta.mobile.data.subagents/subagentViewOf(com.letta.mobile.data.model/AgentId?, com.letta.mobile.data.model/ConversationId?, com.letta.mobile.data.subagents/SubagentViewLabel): com.letta.mobile.data.subagents/SubagentView? // com.letta.mobile.data.subagents/subagentViewOf|subagentViewOf(com.letta.mobile.data.model.AgentId?;com.letta.mobile.data.model.ConversationId?;com.letta.mobile.data.subagents.SubagentViewLabel){}[0]

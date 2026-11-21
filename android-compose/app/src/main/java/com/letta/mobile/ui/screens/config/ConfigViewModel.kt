@@ -17,7 +17,7 @@ import com.letta.mobile.data.settings.ChatSettings
 import com.letta.mobile.data.settings.SettingValue
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.toSettingsStatus
-import com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome
+import com.letta.mobile.data.shellstate.ShellStateEditOutcome
 import com.letta.mobile.data.settings.BackendConnectionTester
 import com.letta.mobile.data.settings.toSettingsStatus
 import com.letta.mobile.data.runtime.host.LocalAppServerHost

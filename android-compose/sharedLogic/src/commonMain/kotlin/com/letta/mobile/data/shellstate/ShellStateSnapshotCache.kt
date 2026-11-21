@@ -1,4 +1,4 @@
-package com.letta.mobile.data.shellstate.shared
+package com.letta.mobile.data.shellstate
 
 import com.letta.mobile.data.shellstate.ShellStateSnapshot
 

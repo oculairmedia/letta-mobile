@@ -151,11 +151,11 @@ class DirectAppServerDialTest {
             },
         ) { transport ->
             val shared = com.letta.mobile.data.shellstate.shared.SharedShellState(
-                com.letta.mobile.data.shellstate.shared.channelShellStateLink(transport),
+                com.letta.mobile.data.shellstate.channel.channelShellStateLink(transport),
             )
             assertTrue(shared.refresh().editable)
             val theme = kotlinx.serialization.json.JsonPrimitive("dark")
-            assertEquals(com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome.APPLIED, shared.set("appearance.theme", theme))
+            assertEquals(com.letta.mobile.data.shellstate.ShellStateEditOutcome.APPLIED, shared.set("appearance.theme", theme))
             assertEquals(theme, shared.refresh().entries.getValue("appearance.theme").value)
         }
     }

@@ -3,7 +3,7 @@ package com.letta.mobile.data.clientstore
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.shellstate.ShellStateSchema
 import com.letta.mobile.data.shellstate.ShellStateSnapshot
-import com.letta.mobile.data.shellstate.shared.ShellStateSnapshotCache
+import com.letta.mobile.data.shellstate.ShellStateSnapshotCache
 import com.letta.mobile.data.shellstate.wire.ShellStateWire
 import com.letta.mobile.data.storage.SecureSettingsStore
 

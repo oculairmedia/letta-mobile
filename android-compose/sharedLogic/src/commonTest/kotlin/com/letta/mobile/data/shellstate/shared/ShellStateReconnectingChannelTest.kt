@@ -1,5 +1,6 @@
 package com.letta.mobile.data.shellstate.shared
 
+import com.letta.mobile.data.shellstate.channel.channelShellStateLink
 import com.letta.mobile.data.controller.reconnect.AppServerClientGeneration
 import com.letta.mobile.data.controller.reconnect.FullJitterBackoff
 import com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient

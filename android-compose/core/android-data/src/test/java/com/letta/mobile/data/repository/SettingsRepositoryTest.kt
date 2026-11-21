@@ -11,7 +11,10 @@ import com.letta.mobile.data.controller.node.iroh.AdminRpcInvocation
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.shellstate.ShellStatePublisher
 import com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateRoutes
-import com.letta.mobile.data.shellstate.shared.ShellStateEditOutcome
+import com.letta.mobile.data.shellstate.ShellStateEditOutcome
+import com.letta.mobile.data.shellstate.appearance.SharedShellAppearance
+import com.letta.mobile.data.shellstate.channel.channelShellStateLink
+import com.letta.mobile.data.shellstate.shared.SharedShellState
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.testutil.FakeChannelTransport
 import java.nio.file.Files
@@ -346,7 +349,7 @@ class SettingsRepositoryTest {
             dataStore = createTestPreferencesDataStore(),
             secureSettingsStore = InMemorySecureSettingsStore().withDevicePins(),
             backendSwitchInvalidator = { BackendSwitchInvalidator(emptySet()) },
-            channelTransport = { transport },
+            hostAppearance = SharedShellAppearance(SharedShellState(channelShellStateLink(transport))),
         )
     }
 
