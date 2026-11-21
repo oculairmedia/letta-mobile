@@ -1,7 +1,9 @@
 package com.letta.mobile.feature.chat.coordination
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.TimelineOpenTrace
 
 /**
  * Debug-only, count-only correlation for the initial chat presentation path.
@@ -59,6 +61,8 @@ internal object ChatHydrationTrace {
 
     fun begin(identity: Identity, reuseIfActive: Boolean = false): Generation = synchronized(this) {
         if (reuseIfActive) registry.active[identity]?.generation?.let { return@synchronized it }
+        // Joins the shell's open when navigation started one; a deep link or restore starts it here.
+        TimelineOpenTrace.requestedIfAbsent(ConversationId(identity.conversationId))
         Generation(++registry.nextGeneration, identity).also { generation ->
             registry.active[identity] = State(generation = generation, startedAtNs = System.nanoTime())
             while (registry.active.size > MAX_ACTIVE_TRACES) registry.active.remove(registry.active.entries.first().key)

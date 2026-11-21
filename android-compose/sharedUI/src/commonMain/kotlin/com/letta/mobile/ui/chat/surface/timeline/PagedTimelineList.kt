@@ -60,10 +60,7 @@ import com.letta.mobile.ui.mascot.MascotLoading
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.CancellationException
-import com.letta.mobile.util.TimelineOpenTrace
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
@@ -106,7 +103,7 @@ private fun PagedTimelineContent(params: PagedTimelineParams, modifier: Modifier
     val visibleLive = remember(live, queued) { live.filterNot(queued::containsQueuedPrompt) }
     val rows = rememberPagedRows(visibleLive, settled, if (params.thinking) 1 else 0, queued)
     // Not composed at all unless a traced open exists, so an untraced open pays one boolean read here.
-    if (TimelineOpenTrace.tracking()) TimelineOpenSettleEffect(presentation.conversationId, rows)
+    if (presentation.isOpenTraced) TimelineOpenSettleEffect(presentation, rows)
     ObserveResidentRows(presentation, settled) {
         residentReport(settled.itemSnapshotList.items, settled.loadState.refresh)
     }
@@ -147,7 +144,7 @@ private fun PagedTimelineBody(
     val bindings = rememberPagedRowBindings(params.bindings, rows)
     val motion = rememberTimelineRowMotionGate(listState, rows.liveCount > 0 || params.state.isRunInFlight)
 
-    Box(modifier.then(rememberFirstFrameMarker(presentation.conversationId, hasRows = rows.size > rows.leading))) {
+    Box(modifier.then(rememberFirstFrameMarker(presentation, hasRows = rows.size > rows.leading))) {
         TimelineListFrame(
             listState = listState,
             bindings = bindings,
@@ -196,39 +193,26 @@ private fun PagedTimelineBody(
  * is [Modifier] when the open is not traced.
  */
 @Composable
-private fun rememberFirstFrameMarker(conversation: com.letta.mobile.data.model.ConversationId, hasRows: Boolean): Modifier {
-    val traced = TimelineOpenTrace.tracking()
+private fun rememberFirstFrameMarker(presentation: CanonicalTimelinePresentation, hasRows: Boolean): Modifier {
+    val traced = presentation.isOpenTraced
     val current = rememberUpdatedState(hasRows)
-    return remember(conversation, traced) {
+    return remember(presentation, traced) {
         if (!traced) {
             Modifier
         } else {
-            val gate = TimelineOpenTrace.FirstFrameGate(conversation)
             Modifier.drawWithContent {
                 drawContent()
-                gate.onDraw(current.value)
+                presentation.traceFirstFrame(current.value)
             }
         }
     }
 }
 
-/**
- * Feeds [TimelineOpenTrace] the list's replacements and polls for its quiet period. Keyed on [rows],
- * a new object per presented list, so each replacement restarts the quiet period; the poll stops
- * when the open settles or gives up.
- */
+/** Keyed on [rows], a new object per presented list, so each replacement restarts the quiet period. */
 @Composable
-private fun TimelineOpenSettleEffect(conversation: com.letta.mobile.data.model.ConversationId, rows: PagedRows) {
-    LaunchedEffect(rows) {
-        TimelineOpenTrace.listReplaced(conversation)
-        while (isActive && TimelineOpenTrace.isActive(conversation)) {
-            delay(TimelineOpenTrace.SETTLE_QUIET_MS / SETTLE_POLLS_PER_QUIET_PERIOD)
-            TimelineOpenTrace.settleIfQuiet(conversation)
-        }
-    }
+private fun TimelineOpenSettleEffect(presentation: CanonicalTimelinePresentation, rows: PagedRows) {
+    LaunchedEffect(rows) { presentation.traceOpenUntilSettled() }
 }
-
-private const val SETTLE_POLLS_PER_QUIET_PERIOD = 5
 
 @Composable
 private fun rememberPagedRowBindings(bindings: TimelineRowBindings, rows: PagedRows): TimelineRowBindings {

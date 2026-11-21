@@ -63,6 +63,7 @@ class TimelineOpenTraceTest : TelemetryRecordingTest() {
             listOf(0L, 10L, 15L, 35L, 42L, 45L, 445L, 475L, 975L),
             trace.map { it.number("elapsedMs") },
         )
+        assertEquals(475L, trace.single { it.name == Stage.Settled.eventName }.number("lastReplacementMs"))
         assertEquals(64L, trace.single { it.name == Stage.CacheReadEnd.eventName }.number("count"))
         val network = trace.single { it.name == Stage.NetworkPageEnd.eventName }
         assertEquals(64L, network.number("count"))
@@ -137,7 +138,7 @@ class TimelineOpenTraceTest : TelemetryRecordingTest() {
     }
 
     @Test
-    fun aListReplacementRestartsTheQuietPeriodAndSettledReportsThatLastReplacement() {
+    fun aListReplacementRestartsTheQuietPeriodAndSettledNamesThatLastReplacement() {
         TimelineOpenTrace.requested(conversation)
         TimelineOpenTrace.mark(conversation, Stage.FirstFrameWithRows)
         TimelineOpenTrace.mark(conversation, Stage.NetworkPageStart)
@@ -152,7 +153,8 @@ class TimelineOpenTraceTest : TelemetryRecordingTest() {
         clock += 1.milliseconds
         TimelineOpenTrace.settleIfQuiet(conversation)
         val settled = events().single { it.name == Stage.Settled.eventName }
-        assertEquals(300L, settled.number("elapsedMs"))
+        assertEquals(800L, settled.number("elapsedMs"))
+        assertEquals(300L, settled.number("lastReplacementMs"))
         assertEquals(1L, settled.number("count"))
 
         clock += 5_000.milliseconds

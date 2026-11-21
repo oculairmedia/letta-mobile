@@ -101,6 +101,20 @@ a real Play Store install with a baseline profile applied).
 `FrameTimingMetric` for scrolling the top-level list using UiAutomator.
 Reports p50/p90/p95/p99 per-frame render times plus jank counts.
 
+### `TimelineOpenBenchmark`
+
+Stage-by-stage latency of opening a conversation from the list, cold (process killed first) and warm
+(process alive), plus a cold launch straight into a conversation that also reports
+`StartupTimingMetric`. The app marks each stage as a `TimelineOpen/<stage>` trace section (and a
+`TimelineOpen` telemetry event) under one open id; the benchmark reports each stage as milliseconds
+since `open.requested`. Stages: `presentation.bound`, `cache.read.start`, `cache.read.end`,
+`first.frame.with.rows`, `network.page.start`, `network.page.end`, `reconcile.end`, `settled`.
+
+It measures the already-installed root-debug dev app (`com.letta.mobile.dev` by default, override with
+`targetPackage`) with its compilation left as installed, and needs a signed-in account that has the
+named conversation (`conversationTitle`, optional `conversationIndex`; `agentId` and `conversationId`
+for the launch variant). It is a local investigation tool and is not gated in CI.
+
 ## CI gate
 
 Thresholds live in `android-compose/perf/baselines.json` (or

@@ -2,8 +2,6 @@ package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.util.TimelineOpenTrace
 import com.letta.mobile.data.repository.RosterNameResolver
 import com.letta.mobile.data.repository.RosterNameTelemetry
 import com.letta.mobile.util.Telemetry
@@ -76,11 +74,7 @@ internal class ChatConversationCoordinator(
 
     /** Records a route-open only when the route already supplies a stable conversation id. */
     fun recordOpenRequested() {
-        activeConversationId?.let {
-            // Joins the navigation's open when the shell started one; a deep link or restore starts it here.
-            TimelineOpenTrace.requestedIfAbsent(ConversationId(it))
-            ChatHydrationTrace.begin(hydrationIdentity(it))
-        }
+        activeConversationId?.let { ChatHydrationTrace.begin(hydrationIdentity(it)) }
     }
 
     fun setActiveConversationId(conversationId: String?) {
