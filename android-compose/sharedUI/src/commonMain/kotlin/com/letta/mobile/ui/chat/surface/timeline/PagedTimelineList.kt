@@ -102,8 +102,7 @@ private fun PagedTimelineContent(params: PagedTimelineParams, modifier: Modifier
     val live by presentation.live.collectForChatSurface()
     val visibleLive = remember(live, queued) { live.filterNot(queued::containsQueuedPrompt) }
     val rows = rememberPagedRows(visibleLive, settled, if (params.thinking) 1 else 0, queued)
-    // Not composed at all unless a traced open exists, so an untraced open pays one boolean read here.
-    if (presentation.isOpenTraced) TimelineOpenSettleEffect(presentation, rows)
+    TimelineOpenSettleEffect(presentation, rows)
     ObserveResidentRows(presentation, settled) {
         residentReport(settled.itemSnapshotList.items, settled.loadState.refresh)
     }
@@ -185,33 +184,6 @@ private fun PagedTimelineBody(
             )
         }
     }
-}
-
-/**
- * Marks the first drawn frame that shows rows. The modifier is built once per presentation and reads
- * [hasRows] through state, so a recomposition never changes it and so never invalidates a draw; it
- * is [Modifier] when the open is not traced.
- */
-@Composable
-private fun rememberFirstFrameMarker(presentation: CanonicalTimelinePresentation, hasRows: Boolean): Modifier {
-    val traced = presentation.isOpenTraced
-    val current = rememberUpdatedState(hasRows)
-    return remember(presentation, traced) {
-        if (!traced) {
-            Modifier
-        } else {
-            Modifier.drawWithContent {
-                drawContent()
-                presentation.traceFirstFrame(current.value)
-            }
-        }
-    }
-}
-
-/** Keyed on [rows], a new object per presented list, so each replacement restarts the quiet period. */
-@Composable
-private fun TimelineOpenSettleEffect(presentation: CanonicalTimelinePresentation, rows: PagedRows) {
-    LaunchedEffect(rows) { presentation.traceOpenUntilSettled() }
 }
 
 @Composable

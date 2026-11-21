@@ -57428,6 +57428,7 @@ public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation 
 	public final fun getSettled ()Lkotlinx/coroutines/flow/Flow;
 	public final fun getTarget ()Lkotlinx/coroutines/flow/MutableStateFlow;
 	public final fun getViewport ()Lkotlin/Pair;
+	public final fun isOpenTraced ()Z
 	public final fun navigate (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun onResidentRows (Ljava/util/List;)V
 	public final fun readChunk (Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;JILkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -57435,6 +57436,8 @@ public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation 
 	public final fun readTextWindow (Lcom/letta/mobile/data/timeline/TimelineBodyReference;Lcom/letta/mobile/data/timeline/TimelineSemanticField;JLkotlinx/coroutines/CoroutineDispatcher;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun retry-jmYxp0c (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun setViewport (Lkotlin/Pair;)V
+	public final fun traceFirstFrame (Z)V
+	public final fun traceOpenUntilSettled (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation$Companion {
@@ -80437,6 +80440,7 @@ public final class com/letta/mobile/util/Telemetry {
 	public final fun getRenderDiagEnabled ()Lcom/letta/mobile/util/TelemetryFlag;
 	public final fun getRosterCompletenessProbeEnabled ()Lcom/letta/mobile/util/TelemetryFlag;
 	public final fun getTimelineDumpEnabled ()Lcom/letta/mobile/util/TelemetryFlag;
+	public final fun getTimelineOpenTraceEnabled ()Lcom/letta/mobile/util/TelemetryFlag;
 	public final fun getTimelineSyncGateDebugEnabled ()Lcom/letta/mobile/util/TelemetryFlag;
 	public final fun installRecorder (Lcom/letta/mobile/util/TelemetryRecorder;)Ljava/lang/AutoCloseable;
 	public final fun isChatHotPathDebugEnabled ()Z
@@ -80444,6 +80448,7 @@ public final class com/letta/mobile/util/Telemetry {
 	public final fun isFrameFlowDiagEnabled ()Z
 	public final fun isRenderDiagEnabled ()Z
 	public final fun isTimelineDumpEnabled ()Z
+	public final fun isTimelineOpenTraceEnabled ()Z
 	public final fun isTimelineSyncGateDebugEnabled ()Z
 	public final fun measure (Ljava/lang/String;Ljava/lang/String;[Lkotlin/Pair;Lkotlin/jvm/functions/Function0;)Ljava/lang/Object;
 	public final fun nowEpochMillis ()J
@@ -80595,6 +80600,56 @@ public final class com/letta/mobile/util/TelemetryValueKt {
 	public static final fun getTextOrNull (Lcom/letta/mobile/util/TelemetryValue;)Ljava/lang/String;
 	public static final fun telemetryAttributes (Ljava/lang/Iterable;)[Lkotlin/Pair;
 	public static final fun telemetryAttributes ([Lkotlin/Pair;)[Lkotlin/Pair;
+}
+
+public final class com/letta/mobile/util/TimelineOpenTrace {
+	public static final field INSTANCE Lcom/letta/mobile/util/TimelineOpenTrace;
+	public static final field SETTLE_QUIET_MS J
+	public static final field TAG Ljava/lang/String;
+	public final fun enabled ()Z
+	public final fun isActive-LfPRSJk (Ljava/lang/String;)Z
+	public final fun listReplaced-LfPRSJk (Ljava/lang/String;)V
+	public final fun mark--K_7Wts (Ljava/lang/String;Lcom/letta/mobile/util/TimelineOpenTrace$Stage;Ljava/lang/Integer;Ljava/lang/Long;)Z
+	public static synthetic fun mark--K_7Wts$default (Lcom/letta/mobile/util/TimelineOpenTrace;Ljava/lang/String;Lcom/letta/mobile/util/TimelineOpenTrace$Stage;Ljava/lang/Integer;Ljava/lang/Long;ILjava/lang/Object;)Z
+	public final fun requested-ItfXVZA (Ljava/lang/String;)Lcom/letta/mobile/util/TimelineOpenTrace$OpenId;
+	public final fun requestedIfAbsent-ItfXVZA (Ljava/lang/String;)Lcom/letta/mobile/util/TimelineOpenTrace$OpenId;
+	public final fun settleIfQuiet-LfPRSJk (Ljava/lang/String;)V
+	public final fun tracking ()Z
+}
+
+public final class com/letta/mobile/util/TimelineOpenTrace$FirstFrameGate {
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun onDraw (Z)V
+}
+
+public final class com/letta/mobile/util/TimelineOpenTrace$OpenId {
+	public static final synthetic fun box-impl (J)Lcom/letta/mobile/util/TimelineOpenTrace$OpenId;
+	public static fun constructor-impl (J)J
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (JLjava/lang/Object;)Z
+	public static final fun equals-impl0 (JJ)Z
+	public final fun getValue ()J
+	public fun hashCode ()I
+	public static fun hashCode-impl (J)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (J)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()J
+}
+
+public final class com/letta/mobile/util/TimelineOpenTrace$Stage : java/lang/Enum {
+	public static final field CacheReadEnd Lcom/letta/mobile/util/TimelineOpenTrace$Stage;
+	public static final field CacheReadStart Lcom/letta/mobile/util/TimelineOpenTrace$Stage;
+	public static final field FirstFrameWithRows Lcom/letta/mobile/util/TimelineOpenTrace$Stage;
+	public static final field NetworkPageEnd Lcom/letta/mobile/util/TimelineOpenTrace$Stage;
+	public static final field NetworkPageStart Lcom/letta/mobile/util/TimelineOpenTrace$Stage;
+	public static final field OpenRequested Lcom/letta/mobile/util/TimelineOpenTrace$Stage;
+	public static final field PresentationBound Lcom/letta/mobile/util/TimelineOpenTrace$Stage;
+	public static final field ReconcileEnd Lcom/letta/mobile/util/TimelineOpenTrace$Stage;
+	public static final field Settled Lcom/letta/mobile/util/TimelineOpenTrace$Stage;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getEventName ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/util/TimelineOpenTrace$Stage;
+	public static fun values ()[Lcom/letta/mobile/util/TimelineOpenTrace$Stage;
 }
 
 public final class com/letta/mobile/util/time/TimeLabels {
