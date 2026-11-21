@@ -113,7 +113,10 @@ since `open.requested`. Stages: `presentation.bound`, `cache.read.start`, `cache
 It measures the already-installed root-debug dev app (`com.letta.mobile.dev` by default, override with
 `targetPackage`) with its compilation left as installed, and needs a signed-in account that has the
 named conversation (`conversationTitle`, optional `conversationIndex`; `agentId` and `conversationId`
-for the launch variant). It is a local investigation tool and is not gated in CI.
+for the launch variant). The dev build is debuggable, so run it with `am instrument -e
+androidx.benchmark.suppressErrors DEBUGGABLE,EMULATOR` (full command in the class KDoc); a debug build's
+stage proportions carry over to release, its absolute times do not. It is a local investigation tool and
+is not gated in CI.
 
 ## CI gate
 
