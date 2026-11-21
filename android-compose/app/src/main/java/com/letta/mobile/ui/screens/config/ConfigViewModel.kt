@@ -403,13 +403,17 @@ class ConfigViewModel @Inject constructor(
     }
 
     fun updateThemePreset(themePreset: ThemePreset) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        val dynamicColor = if (themePreset == ThemePreset.DEFAULT) currentState.dynamicColor else false
+        if ((_uiState.value as? UiState.Success) == null) return
         viewModelScope.launch {
-            // One edit after the other: a refused preset leaves the dynamic colour alone too.
+            // DEFAULT leaves dynamic colour as the host holds it (another device may have changed it since this form
+            // loaded); any other preset turns it off. One edit after the other: a refused preset changes nothing else.
+            val keepsDynamic = themePreset == ThemePreset.DEFAULT
             val taken = noteOutcome(settingsRepository.setThemePreset(themePreset)) &&
-                noteOutcome(settingsRepository.setDynamicColor(dynamicColor))
-            if (taken) showEdited { it.copy(themePreset = themePreset, dynamicColor = dynamicColor) }
+                (keepsDynamic || noteOutcome(settingsRepository.setDynamicColor(false)))
+            if (!taken) return@launch
+            showEdited { form ->
+                if (keepsDynamic) form.copy(themePreset = themePreset) else form.copy(themePreset = themePreset, dynamicColor = false)
+            }
         }
     }
 

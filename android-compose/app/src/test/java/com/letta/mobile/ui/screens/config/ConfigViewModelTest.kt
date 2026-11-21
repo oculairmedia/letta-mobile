@@ -477,6 +477,19 @@ class ConfigViewModelTest {
     }
 
     @Test
+    fun choosingTheDefaultPresetLeavesTheHostsDynamicColorAsItNowIs() = runTest {
+        val loaded = loadedFormAfter { updateDynamicColor(true) }
+        assertEquals(true, loaded.dynamicColor)
+        // Another device turns dynamic colour off after this form loaded.
+        fakeRepository.setDynamicColor(false)
+
+        viewModel.updateThemePreset(ThemePreset.DEFAULT)
+
+        assertEquals(ThemePreset.DEFAULT, fakeRepository.getThemePreset().first())
+        assertEquals(false, fakeRepository.getDynamicColor().first())
+    }
+
+    @Test
     fun aPresetTheHostDoesNotTakeAlsoLeavesDynamicColorAlone() = runTest {
         fakeRepository.hostOutcome = ShellStateEditOutcome.CONFLICT
         val form = loadedFormAfter { updateThemePreset(ThemePreset.SAKURA) }
