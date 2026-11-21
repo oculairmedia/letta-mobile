@@ -1,7 +1,9 @@
 package com.letta.mobile.data.settings
 
 import com.letta.mobile.data.model.AppTheme
+import com.letta.mobile.data.model.appThemeNamed
 import com.letta.mobile.data.model.ThemePreset
+import com.letta.mobile.data.model.themePresetNamed
 import com.letta.mobile.data.shellstate.AppearanceValues
 import com.letta.mobile.data.shellstate.HostAppearance
 import com.letta.mobile.data.shellstate.ShellStateEditOutcome
@@ -33,8 +35,10 @@ fun hostAppearanceSettings(
     val edits = AppearanceEdits(appearance, notice)
     val shown = appearance.current
     return AppearanceSettings(
-        theme = SettingValue(appearance.shown(scope, shown.appTheme) { it.appTheme }) { edits.launchIn(scope) { setTheme(it) } },
-        themePreset = SettingValue(appearance.shown(scope, shown.presetOrDefault) { it.presetOrDefault }) {
+        theme = SettingValue(appearance.shown(scope, appThemeNamed(shown.theme)) { appThemeNamed(it.theme) }) {
+            edits.launchIn(scope) { setTheme(it) }
+        },
+        themePreset = SettingValue(appearance.shown(scope, themePresetNamed(shown.themePreset)) { themePresetNamed(it.themePreset) }) {
             edits.launchIn(scope) { setPreset(it) }
         },
         dynamicColor = SettingValue(appearance.shown(scope, shown.dynamicColor == true) { it.dynamicColor == true }) {

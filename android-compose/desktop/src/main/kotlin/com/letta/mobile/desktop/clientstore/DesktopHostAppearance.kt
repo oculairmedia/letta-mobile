@@ -5,7 +5,6 @@ import com.letta.mobile.data.shellstate.HostAppearance
 import com.letta.mobile.data.shellstate.channel.channelShellStateLink
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.api.IChannelTransport
-import com.letta.mobile.desktop.data.DesktopPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
@@ -22,10 +21,5 @@ internal class DesktopHostAppearance private constructor(
     /** Follows the host over [transport] from now on; null while the desktop is not connected to one. */
     fun attach(transport: IChannelTransport?) {
         this.transport.value = transport
-    }
-
-    companion object {
-        /** The one appearance of the process: every window draws it. */
-        val shared: DesktopHostAppearance by lazy { DesktopHostAppearance(DesktopPreferences.store) }
     }
 }

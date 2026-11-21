@@ -1,7 +1,5 @@
 package com.letta.mobile.data.shellstate
 
-import com.letta.mobile.data.model.AppTheme
-import com.letta.mobile.data.model.ThemePreset
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -40,12 +38,6 @@ data class AppearanceValues(
 ) {
     /** Whether no field holds a choice. */
     val isEmpty: Boolean get() = this == NONE
-
-    /** The theme to draw: the recorded one, or [AppTheme.SYSTEM] when none was recorded or its name is not known here. */
-    val appTheme: AppTheme get() = AppTheme.entries.firstOrNull { it.name == theme } ?: AppTheme.SYSTEM
-
-    /** The colour preset to draw: the recorded one, or [ThemePreset.DEFAULT] when none was recorded or its name is not known here. */
-    val presetOrDefault: ThemePreset get() = ThemePreset.entries.firstOrNull { it.name == themePreset } ?: ThemePreset.DEFAULT
 
     /** This choice where there is one, else [fallback]'s. */
     fun orElse(fallback: AppearanceValues): AppearanceValues = AppearanceValues(

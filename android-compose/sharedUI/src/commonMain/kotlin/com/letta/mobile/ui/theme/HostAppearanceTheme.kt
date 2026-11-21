@@ -5,6 +5,8 @@ import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import com.letta.mobile.data.model.appThemeNamed
+import com.letta.mobile.data.model.themePresetNamed
 import com.letta.mobile.data.shellstate.HostAppearance
 
 /**
@@ -25,8 +27,8 @@ fun HostAppearanceTheme(
 ) {
     val shown by appearance.values.collectAsState(appearance.current)
     SharedMaterialTheme(
-        darkTheme = darkOverride ?: shown.appTheme.isDark(systemDark),
-        preset = shown.presetOrDefault,
+        darkTheme = darkOverride ?: appThemeNamed(shown.theme).isDark(systemDark),
+        preset = themePresetNamed(shown.themePreset),
         typography = typography,
         content = content,
     )
@@ -39,5 +41,5 @@ fun HostAppearanceTheme(
 @Composable
 fun rememberHostDark(appearance: HostAppearance, systemDark: Boolean, darkOverride: Boolean? = null): Boolean {
     val shown by appearance.values.collectAsState(appearance.current)
-    return darkOverride ?: shown.appTheme.isDark(systemDark)
+    return darkOverride ?: appThemeNamed(shown.theme).isDark(systemDark)
 }

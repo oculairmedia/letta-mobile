@@ -28259,6 +28259,11 @@ public final class com/letta/mobile/data/model/AppTheme : java/lang/Enum {
 	public static fun values ()[Lcom/letta/mobile/data/model/AppTheme;
 }
 
+public final class com/letta/mobile/data/model/AppearanceNamesKt {
+	public static final fun appThemeNamed (Ljava/lang/String;)Lcom/letta/mobile/data/model/AppTheme;
+	public static final fun themePresetNamed (Ljava/lang/String;)Lcom/letta/mobile/data/model/ThemePreset;
+}
+
 public final class com/letta/mobile/data/model/ApprovalCreate {
 	public static final field Companion Lcom/letta/mobile/data/model/ApprovalCreate$Companion;
 	public fun <init> ()V
@@ -56166,9 +56171,7 @@ public final class com/letta/mobile/data/shellstate/AppearanceValues {
 	public static synthetic fun copy$default (Lcom/letta/mobile/data/shellstate/AppearanceValues;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/letta/mobile/data/shellstate/AppearanceValues;
 	public final fun editsExcept (Ljava/util/Set;)Ljava/util/List;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAppTheme ()Lcom/letta/mobile/data/model/AppTheme;
 	public final fun getDynamicColor ()Ljava/lang/Boolean;
-	public final fun getPresetOrDefault ()Lcom/letta/mobile/data/model/ThemePreset;
 	public final fun getTheme ()Ljava/lang/String;
 	public final fun getThemePreset ()Ljava/lang/String;
 	public fun hashCode ()I

@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.data.shellstate.HostAppearance
 import com.letta.mobile.desktop.clientstore.DesktopHostAppearance
+import com.letta.mobile.desktop.data.DesktopPreferences
 import com.letta.mobile.ui.theme.HostAppearanceTheme
 import com.letta.mobile.ui.theme.SharedTypography
 import com.letta.mobile.ui.theme.rememberHostDark
@@ -33,8 +34,11 @@ internal data class DesktopThemeOverride(
 
 internal val LocalDesktopThemeOverride = staticCompositionLocalOf<DesktopThemeOverride?> { null }
 
+/** The one appearance of the process, kept in the desktop's preferences file: every window draws it, the shell follows the host with it. */
+internal val desktopHostAppearance: DesktopHostAppearance by lazy { DesktopHostAppearance(DesktopPreferences.store) }
+
 /** The appearance every window draws: the person's choice on the host. Tests and previews provide their own. */
-internal val LocalDesktopHostAppearance = staticCompositionLocalOf<HostAppearance> { DesktopHostAppearance.shared }
+internal val LocalDesktopHostAppearance = staticCompositionLocalOf<HostAppearance> { desktopHostAppearance }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable

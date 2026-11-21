@@ -3,6 +3,8 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
+import com.letta.mobile.data.model.appThemeNamed
+import com.letta.mobile.data.model.themePresetNamed
 import com.letta.mobile.data.objectverbs.ObjectRef
 import com.letta.mobile.data.objectverbs.VerbContext
 import com.letta.mobile.data.objectverbs.VerbInvocation
@@ -148,12 +150,12 @@ open class CachedSettingsRepository(
         }
     }
 
-    override fun getTheme(): Flow<AppTheme> = hostAppearance.values.map { it.appTheme }
+    override fun getTheme(): Flow<AppTheme> = hostAppearance.values.map { appThemeNamed(it.theme) }
 
-    override fun getThemePreset(): Flow<ThemePreset> = hostAppearance.values.map { it.presetOrDefault }
+    override fun getThemePreset(): Flow<ThemePreset> = hostAppearance.values.map { themePresetNamed(it.themePreset) }
 
     override fun getDynamicColor(): Flow<Boolean> = hostAppearance.values.map { chosen ->
-        chosen.dynamicColor ?: (chosen.presetOrDefault == ThemePreset.DEFAULT && platformDefaults.defaultDynamicColorWhenPresetUnset)
+        chosen.dynamicColor ?: (themePresetNamed(chosen.themePreset) == ThemePreset.DEFAULT && platformDefaults.defaultDynamicColorWhenPresetUnset)
     }
 
     override suspend fun followHostSettings() = hostAppearance.run()
