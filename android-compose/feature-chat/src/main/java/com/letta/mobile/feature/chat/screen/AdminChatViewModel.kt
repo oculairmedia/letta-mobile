@@ -47,6 +47,7 @@ import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.WsActiveSubagentSource
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.TimelineOpenTrace
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
@@ -833,6 +834,7 @@ internal class AdminChatViewModel @Inject constructor(
                             }
                         }
                         _pagingPresentation.value = presentation
+                        TimelineOpenTrace.mark(ConversationId(conversationId), TimelineOpenTrace.Stage.PresentationBound)
                         kotlinx.coroutines.awaitCancellation()
                     } finally {
                         presentation.close()

@@ -4,6 +4,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.map
 import androidx.paging.filter
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.chat.projection.CanvasArtifactReceipts
 import com.letta.mobile.data.chat.projection.ChatRenderItem
@@ -50,6 +51,9 @@ class CanonicalTimelinePresentation private constructor(
     private val job = SupervisorJob(parentScope.coroutineContext[Job])
     private val scope = parentScope + job
     private val owner = lease.owner
+
+    /** The conversation this presentation shows. */
+    val conversationId: ConversationId = ConversationId(owner.selection.scope.conversationId)
     /**
      * What the list holds, published as ONE value. The live projection drains the prompt by otid and
      * the reply by server id; held in separate flows, a combine could see the new otids before the

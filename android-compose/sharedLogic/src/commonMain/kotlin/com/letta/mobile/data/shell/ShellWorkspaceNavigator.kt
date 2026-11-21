@@ -8,6 +8,7 @@ import com.letta.mobile.data.home.conversationRecency
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.lanes.ConversationPurpose
+import com.letta.mobile.util.TimelineOpenTrace
 
 /**
  * What the shell's navigation needs from a host's chat. Read when a verb runs, never captured: the
@@ -90,6 +91,7 @@ class ShellWorkspaceNavigator(
 
     /** Commit exact identity before asking a port to load it. An unknown owner stays unresolved. */
     fun openConversation(conversation: ConversationId) {
+        TimelineOpenTrace.requested(conversation)
         val references = chat.conversations().filter { it.id == conversation }
         val owners = references.mapNotNull { it.agent }.distinct()
         val agent = owners.singleOrNull()
