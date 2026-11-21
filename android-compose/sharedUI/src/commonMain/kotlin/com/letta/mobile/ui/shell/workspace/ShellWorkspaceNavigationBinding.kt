@@ -7,6 +7,8 @@ import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
+import com.letta.mobile.util.TimelineOpenTrace
 import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellRoute
@@ -109,7 +111,7 @@ fun ShellWorkspaceNavigator.workspaceNavigationActions(
             },
             onNewSession = { state.overlays.newConversation = true },
         ),
-        panel = conversations?.panelActions(drawer.panel) ?: drawer.panel,
+        panel = (conversations?.panelActions(drawer.panel) ?: drawer.panel).tracingOpens(),
         onRailDismiss = { state.railExpanded = false },
     )
 }
@@ -131,3 +133,15 @@ fun ShellWorkspaceNavigator.openSearchHit(
         UnifiedSearchKind.Destinations -> destinationOf(hit.id)?.let { navigate(it) }
     }
 }
+
+/**
+ * A pick from the conversation list is where a conversation open begins, so it starts the open's
+ * latency trace ([TimelineOpenTrace]) before the shell navigates. Other ways in (a link, a restore)
+ * start theirs when the chat model binds.
+ */
+private fun ShellAgentPanelActions.tracingOpens() = copy(
+    onConversationSelected = { id ->
+        TimelineOpenTrace.requested(ConversationId(id))
+        onConversationSelected(id)
+    },
+)

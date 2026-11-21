@@ -167,7 +167,8 @@ object TimelineOpenTrace {
      * Records [Stage.Settled] when the list has been quiet for [SETTLE_QUIET_MS], rows have been
      * drawn and the host page has come back (or failed); otherwise does nothing. Without the last
      * two a quiet moment between the cached rows and the network's rows would end the open early.
-     * The event's `elapsedMs` is when the last replacement happened, not when the quiet period ended.
+     * `elapsedMs` (like the stage's trace section) is when this was recorded, at least
+     * [SETTLE_QUIET_MS] after the last replacement; `lastReplacementMs` is when the list last changed.
      */
     fun settleIfQuiet(conversation: ConversationId) {
         if (!tracking()) return
@@ -176,7 +177,7 @@ object TimelineOpenTrace {
             val quiet = (timeSource.markNow() - open.lastReplacement).inWholeMilliseconds >= SETTLE_QUIET_MS
             val ready = Stage.FirstFrameWithRows in open.fired && Stage.NetworkPageEnd in open.fired
             if (quiet && ready && open.fired.add(Stage.Settled)) {
-                emit(conversation, open, Stage.Settled, open.replacements, null, at = open.lastReplacement)
+                emit(conversation, open, Stage.Settled, open.replacements, null, lastReplacement = open.lastReplacement)
             }
         }
     }
@@ -205,9 +206,9 @@ object TimelineOpenTrace {
         stage: Stage,
         count: Int?,
         bytes: Long?,
-        at: ComparableTimeMark = timeSource.markNow(),
+        lastReplacement: ComparableTimeMark? = null,
     ) {
-        val elapsed: Duration = at - open.startedAt
+        val elapsed: Duration = timeSource.markNow() - open.startedAt
         val section = "$TAG/${stage.eventName}"
         if (Telemetry.beginTraceSection(section)) Telemetry.endTraceSection()
         val attrs = buildList {
@@ -217,6 +218,7 @@ object TimelineOpenTrace {
             add("elapsedUs" attr elapsed.inWholeMicroseconds)
             if (count != null) add("count" attr count)
             if (bytes != null) add("bytes" attr bytes)
+            if (lastReplacement != null) add("lastReplacementMs" attr (lastReplacement - open.startedAt).inWholeMilliseconds)
         }
         Telemetry.event(TAG, stage.eventName, *attrs.toTypedArray())
     }

@@ -16,6 +16,7 @@ import com.letta.mobile.data.chat.projection.parseTimestampEpochMillis
 import com.letta.mobile.data.timeline.handover.HandedOverPrompts
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.platform.MemoryPressure
+import com.letta.mobile.util.TimelineOpenTrace
 import com.letta.mobile.ui.common.GroupPosition
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -24,6 +25,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,8 +56,26 @@ class CanonicalTimelinePresentation private constructor(
     private val scope = parentScope + job
     private val owner = lease.owner
 
-    /** The conversation this presentation shows. */
-    val conversationId: ConversationId = ConversationId(owner.selection.scope.conversationId)
+    internal val conversationId = ConversationId(owner.selection.scope.conversationId)
+    private val firstFrame = TimelineOpenTrace.FirstFrameGate(conversationId)
+
+    /** Whether an open of this conversation is being traced; lets a caller skip building trace work. */
+    val isOpenTraced: Boolean get() = TimelineOpenTrace.tracking()
+
+    /** Called from each draw of the list: marks the first frame that shows [hasRows]. Costs one read when untraced. */
+    fun traceFirstFrame(hasRows: Boolean) = firstFrame.onDraw(hasRows)
+
+    /**
+     * Notes a list replacement and, while the open can still settle, polls for its quiet period.
+     * Returns when it settles or gives up, or is cancelled by the next replacement.
+     */
+    suspend fun traceOpenUntilSettled() {
+        TimelineOpenTrace.listReplaced(conversationId)
+        while (currentCoroutineContext().isActive && TimelineOpenTrace.isActive(conversationId)) {
+            delay(TimelineOpenTrace.SETTLE_QUIET_MS / SETTLE_POLLS_PER_QUIET_PERIOD)
+            TimelineOpenTrace.settleIfQuiet(conversationId)
+        }
+    }
     /**
      * What the list holds, published as ONE value. The live projection drains the prompt by otid and
      * the reply by server id; held in separate flows, a combine could see the new otids before the
@@ -486,7 +508,9 @@ class CanonicalTimelinePresentation private constructor(
             return try {
                 CanonicalTimelinePresentation(
                     coordinator, lease, parentScope, if (requested == null) target?.value else null, settledProjectionAdapter,
-                )
+                ).also {
+                    TimelineOpenTrace.mark(it.conversationId, TimelineOpenTrace.Stage.PresentationBound)
+                }
             } catch (failure: Throwable) {
                 withContext(NonCancellable) { coordinator.detach(lease) }
                 throw failure
@@ -501,3 +525,5 @@ class CanonicalTimelinePresentation private constructor(
  */
 private fun TimelinePageKey.ledgerTimestamp(): String =
     if (order > 0) Instant.fromEpochMilliseconds(order).toString() else ""
+
+private const val SETTLE_POLLS_PER_QUIET_PERIOD = 5
