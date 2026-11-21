@@ -3,6 +3,7 @@ package com.letta.mobile.data.voice.speech
 import com.letta.mobile.data.voice.VoiceText
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /** Sentences after the first are merged into longer segments, so the speech server gets fewer, steadier requests. */
@@ -12,8 +13,9 @@ class SentenceChunkerMergeTest {
         minimum: Int? = MIN,
         max: Int = SentenceChunker.DEFAULT_MAX_SEGMENT_LENGTH,
         firstClause: Int? = null,
+        tail: Int? = null,
     ): List<String> {
-        val chunker = SentenceChunker(max, firstClause, minimum)
+        val chunker = SentenceChunker(max, firstClause, minimum, tail)
         val pushed = deltas.flatMap { chunker.push(VoiceText(it)) }
         return (pushed + chunker.flush()).map { it.value }
     }
@@ -105,7 +107,103 @@ class SentenceChunkerMergeTest {
         assertTrue(chunker.flush().isEmpty())
     }
 
+    @Test
+    fun theDefaultLongestSegmentMatchesTheSpeechServersRequestSize() {
+        assertEquals(400, SentenceChunker.DEFAULT_MAX_SEGMENT_LENGTH)
+        val sentence = "w".repeat(59) + "."
+        val text = (1..12).joinToString(" ") { sentence }
+        val lengths = merged(text, minimum = 200, max = 400).map { it.length }
+        assertEquals(listOf(60, 365, 305), lengths, "first alone, then six sentences (365) fit in 400, a seventh would not")
+    }
+
+    @Test
+    fun aTinyTailJoinsTheSegmentBeforeItInsteadOfGoingOutAlone() {
+        val text = "Hi there. $LONG_SECOND Ok."
+        assertEquals(listOf("Hi there.", LONG_SECOND, "Ok."), merged(text, tail = null), "without absorption the tail is alone")
+        assertEquals(listOf("Hi there.", "$LONG_SECOND Ok."), merged(text, tail = TAIL))
+    }
+
+    @Test
+    fun aTailJoinsAsItStreamsInAndTheSegmentWaitsForIt() {
+        val chunker = SentenceChunker(minSegmentLength = MIN, tailAbsorbLength = TAIL)
+        assertEquals(listOf("Hi there."), chunker.push(VoiceText("Hi there. $LONG_SECOND ")).map { it.value })
+        assertEquals(listOf("$LONG_SECOND Ok."), chunker.push(VoiceText("Ok. ")).map { it.value })
+        assertTrue(chunker.flush().isEmpty())
+        assertEquals(1, chunker.tailsAbsorbed)
+    }
+
+    @Test
+    fun aSegmentAtTheMinimumIsReleasedByTheFlushWhenNoTailComes() {
+        val chunker = SentenceChunker(minSegmentLength = MIN, tailAbsorbLength = TAIL)
+        chunker.push(VoiceText("Hi there. $LONG_SECOND "))
+        assertEquals(listOf(LONG_SECOND), chunker.flush().map { it.value })
+        assertEquals(0, chunker.tailsAbsorbed)
+    }
+
+    @Test
+    fun aSentenceAsLongAsTheTailLengthIsNotATail() {
+        val tail = "t".repeat(TAIL - 1) + "."
+        assertEquals(listOf("Hi there.", LONG_SECOND, tail), merged("Hi there. $LONG_SECOND $tail", tail = TAIL))
+        val shorter = "t".repeat(TAIL - 2) + "."
+        assertEquals(listOf("Hi there.", "$LONG_SECOND $shorter"), merged("Hi there. $LONG_SECOND $shorter", tail = TAIL))
+    }
+
+    @Test
+    fun aTailNeverTakesASegmentPastTheMaximum() {
+        val nearFull = "n".repeat(97) + "."
+        assertEquals(
+            listOf("Hi there.", nearFull, "Ok."),
+            merged("Hi there. $nearFull Ok.", minimum = 50, max = 100, tail = TAIL),
+            "98 + 1 + 3 would be 102",
+        )
+        val room = "r".repeat(95) + "."
+        assertEquals(listOf("Hi there.", "$room Ok."), merged("Hi there. $room Ok.", minimum = 50, max = 100, tail = TAIL))
+    }
+
+    @Test
+    fun aTailNeverJoinsAcrossAFencedCodeBlock() {
+        assertEquals(
+            listOf("Hi there.", LONG_SECOND, "Ok."),
+            merged("Hi there. $LONG_SECOND\n```\ncode. here\n```\nOk.", tail = TAIL),
+        )
+    }
+
+    @Test
+    fun aTailNeverJoinsAcrossAFlush() {
+        val chunker = SentenceChunker(minSegmentLength = MIN, tailAbsorbLength = TAIL)
+        val before = chunker.push(VoiceText("Hi there. $LONG_SECOND ")) + chunker.flush()
+        val after = chunker.push(VoiceText("Ok. ")) + chunker.flush()
+        assertEquals(listOf("Hi there.", LONG_SECOND), before.map { it.value })
+        assertEquals(listOf("Ok."), after.map { it.value })
+    }
+
+    @Test
+    fun theFirstSegmentIsTheSameWithAndWithoutTailAbsorption() {
+        listOf("Ok. $LONG_SECOND Ok.", "Hi there. $LONG_SECOND Ok.", "Just one. ").forEach { text ->
+            assertEquals(merged(text, tail = null).first(), merged(text, tail = TAIL).first(), text)
+        }
+        val early = "Here is the short answer to your question, and then the rest of it. $LONG_SECOND Ok."
+        assertEquals(merged(early, firstClause = 20, tail = null).first(), merged(early, firstClause = 20, tail = TAIL).first())
+    }
+
+    @Test
+    fun aTailAfterALateReplysFirstSentenceStillJoinsTheSegmentBeforeIt() {
+        val chunker = SentenceChunker(minSegmentLength = MIN, tailAbsorbLength = TAIL)
+        chunker.push(VoiceText("Hi there. "))
+        chunker.flush()
+        chunker.startNewPart()
+        val released = chunker.push(VoiceText("Research is done. $LONG_SECOND Ok. ")) + chunker.flush()
+        assertEquals(listOf("Research is done.", "$LONG_SECOND Ok."), released.map { it.value })
+    }
+
+    @Test
+    fun aNonPositiveTailLengthIsRejected() {
+        assertFailsWith<IllegalArgumentException> { SentenceChunker(tailAbsorbLength = 0) }
+    }
+
     private companion object {
         const val MIN = 30
+        const val TAIL = 10
+        const val LONG_SECOND = "This second sentence is comfortably long enough."
     }
 }

@@ -105,7 +105,12 @@ internal class ReplyFollower(private val wiring: LoopWiring) {
     }
 
     private suspend fun follow(turn: TurnKey, reply: VoiceReply) {
-        val chunker = SentenceChunker(wiring.config.maxSegmentLength, wiring.config.firstClauseMinLength, wiring.config.minSegmentLength)
+        val chunker = SentenceChunker(
+            wiring.config.maxSegmentLength,
+            wiring.config.firstClauseMinLength,
+            wiring.config.minSegmentLength,
+            wiring.config.tailAbsorbLength,
+        )
         val forwarder = ReplyForwarder(turn, chunker, wiring.config.maxSegmentLength, wiring.inputs, wiring.observer)
         try {
             val outcome = runCatching { reply.events.collect(forwarder::forward) }
@@ -197,7 +202,7 @@ private class ReplyForwarder(
     fun report() {
         if (reported) return
         reported = true
-        val error = runCatching { shape.report(observer) }.exceptionOrNull()
+        val error = runCatching { shape.report(observer, chunker.tailsAbsorbed) }.exceptionOrNull()
         if (error is CancellationException) throw error
     }
 
@@ -232,12 +237,12 @@ private class ReplyShape {
         tones += tone
     }
 
-    /** Tells [observer] the shape; an answer with no segment reports nothing. */
-    fun report(observer: VoiceLoopObserver) {
+    /** Tells [observer] the shape, with how many short tails were [tailsAbsorbed]; an answer with no segment reports nothing. */
+    fun report(observer: VoiceLoopObserver, tailsAbsorbed: Int) {
         if (lengths.isEmpty()) return
         val sorted = lengths.sorted()
         val median = (sorted[(sorted.size - 1) / 2] + sorted[sorted.size / 2]) / 2
         val moodChanges = tones.zipWithNext().count { (before, after) -> before != after }
-        observer.replySegmented(sorted.size, sorted.first(), median, moodChanges)
+        observer.replySegmented(sorted.size, sorted.first(), median, moodChanges, tailsAbsorbed)
     }
 }

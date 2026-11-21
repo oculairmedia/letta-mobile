@@ -122,16 +122,25 @@ data class VoiceLoopConfig(
      * the oldest answer that has not started speaking.
      */
     val maxPendingReplies: Int = DEFAULT_MAX_PENDING,
+    /**
+     * A tail shorter than this many characters (what is left when the answer ends or a code block
+     * opens) is joined to the segment before it when that segment has not gone out yet and the two
+     * fit in [maxSegmentLength], so no answer ends on a tiny segment (the least steady one for the
+     * voice); null never joins. See [com.letta.mobile.data.voice.speech.SentenceChunker].
+     */
+    val tailAbsorbLength: Int? = DEFAULT_TAIL_ABSORB_LENGTH,
 ) {
     init {
         require(minSegmentLength == null || minSegmentLength > 0) { "minSegmentLength must be positive or null" }
+        require(tailAbsorbLength == null || tailAbsorbLength > 0) { "tailAbsorbLength must be positive or null" }
     }
 
     private companion object {
         const val DEFAULT_MAX_HELD = 16
         const val DEFAULT_MAX_PENDING = 4
-        const val DEFAULT_MAX_SEGMENT_LENGTH = 240
+        const val DEFAULT_MAX_SEGMENT_LENGTH = 400
         const val DEFAULT_FIRST_CLAUSE_MIN_LENGTH = 40
-        const val DEFAULT_MIN_SEGMENT_LENGTH = 120
+        const val DEFAULT_MIN_SEGMENT_LENGTH = 200
+        const val DEFAULT_TAIL_ABSORB_LENGTH = 60
     }
 }

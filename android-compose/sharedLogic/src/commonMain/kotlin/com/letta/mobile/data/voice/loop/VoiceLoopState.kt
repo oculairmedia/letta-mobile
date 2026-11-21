@@ -102,9 +102,10 @@ interface VoiceLoopObserver {
     /**
      * One answer was spoken as [segments] segments of [minChars] characters at least and [medianChars]
      * in the middle, with its tone changing [moodChanges] times between neighbouring segments; for
-     * measuring how steady the voice can be from one chunk to the next. Counts only.
+     * measuring how steady the voice can be from one chunk to the next. [tailsAbsorbed] short last
+     * sentences were joined to the segment before them instead of going out alone. Counts only.
      */
-    fun replySegmented(segments: Int, minChars: Int, medianChars: Int, moodChanges: Int) = Unit
+    fun replySegmented(segments: Int, minChars: Int, medianChars: Int, moodChanges: Int, tailsAbsorbed: Int) = Unit
 
     /** An observer that ignores everything. */
     companion object {
