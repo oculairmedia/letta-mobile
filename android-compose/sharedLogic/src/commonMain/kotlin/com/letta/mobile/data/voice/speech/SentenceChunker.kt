@@ -276,22 +276,33 @@ private class SegmentMerger(private val minimum: Int?, private val maximum: Int,
     fun add(piece: String): List<String> {
         val goal = minimum?.coerceAtMost(maximum)
         if (goal == null || !partSpoken) return listOf(release(piece))
-        val out = mutableListOf<String>()
-        if (held.isNotEmpty()) {
-            val fits = held.length + 1 + piece.length <= maximum
-            val waiting = held.length >= goal
-            if (waiting && fits && tail != null && piece.length < tail) return absorb(piece)
-            if (waiting || !fits) out += take()
-        }
+        if (isTail(goal, piece)) return absorb(piece)
+        val out = if (mustRelease(goal, piece)) take() else emptyList()
+        join(piece)
+        return out + if (done(goal)) take() else emptyList()
+    }
+
+    private fun join(piece: String) {
         if (held.isNotEmpty()) held.append(' ')
         held.append(piece)
-        if (held.length >= goal && !awaitsTail()) out += take()
-        return out
     }
+
+    private fun fits(piece: String): Boolean = held.length + 1 + piece.length <= maximum
+
+    /** A short [piece] that follows a segment already at its [goal] and fits beside it. */
+    private fun isTail(goal: Int, piece: String): Boolean =
+        tail != null && piece.length < tail && held.length >= goal && fits(piece)
+
+    /** What is held goes out before [piece] is added: it is at its [goal] already, or [piece] would overflow it. */
+    private fun mustRelease(goal: Int, piece: String): Boolean =
+        held.isNotEmpty() && (held.length >= goal || !fits(piece))
+
+    /** Held text at its [goal] goes out now, unless it waits for a possible tail. */
+    private fun done(goal: Int): Boolean = held.length >= goal && !awaitsTail()
 
     private fun absorb(piece: String): List<String> {
         tailsAbsorbed++
-        held.append(' ').append(piece)
+        join(piece)
         return take()
     }
 

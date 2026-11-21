@@ -243,6 +243,6 @@ private class ReplyShape {
         val sorted = lengths.sorted()
         val median = (sorted[(sorted.size - 1) / 2] + sorted[sorted.size / 2]) / 2
         val moodChanges = tones.zipWithNext().count { (before, after) -> before != after }
-        observer.replySegmented(sorted.size, sorted.first(), median, moodChanges, tailsAbsorbed)
+        observer.replySegmented(ReplySegmentation(sorted.size, sorted.first(), median, moodChanges, tailsAbsorbed))
     }
 }

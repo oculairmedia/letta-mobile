@@ -46,9 +46,9 @@ internal class LoopHarness(
                 skipped += "${reason.name}:$segments"
             }
 
-            override fun replySegmented(segments: Int, minChars: Int, medianChars: Int, moodChanges: Int, tailsAbsorbed: Int) {
-                segmented += "$segments/$minChars/$medianChars/$moodChanges"
-                absorbed += tailsAbsorbed
+            override fun replySegmented(shape: ReplySegmentation) {
+                segmented += "${shape.segments}/${shape.minChars}/${shape.medianChars}/${shape.moodChanges}"
+                absorbed += shape.tailsAbsorbed
             }
 
             override fun speechStopped(reason: SpeechStopReason, silentAfter: Duration) {

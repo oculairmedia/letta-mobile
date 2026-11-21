@@ -12,10 +12,10 @@ class SentenceChunkerMergeTest {
         vararg deltas: String,
         minimum: Int? = MIN,
         max: Int = SentenceChunker.DEFAULT_MAX_SEGMENT_LENGTH,
-        firstClause: Int? = null,
         tail: Int? = null,
-    ): List<String> {
-        val chunker = SentenceChunker(max, firstClause, minimum, tail)
+    ): List<String> = mergedWith(SentenceChunker(max, null, minimum, tail), *deltas)
+
+    private fun mergedWith(chunker: SentenceChunker, vararg deltas: String): List<String> {
         val pushed = deltas.flatMap { chunker.push(VoiceText(it)) }
         return (pushed + chunker.flush()).map { it.value }
     }
@@ -33,7 +33,10 @@ class SentenceChunkerMergeTest {
         val text = "Yes. That is right, and here is a long clause after it. Another short one."
         assertEquals(merged(text, minimum = null).first(), merged(text).first())
         val early = "Here is the short answer to your question, and then the rest of it. Then a second sentence."
-        assertEquals(merged(early, minimum = null, firstClause = 20).first(), merged(early, firstClause = 20).first())
+        assertEquals(
+            mergedWith(SentenceChunker(DEFAULT_MAX, 20, null), early).first(),
+            mergedWith(SentenceChunker(DEFAULT_MAX, 20, MIN), early).first(),
+        )
     }
 
     @Test
@@ -185,7 +188,10 @@ class SentenceChunkerMergeTest {
             assertEquals(merged(text, tail = null).first(), merged(text, tail = TAIL).first(), text)
         }
         val early = "Here is the short answer to your question, and then the rest of it. $LONG_SECOND Ok."
-        assertEquals(merged(early, firstClause = 20, tail = null).first(), merged(early, firstClause = 20, tail = TAIL).first())
+        assertEquals(
+            mergedWith(SentenceChunker(DEFAULT_MAX, 20, MIN, null), early).first(),
+            mergedWith(SentenceChunker(DEFAULT_MAX, 20, MIN, TAIL), early).first(),
+        )
     }
 
     @Test
@@ -205,6 +211,7 @@ class SentenceChunkerMergeTest {
 
     private companion object {
         const val MIN = 30
+        const val DEFAULT_MAX = SentenceChunker.DEFAULT_MAX_SEGMENT_LENGTH
         const val TAIL = 10
         const val LONG_SECOND = "This second sentence is comfortably long enough."
     }
