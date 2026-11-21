@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.util.TimelineOpenTrace
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -403,7 +404,7 @@ class CanonicalTimelineSession(
     suspend fun loadOlder(selection: TimelineEngineSelection): TimelineEnginePageOutcome {
         val request = engine.beginPage(selection)
         try {
-            return when (val response = transport.listConversationMessagePage(request.remote)) {
+            return when (val response = transport.tracedPage(request.remote)) {
                 is TimelineRemotePageResult.Page -> engine.applyPage(request, response).also {
                     if (it == TimelineEnginePageOutcome.Applied) refreshPending(historyPage = response)
                 }
@@ -453,15 +454,44 @@ internal suspend fun CanonicalTimelineSession.reconcileRecentDetailed(
 ): TimelineEngineReconcileResult {
     val request = engine.beginReconcile(selection)
     try {
-        return when (val response = transport.listConversationMessagePage(request.remote)) {
+        val result = when (val response = transport.tracedPage(request.remote)) {
             is TimelineRemotePageResult.Page -> engine.reconcilePageDetailed(request, response, catchUp).also {
                 if (it.outcome == TimelineEnginePageOutcome.Applied) refreshPending(historyPage = response)
             }
             is TimelineRemotePageResult.NoProgress -> TimelineEngineReconcileResult(engine.rejectReconcileNoProgress(request, response))
         }
+        // A superseded request merged nothing; the request that superseded it ends the stage.
+        if (result.outcome != TimelineEnginePageOutcome.Stale) {
+            TimelineOpenTrace.mark(
+                ConversationId(selection.scope.conversationId), TimelineOpenTrace.Stage.ReconcileEnd, count = result.appended,
+            )
+        }
+        return result
     } finally {
         kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
             engine.cancelReconcile(request)
+        }
+    }
+}
+
+/**
+ * One host page fetch, bracketed for [TimelineOpenTrace]. Whichever page request of an open leaves
+ * first (the recent tail, or older history into an empty ledger) is the open's network stage, and
+ * only that request ends it; the end is recorded on failure too, with no count, so an open that
+ * never reached the host still closes the stage.
+ */
+private suspend fun TimelineTransport.tracedPage(request: TimelineRemotePageRequest): TimelineRemotePageResult {
+    val conversation = ConversationId(request.scope.conversationId)
+    val traced = TimelineOpenTrace.mark(conversation, TimelineOpenTrace.Stage.NetworkPageStart)
+    var page: TimelineRemotePageResult.Page? = null
+    try {
+        return listConversationMessagePage(request).also { page = it as? TimelineRemotePageResult.Page }
+    } finally {
+        if (traced) {
+            TimelineOpenTrace.mark(
+                conversation, TimelineOpenTrace.Stage.NetworkPageEnd,
+                count = page?.records?.size ?: 0, bytes = page?.decodedBodyBytes ?: 0L,
+            )
         }
     }
 }

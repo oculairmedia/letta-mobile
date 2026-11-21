@@ -2,6 +2,8 @@ package com.letta.mobile.data.timeline
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.util.TimelineOpenTrace
 import kotlinx.coroutines.CancellationException
 
 /** Newest-first adapter. Paging alone owns load state, retry, resident caching and page dropping. */
@@ -46,8 +48,11 @@ class TimelineLedgerPagingSource(
                 is LoadParams.Append -> TimelineReadPosition.Before(params.key)
                 is LoadParams.Prepend -> TimelineReadPosition.After(params.key)
             }
+            val conversation = ConversationId(selection.scope.conversationId)
+            TimelineOpenTrace.mark(conversation, TimelineOpenTrace.Stage.CacheReadStart)
             val page = engine.preparePage(selection, position, params.loadSize, ownAgentId, settledProjectionAdapter)
             if (isObsolete()) return LoadResult.Invalid()
+            TimelineOpenTrace.mark(conversation, TimelineOpenTrace.Stage.CacheReadEnd, count = page.records.size)
             LoadResult.Page(
                 data = page.records.reversed(),
                 prevKey = page.metadata.newer,
