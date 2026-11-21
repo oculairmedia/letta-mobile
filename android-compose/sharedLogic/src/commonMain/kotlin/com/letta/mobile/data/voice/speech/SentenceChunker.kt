@@ -211,12 +211,12 @@ class SentenceChunker(private val sizing: SegmentSizing = SegmentSizing()) {
             val raw = pending.substring(0, cut.length)
             pending.deleteRange(0, cut.length + cut.skip)
             val spoken = SpeakableText.clean(raw)
-            if (spoken.isNotEmpty()) splitLong(spoken).forEach { out += merger.add(it).map(::VoiceText) }
+            if (spoken.isNotEmpty()) splitLong(spoken).forEach { out += merger.add(VoiceText(it)) }
             return true
         }
 
         private fun emitMerged() {
-            out += merger.take().map(::VoiceText)
+            out += merger.take()
         }
 
         private fun splitLong(text: String): List<String> {
@@ -238,92 +238,5 @@ class SentenceChunker(private val sizing: SegmentSizing = SegmentSizing()) {
         const val DEFAULT_MAX_SEGMENT_LENGTH: Int = 400
         private const val FENCE = "```"
         private const val HARD_LIMIT_FACTOR = 4
-    }
-}
-
-/**
- * Merges the pieces after a part's first into segments of at least [goal] characters (never
- * more than [maximum]; the goal is the sizing's minimum capped by it); with no [goal] every piece is its own segment. A part's first piece is
- * never held: it goes out at once, and merging starts after it.
- *
- * With a [tail] length (only while merging is on), a segment that has reached [goal] is kept one piece longer, so a piece
- * shorter than [tail] that follows it (the end of a reply, usually) joins it instead of going out as
- * a tiny segment of its own; the join never takes the segment past [maximum]. Without it, a segment
- * goes out the moment it reaches [goal], and a tiny last piece can only follow it alone.
- */
-private class SegmentMerger(sizing: SegmentSizing) {
-    private val goal = sizing.mergeGoal
-    private val maximum = sizing.maxSegmentLength
-    private val tail = sizing.tailAbsorbLength
-
-    private val held = StringBuilder()
-    private var partSpoken = false
-
-    /** How many short pieces were joined to a segment that had already reached the minimum. */
-    var tailsAbsorbed = 0
-        private set
-
-    /** Whether any segment has been released yet. */
-    var released = false
-        private set
-
-    /** Takes [piece]; returns the segments that are complete now. */
-    fun add(piece: String): List<String> {
-        if (goal == null || !partSpoken) return listOf(release(piece))
-        if (isTail(goal, piece)) return absorb(piece)
-        val out = if (mustRelease(goal, piece)) take() else emptyList()
-        join(piece)
-        return out + if (done(goal)) take() else emptyList()
-    }
-
-    private fun join(piece: String) {
-        if (held.isNotEmpty()) held.append(' ')
-        held.append(piece)
-    }
-
-    private fun fits(piece: String): Boolean = held.length + 1 + piece.length <= maximum
-
-    /** A short [piece] that follows a segment already at its [goal] and fits beside it. */
-    private fun isTail(goal: Int, piece: String): Boolean =
-        tail != null && piece.length < tail && held.length >= goal && fits(piece)
-
-    /** What is held goes out before [piece] is added: it is at its [goal] already, or [piece] would overflow it. */
-    private fun mustRelease(goal: Int, piece: String): Boolean =
-        held.isNotEmpty() && (held.length >= goal || !fits(piece))
-
-    /** Held text at its [goal] goes out now, unless it waits for a possible tail. */
-    private fun done(goal: Int): Boolean = held.length >= goal && !awaitsTail()
-
-    private fun absorb(piece: String): List<String> {
-        tailsAbsorbed++
-        join(piece)
-        return take()
-    }
-
-    /** Takes whatever is held as one segment, if anything is. */
-    fun take(): List<String> {
-        if (held.isEmpty()) return emptyList()
-        return listOf(release(held.toString())).also { held.clear() }
-    }
-
-    /** The next piece is a new part's first: released alone, then merging resumes. */
-    fun startNewPart() {
-        partSpoken = false
-    }
-
-    fun clear() = held.clear()
-
-    /** A segment at its minimum waits for the next piece while there is room to join a tail to it. */
-    private fun awaitsTail(): Boolean = tail != null && held.length + MIN_JOIN <= maximum
-
-    private fun release(segment: String): String {
-        released = true
-        partSpoken = true
-        return segment
-    }
-
-    private companion object {
-        /** A space and one character: the least a joined piece adds. */
-        const val MIN_JOIN = 2
     }
 }
