@@ -11,8 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import com.letta.mobile.ui.components.foundation.LettaCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -32,7 +31,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.A2uiActionOrigin
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
@@ -99,7 +97,7 @@ internal fun A2uiToolApprovalCard(
         }
     }
 
-    Card(
+    LettaCard(
         modifier = modifier
             .fillMaxWidth()
             .semantics {
@@ -107,12 +105,7 @@ internal fun A2uiToolApprovalCard(
                 stateDescription = result?.statusLabel() ?: "Awaiting approval"
             }
             .testTag(A2uiTestTags.TOOL_APPROVAL_CARD),
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-        border = BorderStroke(riskStyle.borderWidth, riskStyle.borderColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        accent = BorderStroke(riskStyle.borderWidth, riskStyle.borderColor),
     ) {
         Column(
             modifier = Modifier.padding(LettaDimens.Space.lg),

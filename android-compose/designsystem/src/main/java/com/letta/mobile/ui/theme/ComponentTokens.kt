@@ -46,5 +46,3 @@ const val MERMAID_VIEWPORT_FILL_ALPHA: Float = 0.08f
 /** ThinkingTextToken: the dim ink either side of the sweep's bright band (a shimmer gradient stop). */
 const val THINKING_SWEEP_TAIL_ALPHA: Float = 0.45f
 
-/** TagDrillInDialog: the item card's surfaceVariant wash over the dialog surface (a fill, not text). */
-const val TAG_DRILL_IN_CARD_FILL_ALPHA: Float = 0.45f

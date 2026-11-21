@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ca.oculair.meridian.R
+import com.letta.mobile.ui.components.foundation.LettaNestedCard
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.tags.TagDrillInEntityType
 import com.letta.mobile.ui.tags.TagDrillInItem
@@ -99,12 +98,7 @@ fun TagDrillInDialog(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TagDrillInItemCard(item: TagDrillInItem) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = com.letta.mobile.ui.theme.TAG_DRILL_IN_CARD_FILL_ALPHA),
-        ),
-    ) {
+    LettaNestedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(LettaDimens.Space.md),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),

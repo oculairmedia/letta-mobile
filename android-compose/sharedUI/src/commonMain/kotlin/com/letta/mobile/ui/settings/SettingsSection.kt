@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.settings
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,8 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.settings.SettingsAction
 import com.letta.mobile.data.settings.SettingsDrafts
 import com.letta.mobile.data.settings.SettingsRow
+import com.letta.mobile.ui.components.foundation.LettaCard
 import com.letta.mobile.ui.components.foundation.LettaRowLabel
 import com.letta.mobile.ui.components.foundation.LettaToggleRow
 import com.letta.mobile.ui.components.picker.LettaPicker
@@ -89,18 +87,13 @@ object SettingsSectionTags {
 data class SettingsHeader(val key: String, val title: String, val supporting: String? = null, val showTitle: Boolean = true)
 
 /**
- *  (hard cut S10, primitive P9) / one rounded settings card.
+ * One settings card, drawn by the shared [LettaCard].
  * Every Settings row on every platform is drawn by the [SettingsScope] rows inside one of these, from
  * the row models in com.letta.mobile.data.settings; a platform describes its own sections as data.
  */
 @Composable
 fun SettingsSection(header: SettingsHeader, modifier: Modifier = Modifier, content: @Composable SettingsScope.() -> Unit) {
-    Card(
-        modifier = modifier.fillMaxWidth().testTag(SettingsSectionTags.SECTION_PREFIX + header.key),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        shape = MaterialTheme.shapes.large,
-        border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
-    ) {
+    LettaCard(modifier = modifier.fillMaxWidth().testTag(SettingsSectionTags.SECTION_PREFIX + header.key)) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),

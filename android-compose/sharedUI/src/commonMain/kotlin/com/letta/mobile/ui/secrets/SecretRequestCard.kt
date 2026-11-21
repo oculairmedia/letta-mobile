@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.secrets
 
+import com.letta.mobile.ui.theme.tokens.LettaPanelTone
+import com.letta.mobile.ui.components.foundation.LettaPanel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -68,12 +69,7 @@ data class SecretRequestCardModel(
 @Composable
 fun SecretRequestCard(model: SecretRequestCardModel, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val details = model.request.details
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        shape = MaterialTheme.shapes.medium,
-        modifier = modifier.fillMaxWidth().testTag(SecretRequestCardTags.CARD),
-    ) {
+    LettaPanel(modifier = modifier.fillMaxWidth().testTag(SecretRequestCardTags.CARD), tone = LettaPanelTone.Info, border = false) {
         Column(Modifier.padding(LettaDimens.Space.lg), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalAlignment = Alignment.CenterVertically) {
                 Icon(LettaIcons.Key, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
