@@ -22,6 +22,10 @@ object ClientStoreEntries {
     // Disposable caches.
     val ContextReadings = cache("context_readings_v1", "Context token readings the host recomputes")
     val MascotIdentity = cacheFamily("agent.", "Avatar style per agent, cached from the host's agent metadata")
+    val ShellStateMirror = cache(
+        "shell_state_mirror_v1",
+        "The last shell state document the host answered, shown until the host answers again; never a base for an edit",
+    )
     val ChannelSyncState = cache("channel_sync_state", "Notification dedupe cursors; a wipe can repeat a notification")
     val NotificationLaunchTokens = cache("letta_notification_launch_tokens", "Targets of notification taps not yet opened")
 
@@ -35,7 +39,7 @@ object ClientStoreEntries {
     /** Every declared entry, in declaration order. */
     val all: List<ClientStoreEntry> = listOf(
         BackendConfigs, ActiveBackendConfig, DesktopBackendConfig, WebBackend, DesktopLocalRuntime, DesktopIrohIdentity,
-        NotebookIdentity, AutomationImport, ContextReadings, MascotIdentity, ChannelSyncState, NotificationLaunchTokens,
+        NotebookIdentity, AutomationImport, ContextReadings, MascotIdentity, ShellStateMirror, ChannelSyncState, NotificationLaunchTokens,
         VoiceHostAudioAck,
     )
 

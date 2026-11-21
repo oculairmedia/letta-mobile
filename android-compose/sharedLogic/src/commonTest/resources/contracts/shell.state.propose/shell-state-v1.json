@@ -7,7 +7,7 @@
   "required_capability": "conversation.manage",
   "streamed": false,
   "spec": "docs/reference/contracts/shell-state-v1.md",
-  "note": "Synthetic keys and values only. The host clock is fixed at updated_at_ms 1700000000000. pushed_frame lists the deterministic fields of the shell_state_updated push an accepted change sends; id (shell-state-updated-<uuid>) and ts (ISO-8601) vary per push. A case without pushed_frame sends no push. The too_large case carries a value one byte over the 8192-byte cap.",
+  "note": "Synthetic keys and values only. The host clock is fixed at updated_at_ms 1700000000000. pushed_frame lists the deterministic fields of the shell_state_updated push an accepted change sends; id (shell-state-updated-<uuid>) and ts (ISO-8601) vary per push. A case without pushed_frame sends no push. The too_large case carries a value one byte over the 8192-byte cap. Only keys under the allowed namespaces (appearance.) may be proposed; every other key is invalid_request and the proposal changes nothing.",
   "cases": [
     {
       "name": "first write of two entries",
@@ -31,7 +31,7 @@
             "expected_revision": 0
           },
           {
-            "key": "layout.sidebar_open",
+            "key": "appearance.dynamic_color",
             "value": true,
             "expected_revision": 0
           }
@@ -56,7 +56,7 @@
               },
               "updated_at_ms": 1700000000000
             },
-            "layout.sidebar_open": {
+            "appearance.dynamic_color": {
               "value": true,
               "revision": 1,
               "updated_by": {
@@ -85,7 +85,7 @@
             },
             "updated_at_ms": 1700000000000
           },
-          "layout.sidebar_open": {
+          "appearance.dynamic_color": {
             "value": true,
             "revision": 1,
             "updated_by": {
@@ -121,7 +121,7 @@
                 },
                 "updated_at_ms": 1700000000000
               },
-              "layout.sidebar_open": {
+              "appearance.dynamic_color": {
                 "value": true,
                 "revision": 4,
                 "updated_by": {
@@ -164,7 +164,7 @@
               },
               "updated_at_ms": 1700000000000
             },
-            "layout.sidebar_open": {
+            "appearance.dynamic_color": {
               "value": true,
               "revision": 4,
               "updated_by": {
@@ -193,7 +193,7 @@
             },
             "updated_at_ms": 1700000000000
           },
-          "layout.sidebar_open": {
+          "appearance.dynamic_color": {
             "value": true,
             "revision": 4,
             "updated_by": {
@@ -229,7 +229,7 @@
                 },
                 "updated_at_ms": 1700000000000
               },
-              "layout.sidebar_open": {
+              "appearance.dynamic_color": {
                 "value": true,
                 "revision": 4,
                 "updated_by": {
@@ -245,7 +245,7 @@
       "params": {
         "changes": [
           {
-            "key": "layout.sidebar_open",
+            "key": "appearance.dynamic_color",
             "expected_revision": 4
           }
         ]
@@ -316,7 +316,7 @@
                 },
                 "updated_at_ms": 1700000000000
               },
-              "layout.sidebar_open": {
+              "appearance.dynamic_color": {
                 "value": true,
                 "revision": 4,
                 "updated_by": {
@@ -359,7 +359,7 @@
               },
               "updated_at_ms": 1700000000000
             },
-            "layout.sidebar_open": {
+            "appearance.dynamic_color": {
               "value": true,
               "revision": 4,
               "updated_by": {
@@ -396,7 +396,7 @@
                 },
                 "updated_at_ms": 1700000000000
               },
-              "layout.sidebar_open": {
+              "appearance.dynamic_color": {
                 "value": true,
                 "revision": 4,
                 "updated_by": {
@@ -451,7 +451,7 @@
                 },
                 "updated_at_ms": 1700000000000
               },
-              "layout.sidebar_open": {
+              "appearance.dynamic_color": {
                 "value": true,
                 "revision": 4,
                 "updated_by": {
@@ -467,7 +467,7 @@
       "params": {
         "changes": [
           {
-            "key": "layout.sidebar_open",
+            "key": "appearance.dynamic_color",
             "value": false,
             "expected_revision": 4
           },
@@ -511,7 +511,7 @@
                 },
                 "updated_at_ms": 1700000000000
               },
-              "layout.sidebar_open": {
+              "appearance.dynamic_color": {
                 "value": true,
                 "revision": 4,
                 "updated_by": {
@@ -556,7 +556,7 @@
                 },
                 "updated_at_ms": 1700000000000
               },
-              "layout.sidebar_open": {
+              "appearance.dynamic_color": {
                 "value": true,
                 "revision": 4,
                 "updated_by": {
@@ -603,7 +603,7 @@
                 },
                 "updated_at_ms": 1700000000000
               },
-              "layout.sidebar_open": {
+              "appearance.dynamic_color": {
                 "value": true,
                 "revision": 4,
                 "updated_by": {
@@ -622,6 +622,176 @@
             "key": "Appearance",
             "value": {
               "mode": "dark"
+            },
+            "expected_revision": 0
+          }
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "invalid_request"
+      }
+    },
+    {
+      "name": "key outside the allowed namespaces",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "appearance.dynamic_color": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {
+        "changes": [
+          {
+            "key": "layout.sidebar_open",
+            "value": {
+              "token": "synthetic"
+            },
+            "expected_revision": 0
+          }
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "invalid_request"
+      }
+    },
+    {
+      "name": "secret-like key is refused like any other outside key",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "appearance.dynamic_color": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {
+        "changes": [
+          {
+            "key": "secrets.service_token",
+            "value": {
+              "token": "synthetic"
+            },
+            "expected_revision": 0
+          }
+        ]
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "invalid_request"
+      }
+    },
+    {
+      "name": "one outside key refuses the whole proposal",
+      "context": {
+        "authenticated": true,
+        "authenticated_endpoint_id": "endpoint-a"
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "shell_state": {
+          "stored": {
+            "schema_version": 1,
+            "document_revision": 4,
+            "entries": {
+              "appearance.theme": {
+                "value": {
+                  "mode": "dark"
+                },
+                "revision": 3,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              },
+              "appearance.dynamic_color": {
+                "value": true,
+                "revision": 4,
+                "updated_by": {
+                  "type": "user",
+                  "client_id": "endpoint-b"
+                },
+                "updated_at_ms": 1700000000000
+              }
+            }
+          }
+        }
+      },
+      "params": {
+        "changes": [
+          {
+            "key": "appearance.theme",
+            "value": "DARK",
+            "expected_revision": 3
+          },
+          {
+            "key": "secrets.service_token",
+            "value": {
+              "token": "synthetic"
             },
             "expected_revision": 0
           }
@@ -658,7 +828,7 @@
                 },
                 "updated_at_ms": 1700000000000
               },
-              "layout.sidebar_open": {
+              "appearance.dynamic_color": {
                 "value": true,
                 "revision": 4,
                 "updated_by": {
@@ -674,12 +844,12 @@
       "params": {
         "changes": [
           {
-            "key": "layout.a",
+            "key": "appearance.a",
             "value": 1,
             "expected_revision": 0
           },
           {
-            "key": "layout.a",
+            "key": "appearance.a",
             "value": 2,
             "expected_revision": 0
           }
@@ -716,7 +886,7 @@
                 },
                 "updated_at_ms": 1700000000000
               },
-              "layout.sidebar_open": {
+              "appearance.dynamic_color": {
                 "value": true,
                 "revision": 4,
                 "updated_by": {
@@ -732,7 +902,7 @@
       "params": {
         "changes": [
           {
-            "key": "layout.a",
+            "key": "appearance.a",
             "value": 1
           }
         ]
@@ -768,7 +938,7 @@
                 },
                 "updated_at_ms": 1700000000000
               },
-              "layout.sidebar_open": {
+              "appearance.dynamic_color": {
                 "value": true,
                 "revision": 4,
                 "updated_by": {
@@ -784,7 +954,7 @@
       "params": {
         "changes": [
           {
-            "key": "layout.big",
+            "key": "appearance.big",
             "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             "expected_revision": 0
           }
@@ -824,7 +994,7 @@
                 },
                 "updated_at_ms": 1700000000000
               },
-              "layout.sidebar_open": {
+              "appearance.dynamic_color": {
                 "value": true,
                 "revision": 4,
                 "updated_by": {
@@ -840,7 +1010,7 @@
       "params": {
         "changes": [
           {
-            "key": "layout.a",
+            "key": "appearance.a",
             "value": 1,
             "expected_revision": 0
           }

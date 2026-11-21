@@ -30,6 +30,9 @@ interface AppStartupActions {
      * composition finds the singleton already constructed (letta-mobile-wyo3p).
      */
     suspend fun prewarmSettings()
+
+    /** Follows the host's shell state until cancelled ([ISettingsRepository.followHostSettings]); runs beside the startup tasks. */
+    suspend fun followHostSettings()
 }
 
 @Singleton
@@ -69,6 +72,8 @@ class DefaultAppStartupActions @Inject constructor(
             settingsRepository.get()
         }
     }
+
+    override suspend fun followHostSettings() = withContext(Dispatchers.IO) { settingsRepository.get() }.followHostSettings()
 
     override suspend fun prewarmDatabase() {
         // letta-mobile-g2ff0: Room DB init is expensive (~700ms). Pre-warm it on IO

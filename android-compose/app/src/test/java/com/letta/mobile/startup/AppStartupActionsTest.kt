@@ -10,6 +10,8 @@ import com.letta.mobile.debug.AutomationAuthBootstrap
 import com.letta.mobile.performance.DebugPerformanceMonitor
 import com.letta.mobile.performance.ProductionJankStatsMonitor
 import dagger.Lazy
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
@@ -17,6 +19,7 @@ import io.mockk.unmockkAll
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 
@@ -92,6 +95,17 @@ class AppStartupActionsTest {
         startupActions.prewarmSettings()
 
         verify(exactly = 1) { lazySettingsRepository.get() }
+    }
+
+    @Test
+    fun `followHostSettings follows the host through the settings repository`() = runTest {
+        var follows = 0
+        coEvery { settingsRepository.followHostSettings() } coAnswers { follows += 1 }
+
+        startupActions.followHostSettings()
+
+        assertEquals(1, follows)
+        coVerify(exactly = 1) { settingsRepository.followHostSettings() }
     }
 
     @Test

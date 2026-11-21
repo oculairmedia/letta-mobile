@@ -27,6 +27,10 @@ class AppStartupCoordinator @Inject constructor(
         scope.launch {
             runStartupTasks(application)
         }
+        // Its own coroutine: it follows the host until the process ends, so it must not hold up the tasks above.
+        scope.launch {
+            runTask(AppStartupTask("follow host settings") { actions.followHostSettings() })
+        }
     }
 
     /**

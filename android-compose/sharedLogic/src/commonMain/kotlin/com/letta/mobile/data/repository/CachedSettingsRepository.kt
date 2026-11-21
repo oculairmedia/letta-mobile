@@ -18,6 +18,8 @@ import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.storage.SettingsPlatformDefaults
 import com.letta.mobile.data.storage.SettingsPreferencesStore
 import com.letta.mobile.data.session.ANDROID_REMOTE_LETTA_ID_PREFIX
+import com.letta.mobile.data.shellstate.HostAppearance
+import com.letta.mobile.data.shellstate.ShellStateEditOutcome
 import com.letta.mobile.data.session.remoteLettaBackendDescriptor
 import com.letta.mobile.data.flow.DerivedStateFlow
 import com.letta.mobile.util.Telemetry
@@ -43,7 +45,14 @@ import kotlinx.serialization.json.put
 
 private const val DEFAULT_CHAT_BACKGROUND_KEY = "default"
 
-/** Phase 5q: platform-neutral settings repository; storage adapters stay in platform modules. */
+/**
+ * Phase 5q: platform-neutral settings repository; storage adapters stay in platform modules.
+ *
+ * The person's appearance (theme, colour preset, dynamic colour) is not stored here: it is the host's, read and
+ * proposed through [hostAppearance], so every paired device shows the same one. The device keeps only a disposable
+ * mirror of the host's document for offline display. A repository built without a host has no appearance of its
+ * own: it shows the defaults and refuses edits.
+ */
 open class CachedSettingsRepository(
     private val preferencesStore: SettingsPreferencesStore,
     private val secureSettingsStore: SecureSettingsStore,
@@ -51,6 +60,7 @@ open class CachedSettingsRepository(
     private val clearBackendScopedCaches: SettingsBackendCacheClearer = SettingsBackendCacheClearer {
         SettingsBackendCacheClearResult(successes = 0, failedCacheNames = emptyList())
     },
+    private val hostAppearance: HostAppearance = HostAppearance.None,
 ) : ISettingsRepository {
 
     private val _configs = MutableStateFlow<List<LettaConfig>>(emptyList())
@@ -138,30 +148,18 @@ open class CachedSettingsRepository(
         }
     }
 
-    override fun getTheme(): Flow<AppTheme> = preferencesStore.snapshots.map { prefs ->
-        val themeName = prefs.getString(SettingsPreferenceKeys.THEME) ?: AppTheme.SYSTEM.name
-        try {
-            AppTheme.valueOf(themeName)
-        } catch (_: IllegalArgumentException) {
-            AppTheme.SYSTEM
-        }
+    override fun getTheme(): Flow<AppTheme> =
+        hostAppearance.values.map { chosen -> AppTheme.entries.firstOrNull { it.name == chosen.theme } ?: AppTheme.SYSTEM }
+
+    override fun getThemePreset(): Flow<ThemePreset> =
+        hostAppearance.values.map { chosen -> ThemePreset.entries.firstOrNull { it.name == chosen.themePreset } ?: ThemePreset.DEFAULT }
+
+    override fun getDynamicColor(): Flow<Boolean> = hostAppearance.values.map { chosen ->
+        val preset = ThemePreset.entries.firstOrNull { it.name == chosen.themePreset } ?: ThemePreset.DEFAULT
+        chosen.dynamicColor ?: (preset == ThemePreset.DEFAULT && platformDefaults.defaultDynamicColorWhenPresetUnset)
     }
 
-    override fun getThemePreset(): Flow<ThemePreset> = preferencesStore.snapshots.map { prefs ->
-        val presetName = prefs.getString(SettingsPreferenceKeys.THEME_PRESET) ?: ThemePreset.DEFAULT.name
-        try {
-            ThemePreset.valueOf(presetName)
-        } catch (_: IllegalArgumentException) {
-            ThemePreset.DEFAULT
-        }
-    }
-
-    override fun getDynamicColor(): Flow<Boolean> = preferencesStore.snapshots.map { prefs ->
-        prefs.getBoolean(SettingsPreferenceKeys.DYNAMIC_COLOR)
-            ?: ((prefs.getString(SettingsPreferenceKeys.THEME_PRESET) ?: ThemePreset.DEFAULT.name) ==
-                ThemePreset.DEFAULT.name &&
-                platformDefaults.defaultDynamicColorWhenPresetUnset)
-    }
+    override suspend fun followHostSettings() = hostAppearance.run()
 
     fun setAdminAgentId(agentId: String?) {
         _adminAgentId.update { agentId }
@@ -213,6 +211,7 @@ open class CachedSettingsRepository(
         secureSettingsStore.clear()
         objectPins.store.reload()
         preferencesStore.clearAll()
+        hostAppearance.clearLocal()
         _configs.update { emptyList() }
         _activeConfig.update { null }
         _favoriteAgentId.update { null }
@@ -231,24 +230,18 @@ open class CachedSettingsRepository(
         }
     }
 
-    override suspend fun setTheme(theme: AppTheme) {
-        preferencesStore.edit { prefs ->
-            prefs.putString(SettingsPreferenceKeys.THEME, theme.name)
-            prefs.putString(SettingsPreferenceKeys.CHAT_BACKGROUND, DEFAULT_CHAT_BACKGROUND_KEY)
-        }
-    }
+    override suspend fun setTheme(theme: AppTheme): ShellStateEditOutcome =
+        hostAppearance.setTheme(theme.name).also { resetChatBackgroundIfApplied(it) }
 
-    override suspend fun setThemePreset(themePreset: ThemePreset) {
-        preferencesStore.edit { prefs ->
-            prefs.putString(SettingsPreferenceKeys.THEME_PRESET, themePreset.name)
-            prefs.putString(SettingsPreferenceKeys.CHAT_BACKGROUND, DEFAULT_CHAT_BACKGROUND_KEY)
-        }
-    }
+    override suspend fun setThemePreset(themePreset: ThemePreset): ShellStateEditOutcome =
+        hostAppearance.setThemePreset(themePreset.name).also { resetChatBackgroundIfApplied(it) }
 
-    override suspend fun setDynamicColor(enabled: Boolean) {
-        preferencesStore.edit { prefs ->
-            prefs.putBoolean(SettingsPreferenceKeys.DYNAMIC_COLOR, enabled)
-        }
+    override suspend fun setDynamicColor(enabled: Boolean): ShellStateEditOutcome = hostAppearance.setDynamicColor(enabled)
+
+    /** A new theme or preset puts the chat background back to the theme's own; the background itself stays on this device. */
+    private suspend fun resetChatBackgroundIfApplied(outcome: ShellStateEditOutcome) {
+        if (outcome != ShellStateEditOutcome.APPLIED) return
+        preferencesStore.edit { prefs -> prefs.putString(SettingsPreferenceKeys.CHAT_BACKGROUND, DEFAULT_CHAT_BACKGROUND_KEY) }
     }
 
     override fun getChatBackgroundKey(): Flow<String> = preferencesStore.snapshots.map { prefs ->

@@ -8,6 +8,7 @@ import com.letta.mobile.data.repository.LastChatSelection
 import com.letta.mobile.data.repository.LastChatSelectionStorage
 import com.letta.mobile.data.repository.mergeLastChatSelection
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.shellstate.ShellStateEditOutcome
 import com.letta.mobile.data.repository.api.backendIdentity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -202,16 +203,19 @@ class FakeSettingsRepository(
         openChatsOnCanvasState.value = enabled
     }
 
-    override suspend fun setTheme(theme: AppTheme) {
+    override suspend fun setTheme(theme: AppTheme): ShellStateEditOutcome {
         themeState.value = theme
+        return ShellStateEditOutcome.APPLIED
     }
 
-    override suspend fun setThemePreset(themePreset: ThemePreset) {
+    override suspend fun setThemePreset(themePreset: ThemePreset): ShellStateEditOutcome {
         themePresetState.value = themePreset
+        return ShellStateEditOutcome.APPLIED
     }
 
-    override suspend fun setDynamicColor(enabled: Boolean) {
+    override suspend fun setDynamicColor(enabled: Boolean): ShellStateEditOutcome {
         dynamicColorState.value = enabled
+        return ShellStateEditOutcome.APPLIED
     }
 
     override suspend fun setEnableProjects(enabled: Boolean) {

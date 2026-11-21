@@ -16505,6 +16505,7 @@ public final class com/letta/mobile/data/clientstore/ClientStoreEntries {
 	public final fun getMascotIdentity ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
 	public final fun getNotebookIdentity ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
 	public final fun getNotificationLaunchTokens ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public final fun getShellStateMirror ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
 	public final fun getVoiceHostAudioAck ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
 	public final fun getWebBackend ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
 }
@@ -16551,6 +16552,15 @@ public final class com/letta/mobile/data/clientstore/ClientStoreKind$DisposableC
 public abstract interface class com/letta/mobile/data/clientstore/DisposableCache {
 	public abstract fun clearAll (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun getEntry ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+}
+
+public final class com/letta/mobile/data/clientstore/ShellStateCacheStore : com/letta/mobile/data/clientstore/DisposableCache, com/letta/mobile/data/shellstate/ShellStateSnapshotCache {
+	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;)V
+	public fun clear ()V
+	public fun clearAll (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getEntry ()Lcom/letta/mobile/data/clientstore/ClientStoreEntry;
+	public fun load ()Lcom/letta/mobile/data/shellstate/ShellStateSnapshot;
+	public fun save (Lcom/letta/mobile/data/shellstate/ShellStateSnapshot;)V
 }
 
 public final class com/letta/mobile/data/commands/AppServerSlashCommandApi : com/letta/mobile/data/transport/appserver/AppServerSlashCommandApi {
@@ -44122,6 +44132,7 @@ public final class com/letta/mobile/data/repository/ActiveConfigSettingsReposito
 	public fun <init> (Lcom/letta/mobile/data/model/LettaConfig;)V
 	public fun clearAllData (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun deleteConfig (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun followHostSettings (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getActiveConfig ()Lkotlinx/coroutines/flow/Flow;
 	public fun getActiveConfig ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getActiveConfigChanges ()Lkotlinx/coroutines/flow/Flow;
@@ -44410,10 +44421,11 @@ public class com/letta/mobile/data/repository/CachedRunRepository : com/letta/mo
 }
 
 public class com/letta/mobile/data/repository/CachedSettingsRepository : com/letta/mobile/data/repository/api/ISettingsRepository {
-	public fun <init> (Lcom/letta/mobile/data/storage/SettingsPreferencesStore;Lcom/letta/mobile/data/storage/SecureSettingsStore;Lcom/letta/mobile/data/storage/SettingsPlatformDefaults;Lcom/letta/mobile/data/repository/SettingsBackendCacheClearer;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/storage/SettingsPreferencesStore;Lcom/letta/mobile/data/storage/SecureSettingsStore;Lcom/letta/mobile/data/storage/SettingsPlatformDefaults;Lcom/letta/mobile/data/repository/SettingsBackendCacheClearer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/storage/SettingsPreferencesStore;Lcom/letta/mobile/data/storage/SecureSettingsStore;Lcom/letta/mobile/data/storage/SettingsPlatformDefaults;Lcom/letta/mobile/data/repository/SettingsBackendCacheClearer;Lcom/letta/mobile/data/shellstate/HostAppearance;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/storage/SettingsPreferencesStore;Lcom/letta/mobile/data/storage/SecureSettingsStore;Lcom/letta/mobile/data/storage/SettingsPlatformDefaults;Lcom/letta/mobile/data/repository/SettingsBackendCacheClearer;Lcom/letta/mobile/data/shellstate/HostAppearance;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun clearAllData (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun deleteConfig (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun followHostSettings (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getActiveConfig ()Lkotlinx/coroutines/flow/Flow;
 	public fun getActiveConfig ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getActiveConfigChanges ()Lkotlinx/coroutines/flow/Flow;
@@ -45752,6 +45764,7 @@ public final class com/letta/mobile/data/repository/api/ISelfTodoRepository$Defa
 public abstract interface class com/letta/mobile/data/repository/api/ISettingsRepository {
 	public abstract fun clearAllData (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun deleteConfig (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun followHostSettings (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun getActiveConfig ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getActiveConfig ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun getActiveConfigChanges ()Lkotlinx/coroutines/flow/Flow;
@@ -45798,6 +45811,7 @@ public abstract interface class com/letta/mobile/data/repository/api/ISettingsRe
 }
 
 public final class com/letta/mobile/data/repository/api/ISettingsRepository$DefaultImpls {
+	public static fun followHostSettings (Lcom/letta/mobile/data/repository/api/ISettingsRepository;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun getFeatureFlag (Lcom/letta/mobile/data/repository/api/ISettingsRepository;Lcom/letta/mobile/data/repository/api/FeatureFlag;)Lkotlinx/coroutines/flow/Flow;
 	public static fun lastChatSeed (Lcom/letta/mobile/data/repository/api/ISettingsRepository;Ljava/lang/String;)Lcom/letta/mobile/data/repository/LastChatSelection;
 	public static fun setFeatureFlag (Lcom/letta/mobile/data/repository/api/ISettingsRepository;Lcom/letta/mobile/data/repository/api/FeatureFlag;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -52792,10 +52806,11 @@ public final class com/letta/mobile/data/session/pins/SessionPinsKt {
 
 public final class com/letta/mobile/data/settings/AppearanceSettings {
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;Lkotlinx/coroutines/flow/StateFlow;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;Lkotlinx/coroutines/flow/StateFlow;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getDynamicColor ()Lcom/letta/mobile/data/settings/SettingValue;
 	public final fun getHaptics ()Lcom/letta/mobile/data/settings/SettingValue;
+	public final fun getNotice ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getTheme ()Lcom/letta/mobile/data/settings/SettingValue;
 	public final fun getThemePreset ()Lcom/letta/mobile/data/settings/SettingValue;
 	public final fun isEmpty ()Z
@@ -52937,6 +52952,7 @@ public final class com/letta/mobile/data/settings/SettingsOption {
 }
 
 public final class com/letta/mobile/data/settings/SettingsPortsKt {
+	public static final fun toSettingsStatus (Lcom/letta/mobile/data/shellstate/ShellStateEditOutcome;)Lcom/letta/mobile/data/settings/SettingsStatus;
 	public static final fun toSettingsStatus (Lcom/letta/mobile/data/transport/appserver/AppServerProbeResult;)Lcom/letta/mobile/data/settings/SettingsStatus;
 }
 
@@ -54331,6 +54347,77 @@ public final class com/letta/mobile/data/shell/sidemenu/RailViews {
 	public final fun getNEW-p0dNODo ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/shellstate/AppearanceEdit {
+	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun copy (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;)Lcom/letta/mobile/data/shellstate/AppearanceEdit;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shellstate/AppearanceEdit;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;ILjava/lang/Object;)Lcom/letta/mobile/data/shellstate/AppearanceEdit;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getValue ()Lkotlinx/serialization/json/JsonElement;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shellstate/AppearanceKeys {
+	public static final field DYNAMIC_COLOR Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/data/shellstate/AppearanceKeys;
+	public static final field THEME Ljava/lang/String;
+	public static final field THEME_PRESET Ljava/lang/String;
+	public final fun getAll ()Ljava/util/Set;
+}
+
+public final class com/letta/mobile/data/shellstate/AppearanceValues {
+	public static final field Companion Lcom/letta/mobile/data/shellstate/AppearanceValues$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/Boolean;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;)Lcom/letta/mobile/data/shellstate/AppearanceValues;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shellstate/AppearanceValues;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/letta/mobile/data/shellstate/AppearanceValues;
+	public final fun editsExcept (Ljava/util/Set;)Ljava/util/List;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDynamicColor ()Ljava/lang/Boolean;
+	public final fun getTheme ()Ljava/lang/String;
+	public final fun getThemePreset ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isEmpty ()Z
+	public final fun orElse (Lcom/letta/mobile/data/shellstate/AppearanceValues;)Lcom/letta/mobile/data/shellstate/AppearanceValues;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shellstate/AppearanceValues$Companion {
+	public final fun getNONE ()Lcom/letta/mobile/data/shellstate/AppearanceValues;
+	public final fun of (Ljava/util/Map;)Lcom/letta/mobile/data/shellstate/AppearanceValues;
+}
+
+public abstract interface class com/letta/mobile/data/shellstate/HostAppearance {
+	public static final field Companion Lcom/letta/mobile/data/shellstate/HostAppearance$Companion;
+	public abstract fun clearLocal (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getValues ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun run (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun setDynamicColor (ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun setTheme (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun setThemePreset (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/shellstate/HostAppearance$Companion {
+	public final fun getNone ()Lcom/letta/mobile/data/shellstate/HostAppearance;
+}
+
+public abstract interface class com/letta/mobile/data/shellstate/LegacyAppearance {
+	public static final field Companion Lcom/letta/mobile/data/shellstate/LegacyAppearance$Companion;
+	public abstract fun clear (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getValues ()Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class com/letta/mobile/data/shellstate/LegacyAppearance$Companion {
+	public final fun getNone ()Lcom/letta/mobile/data/shellstate/LegacyAppearance;
+}
+
 public abstract interface class com/letta/mobile/data/shellstate/ShellStateActor {
 	public static final field Companion Lcom/letta/mobile/data/shellstate/ShellStateActor$Companion;
 }
@@ -54398,6 +54485,17 @@ public abstract interface class com/letta/mobile/data/shellstate/ShellStateDocum
 	public abstract fun getSnapshot ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun import (Lcom/letta/mobile/data/shellstate/ShellStateExport;Lcom/letta/mobile/data/shellstate/ShellStateImportPolicy;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun propose (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Long;Lcom/letta/mobile/data/shellstate/ShellStateActor;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateEditOutcome : java/lang/Enum {
+	public static final field APPLIED Lcom/letta/mobile/data/shellstate/ShellStateEditOutcome;
+	public static final field CONFLICT Lcom/letta/mobile/data/shellstate/ShellStateEditOutcome;
+	public static final field OFFLINE Lcom/letta/mobile/data/shellstate/ShellStateEditOutcome;
+	public static final field REFUSED Lcom/letta/mobile/data/shellstate/ShellStateEditOutcome;
+	public static final field UNSUPPORTED Lcom/letta/mobile/data/shellstate/ShellStateEditOutcome;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/shellstate/ShellStateEditOutcome;
+	public static fun values ()[Lcom/letta/mobile/data/shellstate/ShellStateEditOutcome;
 }
 
 public final class com/letta/mobile/data/shellstate/ShellStateEntry {
@@ -54546,8 +54644,46 @@ public final class com/letta/mobile/data/shellstate/ShellStateSnapshot$Companion
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public abstract interface class com/letta/mobile/data/shellstate/ShellStateSnapshotCache {
+	public static final field Companion Lcom/letta/mobile/data/shellstate/ShellStateSnapshotCache$Companion;
+	public abstract fun clear ()V
+	public abstract fun load ()Lcom/letta/mobile/data/shellstate/ShellStateSnapshot;
+	public abstract fun save (Lcom/letta/mobile/data/shellstate/ShellStateSnapshot;)V
+}
+
+public final class com/letta/mobile/data/shellstate/ShellStateSnapshotCache$Companion {
+	public final fun getNone ()Lcom/letta/mobile/data/shellstate/ShellStateSnapshotCache;
+}
+
+public final class com/letta/mobile/data/shellstate/appearance/SharedShellAppearance : com/letta/mobile/data/shellstate/HostAppearance {
+	public fun <init> (Lcom/letta/mobile/data/shellstate/shared/SharedShellState;Lcom/letta/mobile/data/shellstate/ShellStateSnapshotCache;Lcom/letta/mobile/data/shellstate/LegacyAppearance;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/shellstate/shared/SharedShellState;Lcom/letta/mobile/data/shellstate/ShellStateSnapshotCache;Lcom/letta/mobile/data/shellstate/LegacyAppearance;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun clearLocal (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getValues ()Lkotlinx/coroutines/flow/Flow;
+	public fun run (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun setDynamicColor (ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun setTheme (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun setThemePreset (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/shellstate/channel/ChannelShellStateLinkKt {
+	public static final fun channelShellStateLink (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Lcom/letta/mobile/data/shellstate/shared/ShellStateLink;
+	public static final fun channelShellStateLink (Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/data/shellstate/shared/ShellStateLink;
+}
+
+public final class com/letta/mobile/data/shellstate/shared/NoShellStateLink : com/letta/mobile/data/shellstate/shared/ShellStateLink {
+	public static final field INSTANCE Lcom/letta/mobile/data/shellstate/shared/NoShellStateLink;
+	public fun call (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getConnection ()Lkotlinx/coroutines/flow/Flow;
+	public fun getCurrentConnection ()Ljava/lang/String;
+	public fun getHostCapabilities ()Ljava/util/Set;
+	public fun getPushes ()Lkotlinx/coroutines/flow/Flow;
+	public fun isConnected ()Z
+}
+
 public final class com/letta/mobile/data/shellstate/shared/SharedShellState {
-	public fun <init> (Lcom/letta/mobile/data/shellstate/shared/ShellStateLink;)V
+	public fun <init> (Lcom/letta/mobile/data/shellstate/shared/ShellStateLink;Lcom/letta/mobile/data/shellstate/ShellStateSnapshotCache;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/shellstate/shared/ShellStateLink;Lcom/letta/mobile/data/shellstate/ShellStateSnapshotCache;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getSupported ()Z
 	public final fun propose (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -54570,17 +54706,6 @@ public final class com/letta/mobile/data/shellstate/shared/SharedShellState$Edit
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/letta/mobile/data/shellstate/shared/ShellStateEditOutcome : java/lang/Enum {
-	public static final field APPLIED Lcom/letta/mobile/data/shellstate/shared/ShellStateEditOutcome;
-	public static final field CONFLICT Lcom/letta/mobile/data/shellstate/shared/ShellStateEditOutcome;
-	public static final field OFFLINE Lcom/letta/mobile/data/shellstate/shared/ShellStateEditOutcome;
-	public static final field REFUSED Lcom/letta/mobile/data/shellstate/shared/ShellStateEditOutcome;
-	public static final field UNSUPPORTED Lcom/letta/mobile/data/shellstate/shared/ShellStateEditOutcome;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/shellstate/shared/ShellStateEditOutcome;
-	public static fun values ()[Lcom/letta/mobile/data/shellstate/shared/ShellStateEditOutcome;
-}
-
 public abstract interface class com/letta/mobile/data/shellstate/shared/ShellStateLink {
 	public abstract fun call (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun getConnection ()Lkotlinx/coroutines/flow/Flow;
@@ -54592,10 +54717,6 @@ public abstract interface class com/letta/mobile/data/shellstate/shared/ShellSta
 
 public final class com/letta/mobile/data/shellstate/shared/ShellStateLink$DefaultImpls {
 	public static fun isConnected (Lcom/letta/mobile/data/shellstate/shared/ShellStateLink;)Z
-}
-
-public final class com/letta/mobile/data/shellstate/shared/ShellStateLinkKt {
-	public static final fun channelShellStateLink (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Lcom/letta/mobile/data/shellstate/shared/ShellStateLink;
 }
 
 public final class com/letta/mobile/data/shellstate/shared/ShellStateReply {
@@ -54685,8 +54806,10 @@ public final class com/letta/mobile/data/shellstate/wire/ShellStateWire {
 	public static final field STATE_UNREADABLE Ljava/lang/String;
 	public static final field TOO_LARGE Ljava/lang/String;
 	public static final field VALUE Ljava/lang/String;
+	public final fun getKEY_NAMESPACES ()Ljava/util/List;
 	public final fun getKEY_PATTERN ()Lkotlin/text/Regex;
 	public final fun getMETHODS ()Ljava/util/Set;
+	public final fun isAllowedKey (Ljava/lang/String;)Z
 }
 
 public final class com/letta/mobile/data/skills/Skill {

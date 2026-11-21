@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.flow.MutableStateFlow
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.runtime.PermissionModeSettings
@@ -41,6 +42,8 @@ fun AppearanceSettingsSection(settings: AppearanceSettings, modifier: Modifier =
             EnumChoice(preset, PRESET_CHOICE.copy(supporting = if (dynamicOn) "Dynamic colour overrides the preset" else null))
         }
         settings.haptics?.let { ToggleSetting(it, SettingsCopy.HAPTICS) }
+        val notice by (settings.notice ?: remember { MutableStateFlow<SettingsStatus?>(null) }).collectAsState()
+        notice?.let { NoteRow(SettingsRow.Note("appearance-edit-notice", it)) }
     }
 }
 

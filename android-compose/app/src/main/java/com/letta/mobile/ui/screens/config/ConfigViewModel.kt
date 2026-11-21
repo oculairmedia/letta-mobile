@@ -15,6 +15,9 @@ import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.settings.AppearanceSettings
 import com.letta.mobile.data.settings.ChatSettings
 import com.letta.mobile.data.settings.SettingValue
+import com.letta.mobile.data.settings.SettingsStatus
+import com.letta.mobile.data.settings.toSettingsStatus
+import com.letta.mobile.data.shellstate.ShellStateEditOutcome
 import com.letta.mobile.data.settings.BackendConnectionTester
 import com.letta.mobile.data.settings.toSettingsStatus
 import com.letta.mobile.data.runtime.host.LocalAppServerHost
@@ -143,15 +146,31 @@ class ConfigViewModel @Inject constructor(
     private val blankBackend: LettaConfig
         get() = LettaConfig(id = newBackendId, mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "")
 
-    /** The Appearance section's settings, read from the form and written straight through. */
+    private val appearanceNotice = MutableStateFlow<SettingsStatus?>(null)
+
+    /**
+     * The Appearance section's settings. Theme, preset and dynamic colour are the host's (shared by every paired
+     * device), so they show what the repository holds and a change that the host does not take leaves them as they
+     * were, with [AppearanceSettings.notice] saying why; haptics are read from the form and written straight through.
+     */
     val appearance: AppearanceSettings by lazy {
         AppearanceSettings(
-            theme = setting(AppTheme.SYSTEM, { it.theme }, ::updateTheme),
-            themePreset = setting(ThemePreset.DEFAULT, { it.themePreset }, ::updateThemePreset),
+            theme = hostSetting(AppTheme.SYSTEM, settingsRepository.getTheme(), ::updateTheme),
+            themePreset = hostSetting(ThemePreset.DEFAULT, settingsRepository.getThemePreset(), ::updateThemePreset),
             // Wallpaper colours exist from Android 12.
-            dynamicColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) setting(false, { it.dynamicColor }, ::updateDynamicColor) else null,
+            dynamicColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                hostSetting(false, settingsRepository.getDynamicColor(), ::updateDynamicColor)
+            } else {
+                null
+            },
             haptics = setting(true, { it.hapticsEnabled }, ::updateHapticsEnabled),
+            notice = appearanceNotice.asStateFlow(),
         )
+    }
+
+    private fun <T> hostSetting(default: T, shown: kotlinx.coroutines.flow.Flow<T>, write: (T) -> Unit): SettingValue<T> {
+        val current = shown.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SETTING_STOP_TIMEOUT_MS), default)
+        return SettingValue(current, write)
     }
 
     /** The Chat section's settings. */
@@ -377,41 +396,44 @@ class ConfigViewModel @Inject constructor(
     }
 
     fun updateTheme(theme: AppTheme) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, theme = theme))
-            viewModelScope.launch {
-                settingsRepository.setTheme(theme)
-            }
+        if ((_uiState.value as? UiState.Success) == null) return
+        viewModelScope.launch {
+            if (noteOutcome(settingsRepository.setTheme(theme))) showEdited { it.copy(theme = theme) }
         }
     }
 
     fun updateThemePreset(themePreset: ThemePreset) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            val dynamicColor = if (themePreset == ThemePreset.DEFAULT) currentState.dynamicColor else false
-            _uiState.value = UiState.Success(
-                currentState.copy(
-                    hasUnsavedChanges = true,
-                    themePreset = themePreset,
-                    dynamicColor = dynamicColor,
-                )
-            )
-            viewModelScope.launch {
-                settingsRepository.setThemePreset(themePreset)
-                settingsRepository.setDynamicColor(dynamicColor)
+        if ((_uiState.value as? UiState.Success) == null) return
+        viewModelScope.launch {
+            // DEFAULT leaves dynamic colour as the host holds it (another device may have changed it since this form
+            // loaded); any other preset turns it off. One edit after the other: a refused preset changes nothing else.
+            val keepsDynamic = themePreset == ThemePreset.DEFAULT
+            val taken = noteOutcome(settingsRepository.setThemePreset(themePreset)) &&
+                (keepsDynamic || noteOutcome(settingsRepository.setDynamicColor(false)))
+            if (!taken) return@launch
+            showEdited { form ->
+                if (keepsDynamic) form.copy(themePreset = themePreset) else form.copy(themePreset = themePreset, dynamicColor = false)
             }
         }
     }
 
     fun updateDynamicColor(enabled: Boolean) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, dynamicColor = enabled))
-            viewModelScope.launch {
-                settingsRepository.setDynamicColor(enabled)
-            }
+        if ((_uiState.value as? UiState.Success) == null) return
+        viewModelScope.launch {
+            if (noteOutcome(settingsRepository.setDynamicColor(enabled))) showEdited { it.copy(dynamicColor = enabled) }
         }
+    }
+
+    /** Shows why a host-held setting was not changed (or clears the note when it was); whether the host took it. */
+    private fun noteOutcome(outcome: ShellStateEditOutcome): Boolean {
+        appearanceNotice.value = outcome.toSettingsStatus()
+        return outcome == ShellStateEditOutcome.APPLIED
+    }
+
+    /** Applies [edit] to the form as it is now, once the host has taken the change. */
+    private fun showEdited(edit: (ConfigUiState) -> ConfigUiState) {
+        val latest = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(edit(latest).copy(hasUnsavedChanges = true))
     }
 
     fun updateEnableProjects(enabled: Boolean) {

@@ -6,6 +6,8 @@ import androidx.datastore.preferences.core.Preferences
 import com.letta.mobile.core.BuildConfig
 import com.letta.mobile.data.session.BackendSwitchClearResult
 import com.letta.mobile.data.session.BackendSwitchInvalidator
+import com.letta.mobile.data.shellstate.HostAppearance
+import com.letta.mobile.data.storage.SettingsPreferencesStore
 import com.letta.mobile.data.storage.DataStoreSettingsPreferencesStore
 import com.letta.mobile.data.objectverbs.binding.withDevicePins
 import com.letta.mobile.data.storage.SecureSettingsStore
@@ -22,13 +24,15 @@ import javax.inject.Singleton
  * sharedLogic; this class wires Android storage only.
  */
 @Singleton
-class SettingsRepository @Inject constructor(
-    dataStore: DataStore<Preferences>,
+class SettingsRepository private constructor(
+    preferences: SettingsPreferencesStore,
     secureSettingsStore: SecureSettingsStore,
     backendSwitchInvalidator: Provider<BackendSwitchInvalidator>,
+    hostAppearance: HostAppearance,
 ) : CachedSettingsRepository(
-    preferencesStore = DataStoreSettingsPreferencesStore(dataStore),
+    preferencesStore = preferences,
     secureSettingsStore = secureSettingsStore.withDevicePins(),
+    hostAppearance = hostAppearance,
     platformDefaults = SettingsPlatformDefaults(
         defaultResumeRecentConversation = BuildConfig.DEBUG,
         defaultDynamicColorWhenPresetUnset = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
@@ -37,6 +41,24 @@ class SettingsRepository @Inject constructor(
         backendSwitchInvalidator.get().clearAll().toSettingsResult()
     },
 ) {
+    /**
+     * [hostAppearance] is the person's appearance on the host (the shell state document); the app binds it with the
+     * session's transport resolved lazily, so this repository does not depend on the transport it feeds.
+     */
+    @Inject
+    constructor(
+        dataStore: DataStore<Preferences>,
+        secureSettingsStore: SecureSettingsStore,
+        backendSwitchInvalidator: Provider<BackendSwitchInvalidator>,
+        hostAppearance: HostAppearance,
+    ) : this(
+        preferences = DataStoreSettingsPreferencesStore(dataStore),
+        secureSettingsStore = secureSettingsStore,
+        backendSwitchInvalidator = backendSwitchInvalidator,
+        hostAppearance = hostAppearance,
+    )
+
+    /** A repository with no host behind it (tests): appearance shows the defaults and refuses edits. */
     constructor(
         dataStore: DataStore<Preferences>,
         secureSettingsStore: SecureSettingsStore,
@@ -44,6 +66,7 @@ class SettingsRepository @Inject constructor(
         dataStore = dataStore,
         secureSettingsStore = secureSettingsStore.withDevicePins(),
         backendSwitchInvalidator = Provider { BackendSwitchInvalidator(emptySet()) },
+        hostAppearance = HostAppearance.None,
     )
 
     companion object {

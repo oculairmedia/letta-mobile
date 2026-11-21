@@ -33,6 +33,17 @@ object ShellStateWire {
     /** What an entry key looks like: lowercase words joined by dots, hyphens or underscores, like `appearance.theme`. */
     val KEY_PATTERN: Regex = Regex("[a-z0-9][a-z0-9._-]*")
 
+    /**
+     * The key namespaces a proposal may write: a key must start with one of these prefixes, and anything else is
+     * refused as [INVALID_REQUEST]. The list grows only when an area of client state moves onto the document (one
+     * namespace per area), so a paired chat device can never write arbitrary keys, and nothing outside a moved area
+     * (and never a secret) has a place in it.
+     */
+    val KEY_NAMESPACES: List<String> = listOf("appearance.")
+
+    /** Whether [key] lies in one of the [KEY_NAMESPACES] with something after the prefix. */
+    fun isAllowedKey(key: String): Boolean = KEY_NAMESPACES.any { key.length > it.length && key.startsWith(it) }
+
     /** Largest encoded value of one entry, in UTF-8 bytes. */
     const val MAX_VALUE_BYTES: Int = 8 * 1024
 

@@ -131,15 +131,52 @@ class AppStartupCoordinatorTest {
         assertEquals(ExpectedStartupOrder, actions.calls)
     }
 
+    @Test
+    fun startFollowsTheHostBesideTheStartupTasksWithoutHoldingThemUp() = runTest {
+        val follow = CompletableDeferred<Unit>()
+        val actions = FakeStartupActions(followGate = follow)
+        val coordinator = AppStartupCoordinator(actions, StandardTestDispatcher(testScheduler))
+
+        coordinator.start(application)
+        advanceUntilIdle()
+
+        // Following never ends on its own, yet every ordered task ran.
+        assertEquals(ExpectedStartupOrder, actions.calls)
+        assertEquals(1, actions.followStarts)
+        assertEquals(false, follow.isCompleted)
+    }
+
+    @Test
+    fun aFailureToFollowTheHostIsContainedAndDoesNotStopTheStartupTasks() = runTest {
+        val actions = FakeStartupActions(followFailure = IllegalStateException("no transport"))
+        val coordinator = AppStartupCoordinator(actions, StandardTestDispatcher(testScheduler))
+
+        coordinator.start(application)
+        advanceUntilIdle()
+
+        assertEquals(ExpectedStartupOrder, actions.calls)
+        assertTrue(Telemetry.snapshot().any { it.tag == "AppStartup" && it.name == "follow_host_settings:failed" })
+    }
+
     private class FakeStartupActions(
         private val failure: StartupFailure? = null,
         private val databaseGate: CompletableDeferred<Unit>? = null,
+        private val followGate: CompletableDeferred<Unit>? = null,
+        private val followFailure: Throwable? = null,
     ) : AppStartupActions {
+        var followStarts = 0
+            private set
         val calls = mutableListOf<String>()
         var settingsWarmupFinished = false
             private set
 
         override suspend fun ensureNotificationChannel() = record("notification channel")
+
+        override suspend fun followHostSettings() {
+            followStarts += 1
+            followFailure?.let { throw it }
+            followGate?.await()
+        }
 
         override suspend fun prewarmSettings() {
             record("prewarm settings")

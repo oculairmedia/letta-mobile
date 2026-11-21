@@ -57,7 +57,7 @@
                 },
                 "updated_at_ms": 1700000000000
               },
-              "layout.sidebar_open": {
+              "appearance.dynamic_color": {
                 "value": true,
                 "revision": 4,
                 "updated_by": {
@@ -90,7 +90,7 @@
               },
               "updated_at_ms": 1700000000000
             },
-            "layout.sidebar_open": {
+            "appearance.dynamic_color": {
               "value": true,
               "revision": 4,
               "updated_by": {
@@ -130,7 +130,7 @@
                 },
                 "updated_at_ms": 1700000000000
               },
-              "layout.sidebar_open": {
+              "appearance.dynamic_color": {
                 "value": true,
                 "revision": 4,
                 "updated_by": {

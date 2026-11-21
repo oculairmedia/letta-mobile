@@ -1,5 +1,6 @@
 package com.letta.mobile.data.shellstate.shared
 
+import com.letta.mobile.data.shellstate.ShellStateEditOutcome
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.shellstate.ShellStateActor
 import com.letta.mobile.data.shellstate.ShellStateEntry

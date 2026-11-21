@@ -1,8 +1,10 @@
 package com.letta.mobile.data.shellstate.shared
 
+import com.letta.mobile.data.shellstate.ShellStateEditOutcome
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.shellstate.ShellStateEntry
 import com.letta.mobile.data.shellstate.ShellStateSchema
+import com.letta.mobile.data.shellstate.ShellStateSnapshotCache
 import com.letta.mobile.data.shellstate.ShellStateSnapshot
 import com.letta.mobile.data.shellstate.wire.ShellStateChange
 import com.letta.mobile.data.shellstate.wire.ShellStateError
@@ -31,9 +33,9 @@ import kotlinx.serialization.json.put
 
 /**
  * What this device knows of the host's shell state. [snapshot] is the last document read from the host
- * while this repository lives (kept in memory across a failed read or a disconnect, never stored on the
- * device); [live] is whether it was read from the connected host since the connection came up. Edits
- * need [editable].
+ * (kept in memory across a failed read or a disconnect; a [ShellStateSnapshotCache] may restore it at the next
+ * start so something shows before the host answers, but it is only ever a mirror of the host); [live] is whether
+ * it was read from the connected host since the connection came up. Edits need [editable].
  */
 data class ShellStateState(
     /** Whether the connected host serves the shell-state contract. */
@@ -50,24 +52,6 @@ data class ShellStateState(
 
     /** Whether an edit may be sent now. */
     val editable: Boolean get() = supported && live && snapshot != null
-}
-
-/** How one proposal ended. */
-enum class ShellStateEditOutcome {
-    /** The host accepted it (or it changed nothing). */
-    APPLIED,
-
-    /** Another writer changed one of the entries first; the document was read again. */
-    CONFLICT,
-
-    /** The host is out of reach or the document is not read yet; nothing was sent or queued. */
-    OFFLINE,
-
-    /** The host does not keep shared shell state. */
-    UNSUPPORTED,
-
-    /** The host refused the proposal (malformed, too large, unreadable store or not allowed). */
-    REFUSED,
 }
 
 /**
@@ -108,9 +92,13 @@ enum class ShellStateEditOutcome {
  */
 class SharedShellState(
     private val link: ShellStateLink,
+    private val cache: ShellStateSnapshotCache = ShellStateSnapshotCache.None,
 ) {
     private val edits = Mutex()
-    private val mutableState = MutableStateFlow(ShellStateState())
+
+    // The cached document (a mirror of the last one the host answered, restored for offline display) is shown, never
+    // live: [ShellStateState.editable] needs a read on the current connection, so no edit is ever based on it.
+    private val mutableState = MutableStateFlow(ShellStateState(snapshot = cache.load()))
 
     /** Held across every change of the state and of [ledger]. */
     private val model = Mutex()
@@ -165,6 +153,7 @@ class SharedShellState(
     private suspend fun noteUnsupported() {
         val connected = link.isConnected
         transition { if (connected) it.copy(supported = false, live = false, snapshot = null) else it.copy(live = false) }
+        if (connected) cache.clear()
     }
 
     /** Starts a new generation and applies [change] with it: the one place the connection epoch moves. */
@@ -235,7 +224,10 @@ class SharedShellState(
     private suspend fun adopt(snapshot: ShellStateSnapshot, issued: Issue, live: Boolean): Boolean = model.withLock {
         val shownRevision = mutableState.value.snapshot?.documentRevision ?: NO_REVISION
         val admission = ledger.admit(issued, snapshot.documentRevision, shownRevision)
-        if (admission == Admission.REPLACE) ledger.recordShown(issued)
+        if (admission == Admission.REPLACE) {
+            ledger.recordShown(issued)
+            cache.save(snapshot)
+        }
         if (admission != Admission.DROP) {
             mutableState.update { current ->
                 val shown = if (admission == Admission.REPLACE) snapshot else current.snapshot
