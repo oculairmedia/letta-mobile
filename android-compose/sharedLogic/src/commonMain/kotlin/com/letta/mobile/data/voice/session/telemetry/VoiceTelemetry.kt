@@ -21,6 +21,7 @@ import com.letta.mobile.data.voice.engine.VoiceResponder
 import com.letta.mobile.data.voice.local.LocalEarObserver
 import com.letta.mobile.data.voice.local.LocalHandoverReason
 import com.letta.mobile.data.voice.local.LocalRecognitionError
+import com.letta.mobile.data.voice.loop.ReplySegmentation
 import com.letta.mobile.data.voice.loop.VoiceLoopObserver
 import com.letta.mobile.data.voice.loop.VoiceLoopState
 import com.letta.mobile.data.voice.responder.ClientMessageId
@@ -141,19 +142,20 @@ internal class VoiceTelemetry(
     /**
      * The loop's own decisions: `speech.skipped` with its reason and how many segments,
      * `reply.segments` with how an answer was cut up (segment count, shortest and median length in
-     * characters, tone changes between segments), and `speech.stopped` with its reason and
+     * characters, tone changes between segments, short tails joined to the segment before), and `speech.stopped` with its reason and
      * `silentMs`, the time from the stop request until the speaker was released.
      */
     val loop: VoiceLoopObserver = object : VoiceLoopObserver {
         override fun speechSkipped(reason: SpeechSkipReason, segments: Int) =
             event("speech.skipped", "reason" attr reason.name, "segments" attr segments)
 
-        override fun replySegmented(segments: Int, minChars: Int, medianChars: Int, moodChanges: Int) = event(
+        override fun replySegmented(shape: ReplySegmentation) = event(
             "reply.segments",
-            "segments" attr segments,
-            "minChars" attr minChars,
-            "medianChars" attr medianChars,
-            "moodChanges" attr moodChanges,
+            "segments" attr shape.segments,
+            "minChars" attr shape.minChars,
+            "medianChars" attr shape.medianChars,
+            "moodChanges" attr shape.moodChanges,
+            "tailAbsorbed" attr shape.tailsAbsorbed,
         )
 
         override fun speechStopped(reason: SpeechStopReason, silentAfter: Duration) =

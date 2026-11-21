@@ -7845,7 +7845,7 @@ abstract interface com.letta.mobile.data.voice.local/LocalSpeechRecognizer { // 
 }
 
 abstract interface com.letta.mobile.data.voice.loop/VoiceLoopObserver { // com.letta.mobile.data.voice.loop/VoiceLoopObserver|null[0]
-    open fun replySegmented(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int) // com.letta.mobile.data.voice.loop/VoiceLoopObserver.replySegmented|replySegmented(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+    open fun replySegmented(com.letta.mobile.data.voice.loop/ReplySegmentation) // com.letta.mobile.data.voice.loop/VoiceLoopObserver.replySegmented|replySegmented(com.letta.mobile.data.voice.loop.ReplySegmentation){}[0]
     open fun speechSkipped(com.letta.mobile.data.voice/SpeechSkipReason, kotlin/Int) // com.letta.mobile.data.voice.loop/VoiceLoopObserver.speechSkipped|speechSkipped(com.letta.mobile.data.voice.SpeechSkipReason;kotlin.Int){}[0]
     open fun speechStopped(com.letta.mobile.data.voice/SpeechStopReason, kotlin.time/Duration) // com.letta.mobile.data.voice.loop/VoiceLoopObserver.speechStopped|speechStopped(com.letta.mobile.data.voice.SpeechStopReason;kotlin.time.Duration){}[0]
 
@@ -73252,6 +73252,31 @@ final class com.letta.mobile.data.voice.local/LocalVoiceEar : com.letta.mobile.d
     final fun setOutputActive(kotlin/Boolean) // com.letta.mobile.data.voice.local/LocalVoiceEar.setOutputActive|setOutputActive(kotlin.Boolean){}[0]
 }
 
+final class com.letta.mobile.data.voice.loop/ReplySegmentation { // com.letta.mobile.data.voice.loop/ReplySegmentation|null[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int) // com.letta.mobile.data.voice.loop/ReplySegmentation.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+
+    final val medianChars // com.letta.mobile.data.voice.loop/ReplySegmentation.medianChars|{}medianChars[0]
+        final fun <get-medianChars>(): kotlin/Int // com.letta.mobile.data.voice.loop/ReplySegmentation.medianChars.<get-medianChars>|<get-medianChars>(){}[0]
+    final val minChars // com.letta.mobile.data.voice.loop/ReplySegmentation.minChars|{}minChars[0]
+        final fun <get-minChars>(): kotlin/Int // com.letta.mobile.data.voice.loop/ReplySegmentation.minChars.<get-minChars>|<get-minChars>(){}[0]
+    final val moodChanges // com.letta.mobile.data.voice.loop/ReplySegmentation.moodChanges|{}moodChanges[0]
+        final fun <get-moodChanges>(): kotlin/Int // com.letta.mobile.data.voice.loop/ReplySegmentation.moodChanges.<get-moodChanges>|<get-moodChanges>(){}[0]
+    final val segments // com.letta.mobile.data.voice.loop/ReplySegmentation.segments|{}segments[0]
+        final fun <get-segments>(): kotlin/Int // com.letta.mobile.data.voice.loop/ReplySegmentation.segments.<get-segments>|<get-segments>(){}[0]
+    final val tailsAbsorbed // com.letta.mobile.data.voice.loop/ReplySegmentation.tailsAbsorbed|{}tailsAbsorbed[0]
+        final fun <get-tailsAbsorbed>(): kotlin/Int // com.letta.mobile.data.voice.loop/ReplySegmentation.tailsAbsorbed.<get-tailsAbsorbed>|<get-tailsAbsorbed>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.data.voice.loop/ReplySegmentation.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.letta.mobile.data.voice.loop/ReplySegmentation.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // com.letta.mobile.data.voice.loop/ReplySegmentation.component3|component3(){}[0]
+    final fun component4(): kotlin/Int // com.letta.mobile.data.voice.loop/ReplySegmentation.component4|component4(){}[0]
+    final fun component5(): kotlin/Int // com.letta.mobile.data.voice.loop/ReplySegmentation.component5|component5(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ...): com.letta.mobile.data.voice.loop/ReplySegmentation // com.letta.mobile.data.voice.loop/ReplySegmentation.copy|copy(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.loop/ReplySegmentation.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.loop/ReplySegmentation.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.loop/ReplySegmentation.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.voice.loop/VoiceEngines { // com.letta.mobile.data.voice.loop/VoiceEngines|null[0]
     constructor <init>(com.letta.mobile.data.voice.engine/VoiceEar, com.letta.mobile.data.voice.engine/VoiceResponder, com.letta.mobile.data.voice.engine/VoiceMouth) // com.letta.mobile.data.voice.loop/VoiceEngines.<init>|<init>(com.letta.mobile.data.voice.engine.VoiceEar;com.letta.mobile.data.voice.engine.VoiceResponder;com.letta.mobile.data.voice.engine.VoiceMouth){}[0]
 
@@ -73763,8 +73788,38 @@ final class com.letta.mobile.data.voice.session/VoiceTuning { // com.letta.mobil
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.session/VoiceTuning.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.voice.speech/SegmentSizing { // com.letta.mobile.data.voice.speech/SegmentSizing|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Int? = ..., kotlin/Int? = ..., kotlin/Int? = ...) // com.letta.mobile.data.voice.speech/SegmentSizing.<init>|<init>(kotlin.Int;kotlin.Int?;kotlin.Int?;kotlin.Int?){}[0]
+
+    final val firstClauseMinLength // com.letta.mobile.data.voice.speech/SegmentSizing.firstClauseMinLength|{}firstClauseMinLength[0]
+        final fun <get-firstClauseMinLength>(): kotlin/Int? // com.letta.mobile.data.voice.speech/SegmentSizing.firstClauseMinLength.<get-firstClauseMinLength>|<get-firstClauseMinLength>(){}[0]
+    final val maxSegmentLength // com.letta.mobile.data.voice.speech/SegmentSizing.maxSegmentLength|{}maxSegmentLength[0]
+        final fun <get-maxSegmentLength>(): kotlin/Int // com.letta.mobile.data.voice.speech/SegmentSizing.maxSegmentLength.<get-maxSegmentLength>|<get-maxSegmentLength>(){}[0]
+    final val minSegmentLength // com.letta.mobile.data.voice.speech/SegmentSizing.minSegmentLength|{}minSegmentLength[0]
+        final fun <get-minSegmentLength>(): kotlin/Int? // com.letta.mobile.data.voice.speech/SegmentSizing.minSegmentLength.<get-minSegmentLength>|<get-minSegmentLength>(){}[0]
+    final val tailAbsorbLength // com.letta.mobile.data.voice.speech/SegmentSizing.tailAbsorbLength|{}tailAbsorbLength[0]
+        final fun <get-tailAbsorbLength>(): kotlin/Int? // com.letta.mobile.data.voice.speech/SegmentSizing.tailAbsorbLength.<get-tailAbsorbLength>|<get-tailAbsorbLength>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.data.voice.speech/SegmentSizing.component1|component1(){}[0]
+    final fun component2(): kotlin/Int? // com.letta.mobile.data.voice.speech/SegmentSizing.component2|component2(){}[0]
+    final fun component3(): kotlin/Int? // com.letta.mobile.data.voice.speech/SegmentSizing.component3|component3(){}[0]
+    final fun component4(): kotlin/Int? // com.letta.mobile.data.voice.speech/SegmentSizing.component4|component4(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int? = ..., kotlin/Int? = ..., kotlin/Int? = ...): com.letta.mobile.data.voice.speech/SegmentSizing // com.letta.mobile.data.voice.speech/SegmentSizing.copy|copy(kotlin.Int;kotlin.Int?;kotlin.Int?;kotlin.Int?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.speech/SegmentSizing.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.speech/SegmentSizing.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.voice.speech/SegmentSizing.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.voice.speech/SegmentSizing.Companion|null[0]
+        final const val MIN_SEGMENT_LENGTH // com.letta.mobile.data.voice.speech/SegmentSizing.Companion.MIN_SEGMENT_LENGTH|{}MIN_SEGMENT_LENGTH[0]
+            final fun <get-MIN_SEGMENT_LENGTH>(): kotlin/Int // com.letta.mobile.data.voice.speech/SegmentSizing.Companion.MIN_SEGMENT_LENGTH.<get-MIN_SEGMENT_LENGTH>|<get-MIN_SEGMENT_LENGTH>(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.voice.speech/SentenceChunker { // com.letta.mobile.data.voice.speech/SentenceChunker|null[0]
-    constructor <init>(kotlin/Int = ..., kotlin/Int? = ..., kotlin/Int? = ...) // com.letta.mobile.data.voice.speech/SentenceChunker.<init>|<init>(kotlin.Int;kotlin.Int?;kotlin.Int?){}[0]
+    constructor <init>(com.letta.mobile.data.voice.speech/SegmentSizing = ...) // com.letta.mobile.data.voice.speech/SentenceChunker.<init>|<init>(com.letta.mobile.data.voice.speech.SegmentSizing){}[0]
+
+    final val tailsAbsorbed // com.letta.mobile.data.voice.speech/SentenceChunker.tailsAbsorbed|{}tailsAbsorbed[0]
+        final fun <get-tailsAbsorbed>(): kotlin/Int // com.letta.mobile.data.voice.speech/SentenceChunker.tailsAbsorbed.<get-tailsAbsorbed>|<get-tailsAbsorbed>(){}[0]
 
     final fun flush(): kotlin.collections/List<com.letta.mobile.data.voice/VoiceText> // com.letta.mobile.data.voice.speech/SentenceChunker.flush|flush(){}[0]
     final fun push(com.letta.mobile.data.voice/VoiceText): kotlin.collections/List<com.letta.mobile.data.voice/VoiceText> // com.letta.mobile.data.voice.speech/SentenceChunker.push|push(com.letta.mobile.data.voice.VoiceText){}[0]
@@ -74353,7 +74408,7 @@ final class com.letta.mobile.data.voice/VoiceError { // com.letta.mobile.data.vo
 }
 
 final class com.letta.mobile.data.voice/VoiceLoopConfig { // com.letta.mobile.data.voice/VoiceLoopConfig|null[0]
-    constructor <init>(com.letta.mobile.data.voice/VoiceConversationMode = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.letta.mobile.data.voice/LateReplyPolicy = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin/Int = ..., kotlin/Int? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Int = ...) // com.letta.mobile.data.voice/VoiceLoopConfig.<init>|<init>(com.letta.mobile.data.voice.VoiceConversationMode;kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.voice.LateReplyPolicy;kotlin.time.Duration;kotlin.time.Duration;kotlin.Int;kotlin.Int?;kotlin.Int?;kotlin.Int;kotlin.Int){}[0]
+    constructor <init>(com.letta.mobile.data.voice/VoiceConversationMode = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.letta.mobile.data.voice/LateReplyPolicy = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin/Int = ..., kotlin/Int? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int? = ...) // com.letta.mobile.data.voice/VoiceLoopConfig.<init>|<init>(com.letta.mobile.data.voice.VoiceConversationMode;kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.voice.LateReplyPolicy;kotlin.time.Duration;kotlin.time.Duration;kotlin.Int;kotlin.Int?;kotlin.Int?;kotlin.Int;kotlin.Int;kotlin.Int?){}[0]
 
     final val bargeIn // com.letta.mobile.data.voice/VoiceLoopConfig.bargeIn|{}bargeIn[0]
         final fun <get-bargeIn>(): kotlin/Boolean // com.letta.mobile.data.voice/VoiceLoopConfig.bargeIn.<get-bargeIn>|<get-bargeIn>(){}[0]
@@ -74373,6 +74428,8 @@ final class com.letta.mobile.data.voice/VoiceLoopConfig { // com.letta.mobile.da
         final fun <get-mode>(): com.letta.mobile.data.voice/VoiceConversationMode // com.letta.mobile.data.voice/VoiceLoopConfig.mode.<get-mode>|<get-mode>(){}[0]
     final val releaseTimeout // com.letta.mobile.data.voice/VoiceLoopConfig.releaseTimeout|{}releaseTimeout[0]
         final fun <get-releaseTimeout>(): kotlin.time/Duration // com.letta.mobile.data.voice/VoiceLoopConfig.releaseTimeout.<get-releaseTimeout>|<get-releaseTimeout>(){}[0]
+    final val tailAbsorbLength // com.letta.mobile.data.voice/VoiceLoopConfig.tailAbsorbLength|{}tailAbsorbLength[0]
+        final fun <get-tailAbsorbLength>(): kotlin/Int? // com.letta.mobile.data.voice/VoiceLoopConfig.tailAbsorbLength.<get-tailAbsorbLength>|<get-tailAbsorbLength>(){}[0]
     final val thinkingTimeout // com.letta.mobile.data.voice/VoiceLoopConfig.thinkingTimeout|{}thinkingTimeout[0]
         final fun <get-thinkingTimeout>(): kotlin.time/Duration // com.letta.mobile.data.voice/VoiceLoopConfig.thinkingTimeout.<get-thinkingTimeout>|<get-thinkingTimeout>(){}[0]
     final val voiceInterrupts // com.letta.mobile.data.voice/VoiceLoopConfig.voiceInterrupts|{}voiceInterrupts[0]
@@ -74381,6 +74438,7 @@ final class com.letta.mobile.data.voice/VoiceLoopConfig { // com.letta.mobile.da
     final fun component1(): com.letta.mobile.data.voice/VoiceConversationMode // com.letta.mobile.data.voice/VoiceLoopConfig.component1|component1(){}[0]
     final fun component10(): kotlin/Int // com.letta.mobile.data.voice/VoiceLoopConfig.component10|component10(){}[0]
     final fun component11(): kotlin/Int // com.letta.mobile.data.voice/VoiceLoopConfig.component11|component11(){}[0]
+    final fun component12(): kotlin/Int? // com.letta.mobile.data.voice/VoiceLoopConfig.component12|component12(){}[0]
     final fun component2(): kotlin/Boolean // com.letta.mobile.data.voice/VoiceLoopConfig.component2|component2(){}[0]
     final fun component3(): kotlin/Boolean // com.letta.mobile.data.voice/VoiceLoopConfig.component3|component3(){}[0]
     final fun component4(): com.letta.mobile.data.voice/LateReplyPolicy // com.letta.mobile.data.voice/VoiceLoopConfig.component4|component4(){}[0]
@@ -74389,7 +74447,7 @@ final class com.letta.mobile.data.voice/VoiceLoopConfig { // com.letta.mobile.da
     final fun component7(): kotlin/Int // com.letta.mobile.data.voice/VoiceLoopConfig.component7|component7(){}[0]
     final fun component8(): kotlin/Int? // com.letta.mobile.data.voice/VoiceLoopConfig.component8|component8(){}[0]
     final fun component9(): kotlin/Int? // com.letta.mobile.data.voice/VoiceLoopConfig.component9|component9(){}[0]
-    final fun copy(com.letta.mobile.data.voice/VoiceConversationMode = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.letta.mobile.data.voice/LateReplyPolicy = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin/Int = ..., kotlin/Int? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Int = ...): com.letta.mobile.data.voice/VoiceLoopConfig // com.letta.mobile.data.voice/VoiceLoopConfig.copy|copy(com.letta.mobile.data.voice.VoiceConversationMode;kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.voice.LateReplyPolicy;kotlin.time.Duration;kotlin.time.Duration;kotlin.Int;kotlin.Int?;kotlin.Int?;kotlin.Int;kotlin.Int){}[0]
+    final fun copy(com.letta.mobile.data.voice/VoiceConversationMode = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.letta.mobile.data.voice/LateReplyPolicy = ..., kotlin.time/Duration = ..., kotlin.time/Duration = ..., kotlin/Int = ..., kotlin/Int? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int? = ...): com.letta.mobile.data.voice/VoiceLoopConfig // com.letta.mobile.data.voice/VoiceLoopConfig.copy|copy(com.letta.mobile.data.voice.VoiceConversationMode;kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.voice.LateReplyPolicy;kotlin.time.Duration;kotlin.time.Duration;kotlin.Int;kotlin.Int?;kotlin.Int?;kotlin.Int;kotlin.Int;kotlin.Int?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice/VoiceLoopConfig.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice/VoiceLoopConfig.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.voice/VoiceLoopConfig.toString|toString(){}[0]

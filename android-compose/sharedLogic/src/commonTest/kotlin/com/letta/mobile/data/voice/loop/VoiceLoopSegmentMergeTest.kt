@@ -15,7 +15,9 @@ import kotlin.test.assertFailsWith
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class VoiceLoopSegmentMergeTest {
-    private val merging = VoiceLoopConfig(minSegmentLength = MIN, firstClauseMinLength = null)
+    // Tail absorption off: these cases pin the merge-to-minimum behaviour on its own; the tail cases below turn it on.
+    private val merging = VoiceLoopConfig(minSegmentLength = MIN, firstClauseMinLength = null, tailAbsorbLength = null)
+    private val absorbing = merging.copy(tailAbsorbLength = TAIL)
 
     private fun LoopHarness.spoken(): List<Pair<String, String?>> = mouth.segments.map { it.text.value to it.tone?.instructions }
 
@@ -146,13 +148,81 @@ class VoiceLoopSegmentMergeTest {
     }
 
     @Test
+    fun theDefaultsMatchTheSpeechServersRequestSize() {
+        val defaults = VoiceLoopConfig()
+        assertEquals(200, defaults.minSegmentLength)
+        assertEquals(400, defaults.maxSegmentLength)
+        assertEquals(60, defaults.tailAbsorbLength)
+    }
+
+    @Test
+    fun aTinyLastSentenceJoinsTheSegmentBeforeItAndIsReported() = runTest {
+        val h = LoopHarness(this, absorbing)
+        h.listening()
+        h.turn()
+
+        h.replyText(VoiceText("It is noon. $LONG_SECOND "))
+        assertEquals(listOf("It is noon."), h.mouth.spokenTexts, "the long segment waits for a possible tail")
+        h.replyText(VoiceText("Ok."))
+        h.reply(VoiceReplyEvent.Completed)
+
+        assertEquals(listOf("It is noon.", "$LONG_SECOND Ok."), h.mouth.spokenTexts)
+        assertEquals(listOf("2/11/${(11 + LONG_SECOND.length + 4) / 2}/0"), h.segmented)
+        assertEquals(listOf(1), h.absorbed)
+    }
+
+    @Test
+    fun aTailLengthWithoutAMinimumLengthKeepsOneSentencePerSegment() = runTest {
+        val h = LoopHarness(this, merging.copy(minSegmentLength = null, tailAbsorbLength = TAIL))
+        h.listening()
+        h.turn()
+
+        // One delta per sentence: sentences released from the same delta are joined by the burst batching, which is separate.
+        h.replyText(VoiceText("It is noon. "))
+        h.replyText(VoiceText("$LONG_SECOND "))
+        h.replyText(VoiceText("Ok. "))
+        h.reply(VoiceReplyEvent.Completed)
+
+        assertEquals(listOf("It is noon.", LONG_SECOND, "Ok."), h.mouth.spokenTexts)
+        assertEquals(listOf(0), h.absorbed)
+    }
+
+    @Test
+    fun aTailAfterAMoodCueIsNotJoinedAcrossTheMoodChange() = runTest {
+        val h = LoopHarness(this, absorbing)
+        h.listening()
+        h.turn()
+
+        h.replyText(VoiceText("[warm] It is noon. $LONG_SECOND [quiet] Ok. "))
+        h.reply(VoiceReplyEvent.Completed)
+
+        assertEquals(listOf("It is noon." to "warm", LONG_SECOND to "warm", "Ok." to "quiet"), h.spoken())
+        assertEquals(listOf(0), h.absorbed)
+    }
+
+    @Test
+    fun aTailAfterACodeBlockIsNotJoinedToTheTextBeforeIt() = runTest {
+        val h = LoopHarness(this, absorbing)
+        h.listening()
+        h.turn()
+
+        h.replyText(VoiceText("It is noon. $LONG_SECOND\n```\nval x = 1\n```\nOk. "))
+        h.reply(VoiceReplyEvent.Completed)
+
+        assertEquals(listOf("It is noon.", LONG_SECOND, "Ok."), h.mouth.spokenTexts)
+    }
+
+    @Test
     fun aMinimumLengthThatIsNotPositiveIsRejectedWhenConfigured() {
         assertFailsWith<IllegalArgumentException> { VoiceLoopConfig(minSegmentLength = 0) }
         assertFailsWith<IllegalArgumentException> { VoiceLoopConfig(minSegmentLength = -1) }
         assertEquals(null, VoiceLoopConfig(minSegmentLength = null).minSegmentLength)
+        assertFailsWith<IllegalArgumentException> { VoiceLoopConfig(tailAbsorbLength = 0) }
     }
 
     private companion object {
         const val MIN = 30
+        const val TAIL = 10
+        const val LONG_SECOND = "This second sentence is comfortably long enough."
     }
 }

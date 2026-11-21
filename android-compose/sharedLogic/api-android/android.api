@@ -72898,11 +72898,12 @@ public final class com/letta/mobile/data/voice/VoiceErrorCode : java/lang/Enum {
 }
 
 public final class com/letta/mobile/data/voice/VoiceLoopConfig {
-	public synthetic fun <init> (Lcom/letta/mobile/data/voice/VoiceConversationMode;ZZLcom/letta/mobile/data/voice/LateReplyPolicy;JJILjava/lang/Integer;Ljava/lang/Integer;IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/voice/VoiceConversationMode;ZZLcom/letta/mobile/data/voice/LateReplyPolicy;JJILjava/lang/Integer;Ljava/lang/Integer;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/VoiceConversationMode;ZZLcom/letta/mobile/data/voice/LateReplyPolicy;JJILjava/lang/Integer;Ljava/lang/Integer;IILjava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/VoiceConversationMode;ZZLcom/letta/mobile/data/voice/LateReplyPolicy;JJILjava/lang/Integer;Ljava/lang/Integer;IILjava/lang/Integer;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/voice/VoiceConversationMode;
 	public final fun component10 ()I
 	public final fun component11 ()I
+	public final fun component12 ()Ljava/lang/Integer;
 	public final fun component2 ()Z
 	public final fun component3 ()Z
 	public final fun component4 ()Lcom/letta/mobile/data/voice/LateReplyPolicy;
@@ -72911,8 +72912,8 @@ public final class com/letta/mobile/data/voice/VoiceLoopConfig {
 	public final fun component7 ()I
 	public final fun component8 ()Ljava/lang/Integer;
 	public final fun component9 ()Ljava/lang/Integer;
-	public final fun copy-DANRxj8 (Lcom/letta/mobile/data/voice/VoiceConversationMode;ZZLcom/letta/mobile/data/voice/LateReplyPolicy;JJILjava/lang/Integer;Ljava/lang/Integer;II)Lcom/letta/mobile/data/voice/VoiceLoopConfig;
-	public static synthetic fun copy-DANRxj8$default (Lcom/letta/mobile/data/voice/VoiceLoopConfig;Lcom/letta/mobile/data/voice/VoiceConversationMode;ZZLcom/letta/mobile/data/voice/LateReplyPolicy;JJILjava/lang/Integer;Ljava/lang/Integer;IIILjava/lang/Object;)Lcom/letta/mobile/data/voice/VoiceLoopConfig;
+	public final fun copy-FWYn3pE (Lcom/letta/mobile/data/voice/VoiceConversationMode;ZZLcom/letta/mobile/data/voice/LateReplyPolicy;JJILjava/lang/Integer;Ljava/lang/Integer;IILjava/lang/Integer;)Lcom/letta/mobile/data/voice/VoiceLoopConfig;
+	public static synthetic fun copy-FWYn3pE$default (Lcom/letta/mobile/data/voice/VoiceLoopConfig;Lcom/letta/mobile/data/voice/VoiceConversationMode;ZZLcom/letta/mobile/data/voice/LateReplyPolicy;JJILjava/lang/Integer;Ljava/lang/Integer;IILjava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/VoiceLoopConfig;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBargeIn ()Z
 	public final fun getFirstClauseMinLength ()Ljava/lang/Integer;
@@ -72923,6 +72924,7 @@ public final class com/letta/mobile/data/voice/VoiceLoopConfig {
 	public final fun getMinSegmentLength ()Ljava/lang/Integer;
 	public final fun getMode ()Lcom/letta/mobile/data/voice/VoiceConversationMode;
 	public final fun getReleaseTimeout-UwyO8pc ()J
+	public final fun getTailAbsorbLength ()Ljava/lang/Integer;
 	public final fun getThinkingTimeout-UwyO8pc ()J
 	public final fun getVoiceInterrupts ()Z
 	public fun hashCode ()I
@@ -75075,6 +75077,25 @@ public final class com/letta/mobile/data/voice/local/android/AndroidLocalSpeechR
 	public fun open (Lcom/letta/mobile/data/voice/local/LocalRecognitionRequest;)Lcom/letta/mobile/data/voice/local/LocalRecognizerSession;
 }
 
+public final class com/letta/mobile/data/voice/loop/ReplySegmentation {
+	public fun <init> (IIIII)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun component5 ()I
+	public final fun copy (IIIII)Lcom/letta/mobile/data/voice/loop/ReplySegmentation;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/loop/ReplySegmentation;IIIIIILjava/lang/Object;)Lcom/letta/mobile/data/voice/loop/ReplySegmentation;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMedianChars ()I
+	public final fun getMinChars ()I
+	public final fun getMoodChanges ()I
+	public final fun getSegments ()I
+	public final fun getTailsAbsorbed ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/voice/loop/VoiceEngines {
 	public fun <init> (Lcom/letta/mobile/data/voice/engine/VoiceEar;Lcom/letta/mobile/data/voice/engine/VoiceResponder;Lcom/letta/mobile/data/voice/engine/VoiceMouth;)V
 	public final fun component1 ()Lcom/letta/mobile/data/voice/engine/VoiceEar;
@@ -75107,7 +75128,7 @@ public final class com/letta/mobile/data/voice/loop/VoiceLoop {
 
 public abstract interface class com/letta/mobile/data/voice/loop/VoiceLoopObserver {
 	public static final field Companion Lcom/letta/mobile/data/voice/loop/VoiceLoopObserver$Companion;
-	public fun replySegmented (IIII)V
+	public fun replySegmented (Lcom/letta/mobile/data/voice/loop/ReplySegmentation;)V
 	public fun speechSkipped (Lcom/letta/mobile/data/voice/SpeechSkipReason;I)V
 	public fun speechStopped-HG0u8IE (Lcom/letta/mobile/data/voice/SpeechStopReason;J)V
 }
@@ -75117,7 +75138,7 @@ public final class com/letta/mobile/data/voice/loop/VoiceLoopObserver$Companion 
 }
 
 public final class com/letta/mobile/data/voice/loop/VoiceLoopObserver$DefaultImpls {
-	public static fun replySegmented (Lcom/letta/mobile/data/voice/loop/VoiceLoopObserver;IIII)V
+	public static fun replySegmented (Lcom/letta/mobile/data/voice/loop/VoiceLoopObserver;Lcom/letta/mobile/data/voice/loop/ReplySegmentation;)V
 	public static fun speechSkipped (Lcom/letta/mobile/data/voice/loop/VoiceLoopObserver;Lcom/letta/mobile/data/voice/SpeechSkipReason;I)V
 	public static fun speechStopped-HG0u8IE (Lcom/letta/mobile/data/voice/loop/VoiceLoopObserver;Lcom/letta/mobile/data/voice/SpeechStopReason;J)V
 }
@@ -75822,13 +75843,38 @@ public final class com/letta/mobile/data/voice/session/telemetry/VoiceTelemetryV
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/voice/speech/SegmentSizing {
+	public static final field Companion Lcom/letta/mobile/data/voice/speech/SegmentSizing$Companion;
+	public static final field MIN_SEGMENT_LENGTH I
+	public fun <init> ()V
+	public fun <init> (ILjava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Integer;)V
+	public synthetic fun <init> (ILjava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/lang/Integer;
+	public final fun component3 ()Ljava/lang/Integer;
+	public final fun component4 ()Ljava/lang/Integer;
+	public final fun copy (ILjava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Integer;)Lcom/letta/mobile/data/voice/speech/SegmentSizing;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/speech/SegmentSizing;ILjava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/speech/SegmentSizing;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFirstClauseMinLength ()Ljava/lang/Integer;
+	public final fun getMaxSegmentLength ()I
+	public final fun getMinSegmentLength ()Ljava/lang/Integer;
+	public final fun getTailAbsorbLength ()Ljava/lang/Integer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/speech/SegmentSizing$Companion {
+}
+
 public final class com/letta/mobile/data/voice/speech/SentenceChunker {
 	public static final field Companion Lcom/letta/mobile/data/voice/speech/SentenceChunker$Companion;
 	public static final field DEFAULT_MAX_SEGMENT_LENGTH I
 	public fun <init> ()V
-	public fun <init> (ILjava/lang/Integer;Ljava/lang/Integer;)V
-	public synthetic fun <init> (ILjava/lang/Integer;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/voice/speech/SegmentSizing;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/speech/SegmentSizing;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun flush ()Ljava/util/List;
+	public final fun getTailsAbsorbed ()I
 	public final fun push-8iZQIHs (Ljava/lang/String;)Ljava/util/List;
 	public final fun reset ()V
 	public final fun startNewPart ()V

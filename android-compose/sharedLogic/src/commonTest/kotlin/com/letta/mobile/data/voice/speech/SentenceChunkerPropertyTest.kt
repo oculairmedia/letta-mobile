@@ -125,7 +125,7 @@ class SentenceChunkerPropertyTest {
     private val rawMarkup = Regex("""<[A-Za-z/]|]\(|\[|http""")
 
     private fun spoken(case: GeneratedCase, limit: Limit): List<String> {
-        val chunker = SentenceChunker(limit.chars)
+        val chunker = SentenceChunker(SegmentSizing(limit.chars))
         val pushed = case.deltas.flatMap { chunker.push(VoiceText(it.value)) }
         val flushed = if (case.ending == Ending.FLUSHED) chunker.flush() else emptyList()
         return (pushed + flushed).map { it.value }
@@ -152,7 +152,7 @@ class SentenceChunkerPropertyTest {
 
     @Test
     fun theComparisonKeepsItsLessThanSign() {
-        val chunker = SentenceChunker(Limit.SMALL.chars)
+        val chunker = SentenceChunker(SegmentSizing(Limit.SMALL.chars))
         val segments = chunker.push(VoiceText("Is 2 < 3 true")) + chunker.flush()
         assertEquals(listOf("Is 2 < 3 true"), segments.map { it.value })
     }
@@ -161,7 +161,7 @@ class SentenceChunkerPropertyTest {
     fun unfinishedMarkupAtTheEndOfAReplyIsNeverSpoken() {
         val cases = mapOf("Hello <span" to "Hello", "See [docs](https://x.io/" to "See docs")
         cases.forEach { (reply, heard) ->
-            val chunker = SentenceChunker(Limit.SMALL.chars)
+            val chunker = SentenceChunker(SegmentSizing(Limit.SMALL.chars))
             val segments = chunker.push(VoiceText(reply)) + chunker.flush()
             assertEquals(heard, segments.joinToString(" ") { it.value }, reply)
         }

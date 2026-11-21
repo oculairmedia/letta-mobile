@@ -91,6 +91,20 @@ data class VoiceLoopRuntime(
     val observer: VoiceLoopObserver = VoiceLoopObserver.None,
 )
 
+/**
+ * How one answer was cut into speech segments: [segments] of them, [minChars] characters at least
+ * and [medianChars] in the middle, with its tone changing [moodChanges] times between neighbouring
+ * segments; [tailsAbsorbed] short last sentences were joined to the segment before them instead of
+ * going out alone. Counts only.
+ */
+data class ReplySegmentation(
+    val segments: Int,
+    val minChars: Int,
+    val medianChars: Int,
+    val moodChanges: Int,
+    val tailsAbsorbed: Int,
+)
+
 /** Decisions of the loop that leave no trace in its state, for diagnostics. Never given text or audio. */
 interface VoiceLoopObserver {
     /** [segments] segments of answer text (or one whole unspoken answer) were not spoken, for [reason]. */
@@ -100,11 +114,10 @@ interface VoiceLoopObserver {
     fun speechStopped(reason: SpeechStopReason, silentAfter: Duration) = Unit
 
     /**
-     * One answer was spoken as [segments] segments of [minChars] characters at least and [medianChars]
-     * in the middle, with its tone changing [moodChanges] times between neighbouring segments; for
-     * measuring how steady the voice can be from one chunk to the next. Counts only.
+     * One answer was spoken as the segments [shape] describes; for measuring how steady the voice can
+     * be from one chunk to the next. Counts only.
      */
-    fun replySegmented(segments: Int, minChars: Int, medianChars: Int, moodChanges: Int) = Unit
+    fun replySegmented(shape: ReplySegmentation) = Unit
 
     /** An observer that ignores everything. */
     companion object {

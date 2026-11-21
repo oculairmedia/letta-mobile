@@ -27,6 +27,7 @@ internal class LoopHarness(
 
     /** Every reply.segments report the loop made, as "segments/min/median/moodChanges". */
     val segmented = mutableListOf<String>()
+    val absorbed = mutableListOf<Int>()
 
     /** Every confirmed stop of the mouth the loop reported, by reason. */
     val stopped = mutableListOf<SpeechStopReason>()
@@ -45,8 +46,9 @@ internal class LoopHarness(
                 skipped += "${reason.name}:$segments"
             }
 
-            override fun replySegmented(segments: Int, minChars: Int, medianChars: Int, moodChanges: Int) {
-                segmented += "$segments/$minChars/$medianChars/$moodChanges"
+            override fun replySegmented(shape: ReplySegmentation) {
+                segmented += "${shape.segments}/${shape.minChars}/${shape.medianChars}/${shape.moodChanges}"
+                absorbed += shape.tailsAbsorbed
             }
 
             override fun speechStopped(reason: SpeechStopReason, silentAfter: Duration) {
