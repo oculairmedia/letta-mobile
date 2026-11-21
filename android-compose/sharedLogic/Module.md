@@ -237,7 +237,7 @@ What the timeline does with steps once presenters have drawn them: which kind of
 
 # Package com.letta.mobile.data.clientstore
 
-The only persistent state a client may keep, declared in ClientStoreEntries: connection bootstrap (host address or pairing, this device's identity key or token), disposable caches that rebuild from the host and are wiped through DisposableCache.clearAll, and the few per-device facts the host cannot own, each with a justification. Preferences, pins, layout choices, drafts, history and settings are host state (see com.letta.mobile.data.shellstate). The ClientPersistenceOutsideClientStore guardrail allows client persistence APIs only in packages with a `clientstore` segment and in host packages.
+The only persistent state a client may keep, declared in ClientStoreEntries: connection bootstrap (host address or pairing, this device's identity key or token), disposable caches that rebuild from the host and are wiped through DisposableCache.clearAll, and the few per-device facts the host cannot own, each with a justification. Preferences, pins, layout choices, drafts, history and settings are host state (see com.letta.mobile.data.shellstate). The ClientPersistenceOutsideClientStore guardrail allows client persistence APIs only in packages with a `clientstore` segment and in host packages. `hostAppearanceOver` is the one way every client (Android, desktop, web) builds the person's appearance over the host's shell state, mirrored in the platform's own key-value store; each platform supplies only that store and its channel transport.
 
 # Package com.letta.mobile.data.commands
 

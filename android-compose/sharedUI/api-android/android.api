@@ -7722,6 +7722,10 @@ public final class com/letta/mobile/ui/settings/ConnectionTest$Testing : com/let
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/settings/HostAppearanceBindingKt {
+	public static final fun rememberHostAppearanceSettings (Lcom/letta/mobile/data/shellstate/HostAppearance;ZLandroidx/compose/runtime/Composer;II)Lcom/letta/mobile/data/settings/AppearanceSettings;
+}
+
 public final class com/letta/mobile/ui/settings/SavedBackends {
 	public static final field $stable I
 	public fun <init> (Ljava/util/List;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
@@ -12291,6 +12295,28 @@ public final class com/letta/mobile/ui/theme/ChatTimelineDimens$Alpha {
 	public static final field skeletonPulseLow F
 }
 
+public final class com/letta/mobile/ui/theme/ColorPrimitivesKt {
+	public static final fun complementary-8_81llA (J)J
+	public static final fun getDarkBackground ()J
+	public static final fun getDarkError ()J
+	public static final fun getDarkOnError ()J
+	public static final fun getDarkOnSurface ()J
+	public static final fun getDarkOnSurfaceVariant ()J
+	public static final fun getDarkPrimary ()J
+	public static final fun getDarkSurface ()J
+	public static final fun getDarkSurfaceContainer ()J
+	public static final fun getDarkSurfaceVariant ()J
+	public static final fun getLightError ()J
+	public static final fun getLightOnError ()J
+	public static final fun getLightOnSurface ()J
+	public static final fun getLightOnSurfaceVariant ()J
+	public static final fun getLightPrimary ()J
+	public static final fun getLightSurface ()J
+	public static final fun getLightSurfaceContainer ()J
+	public static final fun getLightSurfaceVariant ()J
+	public static final fun toHslColor-8_81llA (J)Lcom/letta/mobile/ui/theme/HslColor;
+}
+
 public final class com/letta/mobile/ui/theme/CustomColorsKt {
 	public static final fun getCustomColors (Landroidx/compose/material3/MaterialTheme;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/theme/tokens/CustomColors;
 	public static final fun getListItemColors (Lcom/letta/mobile/ui/theme/tokens/CustomColors;Landroidx/compose/runtime/Composer;I)Landroidx/compose/material3/ListItemColors;
@@ -12309,6 +12335,27 @@ public final class com/letta/mobile/ui/theme/HighContrastPreference {
 	public final fun clear ()V
 	public final fun getOverride ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun set (Z)V
+}
+
+public final class com/letta/mobile/ui/theme/HostAppearanceThemeKt {
+	public static final fun HostAppearanceTheme (Lcom/letta/mobile/data/shellstate/HostAppearance;ZLjava/lang/Boolean;Landroidx/compose/material3/Typography;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun rememberHostDark (Lcom/letta/mobile/data/shellstate/HostAppearance;ZLjava/lang/Boolean;Landroidx/compose/runtime/Composer;II)Z
+}
+
+public final class com/letta/mobile/ui/theme/HslColor {
+	public static final field $stable I
+	public fun <init> (FFF)V
+	public final fun component1 ()F
+	public final fun component2 ()F
+	public final fun component3 ()F
+	public final fun copy (FFF)Lcom/letta/mobile/ui/theme/HslColor;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/theme/HslColor;FFFILjava/lang/Object;)Lcom/letta/mobile/ui/theme/HslColor;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHue ()F
+	public final fun getLightness ()F
+	public final fun getSaturation ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/theme/LettaDimens {
@@ -12419,17 +12466,36 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Type {
 	public final fun getMicro-XSAIIZE ()J
 }
 
+public final class com/letta/mobile/ui/theme/PresetColorSchemesKt {
+	public static final fun presetThemeColors (Lcom/letta/mobile/data/model/ThemePreset;)Lcom/letta/mobile/ui/theme/PresetThemeColors;
+	public static final fun withLettaContrastBoost (Landroidx/compose/material3/ColorScheme;)Landroidx/compose/material3/ColorScheme;
+}
+
+public final class com/letta/mobile/ui/theme/PresetThemeColors {
+	public static final field $stable I
+	public fun <init> (Landroidx/compose/material3/ColorScheme;Landroidx/compose/material3/ColorScheme;)V
+	public final fun component1 ()Landroidx/compose/material3/ColorScheme;
+	public final fun component2 ()Landroidx/compose/material3/ColorScheme;
+	public final fun copy (Landroidx/compose/material3/ColorScheme;Landroidx/compose/material3/ColorScheme;)Lcom/letta/mobile/ui/theme/PresetThemeColors;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/theme/PresetThemeColors;Landroidx/compose/material3/ColorScheme;Landroidx/compose/material3/ColorScheme;ILjava/lang/Object;)Lcom/letta/mobile/ui/theme/PresetThemeColors;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDarkScheme ()Landroidx/compose/material3/ColorScheme;
+	public final fun getLightScheme ()Landroidx/compose/material3/ColorScheme;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/ui/theme/ReducedMotionKt {
 	public static final fun getLocalReducedMotion ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun rememberReducedMotionEnabled (Landroidx/compose/runtime/Composer;I)Z
 }
 
 public final class com/letta/mobile/ui/theme/SharedMaterialThemeKt {
-	public static final fun SharedMaterialTheme (ZLkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun SharedMaterialTheme (ZLcom/letta/mobile/data/model/ThemePreset;Landroidx/compose/material3/Typography;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun getSharedShapes ()Landroidx/compose/material3/Shapes;
 	public static final fun getSharedTypography ()Landroidx/compose/material3/Typography;
-	public static final fun lettaColorScheme (ZZ)Landroidx/compose/material3/ColorScheme;
-	public static synthetic fun lettaColorScheme$default (ZZILjava/lang/Object;)Landroidx/compose/material3/ColorScheme;
+	public static final fun lettaColorScheme (ZZLcom/letta/mobile/data/model/ThemePreset;)Landroidx/compose/material3/ColorScheme;
+	public static synthetic fun lettaColorScheme$default (ZZLcom/letta/mobile/data/model/ThemePreset;ILjava/lang/Object;)Landroidx/compose/material3/ColorScheme;
 	public static final fun lettaCustomColors (Landroidx/compose/material3/ColorScheme;)Lcom/letta/mobile/ui/theme/tokens/CustomColors;
 }
 
