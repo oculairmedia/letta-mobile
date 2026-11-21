@@ -40,19 +40,22 @@ import org.junit.runner.RunWith
  * in on the device): this benchmark never installs a different build or touches a different package.
  * Compilation is left exactly as installed ([CompilationMode.Ignore]).
  *
- * Run with the dev package, the Pixel 2 XL serial and the seeded conversation:
+ * Run on the Pixel 2 XL against the already-installed dev app. The dev build is debuggable, so the
+ * benchmark library's debuggable guard is suppressed; the numbers are therefore a debug build's, and
+ * only their stage proportions (not absolute times) carry over to a release build:
  *
- *     ./gradlew :macrobenchmark:connectedBenchmarkAndroidTest \
- *         -Pandroid.testInstrumentationRunnerArguments.class=\
- *           com.letta.mobile.macrobenchmark.TimelineOpenBenchmark \
- *         -Pandroid.testInstrumentationRunnerArguments.targetPackage=com.letta.mobile.dev \
- *         -Pandroid.testInstrumentationRunnerArguments.agentId=... \
- *         -Pandroid.testInstrumentationRunnerArguments.conversationId=... \
- *         -Pandroid.testInstrumentationRunnerArguments.conversationTitle=...
+ *     adb -s 711KPAE0914240 shell am instrument -w \
+ *         -e class com.letta.mobile.macrobenchmark.TimelineOpenBenchmark \
+ *         -e androidx.benchmark.suppressErrors DEBUGGABLE,EMULATOR \
+ *         -e targetPackage com.letta.mobile.dev \
+ *         -e agentId ... -e conversationId ... -e conversationTitle ... \
+ *         com.letta.mobile.macrobenchmark/androidx.test.runner.AndroidJUnitRunner
  *
- * `connectedBenchmarkAndroidTest` uninstalls the test APK afterwards; on a shared device install it
- * and run `adb shell am instrument` instead. Needs a signed-in account with that real conversation:
- * there is no fixture, and a missing conversation fails the run instead of measuring nothing.
+ * Gradle's `connectedBenchmarkAndroidTest` uninstalls the test APK afterwards, so on a shared device
+ * install the benchmark APK once and use `am instrument` as above.
+ *
+ * Needs a signed-in account with that real conversation: there is no fixture, and a missing
+ * conversation fails the run instead of measuring nothing.
  */
 @OptIn(ExperimentalMetricApi::class, ExperimentalMacrobenchmarkApi::class)
 @RunWith(AndroidJUnit4::class)
