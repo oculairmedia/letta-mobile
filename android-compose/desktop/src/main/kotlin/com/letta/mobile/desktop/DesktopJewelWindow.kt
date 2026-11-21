@@ -26,6 +26,7 @@ import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeader
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState
 import com.letta.mobile.ui.shell.workspace.barHeight
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.rememberHostDark
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import dev.nucleusframework.window.AwtDecoratedWindowScope
 import dev.nucleusframework.window.BasicTitleBar
@@ -60,7 +61,7 @@ internal fun DesktopJewelWindow(
     content: @Composable AwtDecoratedWindowScope.() -> Unit,
 ) {
     DesktopJewelTheme {
-        val dark = isSystemInDarkMode()
+        val dark = rememberHostDark(LocalDesktopHostAppearance.current, isSystemInDarkMode())
         DecoratedWindow(
             onCloseRequest = onCloseRequest,
             state = state,

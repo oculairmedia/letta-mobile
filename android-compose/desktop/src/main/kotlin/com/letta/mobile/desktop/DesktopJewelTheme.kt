@@ -1,19 +1,16 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
-import com.letta.mobile.ui.theme.LocalCustomColors
-import com.letta.mobile.ui.theme.LocalHighContrast
-import com.letta.mobile.ui.theme.ProvideAccessibilityPolicy
-import com.letta.mobile.ui.theme.SharedShapes
+import com.letta.mobile.data.shellstate.HostAppearance
+import com.letta.mobile.desktop.clientstore.DesktopHostAppearance
+import com.letta.mobile.ui.theme.HostAppearanceTheme
 import com.letta.mobile.ui.theme.SharedTypography
-import com.letta.mobile.ui.theme.lettaColorScheme
-import com.letta.mobile.ui.theme.lettaCustomColors
+import com.letta.mobile.ui.theme.rememberHostDark
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.jewel.intui.standalone.theme.darkThemeDefinition
@@ -36,10 +33,13 @@ internal data class DesktopThemeOverride(
 
 internal val LocalDesktopThemeOverride = staticCompositionLocalOf<DesktopThemeOverride?> { null }
 
+/** The appearance every window draws: the person's choice on the host. Tests and previews provide their own. */
+internal val LocalDesktopHostAppearance = staticCompositionLocalOf<HostAppearance> { DesktopHostAppearance.shared }
+
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
-    val dark = LocalDesktopThemeOverride.current?.dark ?: isSystemInDarkMode()
+    val dark = rememberHostDark(LocalDesktopHostAppearance.current, isSystemInDarkMode(), LocalDesktopThemeOverride.current?.dark)
     val themeDefinition = remember(dark) {
         if (dark) JewelTheme.darkThemeDefinition() else JewelTheme.lightThemeDefinition()
     }
@@ -62,43 +62,28 @@ internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
 }
 
 /**
- * Desktop Material theme — re-based onto the Letta palette (teal primary,
- * #0A0A0A background, #1E1E1E surfaces) instead of Jewel-derived hues, so the
- * desktop app matches the mobile design template while following live OS
- * light/dark appearance changes through Nucleus.
+ * Desktop Material theme: what the person chose on the host, drawn through the shared [HostAppearanceTheme]: the
+ * Letta palette (teal primary, #0A0A0A background, #1E1E1E surfaces) or the colour preset the host holds, light or dark
+ * as the host's theme mode says (SYSTEM follows the live OS appearance through Nucleus). Dynamic colour is Android 12+
+ * only and is not drawn here.
  *
- * The OS accent color deliberately does NOT repaint `primary`: the rest of the
- * pairing (onPrimary, containers, the fixed orb gradients) is brand-derived,
- * so a non-teal accent (e.g. Windows red) turned the thinking ring and
- * selection markers into what read as error states. The live accent remains
- * visible as a read-only row in Settings.
+ * The OS accent color deliberately does NOT repaint `primary`: the rest of the pairing (onPrimary, containers, the
+ * fixed orb gradients) is brand-derived, so a non-teal accent (e.g. Windows red) turned the thinking ring and selection
+ * markers into what read as error states. The live accent remains visible as a read-only row in Settings.
  *
- * The scheme, `LocalCustomColors`, type scale and shapes are the shared
- * [lettaColorScheme], [lettaCustomColors], [SharedTypography] and
- * [SharedShapes] (also behind the web host's `SharedMaterialTheme`); the
- * desktop type scale is tighter than Material 3's phone defaults so monitors
- * get more words per line; the shapes are the one scale every host uses.
+ * The desktop type scale is tighter than Material 3's phone defaults so monitors get more words per line; the shapes
+ * are the one scale every host uses. The phone preview picks light or dark itself ([DesktopThemeOverride]).
  */
 @Composable
 internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
-    ProvideAccessibilityPolicy {
-        val override = LocalDesktopThemeOverride.current
-        val dark = override?.dark ?: isSystemInDarkMode()
-        val highContrast = LocalHighContrast.current
-        val scheme = remember(dark, highContrast) { lettaColorScheme(dark, highContrast) }
-        val customColors = remember(scheme) { lettaCustomColors(scheme) }
-
-        CompositionLocalProvider(LocalCustomColors provides customColors) {
-            val phoneMetrics = override?.phoneMetrics == true
-            MaterialTheme(
-                colorScheme = scheme,
-                // One corner scale on every host and metric; only the type scale follows density.
-                shapes = SharedShapes,
-                typography = if (phoneMetrics) PhoneTypography else SharedTypography,
-                content = content,
-            )
-        }
-    }
+    val override = LocalDesktopThemeOverride.current
+    HostAppearanceTheme(
+        appearance = LocalDesktopHostAppearance.current,
+        systemDark = isSystemInDarkMode(),
+        darkOverride = override?.dark,
+        typography = if (override?.phoneMetrics == true) PhoneTypography else SharedTypography,
+        content = content,
+    )
 }
 
 /** The phone preview's type scale: Material 3's defaults, the sizes Android's theme uses (in Inter there). */

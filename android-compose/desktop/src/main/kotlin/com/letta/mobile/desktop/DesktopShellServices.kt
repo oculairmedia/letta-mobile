@@ -25,6 +25,7 @@ import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.desktop.canvas.DesktopCanvasShell
+import com.letta.mobile.desktop.clientstore.DesktopHostAppearance
 import com.letta.mobile.desktop.canvas.rememberDesktopCanvasShell
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
@@ -169,7 +170,9 @@ private fun rememberDesktopIrohLink(bootstrap: DesktopConfigBootstrap, chatScope
         bootstrap.irohAgentDirectorySlot.value = agentDirectory
         // letta-mobile-bzvro.37: MemFS, secrets and workspace files go through the host's relay.
         com.letta.mobile.desktop.workspace.DesktopIrohWorkspaceRelay.transport = transport
+        DesktopHostAppearance.shared.attach(transport)
     }
+    LaunchedEffect(Unit) { DesktopHostAppearance.shared.run() }
     rememberAndPublishGraphChannelTransport(
         irohTransport = transport,
         publish = bootstrap.publishChannelTransport,

@@ -2,7 +2,6 @@ package com.letta.mobile.desktop.markdown
 
 import com.letta.mobile.mermaid.MermaidNativeRenderer
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,6 +20,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -45,7 +45,7 @@ val DesktopMermaidDiagramRenderer = MermaidDiagramRenderer { source, modifier ->
 @Composable
 private fun DesktopMermaidDiagram(source: String, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkTheme = colors.background.luminance() < DARK_BACKGROUND_LUMINANCE
     val style = remember(colors, isDarkTheme) {
         DesktopMermaidStyle(
             textArgb = colors.onSurfaceVariant.toArgb(),
@@ -158,6 +158,7 @@ private val MermaidCanvasPadding: Dp = LettaDimens.Space.md
  * the block swallowing the viewport.
  */
 private const val MermaidMinDrawHeight = 120f
+private const val DARK_BACKGROUND_LUMINANCE = 0.5f
 private const val MermaidMaxDrawHeight = 560f
 
 private fun mermaidAspectRatio(bitmap: ImageBitmap): Float =

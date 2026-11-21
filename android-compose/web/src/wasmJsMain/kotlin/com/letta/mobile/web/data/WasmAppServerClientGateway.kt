@@ -41,6 +41,7 @@ import com.letta.mobile.ui.chat.session.TimelineChatTarget
 import com.letta.mobile.ui.chat.session.TimelineChipSources
 import com.letta.mobile.ui.chat.session.timelineModelSource
 import com.letta.mobile.web.chat.WebChatBinding
+import com.letta.mobile.web.clientstore.WebHostAppearance
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.js.Js
 import io.ktor.client.plugins.websocket.WebSockets
@@ -94,6 +95,7 @@ class WasmAppServerClientGateway(
     )
 
     private val liveTransport = { activeSession?.let { sessionGraphProvider.current.channelTransport } }
+    internal val hostAppearance = WebHostAppearance(sessionGraphProvider, settings, scope)
 
     /** The live session's `admin_rpc`. */
     val adminRpc: AdminRpcInvoker = AdminRpcInvoker.overTransport(liveTransport)

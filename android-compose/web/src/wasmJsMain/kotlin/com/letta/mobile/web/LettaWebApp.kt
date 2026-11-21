@@ -30,7 +30,7 @@ import com.letta.mobile.ui.shell.workspace.rememberShellLayoutController
 import com.letta.mobile.ui.shell.workspace.rememberShellWorkspaceHeader
 import com.letta.mobile.ui.theme.HighContrastPreference
 import com.letta.mobile.ui.theme.LocalHighContrastPreference
-import com.letta.mobile.ui.theme.SharedMaterialTheme
+import com.letta.mobile.ui.theme.HostAppearanceTheme
 import com.letta.mobile.ui.shell.conversations.rememberShellTimelineChat
 import com.letta.mobile.web.data.WebPairedHostStore
 import com.letta.mobile.web.mascot.RiveCanvasRenderer
@@ -70,12 +70,12 @@ fun LettaWebApp() {
     val pairing = remember(backend, workspace) {
         WebPairingPorts(backend, workspace, WebPairedHostStore(backend.config, app.settingsStore), app.gateway.adminRpc)
     }
-    val settings = webSettingsServices(backend.config, app.settingsStore, app.gateway.permissionModeSettings, pairing)
+    val settings = webSettingsServices(backend.config, app.settingsStore, app.gateway, pairing)
     val page = WebPageInputs(chat, connection, app.canvas, settings, WebPagesSession(graph, controllers, app.services, onRosterChanged))
     val header = rememberShellWorkspaceHeader(ShellWorkspaceHeaderBinding(shell.navigator, layout, webSearch(shell, page), chat.list::tab))
     val host = rememberShellWorkspaceHost(page, Triple(shell, chat.owner, chat.list.state)) { webWorkspaceHost(shell, it) }
     CompositionLocalProvider(LocalHighContrastPreference provides highContrastPreference) {
-        SharedMaterialTheme {
+        HostAppearanceTheme(app.gateway.hostAppearance) {
             // letta-mobile-ckmub.17.36: the root reports the browser's pointer; the workspace turns it into the idiom.
             val pointer = rememberPrimaryPointer()
             ProvideLettaHost(remember(pointer) { LettaHost.Pointer.copy(input = pointer) }) {
