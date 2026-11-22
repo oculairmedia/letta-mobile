@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.chat.surface.composer
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +24,9 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.components.attached.LettaAttachedStatus
 import com.letta.mobile.ui.components.attached.LettaAttachedStatusFrame
+import com.letta.mobile.ui.components.field.lettaField
+import com.letta.mobile.ui.components.field.lettaFieldBorder
+import com.letta.mobile.ui.components.field.rememberLettaField
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -66,20 +68,21 @@ internal fun ComposerPromptCard(model: ComposerModel, onAttachImage: () -> Unit,
 @Composable
 private fun PromptCardSurface(model: ComposerModel, onAttachImage: () -> Unit) {
     val swipeEnabled = model.offersOpenCanvas && !model.streaming && !keyboardOpen()
+    val field = rememberLettaField()
+    val look = field.state()
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .swipeUpToCanvas(enabled = swipeEnabled, onTrigger = { model.onIntent(ChatSurfaceIntent.OpenCanvas) })
             .composerOutline(MaterialTheme.shapes.large, model.uiState)
+            .lettaField(field, look)
             .testTag(ComposerTestTags.CARD),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        // Low-contrast hairline: the fill alone is barely a step off the page background.
-        border = BorderStroke(
-            LettaDimens.Stroke.hairline,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline),
-        ),
+        // A text input's border: a hairline at rest (the fill alone is barely a step off the page),
+        // firmer under the pointer, the primary colour while anything in the card holds focus.
+        border = lettaFieldBorder(look),
     ) {
         val fieldEndPadding = cornerContentPadding()
         Box {
@@ -132,18 +135,18 @@ private fun DockedComposerBarSurface(model: ComposerModel, onAttachImage: () -> 
 
 @Composable
 private fun DockedBarRow(model: ComposerModel, onAttachImage: () -> Unit, fieldHeight: Dp?) {
+    val field = rememberLettaField()
+    val look = field.state()
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .composerOutline(MaterialTheme.shapes.large, model.uiState)
+            .lettaField(field, look)
             .testTag(ComposerTestTags.DOCKED_BAR),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(
-            LettaDimens.Stroke.hairline,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline),
-        ),
+        border = lettaFieldBorder(look),
     ) {
         Box {
             Row(

@@ -12238,6 +12238,16 @@ final object com.letta.mobile.ui.theme.tokens/LettaControlTokens { // com.letta.
         final fun <get-spinnerSm>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.tokens/LettaControlTokens.spinnerSm.<get-spinnerSm>|<get-spinnerSm>(){}[0]
 }
 
+final object com.letta.mobile.ui.theme.tokens/LettaFieldTokens { // com.letta.mobile.ui.theme.tokens/LettaFieldTokens|null[0]
+    final const val BORDER_MILLIS // com.letta.mobile.ui.theme.tokens/LettaFieldTokens.BORDER_MILLIS|{}BORDER_MILLIS[0]
+        final fun <get-BORDER_MILLIS>(): kotlin/Int // com.letta.mobile.ui.theme.tokens/LettaFieldTokens.BORDER_MILLIS.<get-BORDER_MILLIS>|<get-BORDER_MILLIS>(){}[0]
+    final const val REST_ALPHA // com.letta.mobile.ui.theme.tokens/LettaFieldTokens.REST_ALPHA|{}REST_ALPHA[0]
+        final fun <get-REST_ALPHA>(): kotlin/Float // com.letta.mobile.ui.theme.tokens/LettaFieldTokens.REST_ALPHA.<get-REST_ALPHA>|<get-REST_ALPHA>(){}[0]
+
+    final val border // com.letta.mobile.ui.theme.tokens/LettaFieldTokens.border|{}border[0]
+        final fun <get-border>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.tokens/LettaFieldTokens.border.<get-border>|<get-border>(){}[0]
+}
+
 final object com.letta.mobile.ui.theme.tokens/LettaRowDimens { // com.letta.mobile.ui.theme.tokens/LettaRowDimens|null[0]
     final const val disabledAlpha // com.letta.mobile.ui.theme.tokens/LettaRowDimens.disabledAlpha|{}disabledAlpha[0]
         final fun <get-disabledAlpha>(): kotlin/Float // com.letta.mobile.ui.theme.tokens/LettaRowDimens.disabledAlpha.<get-disabledAlpha>|<get-disabledAlpha>(){}[0]
@@ -13865,6 +13875,7 @@ final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_Lett
 final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaBeamPalette$stableprop // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaBeamPalette$stableprop|#static{}com_letta_mobile_ui_theme_tokens_LettaBeamPalette$stableprop[0]
 final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaComponentDimens$stableprop // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaComponentDimens$stableprop|#static{}com_letta_mobile_ui_theme_tokens_LettaComponentDimens$stableprop[0]
 final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaControlTokens$stableprop // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaControlTokens$stableprop|#static{}com_letta_mobile_ui_theme_tokens_LettaControlTokens$stableprop[0]
+final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaFieldTokens$stableprop // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaFieldTokens$stableprop|#static{}com_letta_mobile_ui_theme_tokens_LettaFieldTokens$stableprop[0]
 final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaRowDimens$stableprop // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaRowDimens$stableprop|#static{}com_letta_mobile_ui_theme_tokens_LettaRowDimens$stableprop[0]
 final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaShapes$stableprop // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaShapes$stableprop|#static{}com_letta_mobile_ui_theme_tokens_LettaShapes$stableprop[0]
 final val com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaSpaceTokens$stableprop // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaSpaceTokens$stableprop|#static{}com_letta_mobile_ui_theme_tokens_LettaSpaceTokens$stableprop[0]
@@ -15169,6 +15180,7 @@ final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_Lett
 final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaBeamPalette$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaBeamPalette$stableprop_getter|com_letta_mobile_ui_theme_tokens_LettaBeamPalette$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaComponentDimens$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaComponentDimens$stableprop_getter|com_letta_mobile_ui_theme_tokens_LettaComponentDimens$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaControlTokens$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaControlTokens$stableprop_getter|com_letta_mobile_ui_theme_tokens_LettaControlTokens$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaFieldTokens$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaFieldTokens$stableprop_getter|com_letta_mobile_ui_theme_tokens_LettaFieldTokens$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaRowDimens$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaRowDimens$stableprop_getter|com_letta_mobile_ui_theme_tokens_LettaRowDimens$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaShapes$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaShapes$stableprop_getter|com_letta_mobile_ui_theme_tokens_LettaShapes$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaSpaceTokens$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme.tokens/com_letta_mobile_ui_theme_tokens_LettaSpaceTokens$stableprop_getter|com_letta_mobile_ui_theme_tokens_LettaSpaceTokens$stableprop_getter(){}[0]
