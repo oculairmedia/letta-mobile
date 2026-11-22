@@ -105,23 +105,7 @@ internal fun ProjectAgentsCard(
                 }
             }
 
-            state.error?.let { error ->
-                LettaPanel(tone = LettaPanelTone.Error, border = false) {
-                    Column(
-                        modifier = Modifier.padding(LettaDimens.Space.md),
-                        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-                    ) {
-                        Text(
-                            text = error,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                        OutlinedButton(onClick = onRetry) {
-                            Text(stringResource(R.string.action_retry))
-                        }
-                    }
-                }
-            }
+            state.error?.let { error -> ProjectErrorPanel(error = error, onRetry = onRetry) }
 
             if (!state.isLoading && state.agents.isEmpty()) {
                 Text(
@@ -195,6 +179,26 @@ internal fun toneColor(tone: ProjectAgentStatusTone) = when (tone) {
     ProjectAgentStatusTone.Good -> MaterialTheme.colorScheme.tertiary
     ProjectAgentStatusTone.Busy -> MaterialTheme.colorScheme.primary
     ProjectAgentStatusTone.Error -> MaterialTheme.colorScheme.error
+}
+
+/** The error-toned retry panel shared by the project agents and project brief cards. */
+@Composable
+private fun ProjectErrorPanel(error: String, onRetry: () -> Unit) {
+    LettaPanel(tone = LettaPanelTone.Error, border = false) {
+        Column(
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        ) {
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            OutlinedButton(onClick = onRetry) {
+                Text(stringResource(R.string.action_retry))
+            }
+        }
+    }
 }
 
 @androidx.annotation.VisibleForTesting
@@ -462,23 +466,7 @@ internal fun ProjectBriefCard(
                     }
                 }
 
-                brief.error?.let { error ->
-                    LettaPanel(tone = LettaPanelTone.Error, border = false) {
-                        Column(
-                            modifier = Modifier.padding(LettaDimens.Space.md),
-                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-                        ) {
-                            Text(
-                                text = error,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                            )
-                            OutlinedButton(onClick = onRetry) {
-                                Text(stringResource(R.string.action_retry))
-                            }
-                        }
-                    }
-                }
+                brief.error?.let { error -> ProjectErrorPanel(error = error, onRetry = onRetry) }
 
                 if (!brief.isLoading && brief.sections.isEmpty()) {
                     Text(

@@ -6290,10 +6290,10 @@ public final class com/letta/mobile/ui/pairing/ComposableSingletons$PairedDevice
 	public static final field INSTANCE Lcom/letta/mobile/ui/pairing/ComposableSingletons$PairedDevicesListKt;
 	public fun <init> ()V
 	public final fun getLambda$-1224566512$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-198833712$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-286644337$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-358692765$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1737967135$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$714823080$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/pairing/ComposableSingletons$PairingScanScreenKt {

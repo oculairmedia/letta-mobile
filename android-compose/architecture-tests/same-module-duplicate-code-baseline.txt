@@ -19,7 +19,6 @@ android-compose/drawbox/src/commonMain/kotlin/io/ak1/drawbox/DrawBox.kt|android-
 android-compose/drawbox/src/commonMain/kotlin/io/ak1/drawbox/domain/model/Geometry.kt|android-compose/drawbox/src/commonMain/kotlin/io/ak1/drawbox/domain/model/Geometry.kt 21
 android-compose/drawbox/src/commonMain/kotlin/io/ak1/drawbox/domain/model/Serialization.kt|android-compose/drawbox/src/commonMain/kotlin/io/ak1/drawbox/domain/model/Serialization.kt 93
 android-compose/drawbox/src/jvmMain/kotlin/io/ak1/drawbox/ImageDecoder.jvm.kt|android-compose/drawbox/src/wasmJsMain/kotlin/io/ak1/drawbox/ImageDecoder.web.kt 34
-android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldDrawer.kt|android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldDrawer.kt 18
 android-compose/iroh-wrapper-cli/src/main/kotlin/com/letta/mobile/cli/commands/A2aWiring.kt|android-compose/iroh-wrapper-cli/src/main/kotlin/com/letta/mobile/cli/commands/A2aWiring.kt 13
 android-compose/sharedLogic/src/androidMain/kotlin/com/letta/mobile/data/a2ui/A2uiBindingFormatters.android.kt|android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/a2ui/A2uiBindingFormatters.jvm.kt 35
 android-compose/sharedLogic/src/androidMain/kotlin/com/letta/mobile/data/timeline/TimelinePlatform.android.kt|android-compose/sharedLogic/src/hostNativeMain/kotlin/com/letta/mobile/data/timeline/TimelinePlatform.hostNative.kt 11
@@ -79,7 +78,7 @@ android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiBasi
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiBasicWidgets.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiSelectionWidgets.kt 87
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiRendererSupport.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiScheduleWidgets.kt 20
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiRendererSupport.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiToolApprovalWidgets.kt 6
-android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiScheduleWidgets.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiToolApprovalWidgets.kt 24
+android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiScheduleWidgets.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiToolApprovalWidgets.kt 23
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiSelectionWidgets.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiSelectionWidgets.kt 66
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasChromeRegions.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/WheelZoomRegions.kt 10
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasCompactToolbar.kt|android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/canvas/CanvasSelectionBar.kt 10
