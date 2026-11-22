@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 import kotlin.time.Duration.Companion.milliseconds
@@ -46,8 +47,8 @@ class IrohLivenessProbeWiringTest {
     )
 
     /** Production construction: probe cadence comes ONLY from the defaults. */
-    private fun productionTransport(): IrohChannelTransport = IrohChannelTransport(
-        scope = scope,
+    private fun productionTransport(owner: CoroutineScope = scope): IrohChannelTransport = IrohChannelTransport(
+        scope = owner,
         activeConfigProvider = { config },
         testDialer = { dialConfig ->
             IrohConnectionHandle(
@@ -148,11 +149,40 @@ class IrohLivenessProbeWiringTest {
         assertTrue(!transport.isLivenessProbeArmed, "disconnect disarms the probe")
     }
 
+    /**
+     * The probe loop must end with the transport's lifetime, not only on an explicit disconnect.
+     * A loop on a scope of its own kept probing an abandoned handle for the rest of the process
+     * once its owner ended without calling disconnect()/close(), writing liveness telemetry into
+     * whichever history the process had installed by then.
+     */
+    @Test
+    fun endingTheOwnerLifetimeDisarmsTheProbeWithoutDisconnect() = runBlocking {
+        val owner = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val transport = productionTransport(owner)
+        transport.connect("iroh://ticket", "", "device", "test")
+        withTimeout(5.seconds) {
+            while (!transport.isLivenessProbeArmed) delay(10.milliseconds)
+        }
+
+        owner.coroutineContext[kotlinx.coroutines.Job]!!.cancel()
+        val deadline = System.nanoTime() + OWNER_END_GRACE.inWholeNanoseconds
+        while (transport.isLivenessProbeArmed && System.nanoTime() < deadline) delay(10.milliseconds)
+
+        assertFalse(
+            transport.isLivenessProbeArmed,
+            "the liveness loop outlived the transport's owner and keeps probing an abandoned connection",
+        )
+    }
+
     @Test
     fun transportExposesProbeNowForLifecycleResume() {
         val transport: LivenessProbingChannelTransport = productionTransport()
         // Doze/background makes the periodic loop unreliable; the resume hook must
         // exist on the shared interface and be safe to call when idle.
         transport.probeNow()
+    }
+
+    private companion object {
+        val OWNER_END_GRACE = 2.seconds
     }
 }
