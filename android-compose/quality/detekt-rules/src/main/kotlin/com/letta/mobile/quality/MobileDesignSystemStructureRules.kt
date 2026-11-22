@@ -327,7 +327,7 @@ internal class RawMaterialCard(config: Config = Config.empty) : MobileRule(
         val file = expression.containingKtFile
         val card = expression.calleeName()
             ?.takeIf { file.isUiSource() && FOUNDATION_PATH !in file.uiPath() }
-            ?.let { callee -> expression.qualifiedMaterialCard(callee) ?: file.importedMaterialCard(callee) }
+            ?.let { callee -> expression.materialCard(callee, file) }
             ?: return
         report(
             expression,
@@ -337,26 +337,40 @@ internal class RawMaterialCard(config: Config = Config.empty) : MobileRule(
         )
     }
 
-    /** `androidx.compose.material3.Card(...)` written out in full. */
-    private fun KtCallExpression.qualifiedMaterialCard(callee: String): String? {
-        val qualified = parent as? KtDotQualifiedExpression ?: return null
-        val material = qualified.selectorExpression == this &&
-            qualified.receiverExpression.compactText() in MATERIAL_PACKAGES
-        return callee.takeIf { material && it in CARD_CALLS }
+    /**
+     * The Material card this call names, if any. A qualified call is judged only by its receiver
+     * (`androidx.compose.material3.Card()` counts, `Factory.Card()` does not); a bare call goes
+     * through the file's imports.
+     */
+    private fun KtCallExpression.materialCard(callee: String, file: KtFile): String? {
+        val qualified = (parent as? KtDotQualifiedExpression)?.takeIf { it.selectorExpression == this }
+        return when {
+            qualified == null -> file.importedMaterialCard(callee)
+            qualified.receiverExpression.compactText() in MATERIAL_PACKAGES -> callee.takeIf { it in CARD_CALLS }
+            else -> null
+        }
     }
 
-    /** The Material card [callee] names through this file's imports (explicit, aliased or wildcard), if any. */
-    private fun KtFile.importedMaterialCard(callee: String): String? =
-        importDirectives.firstNotNullOfOrNull { directive ->
-            val imported = directive.importedFqName?.asString() ?: return@firstNotNullOfOrNull null
-            val simple = imported.substringAfterLast('.')
-            when {
-                directive.isAllUnder -> callee.takeIf { imported in MATERIAL_PACKAGES && it in CARD_CALLS }
-                imported.substringBeforeLast('.') !in MATERIAL_PACKAGES || simple !in CARD_CALLS -> null
-                (directive.aliasName ?: simple) == callee -> simple
-                else -> null
-            }
+    /**
+     * The Material card a bare [callee] resolves to through this file's imports. An explicit or
+     * aliased import of that name wins over any wildcard, as in Kotlin, so a project `Card`
+     * imported beside `androidx.compose.material3.*` passes.
+     */
+    private fun KtFile.importedMaterialCard(callee: String): String? {
+        val explicit = importDirectives.firstOrNull { directive ->
+            !directive.isAllUnder && directive.importedName?.asString() == callee
         }
+        val fromWildcard = importDirectives.any { directive ->
+            directive.isAllUnder && directive.importedFqName?.asString() in MATERIAL_PACKAGES
+        }
+        val imported = explicit?.importedFqName?.asString()
+        return when {
+            explicit == null -> callee.takeIf { fromWildcard && it in CARD_CALLS }
+            imported?.substringBeforeLast('.') in MATERIAL_PACKAGES ->
+                imported?.substringAfterLast('.')?.takeIf { it in CARD_CALLS }
+            else -> null
+        }
+    }
 
     private companion object {
         val CARD_CALLS = setOf("Card", "OutlinedCard", "ElevatedCard")

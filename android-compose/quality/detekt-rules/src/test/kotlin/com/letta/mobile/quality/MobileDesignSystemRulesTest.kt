@@ -256,6 +256,15 @@ class MobileDesignSystemRulesTest {
         assertEquals(2, RawMaterialCard().lintAt(root, FEATURE, wildcard).size)
         assertEquals(1, RawMaterialCard().lintAt(root, FEATURE, qualified).size)
         assertEquals(0, RawMaterialCard().lintAt(root, FEATURE, projectType).size)
+        val otherReceiver = "import androidx.compose.material3.Card\nfun a() = Factory.Card()\nfun b() = Card {}\n"
+        assertEquals(1, RawMaterialCard().lintAt(root, FEATURE, otherReceiver).size)
+        val shadowedWildcard = """
+            import androidx.compose.material3.*
+            import com.letta.mobile.data.canvas.Card
+            fun a() = Card(label = "x")
+            fun b() = OutlinedCard {}
+        """.trimIndent()
+        assertEquals(1, RawMaterialCard().lintAt(root, FEATURE, shadowedWildcard).size)
         assertEquals(2, RawMaterialCard().lintAt(root, COMPONENT, explicit).size)
         assertEquals(2, RawMaterialCard().lintAt(root, THEME, explicit).size)
         assertEquals(0, RawMaterialCard().lintAt(root, FOUNDATION, explicit).size)
