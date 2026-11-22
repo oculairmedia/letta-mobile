@@ -78,7 +78,12 @@ class ContextPaletteSnapshotTest {
             maxTokens = window,
             freeTokens = window - used,
             segments = sizes.map { (kind, tokens) -> ContextWindowSegment(kind, kind.name, tokens, tokens.toFloat() / window) },
-            freeSegment = ContextWindowSegment(ContextWindowSegmentKind.FreeSpace, "Free", window - used, (window - used).toFloat() / window),
+            freeSegment = ContextWindowSegment(
+                kind = ContextWindowSegmentKind.FreeSpace,
+                label = "Free",
+                tokens = window - used,
+                fraction = (window - used).toFloat() / window,
+            ),
         )
     }
 
