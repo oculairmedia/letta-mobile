@@ -13,3 +13,7 @@
 
 Fixture: `feed.subscribe/feed-v1.json`, replayed through the real route over a seeded journal and decoded by the client
 types. The cases name their own host state (`host_state.feed.turns`): each turn is written through the journal's writer.
+
+Live push: a host that advertises `conversation_feed_push_v1` also pushes `feed_delta` frames to the connections that have read
+this method for a conversation (see the contract's Live push section; fixture `feed-delta/v1.json`). Calling this method for a
+conversation registers the caller as a viewer of it; a refused call does not.

@@ -338,3 +338,11 @@ private val LOST_EVENTS = mapOf(
     OutboxState.Accepted to listOf(OutboxEvent.EchoTimeout, OutboxEvent.ProbeNoEcho),
     OutboxState.Unknown to listOf(OutboxEvent.ProbeNoEcho),
 )
+
+/** Confirms each of [otids] in [scope]'s outbox as echoed, in one transaction; whether any was still pending. */
+internal suspend fun TimelineBoundedStore.confirmPendingEchoes(scope: TimelineScope, otids: Set<String>): Boolean =
+    transaction(scope) {
+        val confirmed = otids.count { CanonicalPendingLocalStore.confirmEcho(this, it) } > 0
+        if (confirmed) nextRevision()
+        confirmed
+    }

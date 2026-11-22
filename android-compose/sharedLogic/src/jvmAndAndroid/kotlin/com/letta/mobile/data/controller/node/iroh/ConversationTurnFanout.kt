@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.runtime.turnStreamIdentityFor
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -182,6 +183,8 @@ internal class ConversationTurnFanout(
      * scoped). No-op when the turn is not parkable (no client_message_id).
      */
     private val trackInitiatorFrame: (deltaJson: String) -> Unit = {},
+    /** Records the synthesized user echo in the turn's journal; never replayed to the initiator, never parked. */
+    private val journalUserEcho: (deltaJson: String) -> Unit = {},
     /**
      * The turn's prompt client message id, the turn id stamped on the deltas
      * the host synthesizes itself (tool projection, user echo, dangling-call settlement).
@@ -457,7 +460,8 @@ internal class ConversationTurnFanout(
      * redial; the user echo is derived deterministically from the resent input
      * and the reconnecting initiator re-owns its optimistic row, so echoing it is
      * pure fanout — it must NOT count toward initiator parking (which stays
-     * scoped to assistant/tool/terminal deltas). Uses [broadcastDeltaBodyNoPark].
+     * scoped to assistant/tool/terminal deltas). It does reach the turn's journal ([journalUserEcho]) so a viewer
+     * reading the feed sees the prompt; the journal's redial replay skips it. Uses [broadcastDeltaBodyNoPark].
      */
     suspend fun broadcastUserEcho(
         clientMessageId: String,
@@ -479,7 +483,11 @@ internal class ConversationTurnFanout(
             put("seq_id", USER_ECHO_SEQ_ID)
             put("content", content)
         }
-        broadcastDeltaBodyNoPark(synthesizedIdentity.stampDelta(delta))
+        val stamped = synthesizedIdentity.stampDelta(delta)
+        // The feed is the sole row source of its viewers, so the prompt belongs in the journal too. That is not parking:
+        // the initiator's redial replay skips it (FeedJournalStore.replayForInitiator).
+        journalUserEcho(stamped.toString())
+        broadcastDeltaBodyNoPark(stamped)
     }
 
     /**
@@ -616,9 +624,11 @@ internal class ConversationTurnFanout(
                 // letta-mobile-qygvv.3: the dead initiator handle gets nothing more. A NEW
                 // handle from the same peer (its redial) is an ordinary observer.
                 detached && viewer === initiatorViewer -> Unit
-                detached -> observers += viewer
-                viewer === initiatorViewer || (initiatorId != null && viewer.connectionId == initiatorId) ->
+                !detached && (viewer === initiatorViewer || (initiatorId != null && viewer.connectionId == initiatorId)) ->
                     initiators += viewer
+                // A feed reader takes this conversation from feed_delta alone: streaming it too would send every row twice.
+                // The live initiator above keeps its own turn's stream (its send and redial parking ride on it).
+                viewer.readsFeedOf(ConversationId(conversationId)) -> Unit
                 else -> observers += viewer
             }
         }

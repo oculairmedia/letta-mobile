@@ -217,6 +217,7 @@ val contractTestFixtures = listOf(
     Triple("ShellStatePropose", "shell.state.propose/shell-state-v1.json", "com.letta.mobile.data.shellstate.shared"),
     Triple("FeedSubscribe", "feed.subscribe/feed-v1.json", "com.letta.mobile.data.feed.wire"),
     Triple("AgentListSlim", "agent.list/slim-list-v1.json", "com.letta.mobile.data.repository.iroh"),
+    Triple("FeedDelta", "feed-delta/v1.json", "com.letta.mobile.data.feed.wire"),
 )
 contractTestFixtures.forEach { (name, fixture, packageName) ->
     val generate = tasks.register("generate${name}TestData") {

@@ -1,0 +1,154 @@
+{
+  "frame": "feed_delta",
+  "version": 1,
+  "capability": "conversation_feed_push_v1",
+  "required_capability": "chat.read",
+  "spec": "docs/reference/contracts/conversation-feed-v1.md",
+  "note": "Synthetic ids only. The host's clock is fixed so its epoch is 1000. Each case registers its viewers on the real connection registry, writes the turns through the journal's writer, lets one frame budget pass and lists the frames each viewer received. A connection that reads a conversation through the feed receives no stream_delta fanout for it (FeedViewerStreamSplitTest); these cases list feed_delta frames only. A viewer is {conversation: the id it views, pushes: it has read the feed, authorized_agent_ids: its agent scope or null, bound_conversation_ids: its conversation scope or null}. A write is {agent_id, conversation_id, turn, deltas, close}; a delta {synthetic_tool_return_bytes: n, tool_call_id: id} is not used here.",
+  "cases": [
+    {
+      "name": "one frame carries everything written within a frame budget",
+      "viewers": {
+        "phone": {"conversation": "conv-1", "pushes": true}
+      },
+      "writes": [
+        {
+          "agent_id": "agent-a", "conversation_id": "conv-1", "turn": "cm-1", "close": true,
+          "deltas": [
+            {"message_type": "tool_call_message", "tool_call_id": "t1"},
+            {"message_type": "stop_reason", "stop_reason": "end_turn"}
+          ]
+        }
+      ],
+      "expected_frames": {
+        "phone": [
+          {
+            "type": "feed_delta", "conversation": "conv-1", "agent_id": "agent-a", "epoch": 1000, "seq": 4, "after_seq": 0,
+            "entries": [
+              {"epoch": 1000, "seq": 1, "kind": "turn_open", "turn": "cm-1", "payload": {}},
+              {"epoch": 1000, "seq": 2, "kind": "stream_delta", "turn": "cm-1", "payload": {"message_type": "tool_call_message", "tool_call_id": "t1"}},
+              {"epoch": 1000, "seq": 3, "kind": "stream_delta", "turn": "cm-1", "payload": {"message_type": "stop_reason", "stop_reason": "end_turn"}},
+              {"epoch": 1000, "seq": 4, "kind": "turn_closed", "turn": "cm-1", "payload": {"terminal_observed": true}}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "a cumulative snapshot replaces its predecessor and the replaced seq is a hole",
+      "viewers": {
+        "phone": {"conversation": "conv-1", "pushes": true}
+      },
+      "writes": [
+        {
+          "agent_id": "agent-a", "conversation_id": "conv-1", "turn": "cm-1", "close": false,
+          "deltas": [
+            {"message_type": "assistant_message", "logical_message_id": "lm-1", "content": "Hel", "text_seq": 1},
+            {"message_type": "assistant_message", "logical_message_id": "lm-1", "content": "Hello", "text_seq": 2}
+          ]
+        }
+      ],
+      "expected_frames": {
+        "phone": [
+          {
+            "type": "feed_delta", "conversation": "conv-1", "agent_id": "agent-a", "epoch": 1000, "seq": 3, "after_seq": 0,
+            "entries": [
+              {"epoch": 1000, "seq": 1, "kind": "turn_open", "turn": "cm-1", "payload": {}},
+              {"epoch": 1000, "seq": 3, "kind": "stream_delta", "turn": "cm-1", "payload": {"message_type": "assistant_message", "logical_message_id": "lm-1", "content": "Hello", "text_seq": 2}}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "only viewers of the written conversation receive its frames",
+      "viewers": {
+        "viewing-it": {"conversation": "conv-1", "pushes": true},
+        "viewing-another": {"conversation": "conv-2", "pushes": true}
+      },
+      "writes": [
+        {
+          "agent_id": "agent-a", "conversation_id": "conv-1", "turn": "cm-1", "close": false,
+          "deltas": [{"message_type": "tool_call_message", "tool_call_id": "t1"}]
+        }
+      ],
+      "expected_frames": {
+        "viewing-it": [
+          {
+            "type": "feed_delta", "conversation": "conv-1", "agent_id": "agent-a", "epoch": 1000, "seq": 2, "after_seq": 0,
+            "entries": [
+              {"epoch": 1000, "seq": 1, "kind": "turn_open", "turn": "cm-1", "payload": {}},
+              {"epoch": 1000, "seq": 2, "kind": "stream_delta", "turn": "cm-1", "payload": {"message_type": "tool_call_message", "tool_call_id": "t1"}}
+            ]
+          }
+        ],
+        "viewing-another": []
+      }
+    },
+    {
+      "name": "a viewer that never read the feed is not pushed to",
+      "viewers": {
+        "old-client": {"conversation": "conv-1", "pushes": false}
+      },
+      "writes": [
+        {
+          "agent_id": "agent-a", "conversation_id": "conv-1", "turn": "cm-1", "close": false,
+          "deltas": [{"message_type": "tool_call_message", "tool_call_id": "t1"}]
+        }
+      ],
+      "expected_frames": {
+        "old-client": []
+      }
+    },
+    {
+      "name": "an agent-scoped viewer receives only the journals of agents in its scope",
+      "viewers": {
+        "in-scope": {"conversation": "conv-1", "pushes": true, "authorized_agent_ids": ["agent-a"]},
+        "out-of-scope": {"conversation": "conv-1", "pushes": true, "authorized_agent_ids": ["agent-b"]}
+      },
+      "writes": [
+        {
+          "agent_id": "agent-a", "conversation_id": "conv-1", "turn": "cm-1", "close": false,
+          "deltas": [{"message_type": "tool_call_message", "tool_call_id": "t1"}]
+        }
+      ],
+      "expected_frames": {
+        "in-scope": [
+          {
+            "type": "feed_delta", "conversation": "conv-1", "agent_id": "agent-a", "epoch": 1000, "seq": 2, "after_seq": 0,
+            "entries": [
+              {"epoch": 1000, "seq": 1, "kind": "turn_open", "turn": "cm-1", "payload": {}},
+              {"epoch": 1000, "seq": 2, "kind": "stream_delta", "turn": "cm-1", "payload": {"message_type": "tool_call_message", "tool_call_id": "t1"}}
+            ]
+          }
+        ],
+        "out-of-scope": []
+      }
+    },
+    {
+      "name": "a viewer bound to a conversation never receives the bare default's frames, but its alias",
+      "viewers": {
+        "bound-bare": {"conversation": "default", "pushes": true, "bound_conversation_ids": ["default"]},
+        "bound-alias": {"conversation": "conv-default-agent-a", "pushes": true, "bound_conversation_ids": ["conv-default-agent-a"]}
+      },
+      "writes": [
+        {
+          "agent_id": "agent-a", "conversation_id": "default", "turn": "cm-1", "close": false,
+          "deltas": [{"message_type": "tool_call_message", "tool_call_id": "t1"}]
+        }
+      ],
+      "expected_frames": {
+        "bound-bare": [],
+        "bound-alias": [
+          {
+            "type": "feed_delta", "conversation": "default", "agent_id": "agent-a", "epoch": 1000, "seq": 2, "after_seq": 0,
+            "entries": [
+              {"epoch": 1000, "seq": 1, "kind": "turn_open", "turn": "cm-1", "payload": {}},
+              {"epoch": 1000, "seq": 2, "kind": "stream_delta", "turn": "cm-1", "payload": {"message_type": "tool_call_message", "tool_call_id": "t1"}}
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

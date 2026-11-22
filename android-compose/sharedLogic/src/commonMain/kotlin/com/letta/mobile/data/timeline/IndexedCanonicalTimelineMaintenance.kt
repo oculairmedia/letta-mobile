@@ -35,6 +35,8 @@ class IndexedCanonicalTimelineMaintenance(
             coordinator.retainRepair(owner)
             jobs[owner] = scope.launch(start = kotlinx.coroutines.CoroutineStart.ATOMIC) {
                 try {
+                    // A conversation read through the host feed is repaired by the host: its ledger merges nothing.
+                    if (coordinator.readsThroughFeed(owner)) return@launch
                     for (wait in DanglingToolCallResolver.DEFAULT_BACKOFF_MS) {
                         delay(wait)
                         val result = coordinator.reconcileRecent(owner)

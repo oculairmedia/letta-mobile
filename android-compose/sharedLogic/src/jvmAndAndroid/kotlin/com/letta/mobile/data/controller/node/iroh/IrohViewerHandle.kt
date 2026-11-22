@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
@@ -64,6 +65,17 @@ internal class IrohViewerHandle(
     private val conversationEventsGate: () -> Boolean = { false },
 ) : ViewerHandle {
     /**
+     * Whether this connection has read the feed and may be pushed `feed_delta` frames; evaluated at send time. Set by the
+     * owning connection before the handle is shared. Default: no.
+     */
+    @Volatile
+    var feedPushGate: () -> Boolean = { false }
+
+    /** Whether this connection reads a conversation through the feed; evaluated at send time. Set like [feedPushGate]. */
+    @Volatile
+    var feedReaderGate: (ConversationId) -> Boolean = { false }
+
+    /**
      * The connection's admin RPC context while it is authenticated, null otherwise; evaluated at send time for
      * method-scoped pushes. Set by the owning connection before the handle is shared. Default: none.
      */
@@ -76,6 +88,10 @@ internal class IrohViewerHandle(
         receivesConversationEvents() && conversationActivityGate(agentId.value)
 
     override fun receivesConversationEvents(): Boolean = conversationEventsGate()
+
+    override fun receivesFeedPushes(): Boolean = feedPushGate()
+
+    override fun readsFeedOf(conversation: ConversationId): Boolean = feedReaderGate(conversation)
 
     override fun adminContext(): AdminRpcRequestContext? = adminContextGate()
 

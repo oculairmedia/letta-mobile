@@ -1,16 +1,20 @@
 # Conversation feed v1: the host's durable, resumable record of every turn
 
-Status: **v1, host journal and `feed.subscribe` implemented; live push and client adoption are later stages.**
+Status: **v1, host journal, `feed.subscribe` and the live `feed_delta` push implemented; the shared chat presentation draws a conversation from them behind the capabilities, and a feed reader leaves the `stream_delta` fanout for it. Turn commands and removing the old client path are later stages.**
 Epic: letta-mobile-p3hlw (host owns turns and the canonical timeline; clients become views).
 
-Fixture: `android-compose/sharedLogic/src/commonTest/resources/contracts/feed.subscribe/feed-v1.json`, with a short
-spec in [feed.subscribe/feed-v1.md](feed.subscribe/feed-v1.md).
+Fixtures: `android-compose/sharedLogic/src/commonTest/resources/contracts/feed.subscribe/feed-v1.json`, with a short
+spec in [feed.subscribe/feed-v1.md](feed.subscribe/feed-v1.md), and `.../contracts/feed-delta/v1.json` for the live push
+(see Live push).
 Wire names, limits and codes: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/feed/wire/`.
-Host journal, store and route: `android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/feed/`;
+Host journal, store, route and push: `android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/feed/`;
 the turn-side interface: `TurnJournal` in `.../node/iroh/`; the producer: `NodeTurnHost`.
+Client: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/feed/client/` (`FeedTimelineSource`,
+`FeedFollower`) and `.../data/feed/channel/` (the channel transport binding).
 Contract tests: `FeedFixtureTest` (commonTest) decodes every case through the client types; `FeedRoutesTest` and
 `FeedJournalStoreTest` (jvmTest) replay them through the real route and the real store; `WireContractsTest` (jvmTest)
-runs every case through the full host router.
+runs every case through the full host router; `FeedDeltaFixtureTest` (jvmTest) writes the `feed-delta` cases through the real
+journal, registry and pusher.
 
 ## What this is, and why
 
@@ -68,12 +72,13 @@ A **cursor** is `{"epoch": <int >= 0>, "seq": <int >= 0>}`: the last entry a cli
 | `payload` | `stream_delta`: one App Server stream delta body, verbatim (the object that is `stream_delta.delta` on the live stream, already stamped with `logical_message_id`/`turn_id`). `turn_closed`: `{"terminal_observed": bool, "host_restarted"?: true}`. `turn_open`: `{}`. |
 | `pointer` | Set instead of `payload` for a payload over the inline cap. Exactly one of the two is present. |
 
-`feed_delta` is reserved as the frame type of a later live push; a v1 host never sends it and a client ignores it.
+`feed_delta` is the frame type of the live push (see Live push). A client that does not know it ignores it.
 
 ## `feed.subscribe`
 
-`feed.subscribe` is an `admin_rpc` method. Despite the name, v1 is a **read from a cursor**: ask again to see later entries
-(the host pushes nothing yet), which is what a reconnecting client does anyway.
+`feed.subscribe` is an `admin_rpc` method. Despite the name, it is a **read from a cursor**: ask again to see later entries,
+which is what a reconnecting client does. A host that also advertises `conversation_feed_push_v1` pushes later entries as
+`feed_delta` frames (see Live push), and the read is how a client catches up and recovers from anything the push cannot carry.
 
 Params:
 
@@ -129,6 +134,105 @@ Unscoped peers read any conversation. (A conversation id whose owner the journal
 | `Unknown method: feed.subscribe` | A host that predates the contract. |
 
 Clients map unknown codes to an "unknown" error; they must not fail on a new code.
+
+## Live push: `feed_delta`
+
+Status: additive to v1; a host announces it with the capability **`conversation_feed_push_v1`**, advertised beside
+`conversation_feed_v1` (a host without it never sends the frame, and a client then reads `feed.subscribe` on its own schedule).
+
+### Who is pushed to
+
+A connection is pushed `feed_delta` frames for a conversation when all of these hold, **evaluated per frame at send time**,
+exactly as `pins_updated` and `shell_state_updated` are gated per viewer:
+
+1. It is a registered viewer of the conversation: it has called `feed.subscribe` (or `message.list`) for it. The viewer set is the
+   host's one registry of conversation viewers; a connection views one conversation at a time, and a rejected read leaves it
+   unregistered, so a refused viewer is never pushed to. A frame for a conversation nobody views is never built: an idle host
+   does no push work and writes no frame.
+2. It has called `feed.subscribe` on this connection (a client that never reads the feed never receives one).
+3. Its granted capabilities allow `feed.subscribe` (`chat.read`).
+4. It may read the conversation under the name it views it by, by the rule `feed.subscribe` applies: a peer bound to
+   conversations never receives the bare `default`'s frames (it names no agent) but receives its `conv-default-<agent>` alias's;
+   a peer bound to conversations receives only the one it views.
+5. The journal's owning agent is in its agent scope; an agent-scoped peer receives no frame of another agent's journal.
+
+A peer that fails any check receives nothing and is not told why. Telemetry carries counts only, never ids.
+
+### Feed readers leave the stream fanout
+
+A connection whose `feed.subscribe` for a conversation succeeded is a **feed reader** of it for the rest of the connection.
+The turn fanout sends a feed reader **no `stream_delta` frames** for that conversation: it takes the conversation's turns from
+`feed_delta` alone, so no row travels twice and no row is folded twice. Every other connection keeps the `stream_delta`
+fanout unchanged: one that never read the feed, one that reads another conversation's feed, and the turn's own **initiator**
+(its send and its redial parking ride on its own stream; a client that initiates a turn on a feed-backed conversation folds
+nothing from that stream into its list). A refused `feed.subscribe` makes no feed reader. Test:
+`FeedViewerStreamSplitTest`.
+
+### The frame
+
+```json
+{"type": "feed_delta", "conversation": "conv-1", "agent_id": "agent-a", "epoch": 1700000000000,
+ "seq": 44, "after_seq": 41, "entries": [ ... ]}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `conversation` | The journal's key: the bare `default` for an agent's default conversation (whichever spelling the viewer used), else the conversation id. |
+| `agent_id` | The agent owning the journal. A client matches a frame to its conversation by this pair, never by the spelling it asked with. |
+| `epoch` | The host start that wrote the entries. |
+| `seq` | The seq of the newest entry the frame carries, or the head when it carries none. |
+| `after_seq` | The seq this frame continues from: the head before its first entry was written. |
+| `entries` | The entries after `after_seq` up to `seq`, oldest first, in the shape `feed.subscribe` returns them. Empty in a resync marker. |
+
+**Coalescing.** The host writes at most one frame per conversation per frame budget (about 32 ms): the entries written within it
+travel in one frame, and a cumulative snapshot superseded inside it is not sent, so a streamed message is a few frames, not one
+per chunk. A frame carries at most 128 entries; a burst past it, or one retention compacted past, is sent as a **resync marker**:
+no entries, `seq` and `after_seq` both the head.
+
+**Bounded.** A connection already four frames behind drops the frame instead of queuing it, and a write that does not finish in
+five seconds is abandoned. Dropping loses nothing: the next frame's `after_seq` is above the client's cursor, which tells it.
+
+### What a client does
+
+A client holds one cursor per conversation. On a frame it:
+
+1. Ignores a frame whose `conversation` and `agent_id` are not the conversation it follows.
+2. **Resyncs** when `epoch` differs from its cursor's epoch, when `after_seq` is above its cursor's `seq` (it missed entries), or
+   when the frame is a marker above its cursor. A resync is a `feed.subscribe` read from its cursor, repeated while `has_more`;
+   the client never applies a frame it cannot follow and never guesses what a hole held.
+3. Otherwise applies the entries above its cursor in order and moves the cursor to `seq`. A frame at or below the cursor is a
+   repeat and changes nothing.
+4. On every new connection reads from its cursor before trusting any push: frames sent while it was away are gone.
+
+A seq hole is never a loss signal, in a frame as in a page. A `snapshot` page replaces what the client holds; a `replay` page
+appends only what is above the cursor.
+
+Fixture: `.../contracts/feed-delta/v1.json`. Each case registers viewers on the real registry, writes turns through the real
+journal, and lists the exact frames each viewer received (and that the others received none). Tests: `FeedDeltaFixtureTest`,
+`FeedPusherTest` (coalescing, `after_seq` continuity, marker, zero work when unviewed), `FeedTimelineSourceTest` and
+`FeedFollowerTest` (the client rules).
+
+## Client
+
+`FeedTimelineSource` renders one conversation from the feed alone, behind both capabilities (`FeedTimelineSource.isAvailable`);
+against any other host the old path stays in place.
+
+**Selection, per conversation (until the old path is removed).** The shared `CanonicalTimelinePresentation` is opened with the
+feed's rows (`FeedTimelineSource.rowsFor`, bound to the session channel by `channelFeedRows`) when the host advertises both
+capabilities, and without them otherwise; Android and desktop only pass their channel. A feed-backed presentation draws the
+feed's rows plus the prompts still being sent, pages no ledger history, and while it is attached the ledger runs no
+`message.list` reconcile and no turn-end repair for that conversation: one writer, never two. A prompt the feed echoes leaves
+the pending store. A presentation opened on a target message (search, deep link) reads the ledger. Older history for a
+feed-backed conversation is what the journal retains (see Retention); turns this host never journaled do not appear.
+Tests: `FeedPresentationSelectionTest`, `FeedTimelineRecompositionTest`. It reads `feed.subscribe` pages and applies `feed_delta` frames by the rules
+above, folds each entry with the live reducer and projection the app already uses (so a row has the id, run and key it has
+everywhere), and publishes one ordered list. A cumulative snapshot replaces its row where it stands: a row keeps its key and
+its instance unless its own content changed, so the list under it redraws only that row. `FeedTimelineMetrics` counts list
+replacements (rows removed or reordered, or a host snapshot), rows redrawn, pages read, resyncs and frames applied, and the
+source reports `generation.replaced` for a replacement, the name the old path uses, so one device capture compares both.
+
+The host journals the user's prompt echo (`user_message`) beside the turn, so a viewer's list holds the prompt; the
+initiator's redial replay still skips it.
 
 ## Chunking and large payloads
 
@@ -200,6 +304,6 @@ device A stops the turn on B; settle produces exactly one in-place update.
 
 ## Out of scope for v1
 
-Live push (`feed_delta` frames), commands (send, stop, approve with idempotency keys), a host-to-client channel for
+Commands (send, stop, approve with idempotency keys), a host-to-client channel for
 device-owned tools, local mode (the in-process host restarts with the app; resume semantics are open), and any change to
 letta.js's own cancel when the wrapper's connection drops.

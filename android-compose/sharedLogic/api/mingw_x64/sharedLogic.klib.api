@@ -1470,6 +1470,20 @@ final enum class com.letta.mobile.data.dreaming/DreamUnsupportedReason : kotlin/
     final fun values(): kotlin/Array<com.letta.mobile.data.dreaming/DreamUnsupportedReason> // com.letta.mobile.data.dreaming/DreamUnsupportedReason.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.feed.client/FeedResync : kotlin/Enum<com.letta.mobile.data.feed.client/FeedResync> { // com.letta.mobile.data.feed.client/FeedResync|null[0]
+    enum entry EpochChanged // com.letta.mobile.data.feed.client/FeedResync.EpochChanged|null[0]
+    enum entry Gap // com.letta.mobile.data.feed.client/FeedResync.Gap|null[0]
+    enum entry Marker // com.letta.mobile.data.feed.client/FeedResync.Marker|null[0]
+    enum entry NoCursor // com.letta.mobile.data.feed.client/FeedResync.NoCursor|null[0]
+    enum entry Reconnected // com.letta.mobile.data.feed.client/FeedResync.Reconnected|null[0]
+
+    final val entries // com.letta.mobile.data.feed.client/FeedResync.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.feed.client/FeedResync> // com.letta.mobile.data.feed.client/FeedResync.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.feed.client/FeedResync // com.letta.mobile.data.feed.client/FeedResync.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.feed.client/FeedResync> // com.letta.mobile.data.feed.client/FeedResync.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.health/ServerHealthState : kotlin/Enum<com.letta.mobile.data.health/ServerHealthState> { // com.letta.mobile.data.health/ServerHealthState|null[0]
     enum entry OFFLINE // com.letta.mobile.data.health/ServerHealthState.OFFLINE|null[0]
     enum entry ONLINE // com.letta.mobile.data.health/ServerHealthState.ONLINE|null[0]
@@ -6186,6 +6200,17 @@ abstract interface com.letta.mobile.data.dreaming/DreamingRepository { // com.le
     abstract suspend fun runNow(com.letta.mobile.data.dreaming/DreamTarget, kotlin/String? = ...): com.letta.mobile.data.dreaming/DreamOutcome<com.letta.mobile.data.dreaming/DreamRunStart> // com.letta.mobile.data.dreaming/DreamingRepository.runNow|runNow(com.letta.mobile.data.dreaming.DreamTarget;kotlin.String?){}[0]
     abstract suspend fun save(com.letta.mobile.data.dreaming/DreamTarget, com.letta.mobile.data.dreaming/DreamSettingsChange): com.letta.mobile.data.dreaming/DreamOutcome<com.letta.mobile.data.dreaming/DreamSettings> // com.letta.mobile.data.dreaming/DreamingRepository.save|save(com.letta.mobile.data.dreaming.DreamTarget;com.letta.mobile.data.dreaming.DreamSettingsChange){}[0]
     abstract suspend fun settings(com.letta.mobile.data.dreaming/DreamTarget): com.letta.mobile.data.dreaming/DreamOutcome<com.letta.mobile.data.dreaming/DreamSettings> // com.letta.mobile.data.dreaming/DreamingRepository.settings|settings(com.letta.mobile.data.dreaming.DreamTarget){}[0]
+}
+
+abstract interface com.letta.mobile.data.feed.client/FeedLink { // com.letta.mobile.data.feed.client/FeedLink|null[0]
+    abstract val connection // com.letta.mobile.data.feed.client/FeedLink.connection|{}connection[0]
+        abstract fun <get-connection>(): kotlinx.coroutines.flow/Flow<kotlin/String?> // com.letta.mobile.data.feed.client/FeedLink.connection.<get-connection>|<get-connection>(){}[0]
+    abstract val hostCapabilities // com.letta.mobile.data.feed.client/FeedLink.hostCapabilities|{}hostCapabilities[0]
+        abstract fun <get-hostCapabilities>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.feed.client/FeedLink.hostCapabilities.<get-hostCapabilities>|<get-hostCapabilities>(){}[0]
+    abstract val pushes // com.letta.mobile.data.feed.client/FeedLink.pushes|{}pushes[0]
+        abstract fun <get-pushes>(): kotlinx.coroutines.flow/Flow<kotlinx.serialization.json/JsonObject> // com.letta.mobile.data.feed.client/FeedLink.pushes.<get-pushes>|<get-pushes>(){}[0]
+
+    abstract suspend fun call(kotlin/String, kotlinx.serialization.json/JsonObject): com.letta.mobile.data.feed.client/FeedReply // com.letta.mobile.data.feed.client/FeedLink.call|call(kotlin.String;kotlinx.serialization.json.JsonObject){}[0]
 }
 
 abstract interface com.letta.mobile.data.health/IServerHealthRepository { // com.letta.mobile.data.health/IServerHealthRepository|null[0]
@@ -12371,6 +12396,40 @@ sealed interface com.letta.mobile.data.dreaming/DreamHistoryState { // com.letta
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.dreaming/DreamHistoryState.Loading.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.dreaming/DreamHistoryState.Loading.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.dreaming/DreamHistoryState.Loading.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.feed.client/FeedFrameOutcome { // com.letta.mobile.data.feed.client/FeedFrameOutcome|null[0]
+    final class Applied : com.letta.mobile.data.feed.client/FeedFrameOutcome { // com.letta.mobile.data.feed.client/FeedFrameOutcome.Applied|null[0]
+        constructor <init>(kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta>) // com.letta.mobile.data.feed.client/FeedFrameOutcome.Applied.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.feed.wire.FeedDelta>){}[0]
+
+        final val entries // com.letta.mobile.data.feed.client/FeedFrameOutcome.Applied.entries|{}entries[0]
+            final fun <get-entries>(): kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta> // com.letta.mobile.data.feed.client/FeedFrameOutcome.Applied.entries.<get-entries>|<get-entries>(){}[0]
+
+        final fun component1(): kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta> // com.letta.mobile.data.feed.client/FeedFrameOutcome.Applied.component1|component1(){}[0]
+        final fun copy(kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta> = ...): com.letta.mobile.data.feed.client/FeedFrameOutcome.Applied // com.letta.mobile.data.feed.client/FeedFrameOutcome.Applied.copy|copy(kotlin.collections.List<com.letta.mobile.data.feed.wire.FeedDelta>){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedFrameOutcome.Applied.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.feed.client/FeedFrameOutcome.Applied.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.feed.client/FeedFrameOutcome.Applied.toString|toString(){}[0]
+    }
+
+    final class Resync : com.letta.mobile.data.feed.client/FeedFrameOutcome { // com.letta.mobile.data.feed.client/FeedFrameOutcome.Resync|null[0]
+        constructor <init>(com.letta.mobile.data.feed.client/FeedResync) // com.letta.mobile.data.feed.client/FeedFrameOutcome.Resync.<init>|<init>(com.letta.mobile.data.feed.client.FeedResync){}[0]
+
+        final val reason // com.letta.mobile.data.feed.client/FeedFrameOutcome.Resync.reason|{}reason[0]
+            final fun <get-reason>(): com.letta.mobile.data.feed.client/FeedResync // com.letta.mobile.data.feed.client/FeedFrameOutcome.Resync.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.feed.client/FeedResync // com.letta.mobile.data.feed.client/FeedFrameOutcome.Resync.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.feed.client/FeedResync = ...): com.letta.mobile.data.feed.client/FeedFrameOutcome.Resync // com.letta.mobile.data.feed.client/FeedFrameOutcome.Resync.copy|copy(com.letta.mobile.data.feed.client.FeedResync){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedFrameOutcome.Resync.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.feed.client/FeedFrameOutcome.Resync.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.feed.client/FeedFrameOutcome.Resync.toString|toString(){}[0]
+    }
+
+    final object Stale : com.letta.mobile.data.feed.client/FeedFrameOutcome { // com.letta.mobile.data.feed.client/FeedFrameOutcome.Stale|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedFrameOutcome.Stale.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.feed.client/FeedFrameOutcome.Stale.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.feed.client/FeedFrameOutcome.Stale.toString|toString(){}[0]
     }
 }
 
@@ -42200,6 +42259,128 @@ final class com.letta.mobile.data.dreaming/DreamingState { // com.letta.mobile.d
     final fun toString(): kotlin/String // com.letta.mobile.data.dreaming/DreamingState.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.feed.client/FeedFollower { // com.letta.mobile.data.feed.client/FeedFollower|null[0]
+    constructor <init>() // com.letta.mobile.data.feed.client/FeedFollower.<init>|<init>(){}[0]
+
+    final var cursor // com.letta.mobile.data.feed.client/FeedFollower.cursor|{}cursor[0]
+        final fun <get-cursor>(): com.letta.mobile.data.feed.wire/FeedCursor? // com.letta.mobile.data.feed.client/FeedFollower.cursor.<get-cursor>|<get-cursor>(){}[0]
+
+    final fun onFrame(com.letta.mobile.data.feed.wire/FeedDeltaFrame): com.letta.mobile.data.feed.client/FeedFrameOutcome // com.letta.mobile.data.feed.client/FeedFollower.onFrame|onFrame(com.letta.mobile.data.feed.wire.FeedDeltaFrame){}[0]
+    final fun onPage(com.letta.mobile.data.feed.wire/FeedPage): com.letta.mobile.data.feed.client/FeedPageOutcome // com.letta.mobile.data.feed.client/FeedFollower.onPage|onPage(com.letta.mobile.data.feed.wire.FeedPage){}[0]
+    final fun reset() // com.letta.mobile.data.feed.client/FeedFollower.reset|reset(){}[0]
+}
+
+final class com.letta.mobile.data.feed.client/FeedPageOutcome { // com.letta.mobile.data.feed.client/FeedPageOutcome|null[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta>, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean) // com.letta.mobile.data.feed.client/FeedPageOutcome.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.feed.wire.FeedDelta>;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+
+    final val entries // com.letta.mobile.data.feed.client/FeedPageOutcome.entries|{}entries[0]
+        final fun <get-entries>(): kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta> // com.letta.mobile.data.feed.client/FeedPageOutcome.entries.<get-entries>|<get-entries>(){}[0]
+    final val hasMore // com.letta.mobile.data.feed.client/FeedPageOutcome.hasMore|{}hasMore[0]
+        final fun <get-hasMore>(): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedPageOutcome.hasMore.<get-hasMore>|<get-hasMore>(){}[0]
+    final val regressed // com.letta.mobile.data.feed.client/FeedPageOutcome.regressed|{}regressed[0]
+        final fun <get-regressed>(): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedPageOutcome.regressed.<get-regressed>|<get-regressed>(){}[0]
+    final val replaced // com.letta.mobile.data.feed.client/FeedPageOutcome.replaced|{}replaced[0]
+        final fun <get-replaced>(): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedPageOutcome.replaced.<get-replaced>|<get-replaced>(){}[0]
+
+    final fun component1(): kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta> // com.letta.mobile.data.feed.client/FeedPageOutcome.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedPageOutcome.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedPageOutcome.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedPageOutcome.component4|component4(){}[0]
+    final fun copy(kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta> = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.data.feed.client/FeedPageOutcome // com.letta.mobile.data.feed.client/FeedPageOutcome.copy|copy(kotlin.collections.List<com.letta.mobile.data.feed.wire.FeedDelta>;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedPageOutcome.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.feed.client/FeedPageOutcome.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.feed.client/FeedPageOutcome.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.feed.client/FeedReply { // com.letta.mobile.data.feed.client/FeedReply|null[0]
+    constructor <init>(kotlin/Boolean, kotlinx.serialization.json/JsonElement? = ..., kotlin/String? = ...) // com.letta.mobile.data.feed.client/FeedReply.<init>|<init>(kotlin.Boolean;kotlinx.serialization.json.JsonElement?;kotlin.String?){}[0]
+
+    final val error // com.letta.mobile.data.feed.client/FeedReply.error|{}error[0]
+        final fun <get-error>(): kotlin/String? // com.letta.mobile.data.feed.client/FeedReply.error.<get-error>|<get-error>(){}[0]
+    final val result // com.letta.mobile.data.feed.client/FeedReply.result|{}result[0]
+        final fun <get-result>(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.feed.client/FeedReply.result.<get-result>|<get-result>(){}[0]
+    final val success // com.letta.mobile.data.feed.client/FeedReply.success|{}success[0]
+        final fun <get-success>(): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedReply.success.<get-success>|<get-success>(){}[0]
+}
+
+final class com.letta.mobile.data.feed.client/FeedRowDiff { // com.letta.mobile.data.feed.client/FeedRowDiff|null[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>, kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Boolean) // com.letta.mobile.data.feed.client/FeedRowDiff.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.chat.projection.ChatRenderItem>;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Boolean){}[0]
+
+    final val added // com.letta.mobile.data.feed.client/FeedRowDiff.added|{}added[0]
+        final fun <get-added>(): kotlin/Int // com.letta.mobile.data.feed.client/FeedRowDiff.added.<get-added>|<get-added>(){}[0]
+    final val changed // com.letta.mobile.data.feed.client/FeedRowDiff.changed|{}changed[0]
+        final fun <get-changed>(): kotlin/Int // com.letta.mobile.data.feed.client/FeedRowDiff.changed.<get-changed>|<get-changed>(){}[0]
+    final val redrawn // com.letta.mobile.data.feed.client/FeedRowDiff.redrawn|{}redrawn[0]
+        final fun <get-redrawn>(): kotlin/Int // com.letta.mobile.data.feed.client/FeedRowDiff.redrawn.<get-redrawn>|<get-redrawn>(){}[0]
+    final val removed // com.letta.mobile.data.feed.client/FeedRowDiff.removed|{}removed[0]
+        final fun <get-removed>(): kotlin/Int // com.letta.mobile.data.feed.client/FeedRowDiff.removed.<get-removed>|<get-removed>(){}[0]
+    final val reordered // com.letta.mobile.data.feed.client/FeedRowDiff.reordered|{}reordered[0]
+        final fun <get-reordered>(): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedRowDiff.reordered.<get-reordered>|<get-reordered>(){}[0]
+    final val replacement // com.letta.mobile.data.feed.client/FeedRowDiff.replacement|{}replacement[0]
+        final fun <get-replacement>(): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedRowDiff.replacement.<get-replacement>|<get-replacement>(){}[0]
+    final val rows // com.letta.mobile.data.feed.client/FeedRowDiff.rows|{}rows[0]
+        final fun <get-rows>(): kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem> // com.letta.mobile.data.feed.client/FeedRowDiff.rows.<get-rows>|<get-rows>(){}[0]
+
+    final fun component1(): kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem> // com.letta.mobile.data.feed.client/FeedRowDiff.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.letta.mobile.data.feed.client/FeedRowDiff.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // com.letta.mobile.data.feed.client/FeedRowDiff.component3|component3(){}[0]
+    final fun component4(): kotlin/Int // com.letta.mobile.data.feed.client/FeedRowDiff.component4|component4(){}[0]
+    final fun component5(): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedRowDiff.component5|component5(){}[0]
+    final fun copy(kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem> = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Boolean = ...): com.letta.mobile.data.feed.client/FeedRowDiff // com.letta.mobile.data.feed.client/FeedRowDiff.copy|copy(kotlin.collections.List<com.letta.mobile.data.chat.projection.ChatRenderItem>;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedRowDiff.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.feed.client/FeedRowDiff.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.feed.client/FeedRowDiff.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.feed.client/FeedTimelineMetrics { // com.letta.mobile.data.feed.client/FeedTimelineMetrics|null[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...) // com.letta.mobile.data.feed.client/FeedTimelineMetrics.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+
+    final val framesApplied // com.letta.mobile.data.feed.client/FeedTimelineMetrics.framesApplied|{}framesApplied[0]
+        final fun <get-framesApplied>(): kotlin/Long // com.letta.mobile.data.feed.client/FeedTimelineMetrics.framesApplied.<get-framesApplied>|<get-framesApplied>(){}[0]
+    final val listReplacements // com.letta.mobile.data.feed.client/FeedTimelineMetrics.listReplacements|{}listReplacements[0]
+        final fun <get-listReplacements>(): kotlin/Long // com.letta.mobile.data.feed.client/FeedTimelineMetrics.listReplacements.<get-listReplacements>|<get-listReplacements>(){}[0]
+    final val pagesRead // com.letta.mobile.data.feed.client/FeedTimelineMetrics.pagesRead|{}pagesRead[0]
+        final fun <get-pagesRead>(): kotlin/Long // com.letta.mobile.data.feed.client/FeedTimelineMetrics.pagesRead.<get-pagesRead>|<get-pagesRead>(){}[0]
+    final val publications // com.letta.mobile.data.feed.client/FeedTimelineMetrics.publications|{}publications[0]
+        final fun <get-publications>(): kotlin/Long // com.letta.mobile.data.feed.client/FeedTimelineMetrics.publications.<get-publications>|<get-publications>(){}[0]
+    final val resyncs // com.letta.mobile.data.feed.client/FeedTimelineMetrics.resyncs|{}resyncs[0]
+        final fun <get-resyncs>(): kotlin/Long // com.letta.mobile.data.feed.client/FeedTimelineMetrics.resyncs.<get-resyncs>|<get-resyncs>(){}[0]
+    final val rowsRedrawn // com.letta.mobile.data.feed.client/FeedTimelineMetrics.rowsRedrawn|{}rowsRedrawn[0]
+        final fun <get-rowsRedrawn>(): kotlin/Long // com.letta.mobile.data.feed.client/FeedTimelineMetrics.rowsRedrawn.<get-rowsRedrawn>|<get-rowsRedrawn>(){}[0]
+
+    final fun component1(): kotlin/Long // com.letta.mobile.data.feed.client/FeedTimelineMetrics.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // com.letta.mobile.data.feed.client/FeedTimelineMetrics.component2|component2(){}[0]
+    final fun component3(): kotlin/Long // com.letta.mobile.data.feed.client/FeedTimelineMetrics.component3|component3(){}[0]
+    final fun component4(): kotlin/Long // com.letta.mobile.data.feed.client/FeedTimelineMetrics.component4|component4(){}[0]
+    final fun component5(): kotlin/Long // com.letta.mobile.data.feed.client/FeedTimelineMetrics.component5|component5(){}[0]
+    final fun component6(): kotlin/Long // com.letta.mobile.data.feed.client/FeedTimelineMetrics.component6|component6(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.letta.mobile.data.feed.client/FeedTimelineMetrics // com.letta.mobile.data.feed.client/FeedTimelineMetrics.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedTimelineMetrics.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.feed.client/FeedTimelineMetrics.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.feed.client/FeedTimelineMetrics.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.feed.client/FeedTimelineSource { // com.letta.mobile.data.feed.client/FeedTimelineSource|null[0]
+    constructor <init>(com.letta.mobile.data.feed.client/FeedLink, com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId, kotlinx.coroutines/CoroutineScope, kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.model/LettaMessage, kotlin/Unit> = ...) // com.letta.mobile.data.feed.client/FeedTimelineSource.<init>|<init>(com.letta.mobile.data.feed.client.FeedLink;com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId;kotlinx.coroutines.CoroutineScope;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.model.LettaMessage,kotlin.Unit>){}[0]
+
+    final val cursor // com.letta.mobile.data.feed.client/FeedTimelineSource.cursor|{}cursor[0]
+        final fun <get-cursor>(): com.letta.mobile.data.feed.wire/FeedCursor? // com.letta.mobile.data.feed.client/FeedTimelineSource.cursor.<get-cursor>|<get-cursor>(){}[0]
+    final val metrics // com.letta.mobile.data.feed.client/FeedTimelineSource.metrics|{}metrics[0]
+        final fun <get-metrics>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.feed.client/FeedTimelineMetrics> // com.letta.mobile.data.feed.client/FeedTimelineSource.metrics.<get-metrics>|<get-metrics>(){}[0]
+    final val presented // com.letta.mobile.data.feed.client/FeedTimelineSource.presented|{}presented[0]
+        final fun <get-presented>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>?> // com.letta.mobile.data.feed.client/FeedTimelineSource.presented.<get-presented>|<get-presented>(){}[0]
+    final val rows // com.letta.mobile.data.feed.client/FeedTimelineSource.rows|{}rows[0]
+        final fun <get-rows>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>> // com.letta.mobile.data.feed.client/FeedTimelineSource.rows.<get-rows>|<get-rows>(){}[0]
+
+    final fun start() // com.letta.mobile.data.feed.client/FeedTimelineSource.start|start(){}[0]
+    final fun stop() // com.letta.mobile.data.feed.client/FeedTimelineSource.stop|stop(){}[0]
+
+    final object Companion { // com.letta.mobile.data.feed.client/FeedTimelineSource.Companion|null[0]
+        final fun isAvailable(com.letta.mobile.data.feed.client/FeedLink): kotlin/Boolean // com.letta.mobile.data.feed.client/FeedTimelineSource.Companion.isAvailable|isAvailable(com.letta.mobile.data.feed.client.FeedLink){}[0]
+        final fun rowsFor(com.letta.mobile.data.feed.client/FeedLink, com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId): kotlin/Function1<kotlinx.coroutines/CoroutineScope, kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>?>>? // com.letta.mobile.data.feed.client/FeedTimelineSource.Companion.rowsFor|rowsFor(com.letta.mobile.data.feed.client.FeedLink;com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId){}[0]
+    }
+}
+
 final class com.letta.mobile.data.feed.wire/FeedCursor { // com.letta.mobile.data.feed.wire/FeedCursor|null[0]
     constructor <init>(kotlin/Long, kotlin/Long) // com.letta.mobile.data.feed.wire/FeedCursor.<init>|<init>(kotlin.Long;kotlin.Long){}[0]
 
@@ -42267,6 +42448,52 @@ final class com.letta.mobile.data.feed.wire/FeedDelta { // com.letta.mobile.data
 
     final object Companion { // com.letta.mobile.data.feed.wire/FeedDelta.Companion|null[0]
         final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.feed.wire/FeedDelta> // com.letta.mobile.data.feed.wire/FeedDelta.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.feed.wire/FeedDeltaFrame { // com.letta.mobile.data.feed.wire/FeedDeltaFrame|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/Long, kotlin/Long, kotlin/Long, kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta>) // com.letta.mobile.data.feed.wire/FeedDeltaFrame.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.collections.List<com.letta.mobile.data.feed.wire.FeedDelta>){}[0]
+
+    final val afterSeq // com.letta.mobile.data.feed.wire/FeedDeltaFrame.afterSeq|{}afterSeq[0]
+        final fun <get-afterSeq>(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedDeltaFrame.afterSeq.<get-afterSeq>|<get-afterSeq>(){}[0]
+    final val agentId // com.letta.mobile.data.feed.wire/FeedDeltaFrame.agentId|{}agentId[0]
+        final fun <get-agentId>(): kotlin/String // com.letta.mobile.data.feed.wire/FeedDeltaFrame.agentId.<get-agentId>|<get-agentId>(){}[0]
+    final val conversation // com.letta.mobile.data.feed.wire/FeedDeltaFrame.conversation|{}conversation[0]
+        final fun <get-conversation>(): kotlin/String // com.letta.mobile.data.feed.wire/FeedDeltaFrame.conversation.<get-conversation>|<get-conversation>(){}[0]
+    final val entries // com.letta.mobile.data.feed.wire/FeedDeltaFrame.entries|{}entries[0]
+        final fun <get-entries>(): kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta> // com.letta.mobile.data.feed.wire/FeedDeltaFrame.entries.<get-entries>|<get-entries>(){}[0]
+    final val epoch // com.letta.mobile.data.feed.wire/FeedDeltaFrame.epoch|{}epoch[0]
+        final fun <get-epoch>(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedDeltaFrame.epoch.<get-epoch>|<get-epoch>(){}[0]
+    final val seq // com.letta.mobile.data.feed.wire/FeedDeltaFrame.seq|{}seq[0]
+        final fun <get-seq>(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedDeltaFrame.seq.<get-seq>|<get-seq>(){}[0]
+    final val type // com.letta.mobile.data.feed.wire/FeedDeltaFrame.type|{}type[0]
+        final fun <get-type>(): kotlin/String // com.letta.mobile.data.feed.wire/FeedDeltaFrame.type.<get-type>|<get-type>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.feed.wire/FeedDeltaFrame.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.feed.wire/FeedDeltaFrame.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.feed.wire/FeedDeltaFrame.component3|component3(){}[0]
+    final fun component4(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedDeltaFrame.component4|component4(){}[0]
+    final fun component5(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedDeltaFrame.component5|component5(){}[0]
+    final fun component6(): kotlin/Long // com.letta.mobile.data.feed.wire/FeedDeltaFrame.component6|component6(){}[0]
+    final fun component7(): kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta> // com.letta.mobile.data.feed.wire/FeedDeltaFrame.component7|component7(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedDelta> = ...): com.letta.mobile.data.feed.wire/FeedDeltaFrame // com.letta.mobile.data.feed.wire/FeedDeltaFrame.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.collections.List<com.letta.mobile.data.feed.wire.FeedDelta>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.feed.wire/FeedDeltaFrame.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.feed.wire/FeedDeltaFrame.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.feed.wire/FeedDeltaFrame.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.feed.wire/FeedDeltaFrame> { // com.letta.mobile.data.feed.wire/FeedDeltaFrame.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.feed.wire/FeedDeltaFrame.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.feed.wire/FeedDeltaFrame.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.feed.wire/FeedDeltaFrame.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.feed.wire/FeedDeltaFrame // com.letta.mobile.data.feed.wire/FeedDeltaFrame.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.feed.wire/FeedDeltaFrame) // com.letta.mobile.data.feed.wire/FeedDeltaFrame.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.feed.wire.FeedDeltaFrame){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.feed.wire/FeedDeltaFrame.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.feed.wire/FeedDeltaFrame.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.feed.wire/FeedDeltaFrame> // com.letta.mobile.data.feed.wire/FeedDeltaFrame.Companion.serializer|serializer(){}[0]
     }
 }
 
@@ -68308,6 +68535,7 @@ final class com.letta.mobile.data.timeline/CanonicalTimelineCoordinator { // com
     final suspend fun ingestExternal(com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.Owner, com.letta.mobile.data.model/LettaMessage, kotlin/Boolean = ...): kotlin/Boolean // com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.ingestExternal|ingestExternal(com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner;com.letta.mobile.data.model.LettaMessage;kotlin.Boolean){}[0]
     final suspend fun locate(com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.Owner, com.letta.mobile.data.timeline/TimelineMessageId): com.letta.mobile.data.timeline/TimelinePageKey? // com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.locate|locate(com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner;com.letta.mobile.data.timeline.TimelineMessageId){}[0]
     final suspend fun markPending(com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.Owner, kotlin/String, com.letta.mobile.data.timeline/CanonicalPendingLocalStore.Delivery, kotlin/Long? = ...) // com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.markPending|markPending(com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner;kotlin.String;com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Delivery;kotlin.Long?){}[0]
+    final suspend fun readsThroughFeed(com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.Owner): kotlin/Boolean // com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.readsThroughFeed|readsThroughFeed(com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner){}[0]
     final suspend fun reconcileRecent(com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.Owner): com.letta.mobile.data.timeline/TimelineEnginePageOutcome // com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.reconcileRecent|reconcileRecent(com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner){}[0]
     final suspend fun reconcileRecentDetailed(com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.Owner): com.letta.mobile.data.timeline/TimelineEngineReconcileResult // com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.reconcileRecentDetailed|reconcileRecentDetailed(com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner){}[0]
     final suspend fun retire(com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.Owner): kotlin/Boolean // com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.retire|retire(com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner){}[0]
@@ -68369,6 +68597,8 @@ final class com.letta.mobile.data.timeline/CanonicalTimelineEngine { // com.lett
 }
 
 final class com.letta.mobile.data.timeline/CanonicalTimelinePresentation { // com.letta.mobile.data.timeline/CanonicalTimelinePresentation|null[0]
+    final val isFeedBacked // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.isFeedBacked|{}isFeedBacked[0]
+        final fun <get-isFeedBacked>(): kotlin/Boolean // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.isFeedBacked.<get-isFeedBacked>|<get-isFeedBacked>(){}[0]
     final val isOpenTraced // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.isOpenTraced|{}isOpenTraced[0]
         final fun <get-isOpenTraced>(): kotlin/Boolean // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.isOpenTraced.<get-isOpenTraced>|<get-isOpenTraced>(){}[0]
     final val live // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.live|{}live[0]
@@ -68435,7 +68665,7 @@ final class com.letta.mobile.data.timeline/CanonicalTimelinePresentation { // co
 
     final object Companion { // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.Companion|null[0]
         final fun assemble(kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>, kotlin.collections/List<com.letta.mobile.data.timeline/CanonicalTimelinePresentation.Row?>): com.letta.mobile.data.chat.projection/TimelineRowAssembly // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.Companion.assemble|assemble(kotlin.collections.List<com.letta.mobile.data.chat.projection.ChatRenderItem>;kotlin.collections.List<com.letta.mobile.data.timeline.CanonicalTimelinePresentation.Row?>){}[0]
-        final suspend fun open(com.letta.mobile.data.timeline/CanonicalTimelineCoordinator, com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.Owner, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.timeline/TimelineMessageId? = ..., com.letta.mobile.data.timeline/TimelineSettledProjectionAdapter = ...): com.letta.mobile.data.timeline/CanonicalTimelinePresentation // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.Companion.open|open(com.letta.mobile.data.timeline.CanonicalTimelineCoordinator;com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.timeline.TimelineMessageId?;com.letta.mobile.data.timeline.TimelineSettledProjectionAdapter){}[0]
+        final suspend fun open(com.letta.mobile.data.timeline/CanonicalTimelineCoordinator, com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.Owner, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.timeline/TimelineMessageId? = ..., com.letta.mobile.data.timeline/TimelineSettledProjectionAdapter = ..., kotlin/Function1<kotlinx.coroutines/CoroutineScope, kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>?>>? = ...): com.letta.mobile.data.timeline/CanonicalTimelinePresentation // com.letta.mobile.data.timeline/CanonicalTimelinePresentation.Companion.open|open(com.letta.mobile.data.timeline.CanonicalTimelineCoordinator;com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.timeline.TimelineMessageId?;com.letta.mobile.data.timeline.TimelineSettledProjectionAdapter;kotlin.Function1<kotlinx.coroutines.CoroutineScope,kotlinx.coroutines.flow.StateFlow<kotlin.collections.List<com.letta.mobile.data.chat.projection.ChatRenderItem>?>>?){}[0]
     }
 }
 
@@ -81942,17 +82172,29 @@ final object com.letta.mobile.data.dreaming/DreamingRpc { // com.letta.mobile.da
     final fun commandArgs(kotlin/String?): kotlin/String? // com.letta.mobile.data.dreaming/DreamingRpc.commandArgs|commandArgs(kotlin.String?){}[0]
 }
 
+final object com.letta.mobile.data.feed.client/FeedRowIdentity { // com.letta.mobile.data.feed.client/FeedRowIdentity|null[0]
+    final fun reconcile(kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>, kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>): com.letta.mobile.data.feed.client/FeedRowDiff // com.letta.mobile.data.feed.client/FeedRowIdentity.reconcile|reconcile(kotlin.collections.List<com.letta.mobile.data.chat.projection.ChatRenderItem>;kotlin.collections.List<com.letta.mobile.data.chat.projection.ChatRenderItem>){}[0]
+}
+
 final object com.letta.mobile.data.feed.wire/ConversationFeedWire { // com.letta.mobile.data.feed.wire/ConversationFeedWire|null[0]
+    final const val AFTER_SEQ // com.letta.mobile.data.feed.wire/ConversationFeedWire.AFTER_SEQ|{}AFTER_SEQ[0]
+        final fun <get-AFTER_SEQ>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.AFTER_SEQ.<get-AFTER_SEQ>|<get-AFTER_SEQ>(){}[0]
     final const val AGENT_ID // com.letta.mobile.data.feed.wire/ConversationFeedWire.AGENT_ID|{}AGENT_ID[0]
         final fun <get-AGENT_ID>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.AGENT_ID.<get-AGENT_ID>|<get-AGENT_ID>(){}[0]
     final const val CAPABILITY // com.letta.mobile.data.feed.wire/ConversationFeedWire.CAPABILITY|{}CAPABILITY[0]
         final fun <get-CAPABILITY>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.CAPABILITY.<get-CAPABILITY>|<get-CAPABILITY>(){}[0]
+    final const val CONVERSATION // com.letta.mobile.data.feed.wire/ConversationFeedWire.CONVERSATION|{}CONVERSATION[0]
+        final fun <get-CONVERSATION>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.CONVERSATION.<get-CONVERSATION>|<get-CONVERSATION>(){}[0]
     final const val CONVERSATION_ID // com.letta.mobile.data.feed.wire/ConversationFeedWire.CONVERSATION_ID|{}CONVERSATION_ID[0]
         final fun <get-CONVERSATION_ID>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.CONVERSATION_ID.<get-CONVERSATION_ID>|<get-CONVERSATION_ID>(){}[0]
     final const val DEFAULT_LIMIT // com.letta.mobile.data.feed.wire/ConversationFeedWire.DEFAULT_LIMIT|{}DEFAULT_LIMIT[0]
         final fun <get-DEFAULT_LIMIT>(): kotlin/Int // com.letta.mobile.data.feed.wire/ConversationFeedWire.DEFAULT_LIMIT.<get-DEFAULT_LIMIT>|<get-DEFAULT_LIMIT>(){}[0]
+    final const val ENTRIES // com.letta.mobile.data.feed.wire/ConversationFeedWire.ENTRIES|{}ENTRIES[0]
+        final fun <get-ENTRIES>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.ENTRIES.<get-ENTRIES>|<get-ENTRIES>(){}[0]
     final const val EPOCH // com.letta.mobile.data.feed.wire/ConversationFeedWire.EPOCH|{}EPOCH[0]
         final fun <get-EPOCH>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.EPOCH.<get-EPOCH>|<get-EPOCH>(){}[0]
+    final const val FRAME_SEQ // com.letta.mobile.data.feed.wire/ConversationFeedWire.FRAME_SEQ|{}FRAME_SEQ[0]
+        final fun <get-FRAME_SEQ>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.FRAME_SEQ.<get-FRAME_SEQ>|<get-FRAME_SEQ>(){}[0]
     final const val FRAME_TYPE // com.letta.mobile.data.feed.wire/ConversationFeedWire.FRAME_TYPE|{}FRAME_TYPE[0]
         final fun <get-FRAME_TYPE>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.FRAME_TYPE.<get-FRAME_TYPE>|<get-FRAME_TYPE>(){}[0]
     final const val FROM // com.letta.mobile.data.feed.wire/ConversationFeedWire.FROM|{}FROM[0]
@@ -81983,6 +82225,8 @@ final object com.letta.mobile.data.feed.wire/ConversationFeedWire { // com.letta
         final fun <get-POINTER_MESSAGE_ID>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.POINTER_MESSAGE_ID.<get-POINTER_MESSAGE_ID>|<get-POINTER_MESSAGE_ID>(){}[0]
     final const val POINTER_MESSAGE_TYPE // com.letta.mobile.data.feed.wire/ConversationFeedWire.POINTER_MESSAGE_TYPE|{}POINTER_MESSAGE_TYPE[0]
         final fun <get-POINTER_MESSAGE_TYPE>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.POINTER_MESSAGE_TYPE.<get-POINTER_MESSAGE_TYPE>|<get-POINTER_MESSAGE_TYPE>(){}[0]
+    final const val PUSH_CAPABILITY // com.letta.mobile.data.feed.wire/ConversationFeedWire.PUSH_CAPABILITY|{}PUSH_CAPABILITY[0]
+        final fun <get-PUSH_CAPABILITY>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.PUSH_CAPABILITY.<get-PUSH_CAPABILITY>|<get-PUSH_CAPABILITY>(){}[0]
     final const val RESYNC_AHEAD_OF_HEAD // com.letta.mobile.data.feed.wire/ConversationFeedWire.RESYNC_AHEAD_OF_HEAD|{}RESYNC_AHEAD_OF_HEAD[0]
         final fun <get-RESYNC_AHEAD_OF_HEAD>(): kotlin/String // com.letta.mobile.data.feed.wire/ConversationFeedWire.RESYNC_AHEAD_OF_HEAD.<get-RESYNC_AHEAD_OF_HEAD>|<get-RESYNC_AHEAD_OF_HEAD>(){}[0]
     final const val RESYNC_BEHIND_HORIZON // com.letta.mobile.data.feed.wire/ConversationFeedWire.RESYNC_BEHIND_HORIZON|{}RESYNC_BEHIND_HORIZON[0]
@@ -85357,6 +85601,10 @@ final fun com.letta.mobile.data.context/modelCatalogWindowOf(kotlin.collections/
 final fun com.letta.mobile.data.context/reduceContextReadings(kotlin.collections/Map<com.letta.mobile.data.context/ContextReadingKey, kotlin/Int>, com.letta.mobile.data.transport/ServerFrame): kotlin.collections/Map<com.letta.mobile.data.context/ContextReadingKey, kotlin/Int> // com.letta.mobile.data.context/reduceContextReadings|reduceContextReadings(kotlin.collections.Map<com.letta.mobile.data.context.ContextReadingKey,kotlin.Int>;com.letta.mobile.data.transport.ServerFrame){}[0]
 final fun com.letta.mobile.data.controller.extras/claimedToolCaller(com.letta.mobile.data.controller.extras.identity/ToolCallScope): com.letta.mobile.data.controller.extras/ExternalToolCaller // com.letta.mobile.data.controller.extras/claimedToolCaller|claimedToolCaller(com.letta.mobile.data.controller.extras.identity.ToolCallScope){}[0]
 final fun com.letta.mobile.data.controller.extras/defaultIrohCliRunnerOrNull(): com.letta.mobile.data.controller.extras/IrohCliRunner? // com.letta.mobile.data.controller.extras/defaultIrohCliRunnerOrNull|defaultIrohCliRunnerOrNull(){}[0]
+final fun com.letta.mobile.data.feed.channel/channelFeedLink(com.letta.mobile.data.transport.api/IChannelTransport): com.letta.mobile.data.feed.client/FeedLink // com.letta.mobile.data.feed.channel/channelFeedLink|channelFeedLink(com.letta.mobile.data.transport.api.IChannelTransport){}[0]
+final fun com.letta.mobile.data.feed.channel/channelFeedRows(com.letta.mobile.data.transport.api/IChannelTransport, com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId): kotlin/Function1<kotlinx.coroutines/CoroutineScope, kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>?>>? // com.letta.mobile.data.feed.channel/channelFeedRows|channelFeedRows(com.letta.mobile.data.transport.api.IChannelTransport;com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId){}[0]
+final fun com.letta.mobile.data.feed.channel/channelFeedRows(com.letta.mobile.data.transport.api/IChannelTransport?, com.letta.mobile.data.timeline.snapshot/TimelineScope): kotlin/Function1<kotlinx.coroutines/CoroutineScope, kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>?>>? // com.letta.mobile.data.feed.channel/channelFeedRows|channelFeedRows(com.letta.mobile.data.transport.api.IChannelTransport?;com.letta.mobile.data.timeline.snapshot.TimelineScope){}[0]
+final fun com.letta.mobile.data.feed.channel/channelFeedTimelineSource(com.letta.mobile.data.transport.api/IChannelTransport, com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId, kotlinx.coroutines/CoroutineScope, kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.model/LettaMessage, kotlin/Unit> = ...): com.letta.mobile.data.feed.client/FeedTimelineSource? // com.letta.mobile.data.feed.channel/channelFeedTimelineSource|channelFeedTimelineSource(com.letta.mobile.data.transport.api.IChannelTransport;com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId;kotlinx.coroutines.CoroutineScope;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.model.LettaMessage,kotlin.Unit>){}[0]
 final fun com.letta.mobile.data.home/buildFleetOverview(com.letta.mobile.data.home/FleetOverviewParams): com.letta.mobile.data.home/FleetOverview // com.letta.mobile.data.home/buildFleetOverview|buildFleetOverview(com.letta.mobile.data.home.FleetOverviewParams){}[0]
 final fun com.letta.mobile.data.home/conversationRecency(kotlin/String): kotlin.time/Instant // com.letta.mobile.data.home/conversationRecency|conversationRecency(kotlin.String){}[0]
 final fun com.letta.mobile.data.home/formatGroupedNumber(kotlin/Int): kotlin/String // com.letta.mobile.data.home/formatGroupedNumber|formatGroupedNumber(kotlin.Int){}[0]

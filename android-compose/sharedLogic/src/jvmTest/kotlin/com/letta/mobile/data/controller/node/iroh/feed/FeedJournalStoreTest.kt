@@ -53,6 +53,22 @@ class FeedJournalStoreTest : FeedJournalTestBase() {
     }
 
     @Test
+    fun theUserEchoIsInTheFeedButNeverInTheInitiatorsRedialReplay() {
+        val store = start(directory())
+        val echo = Delta("""{"message_type":"user_message","id":"cm-user-cm-1","otid":"cm-1","content":"hi"}""")
+        val writer = store.writerFor(Conv.default, TurnName("cm-1"))
+        writer.append(echo)
+        writer.play(listOf(Delta.assistant(Text("hello")), Delta.stopReason()), Ending.Terminal)
+        writer.noteInitiatorMissedTail()
+
+        val fed = store.drainOf(Conv.default, null).flatMap { it.entries }.mapNotNull { it.payload?.text("message_type") }
+        assertEquals(listOf("user_message", "assistant_message", "stop_reason"), fed, "a viewer reading the feed sees the prompt")
+        val replayed = store.replayFor(Conv.default, TurnName("cm-1"))?.deltas
+            ?.map { Json.parseToJsonElement(it).jsonObject.text("message_type") }
+        assertEquals(listOf("assistant_message", "stop_reason"), replayed, "the initiator re-owns its prompt")
+    }
+
+    @Test
     fun theReplayOfAFinishedTurnCarriesItsRealTerminalAndIsOfferedUntilDelivered() {
         val dir = directory()
         val first = start(dir)

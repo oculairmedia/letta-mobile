@@ -1,5 +1,6 @@
 package com.letta.mobile.di
 
+import com.letta.mobile.data.feed.channel.channelFeedRows
 import com.letta.mobile.data.local.TimelineOwnedStorageFactory
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.local.TimelineOwnershipAuthority
@@ -35,6 +36,7 @@ class AndroidCanonicalTimelineRuntimeFactory(
             storage,
             ownerScope,
             writers,
+            feedTransport = graph.channelTransport,
         )
     }
 }
@@ -47,6 +49,7 @@ class AndroidCanonicalTimelineRuntime(
     private val storage: TimelineOwnedStorageFactory,
     private val graphScope: kotlinx.coroutines.CoroutineScope,
     private val writers: CanonicalConversationWriters = CanonicalConversationWriters(),
+    private val feedTransport: com.letta.mobile.data.transport.api.IChannelTransport? = null,
 ) {
     private val maintenanceJob = kotlinx.coroutines.SupervisorJob(graphScope.coroutineContext[kotlinx.coroutines.Job])
     private val maintenanceScope = graphScope + maintenanceJob
@@ -77,9 +80,10 @@ class AndroidCanonicalTimelineRuntime(
         val owner: CanonicalTimelineCoordinator.Owner,
         val writer: com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter,
         internal val admission: com.letta.mobile.data.timeline.TimelineLegacyAdmission,
+        private val feedTransport: com.letta.mobile.data.transport.api.IChannelTransport? = null,
     ) {
         fun bindPresentation(host: com.letta.mobile.feature.chat.screen.ChatPagingHost) {
-            host.bindCanonical(coordinator) { agent, conversation ->
+            host.bindCanonical(coordinator, { channelFeedRows(feedTransport, owner.selection.scope) }) { agent, conversation ->
                 check(owner.selection.scope.agentId == agent && owner.selection.scope.conversationId == conversation)
                 check(coordinator.current(owner.selection.scope) === owner) { "Retired presentation owner" }
                 owner
@@ -133,7 +137,7 @@ class AndroidCanonicalTimelineRuntime(
         val admission = com.letta.mobile.data.timeline.TimelineLegacyAdmission()
         val admitted = com.letta.mobile.data.timeline.AdmittedTimelineExternalWriter(writer, admission)
         writers.register(ConversationId(scope.conversationId), admitted)
-        Binding(coordinator, owner, admitted, admission)
+        Binding(coordinator, owner, admitted, admission, feedTransport)
     } }
 
     /** Cancels RPCs and invalidates cached canonical owner handles. */

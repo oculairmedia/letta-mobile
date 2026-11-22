@@ -153,6 +153,29 @@ class ConversationTurnFanoutUserEchoTest {
     }
 
     @Test
+    fun userEchoReachesTheJournalButNeverTheParkingSlots() = runTest {
+        val registry = ConnectionRegistry()
+        val parked = mutableListOf<String>()
+        val journaled = mutableListOf<String>()
+        val initiator = viewer("conn-init", CapturingSink())
+        registry.register(conversationId, initiator)
+        val fanout = ConversationTurnFanout(
+            conversationId = conversationId,
+            runtime = runtime,
+            delivery = TurnFanoutDelivery(viewersFor = { conv -> registry.viewersFor(conv) }),
+            initiatorViewer = initiator,
+            trackInitiatorFrame = { parked.add(it) },
+            journalUserEcho = { journaled.add(it) },
+        )
+
+        fanout.broadcastUserEcho(clientMessageId = "cm-1", text = "hello", contentParts = null)
+
+        assertEquals(1, journaled.size, "the feed is the sole row source of its viewers: the prompt is in the journal")
+        assertEquals("user_message", json.parseToJsonElement(journaled.single()).jsonObject["message_type"]!!.jsonPrimitive.content)
+        assertTrue(parked.isEmpty(), "and still not a parking slot")
+    }
+
+    @Test
     fun userEchoCarriesContentPartsArray() = runTest {
         val registry = ConnectionRegistry()
         val sinkObs = CapturingSink()

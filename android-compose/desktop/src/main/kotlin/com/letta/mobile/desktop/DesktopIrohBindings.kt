@@ -238,7 +238,7 @@ internal fun rememberDesktopChatController(
     // the same instance the chat gateway uses, so only Iroh mode can serve it; App Server backends
     // keep the controller's in-memory timeline loop.
     val canonicalHost = remember(controller) {
-        DesktopCanonicalTimelineHost().also { host ->
+        DesktopCanonicalTimelineHost(feedTransport = bindings.irohTransport).also { host ->
             val irohTransport = bindings.irohTransport ?: return@also
             host.installOn(
                 controller,

@@ -39,8 +39,9 @@ internal suspend fun createCanonicalChatPagingPresentation(
     owner: CanonicalTimelineCoordinator.Owner,
     uiScope: CoroutineScope,
     target: String?,
+    feed: com.letta.mobile.data.feed.client.FeedRowsFactory? = null,
 ): ChatPagingPresentation {
-    val canonical = CanonicalTimelinePresentation.open(coordinator, owner, uiScope, target?.let(::TimelineMessageId))
+    val canonical = CanonicalTimelinePresentation.open(coordinator, owner, uiScope, target?.let(::TimelineMessageId), feed = feed)
     val job = SupervisorJob(uiScope.coroutineContext[Job])
     val scope = uiScope + job
     // Bounded metadata only. Evicted keys cannot acknowledge settlement until seen again.

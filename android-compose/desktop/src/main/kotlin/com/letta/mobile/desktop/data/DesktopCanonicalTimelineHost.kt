@@ -21,11 +21,11 @@ import kotlinx.coroutines.sync.withLock
 class DesktopCanonicalTimelineHost(
     private val backendId: String = DESKTOP_CANONICAL_BACKEND_ID,
     private val ledgerDirectory: Path = defaultDesktopTimelineLedgerDirectory(),
+    private val feedTransport: IChannelTransport? = null, // The live frame source the host feed is read over.
 ) {
     private val mutex = Mutex()
     private val runtimes = mutableMapOf<TimelineTransport, DesktopCanonicalTimelineRuntime>()
     private var closed = false
-
     suspend fun open(request: DesktopCanonicalOpenRequest): CanonicalTimelinePresentation {
         val runtime = mutex.withLock {
             check(!closed) { "Desktop canonical timeline host is closed" }
@@ -35,7 +35,7 @@ class DesktopCanonicalTimelineHost(
     }
 
     private fun runtimeFor(transport: TimelineTransport): DesktopCanonicalTimelineRuntime =
-        runtimes.getOrPut(transport) { createDesktopCanonicalTimelineRuntime(transport, backendId, ledgerDirectory) }
+        runtimes.getOrPut(transport) { createDesktopCanonicalTimelineRuntime(transport, backendId, ledgerDirectory, feedTransport) }
 
     /**
      * Routes the controller's conversation selection through this host. Only a backend whose frame

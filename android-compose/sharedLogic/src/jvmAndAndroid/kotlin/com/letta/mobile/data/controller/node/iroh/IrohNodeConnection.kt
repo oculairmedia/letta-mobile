@@ -4,6 +4,7 @@ import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.extras.relay.AppToolRelay
 import com.letta.mobile.data.controller.extras.relay.AppToolRelayLink
+import com.letta.mobile.data.feed.wire.ConversationFeedWire
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId as ModelConversationId
 import com.letta.mobile.data.runtime.TurnInputAcknowledgement
@@ -196,6 +197,12 @@ class IrohNodeConnection(
      */
     private var viewerSubscription: ConversationViewerSubscription? = null
 
+    /** This connection has called `feed.subscribe`: only then is it pushed `feed_delta` frames, so a client that never reads the feed never receives them. */
+    private val readsFeed = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** The conversations this connection has read with `feed.subscribe`: it takes their turns from the feed, not the stream fanout. */
+    private val feedConversations: MutableSet<ModelConversationId> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
     /**
      * Build this connection's [selfViewer] once, bound to the turn
      * stream's [SendStream]. Idempotent — later calls return the existing handle
@@ -232,6 +239,9 @@ class IrohNodeConnection(
         // Method-scoped pushes (canvas mounts) check the method's capability against the context's granted
         // capabilities and re-run the method's own checks on it; it is given only while authenticated.
         handle.adminContextGate = { currentAdminRpcRequestContext().takeIf { it.authenticated } }
+        // A feed push is for a peer that has read the feed (feed.subscribe); its own scope is checked per push.
+        handle.feedPushGate = { authenticated.get() && readsFeed.get() }
+        handle.feedReaderGate = { conversation -> conversation in feedConversations }
         selfViewer = handle
         return handle
     }
@@ -424,11 +434,12 @@ class IrohNodeConnection(
     }
 
     /**
-     * The OBSERVER signal: a connection that hydrates conversation X with `message.list`
-     * becomes X's viewer (de-scoping any prior conversation), on either admin_rpc path.
+     * The OBSERVER signal: a connection that hydrates conversation X with `message.list` (or reads its feed with
+     * `feed.subscribe`, so it is told of later entries) becomes X's viewer (de-scoping any prior conversation), on either admin_rpc path.
      */
     private suspend fun observeAdminMethod(method: String, params: JsonObject?): (suspend (Boolean) -> Unit)? {
-        if (method != "message.list") return null
+        if (method == ConversationFeedWire.SUBSCRIBE) readsFeed.set(true)
+        if (method != "message.list" && method != ConversationFeedWire.SUBSCRIBE) return null
         val conversationId = params?.get("conversation_id")?.let { (it as? JsonPrimitive)?.contentOrNull }
         if (conversationId.isNullOrEmpty()) return null
         val subscription = viewerSubscription ?: return null
@@ -445,6 +456,8 @@ class IrohNodeConnection(
         }
         return { succeeded ->
             settle(succeeded)
+            // Only a read the host answered makes this connection a feed reader of the conversation (a refused one keeps the stream).
+            if (succeeded && method == ConversationFeedWire.SUBSCRIBE) feedConversations += ModelConversationId(conversationId)
             if (!succeeded) {
                 Telemetry.event(
                     "IrohNode", "viewer.registration_rolled_back",
@@ -874,6 +887,7 @@ class IrohNodeConnection(
         ),
         initiatorViewer = ensureSelfViewer(streamSend),
         trackInitiatorFrame = journal::append,
+        journalUserEcho = journal::append,
         turnId = firstUserMessage(input)?.clientMessageId,
         identity = turnIdentity?.let { TurnIdentityBinding(it, input.runtime.conversationId, clientMessageId) },
     )

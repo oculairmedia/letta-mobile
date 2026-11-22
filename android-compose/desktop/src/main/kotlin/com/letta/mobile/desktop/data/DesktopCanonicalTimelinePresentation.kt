@@ -19,5 +19,6 @@ suspend fun openDesktopCanonicalPresentation(
     owner: CanonicalTimelineCoordinator.Owner,
     uiScope: CoroutineScope,
     target: String? = null,
+    feed: com.letta.mobile.data.feed.client.FeedRowsFactory? = null,
 ): CanonicalTimelinePresentation =
-    CanonicalTimelinePresentation.open(coordinator, owner, uiScope, target?.let(::TimelineMessageId))
+    CanonicalTimelinePresentation.open(coordinator, owner, uiScope, target?.let(::TimelineMessageId), feed = feed)
