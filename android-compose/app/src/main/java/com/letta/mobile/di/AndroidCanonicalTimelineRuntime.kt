@@ -1,5 +1,6 @@
 package com.letta.mobile.di
 
+import com.letta.mobile.data.feed.channel.channelFeedRows
 import com.letta.mobile.data.local.TimelineOwnedStorageFactory
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.local.TimelineOwnershipAuthority
@@ -82,7 +83,7 @@ class AndroidCanonicalTimelineRuntime(
         private val feedTransport: com.letta.mobile.data.transport.api.IChannelTransport? = null,
     ) {
         fun bindPresentation(host: com.letta.mobile.feature.chat.screen.ChatPagingHost) {
-            host.bindCanonical(coordinator, { com.letta.mobile.data.feed.channel.channelFeedRows(feedTransport, owner.selection.scope) }) { agent, conversation ->
+            host.bindCanonical(coordinator, { channelFeedRows(feedTransport, owner.selection.scope) }) { agent, conversation ->
                 check(owner.selection.scope.agentId == agent && owner.selection.scope.conversationId == conversation)
                 check(coordinator.current(owner.selection.scope) === owner) { "Retired presentation owner" }
                 owner

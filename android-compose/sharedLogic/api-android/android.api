@@ -23402,6 +23402,7 @@ public final class com/letta/mobile/data/dreaming/DreamingState {
 
 public final class com/letta/mobile/data/feed/channel/ChannelFeedLinkKt {
 	public static final fun channelFeedLink (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Lcom/letta/mobile/data/feed/client/FeedLink;
+	public static final fun channelFeedRows (Lcom/letta/mobile/data/transport/api/IChannelTransport;Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;)Lkotlin/jvm/functions/Function1;
 	public static final fun channelFeedRows-bONJEPk (Lcom/letta/mobile/data/transport/api/IChannelTransport;Ljava/lang/String;Ljava/lang/String;)Lkotlin/jvm/functions/Function1;
 	public static final fun channelFeedTimelineSource-8oP-BNM (Lcom/letta/mobile/data/transport/api/IChannelTransport;Ljava/lang/String;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;)Lcom/letta/mobile/data/feed/client/FeedTimelineSource;
 	public static synthetic fun channelFeedTimelineSource-8oP-BNM$default (Lcom/letta/mobile/data/transport/api/IChannelTransport;Ljava/lang/String;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/letta/mobile/data/feed/client/FeedTimelineSource;
