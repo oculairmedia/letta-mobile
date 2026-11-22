@@ -71,6 +71,8 @@ import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.TouchComposerDimens
 import com.letta.mobile.ui.theme.chatBottomBarShape
+import com.letta.mobile.ui.components.attached.LettaAttachedStatusFrame
+import com.letta.mobile.ui.components.attached.LettaStatusEdge
 import org.jetbrains.compose.resources.stringResource
 
 /*
@@ -92,9 +94,10 @@ private val TouchFieldStyle = ComposerFieldStyle(
 )
 
 /**
- * The Touch bar with what stands above it: the staged images. [leading] goes before the "+" (the
- * canvas bar's way back to the reply). [docked] is the canvas's bar, which keeps the field to its
- * test tag for the docked input.
+ * The Touch bar with what stands above it: the staged images, then the composer's statuses attached
+ * to the bar's top edge (all of them: the bar's bottom edge is the screen's; the canvas's bar carries
+ * only the error). [leading] goes before the "+" (the canvas bar's way back to the reply). [docked] is
+ * the canvas's bar, which keeps the field to its test tag for the docked input.
  */
 @Composable
 internal fun TouchComposerBar(
@@ -103,6 +106,8 @@ internal fun TouchComposerBar(
     modifier: Modifier = Modifier,
     leading: (@Composable () -> Unit)? = null,
 ) {
+    val statuses = composerStatuses(model, withContextWarning = model.mode != ChatSurfaceMode.Docked)
+        .map { it.copy(edge = LettaStatusEdge.Top) }
     var sheetOpen by remember { mutableStateOf(false) }
     val modePicker = remember { TouchModePicker() }
     val baseItems = touchSheetItems(model, onAttachImage, onPermissionMode = { modePicker.open = true })
@@ -111,13 +116,15 @@ internal fun TouchComposerBar(
         val sheetItems = baseItems + listOfNotNull(touchVoiceModeSheetItem().takeUnless { voiceInSlot })
         Column(Modifier.fillMaxWidth().then(touchBarSwipe(model))) {
             TouchAttachments(model)
-            TouchBarSurface(model) {
-                leading?.invoke()
-                TouchPlus(model, sheetItems, modePicker, onOpenSheet = { sheetOpen = true })
-                Box(Modifier.weight(1f).padding(TouchComposerDimens.fieldPadding)) {
-                    ComposerTextField(model = model, style = touchFieldStyle(model))
+            LettaAttachedStatusFrame(statuses, shape = chatBottomBarShape(TouchComposerDimens.cornerReach)) {
+                TouchBarSurface(model) {
+                    leading?.invoke()
+                    TouchPlus(model, sheetItems, modePicker, onOpenSheet = { sheetOpen = true })
+                    Box(Modifier.weight(1f).padding(TouchComposerDimens.fieldPadding)) {
+                        ComposerTextField(model = model, style = touchFieldStyle(model))
+                    }
+                    TouchTrailingSlot(model, voiceMode = voiceInSlot)
                 }
-                TouchTrailingSlot(model, voiceMode = voiceInSlot)
             }
         }
         if (sheetOpen) TouchComposerActionSheet(items = sheetItems, onDismiss = { sheetOpen = false })

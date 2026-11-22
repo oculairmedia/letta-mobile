@@ -40,6 +40,8 @@
     <string name="composer_context_total">%1$s / %2$s</string>
     <string name="composer_context_total_share">%1$s / %2$s (%3$s)</string>
     <string name="composer_context_unknown_total">?</string>
+    <!-- The warning attached under the prompt once the context window is nearly full; %1$s is a share like "92%". -->
+    <string name="composer_context_nearly_full">Context window is %1$s full.</string>
     <string name="composer_working_directory">Working directory</string>
     <string name="composer_working_directory_loading">Loading working directory…</string>
     <string name="composer_working_directory_unknown">Working directory unknown</string>

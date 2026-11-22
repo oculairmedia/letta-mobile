@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
+import com.letta.mobile.ui.components.attached.LettaAttachedStatus
+import com.letta.mobile.ui.components.attached.LettaAttachedStatusFrame
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -47,18 +49,25 @@ private val DockedFieldStyle = ComposerFieldStyle(
 internal fun keyboardOpen(): Boolean = WindowInsets.ime.getBottom(LocalDensity.current) > 0
 
 /**
- * The full composer's prompt card: staged images, the prompt field and the control row.
+ * The full composer's prompt card: staged images, the prompt field and the control row, with
+ * [statuses] attached to its edges ([LettaAttachedStatusFrame]).
  *
  * In [ChatSurfaceMode.FullScreen] a swipe up on the card raises
  * [ChatSurfaceIntent.OpenCanvas], except while the keyboard is open or a run streams.
  */
 @Composable
-internal fun ComposerPromptCard(model: ComposerModel, onAttachImage: () -> Unit) {
+internal fun ComposerPromptCard(model: ComposerModel, onAttachImage: () -> Unit, statuses: List<LettaAttachedStatus> = emptyList()) {
+    // Order matters: widthIn BEFORE fillMaxWidth, or fillMaxWidth pins min == max and the cap is lost.
+    LettaAttachedStatusFrame(statuses, MaterialTheme.shapes.large, Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
+        PromptCardSurface(model, onAttachImage)
+    }
+}
+
+@Composable
+private fun PromptCardSurface(model: ComposerModel, onAttachImage: () -> Unit) {
     val swipeEnabled = model.offersOpenCanvas && !model.streaming && !keyboardOpen()
     Surface(
-        // Order matters: widthIn BEFORE fillMaxWidth, or fillMaxWidth pins min == max and the cap is lost.
         modifier = Modifier
-            .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .swipeUpToCanvas(enabled = swipeEnabled, onTrigger = { model.onIntent(ChatSurfaceIntent.OpenCanvas) })
             .composerOutline(MaterialTheme.shapes.large, model.uiState)
@@ -101,20 +110,23 @@ internal fun ComposerPromptCard(model: ComposerModel, onAttachImage: () -> Unit)
  * raises [ChatSurfaceIntent.Expand] to open the full page. Off the chat page the agent's mascot
  * rides beside it ([ComposerCompanionRow]); on the chat page the docked panel seats it in its
  * top-centre badge instead ([LocalComposerCompanion] is off), so the bar keeps the full width.
+ * [statuses] attach to the bar's edges as on the full card.
  */
 @Composable
-internal fun DockedComposerBar(model: ComposerModel, onAttachImage: () -> Unit) {
-    ComposerCompanionRow(model) { DockedComposerBarSurface(model, onAttachImage) }
+internal fun DockedComposerBar(model: ComposerModel, onAttachImage: () -> Unit, statuses: List<LettaAttachedStatus> = emptyList()) {
+    ComposerCompanionRow(model) { DockedComposerBarSurface(model, onAttachImage, statuses) }
 }
 
 @Composable
-private fun DockedComposerBarSurface(model: ComposerModel, onAttachImage: () -> Unit) {
+private fun DockedComposerBarSurface(model: ComposerModel, onAttachImage: () -> Unit, statuses: List<LettaAttachedStatus>) {
     val minimised = LocalMinimisedBarLayout.current
     val fieldHeight = minimised?.fieldHeight
-    Box(Modifier.widthIn(max = composerBarMaxWidth()).fillMaxWidth()) {
-        DockedBarRow(model, onAttachImage, fieldHeight)
-        // Over the bar's own edges, so the strips are where the edge is drawn, however wide it runs.
-        minimised?.handles?.let { handles -> Box(Modifier.matchParentSize(), content = handles) }
+    LettaAttachedStatusFrame(statuses, MaterialTheme.shapes.large, Modifier.widthIn(max = composerBarMaxWidth()).fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth()) {
+            DockedBarRow(model, onAttachImage, fieldHeight)
+            // Over the bar's own edges, so the strips are where the edge is drawn, however wide it runs.
+            minimised?.handles?.let { handles -> Box(Modifier.matchParentSize(), content = handles) }
+        }
     }
 }
 
