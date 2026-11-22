@@ -141,6 +141,10 @@ What the chat page's voice mode shares with the rest of the app, kept free of pa
 Reusable list parts, errors, refresh, page headers and pane primitives, and the chat timeline's disclosure and notice lines. Menus are [LettaPopupMenu](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.components/-letta-popup-menu.html) over [LettaMenuItem](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.components.foundation/-letta-menu-item/index.html); chips, pills, spinners and section labels live in `ui.components.foundation`, the disclosure chevron and its controls in `ui.components.disclosure`. Supply content through composable slots and modifiers; business workflows and repository access belong to callers.
 
 
+# Package com.letta.mobile.ui.components.attached
+
+Status that rides an edge of the surface it qualifies, the way Astryx attaches status to its input: `LettaAttachedStatusFrame` draws a band on the composer's top edge for a refused attachment or blocked send (dismissible) and for the context-window warning from 90% full (not dismissible), tinted with the status tone's own colour so a warning is the theme's amber and an error a soft red rather than the full error container.
+
 # Package com.letta.mobile.ui.components.row
 
 The one list row every roster, recents and history list uses. [LettaListRow] owns the row's interaction source, hover, focus and press states, the rounded background ladder, the pointer cursor, muting and the tooltip entry point, so callers describe a row with [LettaListRowSpec] and never re-implement any of it. The tooltip is injected by the host, so this package depends on no host, shell or chat package. `LettaHangingRow` is the hanging-indent item (a leading mark in its own column, every line and action of the item on one left edge after it) with `LettaHangingRowAction` for text actions on that edge; the subagent roster's running cards use it.
