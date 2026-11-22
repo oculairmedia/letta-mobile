@@ -12271,6 +12271,8 @@ final object com.letta.mobile.ui.theme.tokens/LettaSurfaceSizes { // com.letta.m
         final fun <get-sidePaneWidth>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.tokens/LettaSurfaceSizes.sidePaneWidth.<get-sidePaneWidth>|<get-sidePaneWidth>(){}[0]
     final val snackbarMaxWidth // com.letta.mobile.ui.theme.tokens/LettaSurfaceSizes.snackbarMaxWidth|{}snackbarMaxWidth[0]
         final fun <get-snackbarMaxWidth>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.tokens/LettaSurfaceSizes.snackbarMaxWidth.<get-snackbarMaxWidth>|<get-snackbarMaxWidth>(){}[0]
+    final val snackbarSwipeThreshold // com.letta.mobile.ui.theme.tokens/LettaSurfaceSizes.snackbarSwipeThreshold|{}snackbarSwipeThreshold[0]
+        final fun <get-snackbarSwipeThreshold>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.tokens/LettaSurfaceSizes.snackbarSwipeThreshold.<get-snackbarSwipeThreshold>|<get-snackbarSwipeThreshold>(){}[0]
     final val wideContentGutter // com.letta.mobile.ui.theme.tokens/LettaSurfaceSizes.wideContentGutter|{}wideContentGutter[0]
         final fun <get-wideContentGutter>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.tokens/LettaSurfaceSizes.wideContentGutter.<get-wideContentGutter>|<get-wideContentGutter>(){}[0]
     final val wideContentMaxWidth // com.letta.mobile.ui.theme.tokens/LettaSurfaceSizes.wideContentMaxWidth|{}wideContentMaxWidth[0]
