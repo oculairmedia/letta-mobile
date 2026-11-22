@@ -76,7 +76,7 @@ class PairingAdminRepository(private val rpc: AdminRpcInvoker) {
             },
         ) as? JsonObject ?: error("pair.invite.create returned no result")
         val link = result.string("pair_link")
-            ?: error("This host cannot mint scannable invites yet; update the Meridian host.")
+            ?: error("This host cannot mint scannable invites yet; update the Baken host.")
         return MintedPairInvite(
             pairLink = link,
             inviteId = result.string("invite_id").orEmpty(),

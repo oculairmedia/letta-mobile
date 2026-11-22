@@ -289,7 +289,7 @@ private fun AgentWorkEffect(window: Window, state: DesktopNucleusEffectState) {
             EnergyManager.disableLightEfficiencyMode()
             EnergyManager.keepScreenAwake()
             MediaControlService.setMetadata(
-                MediaMetadata(title = "${state.agentName} is working", artist = "Letta Desktop"),
+                MediaMetadata(title = "${state.agentName} is working", artist = DESKTOP_DISPLAY_NAME),
             )
             MediaControlService.setPlaybackState(MediaPlaybackState(MediaPlaybackStatus.PLAYING))
         } else {
@@ -297,7 +297,7 @@ private fun AgentWorkEffect(window: Window, state: DesktopNucleusEffectState) {
             EnergyManager.releaseScreenAwake()
             EnergyManager.enableLightEfficiencyMode()
             MediaControlService.setMetadata(
-                MediaMetadata(title = state.agentName, artist = "Letta Desktop"),
+                MediaMetadata(title = state.agentName, artist = DESKTOP_DISPLAY_NAME),
             )
             MediaControlService.setPlaybackState(MediaPlaybackState(MediaPlaybackStatus.PAUSED))
         }
@@ -453,10 +453,10 @@ private fun DesktopTray(
 ) {
     Tray(
         icon = Icons.Outlined.SmartToy,
-        tooltip = if (isAgentWorking) "Letta Desktop — agent working" else "Letta Desktop",
+        tooltip = if (isAgentWorking) "$DESKTOP_DISPLAY_NAME — agent working" else DESKTOP_DISPLAY_NAME,
         primaryAction = actions.onShow,
     ) {
-        Item(label = "Show Letta Desktop", onClick = actions.onShow)
+        Item(label = "Show $DESKTOP_DISPLAY_NAME", onClick = actions.onShow)
         Item(label = "Settings", onClick = actions.onOpenSettings)
         Item(label = "Check for updates", onClick = actions.onCheckForUpdates)
         Divider()
@@ -466,8 +466,8 @@ private fun DesktopTray(
 
 private fun configureMediaControls(agentName: String, onActivate: () -> Unit) {
     if (!MediaControlService.isAvailable()) return
-    MediaControlService.configure(displayName = "Letta Desktop")
-    MediaControlService.setMetadata(MediaMetadata(title = agentName, artist = "Letta Desktop"))
+    MediaControlService.configure(displayName = DESKTOP_DISPLAY_NAME)
+    MediaControlService.setMetadata(MediaMetadata(title = agentName, artist = DESKTOP_DISPLAY_NAME))
     MediaControlService.attach { event ->
         when (event) {
             MediaControlEvent.Play,
@@ -496,7 +496,7 @@ private fun configureLauncherMenus(onShow: () -> Unit, onOpenSettings: () -> Uni
             }
             MacOsDockMenu.setDockMenu(
                 listOf(
-                    DockMenuItem(id = 1, title = "Show Letta Desktop"),
+                    DockMenuItem(id = 1, title = "Show $DESKTOP_DISPLAY_NAME"),
                     DockMenuItem(id = 2, title = "Settings"),
                 ),
             )
@@ -508,8 +508,8 @@ private fun configureLauncherMenus(onShow: () -> Unit, onOpenSettings: () -> Uni
 private fun configureWindowsJumpList() {
     WindowsJumpListManager.setJumpList(
         tasks = listOf(
-            JumpListItem("Open conversations", "meridian://conversations", "Show Letta Desktop conversations"),
-            JumpListItem("Open settings", "meridian://settings", "Show Letta Desktop settings"),
+            JumpListItem("Open conversations", "meridian://conversations", "Show $DESKTOP_DISPLAY_NAME conversations"),
+            JumpListItem("Open settings", "meridian://settings", "Show $DESKTOP_DISPLAY_NAME settings"),
         ),
     )
 }

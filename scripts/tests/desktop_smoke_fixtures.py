@@ -118,7 +118,7 @@ class DesktopSmokeFixtures:
             'sleep': 'exec /bin/sleep 0.01',
             'xdotool': ('if [ -n "$FIXTURE_READY" ]; then\n'
                         'while [ ! -f "$FIXTURE_READY" ]; do /bin/sleep 0.01; done\nfi\n' +
-                        ('if [ "$1" = search ]; then echo 123; else echo Meridian; fi' if visible else 'exit 1')),
+                        ('if [ "$1" = search ]; then echo 123; else echo Baken; fi' if visible else 'exit 1')),
             **options.get('tools', {}),
         }.items():
             write(tools / name, '#!/bin/sh\n' + body + '\n', True)

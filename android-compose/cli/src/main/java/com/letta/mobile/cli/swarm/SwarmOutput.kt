@@ -141,7 +141,7 @@ private fun DeliveryReceipt.Processed.processedText(): String {
         is TurnTerminal.Failed -> "processed: failed (${ended.reason})"
         is TurnTerminal.Cancelled -> "processed: cancelled (${ended.reason})"
         is TurnTerminal.NeedsApproval ->
-            "processed: needs approval (${ended.approvals.joinToString { it.toolName }}); answer it in the Meridian app"
+            "processed: needs approval (${ended.approvals.joinToString { it.toolName }}); answer it in the Baken app"
         TurnTerminal.Completed -> "processed: completed"
         TurnTerminal.Unobserved -> "processed: reply read from history after a dropped link (terminal not observed)"
     }
