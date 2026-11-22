@@ -48,6 +48,19 @@ class IrohAgentSlimListTest {
         assertFailsWith<NoSuchElementException> { repository.getFreshAgent(AgentId("agent-404")) }
     }
 
+    @Test
+    fun aSlimRosterRefreshKeepsDetailAnEarlierReadCached() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohAdminTransport().apply { rpcResponder = ::answer }
+        val repository = IrohAgentRepository(directoryProvider = { IrohAdminRpcAgentDirectory(transport) })
+        val detail = repository.getFreshAgent(ADA)
+
+        repository.refreshAgents()
+
+        val cached = repository.agents.value.single { it.id == ADA }
+        assertEquals(detail.system, cached.system, "a list row never erases cached detail")
+        assertEquals(detail.model, cached.model)
+    }
+
     /** `agent.list` answers with the contract's envelope; `agent.get` answers like the host: the whole row, or a refusal. */
     private fun answer(call: AdminRpcCall): AppServerInboundFrame.AdminRpcResponse = when (call.method) {
         "agent.list" -> listPage(call)
