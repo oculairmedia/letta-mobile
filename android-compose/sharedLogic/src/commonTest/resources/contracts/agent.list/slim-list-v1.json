@@ -1,0 +1,444 @@
+{
+  "method": "agent.list",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/AgentAdminHandlers.kt",
+  "cases": [
+    {
+      "name": "list-fields",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "agents": [
+          {
+            "id": "agent-ada",
+            "name": "Ada",
+            "description": "Ada agent",
+            "system": "You are a Letta Code agent. Long instructions follow.",
+            "tools": [],
+            "tags": [
+              "origin:letta-code"
+            ],
+            "model": "anthropic/claude-sonnet-5-5",
+            "model_settings": {
+              "provider_type": "anthropic",
+              "context_window_limit": 200000
+            },
+            "message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "in_context_message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "last_run_completion": "2026-11-01T03:16:48.945Z",
+            "llm_config": {
+              "model": "claude-sonnet-5-5",
+              "model_endpoint_type": "anthropic",
+              "context_window": 200000
+            },
+            "compaction_settings": {
+              "mode": "sliding_window"
+            },
+            "created_at": "2026-10-01T00:00:00Z",
+            "updated_at": "2026-11-01T00:00:00Z"
+          },
+          {
+            "id": "agent-worker",
+            "name": "Worker",
+            "description": "Worker agent",
+            "system": "You are a Letta Code agent. Long instructions follow.",
+            "tools": [],
+            "tags": [
+              "role:subagent"
+            ],
+            "model": "anthropic/claude-sonnet-5-5",
+            "model_settings": {
+              "provider_type": "anthropic",
+              "context_window_limit": 200000
+            },
+            "message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "in_context_message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "last_run_completion": "2026-11-01T03:16:48.945Z",
+            "llm_config": {
+              "model": "claude-sonnet-5-5",
+              "model_endpoint_type": "anthropic",
+              "context_window": 200000
+            },
+            "compaction_settings": {
+              "mode": "sliding_window"
+            }
+          },
+          {
+            "id": "agent-bob",
+            "name": "Bob",
+            "description": "Bob agent",
+            "system": "You are a Letta Code agent. Long instructions follow.",
+            "tools": [],
+            "tags": [
+              "origin:letta-code"
+            ],
+            "model": "anthropic/claude-sonnet-5-5",
+            "model_settings": {
+              "provider_type": "anthropic",
+              "context_window_limit": 200000
+            },
+            "message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "in_context_message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "last_run_completion": "2026-11-01T03:16:48.945Z",
+            "llm_config": {
+              "model": "claude-sonnet-5-5",
+              "model_endpoint_type": "anthropic",
+              "context_window": 200000
+            },
+            "compaction_settings": {
+              "mode": "sliding_window"
+            },
+            "hidden": false
+          },
+          {
+            "id": "agent-gone",
+            "name": "Gone",
+            "description": "Gone agent",
+            "system": "You are a Letta Code agent. Long instructions follow.",
+            "tools": [],
+            "tags": [
+              "origin:letta-code"
+            ],
+            "model": "anthropic/claude-sonnet-5-5",
+            "model_settings": {
+              "provider_type": "anthropic",
+              "context_window_limit": 200000
+            },
+            "message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "in_context_message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "last_run_completion": "2026-11-01T03:16:48.945Z",
+            "llm_config": {
+              "model": "claude-sonnet-5-5",
+              "model_endpoint_type": "anthropic",
+              "context_window": 200000
+            },
+            "compaction_settings": {
+              "mode": "sliding_window"
+            },
+            "hidden": true
+          }
+        ]
+      },
+      "params": {
+        "limit": "50",
+        "offset": "0"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": [
+          {
+            "id": "agent-ada",
+            "name": "Ada",
+            "description": "Ada agent",
+            "tags": [
+              "origin:letta-code"
+            ],
+            "model": "anthropic/claude-sonnet-5-5",
+            "model_settings": {
+              "provider_type": "anthropic",
+              "context_window_limit": 200000
+            },
+            "last_run_completion": "2026-11-01T03:16:48.945Z",
+            "llm_config": {
+              "model": "claude-sonnet-5-5",
+              "model_endpoint_type": "anthropic",
+              "context_window": 200000
+            },
+            "created_at": "2026-10-01T00:00:00Z",
+            "updated_at": "2026-11-01T00:00:00Z"
+          },
+          {
+            "id": "agent-bob",
+            "name": "Bob",
+            "description": "Bob agent",
+            "tags": [
+              "origin:letta-code"
+            ],
+            "model": "anthropic/claude-sonnet-5-5",
+            "model_settings": {
+              "provider_type": "anthropic",
+              "context_window_limit": 200000
+            },
+            "last_run_completion": "2026-11-01T03:16:48.945Z",
+            "llm_config": {
+              "model": "claude-sonnet-5-5",
+              "model_endpoint_type": "anthropic",
+              "context_window": 200000
+            },
+            "hidden": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "page",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "agents": [
+          {
+            "id": "agent-ada",
+            "name": "Ada",
+            "description": "Ada agent",
+            "system": "You are a Letta Code agent. Long instructions follow.",
+            "tools": [],
+            "tags": [
+              "origin:letta-code"
+            ],
+            "model": "anthropic/claude-sonnet-5-5",
+            "model_settings": {
+              "provider_type": "anthropic",
+              "context_window_limit": 200000
+            },
+            "message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "in_context_message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "last_run_completion": "2026-11-01T03:16:48.945Z",
+            "llm_config": {
+              "model": "claude-sonnet-5-5",
+              "model_endpoint_type": "anthropic",
+              "context_window": 200000
+            },
+            "compaction_settings": {
+              "mode": "sliding_window"
+            },
+            "created_at": "2026-10-01T00:00:00Z",
+            "updated_at": "2026-11-01T00:00:00Z"
+          },
+          {
+            "id": "agent-bob",
+            "name": "Bob",
+            "description": "Bob agent",
+            "system": "You are a Letta Code agent. Long instructions follow.",
+            "tools": [],
+            "tags": [
+              "origin:letta-code"
+            ],
+            "model": "anthropic/claude-sonnet-5-5",
+            "model_settings": {
+              "provider_type": "anthropic",
+              "context_window_limit": 200000
+            },
+            "message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "in_context_message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "last_run_completion": "2026-11-01T03:16:48.945Z",
+            "llm_config": {
+              "model": "claude-sonnet-5-5",
+              "model_endpoint_type": "anthropic",
+              "context_window": 200000
+            },
+            "compaction_settings": {
+              "mode": "sliding_window"
+            },
+            "hidden": false
+          }
+        ]
+      },
+      "params": {
+        "limit": "1",
+        "offset": "1"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": [
+          {
+            "id": "agent-bob",
+            "name": "Bob",
+            "description": "Bob agent",
+            "tags": [
+              "origin:letta-code"
+            ],
+            "model": "anthropic/claude-sonnet-5-5",
+            "model_settings": {
+              "provider_type": "anthropic",
+              "context_window_limit": 200000
+            },
+            "last_run_completion": "2026-11-01T03:16:48.945Z",
+            "llm_config": {
+              "model": "claude-sonnet-5-5",
+              "model_endpoint_type": "anthropic",
+              "context_window": 200000
+            },
+            "hidden": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "scoped",
+      "context": {
+        "authenticated": true,
+        "authorized_agent_ids": [
+          "agent-bob"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "agents": [
+          {
+            "id": "agent-ada",
+            "name": "Ada",
+            "description": "Ada agent",
+            "system": "You are a Letta Code agent. Long instructions follow.",
+            "tools": [],
+            "tags": [
+              "origin:letta-code"
+            ],
+            "model": "anthropic/claude-sonnet-5-5",
+            "model_settings": {
+              "provider_type": "anthropic",
+              "context_window_limit": 200000
+            },
+            "message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "in_context_message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "last_run_completion": "2026-11-01T03:16:48.945Z",
+            "llm_config": {
+              "model": "claude-sonnet-5-5",
+              "model_endpoint_type": "anthropic",
+              "context_window": 200000
+            },
+            "compaction_settings": {
+              "mode": "sliding_window"
+            },
+            "created_at": "2026-10-01T00:00:00Z",
+            "updated_at": "2026-11-01T00:00:00Z"
+          },
+          {
+            "id": "agent-bob",
+            "name": "Bob",
+            "description": "Bob agent",
+            "system": "You are a Letta Code agent. Long instructions follow.",
+            "tools": [],
+            "tags": [
+              "origin:letta-code"
+            ],
+            "model": "anthropic/claude-sonnet-5-5",
+            "model_settings": {
+              "provider_type": "anthropic",
+              "context_window_limit": 200000
+            },
+            "message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "in_context_message_ids": [
+              "message-1",
+              "message-2"
+            ],
+            "last_run_completion": "2026-11-01T03:16:48.945Z",
+            "llm_config": {
+              "model": "claude-sonnet-5-5",
+              "model_endpoint_type": "anthropic",
+              "context_window": 200000
+            },
+            "compaction_settings": {
+              "mode": "sliding_window"
+            },
+            "hidden": false
+          }
+        ]
+      },
+      "params": {
+        "limit": "50",
+        "offset": "0"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": [
+          {
+            "id": "agent-bob",
+            "name": "Bob",
+            "description": "Bob agent",
+            "tags": [
+              "origin:letta-code"
+            ],
+            "model": "anthropic/claude-sonnet-5-5",
+            "model_settings": {
+              "provider_type": "anthropic",
+              "context_window_limit": 200000
+            },
+            "last_run_completion": "2026-11-01T03:16:48.945Z",
+            "llm_config": {
+              "model": "claude-sonnet-5-5",
+              "model_endpoint_type": "anthropic",
+              "context_window": 200000
+            },
+            "hidden": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "native-refused",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "agents": [],
+        "agent_list_error": "Failed to list agents"
+      },
+      "params": {
+        "limit": "50",
+        "offset": "0"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "app_server_error: agent.list native command unsuccessful"
+      }
+    }
+  ]
+}

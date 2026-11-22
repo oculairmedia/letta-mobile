@@ -4,7 +4,6 @@ agent.count
 agent.create
 agent.delete
 agent.get
-agent.list
 agent.update
 approval.submit
 archive.list
