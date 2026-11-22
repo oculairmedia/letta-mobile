@@ -336,8 +336,6 @@ class WireContractsTest {
         else -> row["tags"]?.jsonArray.orEmpty().any { it.jsonPrimitive.content == "role:subagent" }
     }
 
-    private fun fixtureNative(host: JsonObject?): AppServerClient = when {
-        host?.containsKey("agents") == true -> agentNative(host)
     /** The App Server's message paging over the case's stored rows ([LettaJsMessagePaging]); any other native call fails. */
     private fun messagesNative(host: JsonObject): AppServerClient {
         val paging = LettaJsMessagePaging.fromFixture(host.getValue("messages").jsonObject)
@@ -350,6 +348,7 @@ class WireContractsTest {
     }
 
     private fun fixtureNative(host: JsonObject?): AppServerClient = when {
+        host?.containsKey("agents") == true -> agentNative(host)
         host?.containsKey("messages") == true -> messagesNative(host)
         host?.containsKey("monitor_success") == true -> monitorNative(host)
         host?.containsKey("toolset_response") == true -> toolsetNative(host)
