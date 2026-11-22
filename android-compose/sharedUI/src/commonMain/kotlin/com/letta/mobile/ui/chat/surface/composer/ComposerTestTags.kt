@@ -16,7 +16,10 @@ internal object ComposerTestTags {
     const val DOCKED_INPUT = "composer-docked-input"
     const val EXPAND = "composer-expand"
     const val SHOW_CANVAS = "composer-show-canvas"
+    /** The error band on the prompt's top edge. */
     const val ERROR = "composer-error"
+    /** The context-window warning band on the prompt's bottom edge. */
+    const val CONTEXT_WARNING = "composer-context-warning"
     const val HINT = "composer-hint"
     /** The line under the card: the permission mode, the keyboard hint and, at its right, the context indicator. */
     const val HINT_FOOTER = "composer-hint-footer"

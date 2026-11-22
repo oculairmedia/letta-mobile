@@ -12,9 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,7 +29,6 @@ import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.workspace.directory.WorktreePaths
 import com.letta.mobile.data.workspace.directory.devicePathOrNull
 import com.letta.mobile.sharedui.resources.Res
-import com.letta.mobile.sharedui.resources.composer_dismiss_error
 import com.letta.mobile.sharedui.resources.composer_hint
 import com.letta.mobile.sharedui.resources.composer_working_directory
 import com.letta.mobile.sharedui.resources.composer_working_directory_change
@@ -40,7 +37,6 @@ import com.letta.mobile.sharedui.resources.composer_working_directory_unknown
 import com.letta.mobile.sharedui.resources.composer_worktree_badge
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryUiState
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
@@ -116,35 +112,6 @@ private fun ComposerWorktreeBadge(name: String) {
 /** Test tags of the working-directory row's worktree badge. */
 object ComposerWorktreeTags {
     const val BADGE = "composer-worktree-badge"
-}
-
-/** A composer error (attachment refused, send blocked) shown inline above the prompt. */
-@Composable
-internal fun ComposerErrorRow(message: String, onDismiss: () -> Unit) {
-    Surface(
-        modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth().testTag(ComposerTestTags.ERROR),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-    ) {
-        Row(
-            modifier = Modifier.padding(start = LettaDimens.Space.md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.weight(1f).padding(vertical = LettaDimens.Space.sm),
-            )
-            IconButton(onClick = onDismiss) {
-                Icon(
-                    imageVector = LettaIcons.Close,
-                    contentDescription = stringResource(Res.string.composer_dismiss_error),
-                    modifier = Modifier.size(LettaDimens.Control.icon),
-                )
-            }
-        }
-    }
 }
 
 /**

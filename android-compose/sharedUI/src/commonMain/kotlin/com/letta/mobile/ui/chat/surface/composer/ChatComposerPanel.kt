@@ -116,11 +116,13 @@ internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modi
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         ComposerAboveCard(model, parts)
+        // The compact dock carries only the error; the context warning is chrome of the full page.
+        val statuses = composerStatuses(model, withContextWarning = mode != ChatSurfaceMode.Docked)
         if (mode == ChatSurfaceMode.Docked) {
-            VoiceCardDock(model.uiState) { DockedComposerBar(model, images.attach) }
+            VoiceCardDock(model.uiState) { DockedComposerBar(model, images.attach, statuses) }
         } else {
             Box(Modifier.measuredAs(parts, PART_CARD)) {
-                ComposerCompanionRow(model) { VoiceCardDock(model.uiState) { ComposerPromptCard(model, images.attach) } }
+                ComposerCompanionRow(model) { VoiceCardDock(model.uiState) { ComposerPromptCard(model, images.attach, statuses) } }
             }
             ComposerUnderCardLine(model)
         }
@@ -209,11 +211,13 @@ private fun ComposerUnderCardLine(model: ComposerModel) {
     )
 }
 
-/** What stacks above the prompt: the queue, the error, the working directory, suggestions. */
+/**
+ * What stacks above the prompt: voice mode's notices, the working directory, suggestions, the queue.
+ * The composer's own error is not here: it is attached to the prompt ([composerStatuses]).
+ */
 @Composable
 private fun ComposerAboveCard(model: ComposerModel, parts: SnapshotStateMap<String, Rect>) {
     val actions = model.actions
-    model.composer.error?.let { message -> ComposerErrorRow(message = message, onDismiss = actions::clearComposerError) }
     // Voice mode's failures and missing setup with Retry or Set up (its card extends from the prompt bar).
     ComposerVoiceSlot()
     // The dock stays one compact bar; the directory is chrome of the full page.
