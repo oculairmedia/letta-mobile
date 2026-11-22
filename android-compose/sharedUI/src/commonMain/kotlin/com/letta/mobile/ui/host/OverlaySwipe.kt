@@ -16,6 +16,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.dismiss
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import com.letta.mobile.ui.a11y.politeLiveRegion
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
@@ -70,4 +71,4 @@ internal fun Modifier.swipeAwayOnTouch(enabled: Boolean, onDismiss: () -> Unit):
  * (assertive), anything else waits its turn (polite).
  */
 internal fun Modifier.overlayAnnouncement(urgent: Boolean): Modifier =
-    semantics { liveRegion = if (urgent) LiveRegionMode.Assertive else LiveRegionMode.Polite }
+    if (urgent) semantics { liveRegion = LiveRegionMode.Assertive } else politeLiveRegion()
