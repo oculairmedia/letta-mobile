@@ -96,6 +96,12 @@ object NoMascotHost : MascotHost {
 val LocalMascotHost = compositionLocalOf<MascotHost> { NoMascotHost }
 
 /**
+ * Counts the moments a surface drove a mascot's director itself (the home greeting's looks and
+ * waves). [MascotLive] treats each increase like a touch: a resting scene wakes so the beat plays.
+ */
+internal val LocalMascotWake = compositionLocalOf { 0 }
+
+/**
  * The product rule for whether an agent's tile moves: it is live while the agent is at work
  * (thinking or speaking, as the shell's presence says) and a still otherwise. One rule for every
  * list, chip and header on every platform; a site passes `live` explicitly only when it must
@@ -146,6 +152,7 @@ fun MascotLive(
      */
     touch: MascotTouch = MascotTouch.answering(onClick),
 ) {
+    val wake = LocalMascotWake.current
     val host = LocalMascotHost.current
     val registry = LocalMascotRegistry.current
     val entry = remember(host, sceneKey, identity) { host.entry(sceneKey, identity) } ?: return
@@ -168,7 +175,7 @@ fun MascotLive(
     // is asked for: a seat that stays composed must not redraw the window every vsync (MascotRest).
     val gestures = rememberMascotGestureEffects(entry, onClick, MotionPreference(reducedMotion))
     val engaged = mascotEngaged(presence) || gestures.petting
-    val moving = rememberMascotMoving(engaged, identity, gestures.touches, pointer = cursor)
+    val moving = rememberMascotMoving(engaged, identity, gestures.touches + wake, pointer = cursor)
     // At rest the clock leaves composition and asks for no frames.
     if (moving) MascotClock(entry, registry)
     // Gaze: this tile vs the pointer, the composer / timeline rects, the other mascots and every

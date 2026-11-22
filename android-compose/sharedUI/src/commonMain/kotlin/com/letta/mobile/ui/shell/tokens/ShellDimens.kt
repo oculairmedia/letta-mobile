@@ -24,6 +24,12 @@ internal object ShellDimens {
     /** One agent in Home's avatar row: the avatar and its name under it. */
     val homeAvatarTile: Dp = 64.dp
 
+    /** One mascot's tile in Home's greeting; the rig draws the character across ~60 % of it. */
+    val homeGreetingMascot: Dp = 96.dp
+
+    /** The Baken mark before Home's greeting line, a little taller than the line. */
+    val homeGreetingMark: Dp = 36.dp
+
     /** One tile of Home's pinned grid. */
     val homePinTileHeight: Dp = 108.dp
 
