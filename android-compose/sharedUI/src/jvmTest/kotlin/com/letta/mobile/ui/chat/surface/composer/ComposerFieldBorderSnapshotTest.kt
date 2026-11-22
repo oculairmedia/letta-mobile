@@ -43,7 +43,8 @@ class ComposerFieldBorderSnapshotTest {
         model = ChatModelUiState(currentHandle = null, currentLabel = "Opus 5.5"),
     )
 
-    private fun snapshot(look: LettaFieldState, width: Dp, dark: Boolean) = runDesktopComposeUiTest(width = WINDOW_WIDTH, height = WINDOW_HEIGHT) {
+    private fun snapshot(look: LettaFieldState, width: Dp, dark: Boolean) =
+        runDesktopComposeUiTest(width = WINDOW_WIDTH, height = WINDOW_HEIGHT) {
         setContent {
             SharedMaterialTheme(darkTheme = dark) {
                 ProvideLettaHost(LettaHost.Pointer) {
