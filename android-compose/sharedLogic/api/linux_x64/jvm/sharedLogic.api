@@ -66443,14 +66443,17 @@ public abstract interface class com/letta/mobile/data/transport/api/RuntimeTurnE
 
 public abstract interface class com/letta/mobile/data/transport/api/SubagentScopeAwareChannelTransport {
 	public fun dismissSubagent-mymyBZk (Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun receivesSubagentPushes (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Z
 	public abstract fun sendSubagentListForScope (Lcom/letta/mobile/data/repository/api/SubagentParentScope;ZJLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/transport/api/SubagentScopeAwareChannelTransport$DefaultImpls {
 	public static fun dismissSubagent-mymyBZk (Lcom/letta/mobile/data/transport/api/SubagentScopeAwareChannelTransport;Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun receivesSubagentPushes (Lcom/letta/mobile/data/transport/api/SubagentScopeAwareChannelTransport;Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Z
 }
 
 public final class com/letta/mobile/data/transport/api/SubagentScopeAwareChannelTransportKt {
+	public static final fun receivesSubagentPushesFor (Lcom/letta/mobile/data/transport/api/IChannelTransport;Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Z
 	public static final fun sendSubagentListFor (Lcom/letta/mobile/data/transport/api/IChannelTransport;Lcom/letta/mobile/data/repository/api/SubagentParentScope;ZJLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun sendSubagentListFor$default (Lcom/letta/mobile/data/transport/api/IChannelTransport;Lcom/letta/mobile/data/repository/api/SubagentParentScope;ZJLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
@@ -73924,6 +73927,7 @@ public final class com/letta/mobile/data/transport/iroh/IrohChannelTransport : c
 	public fun hasActiveChatTurn (Ljava/lang/String;)Z
 	public fun isFrameCollectorOverflowCancellation (Ljava/lang/String;Ljava/util/concurrent/CancellationException;)Z
 	public fun probeNow ()V
+	public fun receivesSubagentPushes (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Z
 	public fun send (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonArray;Z)Z
 	public fun sendCronAdd (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun sendCronDelete (Ljava/lang/String;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
