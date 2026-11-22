@@ -159,6 +159,8 @@ private data class EnumChoiceSpec<T : Enum<T>>(
     val entries: List<T>,
     val optionLabel: (T) -> String,
     val supporting: String? = null,
+    /** Shown as segments on every host (a phone too), for a short, frequently changed choice. */
+    val inline: Boolean = false,
 )
 
 @Composable
@@ -171,12 +173,14 @@ private fun <T : Enum<T>> SettingsScope.EnumChoice(value: SettingValue<T>, spec:
             options = spec.entries.map { SettingsOption(it.name, spec.optionLabel(it)) },
             selected = current.name,
             supporting = spec.supporting ?: spec.label.helper,
+            inline = spec.inline,
             onSelect = { picked -> spec.entries.firstOrNull { it.name == picked }?.let(value::set) },
         ),
     )
 }
 
-private val THEME_CHOICE = EnumChoiceSpec(SettingsCopy.THEME, AppTheme.entries, ::themeLabel)
+// Theme is a mode switch, a few short words: segments on every host, as theme pickers on phones are.
+private val THEME_CHOICE = EnumChoiceSpec(SettingsCopy.THEME, AppTheme.entries, ::themeLabel, inline = true)
 
 private val PRESET_CHOICE = EnumChoiceSpec(SettingsCopy.PRESET, ThemePreset.entries, ::presetLabel)
 

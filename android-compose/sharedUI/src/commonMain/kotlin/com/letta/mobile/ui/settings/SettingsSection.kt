@@ -19,9 +19,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -44,6 +41,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.settings.SettingsAction
 import com.letta.mobile.data.settings.SettingsDrafts
 import com.letta.mobile.data.settings.SettingsRow
+import com.letta.mobile.ui.components.choice.LettaSegment
+import com.letta.mobile.ui.components.choice.LettaSegmentedChoice
+import com.letta.mobile.ui.components.choice.LettaSegmentedControl
 import com.letta.mobile.ui.components.foundation.LettaCard
 import com.letta.mobile.ui.components.foundation.LettaRowLabel
 import com.letta.mobile.ui.components.foundation.LettaToggleRow
@@ -342,17 +342,16 @@ private fun SegmentedChoice(row: SettingsRow.Choice, lock: String?) {
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         RowWordsColumn(RowWords(row.title, lock ?: row.supporting ?: current?.description), enabled)
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            row.options.forEachIndexed { index, option ->
-                SegmentedButton(
-                    selected = option.key == row.selected,
-                    onClick = { if (option.key != row.selected) row.onSelect(option.key) },
-                    enabled = enabled,
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = row.options.size),
-                    modifier = Modifier.testTag(SettingsSectionTags.OPTION_PREFIX + row.key + "-" + option.key),
-                ) { Text(option.label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-            }
-        }
+        LettaSegmentedControl(
+            choice = LettaSegmentedChoice(
+                segments = row.options.map { LettaSegment(it.key, it.label) },
+                selected = row.selected,
+                enabled = enabled,
+                tagPrefix = SettingsSectionTags.OPTION_PREFIX + row.key + "-",
+            ),
+            onSelect = row.onSelect,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
