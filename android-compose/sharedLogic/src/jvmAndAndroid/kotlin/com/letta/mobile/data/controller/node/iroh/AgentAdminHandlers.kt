@@ -81,6 +81,11 @@ object AgentAdminHandlers {
         }
     }
 
+    /**
+     * letta-mobile-hvpdq: rows already cut to [AGENT_LIST_FIELDS], so neither the wire nor the held
+     * roster carries the system prompt, message ids, tools or compaction settings (2.06 MB of the
+     * 2.10 MB a live 136-agent roster weighed). Detail is `agent.get`'s job.
+     */
     private suspend fun fetchAgents(client: AppServerClient, count: Long): JsonArray? {
         val response = client.agentList(
             AppServerCommand.AgentList(
@@ -88,8 +93,12 @@ object AgentAdminHandlers {
                 query = NativeAdmin.queryOf("limit" to count.toString()),
             ),
         )
-        return if (response.success) response.agents ?: JsonArray(emptyList()) else null
+        return if (response.success) JsonArray(response.agents.orEmpty().map(::listRow)) else null
     }
+
+    /** [agent] cut to the `agent.list` slim-list-v1 fields; a row that is not an object passes untouched. */
+    private fun listRow(agent: JsonElement): JsonElement =
+        (agent as? JsonObject)?.let { row -> JsonObject(row.filterKeys(AGENT_LIST_FIELDS::contains)) } ?: agent
 
     private fun pageOf(all: JsonArray, offset: Long, pageSize: Long): JsonArray =
         if (offset == 0L && all.size <= pageSize) all else JsonArray(all.drop(offset.toInt()).take(pageSize.toInt()))
@@ -284,7 +293,16 @@ object AgentAdminHandlers {
      */
     private const val MAX_AGENT_LIST_FETCH = 10_000L
 
-    /** Rosters past this are not held: about 17 KB per agent row, so roughly 34 MB at the cap. */
+    /** Rosters past this are not held: list rows are under 1 KB each, so under 2 MB at the cap. */
     private const val MAX_HELD_AGENTS = 2_000
 
+    /**
+     * What a list row keeps (docs/reference/contracts/agent.list/slim-list-v1.md): identity, the
+     * visibility inputs, the mascot metadata, the model label and window, and last activity.
+     */
+    private val AGENT_LIST_FIELDS = setOf(
+        "id", "name", "description", "tags", "hidden", AgentMetadataSidecar.METADATA_KEY,
+        "model", "model_settings", "llm_config", "context_window_limit",
+        "last_run_completion", "created_at", "updated_at",
+    )
 }
