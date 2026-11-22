@@ -623,9 +623,11 @@ internal class ConversationTurnFanout(
                 // letta-mobile-qygvv.3: the dead initiator handle gets nothing more. A NEW
                 // handle from the same peer (its redial) is an ordinary observer.
                 detached && viewer === initiatorViewer -> Unit
-                detached -> observers += viewer
-                viewer === initiatorViewer || (initiatorId != null && viewer.connectionId == initiatorId) ->
+                !detached && (viewer === initiatorViewer || (initiatorId != null && viewer.connectionId == initiatorId)) ->
                     initiators += viewer
+                // A feed reader takes this conversation from feed_delta alone: streaming it too would send every row twice.
+                // The live initiator above keeps its own turn's stream (its send and redial parking ride on it).
+                viewer.readsFeedOf(conversationId) -> Unit
                 else -> observers += viewer
             }
         }

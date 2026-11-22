@@ -200,6 +200,9 @@ class IrohNodeConnection(
     /** This connection has called `feed.subscribe`: only then is it pushed `feed_delta` frames, so a client that never reads the feed never receives them. */
     private val readsFeed = java.util.concurrent.atomic.AtomicBoolean(false)
 
+    /** The conversations this connection has read with `feed.subscribe`: it takes their turns from the feed, not the stream fanout. */
+    private val feedConversations: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
     /**
      * Build this connection's [selfViewer] once, bound to the turn
      * stream's [SendStream]. Idempotent — later calls return the existing handle
@@ -238,6 +241,7 @@ class IrohNodeConnection(
         handle.adminContextGate = { currentAdminRpcRequestContext().takeIf { it.authenticated } }
         // A feed push is for a peer that has read the feed (feed.subscribe); its own scope is checked per push.
         handle.feedPushGate = { authenticated.get() && readsFeed.get() }
+        handle.feedReaderGate = { conversation -> conversation in feedConversations }
         selfViewer = handle
         return handle
     }
@@ -452,6 +456,8 @@ class IrohNodeConnection(
         }
         return { succeeded ->
             settle(succeeded)
+            // Only a read the host answered makes this connection a feed reader of the conversation (a refused one keeps the stream).
+            if (succeeded && method == ConversationFeedWire.SUBSCRIBE) feedConversations += conversationId
             if (!succeeded) {
                 Telemetry.event(
                     "IrohNode", "viewer.registration_rolled_back",

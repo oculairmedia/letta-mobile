@@ -70,6 +70,10 @@ internal class IrohViewerHandle(
     @Volatile
     var feedPushGate: () -> Boolean = { false }
 
+    /** Whether this connection reads a conversation through the feed; evaluated at send time. Set like [feedPushGate]. */
+    @Volatile
+    var feedReaderGate: (String) -> Boolean = { false }
+
     /**
      * The connection's admin RPC context while it is authenticated, null otherwise; evaluated at send time for
      * method-scoped pushes. Set by the owning connection before the handle is shared. Default: none.
@@ -85,6 +89,8 @@ internal class IrohViewerHandle(
     override fun receivesConversationEvents(): Boolean = conversationEventsGate()
 
     override fun receivesFeedPushes(): Boolean = feedPushGate()
+
+    override fun readsFeedOf(conversationId: String): Boolean = feedReaderGate(conversationId)
 
     override fun adminContext(): AdminRpcRequestContext? = adminContextGate()
 
