@@ -15,12 +15,16 @@ import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.runCatchingCancellable
+import com.letta.mobile.data.backend.ConversationListing
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,6 +67,10 @@ open class CachedAllConversationsRepository(
     override val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
 
     private val refreshMutex = Mutex()
+
+    /** The refresh waiting for [refreshMutex], shared by every [refresh] caller that arrived since it was queued. */
+    private var pendingRefresh: Deferred<Result<Unit>>? = null
+    private val pendingLock = Mutex()
     /** Replaced on a backend switch, so the next host is asked for visible recents again. */
     private var listing = newListing()
 
@@ -94,7 +102,7 @@ open class CachedAllConversationsRepository(
             repositoryScope.launch {
                 observeConversationInvalidations(channelTransport.conversationChanges(), PUSH_COALESCE_WINDOW, ::applyPush)
             }
-            repositoryScope.launch { observeReconnectRefresh(channelTransport) { refreshAfterPush("reconnect") } }
+            repositoryScope.launch { observeReconnectRefresh(channelTransport) { refreshAfterReconnect() } }
         }
     }
 
@@ -174,6 +182,33 @@ open class CachedAllConversationsRepository(
         }
     }
 
+    /**
+     * A reconnect re-reads only the bounded recents page ([ConversationListing.reconnect]), O(1) calls whatever the
+     * roster: pushes sent while offline are lost and the recents page carries them. It does not stamp the list as
+     * fresh, so the drawer's next open still reads the pinned and opened agents' pages.
+     */
+    private suspend fun refreshAfterReconnect() {
+        try {
+            reconnectLocked()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            Telemetry.event(
+                TAG,
+                "conversation_updated.refresh_failed",
+                "trigger" attr "reconnect",
+                "error" attr (e.message ?: e.toString()),
+                level = Telemetry.Level.WARN,
+            )
+        }
+    }
+
+    private suspend fun reconnectLocked() = refreshMutex.withLock {
+        // An unopened list loads fresh when first shown.
+        if (!hasLoadedAtLeastOnce) return@withLock
+        publish(listing.reconnect())
+    }
+
     override suspend fun loadNextPage() = refreshMutex.withLock {
         if (!_hasMore.value) return@withLock
         if (!hasLoadedAtLeastOnce) return@withLock refreshLocked()
@@ -182,7 +217,22 @@ open class CachedAllConversationsRepository(
         publish(listed + _conversations.value.filterNot { row -> listed.any { it.id == row.id } })
     }
 
-    override suspend fun refresh() = refreshMutex.withLock {
+    /**
+     * Refreshes the list, one read in flight and at most one more waiting: callers arriving while a read runs
+     * share the single read that follows it, so a burst of triggers (drawer, heartbeat, reconnect) never stacks
+     * one read per trigger.
+     */
+    override suspend fun refresh() {
+        val read = pendingLock.withLock {
+            pendingRefresh ?: repositoryScope.async { runCatchingCancellable { readOncePending() } }
+                .also { pendingRefresh = it }
+        }
+        read.await().getOrThrow()
+    }
+
+    /** Takes the waiting read's place as the one in flight; later callers queue a fresh read behind it. */
+    private suspend fun readOncePending() = refreshMutex.withLock {
+        pendingLock.withLock { pendingRefresh = null }
         refreshLocked()
     }
 

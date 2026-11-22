@@ -83,10 +83,13 @@ class ConversationInvalidationTest {
         transport.state.value = ChannelTransportState.Disconnected(1006, "offline")
         runCurrent()
         remote.requests.clear()
+        remote.methods.clear()
         transport.state.value = ChannelTransportState.Connected("server", "session", "device")
         runCurrent()
-        assertEquals(setOf(a, b), remote.requests.toSet())
-        assertEquals(2, remote.requests.size)
+        // letta-mobile-fj56l: a reconnect asks the host for its recents page (refused here: no visibility index)
+        // and lists no agent; this host's per-agent reads wait for the list's next explicit refresh.
+        assertEquals(emptyList(), remote.requests)
+        assertEquals(1, remote.methods.count { it == "conversation.list" })
     }
 
     /**

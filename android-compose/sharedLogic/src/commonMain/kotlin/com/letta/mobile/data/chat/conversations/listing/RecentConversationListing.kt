@@ -37,6 +37,25 @@ private class RepositoryConversationStore(
     override suspend fun getConversation(id: ConversationId): Conversation = getConversation.invoke(id)
 }
 
+/** What one ask for the host's visible recents answered. */
+private sealed interface RecentsRead {
+    data class Rows(val rows: List<Conversation>) : RecentsRead
+
+    /** The host cannot serve visible recents; [reason] is its own words. */
+    data class Unsupported(val reason: String?) : RecentsRead
+}
+
+/**
+ * The host's answers that mean it has no visible recents at all (`ConversationAdminHandlers`: no local agent
+ * visibility index, or more conversations than it holds). Every other `capability_unavailable` of
+ * `conversation.list` (`NativeAdminSupport`: no App Server yet, breaker open for 60 s, 15 s read timeout) is
+ * transient and says nothing about recents.
+ */
+private val NO_RECENTS_ANSWERS = listOf("visible_only requires local agent visibility", "visible_only supports at most")
+
+private fun TimelineTransportHttpException.refusesRecentsForGood(): Boolean =
+    message.orEmpty().let { text -> NO_RECENTS_ANSWERS.any(text::contains) }
+
 /**
  * Session-local recents plus explicitly requested agent pages; legacy hosts retain their eager policy.
  * Every conversation list (web and desktop timelines, Android's fleet list) reads through this one listing.
@@ -98,26 +117,63 @@ internal class RecentConversationListing(
     }
 
     private suspend fun refreshRecents() {
-        try {
-            recents = gateway.listRecentConversations()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (unsupported: UnsupportedOperationException) {
-            fallBackToLegacy(unsupported.message)
-        } catch (failure: TimelineTransportHttpException) {
-            fallBackOrRethrow(failure)
+        when (val read = readRecents()) {
+            is RecentsRead.Rows -> recents = read.rows
+            is RecentsRead.Unsupported -> fallBackToLegacy(read.reason)
         }
     }
 
-    /** The host lacks visible recents (capability_unavailable); any other failure is a real one. */
-    private fun fallBackOrRethrow(failure: TimelineTransportHttpException) {
-        if (failure.message?.contains("capability_unavailable") != true) throw failure
-        fallBackToLegacy(failure.message)
+    /**
+     * One ask for the host's visible recents. Only a host that cannot serve them at all ([NO_RECENTS_ANSWERS], or
+     * one that ignored the opt-in) is [RecentsRead.Unsupported]; any other failure, a transient
+     * `capability_unavailable` (the App Server's breaker or timeout) included, is rethrown and leaves the
+     * listing as it was, so one bad answer never turns every later read into a per-agent roster sweep.
+     */
+    private suspend fun readRecents(): RecentsRead = try {
+        RecentsRead.Rows(gateway.listRecentConversations())
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (unsupported: UnsupportedOperationException) {
+        RecentsRead.Unsupported(unsupported.message)
+    } catch (failure: TimelineTransportHttpException) {
+        if (!failure.refusesRecentsForGood()) {
+            Telemetry.event(
+                "Conversations", "list.recents_unavailable", "reason" attr failure.message.orEmpty(),
+                level = Telemetry.Level.WARN,
+            )
+            throw failure
+        }
+        RecentsRead.Unsupported(failure.message)
     }
 
     private fun fallBackToLegacy(reason: String?) {
         legacyMode = true
         Telemetry.event("Conversations", "list.legacy_fallback", "reason" attr reason.orEmpty())
+    }
+
+    /**
+     * A reconnect re-reads the one bounded recents page, never an agent: pushes sent while offline are lost, and
+     * the recents page is what shows them. Agents the person opened or pinned are read when the list is next
+     * opened ([refresh]). A host found without recents is asked once more (a restarted host may have gained
+     * them) but stays on its per-agent reads only for an explicit [refresh], never for a reconnect.
+     */
+    override suspend fun reconnect(): List<Conversation> = mutex.withLock {
+        when (val read = readRecents()) {
+            is RecentsRead.Rows -> {
+                if (legacyMode) leaveLegacy()
+                // A loaded agent's own pages stay authoritative: its changed rows fold into them, the rest are recents.
+                val (owned, others) = read.rows.partition { it.agentId in fleet.loadedAgents }
+                owned.forEach { fleet.record(it) }
+                recents = others
+            }
+            is RecentsRead.Unsupported -> if (!legacyMode) fallBackToLegacy(read.reason)
+        }
+        conversations
+    }
+
+    private fun leaveLegacy() {
+        legacyMode = false
+        Telemetry.event("Conversations", "list.legacy_exit")
     }
 
     suspend fun rosterChanged(roster: List<Agent>): List<Conversation> = mutex.withLock {
