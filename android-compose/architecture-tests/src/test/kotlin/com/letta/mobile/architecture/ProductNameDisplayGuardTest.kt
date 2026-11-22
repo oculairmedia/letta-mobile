@@ -134,7 +134,7 @@ class ProductNameDisplayGuardTest {
         Regex("\"${Regex.escape(key)}\"\\s*:\\s*\"([^\"]*)\"").find(json)?.groupValues?.get(1)
 
     private fun gradleString(gradle: String, key: String): String? =
-        Regex("""(?m)^\s*${Regex.escape(key)}\s*=\s*"((?:[^"\\]|\\.)*)"""").find(gradle)?.groupValues?.get(1)
+        Regex("""(?m)^\s*${Regex.escape(key)}\s*=\s*(?:\$\$)?"((?:[^"\\]|\\.)*)"""").find(gradle)?.groupValues?.get(1)
 
     private companion object {
         val OLD_NAME = Regex("""\bMeridian\b""")

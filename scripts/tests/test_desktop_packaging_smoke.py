@@ -68,7 +68,7 @@ PYTHON'''
                                                               options={'ready': self.work / 'child.pid'})
             self.assertLess(time.monotonic() - start, 8)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual((evidence / 'window.txt').read_text(), 'Meridian\n')
+            self.assertEqual((evidence / 'window.txt').read_text(), 'Baken\n')
             self.assert_stubborn_stopped(0)
             self.assertIsNone(unrelated.poll(), 'Cleanup killed an unrelated caller process')
         finally:
@@ -114,7 +114,7 @@ PYTHON'''
         result, evidence = self.run_window_harness_fixture()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual((evidence / 'exit-status.txt').read_text(), '0\n')
-        self.assertEqual((evidence / 'window.txt').read_text(), 'Meridian\n')
+        self.assertEqual((evidence / 'window.txt').read_text(), 'Baken\n')
         self.assertEqual(list(self.work.rglob('letta-linux-package-smoke.*')), [])
 
 
@@ -137,7 +137,7 @@ PYTHON'''
 
 
     def test_window_harness_rejects_foreign_pid_with_brand_title(self):
-        result, evidence = self.run_titled_window_fixture(title='Meridian Desktop', foreign_pid=True)
+        result, evidence = self.run_titled_window_fixture(title='Baken', foreign_pid=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual((evidence / 'exit-status.txt').read_text(), '1\n')
 
