@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,7 +37,6 @@ import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
 import com.letta.mobile.ui.theme.tokens.LettaStrokeTokens
 import com.mikepenz.markdown.compose.LocalMarkdownColors
-import com.mikepenz.markdown.compose.LocalMarkdownDimens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -53,8 +51,9 @@ private const val COPIED_FEEDBACK_MILLIS: Long = 1_500L
  */
 @Composable
 internal fun CodeFenceWithHeader(language: String, source: String, block: @Composable () -> Unit) {
-    // The header sits on the block's own fill and corners, so header and code read as one piece.
-    val shape = RoundedCornerShape(LocalMarkdownDimens.current.codeBackgroundCornerSize)
+    // The header sits on the block's own fill and corners, so header and code read as one piece: the
+    // renderer's code corner is its 8 dp default, which is the shape scale's small (LettaDimens.Radius.sm).
+    val shape = MaterialTheme.shapes.small
     Column(Modifier.fillMaxWidth().clip(shape).background(LocalMarkdownColors.current.codeBackground)) {
         CodeFenceHeader(language, source)
         HorizontalDivider(thickness = LettaStrokeTokens.hairline, color = MaterialTheme.colorScheme.outlineVariant)
