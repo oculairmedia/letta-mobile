@@ -12165,6 +12165,7 @@ final object com.letta.mobile.ui.theme.tokens/LettaFieldTokens { // com.letta.mo
         final fun <get-BORDER_MILLIS>(): kotlin/Int // com.letta.mobile.ui.theme.tokens/LettaFieldTokens.BORDER_MILLIS.<get-BORDER_MILLIS>|<get-BORDER_MILLIS>(){}[0]
     final const val REST_ALPHA // com.letta.mobile.ui.theme.tokens/LettaFieldTokens.REST_ALPHA|{}REST_ALPHA[0]
         final fun <get-REST_ALPHA>(): kotlin/Float // com.letta.mobile.ui.theme.tokens/LettaFieldTokens.REST_ALPHA.<get-REST_ALPHA>|<get-REST_ALPHA>(){}[0]
+
     final val border // com.letta.mobile.ui.theme.tokens/LettaFieldTokens.border|{}border[0]
         final fun <get-border>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.tokens/LettaFieldTokens.border.<get-border>|<get-border>(){}[0]
 }
