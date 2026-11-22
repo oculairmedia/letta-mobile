@@ -102,7 +102,14 @@ class CardSurfacesRenderTest {
                     put(
                         "items",
                         buildJsonArray {
-                            add(buildJsonObject { put("key", "a"); put("title", "Details"); put("child", "accText"); put("defaultOpen", true) })
+                            add(
+                                buildJsonObject {
+                                    put("key", "a")
+                                    put("title", "Details")
+                                    put("child", "accText")
+                                    put("defaultOpen", true)
+                                },
+                            )
                         },
                     )
                 },

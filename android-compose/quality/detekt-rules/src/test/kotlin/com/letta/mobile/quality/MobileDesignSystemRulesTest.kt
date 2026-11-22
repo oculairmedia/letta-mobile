@@ -247,7 +247,11 @@ class MobileDesignSystemRulesTest {
         """.trimIndent()
         val wildcard = "import androidx.compose.material3.*\nfun a() = ElevatedCard {}\nfun b() = Card {}\n"
         val qualified = "fun a() = androidx.compose.material3.Card {}\n"
-        val projectType = "import com.letta.mobile.data.canvas.Card\nfun a() = Card(label = \"x\")\nfun b() = LettaCard {}\n"
+        val projectType = """
+            import com.letta.mobile.data.canvas.Card
+            fun a() = Card(label = "x")
+            fun b() = LettaCard {}
+        """.trimIndent()
         assertEquals(2, RawMaterialCard().lintAt(root, FEATURE, explicit).size)
         assertEquals(2, RawMaterialCard().lintAt(root, FEATURE, wildcard).size)
         assertEquals(1, RawMaterialCard().lintAt(root, FEATURE, qualified).size)

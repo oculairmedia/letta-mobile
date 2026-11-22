@@ -323,10 +323,11 @@ internal class RawMaterialCard(config: Config = Config.empty) : MobileRule(
 ) {
     override fun visitCallExpression(expression: KtCallExpression) {
         super.visitCallExpression(expression)
-        val callee = expression.calleeName() ?: return
         val file = expression.containingKtFile
-        if (!file.isStyledUiSource() || FOUNDATION_PATH in file.uiPath()) return
-        val card = expression.qualifiedMaterialCard(callee) ?: file.importedMaterialCard(callee) ?: return
+        val card = expression.calleeName()
+            ?.takeIf { file.isStyledUiSource() && FOUNDATION_PATH !in file.uiPath() }
+            ?.let { callee -> expression.qualifiedMaterialCard(callee) ?: file.importedMaterialCard(callee) }
+            ?: return
         report(
             expression,
             "`$card(...)` is a raw Material card, which picks its own colours (a bare Card is " +
@@ -338,21 +339,23 @@ internal class RawMaterialCard(config: Config = Config.empty) : MobileRule(
     /** `androidx.compose.material3.Card(...)` written out in full. */
     private fun KtCallExpression.qualifiedMaterialCard(callee: String): String? {
         val qualified = parent as? KtDotQualifiedExpression ?: return null
-        val material = qualified.selectorExpression == this && qualified.receiverExpression.compactText() in MATERIAL_PACKAGES
+        val material = qualified.selectorExpression == this &&
+            qualified.receiverExpression.compactText() in MATERIAL_PACKAGES
         return callee.takeIf { material && it in CARD_CALLS }
     }
 
     /** The Material card [callee] names through this file's imports (explicit, aliased or wildcard), if any. */
-    private fun KtFile.importedMaterialCard(callee: String): String? = importDirectives.firstNotNullOfOrNull { directive ->
-        val imported = directive.importedFqName?.asString() ?: return@firstNotNullOfOrNull null
-        val simple = imported.substringAfterLast('.')
-        when {
-            directive.isAllUnder -> callee.takeIf { imported in MATERIAL_PACKAGES && it in CARD_CALLS }
-            imported.substringBeforeLast('.') !in MATERIAL_PACKAGES || simple !in CARD_CALLS -> null
-            (directive.aliasName ?: simple) == callee -> simple
-            else -> null
+    private fun KtFile.importedMaterialCard(callee: String): String? =
+        importDirectives.firstNotNullOfOrNull { directive ->
+            val imported = directive.importedFqName?.asString() ?: return@firstNotNullOfOrNull null
+            val simple = imported.substringAfterLast('.')
+            when {
+                directive.isAllUnder -> callee.takeIf { imported in MATERIAL_PACKAGES && it in CARD_CALLS }
+                imported.substringBeforeLast('.') !in MATERIAL_PACKAGES || simple !in CARD_CALLS -> null
+                (directive.aliasName ?: simple) == callee -> simple
+                else -> null
+            }
         }
-    }
 
     private companion object {
         val CARD_CALLS = setOf("Card", "OutlinedCard", "ElevatedCard")
