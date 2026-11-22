@@ -74,8 +74,6 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.components.foundation.LettaNavChevron
 import kotlinx.coroutines.launch
-import com.letta.mobile.ui.components.choice.LettaChoiceOption
-import com.letta.mobile.ui.components.choice.LettaRadioList
 
 /** Test handles of the settings primitives; a row's tag is its prefix plus the row key. */
 object SettingsSectionTags {
