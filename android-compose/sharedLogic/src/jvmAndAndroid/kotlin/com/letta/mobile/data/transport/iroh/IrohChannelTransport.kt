@@ -383,6 +383,9 @@ class IrohChannelTransport(
         adminRpcPathEvidence = { windowMs ->
             adminRpcExecutor.pathEvidence(windowMs = windowMs, graceMs = livenessCongestionGraceMs)
         },
+        // Wall clock as before, but bounded by this transport's lifetime: an owner that ends
+        // without disconnect()/close() ends the loop too instead of leaving it probing forever.
+        runtime = IrohLivenessProbe.Runtime(scope = CoroutineScope(SupervisorJob(transportJob) + Dispatchers.IO)),
         // Attribution is MANDATORY (r3i1z): an unattributed loss report landing
         // after a redial destroys the healthy NEW handle.
         reportConnectionLost = { reason, handle -> supervisor.onConnectionLostAsync(reason, handle) },
