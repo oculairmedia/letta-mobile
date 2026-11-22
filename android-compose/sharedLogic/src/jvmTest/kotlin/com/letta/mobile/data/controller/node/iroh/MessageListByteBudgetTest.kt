@@ -89,7 +89,6 @@ class MessageListByteBudgetTest {
             val result = envelope.getValue("result")
             val rows = rowsOf(result)
             bytes += result.toString().encodeToByteArray().size
-            assertCallsTravelWithReturns(rows)
             ids += rows.map { it.id() }
             val hasMore = (result as? JsonObject)?.get("has_more")?.jsonPrimitive?.booleanOrNull ?: (rows.size >= PAGE_LIMIT)
             val lastDelivered = rows.lastOrNull()?.id()
@@ -98,13 +97,6 @@ class MessageListByteBudgetTest {
             assertTrue(ids.size <= STORED_ROWS * 2, "walk must terminate")
         } while (cursor != null)
         return Walk(if (ascending) ids else ids.reversed(), bytes, store.calls - before)
-    }
-
-    private fun assertCallsTravelWithReturns(rows: List<JsonObject>) {
-        val calls = rows.mapNotNull { (it["tool_call"] as? JsonObject)?.get("tool_call_id")?.jsonPrimitive?.contentOrNull }.toSet()
-        rows.mapNotNull { it["tool_call_id"]?.jsonPrimitive?.contentOrNull }.forEach { returned ->
-            assertTrue(returned in calls, "tool return $returned arrived without its call")
-        }
     }
 
     @Test

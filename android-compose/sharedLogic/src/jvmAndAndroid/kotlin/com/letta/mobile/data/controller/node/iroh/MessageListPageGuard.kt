@@ -13,25 +13,26 @@ import com.letta.mobile.util.Telemetry
 
 /**
  * Server-side page-size guard for message.list over Iroh
- * admin_rpc.
+ * admin_rpc (letta-mobile-c4igq.9, letta-mobile-vzn89).
  *
  * A ~60MB conversation transcript serialized into one admin_rpc response is
  * rejected by the frame layer (admin_rpc.stream.response_too_large,
  * maxFrameBytes=1MiB). Long histories are the product, so the serve path must
- * PAGINATE, not prune: this guard bounds every message.list page to stay under
- * the frame cap. The byte budget is soft for an indivisible row or call/return window when
- * frame_part was negotiated, up to the logical response cap. Incapable peers use the page budget
- * as their hard cap. Inline images that exceed that cap become explicit too-large markers.
- * If the projected page
- * is still too large it shrinks the window (dropping the OLDEST rows, keeping the
- * newest so the chat opens at the tail) and marks the response with a
- * continuation cursor so the client can load older windows.
+ * PAGINATE, not prune: every message.list page is bounded by bytes as well as by
+ * the row count the App Server applied.
+ *
+ * A page is anchored where the request is (the rows nearest its cursor, or the newest / oldest
+ * rows without one) and grows away from that anchor one indivisible unit at a time: a tool call
+ * and its returns in the page always travel together. It stops before the unit that would cross
+ * the byte budget, so the client continues from the last row it received and loses nothing.
+ * Only the first unit may exceed the budget, and only for a peer that negotiated frame_part, up
+ * to its logical response cap. Incapable peers use the page budget as their hard cap. Inline images
+ * that exceed that cap become explicit too-large markers.
  *
  * Wire additions (only when the guard trims): the response is wrapped as
- * { "messages": [...], "has_more": true, "next_before": "<oldest-kept-id>" } so
- * the existing `before`-cursor pager can request the next older window. When the
- * page already fits, the raw array/response is returned unchanged (small-
- * conversation hydration is byte-for-byte identical).
+ * { "messages": [...], "has_more": true, "next_before": "<farthest-kept-id>" } (or `next_after`
+ * for an ascending page) so the client can request the next window. When the page already fits,
+ * the raw array/response is returned unchanged (small-conversation hydration is byte-for-byte identical).
  */
 object MessageListPageGuard {
 
@@ -47,13 +48,32 @@ object MessageListPageGuard {
     /** Room for array brackets, cursor metadata and the RPC envelope within the hard budget. */
     private const val PAGE_METADATA_BYTES = 1024
 
+    /** Room for the trimmed page's `{"messages":…,"has_more":true,"next_before":"<id>"}` wrapper. */
+    private const val PAGE_WRAPPER_BYTES = 256
+
+    private const val NEXT_BEFORE = "next_before"
+    private const val NEXT_AFTER = "next_after"
+
+    /**
+     * Bound one App Server `message.list` page for the direction it was requested in. [ascending]
+     * is the App Server's own reading of `order` (only `"asc"`; anything else, including no order,
+     * is its newest-first default). Both directions keep the rows nearest the request's cursor and
+     * name the farthest kept row as the continuation: `next_after` ascending, `next_before` otherwise.
+     */
+    fun boundPage(
+        projected: JsonElement,
+        ascending: Boolean,
+        maxResponseBytes: Int,
+        maxPageBytes: Int = MAX_PAGE_BYTES,
+    ): JsonElement = pack(projected, maxPageBytes, maxResponseBytes, anchorAtFront = true, if (ascending) NEXT_AFTER else NEXT_BEFORE)
+
     /**
      * Bound [projected] (a message.list projection — a JsonArray or {messages:[]})
      * so it fits under [maxPageBytes]. Returns the same shape when it already
      * fits; otherwise a trimmed { messages, has_more, next_before } object.
      *
-     * [newestLast]: true when the array is oldest->newest (default Letta order),
-     * so the NEWEST rows are at the end and we trim from the FRONT.
+     * [newestLast]: true when the array is oldest->newest, so the NEWEST rows are at the end and
+     * the page keeps that end; false when it is newest->oldest and the page keeps the front.
      * [maxResponseBytes] is the peer's hard response budget, including page metadata; the caller
      * supplies [MAX_PAGE_BYTES] for peers without frame_part. Inline images that make a row or
      * atomic window exceed that budget are replaced with unavailable markers, retaining IDs/text.
@@ -64,54 +84,96 @@ object MessageListPageGuard {
         maxPageBytes: Int = MAX_PAGE_BYTES,
         newestLast: Boolean = true,
         maxResponseBytes: Int = IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES - MAX_PAGE_BYTES,
+    ): JsonElement = pack(projected, maxPageBytes, maxResponseBytes, anchorAtFront = !newestLast, NEXT_BEFORE)
+
+    private fun pack(
+        projected: JsonElement,
+        maxPageBytes: Int,
+        maxResponseBytes: Int,
+        anchorAtFront: Boolean,
+        cursorKey: String,
     ): JsonElement {
         val rowBudget = maxResponseBytes - PAGE_METADATA_BYTES
         val pageBudget = minOf(maxPageBytes, rowBudget)
         val original = extractMessages(projected) ?: return projected.alsoLogUnboundableShape()
         fun preservePageShape(rows: List<JsonElement>): JsonElement = when {
-            rows.indices.all { rows[it] === original[it] } -> projected
+            rows.size == original.size && rows.indices.all { rows[it] === original[it] } -> projected
             projected is JsonObject -> JsonObject(projected + ("messages" to JsonArray(rows)))
             else -> JsonArray(rows)
         }
-        val lengths = IntArray(original.size) { index -> byteLen(original[index]) }
-        val messages = original.mapIndexed { index, row ->
+        val inAnchorOrder = if (anchorAtFront) original else original.reversed()
+        val lengths = IntArray(inAnchorOrder.size) { index -> byteLen(inAnchorOrder[index]) }
+        val rows = inAnchorOrder.mapIndexed { index, row ->
             if (lengths[index] <= rowBudget) row else stripInlineImages(row).also { lengths[index] = byteLen(it) }
         }.toMutableList()
-        val totalBytes = totalByteLen(lengths)
-        if (totalBytes <= pageBudget) {
-            return preservePageShape(messages)
+        if (totalByteLen(lengths, rows.size) <= pageBudget) {
+            return preservePageShape(if (anchorAtFront) rows else rows.reversed())
         }
-        // Keep the newest rows that fit under the budget.
-        val keptIndices = ArrayDeque<Int>()
-        var bytes = 2 // "[]"
-        val orderedIndices = if (newestLast) {
-            messages.indices.reversed()
-        } else {
-            messages.indices
-        }
-        for (index in orderedIndices) {
-            val add = lengths[index] + 1
-            if (keptIndices.isNotEmpty() && bytes + add > pageBudget) break
-            if (newestLast) keptIndices.addFirst(index) else keptIndices.addLast(index)
-            bytes += add
-        }
-        keepInvokingCalls(messages, lengths, keptIndices, rowBudget)
-        val kept = keptIndices.map { messages[it] }
-        val trimmed = kept.size < messages.size
-        val keptArray = JsonArray(kept.toList())
-        if (!trimmed) return preservePageShape(kept)
-        // P0.2: `kept` is always oldest->newest (addFirst on the reversed newest-first
-        // stream, addLast on the natural newest-first stream). The oldest kept row —
-        // the `next_before` cursor for the older window — is at the FRONT when
-        // newestLast, and at the BACK otherwise. Both branches previously returned
-        // firstOrNull(), so newestLast=false emitted the NEWEST id -> overlapping/skipped pages.
-        val oldestKept = if (newestLast) kept.firstOrNull() else kept.lastOrNull()
-        val oldestKeptId = (oldestKept as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull
+        val keptCount = keptPrefix(rows, lengths, pageBudget - PAGE_WRAPPER_BYTES, rowBudget)
+        val keptInAnchorOrder = rows.subList(0, keptCount).toList()
+        val kept = if (anchorAtFront) keptInAnchorOrder else keptInAnchorOrder.reversed()
+        if (keptCount == rows.size) return preservePageShape(kept)
+        // The farthest kept row from the anchor is where the next page continues. For an oldest->newest
+        // array anchored at its end that is the FRONT of `kept`; otherwise its BACK (P0.2: the front of a
+        // newest-first page is its NEWEST row and would overlap or skip pages).
+        val farthestId = (keptInAnchorOrder.last() as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull
         return buildJsonObject {
-            put("messages", keptArray)
+            put("messages", JsonArray(kept))
             put("has_more", JsonPrimitive(true))
-            if (oldestKeptId != null) put("next_before", JsonPrimitive(oldestKeptId))
+            if (farthestId != null) put(cursorKey, JsonPrimitive(farthestId))
         }
+    }
+
+    /**
+     * How many rows from the anchor (index 0) the page keeps. A prefix is a valid page only when it is
+     * closed: no tool call in it has a return beyond it and no return in it has its call beyond it.
+     * The longest closed prefix within [packBudget] wins. When even the first closed prefix is over
+     * [packBudget] it is kept alone (frame_part carries it) if it fits [rowBudget] once its inline
+     * images are stripped; failing that, the anchor row is served by itself.
+     */
+    private fun keptPrefix(rows: MutableList<JsonElement>, lengths: IntArray, packBudget: Int, rowBudget: Int): Int {
+        val reach = unitReach(rows)
+        var bytes = 1 // "["; each row adds its length plus one comma or "]"
+        var farthest = 0
+        var kept = 0
+        for (index in rows.indices) {
+            bytes += lengths[index] + 1
+            farthest = maxOf(farthest, reach[index])
+            if (farthest != index) continue
+            if (bytes > packBudget) return if (kept > 0) kept else firstUnit(rows, lengths, index + 1, rowBudget)
+            kept = index + 1
+        }
+        return kept
+    }
+
+    /** The first closed prefix of [count] rows, kept whole when it fits [rowBudget] (images stripped if needed), else its anchor row. */
+    private fun firstUnit(rows: MutableList<JsonElement>, lengths: IntArray, count: Int, rowBudget: Int): Int {
+        fun bytes() = (0 until count).sumOf { lengths[it].toLong() + 1 } + 1
+        if (bytes() > rowBudget) {
+            for (index in 0 until count) {
+                rows[index] = stripInlineImages(rows[index])
+                lengths[index] = byteLen(rows[index])
+            }
+        }
+        return if (bytes() <= rowBudget) count else 1
+    }
+
+    /** For each row, the farthest index its tool call / return partners in this page sit at (itself when none). */
+    private fun unitReach(rows: List<JsonElement>): IntArray {
+        val reach = IntArray(rows.size) { it }
+        val lastById = HashMap<String, Int>()
+        rows.forEachIndexed { index, row -> toolCallIdOf(row)?.let { id -> lastById[id] = index } }
+        rows.forEachIndexed { index, row ->
+            toolCallIdOf(row)?.let { id -> reach[index] = maxOf(index, lastById.getValue(id)) }
+        }
+        return reach
+    }
+
+    /** The tool call id that joins a call row (`tool_call.tool_call_id`) to its return rows (`tool_call_id`). */
+    private fun toolCallIdOf(row: JsonElement): String? {
+        val obj = row as? JsonObject ?: return null
+        val call = obj["tool_call"] as? JsonObject
+        return (call?.get("tool_call_id") ?: obj["tool_call_id"])?.let { (it as? JsonPrimitive)?.contentOrNull }
     }
 
     /**
@@ -184,11 +246,11 @@ object MessageListPageGuard {
         return bytes
     }
 
-    /** UTF-8 size of the elements as a JSON array ("[]" + elements + commas). */
-    private fun totalByteLen(lengths: IntArray): Int {
-        if (lengths.isEmpty()) return 2 // "[]"
-        var bytes = 2 + (lengths.size - 1) // brackets + inter-element commas
-        for (len in lengths) bytes += len
+    /** UTF-8 size of the first [count] elements as a JSON array ("[]" + elements + commas). */
+    private fun totalByteLen(lengths: IntArray, count: Int): Int {
+        if (count == 0) return 2 // "[]"
+        var bytes = 2 + (count - 1) // brackets + inter-element commas
+        for (index in 0 until count) bytes += lengths[index]
         return bytes
     }
 
@@ -238,39 +300,6 @@ object MessageListPageGuard {
         return buildJsonObject {
             for ((key, value) in response) if (key != field) put(key, value)
         }
-    }
-
-    /** Keep an invoking call in the same page as its return, preserving cursor continuity. */
-    private fun keepInvokingCalls(
-        messages: MutableList<JsonElement>, lengths: IntArray, kept: ArrayDeque<Int>, maxResponseBytes: Int,
-    ) {
-        if (kept.isEmpty()) return
-        val callIndices = messages.indices.mapNotNull { index ->
-            val call = (messages[index] as? JsonObject)?.get("tool_call") as? JsonObject
-            call?.get("tool_call_id")?.let { it to index }
-        }.toMap()
-        var first = kept.first()
-        var last = kept.last()
-        do {
-            val previousFirst = first
-            val previousLast = last
-            val dependencies = (first..last).mapNotNull { index ->
-                (messages[index] as? JsonObject)?.get("tool_call_id")?.let(callIndices::get)
-            }
-            first = minOf(first, dependencies.minOrNull() ?: first)
-            last = maxOf(last, dependencies.maxOrNull() ?: last)
-        } while (first != previousFirst || last != previousLast)
-        var bytes = (first..last).sumOf { lengths[it].toLong() + 1 }
-        if (bytes > maxResponseBytes) {
-            for (index in first..last) {
-                messages[index] = stripInlineImages(messages[index])
-                lengths[index] = messages[index].toString().encodeToByteArray().size
-            }
-            bytes = (first..last).sumOf { lengths[it].toLong() + 1 }
-        }
-        if (bytes > maxResponseBytes) return
-        kept.clear()
-        for (index in first..last) kept.addLast(index)
     }
 
     /** Replace inline images, including JSON-string tool returns, without dropping row/call identity or text. */
