@@ -345,7 +345,7 @@ object LettaIcons {
     val ChatBubbleOutline: ImageVector get() = Lucide.MessageCircle
     val Description: ImageVector get() = Lucide.FileText
     val Group: ImageVector get() = Lucide.Users
-    /** Home is the Baken mark (letta-mobile-0sb6o), one ink so the slot's tint recolours it. */
+    /** Home is the Baken mark, one ink so the slot's tint recolours it. */
     val Home: ImageVector get() = BakenMark.mono
     val Hub: ImageVector get() = Lucide.Network
     val PushPin: ImageVector get() = Lucide.Pin

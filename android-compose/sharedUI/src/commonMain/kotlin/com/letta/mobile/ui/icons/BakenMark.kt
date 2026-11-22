@@ -5,29 +5,22 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.ui.theme.LettaColorTokens
 
 /**
- * The Baken mark (letta-mobile-0sb6o): two river-worn basalt stones, the leaning stone and the pebble, as drawn by the
+ * The Baken mark: two river-worn basalt stones, the leaning stone and the pebble, as drawn by the
  * brand kit's flat marks (`svg/baken-mark-{dark,light,mono-*}.svg`, a 200x200 viewport resting on y=168).
  *
  * [mono] is one ink for both stones so an `Icon` tint recolours it (a selection-tinted slot such as the rail's Home).
- * [brand] is the two-colour mark of a brand spot: the pale (dark theme) or petrol (light theme) stone and the vermilion
- * pebble, both read from the design tokens. Draw it with `tint = Color.Unspecified` so its own colours show.
+ * [brand] is the two-colour mark of a brand spot, in the colours its caller passes. Draw it with `tint = Color.Unspecified` so its own colours show.
  */
 object BakenMark {
     val mono: ImageVector by lazy { build(MONO_NAME, Color.Black, Color.Black) }
 
-    private val brandDark: ImageVector by lazy {
-        build(BRAND_DARK_NAME, Color(LettaColorTokens.DARK_MARK_STONE), Color(LettaColorTokens.DARK_PRIMARY))
-    }
-
-    private val brandLight: ImageVector by lazy {
-        build(BRAND_LIGHT_NAME, Color(LettaColorTokens.LIGHT_MARK_STONE), Color(LettaColorTokens.LIGHT_PRIMARY))
-    }
-
-    /** The two-colour mark for a [dark] or light surface. */
-    fun brand(dark: Boolean): ImageVector = if (dark) brandDark else brandLight
+    /**
+     * The two-colour mark: [stone] for the leaning stone and [pebble] for the vermilion pebble. The caller passes
+     * the theme's colours (this package draws, it does not read the theme), and `remember`s the result.
+     */
+    fun brand(stone: Color, pebble: Color): ImageVector = build(BRAND_NAME, stone, pebble)
 
     private fun build(name: String, stone: Color, pebble: Color): ImageVector =
         ImageVector.Builder(
@@ -42,8 +35,7 @@ object BakenMark {
         }.build()
 
     private const val MONO_NAME = "BakenMark"
-    private const val BRAND_DARK_NAME = "BakenMarkDark"
-    private const val BRAND_LIGHT_NAME = "BakenMarkLight"
+    private const val BRAND_NAME = "BakenMarkBrand"
     private const val VIEWPORT = 200f
     private const val DEFAULT_SIZE = 24f
 
