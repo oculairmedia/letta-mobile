@@ -97,6 +97,13 @@ PROBES = (
     Probe("Peek.y", ids.PEEK_NODE, Y, "px"),
     Probe("Peek.scaleX", ids.PEEK_NODE, SX, "x"),
     Probe("Base.x", ids.BONE_BASE, 90, "px"),                # RootBone.x, not Node.x
+    # letta-mobile-su08n: the secondaries (Overlap layer, turning entries) and the first star.
+    # Appended last so every older probe keeps its id.
+    Probe("Lag.x", ids.LAG_NODE, X, "px"),
+    Probe("Lag.y", ids.LAG_NODE, Y, "px"),
+    Probe("Follow.scaleY", ids.FOLLOW_NODE, SY, "x"),
+    Probe("Follow.rotation", ids.FOLLOW_NODE, ROT, "rad"),
+    Probe("Star0.opacity", ids.SPARKLE_STARS[0], OPACITY, "alpha"),
 )
 
 

@@ -66,7 +66,7 @@
   "scenario": "enter-listening",
   "signature": {
     "Arc.y": {
-      "max_delta": 0.1009,
+      "max_delta": 0.0888,
       "overshoot_pct": 0.0,
       "peak": -7.0,
       "peak_frame": 17,
@@ -102,11 +102,11 @@
       "spacing": "ease-out"
     },
     "Face.rotation": {
-      "max_delta": 0.0354,
+      "max_delta": 0.0272,
       "overshoot_pct": 49.99,
       "peak": -0.0524,
       "peak_frame": 13,
-      "range": 0.0643,
+      "range": 0.0611,
       "settle_frame": 16,
       "spacing": "ease-in"
     },
@@ -120,16 +120,34 @@
       "spacing": "hold"
     },
     "Face.y": {
-      "max_delta": 9.9,
-      "overshoot_pct": 7.07,
+      "max_delta": 7.7032,
+      "overshoot_pct": 12.31,
       "peak": -16.0,
       "peak_frame": 13,
-      "range": 18.0523,
-      "settle_frame": 51,
+      "range": 17.532,
+      "settle_frame": 43,
       "spacing": "ease-in"
     },
+    "Follow.rotation": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
+    "Follow.scaleY": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 1.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
     "Joystick.x": {
-      "max_delta": 0.0295,
+      "max_delta": 0.0294,
       "overshoot_pct": 0.0,
       "peak": 0.0,
       "peak_frame": 19,
@@ -138,6 +156,24 @@
       "spacing": "ease-in"
     },
     "Joystick.y": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
+    "Lag.x": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
+    "Lag.y": {
       "max_delta": 0.0,
       "overshoot_pct": 0.0,
       "peak": 0.0,
@@ -245,6 +281,15 @@
       "settle_frame": 0,
       "spacing": "hold"
     },
+    "Star0.opacity": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
     "Trail1.opacity": {
       "max_delta": 0.0,
       "overshoot_pct": 0.0,
@@ -273,7 +318,7 @@
       "spacing": "ease-in"
     },
     "Turn.x": {
-      "max_delta": 2.0631,
+      "max_delta": 2.0584,
       "overshoot_pct": 0.0,
       "peak": 0.0,
       "peak_frame": 19,

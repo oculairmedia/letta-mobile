@@ -37,6 +37,9 @@ from rig.ids import (
     FLASH_FACE_REST_NODE, REACT_EXPR, REACT_FACE_REST_NODE, SUCCESS_FACE_ANIM, SUCCESS_FACE_NODE,
     react_face_anim, react_face_node,
 )
+from rig.ids import (OVERLAP_LAYER, OVERLAP_REST_ANIM, OVERLAP_REST_NODE, OVERLAPS, SPARKLE_LAYER,
+                     SPARKLE_REST_ANIM, SPARKLE_REST_NODE, SPARKLES, overlap_anim, overlap_node,
+                     sparkle_anim, sparkle_node)
 from rig.layers import Exit, Layer, OnBool, OnEnum, OnTrigger, State, When
 from rig.motion import enter_duration
 
@@ -386,6 +389,39 @@ def _react_layer():
     return _react_motion_layer(fires, full), _react_face_layer(fires, full)
 
 
+# --- secondaries and sparkle (letta-mobile-su08n) ------------------------------------------------
+def _moment_trigger(m):
+    """The view-model trigger of a moment: `success` is the original contract's, the rest te3n1.5's."""
+    return VM_SUCCESS if m == "success" else VM_NEW[m]
+
+
+def _moment_layer(name, lid, rest_anim, rest_node, moments, anim_of, node_of):
+    """A layer of one-shots fired by moment triggers, only while reduceMotion is off.
+
+    Like React: fired from wherever the layer is, in at the floor (a new moment restarts over a
+    running one), and every one-shot ends at rest, so the way home moves nothing. Under
+    reduceMotion no trigger reaches it at all - the secondaries and the sparkle are pure
+    embellishment, and the calm twins already carry each moment's meaning."""
+    full = when_bool(VM_REDUCE, "false")
+    fired = [When(node_of[m], (when_trigger(_moment_trigger(m)), full), MIN_TRANSITION_MS, SOFT_OUT)
+             for m in moments]
+    states = [State(rest_anim, rest_node, 0)]
+    states += [State(anim_of[m], node_of[m], 1 + i, reset=True, transitions=[Exit(rest_node)])
+               for i, m in enumerate(moments)]
+    return Layer(name, lid, rest_node, any_transitions=fired, states=states).rml()
+
+
+def _secondary_layers():
+    """Overlap (the face trailing and overshooting the body, the body following through) and
+    Sparkle (star glints at success, toolDone and wake). They key only Lag, Follow's scale and the
+    stars - nodes nothing else keys - so they sit on top without fighting anything."""
+    overlap = _moment_layer("Overlap", OVERLAP_LAYER, OVERLAP_REST_ANIM, OVERLAP_REST_NODE, OVERLAPS,
+                            overlap_anim, overlap_node)
+    sparkle = _moment_layer("Sparkle", SPARKLE_LAYER, SPARKLE_REST_ANIM, SPARKLE_REST_NODE, SPARKLES,
+                            sparkle_anim, sparkle_node)
+    return overlap, sparkle
+
+
 def root_machine():
     """The whole `Avatar` state machine: twelve layers in order, plus the file's own listeners.
 
@@ -399,5 +435,5 @@ def root_machine():
     # the two were one layer: React > PetFace > Drag > Flash > Expression.
     layers = [_shape_layer(), _expression_layer(), breath, blink, hover, flash, flash_face, drag, drag_face,
               _idle_layer(to_park, from_park), _wander_layer(to_park, from_park),
-              pet, pet_face, react, react_face, _listeners()]
+              pet, pet_face, react, react_face, *_secondary_layers(), _listeners()]
     return f'<StateMachine name="Avatar" id="{SM}">\n' + "\n".join(indent(layer, "    ") for layer in layers) + '\n</StateMachine>'
