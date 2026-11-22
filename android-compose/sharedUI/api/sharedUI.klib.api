@@ -10037,6 +10037,13 @@ final object com.letta.mobile.ui.host/OverlayTags { // com.letta.mobile.ui.host/
         final fun <get-SNACKBAR>(): kotlin/String // com.letta.mobile.ui.host/OverlayTags.SNACKBAR.<get-SNACKBAR>|<get-SNACKBAR>(){}[0]
 }
 
+final object com.letta.mobile.ui.icons/BakenMark { // com.letta.mobile.ui.icons/BakenMark|null[0]
+    final val mono // com.letta.mobile.ui.icons/BakenMark.mono|{}mono[0]
+        final fun <get-mono>(): androidx.compose.ui.graphics.vector/ImageVector // com.letta.mobile.ui.icons/BakenMark.mono.<get-mono>|<get-mono>(){}[0]
+
+    final fun brand(kotlin/Boolean): androidx.compose.ui.graphics.vector/ImageVector // com.letta.mobile.ui.icons/BakenMark.brand|brand(kotlin.Boolean){}[0]
+}
+
 final object com.letta.mobile.ui.icons/LettaIcons { // com.letta.mobile.ui.icons/LettaIcons|null[0]
     final val AArrowDown // com.letta.mobile.ui.icons/LettaIcons.AArrowDown|{}AArrowDown[0]
         final fun <get-AArrowDown>(): androidx.compose.ui.graphics.vector/ImageVector // com.letta.mobile.ui.icons/LettaIcons.AArrowDown.<get-AArrowDown>|<get-AArrowDown>(){}[0]
@@ -13502,6 +13509,7 @@ final val com.letta.mobile.ui.host/com_letta_mobile_ui_host_Overlay_Snackbar$sta
 final val com.letta.mobile.ui.host/com_letta_mobile_ui_host_PaneSize$stableprop // com.letta.mobile.ui.host/com_letta_mobile_ui_host_PaneSize$stableprop|#static{}com_letta_mobile_ui_host_PaneSize$stableprop[0]
 final val com.letta.mobile.ui.host/com_letta_mobile_ui_host_PaneSpec$stableprop // com.letta.mobile.ui.host/com_letta_mobile_ui_host_PaneSpec$stableprop|#static{}com_letta_mobile_ui_host_PaneSpec$stableprop[0]
 final val com.letta.mobile.ui.host/com_letta_mobile_ui_host_RowDragTracker$stableprop // com.letta.mobile.ui.host/com_letta_mobile_ui_host_RowDragTracker$stableprop|#static{}com_letta_mobile_ui_host_RowDragTracker$stableprop[0]
+final val com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_BakenMark$stableprop // com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_BakenMark$stableprop|#static{}com_letta_mobile_ui_icons_BakenMark$stableprop[0]
 final val com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_LettaIcons$stableprop // com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_LettaIcons$stableprop|#static{}com_letta_mobile_ui_icons_LettaIcons$stableprop[0]
 final val com.letta.mobile.ui.markdown/LocalMermaidDiagramRenderer // com.letta.mobile.ui.markdown/LocalMermaidDiagramRenderer|{}LocalMermaidDiagramRenderer[0]
     final fun <get-LocalMermaidDiagramRenderer>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.markdown/MermaidDiagramRenderer?> // com.letta.mobile.ui.markdown/LocalMermaidDiagramRenderer.<get-LocalMermaidDiagramRenderer>|<get-LocalMermaidDiagramRenderer>(){}[0]
@@ -14637,6 +14645,7 @@ final fun com.letta.mobile.ui.host/lettaIdiom(com.letta.mobile.ui.host/LettaInpu
 final fun com.letta.mobile.ui.host/rememberInspectorHost(androidx.compose.runtime/Composer?, kotlin/Int): com.letta.mobile.ui.host/InspectorHost // com.letta.mobile.ui.host/rememberInspectorHost|rememberInspectorHost(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.host/rememberOverlayHost(androidx.compose.runtime/Composer?, kotlin/Int): com.letta.mobile.ui.host/OverlayHost // com.letta.mobile.ui.host/rememberOverlayHost|rememberOverlayHost(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.host/rememberPrimaryPointer(androidx.compose.runtime/Composer?, kotlin/Int): com.letta.mobile.ui.host/LettaInput // com.letta.mobile.ui.host/rememberPrimaryPointer|rememberPrimaryPointer(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_BakenMark$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_BakenMark$stableprop_getter|com_letta_mobile_ui_icons_BakenMark$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_LettaIcons$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_LettaIcons$stableprop_getter|com_letta_mobile_ui_icons_LettaIcons$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.image/decodeImageBitmap(kotlin/ByteArray): androidx.compose.ui.graphics/ImageBitmap? // com.letta.mobile.ui.image/decodeImageBitmap|decodeImageBitmap(kotlin.ByteArray){}[0]
 final fun com.letta.mobile.ui.markdown/MessageReferenceDefinitions(kotlin.collections/Map<kotlin/String, kotlin/String>, kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.markdown/MessageReferenceDefinitions|MessageReferenceDefinitions(kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int){}[0]

@@ -18,6 +18,9 @@ internal object ShellDimens {
     /** The header's search trigger on a pointer window. */
     val headerSearchWidth: Dp = 260.dp
 
+    /** The two-colour Baken mark over the wordmark on Home's connection hero. */
+    val heroMark: Dp = 72.dp
+
     /** One agent in Home's avatar row: the avatar and its name under it. */
     val homeAvatarTile: Dp = 64.dp
 

@@ -4931,6 +4931,13 @@ public final class com/letta/mobile/ui/host/purpose/PanePurpose : java/lang/Enum
 	public static fun values ()[Lcom/letta/mobile/ui/host/purpose/PanePurpose;
 }
 
+public final class com/letta/mobile/ui/icons/BakenMark {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/icons/BakenMark;
+	public final fun brand (Z)Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getMono ()Landroidx/compose/ui/graphics/vector/ImageVector;
+}
+
 public final class com/letta/mobile/ui/icons/LettaIcons {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/icons/LettaIcons;
