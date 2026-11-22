@@ -56,6 +56,7 @@ class FollowingLinkTest {
         val received = MutableSharedFlow<ShellStatePush>(replay = 8)
         scope.launch { link.originatedPushes.collect { received.emit(it) } }
         val connectionOfA = link.currentConnection
+        within { while (!a.isListenedTo) delay(POLL_MS) }
 
         a.deliver(frameSettingTheme("DARK", revision = 5))
         within { received.first() }

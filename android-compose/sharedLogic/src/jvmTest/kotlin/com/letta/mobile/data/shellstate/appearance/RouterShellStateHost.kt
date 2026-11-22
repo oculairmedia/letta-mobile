@@ -133,6 +133,9 @@ internal class RouterShellStateHost(private val directory: Path = Files.createTe
             serverId = "iroh-app-server", sessionId = "host-session", deviceId = endpoint.id, connectionEpoch = epoch,
         )
 
+        /** Whether anything is collecting this transport's events yet: a frame delivered before that is lost, as on a real one. */
+        val isListenedTo: Boolean get() = frames.subscriptionCount.value > 0
+
         /** Delivers a `shell_state_updated` [frame] to this transport as the host would push it. */
         fun deliver(frame: JsonObject) {
             frames.tryEmit(ServerFrame.Unknown(type = frame.getValue("type").jsonPrimitive.content, raw = frame))
