@@ -24,16 +24,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -65,10 +65,12 @@ import com.letta.mobile.ui.host.PaneAnchor
 import com.letta.mobile.ui.host.showPasteBlockedHint
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.text.ClipboardPasteButton
+import com.letta.mobile.ui.text.writePlainText
 import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.components.foundation.LettaNavChevron
+import kotlinx.coroutines.launch
 
 /** Test handles of the settings primitives; a row's tag is its prefix plus the row key. */
 object SettingsSectionTags {
@@ -208,14 +210,14 @@ object SettingsScope {
     /** A fact: its label at the start, its value at the end; a click copies the value. */
     @Composable
     fun InfoRow(row: SettingsRow.Info) {
-        @Suppress("DEPRECATION")
-        val clipboard = LocalClipboardManager.current
+        val clipboard = LocalClipboard.current
+        val scope = rememberCoroutineScope()
         SettingsRowFrame(
             tag = SettingsSectionTags.ROW_PREFIX + row.key,
             words = RowWords(row.title, row.supporting),
             enabled = true,
             interaction = Modifier.clickable(onClickLabel = COPY_LABEL, role = Role.Button) {
-                clipboard.setText(AnnotatedString(row.value))
+                scope.launch { clipboard.writePlainText(row.value) }
             },
         ) {
             Text(

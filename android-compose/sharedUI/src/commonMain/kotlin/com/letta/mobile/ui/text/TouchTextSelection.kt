@@ -16,11 +16,13 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
@@ -32,6 +34,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 import com.letta.mobile.ui.theme.tokens.LettaShapes
 import com.letta.mobile.ui.theme.tokens.LettaControlTokens
@@ -131,8 +135,11 @@ class TouchTextToolbar(private val shouldShow: () -> Boolean = { true }) : TextT
 
     /** Runs [action]'s latest callback. */
     internal fun perform(action: Action) {
-        handlers[action]?.invoke()
+        callbackFor(action)?.invoke()
     }
+
+    /** [action]'s latest callback, kept by a caller that runs it after the bar has hidden. */
+    internal fun callbackFor(action: Action): (() -> Unit)? = handlers[action]
 
     /** The bar over [rect] with [offers], in the order phones put them. */
     internal data class Shown(val rect: Rect, val offers: List<Action>)
@@ -175,19 +182,24 @@ fun quoteIntoPrompt(prompt: String, quoted: String): String {
  */
 @Composable
 fun TouchTextToolbarHost(toolbar: TouchTextToolbar, quoteSink: QuoteSink? = null) {
+    // Held above the shown check: a button hides the bar, and a Quote still under way must outlive it.
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     val shown = toolbar.shown ?: return
-    @Suppress("DEPRECATION") // The selection bar reads and restores text only; the suspend Clipboard adds nothing here.
-    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val quoteTarget = quoteSink?.target
     val quote: (() -> Unit)? = if (TouchTextToolbar.Action.COPY in shown.offers && quoteTarget != null) {
         {
-            // Compose hands the bar a copy, not the text. Copy, read it, and put back whatever the
-            // clipboard held before, so quoting does not cost the user their clipboard.
-            val previous = clipboard.getText()
-            toolbar.perform(TouchTextToolbar.Action.COPY)
-            val selected = clipboard.getText()?.text
-            if (previous != null) clipboard.setText(previous)
-            if (!selected.isNullOrBlank()) quoteTarget(selected)
+            // Compose hands the bar a copy, not the text. Copy, read it, and put back the text the
+            // clipboard held before, so quoting does not cost the user their clipboard. The copy is
+            // taken now, since pressing the button hides the bar and drops its callbacks.
+            val copy = toolbar.callbackFor(TouchTextToolbar.Action.COPY)
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                val previous = clipboard.readPlainText()
+                copy?.invoke()
+                val selected = (clipboard.readPlainText() as? ClipboardTextRead.Readable)?.text
+                if (previous is ClipboardTextRead.Readable) clipboard.writePlainText(previous.text)
+                if (!selected.isNullOrBlank()) quoteTarget(selected)
+            }
         }
     } else {
         null
