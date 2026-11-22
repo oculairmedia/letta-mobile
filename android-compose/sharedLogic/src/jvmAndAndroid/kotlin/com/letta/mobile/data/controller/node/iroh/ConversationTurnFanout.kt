@@ -182,6 +182,8 @@ internal class ConversationTurnFanout(
      * scoped). No-op when the turn is not parkable (no client_message_id).
      */
     private val trackInitiatorFrame: (deltaJson: String) -> Unit = {},
+    /** Records the synthesized user echo in the turn's journal; never replayed to the initiator, never parked. */
+    private val journalUserEcho: (deltaJson: String) -> Unit = {},
     /**
      * The turn's prompt client message id, the turn id stamped on the deltas
      * the host synthesizes itself (tool projection, user echo, dangling-call settlement).
@@ -453,9 +455,12 @@ internal class ConversationTurnFanout(
      * Content parts (images) are carried verbatim: when [contentParts] is a JSON
      * array we forward it as `content`; otherwise the plain [text] string.
      *
-     * Journaled but never replayed: the feed records the echo so a viewer that reads it sees the prompt, while the
-     * initiator's redial replay skips it (the echo is derived deterministically from the resent input and the
-     * reconnecting initiator re-owns its optimistic row). Uses [broadcastDeltaBodyNoPark] for the fanout.
+     * NOT parked: parking replays the INITIATOR's own live turn tail on
+     * redial; the user echo is derived deterministically from the resent input
+     * and the reconnecting initiator re-owns its optimistic row, so echoing it is
+     * pure fanout — it must NOT count toward initiator parking (which stays
+     * scoped to assistant/tool/terminal deltas). It does reach the turn's journal ([journalUserEcho]) so a viewer
+     * reading the feed sees the prompt; the journal's redial replay skips it. Uses [broadcastDeltaBodyNoPark].
      */
     suspend fun broadcastUserEcho(
         clientMessageId: String,
@@ -478,9 +483,9 @@ internal class ConversationTurnFanout(
             put("content", content)
         }
         val stamped = synthesizedIdentity.stampDelta(delta)
-        // The feed is the sole row source of its viewers, so the prompt belongs in the journal too. It stays out of the
-        // initiator's redial replay (the initiator re-owns its optimistic row; see FeedJournalStore.replayForInitiator).
-        trackInitiatorFrame(stamped.toString())
+        // The feed is the sole row source of its viewers, so the prompt belongs in the journal too. That is not parking:
+        // the initiator's redial replay skips it (FeedJournalStore.replayForInitiator).
+        journalUserEcho(stamped.toString())
         broadcastDeltaBodyNoPark(stamped)
     }
 

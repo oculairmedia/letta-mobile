@@ -881,6 +881,7 @@ class IrohNodeConnection(
         ),
         initiatorViewer = ensureSelfViewer(streamSend),
         trackInitiatorFrame = journal::append,
+        journalUserEcho = journal::append,
         turnId = firstUserMessage(input)?.clientMessageId,
         identity = turnIdentity?.let { TurnIdentityBinding(it, input.runtime.conversationId, clientMessageId) },
     )
