@@ -7337,8 +7337,11 @@ abstract interface com.letta.mobile.data.shellstate.shared/ShellStateLink { // c
         abstract fun <get-pushes>(): kotlinx.coroutines.flow/Flow<kotlinx.serialization.json/JsonObject> // com.letta.mobile.data.shellstate.shared/ShellStateLink.pushes.<get-pushes>|<get-pushes>(){}[0]
     open val isConnected // com.letta.mobile.data.shellstate.shared/ShellStateLink.isConnected|{}isConnected[0]
         open fun <get-isConnected>(): kotlin/Boolean // com.letta.mobile.data.shellstate.shared/ShellStateLink.isConnected.<get-isConnected>|<get-isConnected>(){}[0]
+    open val originatedPushes // com.letta.mobile.data.shellstate.shared/ShellStateLink.originatedPushes|{}originatedPushes[0]
+        open fun <get-originatedPushes>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.shellstate.shared/ShellStatePush> // com.letta.mobile.data.shellstate.shared/ShellStateLink.originatedPushes.<get-originatedPushes>|<get-originatedPushes>(){}[0]
 
     abstract suspend fun call(kotlin/String, kotlinx.serialization.json/JsonObject): com.letta.mobile.data.shellstate.shared/ShellStateReply // com.letta.mobile.data.shellstate.shared/ShellStateLink.call|call(kotlin.String;kotlinx.serialization.json.JsonObject){}[0]
+    open suspend fun callOn(kotlin/String?, kotlin/String, kotlinx.serialization.json/JsonObject): com.letta.mobile.data.shellstate.shared/ShellStateReply // com.letta.mobile.data.shellstate.shared/ShellStateLink.callOn|callOn(kotlin.String?;kotlin.String;kotlinx.serialization.json.JsonObject){}[0]
 }
 
 abstract interface com.letta.mobile.data.shellstate/HostAppearance { // com.letta.mobile.data.shellstate/HostAppearance|null[0]
@@ -7349,6 +7352,7 @@ abstract interface com.letta.mobile.data.shellstate/HostAppearance { // com.lett
 
     abstract suspend fun clearLocal() // com.letta.mobile.data.shellstate/HostAppearance.clearLocal|clearLocal(){}[0]
     abstract suspend fun run() // com.letta.mobile.data.shellstate/HostAppearance.run|run(){}[0]
+    abstract suspend fun selectThemePreset(kotlin/String, kotlin/Boolean?): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate/HostAppearance.selectThemePreset|selectThemePreset(kotlin.String;kotlin.Boolean?){}[0]
     abstract suspend fun setDynamicColor(kotlin/Boolean): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate/HostAppearance.setDynamicColor|setDynamicColor(kotlin.Boolean){}[0]
     abstract suspend fun setTheme(kotlin/String): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate/HostAppearance.setTheme|setTheme(kotlin.String){}[0]
     abstract suspend fun setThemePreset(kotlin/String): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate/HostAppearance.setThemePreset|setThemePreset(kotlin.String){}[0]
@@ -65379,6 +65383,7 @@ final class com.letta.mobile.data.shellstate.appearance/SharedShellAppearance : 
 
     final suspend fun clearLocal() // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance.clearLocal|clearLocal(){}[0]
     final suspend fun run() // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance.run|run(){}[0]
+    final suspend fun selectThemePreset(kotlin/String, kotlin/Boolean?): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance.selectThemePreset|selectThemePreset(kotlin.String;kotlin.Boolean?){}[0]
     final suspend fun setDynamicColor(kotlin/Boolean): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance.setDynamicColor|setDynamicColor(kotlin.Boolean){}[0]
     final suspend fun setTheme(kotlin/String): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance.setTheme|setTheme(kotlin.String){}[0]
     final suspend fun setThemePreset(kotlin/String): com.letta.mobile.data.shellstate/ShellStateEditOutcome // com.letta.mobile.data.shellstate.appearance/SharedShellAppearance.setThemePreset|setThemePreset(kotlin.String){}[0]
@@ -65413,6 +65418,15 @@ final class com.letta.mobile.data.shellstate.shared/SharedShellState { // com.le
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.shellstate.shared/SharedShellState.Edit.toString|toString(){}[0]
     }
+}
+
+final class com.letta.mobile.data.shellstate.shared/ShellStatePush { // com.letta.mobile.data.shellstate.shared/ShellStatePush|null[0]
+    constructor <init>(kotlinx.serialization.json/JsonObject, kotlin/String?) // com.letta.mobile.data.shellstate.shared/ShellStatePush.<init>|<init>(kotlinx.serialization.json.JsonObject;kotlin.String?){}[0]
+
+    final val connection // com.letta.mobile.data.shellstate.shared/ShellStatePush.connection|{}connection[0]
+        final fun <get-connection>(): kotlin/String? // com.letta.mobile.data.shellstate.shared/ShellStatePush.connection.<get-connection>|<get-connection>(){}[0]
+    final val frame // com.letta.mobile.data.shellstate.shared/ShellStatePush.frame|{}frame[0]
+        final fun <get-frame>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.shellstate.shared/ShellStatePush.frame.<get-frame>|<get-frame>(){}[0]
 }
 
 final class com.letta.mobile.data.shellstate.shared/ShellStateReply { // com.letta.mobile.data.shellstate.shared/ShellStateReply|null[0]

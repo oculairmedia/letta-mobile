@@ -56191,6 +56191,7 @@ public abstract interface class com/letta/mobile/data/shellstate/HostAppearance 
 	public abstract fun getCurrent ()Lcom/letta/mobile/data/shellstate/AppearanceValues;
 	public abstract fun getValues ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun run (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun selectThemePreset (Ljava/lang/String;Ljava/lang/Boolean;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun setDynamicColor (ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun setTheme (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun setThemePreset (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -56454,6 +56455,7 @@ public final class com/letta/mobile/data/shellstate/appearance/SharedShellAppear
 	public fun getCurrent ()Lcom/letta/mobile/data/shellstate/AppearanceValues;
 	public fun getValues ()Lkotlinx/coroutines/flow/Flow;
 	public fun run (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun selectThemePreset (Ljava/lang/String;Ljava/lang/Boolean;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setDynamicColor (ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setTheme (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setThemePreset (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -56468,9 +56470,11 @@ public final class com/letta/mobile/data/shellstate/channel/ChannelShellStateLin
 public final class com/letta/mobile/data/shellstate/shared/NoShellStateLink : com/letta/mobile/data/shellstate/shared/ShellStateLink {
 	public static final field INSTANCE Lcom/letta/mobile/data/shellstate/shared/NoShellStateLink;
 	public fun call (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun callOn (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getConnection ()Lkotlinx/coroutines/flow/Flow;
 	public fun getCurrentConnection ()Ljava/lang/String;
 	public fun getHostCapabilities ()Ljava/util/Set;
+	public fun getOriginatedPushes ()Lkotlinx/coroutines/flow/Flow;
 	public fun getPushes ()Lkotlinx/coroutines/flow/Flow;
 	public fun isConnected ()Z
 }
@@ -56502,15 +56506,25 @@ public final class com/letta/mobile/data/shellstate/shared/SharedShellState$Edit
 
 public abstract interface class com/letta/mobile/data/shellstate/shared/ShellStateLink {
 	public abstract fun call (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun callOn (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun getConnection ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getCurrentConnection ()Ljava/lang/String;
 	public abstract fun getHostCapabilities ()Ljava/util/Set;
+	public fun getOriginatedPushes ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getPushes ()Lkotlinx/coroutines/flow/Flow;
 	public fun isConnected ()Z
 }
 
 public final class com/letta/mobile/data/shellstate/shared/ShellStateLink$DefaultImpls {
+	public static fun callOn (Lcom/letta/mobile/data/shellstate/shared/ShellStateLink;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getOriginatedPushes (Lcom/letta/mobile/data/shellstate/shared/ShellStateLink;)Lkotlinx/coroutines/flow/Flow;
 	public static fun isConnected (Lcom/letta/mobile/data/shellstate/shared/ShellStateLink;)Z
+}
+
+public final class com/letta/mobile/data/shellstate/shared/ShellStatePush {
+	public fun <init> (Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;)V
+	public final fun getConnection ()Ljava/lang/String;
+	public final fun getFrame ()Lkotlinx/serialization/json/JsonObject;
 }
 
 public final class com/letta/mobile/data/shellstate/shared/ShellStateReply {
