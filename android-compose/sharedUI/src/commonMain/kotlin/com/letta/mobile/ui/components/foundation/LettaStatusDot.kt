@@ -50,7 +50,9 @@ fun LettaStatusTone.color(): Color = when (this) {
     LettaStatusTone.Idle -> MaterialTheme.colorScheme.outline
     LettaStatusTone.Running -> MaterialTheme.colorScheme.primary
     LettaStatusTone.Success -> LocalLettaCustomColors.current.successColor
-    LettaStatusTone.Warning -> LocalLettaCustomColors.current.reconnectingColor
+    LettaStatusTone.Warning -> LocalLettaCustomColors.current.let { colors ->
+        colors.warningTextColor.takeIf { it != Color.Unspecified } ?: colors.reconnectingColor
+    }
     LettaStatusTone.Error -> MaterialTheme.colorScheme.error
 }
 

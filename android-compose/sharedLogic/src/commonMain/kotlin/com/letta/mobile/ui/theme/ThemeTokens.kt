@@ -38,6 +38,13 @@ object LettaColorTokens {
     const val LIGHT_VOICE_YOU = 0xFF2F6BD9
     const val LIGHT_VOICE_AGENT = 0xFFC0436B
 
+    // Warning: an amber, so a warning never reads as one of the teal/cyan accents. The ink reads at
+    // 5:1 or more on every surface and on the container of its own theme.
+    const val LIGHT_WARNING = 0xFF8F5200
+    const val LIGHT_WARNING_CONTAINER = 0xFFFFE8C7
+    const val DARK_WARNING = 0xFFE0A458
+    const val DARK_WARNING_CONTAINER = 0xFF3B2A12
+
     const val TEAL_ACCENT = 0xFF1DE9B6
     const val CYAN_ACCENT = 0xFF00E5FF
 

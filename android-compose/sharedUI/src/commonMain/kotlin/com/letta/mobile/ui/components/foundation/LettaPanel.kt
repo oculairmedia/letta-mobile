@@ -8,6 +8,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.letta.mobile.ui.theme.tokens.LettaPanelTone
+import com.letta.mobile.ui.theme.tokens.LocalLettaCustomColors
 import com.letta.mobile.ui.theme.tokens.LettaShapes
 import com.letta.mobile.ui.theme.tokens.LettaStrokeTokens
 
@@ -49,16 +50,19 @@ fun lettaPanelBorder(): BorderStroke = BorderStroke(LettaStrokeTokens.hairline, 
 fun LettaPanelTone.containerColor(): Color = when (this) {
     LettaPanelTone.Neutral -> MaterialTheme.colorScheme.surfaceContainer
     LettaPanelTone.Info -> MaterialTheme.colorScheme.secondaryContainer
-    LettaPanelTone.Warning -> MaterialTheme.colorScheme.tertiaryContainer
+    LettaPanelTone.Warning -> LocalLettaCustomColors.current.warningContainerColor.orElse(MaterialTheme.colorScheme.tertiaryContainer)
     LettaPanelTone.Error -> MaterialTheme.colorScheme.errorContainer
 }
 
-/** The content colour on a [LettaPanel] of this tone. */
+/** This colour, or [fallback] where the theme leaves it unset (a host theme with no Letta colours). */
+private fun Color.orElse(fallback: Color): Color = if (this == Color.Unspecified) fallback else this
+
+/** The content colour on a [LettaPanel] of this tone: a warning's is the amber ink, which reads on its container. */
 @Composable
 @ReadOnlyComposable
 fun LettaPanelTone.contentColor(): Color = when (this) {
     LettaPanelTone.Neutral -> MaterialTheme.colorScheme.onSurface
     LettaPanelTone.Info -> MaterialTheme.colorScheme.onSecondaryContainer
-    LettaPanelTone.Warning -> MaterialTheme.colorScheme.onTertiaryContainer
+    LettaPanelTone.Warning -> LocalLettaCustomColors.current.warningTextColor.orElse(MaterialTheme.colorScheme.onTertiaryContainer)
     LettaPanelTone.Error -> MaterialTheme.colorScheme.onErrorContainer
 }

@@ -20,6 +20,28 @@ import androidx.annotation.VisibleForTesting
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 
+/** The fixed amber warning ink for the theme's lightness, before harmonizing. */
+private fun warningInk(isLightTheme: Boolean): Color =
+    Color(if (isLightTheme) LettaColorTokens.LIGHT_WARNING else LettaColorTokens.DARK_WARNING)
+
+/**
+ * Warning is a fixed amber (LettaColorTokens), harmonized toward the scheme's primary, never the scheme's
+ * tertiary: in the teal presets that is a calm accent, not a warning. Returns the ink and its container.
+ */
+private fun harmonizedWarningPair(colorScheme: ColorScheme, isLightTheme: Boolean): Pair<Color, Color> {
+    val warningInk = warningInk(isLightTheme)
+    val warningContainer = Color(
+        if (isLightTheme) LettaColorTokens.LIGHT_WARNING_CONTAINER else LettaColorTokens.DARK_WARNING_CONTAINER,
+    )
+    val ink = HctColorHarmonizer.harmonize(stateColor = warningInk, seedColor = colorScheme.primary)
+    val container = HctColorHarmonizer.harmonizeContainer(
+        containerColor = warningContainer,
+        seedColor = colorScheme.primary,
+        contentColor = warningInk,
+    )
+    return ink to container
+}
+
 @VisibleForTesting
 internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
     val complementary = colorScheme.primary.complementary()
@@ -34,15 +56,7 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
         seedColor = colorScheme.primary,
         contentColor = colorScheme.onErrorContainer,
     )
-    val harmonizedWarning = HctColorHarmonizer.harmonize(
-        stateColor = colorScheme.tertiary,
-        seedColor = colorScheme.primary,
-    )
-    val harmonizedWarningContainer = HctColorHarmonizer.harmonizeContainer(
-        containerColor = colorScheme.tertiaryContainer,
-        seedColor = colorScheme.primary,
-        contentColor = colorScheme.onTertiaryContainer,
-    )
+    val (harmonizedWarning, harmonizedWarningContainer) = harmonizedWarningPair(colorScheme, isLightTheme)
     val harmonizedSuccess = HctColorHarmonizer.harmonize(
         stateColor = colorScheme.primary,
         seedColor = colorScheme.primary,
@@ -80,7 +94,7 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
         errorContainerColor = harmonizedErrorContainer,
         harmonizedError = harmonizedError,
         harmonizedErrorContainer = harmonizedErrorContainer,
-        warningTextColor = colorScheme.onTertiaryContainer,
+        warningTextColor = warningInk(isLightTheme),
         warningContainerColor = harmonizedWarningContainer,
         harmonizedWarning = harmonizedWarning,
         harmonizedWarningContainer = harmonizedWarningContainer,
