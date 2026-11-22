@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.backend.RemoteRoute
+import com.letta.mobile.data.backend.ConversationListing
 import com.letta.mobile.data.backend.ConversationListingFactory
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
@@ -16,7 +17,6 @@ import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.runCatchingCancellable
-import com.letta.mobile.data.backend.ConversationListing
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CancellationException

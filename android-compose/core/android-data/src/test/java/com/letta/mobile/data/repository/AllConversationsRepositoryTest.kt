@@ -104,7 +104,7 @@ class AllConversationsRepositoryTest {
     }
 
     @Test
-    fun `reconnect re-reads a loaded list since pushes sent while offline are lost`() = runTest {
+    fun `reconnect on a host without recents lists no agent and leaves the loaded list as it was`() = runTest {
         val transport = FakeChannelTransport()
         val pushed = AllConversationsRepository(
             fakeApi,
@@ -123,7 +123,11 @@ class AllConversationsRepositoryTest {
         transport.state.value = ChannelTransportState.Connected(serverId = "srv", sessionId = "sess2", deviceId = "dev")
         runCurrent()
 
-        assertEquals(callsAfterLoad + 1, fakeApi.calls.count { it == "listConversations" })
+        // letta-mobile-fj56l: a reconnect reads only the bounded recents page; a host without one (this per-agent
+        // backend) is read agent by agent only by an explicit refresh, never by a reconnect.
+        assertEquals(callsAfterLoad, fakeApi.calls.count { it == "listConversations" })
+        assertTrue(pushed.conversations.value.none { it.id.value == "while-offline" })
+        pushed.refresh()
         assertTrue(pushed.conversations.value.any { it.id.value == "while-offline" })
     }
 

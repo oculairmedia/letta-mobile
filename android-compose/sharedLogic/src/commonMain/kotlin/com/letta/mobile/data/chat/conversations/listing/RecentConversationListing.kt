@@ -155,7 +155,7 @@ internal class RecentConversationListing(
      * A reconnect re-reads the one bounded recents page, never an agent: pushes sent while offline are lost, and
      * the recents page is what shows them. Agents the person opened or pinned are read when the list is next
      * opened ([refresh]). A host found without recents is asked once more (a restarted host may have gained
-     * them) but stays on its per-agent reads only for an explicit [refresh], never for a reconnect.
+     * them) and leaves legacy mode when it answers; its per-agent reads run only for an explicit [refresh].
      */
     override suspend fun reconnect(): List<Conversation> = mutex.withLock {
         when (val read = readRecents()) {
@@ -166,7 +166,8 @@ internal class RecentConversationListing(
                 owned.forEach { fleet.record(it) }
                 recents = others
             }
-            is RecentsRead.Unsupported -> if (!legacyMode) fallBackToLegacy(read.reason)
+            // A host that lost its recents is found out by the next explicit refresh; a reconnect never empties the list.
+            is RecentsRead.Unsupported -> Telemetry.event("Conversations", "list.reconnect_without_recents", "reason" attr read.reason.orEmpty())
         }
         conversations
     }
