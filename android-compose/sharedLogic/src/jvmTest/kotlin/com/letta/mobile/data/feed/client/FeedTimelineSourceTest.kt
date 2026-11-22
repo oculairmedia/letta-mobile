@@ -145,7 +145,8 @@ class FeedTimelineSourceTest {
         assertEquals(2000L, source.cursor?.epoch, "the cursor moved to the host's new epoch")
         assertEquals(1L, source.metrics.value.resyncs, "one resync, forced by the frame of the other epoch")
         assertEquals(setOf("Before", "After"), source.rows.value.map { it.text() }.toSet())
-        assertTrue(host.reads.last()[ConversationFeedWire.FROM]?.toString()?.contains("\"epoch\":1000") == true, "the resync read named the old cursor")
+        val resyncFrom = host.reads.last()[ConversationFeedWire.FROM]?.toString().orEmpty()
+        assertTrue("\"epoch\":1000" in resyncFrom, "the resync read named the old cursor")
     }
 
     @Test

@@ -63,11 +63,13 @@ class FeedDeltaFixtureTest {
             FeedPusher(backgroundScope, journal, { registry.viewersFor(it.value) }, registry::isViewed, 16)
             val viewers = case.getValue("viewers").jsonObject.mapValues { (id, spec) ->
                 val fields = spec.jsonObject
-                Viewer(id, fields.getValue("pushes").jsonPrimitive.boolean, fields.strings("authorized_agent_ids"), fields.strings("bound_conversation_ids"))
+                val pushes = fields.getValue("pushes").jsonPrimitive.boolean
+                Viewer(id, pushes, fields.strings("authorized_agent_ids"), fields.strings("bound_conversation_ids"))
                     .also { registry.register(fields.getValue("conversation").jsonPrimitive.content, it) }
             }
             case.getValue("writes").jsonArray.map { it.jsonObject }.forEach { write ->
-                val target = Conv(AgentId(write.getValue("agent_id").jsonPrimitive.content), ConversationId(write.getValue("conversation_id").jsonPrimitive.content))
+                val agent = AgentId(write.getValue("agent_id").jsonPrimitive.content)
+                val target = Conv(agent, ConversationId(write.getValue("conversation_id").jsonPrimitive.content))
                 val writer = journal.writerFor(target, TurnName(write.getValue("turn").jsonPrimitive.content))
                 write.getValue("deltas").jsonArray.forEach { writer.append(it.jsonObject.toString()) }
                 if (write.getValue("close").jsonPrimitive.boolean) writer.close(true)

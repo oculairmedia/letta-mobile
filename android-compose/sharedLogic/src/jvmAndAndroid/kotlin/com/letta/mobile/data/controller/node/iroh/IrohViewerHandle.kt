@@ -62,8 +62,14 @@ internal class IrohViewerHandle(
     private val agentEventsGate: () -> Boolean = { false },
     private val conversationActivityGate: (String) -> Boolean = { false },
     private val conversationEventsGate: () -> Boolean = { false },
-    private val feedPushGate: () -> Boolean = { false },
 ) : ViewerHandle {
+    /**
+     * Whether this connection has read the feed and may be pushed `feed_delta` frames; evaluated at send time. Set by the
+     * owning connection before the handle is shared. Default: no.
+     */
+    @Volatile
+    var feedPushGate: () -> Boolean = { false }
+
     /**
      * The connection's admin RPC context while it is authenticated, null otherwise; evaluated at send time for
      * method-scoped pushes. Set by the owning connection before the handle is shared. Default: none.

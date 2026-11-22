@@ -226,8 +226,6 @@ class IrohNodeConnection(
                 com.letta.mobile.data.transport.ServerFrame.ConversationActivity.CAPABILITY in peerCapabilities.get() &&
                     IrohPeerCapabilities.isAgentInScope(sessionAuth.agentScope(), agentId)
             },
-            // A feed push is for a peer that has read the feed (feed.subscribe); its own scope is checked per push.
-            feedPushGate = { authenticated.get() && readsFeed.get() },
             conversationEventsGate = {
                 val capabilities = effectiveCapabilities()
                 authenticated.get() &&
@@ -238,6 +236,8 @@ class IrohNodeConnection(
         // Method-scoped pushes (canvas mounts) check the method's capability against the context's granted
         // capabilities and re-run the method's own checks on it; it is given only while authenticated.
         handle.adminContextGate = { currentAdminRpcRequestContext().takeIf { it.authenticated } }
+        // A feed push is for a peer that has read the feed (feed.subscribe); its own scope is checked per push.
+        handle.feedPushGate = { authenticated.get() && readsFeed.get() }
         selfViewer = handle
         return handle
     }

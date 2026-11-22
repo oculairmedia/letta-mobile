@@ -65,7 +65,7 @@ class FeedJournalStoreTest : FeedJournalTestBase() {
         assertEquals(listOf("user_message", "assistant_message", "stop_reason"), fed, "a viewer reading the feed sees the prompt")
         val replayed = store.replayFor(Conv.default, TurnName("cm-1"))?.deltas
             ?.map { Json.parseToJsonElement(it).jsonObject.text("message_type") }
-        assertEquals(listOf("assistant_message", "stop_reason"), replayed, "the initiator re-owns its prompt: replaying it would only restate it")
+        assertEquals(listOf("assistant_message", "stop_reason"), replayed, "the initiator re-owns its prompt")
     }
 
     @Test

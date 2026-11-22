@@ -2,7 +2,6 @@ package com.letta.mobile.data.controller.node.iroh.feed
 
 import com.letta.mobile.data.controller.node.iroh.ConnectionRegistry
 import com.letta.mobile.data.controller.node.iroh.ConversationViewers
-import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.feed.wire.ConversationFeedWire
 import java.nio.file.Files
 import kotlin.test.Test

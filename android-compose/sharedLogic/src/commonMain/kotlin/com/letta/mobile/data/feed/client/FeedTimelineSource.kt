@@ -13,7 +13,7 @@ import com.letta.mobile.data.model.resolveConversationReadTarget
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
-import kotlinx.coroutines.CancellationException
+import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
@@ -120,18 +120,20 @@ class FeedTimelineSource(
     /** Reads `feed.subscribe` from the cursor until the host has no more, applying each page. */
     private suspend fun catchUp(reason: FeedResync?) {
         reason?.let { bump { m -> m.copy(resyncs = m.resyncs + 1) } }
-        try {
-            do {
-                val page = read() ?: return
-                val outcome = follower.onPage(page)
-                if (outcome.replaced) projector.reset()
-                outcome.entries.forEach { apply(it) }
-                publish(replaced = outcome.replaced)
-            } while (outcome.hasMore)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (failure: Exception) {
+        runCatchingCancellable { readUntilCaughtUp() }.onFailure { failure ->
             Telemetry.event(TAG, "read.failed", "class" attr failure::class.simpleName, level = Telemetry.Level.WARN)
+        }
+    }
+
+    private suspend fun readUntilCaughtUp() {
+        var more = true
+        while (more) {
+            val page = read() ?: return
+            val outcome = follower.onPage(page)
+            if (outcome.replaced) projector.reset()
+            outcome.entries.forEach { apply(it) }
+            publish(replaced = outcome.replaced)
+            more = outcome.hasMore
         }
     }
 

@@ -14,7 +14,6 @@ import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -109,8 +108,6 @@ class FeedPusher(
         writes.enqueue(viewer) {
             try {
                 withTimeoutOrNull(WRITE_TIMEOUT_MS) { viewer.writeFrame(frame) }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
             } finally {
                 release(viewer)
             }
@@ -136,7 +133,8 @@ class FeedPusher(
     /** The names viewers register [key] under: its own, and for an agent's default conversation also the `conv-default-<agent>` alias. */
     private fun namesOf(key: JournalKey): List<String> {
         val own = key.conversationId.value
-        return if (own == IdFormats.DEFAULT_CONVERSATION_ID) listOf(own, IdFormats.defaultConversationIdFor(key.agentId.value)) else listOf(own)
+        if (own != IdFormats.DEFAULT_CONVERSATION_ID) return listOf(own)
+        return listOf(own, IdFormats.defaultConversationIdFor(key.agentId.value))
     }
 }
 
