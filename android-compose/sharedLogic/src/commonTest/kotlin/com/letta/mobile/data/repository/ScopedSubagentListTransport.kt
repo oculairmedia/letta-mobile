@@ -25,6 +25,10 @@ internal class ScopedSubagentListTransport : NoOpChannelTransport(), SubagentSco
 
     override val hostCapabilities: Set<String> get() = advertised
 
+    /** As the Iroh transport: the host must push the registry AND this connection must view the scope. */
+    override fun receivesSubagentPushes(scope: SubagentParentScope): Boolean =
+        "subagent_registry_push_v1" in advertised && viewedConversation == scope.parentConversationId
+
     /** Entries the host holds, keyed by parent conversation id. */
     val entriesByConversation = mutableMapOf<String, List<SubagentEntry>>()
 

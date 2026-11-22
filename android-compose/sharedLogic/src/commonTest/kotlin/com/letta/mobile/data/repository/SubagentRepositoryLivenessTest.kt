@@ -148,6 +148,27 @@ class SubagentRepositoryLivenessTest {
         repo.close()
     }
 
+    /**
+     * Pushes reach only the conversation's viewers. A scope this connection does not view (the
+     * desktop Dreaming pane watches the agent's default conversation) hears nothing, so its quiet
+     * entries are still verified.
+     */
+    @Test
+    fun pushingHostStillVerifiesAScopeThisConnectionDoesNotView() = runTest {
+        transport.advertised = setOf(HOST_PUSH_CAPABILITY)
+        val repo = repository(backgroundScope).primed()
+        transport.viewedConversation = OTHER_CONVERSATION
+        val initialReads = transport.requestedConversations.size
+
+        repeat(IDLE_SWEEPS) {
+            now += IDLE_STEP_MS
+            sweepOnce()
+        }
+
+        assertTrue(transport.requestedConversations.size > initialReads, "an unviewed scope is verified")
+        repo.close()
+    }
+
     /** The same ten idle minutes against a host that does not push still verify quiet entries. */
     @Test
     fun nonPushingHostIsStillVerifiedWhileIdle() = runTest {

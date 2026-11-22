@@ -10,6 +10,7 @@ import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.data.transport.api.SubagentScopeAwareChannelTransport
+import com.letta.mobile.data.transport.api.receivesSubagentPushesFor
 import com.letta.mobile.data.transport.api.sendSubagentListFor
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -381,6 +382,9 @@ class SessionScopedChannelTransport internal constructor(
     ): ServerFrame.SubagentListResponse = sessionManager.withCurrentSession {
         it.channelTransport.sendSubagentListFor(scope, all, timeoutMs)
     }
+
+    override fun receivesSubagentPushes(scope: SubagentParentScope): Boolean =
+        current.receivesSubagentPushesFor(scope)
 
     override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse =
         sessionManager.withCurrentSession { it.channelTransport.sendSubagentTodos(toolCallId, timeoutMs) }
