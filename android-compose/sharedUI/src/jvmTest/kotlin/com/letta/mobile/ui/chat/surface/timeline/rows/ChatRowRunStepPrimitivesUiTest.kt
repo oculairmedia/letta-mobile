@@ -13,10 +13,12 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -29,6 +31,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.disclosure.DisclosureChevronDefaults
+import com.letta.mobile.ui.components.line.StatusTone
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -37,8 +40,8 @@ import kotlin.test.assertTrue
 /**
  * letta-mobile-ckmub.1.2: a run block is built from the shared primitives. Opened, its tool calls
  * list as step lines straight under the summary line (no "Ran N commands" group row with a chevron
- * of its own); each step is one verb-first line (letta-mobile-2ccpv), a spinner at the summary glyph's
- * size only while it runs, one DisclosureChevron only when it has details, its details in one inset.
+ * of its own); each step is one verb-first line, its glyph at the summary glyph's size (a spinner
+ * while it runs, then how it settled), one DisclosureChevron only when it has details, its details in one inset.
  */
 class ChatRowRunStepPrimitivesUiTest {
     @Test
@@ -127,15 +130,51 @@ class ChatRowRunStepPrimitivesUiTest {
     }
 
     @Test
-    fun onlyARunningStepHasAGlyphAndItIsTheSummaryGlyphAtTheSameSize() = runComposeUiTest {
+    fun everyStepSaysHowItStandsWithTheSummaryGlyphAtTheSameSize() = runComposeUiTest {
         showOpened(runOf(call("c1"), call("c2", status = "error"), call("c3", status = null)))
 
         val summary = onNodeWithTag(ChatRowTestTags.RUN_GLYPH, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val steps = onAllNodesWithTag(ChatRowTestTags.TOOL_STATUS_GLYPH, useUnmergedTree = true).fetchSemanticsNodes()
-        assertEquals(1, steps.size, "settled steps are quiet: only the running one has a glyph")
-        assertEquals(summary.width, steps.single().boundsInRoot.width, "the step glyph is not the summary glyph's width")
-        assertEquals(summary.height, steps.single().boundsInRoot.height, "the step glyph is not the summary glyph's height")
+        // The spinner while it runs, then a muted check or the failure mark, in the slot the line always keeps.
+        assertEquals(listOf(StatusTone.Done, StatusTone.Failed, StatusTone.Working), steps.map { it.config[ToolStepToneKey] })
+        steps.forEach { step ->
+            assertEquals(summary.width, step.boundsInRoot.width, "the step glyph is not the summary glyph's width")
+            assertEquals(summary.height, step.boundsInRoot.height, "the step glyph is not the summary glyph's height")
+        }
         assertEquals(1, onAllNodesWithTag(ChatRowTestTags.TOOL_STEP_NOTE, useUnmergedTree = true).fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun aSettledStepSaysHowLongItTookFromASecondUp() = runComposeUiTest {
+        showOpened(
+            runOf(
+                call("c1").copy(executionTimeMs = 2_400L),
+                call("c2", command = "pwd").copy(executionTimeMs = 300L),
+                call("c3", status = null),
+            ),
+        )
+
+        val durations = onAllNodesWithTag(ChatRowTestTags.TOOL_STEP_DURATION, useUnmergedTree = true)
+        durations.assertCountEquals(1)
+        durations[0].assertTextEquals("2.4s")
+    }
+
+    @Test
+    fun anEditSaysTheLinesItAddedAndRemoved() = runComposeUiTest {
+        val edit = UiToolCall(
+            name = "Edit",
+            arguments = """{"file_path":"src/a.kt","old_string":"a
+b","new_string":"c"}""",
+            result = "The file was updated",
+            status = "success",
+            toolCallId = "e1",
+        )
+        showOpened(runOf(edit))
+
+        assertEquals(1, count(hasText("src/a.kt") and under(ChatRowTestTags.TOOL_CARD_TOGGLE)))
+        assertEquals(1, count(hasText("+1") and under(ChatRowTestTags.TOOL_STEP_CHANGES)))
+        assertEquals(1, count(hasText("−2") and under(ChatRowTestTags.TOOL_STEP_CHANGES)))
+        assertEquals(1, onAllNodes(hasContentDescription("1 lines added, 2 removed")).fetchSemanticsNodes().size)
     }
 
     @Test

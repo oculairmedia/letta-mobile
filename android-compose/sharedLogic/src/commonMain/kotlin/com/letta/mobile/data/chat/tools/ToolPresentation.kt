@@ -89,7 +89,7 @@ enum class ToolVerb {
 
 /**
  * A tool step's one line, whatever host draws it: the [verb], the optional [subject] after it, the
- * muted [target], what its chips open in the preview, and a failure the line should say. It is
+ * muted [target], the [changes] it made, what its chips open in the preview, and a failure the line should say. It is
  * cheap to build (no output is read past an exit-code scan), so every visible step has one; the
  * [ToolInset] is built only once the step is opened.
  */
@@ -110,7 +110,13 @@ data class ToolStepLine(
      * step still opens to what went wrong.
      */
     val expandable: Boolean = true,
+    /** The lines a change added and removed, said after the target ("+3 −1"); null for a step that changed no text. */
+    val changes: ToolLineChanges? = null,
 )
+
+/** How many lines a step's change [added] and [removed]: a step line's "+3 −1". */
+@Immutable
+data class ToolLineChanges(val added: Int, val removed: Int)
 
 /** What an opened step shows, in one of the shapes every host knows how to draw. */
 @Immutable
