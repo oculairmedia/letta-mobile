@@ -20,6 +20,11 @@ internal class ScopedSubagentListTransport : NoOpChannelTransport(), SubagentSco
     override val state = MutableStateFlow<ChannelTransportState>(connected())
     override val events = MutableSharedFlow<ServerFrame>(extraBufferCapacity = 16)
 
+    /** What the host advertised at auth; a pushing host names `subagent_registry_push_v1`. */
+    var advertised: Set<String> = emptySet()
+
+    override val hostCapabilities: Set<String> get() = advertised
+
     /** Entries the host holds, keyed by parent conversation id. */
     val entriesByConversation = mutableMapOf<String, List<SubagentEntry>>()
 

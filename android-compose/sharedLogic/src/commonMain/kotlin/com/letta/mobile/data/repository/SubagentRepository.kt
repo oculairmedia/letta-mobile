@@ -57,7 +57,8 @@ import kotlin.time.Duration.Companion.milliseconds
  *    scope it describes ( RC2), and an ended entry never
  *    returns to running (RC3).
  *  - A RUNNING entry nobody has mentioned for [STREAM_TIMEOUT_MS] is verified
- *    with the host, never failed for being quiet (RC1).
+ *    with the host, never failed for being quiet (RC1), unless the host pushes
+ *    its registry, in which case nothing is asked after the initial read.
  *  - On WS reconnect (`Disconnected → Connected`) every scope still being
  *    collected is re-fetched so the UI doesn't keep showing a stale list after
  *    a dropped socket.
@@ -524,8 +525,14 @@ open class SubagentRepository(
      * the host cannot be asked the entry stays as it is; only after
      * [UNVERIFIABLE_SILENCE_MS] of unverifiable silence is it dropped (never
      * failed), so a transport without `subagent.list` cannot pin a chip forever.
+     *
+     * A host that advertises [HOST_PUSH_CAPABILITY] is never asked: it pushes every
+     * registry change, including the end of a quiet run, so asking would only poll.
      */
     private suspend fun sweepStreamTimeouts() {
+        // letta-mobile-wbgpc: a pushing host already tells us every change (and replays the
+        // snapshot on join and reconnect), so quiet is not a reason to ask it again.
+        if (HOST_PUSH_CAPABILITY in transport.hostCapabilities) return
         val now = clock()
         val quiet = state.value.filter { it.status == SubagentStatus.RUNNING && now - it.lastSeenAtMs > STREAM_TIMEOUT_MS }
         if (quiet.isEmpty()) return
@@ -633,6 +640,12 @@ open class SubagentRepository(
         // is dropped - not failed - so it cannot pin a chip forever.
         internal const val UNVERIFIABLE_SILENCE_MS = 30 * 60_000L
         private const val UNSCOPED_LABEL = "<unscoped>"
+
+        /**
+         * Advertised by a host that pushes its subagent registry (`subagents_updated` on every
+         * change, replayed to each new viewer). Mirrors the host's `PUSH_CAPABILITY`.
+         */
+        internal const val HOST_PUSH_CAPABILITY = "subagent_registry_push_v1"
         private val TERMINAL_STATUSES = setOf(
             SubagentStatus.COMPLETED,
             SubagentStatus.FAILED,

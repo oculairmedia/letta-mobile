@@ -124,6 +124,45 @@ class SubagentRepositoryLivenessTest {
         repo.close()
     }
 
+    /**
+     * letta-mobile-wbgpc: a host that advertises `subagent_registry_push_v1` pushes every
+     * registry change to the conversation's viewers and replays the snapshot when a viewer
+     * joins, so quiet is not a reason to ask again. The 2026-11-22 host log showed every idle
+     * desktop asking `subagent.list` every two minutes for each quiet running subagent.
+     * Ten idle minutes must cost no request after the initial read.
+     */
+    @Test
+    fun pushingHostIsNeverAskedAgainWhileIdle() = runTest {
+        transport.advertised = setOf(HOST_PUSH_CAPABILITY)
+        val repo = repository(backgroundScope).primed()
+        val initialReads = transport.requestedConversations.size
+
+        repeat(IDLE_SWEEPS) {
+            now += IDLE_STEP_MS
+            sweepOnce()
+        }
+
+        assertEquals(1, initialReads, "one read when the conversation opens")
+        assertEquals(emptyList(), transport.requestedConversations.drop(initialReads), "no read while idle")
+        assertEquals(SubagentStatus.RUNNING, repo.currentActiveSubagents(scope).single().status)
+        repo.close()
+    }
+
+    /** The same ten idle minutes against a host that does not push still verify quiet entries. */
+    @Test
+    fun nonPushingHostIsStillVerifiedWhileIdle() = runTest {
+        val repo = repository(backgroundScope).primed()
+        val initialReads = transport.requestedConversations.size
+
+        repeat(IDLE_SWEEPS) {
+            now += IDLE_STEP_MS
+            sweepOnce()
+        }
+
+        assertTrue(transport.requestedConversations.size > initialReads, "quiet entries are verified")
+        repo.close()
+    }
+
     /** RC2, log line 48106-48111: a push for local-conv-624 retained (and later evicted) a 517 chip. */
     @Test
     fun scopedPushForAnotherConversationLeavesThisOneAlone() = runTest {
@@ -205,5 +244,12 @@ class SubagentRepositoryLivenessTest {
 
         /** Past the repository's 60s running-absence linger. */
         const val ABSENCE_PAST_LINGER_MS = 61_000L
+
+        /** Literal on purpose: an independent oracle for the host's advertised push capability. */
+        const val HOST_PUSH_CAPABILITY = "subagent_registry_push_v1"
+
+        /** Ten idle minutes, swept every thirty seconds as production does. */
+        const val IDLE_STEP_MS = 30_000L
+        const val IDLE_SWEEPS = 20
     }
 }
