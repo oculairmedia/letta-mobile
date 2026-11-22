@@ -60,7 +60,8 @@ internal class LettaJsMessagePaging(private val conversations: Map<String, List<
 
         /** [element] with every synthetic row expanded, for comparing a served page with a fixture's expected response. */
         fun expanded(element: JsonElement): JsonElement = when (element) {
-            is JsonObject -> if ("synthetic_image_return" in element) expand(element) else JsonObject(element.mapValues { expanded(it.value) })
+            is JsonObject ->
+                if ("synthetic_image_return" in element) expand(element) else JsonObject(element.mapValues { expanded(it.value) })
             is JsonArray -> JsonArray(element.map(::expanded))
             else -> element
         }
@@ -76,7 +77,10 @@ internal class LettaJsMessagePaging(private val conversations: Map<String, List<
                         add(buildJsonObject { put("type", "text"); put("text", "viewed") })
                         add(buildJsonObject {
                             put("type", "image")
-                            put("source", buildJsonObject { put("type", "base64"); put("media_type", "image/png"); put("data", "A".repeat(size)) })
+                            put(
+                                "source",
+                                buildJsonObject { put("type", "base64"); put("media_type", "image/png"); put("data", "A".repeat(size)) },
+                            )
                         })
                     },
                 ),

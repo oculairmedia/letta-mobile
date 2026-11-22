@@ -66,10 +66,15 @@ class CodeFenceHeaderUiTest {
         }
     }
 
+    /** The markdown is parsed off the main thread: wait for the fence's header to compose before asserting. */
+    private fun ComposeUiTest.awaitHeader() =
+        waitUntil(timeoutMillis = WAIT_MILLIS) { onAllNodesWithTag(CodeFenceTags.HEADER).fetchSemanticsNodes().isNotEmpty() }
+
     @Test
     fun aFenceShowsItsLanguageAndCopiesOnlyItsCode() = runComposeUiTest {
         val clipboard = RecordingClipboard()
         show(reply, clipboard)
+        awaitHeader()
 
         onNodeWithTag(CodeFenceTags.LANGUAGE, useUnmergedTree = true).assertTextEquals("kotlin")
         onNodeWithTag(CodeFenceTags.COPY).assertContentDescriptionEquals("Copy code")
@@ -82,6 +87,7 @@ class CodeFenceHeaderUiTest {
     @Test
     fun aFenceWithNoLanguageStillCopies() = runComposeUiTest {
         show("```\nplain\n```")
+        awaitHeader()
 
         onNodeWithTag(CodeFenceTags.LANGUAGE, useUnmergedTree = true).assertTextEquals("")
         assertEquals(1, onAllNodesWithTag(CodeFenceTags.COPY).fetchSemanticsNodes().size)
@@ -107,6 +113,7 @@ class CodeFenceHeaderUiTest {
                 }
             }
         }
+        awaitHeader()
         waitForIdle()
         val out = File("build/code-fence-snapshots").apply { mkdirs() }
             .resolve("fence-${if (dark) "dark" else "light"}-${width.value.toInt()}dp.png")

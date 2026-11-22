@@ -383,8 +383,10 @@ class WireContractsTest {
         // message.list serves every row through the turn identity ledger, as the wrapper wires it: a file store in
         // host state and the App Server's own rows. Every other family must never touch the ledger.
         val serving = host?.containsKey("messages") == true
-        val identityStore = if (serving) FileTurnIdentityStore(File(dir, "turn-identity")) else rejectCalls<TurnIdentityStore>("identity-store")
-        val identityRows = if (serving) AppServerConversationRows(native) else ConversationRowsSource { _, _ -> error("Unexpected transcript read") }
+        val identityStore =
+            if (serving) FileTurnIdentityStore(File(dir, "turn-identity")) else rejectCalls<TurnIdentityStore>("identity-store")
+        val identityRows =
+            if (serving) AppServerConversationRows(native) else ConversationRowsSource { _, _ -> error("Unexpected transcript read") }
         try {
             runtime.start()
             val router = AdminRpcRegistry.buildRouter(

@@ -119,7 +119,9 @@ private fun ShellChatOptionsContent(state: ShellChatOptionsState, actions: Shell
         LettaSectionLabel("Text size")
         SegmentedChoice(TEXT_SIZE_SEGMENTS, state.textSize, ShellChatOptionsTags.TEXT_PREFIX, actions.onTextSizeChange)
         LettaSectionLabel("Thinking glow")
-        SegmentedChoice(GLOW_SEGMENTS, display.thinkingGlow, ShellChatOptionsTags.GLOW_PREFIX) { actions.onDisplayChange(display.copy(thinkingGlow = it)) }
+        SegmentedChoice(GLOW_SEGMENTS, display.thinkingGlow, ShellChatOptionsTags.GLOW_PREFIX) {
+            actions.onDisplayChange(display.copy(thinkingGlow = it))
+        }
         if (state.offersAutoPin) {
             LettaSectionLabel("Chats")
             LettaToggleRow(

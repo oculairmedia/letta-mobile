@@ -12,8 +12,7 @@ import kotlinx.serialization.json.contentOrNull
 import com.letta.mobile.util.Telemetry
 
 /**
- * Server-side page-size guard for message.list over Iroh
- * admin_rpc (letta-mobile-c4igq.9, letta-mobile-vzn89).
+ * Server-side page-size guard for message.list over Iroh admin_rpc.
  *
  * A ~60MB conversation transcript serialized into one admin_rpc response is
  * rejected by the frame layer (admin_rpc.stream.response_too_large,
@@ -158,24 +157,6 @@ object MessageListPageGuard {
         return if (bytes() <= rowBudget) count else 1
     }
 
-    /** For each row, the farthest index its tool call / return partners in this page sit at (itself when none). */
-    private fun unitReach(rows: List<JsonElement>): IntArray {
-        val reach = IntArray(rows.size) { it }
-        val lastById = HashMap<String, Int>()
-        rows.forEachIndexed { index, row -> toolCallIdOf(row)?.let { id -> lastById[id] = index } }
-        rows.forEachIndexed { index, row ->
-            toolCallIdOf(row)?.let { id -> reach[index] = maxOf(index, lastById.getValue(id)) }
-        }
-        return reach
-    }
-
-    /** The tool call id that joins a call row (`tool_call.tool_call_id`) to its return rows (`tool_call_id`). */
-    private fun toolCallIdOf(row: JsonElement): String? {
-        val obj = row as? JsonObject ?: return null
-        val call = obj["tool_call"] as? JsonObject
-        return (call?.get("tool_call_id") ?: obj["tool_call_id"])?.let { (it as? JsonPrimitive)?.contentOrNull }
-    }
-
     /**
      * A message.list response that is neither a bare array nor
      * { messages: [...] } is passed through UNCHANGED by this guard, by
@@ -214,44 +195,6 @@ object MessageListPageGuard {
         is JsonArray -> el.toList()
         is JsonObject if el["messages"] is JsonArray -> (el["messages"] as JsonArray).toList()
         else -> null
-    }
-
-    private fun byteLen(el: JsonElement): Int = utf8ByteLength(el.toString())
-
-    /** UTF-8 size without allocating an intermediate ByteArray. */
-    private fun utf8ByteLength(text: String): Int {
-        var bytes = 0
-        var i = 0
-        while (i < text.length) {
-            val c = text[i].code
-            when {
-                c <= 0x7F -> {
-                    bytes += 1
-                    i += 1
-                }
-                c <= 0x7FF -> {
-                    bytes += 2
-                    i += 1
-                }
-                c in 0xD800..0xDBFF && i + 1 < text.length && text[i + 1].code in 0xDC00..0xDFFF -> {
-                    bytes += 4
-                    i += 2
-                }
-                else -> {
-                    bytes += 3
-                    i += 1
-                }
-            }
-        }
-        return bytes
-    }
-
-    /** UTF-8 size of the first [count] elements as a JSON array ("[]" + elements + commas). */
-    private fun totalByteLen(lengths: IntArray, count: Int): Int {
-        if (count == 0) return 2 // "[]"
-        var bytes = 2 + (count - 1) // brackets + inter-element commas
-        for (index in 0 until count) bytes += lengths[index]
-        return bytes
     }
 
     /**
@@ -325,4 +268,62 @@ object MessageListPageGuard {
             else -> value
         }
     }
+}
+
+// UTF-8 size helpers for the page guard (kept outside the object so it stays a small, focused API).
+private fun byteLen(el: JsonElement): Int = utf8ByteLength(el.toString())
+
+/** UTF-8 size without allocating an intermediate ByteArray. */
+private fun utf8ByteLength(text: String): Int {
+    var bytes = 0
+    var i = 0
+    while (i < text.length) {
+        val c = text[i].code
+        when {
+            c <= 0x7F -> {
+                bytes += 1
+                i += 1
+            }
+            c <= 0x7FF -> {
+                bytes += 2
+                i += 1
+            }
+            c in 0xD800..0xDBFF && i + 1 < text.length && text[i + 1].code in 0xDC00..0xDFFF -> {
+                bytes += 4
+                i += 2
+            }
+            else -> {
+                bytes += 3
+                i += 1
+            }
+        }
+    }
+    return bytes
+}
+
+/** UTF-8 size of the first [count] elements as a JSON array ("[]" + elements + commas). */
+private fun totalByteLen(lengths: IntArray, count: Int): Int {
+    if (count == 0) return 2 // "[]"
+    var bytes = 2 + (count - 1) // brackets + inter-element commas
+    for (index in 0 until count) bytes += lengths[index]
+    return bytes
+}
+
+// Tool-call units of a page: a call and its returns must land on the same page.
+/** For each row, the farthest index its tool call / return partners in this page sit at (itself when none). */
+private fun unitReach(rows: List<JsonElement>): IntArray {
+    val reach = IntArray(rows.size) { it }
+    val lastById = HashMap<String, Int>()
+    rows.forEachIndexed { index, row -> toolCallIdOf(row)?.let { id -> lastById[id] = index } }
+    rows.forEachIndexed { index, row ->
+        toolCallIdOf(row)?.let { id -> reach[index] = maxOf(index, lastById.getValue(id)) }
+    }
+    return reach
+}
+
+/** The tool call id that joins a call row (`tool_call.tool_call_id`) to its return rows (`tool_call_id`). */
+private fun toolCallIdOf(row: JsonElement): String? {
+    val obj = row as? JsonObject ?: return null
+    val call = obj["tool_call"] as? JsonObject
+    return (call?.get("tool_call_id") ?: obj["tool_call_id"])?.let { (it as? JsonPrimitive)?.contentOrNull }
 }
