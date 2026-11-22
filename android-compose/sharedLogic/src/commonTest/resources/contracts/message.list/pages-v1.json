@@ -1,0 +1,730 @@
+{
+  "method": "message.list",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ConversationAdminHandlers.kt",
+  "note": "Synthetic ids only. host_state.messages maps a conversation id to its stored rows, oldest first, served by a copy of the App Server's paging (letta.js 0.34.39 listConversationMessagePage over its strict local store). A row {\"synthetic_image_return\": n, ...} stands for an image tool return whose base64 data is n bytes of 'A' (the file would otherwise be over 2 MB); expected responses use the same marker. Each row is served through the wrapper's turn identity ledger, which backfills it: the user row opens turn otid-1, every other row is <id>:<message_type>.",
+  "cases": [
+    {
+      "name": "newest-page-without-order",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "messages": {
+          "local-conv-pages": [
+            {
+              "id": "u1",
+              "date": "2026-01-01T00:00:01Z",
+              "message_type": "user_message",
+              "role": "user",
+              "otid": "otid-1",
+              "content": "look at these three screenshots"
+            },
+            {
+              "id": "c1",
+              "date": "2026-01-01T00:00:02Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t1",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-1.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r1",
+              "tool_call_id": "t1",
+              "date": "2026-01-01T00:00:03Z"
+            },
+            {
+              "id": "c2",
+              "date": "2026-01-01T00:00:04Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t2",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-2.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r2",
+              "tool_call_id": "t2",
+              "date": "2026-01-01T00:00:05Z"
+            },
+            {
+              "id": "c3",
+              "date": "2026-01-01T00:00:06Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t3",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-3.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r3",
+              "tool_call_id": "t3",
+              "date": "2026-01-01T00:00:07Z"
+            },
+            {
+              "id": "a1",
+              "date": "2026-01-01T00:00:08Z",
+              "message_type": "assistant_message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "All three show the same layout."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "local-conv-pages"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "messages": [
+            {
+              "id": "a1",
+              "date": "2026-01-01T00:00:08Z",
+              "message_type": "assistant_message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "All three show the same layout."
+                }
+              ],
+              "logical_message_id": "a1:assistant_message",
+              "turn_id": "otid-1"
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r3",
+              "tool_call_id": "t3",
+              "date": "2026-01-01T00:00:07Z",
+              "logical_message_id": "r3:tool_return_message",
+              "turn_id": "otid-1"
+            },
+            {
+              "id": "c3",
+              "date": "2026-01-01T00:00:06Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t3",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-3.png\"}"
+              },
+              "logical_message_id": "c3:approval_request_message",
+              "turn_id": "otid-1"
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r2",
+              "tool_call_id": "t2",
+              "date": "2026-01-01T00:00:05Z",
+              "logical_message_id": "r2:tool_return_message",
+              "turn_id": "otid-1"
+            },
+            {
+              "id": "c2",
+              "date": "2026-01-01T00:00:04Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t2",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-2.png\"}"
+              },
+              "logical_message_id": "c2:approval_request_message",
+              "turn_id": "otid-1"
+            }
+          ],
+          "has_more": true,
+          "next_before": "c2"
+        }
+      }
+    },
+    {
+      "name": "descending-continues-from-last-row",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "messages": {
+          "local-conv-pages": [
+            {
+              "id": "u1",
+              "date": "2026-01-01T00:00:01Z",
+              "message_type": "user_message",
+              "role": "user",
+              "otid": "otid-1",
+              "content": "look at these three screenshots"
+            },
+            {
+              "id": "c1",
+              "date": "2026-01-01T00:00:02Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t1",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-1.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r1",
+              "tool_call_id": "t1",
+              "date": "2026-01-01T00:00:03Z"
+            },
+            {
+              "id": "c2",
+              "date": "2026-01-01T00:00:04Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t2",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-2.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r2",
+              "tool_call_id": "t2",
+              "date": "2026-01-01T00:00:05Z"
+            },
+            {
+              "id": "c3",
+              "date": "2026-01-01T00:00:06Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t3",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-3.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r3",
+              "tool_call_id": "t3",
+              "date": "2026-01-01T00:00:07Z"
+            },
+            {
+              "id": "a1",
+              "date": "2026-01-01T00:00:08Z",
+              "message_type": "assistant_message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "All three show the same layout."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "local-conv-pages",
+        "limit": "50",
+        "order": "desc",
+        "before": "c2"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": [
+          {
+            "synthetic_image_return": 400000,
+            "id": "r1",
+            "tool_call_id": "t1",
+            "date": "2026-01-01T00:00:03Z",
+            "logical_message_id": "r1:tool_return_message",
+            "turn_id": "otid-1"
+          },
+          {
+            "id": "c1",
+            "date": "2026-01-01T00:00:02Z",
+            "message_type": "approval_request_message",
+            "tool_call": {
+              "tool_call_id": "t1",
+              "name": "ViewImage",
+              "arguments": "{\"path\": \"/tmp/shot-1.png\"}"
+            },
+            "logical_message_id": "c1:approval_request_message",
+            "turn_id": "otid-1"
+          },
+          {
+            "id": "u1",
+            "date": "2026-01-01T00:00:01Z",
+            "message_type": "user_message",
+            "role": "user",
+            "otid": "otid-1",
+            "content": "look at these three screenshots",
+            "logical_message_id": "otid-1",
+            "turn_id": "otid-1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ascending-keeps-rows-after-cursor",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "messages": {
+          "local-conv-pages": [
+            {
+              "id": "u1",
+              "date": "2026-01-01T00:00:01Z",
+              "message_type": "user_message",
+              "role": "user",
+              "otid": "otid-1",
+              "content": "look at these three screenshots"
+            },
+            {
+              "id": "c1",
+              "date": "2026-01-01T00:00:02Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t1",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-1.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r1",
+              "tool_call_id": "t1",
+              "date": "2026-01-01T00:00:03Z"
+            },
+            {
+              "id": "c2",
+              "date": "2026-01-01T00:00:04Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t2",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-2.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r2",
+              "tool_call_id": "t2",
+              "date": "2026-01-01T00:00:05Z"
+            },
+            {
+              "id": "c3",
+              "date": "2026-01-01T00:00:06Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t3",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-3.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r3",
+              "tool_call_id": "t3",
+              "date": "2026-01-01T00:00:07Z"
+            },
+            {
+              "id": "a1",
+              "date": "2026-01-01T00:00:08Z",
+              "message_type": "assistant_message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "All three show the same layout."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "local-conv-pages",
+        "limit": "50",
+        "order": "asc",
+        "after": "u1"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "messages": [
+            {
+              "id": "c1",
+              "date": "2026-01-01T00:00:02Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t1",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-1.png\"}"
+              },
+              "logical_message_id": "c1:approval_request_message",
+              "turn_id": "otid-1"
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r1",
+              "tool_call_id": "t1",
+              "date": "2026-01-01T00:00:03Z",
+              "logical_message_id": "r1:tool_return_message",
+              "turn_id": "otid-1"
+            },
+            {
+              "id": "c2",
+              "date": "2026-01-01T00:00:04Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t2",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-2.png\"}"
+              },
+              "logical_message_id": "c2:approval_request_message",
+              "turn_id": "otid-1"
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r2",
+              "tool_call_id": "t2",
+              "date": "2026-01-01T00:00:05Z",
+              "logical_message_id": "r2:tool_return_message",
+              "turn_id": "otid-1"
+            }
+          ],
+          "has_more": true,
+          "next_after": "r2"
+        }
+      }
+    },
+    {
+      "name": "ascending-continues-from-last-row",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "messages": {
+          "local-conv-pages": [
+            {
+              "id": "u1",
+              "date": "2026-01-01T00:00:01Z",
+              "message_type": "user_message",
+              "role": "user",
+              "otid": "otid-1",
+              "content": "look at these three screenshots"
+            },
+            {
+              "id": "c1",
+              "date": "2026-01-01T00:00:02Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t1",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-1.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r1",
+              "tool_call_id": "t1",
+              "date": "2026-01-01T00:00:03Z"
+            },
+            {
+              "id": "c2",
+              "date": "2026-01-01T00:00:04Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t2",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-2.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r2",
+              "tool_call_id": "t2",
+              "date": "2026-01-01T00:00:05Z"
+            },
+            {
+              "id": "c3",
+              "date": "2026-01-01T00:00:06Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t3",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-3.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r3",
+              "tool_call_id": "t3",
+              "date": "2026-01-01T00:00:07Z"
+            },
+            {
+              "id": "a1",
+              "date": "2026-01-01T00:00:08Z",
+              "message_type": "assistant_message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "All three show the same layout."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "local-conv-pages",
+        "limit": "50",
+        "order": "asc",
+        "after": "r2"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": [
+          {
+            "id": "c3",
+            "date": "2026-01-01T00:00:06Z",
+            "message_type": "approval_request_message",
+            "tool_call": {
+              "tool_call_id": "t3",
+              "name": "ViewImage",
+              "arguments": "{\"path\": \"/tmp/shot-3.png\"}"
+            },
+            "logical_message_id": "c3:approval_request_message",
+            "turn_id": "otid-1"
+          },
+          {
+            "synthetic_image_return": 400000,
+            "id": "r3",
+            "tool_call_id": "t3",
+            "date": "2026-01-01T00:00:07Z",
+            "logical_message_id": "r3:tool_return_message",
+            "turn_id": "otid-1"
+          },
+          {
+            "id": "a1",
+            "date": "2026-01-01T00:00:08Z",
+            "message_type": "assistant_message",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "All three show the same layout."
+              }
+            ],
+            "logical_message_id": "a1:assistant_message",
+            "turn_id": "otid-1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "out-of-scope-conversation",
+      "context": {
+        "authenticated": true,
+        "authorized_conversation_ids": [
+          "local-conv-other"
+        ]
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "messages": {
+          "local-conv-pages": [
+            {
+              "id": "u1",
+              "date": "2026-01-01T00:00:01Z",
+              "message_type": "user_message",
+              "role": "user",
+              "otid": "otid-1",
+              "content": "look at these three screenshots"
+            },
+            {
+              "id": "c1",
+              "date": "2026-01-01T00:00:02Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t1",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-1.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r1",
+              "tool_call_id": "t1",
+              "date": "2026-01-01T00:00:03Z"
+            },
+            {
+              "id": "c2",
+              "date": "2026-01-01T00:00:04Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t2",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-2.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r2",
+              "tool_call_id": "t2",
+              "date": "2026-01-01T00:00:05Z"
+            },
+            {
+              "id": "c3",
+              "date": "2026-01-01T00:00:06Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t3",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-3.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r3",
+              "tool_call_id": "t3",
+              "date": "2026-01-01T00:00:07Z"
+            },
+            {
+              "id": "a1",
+              "date": "2026-01-01T00:00:08Z",
+              "message_type": "assistant_message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "All three show the same layout."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "local-conv-pages"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "forbidden: conversation out of authorized scope"
+      }
+    },
+    {
+      "name": "unknown-conversation",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected",
+        "messages": {
+          "local-conv-pages": [
+            {
+              "id": "u1",
+              "date": "2026-01-01T00:00:01Z",
+              "message_type": "user_message",
+              "role": "user",
+              "otid": "otid-1",
+              "content": "look at these three screenshots"
+            },
+            {
+              "id": "c1",
+              "date": "2026-01-01T00:00:02Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t1",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-1.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r1",
+              "tool_call_id": "t1",
+              "date": "2026-01-01T00:00:03Z"
+            },
+            {
+              "id": "c2",
+              "date": "2026-01-01T00:00:04Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t2",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-2.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r2",
+              "tool_call_id": "t2",
+              "date": "2026-01-01T00:00:05Z"
+            },
+            {
+              "id": "c3",
+              "date": "2026-01-01T00:00:06Z",
+              "message_type": "approval_request_message",
+              "tool_call": {
+                "tool_call_id": "t3",
+                "name": "ViewImage",
+                "arguments": "{\"path\": \"/tmp/shot-3.png\"}"
+              }
+            },
+            {
+              "synthetic_image_return": 400000,
+              "id": "r3",
+              "tool_call_id": "t3",
+              "date": "2026-01-01T00:00:07Z"
+            },
+            {
+              "id": "a1",
+              "date": "2026-01-01T00:00:08Z",
+              "message_type": "assistant_message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "All three show the same layout."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "params": {
+        "conversation_id": "local-conv-missing"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "app_server_error: message.list native command unsuccessful"
+      }
+    }
+  ]
+}

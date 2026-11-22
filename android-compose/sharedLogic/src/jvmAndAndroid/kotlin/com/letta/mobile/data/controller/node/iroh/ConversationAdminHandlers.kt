@@ -494,9 +494,10 @@ object ConversationAdminHandlers {
             val conversation = ConversationId(convId)
             val response = fetchMessagePage(nativeClient, params, conversation)
             val projected = withLocalImages(MessageListWireProjection.projectMessageList(response, convId), localStore, conversation)
-            MessageListPageGuard.bound(
+            // The App Server reads only "asc" as ascending; no order (or any other) is newest first.
+            MessageListPageGuard.boundPage(
                 MessageListIdentity.enrich(turnIdentity, convId, projected),
-                newestLast = param(params, AdminParamKey("order"))?.lowercase() != "desc",
+                ascending = param(params, AdminParamKey("order")) == ASCENDING_ORDER,
                 maxResponseBytes = if (context.supportsFrameParts) {
                     com.letta.mobile.data.transport.iroh.IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES - MessageListPageGuard.MAX_PAGE_BYTES
                 } else {
@@ -701,6 +702,9 @@ object ConversationAdminHandlers {
 
     /** Conversation lists past this are not held: about 1 KB per row, so roughly 20 MB at the cap. */
     private const val MAX_HELD_CONVERSATIONS = 20_000
+
+    /** The one `order` the App Server lists oldest first; it treats any other value as newest first. */
+    private const val ASCENDING_ORDER = "asc"
 
     /** How many of the newest local messages `message.list` looks in for images to restore. */
     private const val ENRICHMENT_WINDOW = 64

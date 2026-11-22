@@ -21,5 +21,5 @@ uses `AdminRpcRegistry.buildRouter` and the real health handler; its native clie
 all calls. Client doubles can load this same data through `WireContractFixture.response`.
 
 The `conversation.list visible_only` contract is versioned separately under
-`conversation.list/visible-recents-v1.md`. The `message.list` default-alias contract
-remains uncovered until its real-handler fixture lands.
+`conversation.list/visible-recents-v1.md`, and `message.list` paging under
+`message.list/pages-v1.md`.

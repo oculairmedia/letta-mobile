@@ -54,7 +54,6 @@ memfs.list
 memfs.read
 memfs.write
 message.get
-message.list
 model.exposure.get
 model.exposure.set
 model.list
