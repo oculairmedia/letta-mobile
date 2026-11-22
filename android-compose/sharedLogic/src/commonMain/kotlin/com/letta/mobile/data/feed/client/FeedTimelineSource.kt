@@ -100,7 +100,7 @@ class FeedTimelineSource(
 
     private suspend fun handle(event: Event) {
         when (event) {
-            Event.Connected -> catchUp(FeedResync.NoCursor.takeIf { follower.cursor == null })
+            Event.Connected -> catchUp(FeedResync.Reconnected.takeIf { follower.cursor != null })
             is Event.Frame -> follow(event.frame)
         }
     }

@@ -20,8 +20,8 @@ enum class FeedResync {
     /** A frame carried no entries but announced a head above its cursor. */
     Marker,
 
-    /** The host answered a read with a snapshot: what it held was replaced. */
-    HostSnapshot,
+    /** The connection came back: what was pushed meanwhile was missed. */
+    Reconnected,
 }
 
 /** What a `feed_delta` frame did to a [FeedFollower]. */

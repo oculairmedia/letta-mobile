@@ -54,7 +54,8 @@ data class FeedPage(
  */
 @Serializable
 data class FeedDeltaFrame(
-    @SerialName("type") val type: String = ConversationFeedWire.FRAME_TYPE,
+    /** Always [ConversationFeedWire.FRAME_TYPE]; no default, because the wire omits defaults and the frame must always name its type. */
+    @SerialName("type") val type: String,
     @SerialName(ConversationFeedWire.CONVERSATION) val conversation: String,
     @SerialName(ConversationFeedWire.AGENT_ID) val agentId: String,
     @SerialName(ConversationFeedWire.EPOCH) val epoch: Long,

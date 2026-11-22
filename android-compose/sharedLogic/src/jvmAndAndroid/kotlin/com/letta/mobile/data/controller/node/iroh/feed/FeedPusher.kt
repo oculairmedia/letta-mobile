@@ -88,6 +88,7 @@ class FeedPusher(
     private fun frameOf(key: JournalKey, after: Long, page: FeedPage): String {
         val complete = page.mode == ConversationFeedWire.MODE_REPLAY && !page.hasMore
         val frame = FeedDeltaFrame(
+            type = ConversationFeedWire.FRAME_TYPE,
             conversation = key.conversationId.value,
             agentId = key.agentId.value,
             epoch = journal.epoch,
