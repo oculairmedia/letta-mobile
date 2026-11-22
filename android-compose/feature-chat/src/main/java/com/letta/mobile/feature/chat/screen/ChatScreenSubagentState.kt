@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
+import com.letta.mobile.data.subagents.visibleRunningCount
 import com.letta.mobile.feature.chat.subagent.SelfTodoSource
 import com.letta.mobile.ui.chat.subagents.ActiveSubagent
 import com.letta.mobile.ui.chat.subagents.rememberSubagentRingsState
@@ -15,6 +16,8 @@ import kotlinx.coroutines.flow.flowOf
 internal data class ChatScreenSubagentBarState(
     val activeSubagents: ImmutableList<ActiveSubagent>,
     val lingerTick: Long,
+    /** User-facing subagents running in this conversation, planned or not (the tasks launcher's count). */
+    val runningCount: Int = 0,
 )
 
 /**
@@ -33,6 +36,7 @@ internal fun rememberChatScreenSubagentBarState(
     val selfEntry by remember(resolvedSelfTodoSource, currentConversationId) {
         if (currentConversationId.isNullOrBlank()) flowOf(null) else resolvedSelfTodoSource.selfEntry(currentConversationId)
     }.collectAsStateWithLifecycle(initialValue = null)
+    val roster by resolvedSubagentSource.rosterEntries.collectAsStateWithLifecycle()
     val rings = rememberSubagentRingsState(subagentSnapshot, selfEntry)
-    return ChatScreenSubagentBarState(activeSubagents = rings.subagents, lingerTick = rings.now)
+    return ChatScreenSubagentBarState(rings.subagents, rings.now, roster.visibleRunningCount())
 }

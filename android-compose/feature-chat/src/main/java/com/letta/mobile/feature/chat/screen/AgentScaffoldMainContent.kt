@@ -123,6 +123,8 @@ private fun AgentScaffoldChatScreen(
                 )
             }
         },
+        // The phone's way into the workspace's Background tasks pane (desktop's is its header toggle).
+        onOpenBackgroundTasks = { params.workspace.focus.showBackgroundTasks = true },
         viewModel = params.viewModel,
     )
 }
