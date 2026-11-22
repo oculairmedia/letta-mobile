@@ -1,6 +1,6 @@
 package com.letta.mobile.feature.chat.screen.shared
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -22,6 +22,7 @@ import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.SelfTodoSource
 import com.letta.mobile.ui.chat.subagents.ActiveSubagent
 import com.letta.mobile.ui.chat.subagents.ActiveSubagentRings
+import com.letta.mobile.ui.chat.subagents.BackgroundTasksLauncher
 import com.letta.mobile.ui.chat.subagents.LocalSubagentTodoSheetOpener
 import com.letta.mobile.ui.chat.subagents.SubagentRoster
 import com.letta.mobile.ui.chat.subagents.SubagentTodoLoader
@@ -142,7 +143,9 @@ internal fun SharedChatSubagentRings(
 ) {
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
-    Box(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().padding(LettaDimens.Space.sm), horizontalAlignment = Alignment.End) {
+        // Running work with no plan has no ring; the launcher keeps it in sight and opens the tasks pane.
+        BackgroundTasksLauncher(inputs.barState.runningCount, navigation.onOpenBackgroundTasks)
         CompositionLocalProvider(LocalSubagentTodoSheetOpener provides state::open) {
             ActiveSubagentRings(
                 subagents = inputs.barState.activeSubagents,
@@ -153,7 +156,6 @@ internal fun SharedChatSubagentRings(
                         state.viewConversation(subagent, navigation.onViewSubagentConversation) { HapticEffects.longPress(haptic) }
                     }
                 },
-                modifier = Modifier.align(Alignment.TopEnd).padding(LettaDimens.Space.sm),
             )
         }
     }

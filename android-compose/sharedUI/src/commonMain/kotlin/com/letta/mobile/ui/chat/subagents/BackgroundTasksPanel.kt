@@ -182,4 +182,16 @@ fun BackgroundTasksToggle(
     }
 }
 
+/**
+ * A chat page's way into the Background tasks pane when the page has no header bar for
+ * [BackgroundTasksToggle] (the phone): the floating toggle while [runningCount] user-facing subagents
+ * run. Rings only draw runs with a plan, so without this a plan-less run is invisible on the page.
+ * Draws nothing when nothing runs or the host cannot open the pane ([onOpen] null).
+ */
+@Composable
+fun BackgroundTasksLauncher(runningCount: Int, onOpen: (() -> Unit)?, modifier: Modifier = Modifier) {
+    if (onOpen == null || runningCount <= 0) return
+    BackgroundTasksToggle(runningCount = runningCount, onClick = onOpen, modifier = modifier)
+}
+
 private const val BACKGROUND_TASKS_TITLE = "Background tasks"

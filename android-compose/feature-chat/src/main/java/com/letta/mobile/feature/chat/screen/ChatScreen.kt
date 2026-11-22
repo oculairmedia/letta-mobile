@@ -47,6 +47,8 @@ internal fun ChatScreen(
     onHostHeaderHiddenChange: ((Boolean) -> Unit)? = null,
     /** letta-mobile-y5q9z: the agent's conversations for the shared page's canvas bubble "+". */
     recentInteractions: com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions? = null,
+    /** Opens the workspace's Background tasks pane; null: the page offers no way in. */
+    onOpenBackgroundTasks: (() -> Unit)? = null,
     activeSubagentSource: ActiveSubagentSource? = null,
     selfTodoSource: SelfTodoSource? = null,
     viewModel: AdminChatViewModel = hiltViewModel(),
@@ -66,7 +68,7 @@ internal fun ChatScreen(
     }
 
     val navigation = remember(
-        onBugCommand, onViewSubagentConversation, onOpenAgentPane, onOpenCanvas, onOpenAgentSwitcher, onOpenConversation,
+        onBugCommand, onViewSubagentConversation, onOpenAgentPane, onOpenCanvas, onOpenAgentSwitcher, onOpenConversation, onOpenBackgroundTasks,
     ) {
         ChatScreenNavigationCallbacks(
             onBugCommand = onBugCommand,
@@ -75,6 +77,7 @@ internal fun ChatScreen(
             onOpenCanvas = onOpenCanvas,
             onOpenAgentSwitcher = onOpenAgentSwitcher,
             onOpenConversation = onOpenConversation,
+            onOpenBackgroundTasks = onOpenBackgroundTasks,
         )
     }
 

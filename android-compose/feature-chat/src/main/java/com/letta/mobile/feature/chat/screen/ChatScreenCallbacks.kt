@@ -13,6 +13,7 @@ internal data class ChatScreenNavigationCallbacks(
     val onOpenAgentSwitcher: (() -> Unit)? = null,
     /** letta-mobile-bzvro.15/.16: open a conversation (agent id, conversation id), e.g. a fresh fork. */
     val onOpenConversation: ((String, String) -> Unit)? = null,
+    val onOpenBackgroundTasks: (() -> Unit)? = null,
 )
 
 /**
