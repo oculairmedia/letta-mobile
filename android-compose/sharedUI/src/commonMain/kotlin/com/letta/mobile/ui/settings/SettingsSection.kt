@@ -17,11 +17,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.letta.mobile.ui.components.choice.LettaSegment
+import com.letta.mobile.ui.components.choice.LettaSegmentedControl
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -342,17 +341,14 @@ private fun SegmentedChoice(row: SettingsRow.Choice, lock: String?) {
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         RowWordsColumn(RowWords(row.title, lock ?: row.supporting ?: current?.description), enabled)
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            row.options.forEachIndexed { index, option ->
-                SegmentedButton(
-                    selected = option.key == row.selected,
-                    onClick = { if (option.key != row.selected) row.onSelect(option.key) },
-                    enabled = enabled,
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = row.options.size),
-                    modifier = Modifier.testTag(SettingsSectionTags.OPTION_PREFIX + row.key + "-" + option.key),
-                ) { Text(option.label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-            }
-        }
+        LettaSegmentedControl(
+            segments = row.options.map { LettaSegment(it.key, it.label) },
+            selected = row.selected,
+            onSelect = row.onSelect,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = enabled,
+            tagPrefix = SettingsSectionTags.OPTION_PREFIX + row.key + "-",
+        )
     }
 }
 

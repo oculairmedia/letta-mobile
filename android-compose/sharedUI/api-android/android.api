@@ -2698,6 +2698,29 @@ public final class com/letta/mobile/ui/components/beam/telemetry/BeamShaderTelem
 	public static final fun installBeamShaderTelemetry ()V
 }
 
+public final class com/letta/mobile/ui/components/choice/LettaSegment {
+	public static final field $stable I
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun component4 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;Z)Lcom/letta/mobile/ui/components/choice/LettaSegment;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/choice/LettaSegment;Ljava/lang/String;Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZILjava/lang/Object;)Lcom/letta/mobile/ui/components/choice/LettaSegment;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEnabled ()Z
+	public final fun getIcon ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getLabel ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/components/choice/LettaSegmentedControlKt {
+	public static final fun LettaSegmentedControl (Ljava/util/List;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;ZZLjava/lang/String;Landroidx/compose/runtime/Composer;II)V
+}
+
 public final class com/letta/mobile/ui/components/disclosure/ChevronEmphasis : java/lang/Enum {
 	public static final field Emphasized Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;
 	public static final field Neutral Lcom/letta/mobile/ui/components/disclosure/ChevronEmphasis;
