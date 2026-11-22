@@ -149,6 +149,55 @@ data class Agent(
      * only emits the canonical shape.
      */
     val coreBlocks: ImmutableList<Block> get() = blocks ?: memory?.blocks ?: persistentListOf()
+
+    /**
+     * True when this record carries nothing beyond the `agent.list` list fields
+     * (docs/reference/contracts/agent.list/slim-list-v1.md): no system prompt, memory, tools or
+     * other detail. Such a row cannot stand in for a detail read.
+     */
+    val isListRow: Boolean get() = this == listFields()
+
+    /**
+     * This record with [row]'s list fields laid over it. A slim [row] refreshes identity, model and
+     * activity while every detail field this record holds survives; a full [row] (an older host)
+     * replaces the record outright.
+     */
+    fun withListFieldsOf(row: Agent): Agent = if (!row.isListRow || row.id != id) row else copy(
+        name = row.name,
+        description = row.description,
+        metadata = row.metadata,
+        model = row.model,
+        modelSettings = row.modelSettings,
+        llmConfig = row.llmConfig,
+        contextWindowLimit = row.contextWindowLimit,
+        tags = row.tags,
+        hidden = row.hidden,
+        lastRunCompletion = row.lastRunCompletion,
+        createdAt = row.createdAt,
+        updatedAt = row.updatedAt,
+    )
+
+    private fun listFields(): Agent = Agent(
+        id = id,
+        name = name,
+        description = description,
+        metadata = metadata,
+        model = model,
+        modelSettings = modelSettings,
+        llmConfig = llmConfig,
+        contextWindowLimit = contextWindowLimit,
+        tags = tags,
+        hidden = hidden,
+        lastRunCompletion = lastRunCompletion,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+    )
+}
+
+/** [rows] from a roster read, each merged over the record [cached] already holds for its id. */
+fun mergeRosterRows(cached: List<Agent>, rows: List<Agent>): List<Agent> {
+    val byId = cached.associateBy { it.id }
+    return rows.map { row -> byId[row.id]?.withListFieldsOf(row) ?: row }
 }
 
 /** The `memory` sub-object of a canonical Letta `AgentState`. */

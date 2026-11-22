@@ -57,8 +57,16 @@ class SessionGraphMemoryBlockPort(
 
     private fun graph(): SessionRepositoryGraph = sessionGraphProvider.current
 
-    private fun embeddedBlocks(agentId: String): List<Block> =
-        graph().agentRepository.agents.value.firstOrNull { it.id.value == agentId }?.coreBlocks.orEmpty()
+    /**
+     * The agent's embedded memory. A roster known only from `agent.list` rows carries none, so a
+     * list row reads the agent's detail once; a cached detail serves without a read.
+     */
+    private suspend fun embeddedBlocks(agentId: String): List<Block> {
+        val agents = graph().agentRepository
+        val cached = agents.agents.value.firstOrNull { it.id.value == agentId } ?: return emptyList()
+        val agent = if (cached.isListRow) agents.getFreshAgent(cached.id) else cached
+        return agent.coreBlocks
+    }
 
     private fun List<Block>.pick(ref: MemoryBlockRef): Block? =
         firstOrNull { it.id.value == ref.blockId } ?: firstOrNull { it.label == ref.label }
