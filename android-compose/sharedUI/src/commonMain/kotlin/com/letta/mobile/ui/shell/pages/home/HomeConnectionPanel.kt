@@ -1,11 +1,13 @@
 package com.letta.mobile.ui.shell.pages.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -13,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -20,6 +23,7 @@ import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
 import com.letta.mobile.data.chat.runtime.isConnectionRetryable
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.ui.icons.BakenMark
 import com.letta.mobile.ui.shell.tokens.ShellType
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -98,6 +102,12 @@ private fun ConnectionHeadline(headline: String?, wordmark: String) {
             textAlign = TextAlign.Center,
         )
     } else {
+        // The brand spot: the two-colour Baken mark (its own stone and vermilion, not tinted) over the wordmark.
+        Image(
+            imageVector = BakenMark.brand(dark = MaterialTheme.colorScheme.background.luminance() < LIGHT_BACKGROUND_LUMINANCE),
+            contentDescription = null,
+            modifier = Modifier.size(ShellDimens.heroMark),
+        )
         Text(
             text = wordmark,
             style = ShellType.wordmark,
@@ -139,3 +149,6 @@ internal fun connectionHeroBody(status: ChatScreenStatus): String = when (status
         "Connected to the configured backend."
     }
 }
+
+/** A background brighter than this is a light theme: the mark takes its petrol stone, else its pale one. */
+private const val LIGHT_BACKGROUND_LUMINANCE = 0.5f

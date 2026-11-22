@@ -80441,7 +80441,9 @@ public final class com/letta/mobile/ui/theme/LettaColorTokens {
 	public static final field DARK_CATEGORY_PERSONA J
 	public static final field DARK_CATEGORY_PROJECT J
 	public static final field DARK_ERROR J
+	public static final field DARK_MARK_STONE J
 	public static final field DARK_ON_ERROR J
+	public static final field DARK_ON_PRIMARY J
 	public static final field DARK_ON_SURFACE J
 	public static final field DARK_ON_SURFACE_MUTED J
 	public static final field DARK_ON_SURFACE_VARIANT J
@@ -80464,8 +80466,11 @@ public final class com/letta/mobile/ui/theme/LettaColorTokens {
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaColorTokens;
 	public static final field LIGHT_BACKGROUND J
 	public static final field LIGHT_ERROR J
+	public static final field LIGHT_MARK_STONE J
 	public static final field LIGHT_ON_ERROR J
+	public static final field LIGHT_ON_PRIMARY J
 	public static final field LIGHT_ON_SURFACE J
+	public static final field LIGHT_ON_SURFACE_MUTED J
 	public static final field LIGHT_ON_SURFACE_VARIANT J
 	public static final field LIGHT_OUTLINE J
 	public static final field LIGHT_PRIMARY J
