@@ -116,14 +116,16 @@ internal class ConversationViewerSubscription(
      * invokes once with whether the request succeeded. The connection always views the
      * newest view still in good standing: the newest confirmed view, or a newer request
      * that is still running. A failed request never leaves its conversation viewed, even
-     * when several requests fail concurrently.
+     * when several requests fail concurrently. [onJoined] runs only when this made the
+     * connection a new viewer of [conversationId]; a repeat page of the viewed conversation
+     * is not a registration.
      */
     // letta-mobile-wisqe.2 F2: rollback guard for concurrent admin_rpc streams.
-    suspend fun observe(conversationId: ConversationId): suspend (Boolean) -> Unit {
+    suspend fun observe(conversationId: ConversationId, onJoined: () -> Unit = {}): suspend (Boolean) -> Unit {
         val signal = mutex.withLock {
             signals += 1
             inFlight[signals] = conversationId.value
-            applyLocked(conversationId.value)
+            if (applyLocked(conversationId.value)) onJoined()
             signals
         }
         return { succeeded -> settle(signal, succeeded) }
@@ -153,7 +155,8 @@ internal class ConversationViewerSubscription(
         }
     }
 
-    private suspend fun applyLocked(target: String) {
+    /** Views [target]; true when that made this connection a new viewer of it. */
+    private suspend fun applyLocked(target: String): Boolean {
         val previous = viewed
         // De-scope only a DIFFERENT prior conversation (Option A) — unchanged.
         if (previous != null && previous != target) {
@@ -162,8 +165,9 @@ internal class ConversationViewerSubscription(
         // ALWAYS (re-)register while this connection still owns the endpoint
         // claim. A stale generation is rejected atomically, so late polling
         // from an overlapped reconnect cannot reclaim or evict its successor.
-        val registered = runCatching { registry.register(target, registration) }.getOrDefault(false)
-        viewed = target.takeIf { registered }
+        val joined = runCatching { registry.registerJoining(target, registration) }.getOrNull()
+        viewed = target.takeIf { joined != null }
+        return joined == true
     }
 
     private suspend fun unsubscribeLocked() {

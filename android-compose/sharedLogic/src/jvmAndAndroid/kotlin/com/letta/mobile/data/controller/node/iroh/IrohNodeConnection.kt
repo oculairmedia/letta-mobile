@@ -433,13 +433,16 @@ class IrohNodeConnection(
         if (conversationId.isNullOrEmpty()) return null
         val subscription = viewerSubscription ?: return null
         val previous = subscription.currentConversation
-        val settle = subscription.observe(ConversationId(conversationId))
-        Telemetry.event(
-            "IrohNode", "viewer.registered",
-            "remoteEndpointId" attr remoteEndpointId,
-            "conversationId" attr conversationId,
-            "deregistered" attr (previous?.takeIf { it != conversationId } ?: ""),
-        )
+        // letta-mobile-wbgpc: every page and catch-up re-observes the viewed conversation; only a
+        // real join (first view, switch, re-join after eviction) is a registration worth reporting.
+        val settle = subscription.observe(ConversationId(conversationId)) {
+            Telemetry.event(
+                "IrohNode", "viewer.registered",
+                "remoteEndpointId" attr remoteEndpointId,
+                "conversationId" attr conversationId,
+                "deregistered" attr (previous?.takeIf { it != conversationId } ?: ""),
+            )
+        }
         return { succeeded ->
             settle(succeeded)
             if (!succeeded) {

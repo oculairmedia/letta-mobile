@@ -34,6 +34,9 @@ import kotlin.time.Duration.Companion.seconds
  *    accept layer via this hook, not in the shared static handler.
  */
 class ConversationViewerSubscriptionTest {
+    private companion object {
+        const val REPEATED_PAGES = 20
+    }
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -169,6 +172,30 @@ class ConversationViewerSubscriptionTest {
         assertEquals("convA", subscription.currentConversation)
         assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor("convA"))
         assertEquals(1, registry.conversationCount())
+    }
+
+    /**
+     * letta-mobile-wbgpc: every `message.list` page and catch-up re-observes the conversation the
+     * connection already views; the 2026-11-22 host log logged `viewer.registered` for 3,311 such
+     * repeats from one desktop against 785 real switches. Only a real join is reported: the
+     * first view, a switch, and a re-join after an external eviction.
+     */
+    @Test
+    fun onlyARealJoinIsReported() = runTest {
+        val registry = ConnectionRegistry()
+        val v = viewer("conn-A")
+        val subscription = subscription(registry, v)
+        val joins = mutableListOf<String>()
+
+        repeat(REPEATED_PAGES) { subscription.observe(ConversationId("convA")) { joins += "convA" }(true) }
+        assertEquals(listOf("convA"), joins, "repeat pages of the viewed conversation are not new registrations")
+
+        subscription.observe(ConversationId("convB")) { joins += "convB" }(true)
+        registry.unregister("convB", v)
+        subscription.observe(ConversationId("convB")) { joins += "convB" }(true)
+
+        assertEquals(listOf("convA", "convB", "convB"), joins, "a switch and a re-join after eviction are reported")
+        assertEquals(setOf<ViewerHandle>(v), registry.viewersFor("convB"))
     }
 
     @Test
