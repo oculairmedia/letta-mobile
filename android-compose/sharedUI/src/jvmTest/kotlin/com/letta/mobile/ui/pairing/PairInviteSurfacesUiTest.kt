@@ -3,9 +3,12 @@
 package com.letta.mobile.ui.pairing
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -20,6 +23,7 @@ import com.letta.mobile.data.pairing.PairInviteUiState
 import com.letta.mobile.data.pairing.PairedDevice
 import com.letta.mobile.data.pairing.PendingInvite
 import com.letta.mobile.data.pairing.QrModules
+import com.letta.mobile.ui.text.TextClipboard
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -98,6 +102,22 @@ class PairInviteSurfacesUiTest {
         setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(invite = invite, qr = qr), emptyList(), 0), Recorder().actions(share = false)) } }
         onNodeWithTag(PairingTags.INVITE_COPY).assertIsDisplayed()
         onNodeWithTag(PairingTags.INVITE_SHARE).assertDoesNotExist()
+    }
+
+    @Test
+    fun copyPutsTheWholeLinkOnTheClipboardAndSaysCopied() = runComposeUiTest {
+        val clipboard = TextClipboard()
+        setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalClipboard provides clipboard) {
+                    PairDevicePanel(PairDeviceView(PairInviteUiState(invite = invite, qr = qr), emptyList(), 0), Recorder().actions())
+                }
+            }
+        }
+        onNodeWithTag(PairingTags.INVITE_COPY).assertContentDescriptionEquals(PairingStrings.COPY_LINK).performClick()
+        waitUntil(timeoutMillis = 5_000L) { clipboard.text != null }
+        assertEquals(link, clipboard.text)
+        onNodeWithTag(PairingTags.INVITE_COPY).assertContentDescriptionEquals("Copied")
     }
 
     @Test

@@ -79,3 +79,17 @@ fun LettaIconButton(
         LettaIcon(icon.imageVector, icon.contentDescription, style = icon.glyph)
     }
 }
+
+/**
+ * A [LettaIconButton] whose glyph the caller draws, for a glyph that changes in place (a copy's check).
+ * The glyph only decorates: the caller names the button through [modifier]'s semantics.
+ */
+@Composable
+internal fun LettaGlyphButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = LettaControlTokens.iconButton,
+    glyph: @Composable () -> Unit,
+) {
+    IconButton(onClick = onClick, modifier = modifier.size(size), content = glyph)
+}

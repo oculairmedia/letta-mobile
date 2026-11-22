@@ -161,6 +161,10 @@ The shared building blocks every page uses instead of hand-building its own: Let
 
 Shared choice controls: LettaSegmentedControl, a single choice among a few options side by side (a mode such as the theme). Built on the shared foundation and leaf tokens; any page may use it.
 
+# Package com.letta.mobile.ui.components.copy
+
+The one Copy button, LettaCopyButton: it puts its text on the window's clipboard as plain text (`ui.text`'s writePlainText), then shows the success status glyph and says "Copied" in a polite live region for the shared feedback time (LettaFeedbackMotion in `ui.theme.tokens`). Every copy control with "copied" feedback uses it instead of keeping its own copied state. The package imports only Compose, the shared resources, `ui.components.foundation`, `ui.components.line`, `ui.icons`, `ui.text` and `ui.theme.tokens`, never `ui.theme` or a page, so any page can import it without closing a package cycle.
+
 # Package com.letta.mobile.ui.components.disclosure
 
 The one disclosure: DisclosureChevron and everything built on it. LettaDisclosureHeader is a header line whose whole width toggles what it discloses (the same line the chat timeline draws its disclosures with), LettaFoldButton and LettaUnfoldButton fold a dock or card down and back, and LettaMenuIndicator is the still mark at the end of a chip or picker button that opens a menu or sheet. Every disclosure clicks the same way: a button with an action label and an open / closed state, by pointer, touch or keyboard, with the segment tick. The package imports only Compose, `ui.icons`, `ui.haptics`, `ui.theme.tokens`, `ui.components.line` and `ui.components.foundation`, so any page, the chat root and the canvas among them, can import it without closing a package cycle.

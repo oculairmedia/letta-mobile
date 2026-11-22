@@ -6746,7 +6746,6 @@ public final class com/letta/mobile/ui/pairing/PairingStrings {
 	public static final field INVITE_STEP_3 Ljava/lang/String;
 	public static final field INVITE_TITLE Ljava/lang/String;
 	public static final field JOIN_TITLE Ljava/lang/String;
-	public static final field LINK_COPIED Ljava/lang/String;
 	public static final field LINK_ONLY_NO_QR Ljava/lang/String;
 	public static final field LINK_SECRET_NOTE Ljava/lang/String;
 	public static final field NEW_CODE Ljava/lang/String;

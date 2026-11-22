@@ -9,36 +9,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.markdown_copy_code
-import com.letta.mobile.sharedui.resources.rows_copied
-import com.letta.mobile.ui.components.foundation.LettaButtonIcon
+import com.letta.mobile.ui.components.copy.LettaCopyButton
 import com.letta.mobile.ui.components.foundation.LettaDivider
-import com.letta.mobile.ui.components.foundation.LettaIconButton
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
-import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.text.writePlainText
-import com.letta.mobile.ui.theme.tokens.LettaFeedbackMotion
-import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
 import com.mikepenz.markdown.compose.LocalMarkdownColors
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -76,32 +58,11 @@ private fun CodeFenceHeader(language: String, source: String) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).testTag(CodeFenceTags.LANGUAGE),
         )
-        CopyCodeButton(source)
+        LettaCopyButton(
+            text = source,
+            contentDescription = stringResource(Res.string.markdown_copy_code),
+            modifier = Modifier.testTag(CodeFenceTags.COPY),
+            glyph = LettaIconStyle(tint = MaterialTheme.colorScheme.onSurfaceVariant),
+        )
     }
-}
-
-@Composable
-private fun CopyCodeButton(source: String) {
-    val clipboard = LocalClipboard.current
-    val scope = rememberCoroutineScope()
-    var copied by remember { mutableStateOf(false) }
-    LaunchedEffect(copied) {
-        if (copied) {
-            delay(LettaFeedbackMotion.COPIED_MILLIS)
-            copied = false
-        }
-    }
-    val label = stringResource(if (copied) Res.string.rows_copied else Res.string.markdown_copy_code)
-    val icon = if (copied) LettaIcons.Check else LettaIcons.Copy
-    val tint = if (copied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-    LettaIconButton(
-        LettaButtonIcon(icon, label, size = LettaControlTokens.iconButton, glyph = LettaIconStyle(tint = tint)),
-        onClick = {
-            scope.launch {
-                clipboard.writePlainText(source)
-                copied = true
-            }
-        },
-        modifier = Modifier.testTag(CodeFenceTags.COPY).semantics { liveRegion = LiveRegionMode.Polite },
-    )
 }
