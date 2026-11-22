@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.data.repository.modelcontrol.ConnectableProvider
 import com.letta.mobile.data.repository.modelcontrol.ProviderSignInController
 import com.letta.mobile.data.repository.modelcontrol.ProviderSignInState
+import com.letta.mobile.ui.host.purpose.PanePurpose
 import com.letta.mobile.ui.host.LettaAlertPane
 import com.letta.mobile.ui.host.LettaAlertSpec
 import com.letta.mobile.ui.host.LettaPaneButton
@@ -108,6 +109,7 @@ fun ProviderSignInDialog(state: ProviderSignInState, actions: ProviderSignInActi
         kind = LettaPaneKind.Dialog,
         icon = provider.logoOrNull() ?: LettaIcons.AccountCircle,
         testTag = ProviderSignInTags.SHEET,
+        purpose = PanePurpose.Form,
     )
     // A stray tap outside or Back must not drop a running sign-in; Cancel does that explicitly.
     LettaAlertPane(spec, onDismiss = { if (finished) actions.onClose() }) { SignInBody(state, actions, platform) }

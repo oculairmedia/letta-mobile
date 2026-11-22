@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -48,6 +50,7 @@ import androidx.compose.ui.window.PopupProperties
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.host.purpose.PanePurpose
 
 /** The shared containers every host starts from. Platforms override single entries on [LettaHost]. */
 object LettaPaneDefaults {
@@ -60,12 +63,18 @@ object LettaPaneDefaults {
 
 @Composable
 private fun SheetContainer(spec: PaneSpec, content: @Composable ColumnScope.() -> Unit) {
+    val purpose = spec.purpose
     ModalBottomSheet(
         onDismissRequest = spec.onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        // A form or a required question does not swipe away or close on a scrim tap.
+        sheetState = rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+            confirmValueChange = { it != SheetValue.Hidden || purpose.dismissesOnOutside },
+        ),
         modifier = spec.modifier.testTag(LettaPaneTags.SHEET),
+        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = purpose.dismissesOnKey),
     ) {
-        Column(modifier = Modifier.navigationBarsPadding().then(rememberPaneFocus(spec.onDismiss)).tagged(spec.testTag)) {
+        Column(modifier = Modifier.navigationBarsPadding().then(rememberPaneFocus(spec.keyDismiss())).tagged(spec.testTag)) {
             PaneTitle(spec.title)
             content()
         }
@@ -83,7 +92,12 @@ private fun PopoverContainer(spec: PaneSpec, content: @Composable ColumnScope.()
 
 @Composable
 private fun DialogContainer(spec: PaneSpec, width: Dp, tag: String, content: @Composable ColumnScope.() -> Unit) {
-    Dialog(onDismissRequest = spec.onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    val properties = DialogProperties(
+        dismissOnBackPress = spec.purpose.dismissesOnKey,
+        dismissOnClickOutside = spec.purpose.dismissesOnOutside,
+        usePlatformDefaultWidth = false,
+    )
+    Dialog(onDismissRequest = spec.onDismiss, properties = properties) {
         PaneEnter { LettaDialogFrame(spec, width, tag, content) }
     }
 }
@@ -122,12 +136,15 @@ fun LettaDialogFrame(
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
         shadowElevation = LettaDimens.Space.sm,
     ) {
-        Column(Modifier.then(rememberPaneFocus(spec.onDismiss)).tagged(spec.testTag)) {
+        Column(Modifier.then(rememberPaneFocus(spec.keyDismiss())).tagged(spec.testTag)) {
             PaneTitle(spec.title)
             content()
         }
     }
 }
+
+/** What Escape does in [this] pane: dismiss it, unless it must be answered ([PanePurpose.Required]). */
+internal fun PaneSpec.keyDismiss(): (() -> Unit)? = onDismiss.takeIf { purpose.dismissesOnKey }
 
 /** A popover's visual frame: a compact raised card, sized by [PaneSpec.size] when given. */
 @Composable
@@ -176,17 +193,20 @@ private fun PaneEnter(content: @Composable () -> Unit) {
 
 /**
  * Focus moves into the pane when it opens (so keys reach it and Tab stays inside its window), and
- * Escape asks to dismiss it. A field inside that requests focus itself still wins: its request runs
+ * Escape asks to dismiss it through [onDismiss] (null for a pane that must be answered, where Escape
+ * does nothing). A field inside that requests focus itself still wins: its request runs
  * after this one.
  */
 @Composable
-internal fun rememberPaneFocus(onDismiss: () -> Unit): Modifier {
+internal fun rememberPaneFocus(onDismiss: (() -> Unit)?): Modifier {
     val requester = remember { FocusRequester() }
     LaunchedEffect(requester) { runCatching { requester.requestFocus() } }
     return Modifier
         .onPreviewKeyEvent { event ->
+            // A pane with no dismiss (one that must be answered) still swallows Escape, so it never
+            // reaches the page behind.
             val escape = event.type == KeyEventType.KeyDown && event.key == Key.Escape
-            if (escape) onDismiss()
+            if (escape) onDismiss?.invoke()
             escape
         }
         .focusRequester(requester)

@@ -55,16 +55,18 @@ fun LettaHost.Companion.desktopPointer(timeLabel: (String) -> String): LettaHost
 private fun AlertWindow(spec: PaneSpec, content: @Composable ColumnScope.() -> Unit) {
     val width = if (spec.size.width == Dp.Unspecified) LettaDimens.Pane.alertWidth else spec.size.width
     val state = rememberDialogState(size = DpSize(width, Dp.Unspecified))
-    DialogWindow(onCloseRequest = spec.onDismiss, state = state, title = spec.title.orEmpty(), undecorated = true, resizable = false) {
+    // A window that must be answered has no close of its own (no title-bar X, Alt+F4 does nothing).
+    val close = spec.keyDismiss()
+    DialogWindow(onCloseRequest = { close?.invoke() }, state = state, title = spec.title.orEmpty(), undecorated = true, resizable = false) {
         Surface(
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
             modifier = spec.modifier.testTag(LettaPaneTags.ALERT),
         ) {
             Column {
-                AlertTitleBar(this@DialogWindow, spec.title.orEmpty(), spec.onDismiss)
+                AlertTitleBar(this@DialogWindow, spec.title.orEmpty(), close)
                 LettaDivider()
-                Column(Modifier.padding(top = LettaDimens.Space.lg).then(rememberPaneFocus(spec.onDismiss)).then(spec.testTag?.let { Modifier.testTag(it) } ?: Modifier)) {
+                Column(Modifier.padding(top = LettaDimens.Space.lg).then(rememberPaneFocus(close)).then(spec.testTag?.let { Modifier.testTag(it) } ?: Modifier)) {
                     content()
                 }
             }
@@ -73,7 +75,7 @@ private fun AlertWindow(spec: PaneSpec, content: @Composable ColumnScope.() -> U
 }
 
 @Composable
-private fun AlertTitleBar(window: DialogWindowScope, title: String, onDismiss: () -> Unit) {
+private fun AlertTitleBar(window: DialogWindowScope, title: String, onDismiss: (() -> Unit)?) {
     with(window) {
         WindowDraggableArea(modifier = Modifier.fillMaxWidth()) {
             Row(
@@ -91,14 +93,16 @@ private fun AlertTitleBar(window: DialogWindowScope, title: String, onDismiss: (
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f).padding(start = LettaDimens.Space.lg),
                 )
-                Box(
-                    modifier = Modifier
-                        .size(width = LettaDimens.Orb.railSlotWidth, height = LettaDimens.Control.actionButton)
-                        .clickable(onClickLabel = "Close", role = Role.Button, onClick = onDismiss),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    val glyph = LettaIconStyle(tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    LettaIcon(LettaIcons.Close, contentDescription = "Close", style = glyph)
+                onDismiss?.let { close ->
+                    Box(
+                        modifier = Modifier
+                            .size(width = LettaDimens.Orb.railSlotWidth, height = LettaDimens.Control.actionButton)
+                            .clickable(onClickLabel = "Close", role = Role.Button, onClick = close),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        val glyph = LettaIconStyle(tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        LettaIcon(LettaIcons.Close, contentDescription = "Close", style = glyph)
+                    }
                 }
             }
         }

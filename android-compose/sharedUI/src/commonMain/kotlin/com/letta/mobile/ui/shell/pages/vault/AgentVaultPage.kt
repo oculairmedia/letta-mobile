@@ -34,6 +34,7 @@ import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaPageHeader
 import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaRefreshable
+import com.letta.mobile.ui.host.purpose.PanePurpose
 import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.host.LettaConfirmTags
@@ -130,7 +131,7 @@ private fun CompactVaultLayout(page: AgentVaultPageScope) {
         VaultBody(page)
     }
     page.state.draft?.let { draft ->
-        LettaPane(LettaPaneKind.Modal, onDismiss = page.actions::cancelDraft) { SecretEditor(draft, page) }
+        LettaPane(LettaPaneKind.Modal, onDismiss = page.actions::cancelDraft, purpose = PanePurpose.Form) { SecretEditor(draft, page) }
     }
 }
 

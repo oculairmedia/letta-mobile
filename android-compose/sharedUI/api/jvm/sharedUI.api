@@ -128,7 +128,7 @@ public final class com/letta/mobile/ui/agenteditor/AgentEditorPanels {
 public final class com/letta/mobile/ui/agenteditor/ComposableSingletons$AgentEditorPanesKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/agenteditor/ComposableSingletons$AgentEditorPanesKt;
 	public fun <init> ()V
-	public final fun getLambda$308731845$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-2056004602$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$464044840$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
@@ -4298,11 +4298,12 @@ public final class com/letta/mobile/ui/host/LettaAlertPaneKt {
 
 public final class com/letta/mobile/ui/host/LettaAlertSpec {
 	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/ui/host/LettaPaneButtons;Lcom/letta/mobile/ui/host/LettaPaneKind;Landroidx/compose/ui/graphics/vector/ImageVector;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/ui/host/LettaPaneButtons;Lcom/letta/mobile/ui/host/LettaPaneKind;Landroidx/compose/ui/graphics/vector/ImageVector;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/ui/host/LettaPaneButtons;Lcom/letta/mobile/ui/host/LettaPaneKind;Landroidx/compose/ui/graphics/vector/ImageVector;Ljava/lang/String;Lcom/letta/mobile/ui/host/purpose/PanePurpose;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/ui/host/LettaPaneButtons;Lcom/letta/mobile/ui/host/LettaPaneKind;Landroidx/compose/ui/graphics/vector/ImageVector;Ljava/lang/String;Lcom/letta/mobile/ui/host/purpose/PanePurpose;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getButtons ()Lcom/letta/mobile/ui/host/LettaPaneButtons;
 	public final fun getIcon ()Landroidx/compose/ui/graphics/vector/ImageVector;
 	public final fun getKind ()Lcom/letta/mobile/ui/host/LettaPaneKind;
+	public final fun getPurpose ()Lcom/letta/mobile/ui/host/purpose/PanePurpose;
 	public final fun getTestTag ()Ljava/lang/String;
 	public final fun getTitle ()Ljava/lang/String;
 }
@@ -4527,7 +4528,7 @@ public final class com/letta/mobile/ui/host/LettaPaneKind$Sheet : com/letta/mobi
 
 public final class com/letta/mobile/ui/host/LettaPaneKt {
 	public static final fun LettaMenu (ZLkotlin/jvm/functions/Function0;Lcom/letta/mobile/ui/host/PaneAnchor;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaPane (Lcom/letta/mobile/ui/host/LettaPaneKind;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Lcom/letta/mobile/ui/host/PaneSize;Ljava/lang/String;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaPane (Lcom/letta/mobile/ui/host/LettaPaneKind;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Lcom/letta/mobile/ui/host/PaneSize;Ljava/lang/String;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/host/purpose/PanePurpose;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/host/LettaPaneTags {
@@ -4742,11 +4743,12 @@ public final class com/letta/mobile/ui/host/PaneSize$Companion {
 
 public final class com/letta/mobile/ui/host/PaneSpec {
 	public static final field $stable I
-	public fun <init> (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Lcom/letta/mobile/ui/host/PaneAnchor;Lcom/letta/mobile/ui/host/PaneSize;Ljava/lang/String;Landroidx/compose/ui/Modifier;)V
-	public synthetic fun <init> (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Lcom/letta/mobile/ui/host/PaneAnchor;Lcom/letta/mobile/ui/host/PaneSize;Ljava/lang/String;Landroidx/compose/ui/Modifier;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Lcom/letta/mobile/ui/host/PaneAnchor;Lcom/letta/mobile/ui/host/PaneSize;Ljava/lang/String;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/host/purpose/PanePurpose;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function0;Ljava/lang/String;Lcom/letta/mobile/ui/host/PaneAnchor;Lcom/letta/mobile/ui/host/PaneSize;Ljava/lang/String;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/host/purpose/PanePurpose;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getAnchor ()Lcom/letta/mobile/ui/host/PaneAnchor;
 	public final fun getModifier ()Landroidx/compose/ui/Modifier;
 	public final fun getOnDismiss ()Lkotlin/jvm/functions/Function0;
+	public final fun getPurpose ()Lcom/letta/mobile/ui/host/purpose/PanePurpose;
 	public final fun getSize ()Lcom/letta/mobile/ui/host/PaneSize;
 	public final fun getTestTag ()Ljava/lang/String;
 	public final fun getTitle ()Ljava/lang/String;
@@ -4804,6 +4806,17 @@ public abstract interface class com/letta/mobile/ui/host/RowHoldDrag {
 
 public final class com/letta/mobile/ui/host/RowHoldDragKt {
 	public static final fun getLocalRowHoldDrag ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
+public final class com/letta/mobile/ui/host/purpose/PanePurpose : java/lang/Enum {
+	public static final field Form Lcom/letta/mobile/ui/host/purpose/PanePurpose;
+	public static final field Info Lcom/letta/mobile/ui/host/purpose/PanePurpose;
+	public static final field Required Lcom/letta/mobile/ui/host/purpose/PanePurpose;
+	public final fun getDismissesOnKey ()Z
+	public final fun getDismissesOnOutside ()Z
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/host/purpose/PanePurpose;
+	public static fun values ()[Lcom/letta/mobile/ui/host/purpose/PanePurpose;
 }
 
 public final class com/letta/mobile/ui/icons/LettaIcons {
@@ -9923,14 +9936,14 @@ public final class com/letta/mobile/ui/shell/pages/runs/RunsPageTags {
 public final class com/letta/mobile/ui/shell/pages/schedules/ComposableSingletons$ScheduleFormPaneKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/schedules/ComposableSingletons$ScheduleFormPaneKt;
 	public fun <init> ()V
-	public final fun getLambda$-1108773294$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-1687594525$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-237951695$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-436650218$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$1221662537$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-1199576910$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-1398275433$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-2070398509$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-399028759$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$1273364922$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$1645747556$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1666363867$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$562596456$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$260037322$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/shell/pages/schedules/CronTaskId {

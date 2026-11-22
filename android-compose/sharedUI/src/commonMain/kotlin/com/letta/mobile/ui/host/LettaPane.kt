@@ -3,11 +3,14 @@ package com.letta.mobile.ui.host
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.letta.mobile.ui.host.purpose.PanePurpose
 
 /**
  * Shows [content] in the container the current [LettaHost] uses for [kind]. The pane is open while
  * it is composed: a caller dismisses it by removing it (`if (open) LettaPane(...)`), and [onDismiss]
- * is how the container asks for that (scrim tap, Escape, back, swipe down).
+ * is how the container asks for that (scrim tap, Escape, back, swipe down), as far as [purpose]
+ * allows: a [PanePurpose.Form] ignores a stray tap outside, a [PanePurpose.Required] pane closes
+ * only through its own buttons.
  *
  * Every container moves focus into the pane, closes on Escape, and enters without motion when
  * [com.letta.mobile.ui.theme.LocalReducedMotion] is set. An anchored pane (popover, menu) also asks
@@ -22,11 +25,12 @@ fun LettaPane(
     size: PaneSize = PaneSize.Default,
     testTag: String? = null,
     modifier: Modifier = Modifier,
+    purpose: PanePurpose = PanePurpose.Info,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val host = LocalLettaHost.current
     val resolved = host.resolve(kind, currentPaneWindowClass())
-    val spec = PaneSpec(onDismiss, title, resolved.anchorOrDefault(), size, testTag, modifier)
+    val spec = PaneSpec(onDismiss, title, resolved.anchorOrDefault(), size, testTag, modifier, purpose)
     when (resolved) {
         LettaPaneKind.Sheet -> host.sheet(spec, content)
         is LettaPaneKind.Popover -> {

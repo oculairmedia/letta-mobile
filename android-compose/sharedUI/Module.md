@@ -209,6 +209,10 @@ Small fleet-activity chart components. Consume FleetBarSpark with supplied sampl
 
 Pane, overlay and host-container infrastructure with lifecycle/pointer bindings. Provide LettaHost, OverlayHost and InspectorHost and use their container/content seams; LettaMenu is the host's menu container that LettaPopupMenu and every action menu draw in; page business logic and native window ownership stay outside generic pane presentation.
 
+# Package com.letta.mobile.ui.host.purpose
+
+What a modal pane is for (PanePurpose: information, a form, or a question that must be answered), which decides how its container may dismiss it. A leaf the pane contract in ui.host reads; it imports nothing of the app.
+
 # Package com.letta.mobile.ui.icons
 
 Centralized Lucide icon selection for product components. Consume LettaIcons directly; add shared icon mappings here rather than attaching navigation or backend capability decisions to icon selection.

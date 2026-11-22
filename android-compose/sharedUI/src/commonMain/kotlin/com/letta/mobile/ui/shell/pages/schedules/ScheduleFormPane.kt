@@ -38,6 +38,7 @@ import com.letta.mobile.data.schedules.ScheduleClock
 import com.letta.mobile.data.schedules.ScheduleFormDraft
 import com.letta.mobile.data.schedules.ScheduleFormat
 import com.letta.mobile.ui.components.foundation.LettaChipTab
+import com.letta.mobile.ui.host.purpose.PanePurpose
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.host.PaneSize
@@ -65,6 +66,7 @@ internal fun ScheduleFormPane(
         title = "New schedule",
         size = PaneSize(width = ShellDimens.scheduleFormWidth),
         testTag = SchedulesPageTags.FORM,
+        purpose = PanePurpose.Form,
     ) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.xl),

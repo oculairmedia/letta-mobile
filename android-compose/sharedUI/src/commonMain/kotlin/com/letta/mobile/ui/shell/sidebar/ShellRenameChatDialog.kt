@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
+import com.letta.mobile.ui.host.purpose.PanePurpose
 import com.letta.mobile.ui.host.LettaAlertPane
 import com.letta.mobile.ui.host.LettaAlertSpec
 import com.letta.mobile.ui.host.LettaPaneButton
@@ -47,7 +48,7 @@ fun ShellRenameChatDialog(title: String, onRename: (String) -> Unit, onDismiss: 
         confirm = LettaPaneButton("Save", save, enabled = canSave, testTag = ShellRenameChatDialogTags.SAVE),
         dismiss = LettaPaneButton("Cancel", onDismiss),
     )
-    LettaAlertPane(LettaAlertSpec("Rename chat", buttons), onDismiss) {
+    LettaAlertPane(LettaAlertSpec("Rename chat", buttons, purpose = PanePurpose.Form), onDismiss) {
         OutlinedTextField(
             value = value,
             onValueChange = { value = it },

@@ -319,6 +319,22 @@ final enum class com.letta.mobile.ui.context/AgentSettingsLevel : kotlin/Enum<co
     final fun values(): kotlin/Array<com.letta.mobile.ui.context/AgentSettingsLevel> // com.letta.mobile.ui.context/AgentSettingsLevel.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.ui.host.purpose/PanePurpose : kotlin/Enum<com.letta.mobile.ui.host.purpose/PanePurpose> { // com.letta.mobile.ui.host.purpose/PanePurpose|null[0]
+    enum entry Form // com.letta.mobile.ui.host.purpose/PanePurpose.Form|null[0]
+    enum entry Info // com.letta.mobile.ui.host.purpose/PanePurpose.Info|null[0]
+    enum entry Required // com.letta.mobile.ui.host.purpose/PanePurpose.Required|null[0]
+
+    final val dismissesOnKey // com.letta.mobile.ui.host.purpose/PanePurpose.dismissesOnKey|{}dismissesOnKey[0]
+        final fun <get-dismissesOnKey>(): kotlin/Boolean // com.letta.mobile.ui.host.purpose/PanePurpose.dismissesOnKey.<get-dismissesOnKey>|<get-dismissesOnKey>(){}[0]
+    final val dismissesOnOutside // com.letta.mobile.ui.host.purpose/PanePurpose.dismissesOnOutside|{}dismissesOnOutside[0]
+        final fun <get-dismissesOnOutside>(): kotlin/Boolean // com.letta.mobile.ui.host.purpose/PanePurpose.dismissesOnOutside.<get-dismissesOnOutside>|<get-dismissesOnOutside>(){}[0]
+    final val entries // com.letta.mobile.ui.host.purpose/PanePurpose.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.ui.host.purpose/PanePurpose> // com.letta.mobile.ui.host.purpose/PanePurpose.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.ui.host.purpose/PanePurpose // com.letta.mobile.ui.host.purpose/PanePurpose.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.ui.host.purpose/PanePurpose> // com.letta.mobile.ui.host.purpose/PanePurpose.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.ui.host/InspectorPresentation : kotlin/Enum<com.letta.mobile.ui.host/InspectorPresentation> { // com.letta.mobile.ui.host/InspectorPresentation|null[0]
     enum entry Docked // com.letta.mobile.ui.host/InspectorPresentation.Docked|null[0]
     enum entry Sheet // com.letta.mobile.ui.host/InspectorPresentation.Sheet|null[0]
@@ -4114,7 +4130,7 @@ final class com.letta.mobile.ui.host/InspectorHost { // com.letta.mobile.ui.host
 }
 
 final class com.letta.mobile.ui.host/LettaAlertSpec { // com.letta.mobile.ui.host/LettaAlertSpec|null[0]
-    constructor <init>(kotlin/String, com.letta.mobile.ui.host/LettaPaneButtons, com.letta.mobile.ui.host/LettaPaneKind = ..., androidx.compose.ui.graphics.vector/ImageVector? = ..., kotlin/String? = ...) // com.letta.mobile.ui.host/LettaAlertSpec.<init>|<init>(kotlin.String;com.letta.mobile.ui.host.LettaPaneButtons;com.letta.mobile.ui.host.LettaPaneKind;androidx.compose.ui.graphics.vector.ImageVector?;kotlin.String?){}[0]
+    constructor <init>(kotlin/String, com.letta.mobile.ui.host/LettaPaneButtons, com.letta.mobile.ui.host/LettaPaneKind = ..., androidx.compose.ui.graphics.vector/ImageVector? = ..., kotlin/String? = ..., com.letta.mobile.ui.host.purpose/PanePurpose = ...) // com.letta.mobile.ui.host/LettaAlertSpec.<init>|<init>(kotlin.String;com.letta.mobile.ui.host.LettaPaneButtons;com.letta.mobile.ui.host.LettaPaneKind;androidx.compose.ui.graphics.vector.ImageVector?;kotlin.String?;com.letta.mobile.ui.host.purpose.PanePurpose){}[0]
 
     final val buttons // com.letta.mobile.ui.host/LettaAlertSpec.buttons|{}buttons[0]
         final fun <get-buttons>(): com.letta.mobile.ui.host/LettaPaneButtons // com.letta.mobile.ui.host/LettaAlertSpec.buttons.<get-buttons>|<get-buttons>(){}[0]
@@ -4122,6 +4138,8 @@ final class com.letta.mobile.ui.host/LettaAlertSpec { // com.letta.mobile.ui.hos
         final fun <get-icon>(): androidx.compose.ui.graphics.vector/ImageVector? // com.letta.mobile.ui.host/LettaAlertSpec.icon.<get-icon>|<get-icon>(){}[0]
     final val kind // com.letta.mobile.ui.host/LettaAlertSpec.kind|{}kind[0]
         final fun <get-kind>(): com.letta.mobile.ui.host/LettaPaneKind // com.letta.mobile.ui.host/LettaAlertSpec.kind.<get-kind>|<get-kind>(){}[0]
+    final val purpose // com.letta.mobile.ui.host/LettaAlertSpec.purpose|{}purpose[0]
+        final fun <get-purpose>(): com.letta.mobile.ui.host.purpose/PanePurpose // com.letta.mobile.ui.host/LettaAlertSpec.purpose.<get-purpose>|<get-purpose>(){}[0]
     final val testTag // com.letta.mobile.ui.host/LettaAlertSpec.testTag|{}testTag[0]
         final fun <get-testTag>(): kotlin/String? // com.letta.mobile.ui.host/LettaAlertSpec.testTag.<get-testTag>|<get-testTag>(){}[0]
     final val title // com.letta.mobile.ui.host/LettaAlertSpec.title|{}title[0]
@@ -4364,7 +4382,7 @@ final class com.letta.mobile.ui.host/PaneSize { // com.letta.mobile.ui.host/Pane
 }
 
 final class com.letta.mobile.ui.host/PaneSpec { // com.letta.mobile.ui.host/PaneSpec|null[0]
-    constructor <init>(kotlin/Function0<kotlin/Unit>, kotlin/String? = ..., com.letta.mobile.ui.host/PaneAnchor = ..., com.letta.mobile.ui.host/PaneSize = ..., kotlin/String? = ..., androidx.compose.ui/Modifier = ...) // com.letta.mobile.ui.host/PaneSpec.<init>|<init>(kotlin.Function0<kotlin.Unit>;kotlin.String?;com.letta.mobile.ui.host.PaneAnchor;com.letta.mobile.ui.host.PaneSize;kotlin.String?;androidx.compose.ui.Modifier){}[0]
+    constructor <init>(kotlin/Function0<kotlin/Unit>, kotlin/String? = ..., com.letta.mobile.ui.host/PaneAnchor = ..., com.letta.mobile.ui.host/PaneSize = ..., kotlin/String? = ..., androidx.compose.ui/Modifier = ..., com.letta.mobile.ui.host.purpose/PanePurpose = ...) // com.letta.mobile.ui.host/PaneSpec.<init>|<init>(kotlin.Function0<kotlin.Unit>;kotlin.String?;com.letta.mobile.ui.host.PaneAnchor;com.letta.mobile.ui.host.PaneSize;kotlin.String?;androidx.compose.ui.Modifier;com.letta.mobile.ui.host.purpose.PanePurpose){}[0]
 
     final val anchor // com.letta.mobile.ui.host/PaneSpec.anchor|{}anchor[0]
         final fun <get-anchor>(): com.letta.mobile.ui.host/PaneAnchor // com.letta.mobile.ui.host/PaneSpec.anchor.<get-anchor>|<get-anchor>(){}[0]
@@ -4372,6 +4390,8 @@ final class com.letta.mobile.ui.host/PaneSpec { // com.letta.mobile.ui.host/Pane
         final fun <get-modifier>(): androidx.compose.ui/Modifier // com.letta.mobile.ui.host/PaneSpec.modifier.<get-modifier>|<get-modifier>(){}[0]
     final val onDismiss // com.letta.mobile.ui.host/PaneSpec.onDismiss|{}onDismiss[0]
         final fun <get-onDismiss>(): kotlin/Function0<kotlin/Unit> // com.letta.mobile.ui.host/PaneSpec.onDismiss.<get-onDismiss>|<get-onDismiss>(){}[0]
+    final val purpose // com.letta.mobile.ui.host/PaneSpec.purpose|{}purpose[0]
+        final fun <get-purpose>(): com.letta.mobile.ui.host.purpose/PanePurpose // com.letta.mobile.ui.host/PaneSpec.purpose.<get-purpose>|<get-purpose>(){}[0]
     final val size // com.letta.mobile.ui.host/PaneSpec.size|{}size[0]
         final fun <get-size>(): com.letta.mobile.ui.host/PaneSize // com.letta.mobile.ui.host/PaneSpec.size.<get-size>|<get-size>(){}[0]
     final val testTag // com.letta.mobile.ui.host/PaneSpec.testTag|{}testTag[0]
@@ -14430,7 +14450,7 @@ final fun com.letta.mobile.ui.host/LettaAlertPane(com.letta.mobile.ui.host/Letta
 final fun com.letta.mobile.ui.host/LettaConfirmPane(com.letta.mobile.ui.host/LettaConfirmRequest, kotlin/Function0<kotlin/Unit>, kotlin/Function0<kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.host/LettaConfirmPane|LettaConfirmPane(com.letta.mobile.ui.host.LettaConfirmRequest;kotlin.Function0<kotlin.Unit>;kotlin.Function0<kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.host/LettaDialogFrame(com.letta.mobile.ui.host/PaneSpec, androidx.compose.ui.unit/Dp, kotlin/String?, kotlin/Function3<androidx.compose.foundation.layout/ColumnScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.host/LettaDialogFrame|LettaDialogFrame(com.letta.mobile.ui.host.PaneSpec;androidx.compose.ui.unit.Dp;kotlin.String?;kotlin.Function3<androidx.compose.foundation.layout.ColumnScope,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.host/LettaMenu(kotlin/Boolean, kotlin/Function0<kotlin/Unit>, com.letta.mobile.ui.host/PaneAnchor?, androidx.compose.ui/Modifier?, kotlin/Function3<androidx.compose.foundation.layout/ColumnScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.host/LettaMenu|LettaMenu(kotlin.Boolean;kotlin.Function0<kotlin.Unit>;com.letta.mobile.ui.host.PaneAnchor?;androidx.compose.ui.Modifier?;kotlin.Function3<androidx.compose.foundation.layout.ColumnScope,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
-final fun com.letta.mobile.ui.host/LettaPane(com.letta.mobile.ui.host/LettaPaneKind, kotlin/Function0<kotlin/Unit>, kotlin/String?, com.letta.mobile.ui.host/PaneSize?, kotlin/String?, androidx.compose.ui/Modifier?, kotlin/Function3<androidx.compose.foundation.layout/ColumnScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.host/LettaPane|LettaPane(com.letta.mobile.ui.host.LettaPaneKind;kotlin.Function0<kotlin.Unit>;kotlin.String?;com.letta.mobile.ui.host.PaneSize?;kotlin.String?;androidx.compose.ui.Modifier?;kotlin.Function3<androidx.compose.foundation.layout.ColumnScope,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.host/LettaPane(com.letta.mobile.ui.host/LettaPaneKind, kotlin/Function0<kotlin/Unit>, kotlin/String?, com.letta.mobile.ui.host/PaneSize?, kotlin/String?, androidx.compose.ui/Modifier?, com.letta.mobile.ui.host.purpose/PanePurpose?, kotlin/Function3<androidx.compose.foundation.layout/ColumnScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.host/LettaPane|LettaPane(com.letta.mobile.ui.host.LettaPaneKind;kotlin.Function0<kotlin.Unit>;kotlin.String?;com.letta.mobile.ui.host.PaneSize?;kotlin.String?;androidx.compose.ui.Modifier?;com.letta.mobile.ui.host.purpose.PanePurpose?;kotlin.Function3<androidx.compose.foundation.layout.ColumnScope,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.host/LettaPaneButtonRow(com.letta.mobile.ui.host/LettaPaneButtons, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.host/LettaPaneButtonRow|LettaPaneButtonRow(com.letta.mobile.ui.host.LettaPaneButtons;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.host/LettaPopoverFrame(com.letta.mobile.ui.host/PaneSpec, kotlin/Function3<androidx.compose.foundation.layout/ColumnScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.host/LettaPopoverFrame|LettaPopoverFrame(com.letta.mobile.ui.host.PaneSpec;kotlin.Function3<androidx.compose.foundation.layout.ColumnScope,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.host/OverlayHostLayer(com.letta.mobile.ui.host/OverlayHost, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.host/OverlayHostLayer|OverlayHostLayer(com.letta.mobile.ui.host.OverlayHost;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
