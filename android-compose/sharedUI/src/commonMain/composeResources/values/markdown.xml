@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="markdown_copy_code">Copy code</string>
+    <string name="markdown_code_copied">Copied</string>
+</resources>
