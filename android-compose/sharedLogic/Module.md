@@ -987,11 +987,11 @@ The host side of the service-credentials v1 contract: the credentials of the non
 
 # Package com.letta.mobile.data.controller.node.iroh.feed
 
-The host side of the conversation-feed v1 contract (`docs/reference/contracts/conversation-feed-v1.md`): a durable, per-conversation journal of turn events and the one method that reads it. `FeedJournalStore` keeps one JSON-lines file per conversation (and one `epoch` file) in the host's state directory, stamps every entry with the host start's epoch and a per-conversation seq that keeps growing across restarts, and replaces the in-memory ring that parked a detached turn for its initiator's redial. It records what the host observed and invents no terminal: a turn it never saw end is closed with `terminal_observed: false`. Retention is bounded by entries and bytes per conversation (finished turns drop first), by a directory ceiling (least recently used files go first, never one with a running turn) and by the number of conversations held in memory; an oversized payload is stored as a pointer; a corrupt file is logged and reset, never a crash. `FeedRoutes.forHost` builds the `AdminRpcRoutes` a host registers on its built admin router; it registers `feed.subscribe` and advertises `conversation_feed_v1`, and authorizes each request against the peer's conversation scope and the owning agent's scope.
+The host side of the conversation-feed v1 contract (`docs/reference/contracts/conversation-feed-v1.md`): a durable, per-conversation journal of turn events and the one method that reads it. `FeedJournalStore` keeps one JSON-lines file per conversation (and one `epoch` file) in the host's state directory, stamps every entry with the host start's epoch and a per-conversation seq that keeps growing across restarts, and replaces the in-memory ring that parked a detached turn for its initiator's redial. It records what the host observed and invents no terminal: a turn it never saw end is closed with `terminal_observed: false`. Retention is bounded by entries and bytes per conversation (finished turns drop first), by a directory ceiling (least recently used files go first, never one with a running turn) and by the number of conversations held in memory; an oversized payload is stored as a pointer; a corrupt file is logged and reset, never a crash. `FeedPusher` pushes each journal write to the connections viewing its conversation as `feed_delta` frames (one per conversation per frame budget, nothing while nobody views it, each viewer authorized per frame like `feed.subscribe`). `FeedRoutes.forHost` builds the `AdminRpcRoutes` a host registers on its built admin router; it registers `feed.subscribe` and advertises `conversation_feed_v1`, and authorizes each request against the peer's conversation scope and the owning agent's scope.
 
 # Package com.letta.mobile.data.feed.wire
 
-The dependency-free names of the conversation-feed v1 contract: `ConversationFeedWire` holds the capability, the method, entry kinds, page modes, resync reasons, limits and the inline-payload cap, and `FeedCursor`, `FeedDelta` and `FeedPage` are the cursor, journal entry and page a client decodes. Transport and host packages share them; nothing here depends on either.
+The dependency-free names of the conversation-feed v1 contract: `ConversationFeedWire` holds the capability, the method, entry kinds, page modes, resync reasons, limits and the inline-payload cap, and `FeedCursor`, `FeedDelta`, `FeedPage` and `FeedDeltaFrame` are the cursor, journal entry, page and live push a client decodes. Transport and host packages share them; nothing here depends on either.
 
 # Package com.letta.mobile.data.controller.node.iroh.errors
 
@@ -1081,3 +1081,11 @@ for the runtime's device-status echo; hosts bind their shared channel state and 
 # Package com.letta.mobile.data.memory.graph.forces
 
 Internal spring endpoints shared by force tuning and cluster ownership collection. The force field owns the buffers and applies these values without changing arithmetic or visit order.
+
+# Package com.letta.mobile.data.feed.client
+
+The client of the conversation feed (`docs/reference/contracts/conversation-feed-v1.md`): `FeedTimelineSource` keeps one ordered list of rows per conversation from `feed.subscribe` pages and `feed_delta` pushes, resyncing from its cursor whenever a frame cannot be followed, and applies a cumulative snapshot over its predecessor in place so only the changed row redraws. `FeedFollower` holds the cursor and the rules, `FeedLink` is the part of the host connection it uses, and `FeedTimelineMetrics` counts list replacements and redrawn rows. Keep transport and presentation outside it; it is used only against a host that advertises the feed and its push, and `channelFeedTimelineSource` returns null against any other.
+
+# Package com.letta.mobile.data.feed.channel
+
+The binding of the feed client to a session's channel transport: `channelFeedLink` sends `feed.subscribe` over the connected host's admin RPC and hands the host's `feed_delta` pushes to the client. Keep feed rules outside it.

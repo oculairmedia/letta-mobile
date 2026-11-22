@@ -19945,6 +19945,7 @@ public final class com/letta/mobile/data/controller/node/iroh/ConnectionRegistry
 	public final fun claim (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun connections (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun conversationCount (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun isViewed (Ljava/lang/String;)Z
 	public final fun register (Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun register (Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/ViewerRegistration;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun release (Lcom/letta/mobile/data/controller/node/iroh/ViewerRegistration;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -20333,6 +20334,7 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint {
 	public final fun conversationViewers ()Lkotlin/jvm/functions/Function2;
 	public final fun create (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun getAdminRpcRouter ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;
+	public final fun isConversationViewed (Ljava/lang/String;)Z
 	public final fun nodeIdHex ()Ljava/lang/String;
 	public final fun shutdown (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun start (Lcom/letta/mobile/data/controller/AppServerController;)V
@@ -21181,6 +21183,7 @@ public abstract interface class com/letta/mobile/data/controller/node/iroh/Viewe
 	public fun receivesAgentEvents ()Z
 	public fun receivesConversationActivity-qkT7gGE (Ljava/lang/String;)Z
 	public fun receivesConversationEvents ()Z
+	public fun receivesFeedPushes ()Z
 	public fun receivesPinsEvents ()Z
 	public fun receivesShellStateEvents ()Z
 	public abstract fun writeFrame (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -21191,6 +21194,7 @@ public final class com/letta/mobile/data/controller/node/iroh/ViewerHandle$Defau
 	public static fun receivesAgentEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
 	public static fun receivesConversationActivity-qkT7gGE (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Ljava/lang/String;)Z
 	public static fun receivesConversationEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
+	public static fun receivesFeedPushes (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
 	public static fun receivesPinsEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
 	public static fun receivesShellStateEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
 }
@@ -21327,6 +21331,11 @@ public final class com/letta/mobile/data/controller/node/iroh/feed/FeedJournalSt
 	public fun replayForInitiator-eAxutHE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/InitiatorReplay;
 }
 
+public final class com/letta/mobile/data/controller/node/iroh/feed/FeedPusher {
+	public fun <init> (Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/feed/FeedJournalStore;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;J)V
+	public synthetic fun <init> (Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/feed/FeedJournalStore;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
 public final class com/letta/mobile/data/controller/node/iroh/feed/FeedRetention {
 	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/feed/FeedRetention$Companion;
 	public static final field DEFAULT_DISK_CEILING_BYTES J
@@ -21359,7 +21368,8 @@ public final class com/letta/mobile/data/controller/node/iroh/feed/FeedRetention
 
 public final class com/letta/mobile/data/controller/node/iroh/feed/FeedRoutes {
 	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/feed/FeedRoutes;
-	public final fun forHost (Lcom/letta/mobile/data/controller/node/iroh/feed/FeedJournalStore;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
+	public final fun forHost (Lcom/letta/mobile/data/controller/node/iroh/feed/FeedJournalStore;Z)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
+	public static synthetic fun forHost$default (Lcom/letta/mobile/data/controller/node/iroh/feed/FeedRoutes;Lcom/letta/mobile/data/controller/node/iroh/feed/FeedJournalStore;ZILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/feed/JournalKey {
@@ -23457,12 +23467,169 @@ public final class com/letta/mobile/data/dreaming/DreamingState {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/feed/channel/ChannelFeedLinkKt {
+	public static final fun channelFeedLink (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Lcom/letta/mobile/data/feed/client/FeedLink;
+	public static final fun channelFeedTimelineSource-8oP-BNM (Lcom/letta/mobile/data/transport/api/IChannelTransport;Ljava/lang/String;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;)Lcom/letta/mobile/data/feed/client/FeedTimelineSource;
+	public static synthetic fun channelFeedTimelineSource-8oP-BNM$default (Lcom/letta/mobile/data/transport/api/IChannelTransport;Ljava/lang/String;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/letta/mobile/data/feed/client/FeedTimelineSource;
+}
+
+public final class com/letta/mobile/data/feed/client/FeedFollower {
+	public fun <init> ()V
+	public final fun getCursor ()Lcom/letta/mobile/data/feed/wire/FeedCursor;
+	public final fun onFrame (Lcom/letta/mobile/data/feed/wire/FeedDeltaFrame;)Lcom/letta/mobile/data/feed/client/FeedFrameOutcome;
+	public final fun onPage (Lcom/letta/mobile/data/feed/wire/FeedPage;)Lcom/letta/mobile/data/feed/client/FeedPageOutcome;
+	public final fun reset ()V
+}
+
+public abstract interface class com/letta/mobile/data/feed/client/FeedFrameOutcome {
+}
+
+public final class com/letta/mobile/data/feed/client/FeedFrameOutcome$Applied : com/letta/mobile/data/feed/client/FeedFrameOutcome {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Lcom/letta/mobile/data/feed/client/FeedFrameOutcome$Applied;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/feed/client/FeedFrameOutcome$Applied;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/feed/client/FeedFrameOutcome$Applied;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEntries ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/feed/client/FeedFrameOutcome$Resync : com/letta/mobile/data/feed/client/FeedFrameOutcome {
+	public fun <init> (Lcom/letta/mobile/data/feed/client/FeedResync;)V
+	public final fun component1 ()Lcom/letta/mobile/data/feed/client/FeedResync;
+	public final fun copy (Lcom/letta/mobile/data/feed/client/FeedResync;)Lcom/letta/mobile/data/feed/client/FeedFrameOutcome$Resync;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/feed/client/FeedFrameOutcome$Resync;Lcom/letta/mobile/data/feed/client/FeedResync;ILjava/lang/Object;)Lcom/letta/mobile/data/feed/client/FeedFrameOutcome$Resync;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Lcom/letta/mobile/data/feed/client/FeedResync;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/feed/client/FeedFrameOutcome$Stale : com/letta/mobile/data/feed/client/FeedFrameOutcome {
+	public static final field INSTANCE Lcom/letta/mobile/data/feed/client/FeedFrameOutcome$Stale;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/feed/client/FeedLink {
+	public abstract fun call (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getConnection ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun getHostCapabilities ()Ljava/util/Set;
+	public abstract fun getPushes ()Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class com/letta/mobile/data/feed/client/FeedPageOutcome {
+	public fun <init> (Ljava/util/List;ZZZ)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Z
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun copy (Ljava/util/List;ZZZ)Lcom/letta/mobile/data/feed/client/FeedPageOutcome;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/feed/client/FeedPageOutcome;Ljava/util/List;ZZZILjava/lang/Object;)Lcom/letta/mobile/data/feed/client/FeedPageOutcome;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEntries ()Ljava/util/List;
+	public final fun getHasMore ()Z
+	public final fun getRegressed ()Z
+	public final fun getReplaced ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/feed/client/FeedReply {
+	public fun <init> (ZLkotlinx/serialization/json/JsonElement;Ljava/lang/String;)V
+	public synthetic fun <init> (ZLkotlinx/serialization/json/JsonElement;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getError ()Ljava/lang/String;
+	public final fun getResult ()Lkotlinx/serialization/json/JsonElement;
+	public final fun getSuccess ()Z
+}
+
+public final class com/letta/mobile/data/feed/client/FeedResync : java/lang/Enum {
+	public static final field EpochChanged Lcom/letta/mobile/data/feed/client/FeedResync;
+	public static final field Gap Lcom/letta/mobile/data/feed/client/FeedResync;
+	public static final field Marker Lcom/letta/mobile/data/feed/client/FeedResync;
+	public static final field NoCursor Lcom/letta/mobile/data/feed/client/FeedResync;
+	public static final field Reconnected Lcom/letta/mobile/data/feed/client/FeedResync;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/feed/client/FeedResync;
+	public static fun values ()[Lcom/letta/mobile/data/feed/client/FeedResync;
+}
+
+public final class com/letta/mobile/data/feed/client/FeedRowDiff {
+	public fun <init> (Ljava/util/List;IIIZ)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun component5 ()Z
+	public final fun copy (Ljava/util/List;IIIZ)Lcom/letta/mobile/data/feed/client/FeedRowDiff;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/feed/client/FeedRowDiff;Ljava/util/List;IIIZILjava/lang/Object;)Lcom/letta/mobile/data/feed/client/FeedRowDiff;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAdded ()I
+	public final fun getChanged ()I
+	public final fun getRedrawn ()I
+	public final fun getRemoved ()I
+	public final fun getReordered ()Z
+	public final fun getReplacement ()Z
+	public final fun getRows ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/feed/client/FeedRowIdentity {
+	public static final field INSTANCE Lcom/letta/mobile/data/feed/client/FeedRowIdentity;
+	public final fun reconcile (Ljava/util/List;Ljava/util/List;)Lcom/letta/mobile/data/feed/client/FeedRowDiff;
+}
+
+public final class com/letta/mobile/data/feed/client/FeedTimelineMetrics {
+	public fun <init> ()V
+	public fun <init> (JJJJJJ)V
+	public synthetic fun <init> (JJJJJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun component6 ()J
+	public final fun copy (JJJJJJ)Lcom/letta/mobile/data/feed/client/FeedTimelineMetrics;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/feed/client/FeedTimelineMetrics;JJJJJJILjava/lang/Object;)Lcom/letta/mobile/data/feed/client/FeedTimelineMetrics;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFramesApplied ()J
+	public final fun getListReplacements ()J
+	public final fun getPagesRead ()J
+	public final fun getPublications ()J
+	public final fun getResyncs ()J
+	public final fun getRowsRedrawn ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/feed/client/FeedTimelineSource {
+	public static final field Companion Lcom/letta/mobile/data/feed/client/FeedTimelineSource$Companion;
+	public synthetic fun <init> (Lcom/letta/mobile/data/feed/client/FeedLink;Ljava/lang/String;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/feed/client/FeedLink;Ljava/lang/String;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCursor ()Lcom/letta/mobile/data/feed/wire/FeedCursor;
+	public final fun getMetrics ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getRows ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun start ()V
+	public final fun stop ()V
+}
+
+public final class com/letta/mobile/data/feed/client/FeedTimelineSource$Companion {
+	public final fun isAvailable (Lcom/letta/mobile/data/feed/client/FeedLink;)Z
+}
+
 public final class com/letta/mobile/data/feed/wire/ConversationFeedWire {
+	public static final field AFTER_SEQ Ljava/lang/String;
 	public static final field AGENT_ID Ljava/lang/String;
 	public static final field CAPABILITY Ljava/lang/String;
+	public static final field CONVERSATION Ljava/lang/String;
 	public static final field CONVERSATION_ID Ljava/lang/String;
 	public static final field DEFAULT_LIMIT I
+	public static final field ENTRIES Ljava/lang/String;
 	public static final field EPOCH Ljava/lang/String;
+	public static final field FRAME_SEQ Ljava/lang/String;
 	public static final field FRAME_TYPE Ljava/lang/String;
 	public static final field FROM Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/data/feed/wire/ConversationFeedWire;
@@ -23479,6 +23646,7 @@ public final class com/letta/mobile/data/feed/wire/ConversationFeedWire {
 	public static final field POINTER_BYTE_LEN Ljava/lang/String;
 	public static final field POINTER_MESSAGE_ID Ljava/lang/String;
 	public static final field POINTER_MESSAGE_TYPE Ljava/lang/String;
+	public static final field PUSH_CAPABILITY Ljava/lang/String;
 	public static final field RESYNC_AHEAD_OF_HEAD Ljava/lang/String;
 	public static final field RESYNC_BEHIND_HORIZON Ljava/lang/String;
 	public static final field RESYNC_EPOCH_CHANGED Ljava/lang/String;
@@ -23552,6 +23720,45 @@ public final synthetic class com/letta/mobile/data/feed/wire/FeedDelta$$serializ
 }
 
 public final class com/letta/mobile/data/feed/wire/FeedDelta$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/feed/wire/FeedDeltaFrame {
+	public static final field Companion Lcom/letta/mobile/data/feed/wire/FeedDeltaFrame$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJJLjava/util/List;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun component6 ()J
+	public final fun component7 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJJLjava/util/List;)Lcom/letta/mobile/data/feed/wire/FeedDeltaFrame;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/feed/wire/FeedDeltaFrame;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJJLjava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/feed/wire/FeedDeltaFrame;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAfterSeq ()J
+	public final fun getAgentId ()Ljava/lang/String;
+	public final fun getConversation ()Ljava/lang/String;
+	public final fun getEntries ()Ljava/util/List;
+	public final fun getEpoch ()J
+	public final fun getSeq ()J
+	public final fun getType ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/feed/wire/FeedDeltaFrame$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/feed/wire/FeedDeltaFrame$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/feed/wire/FeedDeltaFrame;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/feed/wire/FeedDeltaFrame;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/feed/wire/FeedDeltaFrame$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
