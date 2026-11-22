@@ -300,3 +300,80 @@ internal class BareClickable(config: Config = Config.empty) : MobileRule(
         val CLICK_MODIFIERS = setOf("clickable", "combinedClickable", "selectable", "toggleable")
     }
 }
+
+/** The foundation package, where the shared container primitives (LettaCard, LettaPanel) are built. */
+private const val FOUNDATION_PATH = "/ui/components/foundation/"
+
+/**
+ * A raw Material `Card`, `OutlinedCard` or `ElevatedCard` outside the foundation package.
+ *
+ * A bare `Card()` picks its own colours: it falls back to `surfaceContainerHighest`, two tonal
+ * steps above the app's cards, with no border, so it shows as a mismatched bright card. Containers
+ * come from the foundation primitives (LettaCard, LettaNestedCard, LettaPanel), which take their
+ * fill, border and corner from the theme.
+ *
+ * Only calls whose name the file resolves to Material count: an explicit or wildcard import from
+ * `androidx.compose.material3` or `androidx.compose.material`, or a fully qualified call. A
+ * project type that happens to be called `Card` passes. Token files are checked too: only the
+ * foundation package may build on a raw Material card.
+ */
+internal class RawMaterialCard(config: Config = Config.empty) : MobileRule(
+    config,
+    "RawMaterialCard",
+    "Containers must use the foundation primitives (LettaCard, LettaNestedCard, LettaPanel), not raw Material cards.",
+) {
+    override fun visitCallExpression(expression: KtCallExpression) {
+        super.visitCallExpression(expression)
+        val file = expression.containingKtFile
+        val card = expression.calleeName()
+            ?.takeIf { file.isUiSource() && FOUNDATION_PATH !in file.uiPath() }
+            ?.let { callee -> expression.materialCard(callee, file) }
+            ?: return
+        report(
+            expression,
+            "`$card(...)` is a raw Material card, which picks its own colours (a bare Card is " +
+                "surfaceContainerHighest with no border). Use LettaCard for a card, LettaNestedCard for a " +
+                "surface inside one, or LettaPanel for a toned panel, from ui/components/foundation.",
+        )
+    }
+
+    /**
+     * The Material card this call names, if any. A qualified call is judged only by its receiver
+     * (`androidx.compose.material3.Card()` counts, `Factory.Card()` does not); a bare call goes
+     * through the file's imports.
+     */
+    private fun KtCallExpression.materialCard(callee: String, file: KtFile): String? {
+        val qualified = (parent as? KtDotQualifiedExpression)?.takeIf { it.selectorExpression == this }
+        return when {
+            qualified == null -> file.importedMaterialCard(callee)
+            qualified.receiverExpression.compactText() in MATERIAL_PACKAGES -> callee.takeIf { it in CARD_CALLS }
+            else -> null
+        }
+    }
+
+    /**
+     * The Material card a bare [callee] resolves to through this file's imports. An explicit or
+     * aliased import of that name wins over any wildcard, as in Kotlin, so a project `Card`
+     * imported beside `androidx.compose.material3.*` passes.
+     */
+    private fun KtFile.importedMaterialCard(callee: String): String? {
+        val explicit = importDirectives.firstOrNull { directive ->
+            !directive.isAllUnder && directive.importedName?.asString() == callee
+        }
+        val fromWildcard = importDirectives.any { directive ->
+            directive.isAllUnder && directive.importedFqName?.asString() in MATERIAL_PACKAGES
+        }
+        val imported = explicit?.importedFqName?.asString()
+        return when {
+            explicit == null -> callee.takeIf { fromWildcard && it in CARD_CALLS }
+            imported?.substringBeforeLast('.') in MATERIAL_PACKAGES ->
+                imported?.substringAfterLast('.')?.takeIf { it in CARD_CALLS }
+            else -> null
+        }
+    }
+
+    private companion object {
+        val CARD_CALLS = setOf("Card", "OutlinedCard", "ElevatedCard")
+        val MATERIAL_PACKAGES = setOf("androidx.compose.material3", "androidx.compose.material")
+    }
+}

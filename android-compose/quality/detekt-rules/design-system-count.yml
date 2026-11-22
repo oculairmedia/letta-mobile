@@ -27,3 +27,5 @@ letta-mobile-design-system:
     active: true
   ComponentInExemptPath:
     active: true
+  RawMaterialCard:
+    active: true

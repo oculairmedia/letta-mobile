@@ -9,8 +9,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import com.letta.mobile.ui.components.foundation.LettaCard
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -34,7 +33,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.A2uiBindingResolver
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiResolvedBinding
@@ -63,7 +61,7 @@ internal fun A2uiScheduleCard(
         return
     }
 
-    Card(
+    LettaCard(
         modifier = modifier
             .fillMaxWidth()
             .semantics {
@@ -71,10 +69,6 @@ internal fun A2uiScheduleCard(
                 props.nextRun?.let { stateDescription = "Next run $it" }
             }
             .testTag(A2uiTestTags.SCHEDULE_CARD),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
             modifier = Modifier.padding(LettaDimens.Space.lg),

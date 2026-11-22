@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.memory
 
+import com.letta.mobile.ui.components.foundation.LettaPanel
 import com.letta.mobile.ui.components.lettaPageGutter
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.horizontalScroll
@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -78,12 +76,7 @@ internal fun MemoryGraphZoomControls(
     fitOnly: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
-        modifier = modifier,
-    ) {
+    LettaPanel(modifier = modifier) {
         Column {
             if (!fitOnly) {
                 IconButton(onClick = { viewportState.zoomBy(ZOOM_STEP) }) {

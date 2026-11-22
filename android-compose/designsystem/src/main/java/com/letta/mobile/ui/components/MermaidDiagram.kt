@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,6 +50,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.size.Size
 import coil3.svg.SvgDecoder
+import com.letta.mobile.ui.components.foundation.LettaCard
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSizing
@@ -224,9 +224,7 @@ private fun MermaidFullscreenDialog(
                     .padding(LettaSpacing.INNER_PADDING + LettaSpacing.INNER_PADDING)
             }
 
-            Card(
-                modifier = contentModifier.align(Alignment.Center),
-            ) {
+            LettaCard(modifier = contentModifier.align(Alignment.Center)) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
                 ) {

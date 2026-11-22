@@ -12,13 +12,14 @@ import com.letta.mobile.ui.theme.tokens.LettaShapes
 import com.letta.mobile.ui.theme.tokens.LettaStrokeTokens
 
 /**
- * The one bordered or filled container: a Material [Surface] with the panel corner ([LettaShapes.panel]),
- * a fill and content colour from [tone], and, when [border] is true, a hairline in `outlineVariant`.
- * Replaces the pages' own `Surface`/`Card` panels, which used corners of 6, 8, 10, 12, 14 and 16 dp and
- * borders at alpha 0.3 to 1.0. LettaInlineError and LettaInlineNotice are built on it.
+ * The toned container of the card family (see LettaCard.kt): a Material [Surface] with the panel corner
+ * ([LettaShapes.panel]), a fill and content colour from [tone], and, when [border] is true, a hairline
+ * in `outlineVariant`. Replaces the pages' own `Surface`/`Card` panels, which used corners of 6, 8, 10,
+ * 12, 14 and 16 dp and borders at alpha 0.3 to 1.0. LettaInlineError and LettaInlineNotice are built on it.
  *
- * Use it for a card of content on a page, a group of controls, or a banner. It adds no padding: the
- * content decides its own insets from the spacing scale.
+ * Use it for a panel whose fill says something (info, warning, error), a group of controls, or a banner;
+ * a card of content on a page is a LettaCard. It adds no padding: the content decides its own insets
+ * from the spacing scale.
  */
 @Composable
 fun LettaPanel(
