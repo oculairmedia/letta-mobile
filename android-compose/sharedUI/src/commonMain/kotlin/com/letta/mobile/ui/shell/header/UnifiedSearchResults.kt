@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.shell.header
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,7 +29,16 @@ import kotlinx.coroutines.delay
  * keystroke) and its hits join the other sections. A search that fails leaves the message section empty.
  */
 @Composable
-fun rememberUnifiedSearchSections(query: UnifiedSearchQuery, sources: UnifiedSearchSources): List<LettaSearchSection> {
+fun rememberUnifiedSearchSections(query: UnifiedSearchQuery, sources: UnifiedSearchSources): List<LettaSearchSection> =
+    rememberUnifiedSearch(query, sources).sections
+
+/** The unified search's [sections], and whether the message search is still running for the query. */
+@Immutable
+internal class UnifiedSearchResults(val sections: List<LettaSearchSection>, val searchingMessages: Boolean)
+
+/** [rememberUnifiedSearchSections], with whether the message search has yet to answer for the query. */
+@Composable
+internal fun rememberUnifiedSearch(query: UnifiedSearchQuery, sources: UnifiedSearchSources): UnifiedSearchResults {
     val preparationError = rememberConversationPreparation(query, sources)
     val messageSearch = sources.messageSearch
     val messageQuery = messageQueryFor(query, sources).takeIf { messageSearch != null }
@@ -40,7 +50,9 @@ fun rememberUnifiedSearchSections(query: UnifiedSearchQuery, sources: UnifiedSea
     }
     val current = hits.takeIf { it.query == messageQuery }?.hits.orEmpty()
     val sections = remember(query, sources, current) { UnifiedShellSearch.sections(query, sources, current) }
-    return withPreparationWarning(sections, preparationError)
+    val searching = messageQuery != null && hits.query != messageQuery
+    val shown = withPreparationWarning(sections, preparationError)
+    return remember(shown, searching) { UnifiedSearchResults(shown, searching) }
 }
 
 @Composable

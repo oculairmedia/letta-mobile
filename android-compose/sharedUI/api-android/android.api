@@ -2900,6 +2900,10 @@ public final class com/letta/mobile/ui/components/foundation/LettaInlineNoticeKt
 	public static final fun LettaInlineNotice (Lcom/letta/mobile/ui/components/foundation/LettaNotice;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/foundation/LettaNoticeAction;Lcom/letta/mobile/ui/components/foundation/LettaNoticeAction;Landroidx/compose/runtime/Composer;II)V
 }
 
+public final class com/letta/mobile/ui/components/foundation/LettaKbdKt {
+	public static final fun LettaKbd (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+}
+
 public final class com/letta/mobile/ui/components/foundation/LettaMenuItem {
 	public static final field $stable I
 	public fun <init> (Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;ZZLjava/lang/String;Lkotlin/jvm/functions/Function0;)V
@@ -10272,15 +10276,18 @@ public final class com/letta/mobile/ui/shell/palette/CommandPaletteTags {
 	public static final field $stable I
 	public static final field AMBIENT Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/palette/CommandPaletteTags;
+	public static final field KEYS Ljava/lang/String;
 	public static final field PANE Ljava/lang/String;
 	public static final field QUICK_QUERY Ljava/lang/String;
 	public static final field ROW_PREFIX Ljava/lang/String;
 	public static final field SEARCH Ljava/lang/String;
+	public static final field SEARCHING Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/shell/palette/ComposableSingletons$CommandPalettePaneKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/palette/ComposableSingletons$CommandPalettePaneKt;
 	public fun <init> ()V
+	public final fun getLambda$1251809149$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$976324523$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
