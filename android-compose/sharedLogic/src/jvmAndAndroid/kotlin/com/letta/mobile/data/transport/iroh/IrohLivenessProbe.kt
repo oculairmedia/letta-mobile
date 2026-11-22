@@ -74,26 +74,35 @@ internal class IrohLivenessProbe(
     private val millisSinceLastProofOfLife: () -> Long,
     private val adminRpcPathEvidence: (windowMs: Long) -> AdminRpcPathEvidence =
         { AdminRpcPathEvidence.idle(millisSinceLastProofOfLife()) },
-    private val runtime: Runtime = Runtime(),
+    private val runtime: Runtime,
     private val reportConnectionLost: (reason: String, handle: IrohConnectionHandle) -> Unit,
 ) {
     /**
-     * Where and on what clock the loop runs. Production uses its own wall-clock IO
-     * scope (see [scope]); unit tests pass a virtual-time scope + scheduler clock and
-     * drive the loop with `advanceTimeBy` (never `advanceUntilIdle` — the loop is endless).
+     * Where and on what clock the loop runs. Production uses a wall-clock IO scope
+     * bounded by its owner's lifetime (see [scope]); unit tests pass a virtual-time scope +
+     * scheduler clock and drive the loop with `advanceTimeBy` (never `advanceUntilIdle` —
+     * the loop is endless).
      */
-    @Suppress("NoDetachedCoroutineLifecycle") // deliberate: see [scope] — wall clock, owned via start/stop
     internal class Runtime(
-        val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+        val scope: CoroutineScope,
         val clock: () -> Long = System::currentTimeMillis,
-    )
+    ) {
+        /**
+         * Wall-clock IO scope whose job is a child of [lifetime]. An owner that ends without
+         * calling [stop] (a cancelled caller scope, a transport that is dropped rather than
+         * closed) still ends the loop, so it cannot keep probing an abandoned handle and
+         * writing liveness telemetry for the rest of the process.
+         */
+        @Suppress("NoDetachedCoroutineLifecycle") // Owned: a child of [lifetime], cancelled with it.
+        constructor(lifetime: Job) : this(CoroutineScope(SupervisorJob(lifetime) + Dispatchers.IO))
+    }
 
     /** Evidence window: everything since the previous tick plus this probe's wait. */
     private val evidenceWindowMs: Long get() = intervalMs + timeoutMs
 
     /**
-     * The probe runs on its OWN wall-clock scope, never a caller's (the [Runtime]
-     * default; only isolated unit tests substitute a virtual-time scope).
+     * The probe runs on its OWN wall-clock scope, never a caller's dispatcher (the
+     * owner-bounded [Runtime]; only isolated unit tests substitute a virtual-time scope).
      *
      * Two reasons, both load-bearing:
      *  1. Liveness must be measured in real elapsed time. Parented to a caller's
@@ -103,7 +112,7 @@ internal class IrohLivenessProbe(
      *  2. It is an endless supervision loop, so it must never count as outstanding
      *     structured-concurrency work for whoever owns the transport's scope.
      * Its lifetime is still explicit: [stop] cancels the job on any non-Ready
-     * transition and on disconnect.
+     * transition and on disconnect, and the owner's lifetime ending cancels it too.
      */
     private val scope = runtime.scope
 
