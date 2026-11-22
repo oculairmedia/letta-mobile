@@ -257,6 +257,7 @@ class MobileDesignSystemRulesTest {
         assertEquals(1, RawMaterialCard().lintAt(root, FEATURE, qualified).size)
         assertEquals(0, RawMaterialCard().lintAt(root, FEATURE, projectType).size)
         assertEquals(2, RawMaterialCard().lintAt(root, COMPONENT, explicit).size)
+        assertEquals(2, RawMaterialCard().lintAt(root, THEME, explicit).size)
         assertEquals(0, RawMaterialCard().lintAt(root, FOUNDATION, explicit).size)
         assertEquals(0, RawMaterialCard().lintAt(root, TEST, explicit).size)
         assertEquals(0, RawMaterialCard().lintAt(root, NOT_UI, explicit).size)

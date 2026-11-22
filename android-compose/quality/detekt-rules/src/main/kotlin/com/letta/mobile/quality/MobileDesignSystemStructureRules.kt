@@ -314,7 +314,8 @@ private const val FOUNDATION_PATH = "/ui/components/foundation/"
  *
  * Only calls whose name the file resolves to Material count: an explicit or wildcard import from
  * `androidx.compose.material3` or `androidx.compose.material`, or a fully qualified call. A
- * project type that happens to be called `Card` passes.
+ * project type that happens to be called `Card` passes. Token files are checked too: only the
+ * foundation package may build on a raw Material card.
  */
 internal class RawMaterialCard(config: Config = Config.empty) : MobileRule(
     config,
@@ -325,7 +326,7 @@ internal class RawMaterialCard(config: Config = Config.empty) : MobileRule(
         super.visitCallExpression(expression)
         val file = expression.containingKtFile
         val card = expression.calleeName()
-            ?.takeIf { file.isStyledUiSource() && FOUNDATION_PATH !in file.uiPath() }
+            ?.takeIf { file.isUiSource() && FOUNDATION_PATH !in file.uiPath() }
             ?.let { callee -> expression.qualifiedMaterialCard(callee) ?: file.importedMaterialCard(callee) }
             ?: return
         report(
