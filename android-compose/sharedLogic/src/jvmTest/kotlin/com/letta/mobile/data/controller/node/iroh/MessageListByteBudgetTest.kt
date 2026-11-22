@@ -2,7 +2,6 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -11,7 +10,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -19,7 +17,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,15 +26,13 @@ import kotlin.test.assertTrue
  * letta-mobile-vzn89: `message.list` pages are bounded by bytes as well as count, and a client paging
  * on from the last message it received sees every stored message exactly once, in both orders.
  *
- * The App Server here is a copy of letta.js 0.34.39's local store paging (`listConversationMessagePage`
- * over `LocalStore.applyListOptions`): `desc` is its default order, a page is anchored at the `before` /
- * `after` cursor (or the newest / oldest row without one), a cursor it cannot find is ignored, a
- * non-number or non-positive `limit` lists everything before the 50-row page cut, and an unknown
- * conversation fails as its strict local store does ("Conversation <id> not found").
+ * The App Server here is [LettaJsMessagePaging], a copy of letta.js 0.34.39's local store paging.
  */
 class MessageListByteBudgetTest {
-    private class LettaJsLocalStore(private val conversations: Map<String, List<JsonObject>>) : AppServerClient {
-        var calls = 0
+    /** letta.js paging behind the AppServerClient interface; every other native call is unexpected. */
+    private class LettaJsLocalStore(conversations: Map<String, List<JsonObject>>) : AppServerClient {
+        val paging = LettaJsMessagePaging(conversations)
+        val calls get() = paging.calls
         override val events: Flow<AppServerReceivedFrame> = emptyFlow()
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) = error("unused")
         override suspend fun input(command: AppServerCommand.Input) = error("unused")
@@ -45,25 +40,7 @@ class MessageListByteBudgetTest {
         override suspend fun abort(command: AppServerCommand.AbortMessage) = error("unused")
         override suspend fun adminRpc(command: AppServerCommand.AdminRpc) = error("unused")
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = error("unused")
-
-        override suspend fun conversationMessagesList(
-            command: AppServerCommand.ConversationMessagesList,
-        ): AppServerInboundFrame.ConversationMessagesListResponse {
-            calls++
-            val stored = conversations[command.conversationId]
-                ?: return AppServerInboundFrame.ConversationMessagesListResponse(
-                    command.requestId, false, JsonArray(emptyList()), "Conversation ${command.conversationId} not found",
-                )
-            val query = command.query ?: JsonObject(emptyMap())
-            fun cursor(key: String) = (query[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotEmpty() }
-            var items = stored
-            cursor("before")?.let { before -> items.indexOfFirst { it.id() == before }.takeIf { it >= 0 }?.let { items = items.take(it) } }
-            cursor("after")?.let { after -> items.indexOfFirst { it.id() == after }.takeIf { it >= 0 }?.let { items = items.drop(it + 1) } }
-            if ((query["order"] as? JsonPrimitive)?.contentOrNull != "asc") items = items.reversed()
-            val limit = (query["limit"] as? JsonPrimitive)?.takeUnless { it.isString }?.longOrNull?.takeIf { it > 0 }?.toInt()
-            val page = items.take(limit ?: items.size).take(limit ?: DEFAULT_APP_SERVER_PAGE)
-            return AppServerInboundFrame.ConversationMessagesListResponse(command.requestId, true, JsonArray(page))
-        }
+        override suspend fun conversationMessagesList(command: AppServerCommand.ConversationMessagesList) = paging.list(command)
     }
 
     private data class Walk(val ids: List<String>, val pageBytes: List<Int>, val appServerCalls: Int)
@@ -89,9 +66,9 @@ class MessageListByteBudgetTest {
             val result = envelope.getValue("result")
             val rows = rowsOf(result)
             bytes += result.toString().encodeToByteArray().size
-            ids += rows.map { it.id() }
+            ids += rows.map { it.rowId() }
             val hasMore = (result as? JsonObject)?.get("has_more")?.jsonPrimitive?.booleanOrNull ?: (rows.size >= PAGE_LIMIT)
-            val lastDelivered = rows.lastOrNull()?.id()
+            val lastDelivered = rows.lastOrNull()?.rowId()
             val explicit = (result as? JsonObject)?.get("next_before")?.jsonPrimitive?.contentOrNull.takeUnless { ascending }
             cursor = if (hasMore) explicit ?: lastDelivered else null
             assertTrue(ids.size <= STORED_ROWS * 2, "walk must terminate")
@@ -111,7 +88,7 @@ class MessageListByteBudgetTest {
                         "pages=${walk.pageBytes.size} appServerCalls=${walk.appServerCalls} " +
                         "maxPageBytes=${walk.pageBytes.max()} totalBytes=${walk.pageBytes.sum()} rows=${walk.ids.size}/${stored.size}",
                 )
-                assertEquals(stored.map { it.id() }, walk.ids, "every stored message exactly once, in order")
+                assertEquals(stored.map { it.rowId() }, walk.ids, "every stored message exactly once, in order")
                 walk.pageBytes.forEach { size ->
                     assertTrue(size <= MessageListPageGuard.MAX_PAGE_BYTES, "page of $size bytes exceeds the byte budget")
                 }
@@ -128,8 +105,8 @@ class MessageListByteBudgetTest {
             router.dispatch("default-order", "message.list", buildJsonObject { put("conversation_id", CONVERSATION) }),
         ).jsonObject.getValue("result")
         val rows = rowsOf(result)
-        assertEquals(stored.last().id(), rows.first().id(), "the newest message opens the default page")
-        assertEquals(rows.last().id(), result.jsonObject.getValue("next_before").jsonPrimitive.content)
+        assertEquals(stored.last().rowId(), rows.first().rowId(), "the newest message opens the default page")
+        assertEquals(rows.last().rowId(), result.jsonObject.getValue("next_before").jsonPrimitive.content)
     }
 
     @Test
@@ -206,5 +183,3 @@ class MessageListByteBudgetTest {
         const val LARGE_ASSISTANT_BYTES = 320_000
     }
 }
-
-private fun JsonObject.id(): String = getValue("id").jsonPrimitive.content

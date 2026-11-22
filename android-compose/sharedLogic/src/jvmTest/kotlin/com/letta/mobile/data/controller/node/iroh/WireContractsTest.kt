@@ -72,6 +72,7 @@ class WireContractsTest {
                     "controller_state", "conversations", "hidden_agent_ids", "visibility_index",
                     "reflection_settings", "monitor_success", "toolset_response", "cron_control", "execute_command_response", "voice",
                     "pins", "shell_state", "service_credentials", "feed", "agents", "agent_list_error",
+                    "pins", "shell_state", "service_credentials", "feed", "messages",
                 )
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
@@ -96,7 +97,7 @@ class WireContractsTest {
                         ),
                     )
                     val response = Json.parseToJsonElement(router.dispatch(invocation)).jsonObject
-                    assertEquals(fixture.response(name), response, "${fixture.method}/$name wire response")
+                    assertEquals(LettaJsMessagePaging.expanded(fixture.response(name)), response, "${fixture.method}/$name wire response")
                 }
             }
         }
@@ -337,6 +338,19 @@ class WireContractsTest {
 
     private fun fixtureNative(host: JsonObject?): AppServerClient = when {
         host?.containsKey("agents") == true -> agentNative(host)
+    /** The App Server's message paging over the case's stored rows ([LettaJsMessagePaging]); any other native call fails. */
+    private fun messagesNative(host: JsonObject): AppServerClient {
+        val paging = LettaJsMessagePaging.fromFixture(host.getValue("messages").jsonObject)
+        return Proxy.newProxyInstance(
+            AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java),
+        ) { _, method, args ->
+            check(method.name == "conversationMessagesList") { "Unexpected native call: ${method.name}" }
+            paging.list(args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.ConversationMessagesList)
+        } as AppServerClient
+    }
+
+    private fun fixtureNative(host: JsonObject?): AppServerClient = when {
+        host?.containsKey("messages") == true -> messagesNative(host)
         host?.containsKey("monitor_success") == true -> monitorNative(host)
         host?.containsKey("toolset_response") == true -> toolsetNative(host)
         host?.containsKey("cron_control") == true -> cronControlNative(host)
@@ -367,7 +381,11 @@ class WireContractsTest {
                 File(backend, "agents/$agent.json").writeText("""{"id":"$agent","hidden":true}""")
             }
         }
-        val identityStore = rejectCalls<TurnIdentityStore>("identity-store")
+        // message.list serves every row through the turn identity ledger, as the wrapper wires it: a file store in
+        // host state and the App Server's own rows. Every other family must never touch the ledger.
+        val serving = host?.containsKey("messages") == true
+        val identityStore = if (serving) FileTurnIdentityStore(File(dir, "turn-identity")) else rejectCalls<TurnIdentityStore>("identity-store")
+        val identityRows = if (serving) AppServerConversationRows(native) else ConversationRowsSource { _, _ -> error("Unexpected transcript read") }
         try {
             runtime.start()
             val router = AdminRpcRegistry.buildRouter(
@@ -391,9 +409,7 @@ class WireContractsTest {
                 notifications = AdminRpcNotifications(
                     agentChanges = AgentChangeNotifier(plugins.scope),
                     conversationChanges = ConversationChangeNotifier(plugins.scope),
-                    turnIdentity = TurnIdentityLedger(
-                        identityStore, ConversationRowsSource { _, _ -> error("Unexpected transcript read") },
-                    ) { 0L },
+                    turnIdentity = TurnIdentityLedger(identityStore, identityRows) { 0L },
                     permissionModes = PermissionModePublisher(plugins.scope),
                 ),
             )
