@@ -169,10 +169,14 @@ private fun OverlaySnackbar(host: OverlayHost, modifier: Modifier) {
 @Composable
 private fun OverlaySnackbarCard(host: OverlayHost, entry: OverlayEntry) {
     val overlay = entry.overlay
+    val touch = LocalLettaHost.current.input == LettaInput.Touch
     Snackbar(
         // Slots may require the full width; do not pass that minimum to each snackbar action.
         modifier = Modifier.wrapContentWidth().padding(LettaDimens.Space.md)
-            .widthIn(max = LettaSurfaceSizes.snackbarMaxWidth).testTag(OverlayTags.SNACKBAR),
+            .widthIn(max = LettaSurfaceSizes.snackbarMaxWidth)
+            .swipeAwayOnTouch(enabled = touch) { host.dismiss(entry.id) }
+            .overlayAnnouncement(urgent = false)
+            .testTag(OverlayTags.SNACKBAR),
         action = overlay.action?.let { action ->
             { TextButton(onClick = { host.performAction(entry.id) }, Modifier.testTag(OverlayTags.ACTION)) { Text(action.label) } }
         },
@@ -217,7 +221,10 @@ private fun OverlayBannerCard(host: OverlayHost, entry: OverlayEntry) {
         }
         LettaInlineNotice(
             notice = LettaNotice(overlay.message, tone = if (error) LettaPanelTone.Error else LettaPanelTone.Info, elevated = true),
-            modifier = Modifier.widthIn(max = LettaSurfaceSizes.bannerMaxWidth).testTag(OverlayTags.BANNER),
+            modifier = Modifier
+                .widthIn(max = LettaSurfaceSizes.bannerMaxWidth)
+                .overlayAnnouncement(urgent = error)
+                .testTag(OverlayTags.BANNER),
             action = action,
             dismiss = dismiss,
         )

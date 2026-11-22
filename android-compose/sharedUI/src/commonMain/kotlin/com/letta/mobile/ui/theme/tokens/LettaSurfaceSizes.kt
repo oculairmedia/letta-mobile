@@ -39,6 +39,9 @@ object LettaSurfaceSizes {
     /** The widest a snackbar grows on a wide window (the overlay layer). */
     val snackbarMaxWidth: Dp = 600.dp
 
+    /** How far a snackbar is swiped sideways on touch before letting go puts it away (OverlaySwipe). */
+    val snackbarSwipeThreshold: Dp = 96.dp
+
     /** The widest a top banner grows on a wide window (the overlay layer). */
     val bannerMaxWidth: Dp = 720.dp
 
