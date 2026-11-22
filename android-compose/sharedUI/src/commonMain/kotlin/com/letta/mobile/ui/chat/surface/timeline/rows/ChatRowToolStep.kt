@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,12 +22,18 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.avatar.core.gaze.AttentionKey
 import com.letta.mobile.avatar.core.gaze.AttentionKind
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.chat.projection.classifyToolCallState
 import com.letta.mobile.data.chat.tools.ToolInset
+import com.letta.mobile.data.chat.tools.ToolLineChanges
 import com.letta.mobile.data.chat.tools.ToolVerb
 import com.letta.mobile.data.chat.tools.bundled.PlanModeToolPresenter
 import com.letta.mobile.data.subagents.SubagentIdentity
@@ -40,8 +47,11 @@ import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.model.extractSubagentNotification
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_tool_awaiting_approval
+import com.letta.mobile.sharedui.resources.rows_tool_changes_description
 import com.letta.mobile.sharedui.resources.rows_tool_exited
 import com.letta.mobile.sharedui.resources.rows_tool_failed
+import com.letta.mobile.sharedui.resources.rows_tool_lines_added
+import com.letta.mobile.sharedui.resources.rows_tool_lines_removed
 import com.letta.mobile.sharedui.resources.rows_tool_result_preview
 import com.letta.mobile.sharedui.resources.rows_tool_status_running
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceMetadata
@@ -54,6 +64,7 @@ import com.letta.mobile.ui.chat.tools.title
 import com.letta.mobile.ui.components.LineFrame
 import com.letta.mobile.ui.components.LocalLineRail
 import com.letta.mobile.ui.components.foundation.StatusGlyph
+import com.letta.mobile.ui.components.foundation.successTint
 import com.letta.mobile.ui.components.line.LineDisclosure
 import com.letta.mobile.ui.components.line.LineRail
 import com.letta.mobile.ui.components.line.StatusTone
@@ -69,8 +80,10 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * One tool call as one muted, verb-first step line ("Ran  ./gradlew test  ›"), the same on every
- * host: the presenter's verb and target, a small spinner only while it runs, a muted amber
- * "exited 2" only when it failed, and a chevron when it has something to open. No card, no badge.
+ * host: the presenter's verb and target, an edit's "+3 −1" in diff colours, a small spinner while it
+ * runs and then how it settled (a muted check, or the failure mark), how long it took once that was
+ * a second or more, a muted amber "exited 2" only when it failed, and a chevron when it has
+ * something to open. No card, no badge.
  * Opened, its [ToolInsetView] unfolds under the line (height animated, snapping under reduced
  * motion), with the call's file chips and images. The inset is built only while it is open.
  *
@@ -141,6 +154,12 @@ private class StepLineSpec(
     val running: Boolean,
     /** Who a subagent dispatch went to, badged when it is an external coding agent (Claude Code, Codex). */
     val agent: SubagentIdentity? = null,
+    /** How it settled, for its glyph: null while it runs or waits on the person. */
+    val settled: StatusTone? = null,
+    /** What its change added and removed ("+3 −1"), after the target. */
+    val changes: ToolLineChanges? = null,
+    /** How long it took, said once it settled and only when it took long enough to matter. */
+    val durationMs: Long? = null,
 )
 
 /** A step line's muted note: a failure in amber, or that it waits on the person. */
@@ -158,6 +177,7 @@ private fun stepLineSpec(toolCall: UiToolCall, state: ToolTimelineState, callbac
             target = provenance.deliveryState.displayLabel(),
             note = StepNote(stringResource(Res.string.rows_tool_failed)).takeIf { failed },
             running = running,
+            settled = settledTone(state),
         )
     }
     // A watched task's line says how long it has run ("running 1m 12s"), ticking while it does; no other line ticks.
@@ -165,7 +185,27 @@ private fun stepLineSpec(toolCall: UiToolCall, state: ToolTimelineState, callbac
     val elapsed = if (watching) rememberElapsedSeconds(active = true, startedAtEpochMs = null).value * MILLIS_PER_SECOND else null
     val line = rememberToolStepLine(toolCall, elapsed ?: toolCall.executionTimeMs)
     val agent = toolCall.subagentDispatch?.let { subagentIdentityOf(it.subagentType, listOf(it.subagentAgentId)) }
-    return StepLineSpec(line.title(), line.target, noteOf(line, state), running, agent)
+    return StepLineSpec(
+        title = line.title(),
+        target = line.target,
+        note = noteOf(line, state),
+        running = running,
+        agent = agent,
+        settled = settledTone(state),
+        changes = line.changes,
+        durationMs = toolCall.executionTimeMs.takeIf { !running && (it ?: 0L) >= SHOWN_DURATION_MILLIS },
+    )
+}
+
+/**
+ * A settled step's glyph: a muted check when it succeeded, the warning or failure mark when it did
+ * not; none while it runs (the spinner) or waits on the person (its note says so).
+ */
+private fun settledTone(state: ToolTimelineState): StatusTone? = when (state) {
+    ToolTimelineState.Succeeded -> StatusTone.Done
+    ToolTimelineState.Warning -> StatusTone.Attention
+    ToolTimelineState.Failed, ToolTimelineState.Rejected -> StatusTone.Failed
+    ToolTimelineState.Running, ToolTimelineState.AwaitingApproval -> null
 }
 
 /** "exited 2" for a non-zero exit, "failed" for a failure naming no code, "awaiting approval" while parked; else nothing. */
@@ -194,11 +234,29 @@ private fun ToolStepLineRow(spec: StepLineSpec, disclosure: LineDisclosure?) {
         rail = LineRail.Step,
         tag = ChatRowTestTags.TOOL_CARD_TOGGLE,
         disclosure = disclosure,
-        glyph = { if (spec.running) StatusGlyph(StatusTone.Working, Modifier.testTag(ChatRowTestTags.TOOL_STATUS_GLYPH), runningLabel) },
+        glyph = { StepGlyph(spec, runningLabel) },
     ) {
         StepLineWords(spec)
     }
 }
+
+/**
+ * The step's glyph, in the slot the line always keeps: the spinner while it runs, then how it settled
+ * (cross-fading, so the words never move); nothing while it waits on the person.
+ */
+@Composable
+private fun StepGlyph(spec: StepLineSpec, runningLabel: String) {
+    val tone = if (spec.running) StatusTone.Working else spec.settled ?: return
+    StatusGlyph(
+        tone,
+        Modifier.testTag(ChatRowTestTags.TOOL_STATUS_GLYPH).semantics { toolStepTone = tone },
+        runningLabel.takeIf { spec.running },
+    )
+}
+
+/** The tone a step's glyph shows (tests read it; pixels cannot be asserted). */
+internal val ToolStepToneKey = SemanticsPropertyKey<StatusTone>("ToolStepTone")
+private var SemanticsPropertyReceiver.toolStepTone by ToolStepToneKey
 
 @Composable
 private fun RowScope.StepLineWords(spec: StepLineSpec) {
@@ -213,7 +271,17 @@ private fun RowScope.StepLineWords(spec: StepLineSpec) {
         // Its own width only: the badge, the note and the chevron follow the words, not the far edge.
         modifier = Modifier.weight(1f, fill = false),
     )
+    spec.changes?.let { StepChanges(it) }
     spec.agent?.let { ExternalAgentBadge(it) }
+    spec.durationMs?.let { duration ->
+        Text(
+            text = formatRunDuration(duration),
+            style = MaterialTheme.typography.labelMedium,
+            color = muted.copy(alpha = TARGET_ALPHA),
+            maxLines = 1,
+            modifier = Modifier.testTag(ChatRowTestTags.TOOL_STEP_DURATION),
+        )
+    }
     spec.note?.let { note ->
         Text(
             text = note.text,
@@ -222,6 +290,19 @@ private fun RowScope.StepLineWords(spec: StepLineSpec) {
             maxLines = 1,
             modifier = Modifier.testTag(ChatRowTestTags.TOOL_STEP_NOTE),
         )
+    }
+}
+
+/** A change's "+3 −1": the added count in the success ink, the removed in the error colour, as a diff reads. */
+@Composable
+private fun StepChanges(changes: ToolLineChanges) {
+    val description = stringResource(Res.string.rows_tool_changes_description, changes.added, changes.removed)
+    Row(
+        modifier = Modifier.testTag(ChatRowTestTags.TOOL_STEP_CHANGES).clearAndSetSemantics { contentDescription = description },
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+    ) {
+        Text(text = stringResource(Res.string.rows_tool_lines_added, changes.added), style = MaterialTheme.typography.labelMedium, color = successTint(), maxLines = 1)
+        Text(text = stringResource(Res.string.rows_tool_lines_removed, changes.removed), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error, maxLines = 1)
     }
 }
 
@@ -321,6 +402,9 @@ internal fun ToolGeneratedImages(toolCall: UiToolCall, callbacks: ChatRowCallbac
 }
 
 private const val TARGET_ALPHA = 0.8f
+
+/** A settled step says how long it took from a second up; anything quicker is noise on every line. */
+private const val SHOWN_DURATION_MILLIS = 1_000L
 private const val MILLIS_PER_SECOND = 1_000L
 
 /** A call whose output may still grow: no terminal status yet, and not read back settled from the ledger. */

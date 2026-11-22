@@ -77,6 +77,9 @@
     <string name="rows_tool_exited">exited %1$d</string>
     <string name="rows_tool_status_running">Running</string>
     <string name="rows_tool_failed">failed</string>
+    <string name="rows_tool_lines_added">+%1$d</string>
+    <string name="rows_tool_lines_removed">−%1$d</string>
+    <string name="rows_tool_changes_description">%1$d lines added, %2$d removed</string>
     <string name="rows_tool_awaiting_approval">awaiting approval</string>
     <!-- A group of tool steps' label: its activities, joined pairwise ("Explored files, ran commands"). -->
     <string name="rows_steps_explored">explored files</string>

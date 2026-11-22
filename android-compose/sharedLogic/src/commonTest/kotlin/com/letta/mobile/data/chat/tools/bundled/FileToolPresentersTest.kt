@@ -2,6 +2,7 @@ package com.letta.mobile.data.chat.tools.bundled
 
 import com.letta.mobile.data.chat.tools.ToolCallFacts
 import com.letta.mobile.data.chat.tools.ToolInset
+import com.letta.mobile.data.chat.tools.ToolLineChanges
 import com.letta.mobile.data.chat.tools.ToolPreviewTarget
 import com.letta.mobile.data.chat.tools.ToolVerb
 import kotlinx.serialization.json.JsonPrimitive
@@ -43,10 +44,11 @@ class FileToolPresentersTest {
     fun editCountsTheLinesItAddedAndRemoved() {
         val diff = "--- a/a.kt\n+++ b/a.kt\n@@ -1,2 +1,3 @@\n-a\n+b\n+c\n+d"
         val withDiff = call("Edit", args("file_path" to "a.kt", "old_string" to "a", "new_string" to "b"), diff)
-        assertEquals("a.kt +3 −1", registry.line(withDiff).target)
+        assertEquals("a.kt", registry.line(withDiff).target)
+        assertEquals(ToolLineChanges(added = 3, removed = 1), registry.line(withDiff).changes)
         assertEquals(ToolInset.Diff(diff), registry.inset(withDiff))
         val replaced = call("Edit", args("file_path" to "a.kt", "old_string" to "a\nb", "new_string" to "c"), "The file was updated")
-        assertEquals("a.kt +1 −2", registry.line(replaced).target)
+        assertEquals(ToolLineChanges(added = 1, removed = 2), registry.line(replaced).changes)
         assertEquals(ToolInset.BeforeAfter("a\nb", "c"), registry.inset(replaced))
     }
 
@@ -64,7 +66,8 @@ class FileToolPresentersTest {
         val patch = "*** Begin Patch\n*** Update File: src/a.kt\n@@\n-x\n+y\n*** End Patch"
         val facts = call("apply_patch", args("input" to patch))
         val line = registry.line(facts)
-        assertEquals("src/a.kt +1 −1", line.target)
+        assertEquals("src/a.kt", line.target)
+        assertEquals(ToolLineChanges(added = 1, removed = 1), line.changes)
         assertEquals(listOf(ToolPreviewTarget.File("src/a.kt")), line.previews)
         assertEquals(ToolInset.Text(patch), registry.inset(facts))
     }

@@ -2,6 +2,7 @@ package com.letta.mobile.data.chat.tools.bundled
 
 import com.letta.mobile.data.chat.tools.ToolCallFacts
 import com.letta.mobile.data.chat.tools.ToolInset
+import com.letta.mobile.data.chat.tools.ToolLineChanges
 import com.letta.mobile.data.chat.tools.ToolMatcher
 import com.letta.mobile.data.chat.tools.ToolPresenter
 import com.letta.mobile.data.chat.tools.ToolPresenterScope
@@ -14,7 +15,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * letta-code's `Edit` and `MultiEdit` (and `replace`, `apply_patch`): "Edited src/a.kt +3 −1", the
- * lines it added and removed on the line, opening to the change: the result's unified diff when the
+ * lines it added and removed on the line (its [ToolStepLine.changes]), opening to the change: the result's unified diff when the
  * tool returned one, else the patch it applied, else what was replaced and what replaced it.
  */
 object EditToolPresenter : ToolPresenter {
@@ -25,12 +26,12 @@ object EditToolPresenter : ToolPresenter {
 
     override fun line(call: ToolCallFacts, scope: ToolPresenterScope): ToolStepLine {
         val path = call.filePath() ?: patchedFile(call)
-        val counts = changeCounts(call)?.let { (added, removed) -> "+$added −$removed" }
         return ToolStepLine(
             verb = ToolVerb.Edited,
-            target = listOfNotNull(path, counts).joinToString(" "),
+            target = path.orEmpty(),
             previews = filePreview(path),
             presenterId = id,
+            changes = changeCounts(call),
         )
     }
 
@@ -45,18 +46,18 @@ object EditToolPresenter : ToolPresenter {
      * Lines added and removed: counted in the change's diff or patch (`+` / `-` lines, not their
      * headers), else in what was replaced and what replaced it. Null when the call names no change.
      */
-    private fun changeCounts(call: ToolCallFacts): Pair<Int, Int>? {
+    private fun changeCounts(call: ToolCallFacts): ToolLineChanges? {
         val diff = call.result?.takeIf(UnifiedDiff::looksLikeDiff) ?: call.string(PATCH)
         if (diff != null) return diffCounts(diff)
         val (before, after) = replacement(call) ?: return null
-        return lineCountOrZero(after) to lineCountOrZero(before)
+        return ToolLineChanges(added = lineCountOrZero(after), removed = lineCountOrZero(before))
     }
 
-    private fun diffCounts(diff: String): Pair<Int, Int> {
+    private fun diffCounts(diff: String): ToolLineChanges {
         val lines = diff.lineSequence()
         val added = lines.count { it.startsWith("+") && !it.startsWith("+++") }
         val removed = lines.count { it.startsWith("-") && !it.startsWith("---") }
-        return added to removed
+        return ToolLineChanges(added, removed)
     }
 
     private fun lineCountOrZero(text: String): Int = if (text.isEmpty()) 0 else lineCount(text)

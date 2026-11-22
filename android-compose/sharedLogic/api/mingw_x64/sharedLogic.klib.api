@@ -38713,6 +38713,22 @@ final class com.letta.mobile.data.chat.tools/ToolInsetSpec { // com.letta.mobile
     }
 }
 
+final class com.letta.mobile.data.chat.tools/ToolLineChanges { // com.letta.mobile.data.chat.tools/ToolLineChanges|null[0]
+    constructor <init>(kotlin/Int, kotlin/Int) // com.letta.mobile.data.chat.tools/ToolLineChanges.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
+
+    final val added // com.letta.mobile.data.chat.tools/ToolLineChanges.added|{}added[0]
+        final fun <get-added>(): kotlin/Int // com.letta.mobile.data.chat.tools/ToolLineChanges.added.<get-added>|<get-added>(){}[0]
+    final val removed // com.letta.mobile.data.chat.tools/ToolLineChanges.removed|{}removed[0]
+        final fun <get-removed>(): kotlin/Int // com.letta.mobile.data.chat.tools/ToolLineChanges.removed.<get-removed>|<get-removed>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.data.chat.tools/ToolLineChanges.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.letta.mobile.data.chat.tools/ToolLineChanges.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int = ...): com.letta.mobile.data.chat.tools/ToolLineChanges // com.letta.mobile.data.chat.tools/ToolLineChanges.copy|copy(kotlin.Int;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.tools/ToolLineChanges.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.tools/ToolLineChanges.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools/ToolLineChanges.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.chat.tools/ToolMatcher { // com.letta.mobile.data.chat.tools/ToolMatcher|null[0]
     constructor <init>(kotlin.collections/List<kotlin/String>, kotlin.collections/Set<kotlin/String> = ...) // com.letta.mobile.data.chat.tools/ToolMatcher.<init>|<init>(kotlin.collections.List<kotlin.String>;kotlin.collections.Set<kotlin.String>){}[0]
 
@@ -38866,8 +38882,10 @@ final class com.letta.mobile.data.chat.tools/ToolPreviewSpec { // com.letta.mobi
 }
 
 final class com.letta.mobile.data.chat.tools/ToolStepLine { // com.letta.mobile.data.chat.tools/ToolStepLine|null[0]
-    constructor <init>(com.letta.mobile.data.chat.tools/ToolVerb, kotlin/String? = ..., kotlin/String = ..., kotlin.collections/List<com.letta.mobile.data.chat.tools/ToolPreviewTarget> = ..., com.letta.mobile.data.chat.tools/ToolFailure? = ..., kotlin/String, kotlin/Boolean = ...) // com.letta.mobile.data.chat.tools/ToolStepLine.<init>|<init>(com.letta.mobile.data.chat.tools.ToolVerb;kotlin.String?;kotlin.String;kotlin.collections.List<com.letta.mobile.data.chat.tools.ToolPreviewTarget>;com.letta.mobile.data.chat.tools.ToolFailure?;kotlin.String;kotlin.Boolean){}[0]
+    constructor <init>(com.letta.mobile.data.chat.tools/ToolVerb, kotlin/String? = ..., kotlin/String = ..., kotlin.collections/List<com.letta.mobile.data.chat.tools/ToolPreviewTarget> = ..., com.letta.mobile.data.chat.tools/ToolFailure? = ..., kotlin/String, kotlin/Boolean = ..., com.letta.mobile.data.chat.tools/ToolLineChanges? = ...) // com.letta.mobile.data.chat.tools/ToolStepLine.<init>|<init>(com.letta.mobile.data.chat.tools.ToolVerb;kotlin.String?;kotlin.String;kotlin.collections.List<com.letta.mobile.data.chat.tools.ToolPreviewTarget>;com.letta.mobile.data.chat.tools.ToolFailure?;kotlin.String;kotlin.Boolean;com.letta.mobile.data.chat.tools.ToolLineChanges?){}[0]
 
+    final val changes // com.letta.mobile.data.chat.tools/ToolStepLine.changes|{}changes[0]
+        final fun <get-changes>(): com.letta.mobile.data.chat.tools/ToolLineChanges? // com.letta.mobile.data.chat.tools/ToolStepLine.changes.<get-changes>|<get-changes>(){}[0]
     final val expandable // com.letta.mobile.data.chat.tools/ToolStepLine.expandable|{}expandable[0]
         final fun <get-expandable>(): kotlin/Boolean // com.letta.mobile.data.chat.tools/ToolStepLine.expandable.<get-expandable>|<get-expandable>(){}[0]
     final val failure // com.letta.mobile.data.chat.tools/ToolStepLine.failure|{}failure[0]
@@ -38890,7 +38908,8 @@ final class com.letta.mobile.data.chat.tools/ToolStepLine { // com.letta.mobile.
     final fun component5(): com.letta.mobile.data.chat.tools/ToolFailure? // com.letta.mobile.data.chat.tools/ToolStepLine.component5|component5(){}[0]
     final fun component6(): kotlin/String // com.letta.mobile.data.chat.tools/ToolStepLine.component6|component6(){}[0]
     final fun component7(): kotlin/Boolean // com.letta.mobile.data.chat.tools/ToolStepLine.component7|component7(){}[0]
-    final fun copy(com.letta.mobile.data.chat.tools/ToolVerb = ..., kotlin/String? = ..., kotlin/String = ..., kotlin.collections/List<com.letta.mobile.data.chat.tools/ToolPreviewTarget> = ..., com.letta.mobile.data.chat.tools/ToolFailure? = ..., kotlin/String = ..., kotlin/Boolean = ...): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools/ToolStepLine.copy|copy(com.letta.mobile.data.chat.tools.ToolVerb;kotlin.String?;kotlin.String;kotlin.collections.List<com.letta.mobile.data.chat.tools.ToolPreviewTarget>;com.letta.mobile.data.chat.tools.ToolFailure?;kotlin.String;kotlin.Boolean){}[0]
+    final fun component8(): com.letta.mobile.data.chat.tools/ToolLineChanges? // com.letta.mobile.data.chat.tools/ToolStepLine.component8|component8(){}[0]
+    final fun copy(com.letta.mobile.data.chat.tools/ToolVerb = ..., kotlin/String? = ..., kotlin/String = ..., kotlin.collections/List<com.letta.mobile.data.chat.tools/ToolPreviewTarget> = ..., com.letta.mobile.data.chat.tools/ToolFailure? = ..., kotlin/String = ..., kotlin/Boolean = ..., com.letta.mobile.data.chat.tools/ToolLineChanges? = ...): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools/ToolStepLine.copy|copy(com.letta.mobile.data.chat.tools.ToolVerb;kotlin.String?;kotlin.String;kotlin.collections.List<com.letta.mobile.data.chat.tools.ToolPreviewTarget>;com.letta.mobile.data.chat.tools.ToolFailure?;kotlin.String;kotlin.Boolean;com.letta.mobile.data.chat.tools.ToolLineChanges?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.tools/ToolStepLine.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.tools/ToolStepLine.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools/ToolStepLine.toString|toString(){}[0]

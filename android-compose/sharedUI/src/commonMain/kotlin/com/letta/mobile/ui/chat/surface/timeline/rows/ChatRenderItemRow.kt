@@ -110,8 +110,12 @@ internal object ChatRowTestTags {
     const val TOOL_CARD_STATUS = "tool-card-status"
     const val TOOL_CARD_DETAIL = "tool-card-detail"
     const val TOOL_CARD_BODY = "tool-card-body"
-    /** A running tool step's small spinner: the shared status glyph while it works. */
+    /** A tool step's status glyph: the spinner while it works, then how it settled. */
     const val TOOL_STATUS_GLYPH = "tool-status-glyph"
+    /** A settled tool step's duration ("2.4s"). */
+    const val TOOL_STEP_DURATION = "tool-step-duration"
+    /** An edit step's "+3 −1". */
+    const val TOOL_STEP_CHANGES = "tool-step-changes"
     /** A step line's muted note: "exited N" / "failed" in amber, "awaiting approval" while parked. */
     const val TOOL_STEP_NOTE = "tool-step-note"
     const val PLAN_MODE_DIVIDER = "plan-mode-divider"
