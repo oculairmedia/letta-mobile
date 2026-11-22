@@ -1,6 +1,7 @@
 package com.letta.mobile.data.shellstate.shared
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -13,6 +14,9 @@ class ShellStateReply(
     /** The failure's `error` string; null on success. */
     val error: String? = null,
 )
+
+/** A `shell_state_updated` [frame] and the [connection] that delivered it (a [ShellStateLink.connection] identity). */
+class ShellStatePush(val frame: JsonObject, val connection: String?)
 
 /**
  * The part of the host connection the shared shell state uses. The app binds it to its channel
@@ -47,4 +51,20 @@ interface ShellStateLink {
 
     /** One `admin_rpc` call with [params]: the host's reply, failed or not. Throws when the link itself fails. */
     suspend fun call(method: String, params: JsonObject): ShellStateReply
+
+    /**
+     * [call] bound to [connection] (an identity this link reported): a link whose transport can be replaced must send it
+     * over that connection or not at all, so a request built on one connection's document never reaches another's. When
+     * [connection] is no longer the one that is up, nothing is sent and the reply is a failure without a code (the host is
+     * unreachable as far as that request is concerned). The default suits a link that has one connection for its life.
+     */
+    suspend fun callOn(connection: String?, method: String, params: JsonObject): ShellStateReply =
+        if (connection == currentConnection) call(method, params) else ShellStateReply(success = false)
+
+    /**
+     * [pushes], each with the connection that delivered it, decided where the frame arrived and not where it is read:
+     * a frame buffered behind a replaced transport still names the connection it came from. The default suits a link
+     * that has one connection for its life.
+     */
+    val originatedPushes: Flow<ShellStatePush> get() = pushes.map { ShellStatePush(it, currentConnection) }
 }

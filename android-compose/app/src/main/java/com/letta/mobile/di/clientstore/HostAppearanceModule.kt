@@ -2,11 +2,9 @@ package com.letta.mobile.di.clientstore
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import com.letta.mobile.data.clientstore.ShellStateCacheStore
+import com.letta.mobile.data.clientstore.hostAppearanceOver
 import com.letta.mobile.data.shellstate.HostAppearance
-import com.letta.mobile.data.shellstate.appearance.SharedShellAppearance
 import com.letta.mobile.data.shellstate.channel.channelShellStateLink
-import com.letta.mobile.data.shellstate.shared.SharedShellState
 import com.letta.mobile.data.storage.DataStoreSettingsPreferencesStore
 import com.letta.mobile.data.clientstore.LegacyAppearanceStore
 import com.letta.mobile.data.storage.SecureSettingsStore
@@ -33,10 +31,9 @@ object HostAppearanceModule {
         secureSettingsStore: SecureSettingsStore,
         transport: Provider<IChannelTransport>,
     ): HostAppearance {
-        val mirror = ShellStateCacheStore(secureSettingsStore)
-        return SharedShellAppearance(
-            shell = SharedShellState(channelShellStateLink { transport.get() }, mirror),
-            mirror = mirror,
+        return hostAppearanceOver(
+            link = channelShellStateLink { transport.get() },
+            store = secureSettingsStore,
             legacy = LegacyAppearanceStore(DataStoreSettingsPreferencesStore(dataStore)),
         )
     }

@@ -42,7 +42,6 @@ desktop PluginsPageBinding.liveViews | platform-only by design (ckmub.17.8; lett
 desktop SettingsContribution.needsHost | per-contribution option left unbound (default, null, empty or false); bind it or make it required (letta-mobile-7d9ua)
 desktop SettingsContribution.showForMode | per-contribution option left unbound (default, null, empty or false); bind it or make it required (letta-mobile-7d9ua)
 desktop SettingsContribution.updates | per-contribution option left unbound (default, null, empty or false); bind it or make it required (letta-mobile-7d9ua)
-desktop SettingsPageServices.appearance | desktop leaves appearance unbound (default, null, empty or false); bind it (letta-mobile-7d9ua)
 desktop ShellAgentRailActions.onAgentPinnedChange | desktop leaves onAgentPinnedChange unbound (default, null, empty or false); bind it (letta-mobile-7d9ua)
 desktop ShellHostPages.fallback | desktop leaves fallback unbound (default, null, empty or false); bind it (letta-mobile-7d9ua)
 desktop ShellWorkspaceHeaderBinding | desktop builds ShellWorkspaceHeaderState itself (LettaDesktopApp.kt); bind rememberShellWorkspaceHeader (letta-mobile-7d9ua)
@@ -62,7 +61,6 @@ web LettaShellWorkspaceSlots.sidePane | the browser has no background-task roste
 web PluginsPageBinding.catalog | web leaves catalog unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web PluginsPageBinding.liveViews | platform-only by design (ckmub.17.8; letta-mobile-ckmub.17): live plugin views need a host webview
 web PluginsPageBinding.pickPackage | web leaves pickPackage unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
-web SettingsPageServices.appearance | web leaves appearance unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web SettingsPageServices.contributions | web leaves contributions unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web SettingsPageServices.notifications | web leaves notifications unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web SettingsPageServices.onOpenProviders | web leaves onOpenProviders unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)

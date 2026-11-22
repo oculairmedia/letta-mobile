@@ -2,23 +2,22 @@ package com.letta.mobile.web
 
 import androidx.compose.runtime.MutableState
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.settings.ChatSettings
 import com.letta.mobile.ui.pairing.composition.installAndPairBindings
 import com.letta.mobile.ui.settings.BackendSettingsActions
 import com.letta.mobile.ui.settings.SettingsPageServices
+import com.letta.mobile.web.data.WasmAppServerClientGateway
 import com.letta.mobile.web.data.WebSettingsStore
 
 /**
- * letta-mobile-ckmub.3.12: what the web's Settings page can do. The backend address and mode are
- * kept in the browser's storage; the access token lasts the tab (see [WebSettingsStore]). The chat
- * section carries the default permission mode (letta-mobile-ckmub.17.25), as on desktop, and pairing
- * joins a host by invite through the shared composition (letta-mobile-wisqe S1b).
+ * What the web's Settings page can do. The backend address and mode are kept in the browser's storage; the access
+ * token lasts the tab (see [WebSettingsStore]). Appearance is the host's, as on desktop; the chat section carries the
+ * default permission mode; pairing joins a host by invite through the shared composition.
  */
 internal fun webSettingsServices(
     config: MutableState<LettaConfig>,
     store: WebSettingsStore,
-    permissionModes: PermissionModeSettings,
+    gateway: WasmAppServerClientGateway,
     pairing: WebPairingPorts,
 ) = SettingsPageServices(
     backend = BackendSettingsActions(
@@ -28,6 +27,7 @@ internal fun webSettingsServices(
         },
         onTokenCleared = { config.value = config.value.copy(accessToken = null) },
     ),
-    chat = ChatSettings(permissionMode = permissionModes),
+    appearance = gateway.hostAppearance.settings,
+    chat = ChatSettings(permissionMode = gateway.permissionModeSettings),
     pairing = installAndPairBindings(pairing, pairing),
 )

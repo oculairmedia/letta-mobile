@@ -2,7 +2,9 @@ package com.letta.mobile.desktop
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.runtime.compositionLocalOf
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageSlots
 import com.letta.mobile.ui.shell.pages.channels.ChannelsRefreshActionSlot
 import com.letta.mobile.ui.shell.pages.channels.ChannelsSearchFieldSlot
@@ -55,3 +57,6 @@ internal val DesktopChannelsPageSlots = ChannelsPageSlots(
         DesktopIconButton(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh", onClick = onRefresh, modifier = modifier)
     },
 )
+
+/** The persisted default permission mode (letta-mobile-bzvro.13); Settings leaves its row out where none is provided. */
+internal val LocalDesktopPermissionModeSettings = compositionLocalOf<PermissionModeSettings?> { null }

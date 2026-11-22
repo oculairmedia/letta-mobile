@@ -3,7 +3,6 @@ package com.letta.mobile.desktop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -13,7 +12,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalUriHandler
-import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.settings.BackendConnectionTester
 import com.letta.mobile.data.settings.ChatSettings
 import com.letta.mobile.data.settings.NotificationSettings
@@ -28,6 +26,7 @@ import com.letta.mobile.ui.notify.LocalAttentionPrefs
 import com.letta.mobile.ui.settings.BackendSettingsActions
 import com.letta.mobile.ui.settings.SettingsPageServices
 import com.letta.mobile.ui.settings.SettingsPageState
+import com.letta.mobile.ui.settings.rememberHostAppearanceSettings
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.shellSettingsPage
 import com.letta.mobile.ui.shell.pages.plugins.rememberPluginsContributions
@@ -62,6 +61,7 @@ private fun DesktopSettingsPage(
     val services = SettingsPageServices(
         backend = desktopBackendActions(actions),
         pairing = inputs.pairing,
+        appearance = rememberHostAppearanceSettings(LocalDesktopHostAppearance.current),
         chat = rememberDesktopChatSettings(),
         notifications = NotificationSettings(LocalAttentionPrefs.current),
         onOpenProviders = actions.onOpenProviders,
@@ -166,9 +166,6 @@ private fun rememberSystemAppearance() = systemAppearanceSection(
     // sRGB toArgb() packs ARGB; the low 24 bits are the RGB channels.
     accentHex = systemAccentColor()?.let { "#%06X".format(it.toArgb() and RGB_MASK) },
 )
-
-/** The persisted default permission mode (letta-mobile-bzvro.13); Settings leaves its row out where none is provided. */
-internal val LocalDesktopPermissionModeSettings = compositionLocalOf<PermissionModeSettings?> { null }
 
 /** Telemetry sampling cadence while the Settings page is visible. */
 private const val SYSTEM_INFO_REFRESH_INTERVAL_MS = 3_000L

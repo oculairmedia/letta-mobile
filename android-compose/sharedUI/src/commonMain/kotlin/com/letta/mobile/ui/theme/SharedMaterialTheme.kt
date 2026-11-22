@@ -15,29 +15,31 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.letta.mobile.data.model.ThemePreset
 
 /**
  * The Material 3 theme for hosts of the shared UI that have no platform
- * theme of their own (the web client): the cool-slate palette from the shared [LettaColorTokens],
- * the shared [CustomColors], and compact desktop-density type and shapes. Desktop's
- * `DesktopMaterialTheme` builds from the same [lettaColorScheme], [lettaCustomColors],
- * [SharedTypography] and [SharedShapes], so the two hosts cannot drift.
+ * theme of their own (desktop and the web): the colour [preset] (Default is the cool-slate palette from the shared
+ * [LettaColorTokens]), the shared [CustomColors], and compact desktop-density [typography] and shapes. Which one is drawn
+ * is the person's choice on the host: see [HostAppearanceTheme], which every such host wraps this in.
  */
 @Composable
 fun SharedMaterialTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    preset: ThemePreset = ThemePreset.DEFAULT,
+    typography: Typography = SharedTypography,
     content: @Composable () -> Unit,
 ) {
     ProvideAccessibilityPolicy {
         val highContrast = LocalHighContrast.current
-        val scheme = remember(darkTheme, highContrast) { lettaColorScheme(darkTheme, highContrast) }
+        val scheme = remember(darkTheme, highContrast, preset) { lettaColorScheme(darkTheme, highContrast, preset) }
         val customColors = remember(scheme) { lettaCustomColors(scheme) }
 
         CompositionLocalProvider(LocalCustomColors provides customColors) {
             MaterialTheme(
                 colorScheme = scheme,
                 shapes = SharedShapes,
-                typography = SharedTypography,
+                typography = typography,
                 content = content,
             )
         }
@@ -45,12 +47,15 @@ fun SharedMaterialTheme(
 }
 
 /**
- * The Letta default (cool-slate) Material colour scheme for hosts without a platform theme of their own
- * (desktop, web). Android's `LettaTheme` layers presets, dynamic colour and a contrast boost on top of
- * the same [LettaColorTokens].
+ * The Material colour scheme of [preset] for hosts without a platform theme of their own (desktop, web). Default is the
+ * Letta cool-slate scheme; every other preset is the preset's own light or dark scheme with the same accent contrast
+ * boost Android's `LettaTheme` gives it. Dynamic colour (wallpaper colours) is Android 12+ only and is not drawn here.
  */
-fun lettaColorScheme(dark: Boolean, highContrast: Boolean = false): ColorScheme {
-    val base = if (dark) lettaDarkScheme() else lettaLightScheme()
+fun lettaColorScheme(dark: Boolean, highContrast: Boolean = false, preset: ThemePreset = ThemePreset.DEFAULT): ColorScheme {
+    val base = when (preset) {
+        ThemePreset.DEFAULT -> if (dark) lettaDarkScheme() else lettaLightScheme()
+        else -> presetThemeColors(preset).let { if (dark) it.darkScheme else it.lightScheme }.withLettaContrastBoost()
+    }
     return if (highContrast) base.withHighContrast() else base
 }
 

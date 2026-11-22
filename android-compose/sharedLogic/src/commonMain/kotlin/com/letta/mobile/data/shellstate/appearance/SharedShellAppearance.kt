@@ -40,6 +40,9 @@ class SharedShellAppearance(
         AppearanceValues.of(state.snapshot?.entries).orElse(old)
     }.distinctUntilChanged()
 
+    /** The host's last document as it stands, without waiting for [values]. */
+    override val current: AppearanceValues get() = AppearanceValues.of(shell.state.value.snapshot?.entries)
+
     /** Records [theme] on the host. */
     override suspend fun setTheme(name: String): ShellStateEditOutcome =
         shell.set(AppearanceKeys.THEME, JsonPrimitive(name))
@@ -51,6 +54,15 @@ class SharedShellAppearance(
     /** Records [enabled] on the host. */
     override suspend fun setDynamicColor(enabled: Boolean): ShellStateEditOutcome =
         shell.set(AppearanceKeys.DYNAMIC_COLOR, JsonPrimitive(enabled))
+
+    /** Records [name] and, when [dynamicColor] is given, dynamic colour, as one proposal. */
+    override suspend fun selectThemePreset(name: String, dynamicColor: Boolean?): ShellStateEditOutcome {
+        val edits = listOfNotNull(
+            SharedShellState.Edit(AppearanceKeys.THEME_PRESET, JsonPrimitive(name)),
+            dynamicColor?.let { SharedShellState.Edit(AppearanceKeys.DYNAMIC_COLOR, JsonPrimitive(it)) },
+        )
+        return shell.propose(edits)
+    }
 
     /** Follows the host's shell state and migrates the device-local choices, until cancelled. */
     override suspend fun run() = coroutineScope {

@@ -46,8 +46,8 @@ class HostAppearanceTest {
     @Test
     fun twoDevicesOverOneHostSeeTheSameAppearanceAndEachOthersChanges() = runBlocking {
         val host = RouterShellStateHost()
-        val phone = following(host.device("phone"))
-        val desktop = following(host.device("desktop"))
+        val phone = following(host.device(Endpoint("phone")))
+        val desktop = following(host.device(Endpoint("desktop")))
 
         assertEquals(ShellStateEditOutcome.APPLIED, phone.appearance.setTheme("DARK"))
         assertEquals("DARK", within { desktop.appearance.values.first { it.theme == "DARK" } }.theme)
@@ -64,7 +64,7 @@ class HostAppearanceTest {
     @Test
     fun anEditWhileTheHostIsOutOfReachIsRefusedAndNeverQueued() = runBlocking {
         val host = RouterShellStateHost()
-        val link = host.device("phone")
+        val link = host.device(Endpoint("phone"))
         val phone = following(link)
 
         link.cut()
@@ -83,7 +83,7 @@ class HostAppearanceTest {
         val host = RouterShellStateHost()
         val cache = ShellStateCacheStore(InMemorySecureSettingsStore())
         cache.save(document(AppearanceKeys.THEME to JsonPrimitive("DARK"), AppearanceKeys.THEME_PRESET to JsonPrimitive("SAKURA")))
-        val link = host.device("phone").also { it.cut() }
+        val link = host.device(Endpoint("phone")).also { it.cut() }
         val phone = following(link, cache)
 
         assertEquals(AppearanceValues("DARK", "SAKURA"), phone.appearance.values.first())
@@ -95,11 +95,11 @@ class HostAppearanceTest {
     @Test
     fun theHostsDocumentReplacesAStaleMirrorAndTheMirrorFollowsTheHost() = runBlocking {
         val host = RouterShellStateHost()
-        following(host.device("other")).appearance.setTheme("LIGHT")
+        following(host.device(Endpoint("other"))).appearance.setTheme("LIGHT")
         val store = InMemorySecureSettingsStore()
         val cache = ShellStateCacheStore(store)
         cache.save(document(AppearanceKeys.THEME to JsonPrimitive("DARK")))
-        val phone = following(host.device("phone"), cache)
+        val phone = following(host.device(Endpoint("phone")), cache)
 
         assertEquals("LIGHT", within { phone.appearance.values.first { it.theme == "LIGHT" } }.theme)
         within { while (cache.load()?.entries?.get(AppearanceKeys.THEME)?.value != JsonPrimitive("LIGHT")) delay(POLL_MS) }
@@ -109,7 +109,7 @@ class HostAppearanceTest {
     fun migrationProposesTheDevicesChoicesOnceToAHostThatHasNone() = runBlocking {
         val host = RouterShellStateHost()
         val legacy = FakeLegacy(AppearanceValues("DARK", "OCEAN", dynamicColor = false))
-        val link = host.device("phone")
+        val link = host.device(Endpoint("phone"))
         val phone = following(link, legacy = legacy)
 
         within { legacy.values.first { it.isEmpty } }
@@ -137,10 +137,10 @@ class HostAppearanceTest {
     @Test
     fun migrationNeverOverwritesAChoiceAnotherDeviceAlreadyMade() = runBlocking {
         val host = RouterShellStateHost()
-        following(host.device("desktop")).appearance.setTheme("LIGHT")
+        following(host.device(Endpoint("desktop"))).appearance.setTheme("LIGHT")
         host.proposals.clear()
         val legacy = FakeLegacy(AppearanceValues("DARK", "OCEAN"))
-        val phone = following(host.device("phone"), legacy = legacy)
+        val phone = following(host.device(Endpoint("phone")), legacy = legacy)
 
         within { legacy.values.first { it.isEmpty } }
         assertEquals(listOf(listOf(AppearanceKeys.THEME_PRESET)), host.proposals, "only the preset the host lacked")
@@ -153,9 +153,9 @@ class HostAppearanceTest {
     @Test
     fun aChoiceAnotherDeviceMakesBetweenTheReadAndTheMigrationStillWins() = runBlocking {
         val host = RouterShellStateHost()
-        val desktop = following(host.device("desktop"))
+        val desktop = following(host.device(Endpoint("desktop")))
         val legacy = FakeLegacy(AppearanceValues("DARK", "OCEAN"))
-        val interfering = InterferingLink(host.device("phone")) { desktop.appearance.setTheme("LIGHT") }
+        val interfering = InterferingLink(host.device(Endpoint("phone"))) { desktop.appearance.setTheme("LIGHT") }
         following(interfering, legacy = legacy)
 
         within { legacy.values.first { it.isEmpty } }
@@ -167,7 +167,7 @@ class HostAppearanceTest {
     fun anUnreachableHostKeepsTheDeviceChoicesForALaterAttempt() = runBlocking {
         val host = RouterShellStateHost()
         val legacy = FakeLegacy(AppearanceValues("DARK"))
-        val link = host.device("phone").also { it.cut() }
+        val link = host.device(Endpoint("phone")).also { it.cut() }
         val phone = following(link, legacy = legacy)
 
         assertEquals("DARK", phone.appearance.values.first().theme, "shown from the device's own choice until the host answers")
@@ -185,7 +185,7 @@ class HostAppearanceTest {
         val host = RouterShellStateHost()
         val store = RecordingStore()
         val legacy = FakeLegacy(AppearanceValues("DARK", dynamicColor = true))
-        val phone = following(host.device("phone"), ShellStateCacheStore(store), legacy)
+        val phone = following(host.device(Endpoint("phone")), ShellStateCacheStore(store), legacy)
         within { phone.shell.state.first { it.editable } }
 
         // A chat-role device cannot write a secret, or any key outside the allowed namespace, even by hand.
@@ -250,11 +250,20 @@ class HostAppearanceTest {
         private var fired = false
 
         override suspend fun call(method: String, params: JsonObject): ShellStateReply {
+            interfereWithFirstProposal(method)
+            return inner.call(method, params)
+        }
+
+        override suspend fun callOn(connection: String?, method: String, params: JsonObject): ShellStateReply {
+            interfereWithFirstProposal(method)
+            return inner.callOn(connection, method, params)
+        }
+
+        private suspend fun interfereWithFirstProposal(method: String) {
             if (method == ShellStateWire.PROPOSE && !fired) {
                 fired = true
                 before()
             }
-            return inner.call(method, params)
         }
     }
 
