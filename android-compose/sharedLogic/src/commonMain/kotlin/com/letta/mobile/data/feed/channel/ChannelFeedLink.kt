@@ -55,3 +55,15 @@ fun channelFeedTimelineSource(
     return com.letta.mobile.data.feed.client.FeedTimelineSource(link, agent, conversation, scope, sink)
         .takeIf { com.letta.mobile.data.feed.client.FeedTimelineSource.isAvailable(link) }
 }
+
+/**
+ * The rows a chat presentation draws for [conversation] when [transport]'s host serves and pushes the feed, or null when it
+ * does not (the presentation then reads the ledger, unchanged). The source is built and started in the scope it is given
+ * (the presentation's own), so it stops when the presentation closes, and a conversation switch rebinds by opening a new one.
+ */
+fun channelFeedRows(
+    transport: IChannelTransport,
+    agent: com.letta.mobile.data.model.AgentId,
+    conversation: com.letta.mobile.data.model.ConversationId,
+): ((kotlinx.coroutines.CoroutineScope) -> kotlinx.coroutines.flow.StateFlow<List<com.letta.mobile.data.chat.projection.ChatRenderItem>?>)? =
+    com.letta.mobile.data.feed.client.FeedTimelineSource.rowsFor(channelFeedLink(transport), agent, conversation)

@@ -26,12 +26,15 @@ class DesktopCanonicalTimelineHost(
     private val runtimes = mutableMapOf<TimelineTransport, DesktopCanonicalTimelineRuntime>()
     private var closed = false
 
+    /** The channel the host feed is read over; set by [installOn] (the live frame source). */
+    @Volatile private var feedTransport: IChannelTransport? = null
+
     suspend fun open(request: DesktopCanonicalOpenRequest): CanonicalTimelinePresentation {
         val runtime = mutex.withLock {
             check(!closed) { "Desktop canonical timeline host is closed" }
             runtimeFor(request.transport)
         }
-        return runtime.open(request.agentId, request.conversationId, request.scope)
+        return runtime.open(request.agentId, request.conversationId, request.scope, feedTransport = feedTransport)
     }
 
     private fun runtimeFor(transport: TimelineTransport): DesktopCanonicalTimelineRuntime =
@@ -44,6 +47,7 @@ class DesktopCanonicalTimelineHost(
      */
     internal fun installOn(controller: DesktopChatController, send: DesktopCanonicalSendInstall) {
         controller.canonicalEligible = ::servesConversation
+        feedTransport = send.frameSource
         // Reading history and writing to it are installed together on purpose. A route that can
         // page but not send is a transcript the user cannot reply in, and nothing downstream would
         // report that as broken.

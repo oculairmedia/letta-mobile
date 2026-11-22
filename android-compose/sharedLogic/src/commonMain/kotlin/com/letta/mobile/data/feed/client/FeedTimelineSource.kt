@@ -71,6 +71,7 @@ class FeedTimelineSource(
     private val events = Channel<Event>(EVENT_BUFFER, BufferOverflow.DROP_OLDEST)
     private val mutableRows = MutableStateFlow<List<ChatRenderItem>>(emptyList())
     private val mutableMetrics = MutableStateFlow(FeedTimelineMetrics())
+    private val mutablePresented = MutableStateFlow<List<ChatRenderItem>?>(null)
     private var job: Job? = null
 
     /** The rows now, newest first, as the chat list takes them. */
@@ -78,6 +79,12 @@ class FeedTimelineSource(
 
     /** Counters since [start]. */
     val metrics: StateFlow<FeedTimelineMetrics> = mutableMetrics.asStateFlow()
+
+    /**
+     * [rows] once the first catch-up has finished (answered, refused or failed), null before: an empty list here means
+     * "nothing to show", never "not read yet". What a presentation draws from.
+     */
+    val presented: StateFlow<List<ChatRenderItem>?> = mutablePresented.asStateFlow()
 
     /** The position applied so far; null before the first page. */
     val cursor: FeedCursor? get() = follower.cursor
@@ -123,6 +130,7 @@ class FeedTimelineSource(
         runCatchingCancellable { readUntilCaughtUp() }.onFailure { failure ->
             Telemetry.event(TAG, "read.failed", "class" attr failure::class.simpleName, level = Telemetry.Level.WARN)
         }
+        if (mutablePresented.value == null) mutablePresented.value = mutableRows.value
     }
 
     private suspend fun readUntilCaughtUp() {
@@ -173,6 +181,7 @@ class FeedTimelineSource(
         if (next == previous) return
         val diff = FeedRowIdentity.reconcile(previous, next)
         mutableRows.value = diff.rows
+        if (mutablePresented.value != null) mutablePresented.value = diff.rows
         bump {
             it.copy(
                 publications = it.publications + 1,
@@ -210,6 +219,13 @@ class FeedTimelineSource(
         /** Whether [link]'s host serves the feed and pushes to it; otherwise the caller keeps the path it had. */
         fun isAvailable(link: FeedLink): Boolean =
             link.hostCapabilities.let { ConversationFeedWire.CAPABILITY in it && ConversationFeedWire.PUSH_CAPABILITY in it }
+
+        /**
+         * The rows a presentation draws for [conversation] over [link] when its host serves and pushes the feed, else null
+         * (the presentation then keeps the ledger). Each call of the result starts one source in the scope it is given.
+         */
+        fun rowsFor(link: FeedLink, agent: AgentId, conversation: ConversationId): ((CoroutineScope) -> StateFlow<List<ChatRenderItem>?>)? =
+            if (!isAvailable(link)) null else { scope -> FeedTimelineSource(link, agent, conversation, scope).also { it.start() }.presented }
 
         private const val TAG = "FeedTimeline"
 

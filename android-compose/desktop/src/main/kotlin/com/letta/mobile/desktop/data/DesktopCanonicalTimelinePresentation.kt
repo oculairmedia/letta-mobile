@@ -19,5 +19,6 @@ suspend fun openDesktopCanonicalPresentation(
     owner: CanonicalTimelineCoordinator.Owner,
     uiScope: CoroutineScope,
     target: String? = null,
+    feed: ((CoroutineScope) -> kotlinx.coroutines.flow.StateFlow<List<com.letta.mobile.data.chat.projection.ChatRenderItem>?>)? = null,
 ): CanonicalTimelinePresentation =
-    CanonicalTimelinePresentation.open(coordinator, owner, uiScope, target?.let(::TimelineMessageId))
+    CanonicalTimelinePresentation.open(coordinator, owner, uiScope, target?.let(::TimelineMessageId), feed = feed)

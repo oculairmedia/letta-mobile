@@ -15,6 +15,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 
+/** The host feed's rows for a presentation, built in its scope (see channelFeedRows). */
+typealias CanonicalFeedRows =
+    (CoroutineScope) -> kotlinx.coroutines.flow.StateFlow<List<ChatRenderItem>?>
+
 /** Isolated paging-cache lifetime; disposing it never retires ingestion. */
 internal fun createChatPagingPresentation(
     uiScope: CoroutineScope,
@@ -39,8 +43,9 @@ internal suspend fun createCanonicalChatPagingPresentation(
     owner: CanonicalTimelineCoordinator.Owner,
     uiScope: CoroutineScope,
     target: String?,
+    feed: CanonicalFeedRows? = null,
 ): ChatPagingPresentation {
-    val canonical = CanonicalTimelinePresentation.open(coordinator, owner, uiScope, target?.let(::TimelineMessageId))
+    val canonical = CanonicalTimelinePresentation.open(coordinator, owner, uiScope, target?.let(::TimelineMessageId), feed = feed)
     val job = SupervisorJob(uiScope.coroutineContext[Job])
     val scope = uiScope + job
     // Bounded metadata only. Evicted keys cannot acknowledge settlement until seen again.

@@ -106,6 +106,12 @@ class CanonicalTimelineCoordinator(
             session.live.value?.takeIf { it.settlementRevision != null && it.fence === liveFence }?.fence
         internal var activeRepairs: Int = 0
         internal val presentations = mutableSetOf<Presentation>()
+
+        /** The attached presentations that read this conversation through the host feed; while any does, the ledger reconciles nothing. */
+        internal val feedViews = mutableSetOf<Presentation>()
+
+        /** Whether a presentation reads this conversation through the host feed. */
+        val readsFeed: Boolean get() = feedViews.isNotEmpty()
     }
 
     class Presentation internal constructor(val owner: Owner, val anchor: TimelinePageKey?)
@@ -117,10 +123,16 @@ class CanonicalTimelineCoordinator(
         Presentation(owner, anchor).also { owner.presentations.add(it) }
     }
 
+    /** [presentation] reads its conversation through the host feed until it detaches: no ledger reconcile runs meanwhile. */
+    internal suspend fun viewThroughFeed(presentation: Presentation) = mutex.withLock {
+        if (presentation in presentation.owner.presentations) presentation.owner.feedViews.add(presentation)
+    }
+
     /** Detaching a viewport never closes the conversation or its active transport. */
     suspend fun detach(presentation: Presentation) = mutex.withLock {
         val owner = presentation.owner
         owner.presentations.remove(presentation)
+        owner.feedViews.remove(presentation)
         releaseUnobservedSettlement(owner)
         Unit
     }
@@ -155,8 +167,13 @@ class CanonicalTimelineCoordinator(
 
     // The overlay is the only copy of a settled turn until this path writes it, so keep it resident;
     // the presentation drops it once the reconciled rows are on screen.
-    suspend fun reconcileRecentDetailed(owner: Owner): TimelineEngineReconcileResult = withRepairLease(owner) {
-        owner.session.reconcileRecentDetailed(owner.selection)
+    suspend fun reconcileRecentDetailed(owner: Owner): TimelineEngineReconcileResult {
+        // One writer per conversation: one read through the host feed never also merges message.list pages into the ledger.
+        if (mutex.withLock { owner.readsFeed }) {
+            com.letta.mobile.util.Telemetry.event("CanonicalTimeline", "reconcile.skipped.feed")
+            return TimelineEngineReconcileResult(TimelineEnginePageOutcome.Stale)
+        }
+        return withRepairLease(owner) { owner.session.reconcileRecentDetailed(owner.selection) }
     }
 
     internal suspend fun retainRepair(owner: Owner) = mutex.withLock {
@@ -177,6 +194,15 @@ class CanonicalTimelineCoordinator(
         } finally {
             releaseRepair(owner)
         }
+    }
+
+    /** Whether a presentation reads [owner]'s conversation through the host feed. */
+    suspend fun readsThroughFeed(owner: Owner): Boolean = mutex.withLock { owner.readsFeed }
+
+    /** Confirms the sends whose echo the host feed carried ([CanonicalTimelineSession.confirmFeedEchoes]). */
+    internal suspend fun confirmFeedEchoes(owner: Owner, otids: Set<String>): Boolean {
+        if (otids.isEmpty() || mutex.withLock { owners[owner.selection.scope] !== owner }) return false
+        return owner.session.confirmFeedEchoes(otids)
     }
 
     /** Search resolves a viewport anchor without replacing the conversation's ingestion generation. */
@@ -360,6 +386,16 @@ class CanonicalTimelineSession(
         recoveryCandidates -= MessageId(otid)
         mutablePending.value = pendingStore.load(scope)
         retry
+    }
+
+    /**
+     * The host feed carries the user echo of each of [otids]: their sends are confirmed, as a ledger echo confirms them. A
+     * feed-backed conversation reconciles nothing, so this is the only way its prompts leave the pending store.
+     */
+    internal suspend fun confirmFeedEchoes(otids: Set<String>): Boolean = pendingMutex.withLock {
+        val confirmed = pendingStore.confirmEchoes(scope, otids)
+        if (confirmed) mutablePending.value = pendingStore.load(scope)
+        confirmed
     }
 
     internal suspend fun discardFailed(identity: MessageId): Boolean = pendingMutex.withLock {

@@ -236,6 +236,13 @@ class CanonicalPendingLocalStore(
         }
     }
 
+    /** Confirms each of [otids] as echoed, in one transaction; whether any was pending. */
+    internal suspend fun confirmEchoes(scope: TimelineScope, otids: Set<String>): Boolean = store.transaction(scope) {
+        val confirmed = otids.count { confirmEcho(this, it) } > 0
+        if (confirmed) nextRevision()
+        confirmed
+    }
+
     /** Called inside the same transaction that durably confirms the server echo. */
     internal suspend fun confirm(transaction: TimelineStoreTransaction, otid: String) {
         confirmEcho(transaction, otid)

@@ -36,6 +36,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -51,9 +53,21 @@ class CanonicalTimelinePresentation private constructor(
     parentScope: CoroutineScope,
     val missingTarget: String?,
     private val settledProjectionAdapter: TimelineSettledProjectionAdapter,
+    feed: ((CoroutineScope) -> StateFlow<List<ChatRenderItem>?>)? = null,
 ) {
     private val job = SupervisorJob(parentScope.coroutineContext[Job])
     private val scope = parentScope + job
+
+    /**
+     * The host feed's rows when this conversation is read through the feed (the host serves and pushes it), null when it is
+     * read from the ledger. Null until the first read finished, then the whole list, newest first. A feed-backed
+     * presentation draws these and the prompts still being sent, and nothing from the ledger: it pages no history and
+     * reconciles nothing (see [CanonicalTimelineCoordinator.reconcileRecentDetailed]).
+     */
+    private val feedRows: StateFlow<List<ChatRenderItem>?>? = feed?.invoke(scope)
+
+    /** Whether this presentation draws the host feed instead of the ledger. */
+    val isFeedBacked: Boolean get() = feedRows != null
     private val owner = lease.owner
 
     internal val conversationId = ConversationId(owner.selection.scope.conversationId)
@@ -167,9 +181,13 @@ class CanonicalTimelinePresentation private constructor(
     }.distinctUntilChanged()
 
     /** Pending prompts occupy their send-time position in the same paged list as history. */
-    val settled: Flow<PagingData<Row>> = combine(settledRows, pendingInHistory) { rows, pending ->
+    val settled: Flow<PagingData<Row>> = feedRows?.let(::feedHistory) ?: combine(settledRows, pendingInHistory) { rows, pending ->
         rows.insertPending(pending, owner.selection.scope)
     }
+
+    /** A feed-backed list keeps no settled pages: loading until the feed's first read, then an empty, complete history. */
+    private fun feedHistory(rows: StateFlow<List<ChatRenderItem>?>): Flow<PagingData<Row>> =
+        rows.filterNotNull().take(1).map { PagingData.empty(FEED_HISTORY_COMPLETE) }
 
     /** Retry only this conversation's failed prompt, retaining its original transport identity. */
     suspend fun retry(identity: MessageId): Boolean {
@@ -206,7 +224,18 @@ class CanonicalTimelinePresentation private constructor(
     val live: StateFlow<List<ChatRenderItem>> = mutableLive.asStateFlow()
 
     // Durability alone is not presentation: retain live until the settled ledger is at the turn's revision.
-    private val liveProjection: Flow<List<ChatRenderItem>> = createLiveProjection()
+    private val liveProjection: Flow<List<ChatRenderItem>> = feedRows?.let(::feedProjection) ?: createLiveProjection()
+
+    /**
+     * The feed's rows with the prompts still being sent that the feed does not carry yet, placed by send time. A row the
+     * feed did not change is the instance it already was, so the list redraws only the rows that changed.
+     */
+    private fun feedProjection(rows: StateFlow<List<ChatRenderItem>?>): Flow<List<ChatRenderItem>> =
+        combine(rows.filterNotNull(), owner.session.pending) { feedItems, pending ->
+            val echoed = feedItems.flatMapTo(HashSet()) { item -> item.messagesInOrder().mapNotNull { it.clientMessageId } }
+            val sending = pending.filterNot { it.otid in echoed }.map { it.toRenderItem(owner.selection.scope.agentId) }
+            positionPendingInLive(feedItems, sending.asReversed())
+        }
 
     private data class ResidentState(
         val presented: Map<TimelineMessageId, Long> = emptyMap(),
@@ -306,11 +335,21 @@ class CanonicalTimelinePresentation private constructor(
 
     init {
         scope.launch { liveProjection.collect { mutableLive.value = it } }
+        feedRows?.let { rows -> scope.launch { confirmFeedEchoes(rows) } }
+    }
+
+    /** Each prompt the feed echoes leaves the pending store, as a ledger echo would take it out. */
+    private suspend fun confirmFeedEchoes(rows: StateFlow<List<ChatRenderItem>?>) {
+        combine(rows.filterNotNull(), owner.session.pending) { feedItems, pending ->
+            val sent = pending.mapTo(HashSet()) { it.otid }
+            feedItems.flatMapTo(HashSet()) { item -> item.messagesInOrder().mapNotNull { it.clientMessageId } }.intersect(sent)
+        }.distinctUntilChanged().collect { echoed -> coordinator.confirmFeedEchoes(owner, echoed) }
     }
 
     /** Only actual resident rows count, never prefetched rows or a remembered revision watermark. */
     fun onResidentRows(rows: List<Row>) {
-        if (!job.isActive) return
+        // A feed-backed list holds no ledger rows and has no live overlay to settle.
+        if (!job.isActive || isFeedBacked) return
         val residents = rows.take(128).flatMap { row ->
             row.residentEvents.ifEmpty {
                 listOf(TimelineResidentEvent(row.identity, row.revision, row.otid, row.serverId))
@@ -502,12 +541,20 @@ class CanonicalTimelinePresentation private constructor(
             parentScope: CoroutineScope,
             target: TimelineMessageId? = null,
             settledProjectionAdapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
+            /**
+             * The host feed's rows, built in the presentation's own scope (so they stop with it), when the conversation is
+             * read through the feed; null reads it from the ledger. A target (search, deep link) always reads the ledger.
+             */
+            feed: ((CoroutineScope) -> StateFlow<List<ChatRenderItem>?>)? = null,
         ): CanonicalTimelinePresentation {
+            val throughFeed = feed?.takeIf { target == null }
             val requested = coordinator.attach(owner, target)
             val lease = requested ?: checkNotNull(coordinator.attach(owner))
             return try {
+                if (throughFeed != null) coordinator.viewThroughFeed(lease)
                 CanonicalTimelinePresentation(
                     coordinator, lease, parentScope, if (requested == null) target?.value else null, settledProjectionAdapter,
+                    throughFeed,
                 ).also {
                     TimelineOpenTrace.mark(it.conversationId, TimelineOpenTrace.Stage.PresentationBound)
                 }
@@ -527,3 +574,10 @@ private fun TimelinePageKey.ledgerTimestamp(): String =
     if (order > 0) Instant.fromEpochMilliseconds(order).toString() else ""
 
 private const val SETTLE_POLLS_PER_QUIET_PERIOD = 5
+
+/** The feed's history is the feed itself: nothing to page in either direction. */
+private val FEED_HISTORY_COMPLETE = androidx.paging.LoadStates(
+    androidx.paging.LoadState.NotLoading(endOfPaginationReached = true),
+    androidx.paging.LoadState.NotLoading(endOfPaginationReached = true),
+    androidx.paging.LoadState.NotLoading(endOfPaginationReached = true),
+)

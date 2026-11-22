@@ -43,13 +43,19 @@ class DesktopCanonicalTimelineRuntime internal constructor(
         conversationId: String,
         uiScope: CoroutineScope,
         target: String? = null,
+        feedTransport: com.letta.mobile.data.transport.api.IChannelTransport? = null,
     ): CanonicalTimelinePresentation {
         val scope = TimelineScope(backendId, conversationId, agentId)
         val owner = mutex.withLock {
             check(!closed) { "Desktop canonical timeline runtime is retired" }
             owners.getOrPut(scope) { coordinator.acquire(scope) }
         }
-        return openDesktopCanonicalPresentation(coordinator, owner, uiScope, target)
+        val feed = feedTransport?.let {
+            com.letta.mobile.data.feed.channel.channelFeedRows(
+                it, com.letta.mobile.data.model.AgentId(agentId), com.letta.mobile.data.model.ConversationId(conversationId),
+            )
+        }
+        return openDesktopCanonicalPresentation(coordinator, owner, uiScope, target, feed)
     }
 
     /**
