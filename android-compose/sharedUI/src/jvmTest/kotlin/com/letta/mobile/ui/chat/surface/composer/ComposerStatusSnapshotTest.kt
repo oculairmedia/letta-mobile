@@ -44,7 +44,8 @@ class ComposerStatusSnapshotTest {
         contextUsage = ContextWindowUsageState(usage = ContextWindowUsage.total(usedTokens = 180_000, windowTokens = 200_000)),
     )
 
-    private fun snapshot(input: LettaInput, width: Dp, dark: Boolean) = runDesktopComposeUiTest(width = WINDOW_WIDTH, height = WINDOW_HEIGHT) {
+    private fun snapshot(input: LettaInput, width: Dp, dark: Boolean) =
+        runDesktopComposeUiTest(width = WINDOW_WIDTH, height = WINDOW_HEIGHT) {
         val host = if (input == LettaInput.Pointer) LettaHost.Pointer else LettaHost(input = input)
         setContent {
             SharedMaterialTheme(darkTheme = dark) {
