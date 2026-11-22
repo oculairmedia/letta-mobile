@@ -145,7 +145,6 @@ internal fun SharedChatSubagentRings(
     val scope = rememberCoroutineScope()
     Column(Modifier.fillMaxSize().padding(LettaDimens.Space.sm), horizontalAlignment = Alignment.End) {
         // Running work with no plan has no ring; the launcher keeps it in sight and opens the tasks pane.
-        BackgroundTasksLauncher(inputs.barState.runningCount, navigation.onOpenBackgroundTasks)
         CompositionLocalProvider(LocalSubagentTodoSheetOpener provides state::open) {
             ActiveSubagentRings(
                 subagents = inputs.barState.activeSubagents,
