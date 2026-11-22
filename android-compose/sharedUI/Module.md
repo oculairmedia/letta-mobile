@@ -173,6 +173,10 @@ Installs the beam shader failure callback into shared telemetry for each host.
 
 Shared enter and exit motion for surfaces that are not rows. LettaPanelMotion is a panel extending from the control it belongs to (a card rising out of a prompt bar, a tray dropping from a toolbar) and folding back into it, for an AnimatedVisibility: it unfolds from its anchored edge on the emphasized-decelerate curve with a quick fade and a soft spring scale from that edge, and folds back quicker on the emphasized-accelerate curve. rememberPanelSettle is the arrival's afterglow, a 1-to-0 value to brighten a seam by as the panel lands. Under reduced motion nothing moves in space: the panel only fades, briefly, and the afterglow stays at 0. Every animation is finite, so it settles under a paused test clock. The package imports only Compose and `ui.theme.tokens`, so any page or component can use it without closing a package cycle.
 
+# Package com.letta.mobile.ui.components.field
+
+The border of a text input (the prompt card, a field) in its three looks: a quiet line at rest, a firmer one under the pointer, the primary colour while it or a control inside it holds focus. rememberLettaField tracks the look, Modifier.lettaField wires hover and focus into it, and lettaFieldBorder gives the stroke for a look, easing between looks and switching at once under reduced motion. The package imports only Compose and `ui.theme.tokens`, never `ui.theme` or a page, so any page can import it without closing a package cycle.
+
 # Package com.letta.mobile.ui.components.list
 
 Roster models, sections, row parts and drag/reorder affordances. Extend through roster models, row-content slots and action callbacks; ordering persistence and deletion policy belong to the owner of the list.
