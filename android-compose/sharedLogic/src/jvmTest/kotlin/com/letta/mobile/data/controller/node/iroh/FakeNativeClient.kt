@@ -24,6 +24,9 @@ internal class FakeNativeClient(
     var updateSucceeds: Boolean = true,
     // letta-mobile-fxoew.9: owning agent per listed conversation id.
     val conversationAgentIds: Map<String, String> = emptyMap(),
+    // Full App Server agent rows (projectLocalAgentState shape) for agent_list; when null the
+    // numbered `{id, name}` roster above is served instead.
+    val agentRows: List<kotlinx.serialization.json.JsonObject>? = null,
 ) : AppServerClient {
     var lastAgentListQuery: kotlinx.serialization.json.JsonObject? = null
     override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow()
@@ -65,23 +68,46 @@ internal class FakeNativeClient(
             AppServerInboundFrame.AgentListResponse(
                 requestId = command.requestId,
                 success = true,
-                agents = buildJsonArray {
-                    (1..minOf(limit, agentRosterSize)).forEach { n ->
-                        add(buildJsonObject { put("id", "agent-$n"); put("name", "A$n") })
-                    }
-                },
+                agents = agentRows?.let { rows -> JsonArray(rows.filterNot(::isHiddenAgentRecord).take(limit)) }
+                    ?: buildJsonArray {
+                        (1..minOf(limit, agentRosterSize)).forEach { n ->
+                            add(buildJsonObject { put("id", "agent-$n"); put("name", "A$n") })
+                        }
+                    },
             ),
         )
     }
 
     override suspend fun agentRetrieve(command: AppServerCommand.AgentRetrieve) = record(
         "agent_retrieve",
-        AppServerInboundFrame.AgentRetrieveResponse(
+        agentRows?.let { rows -> retrieveFrom(rows, command) } ?: AppServerInboundFrame.AgentRetrieveResponse(
             requestId = command.requestId,
             success = true,
             agent = buildJsonObject { put("id", command.agentId) },
         ),
     )
+
+    /**
+     * The local backend's strict `retrieveAgent`: an id it does not hold is a LocalBackendNotFoundError
+     * (a failed response), never a synthesized row; a held one, hidden or not, is returned whole.
+     */
+    private fun retrieveFrom(rows: List<kotlinx.serialization.json.JsonObject>, command: AppServerCommand.AgentRetrieve) =
+        rows.firstOrNull { (it["id"] as? kotlinx.serialization.json.JsonPrimitive)?.content == command.agentId }
+            ?.let { AppServerInboundFrame.AgentRetrieveResponse(requestId = command.requestId, success = true, agent = it) }
+            ?: AppServerInboundFrame.AgentRetrieveResponse(
+                requestId = command.requestId,
+                success = false,
+                error = "Agent ${command.agentId} not found",
+            )
+
+    /** letta-code `isHiddenLocalAgentRecord`: `hidden: true`, or unset with the `role:subagent` tag. */
+    private fun isHiddenAgentRecord(row: kotlinx.serialization.json.JsonObject): Boolean =
+        when ((row["hidden"] as? kotlinx.serialization.json.JsonPrimitive)?.content) {
+            "true" -> true
+            "false" -> false
+            else -> (row["tags"] as? JsonArray).orEmpty()
+                .any { (it as? kotlinx.serialization.json.JsonPrimitive)?.content == "role:subagent" }
+        }
 
     override suspend fun agentCreate(command: AppServerCommand.AgentCreate) = record(
         "agent_create",

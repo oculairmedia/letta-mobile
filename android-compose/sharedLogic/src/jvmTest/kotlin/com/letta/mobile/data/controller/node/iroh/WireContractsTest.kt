@@ -71,7 +71,7 @@ class WireContractsTest {
                 val known = setOf(
                     "controller_state", "conversations", "hidden_agent_ids", "visibility_index",
                     "reflection_settings", "monitor_success", "toolset_response", "cron_control", "execute_command_response", "voice",
-                    "pins", "shell_state", "service_credentials", "feed",
+                    "pins", "shell_state", "service_credentials", "feed", "agents", "agent_list_error",
                 )
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
@@ -306,7 +306,37 @@ class WireContractsTest {
         )
     } as AppServerClient
 
+    /**
+     * letta-code 0.30.5 `listAgents` over the case's stored rows (`host_state.agents`): hidden records
+     * dropped (`hidden: true`, or unset with the `role:subagent` tag), then the first `limit` rows,
+     * where only a JSON number counts and anything else means 20. `agent_list_error` answers
+     * `success: false` with that text. Any other native call fails the test.
+     */
+    private fun agentNative(host: JsonObject): AppServerClient = Proxy.newProxyInstance(
+        AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java),
+    ) { _, method, args ->
+        check(method.name == "agentList") { "Unexpected native call: ${method.name}" }
+        val command = args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.AgentList
+        val error = host["agent_list_error"]?.jsonPrimitive?.content
+        val limit = (command.query?.get("limit") as? kotlinx.serialization.json.JsonPrimitive)
+            ?.takeUnless { it.isString }?.content?.toIntOrNull() ?: 20
+        val shown = host.getValue("agents").jsonArray.map { it.jsonObject }.filterNot(::isHiddenAgentRecord)
+        com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AgentListResponse(
+            requestId = command.requestId,
+            success = error == null,
+            agents = kotlinx.serialization.json.JsonArray(if (error == null) shown.take(limit) else emptyList()),
+            error = error,
+        )
+    } as AppServerClient
+
+    private fun isHiddenAgentRecord(row: JsonObject): Boolean = when (row["hidden"]?.jsonPrimitive?.content) {
+        "true" -> true
+        "false" -> false
+        else -> row["tags"]?.jsonArray.orEmpty().any { it.jsonPrimitive.content == "role:subagent" }
+    }
+
     private fun fixtureNative(host: JsonObject?): AppServerClient = when {
+        host?.containsKey("agents") == true -> agentNative(host)
         host?.containsKey("monitor_success") == true -> monitorNative(host)
         host?.containsKey("toolset_response") == true -> toolsetNative(host)
         host?.containsKey("cron_control") == true -> cronControlNative(host)

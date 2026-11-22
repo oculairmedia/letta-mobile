@@ -221,6 +221,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Shell state v1: the host's one versioned document of shell and user state](reference/contracts/shell-state-v1.md)
 - [Voice endpoint v1: host-stored speech setup and speech through the host](reference/contracts/voice-endpoint-v1.md)
 
+### reference/contracts/agent.list
+
+- [agent.list: Slim List v1](reference/contracts/agent.list/slim-list-v1.md)
+
 ### reference/contracts/beads.config.get
 
 - [beads.config.get v1](reference/contracts/beads.config.get/beads-v1.md)
