@@ -72,7 +72,7 @@ class WireContractsTest {
                     "controller_state", "conversations", "hidden_agent_ids", "visibility_index",
                     "reflection_settings", "monitor_success", "toolset_response", "cron_control", "execute_command_response", "voice",
                     "pins", "shell_state", "service_credentials", "feed", "agents", "agent_list_error",
-                    "pins", "shell_state", "service_credentials", "feed", "messages",
+                    "messages",
                 )
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
