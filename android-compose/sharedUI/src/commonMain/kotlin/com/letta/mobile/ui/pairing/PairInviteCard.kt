@@ -7,12 +7,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,7 +26,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
@@ -49,6 +46,9 @@ import com.letta.mobile.ui.components.foundation.LettaRowLabel
 import com.letta.mobile.ui.components.foundation.LettaToggleRow
 import com.letta.mobile.ui.text.writePlainText
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.components.choice.LettaChoiceOption
+import com.letta.mobile.ui.components.choice.LettaRadioChoice
+import com.letta.mobile.ui.components.choice.LettaRadioList
 
 /** An agent the inviter may share with the new device. */
 data class AgentChoice(val id: String, val name: String)
@@ -125,7 +125,10 @@ private fun InviteForm(agents: List<AgentChoice>, enabled: Boolean, onMint: (Pai
         modifier = Modifier.fillMaxWidth(),
     )
     Text(PairingStrings.INVITE_ACCESS, style = MaterialTheme.typography.labelLarge)
-    form.options.forEach { option -> ChoiceRow(option, selected = form.scope == option) { form.scope = option } }
+    LettaRadioList(
+        choice = LettaRadioChoice(form.options.map { LettaChoiceOption(it.name, it.label, tag = it.tag) }, selected = form.scope.name),
+        onSelect = { key -> form.scope = AgentScopeOption.valueOf(key) },
+    )
     if (form.choosing) AgentScopePicker(agents, form.selected) { form.selected = it }
     SettingsToggle(form.allowSettings) { form.allowSettings = it }
     Text(PairingStrings.accessSummary(form.summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -135,17 +138,6 @@ private fun InviteForm(agents: List<AgentChoice>, enabled: Boolean, onMint: (Pai
         enabled = enabled && form.ready,
         modifier = Modifier.testTag(PairingTags.INVITE_SHOW),
     ) { Text(PairingStrings.INVITE_SHOW_CODE) }
-}
-
-@Composable
-private fun ChoiceRow(option: AgentScopeOption, selected: Boolean, onSelect: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onSelect).testTag(option.tag),
-    ) {
-        RadioButton(selected = selected, onClick = null)
-        Text(option.label)
-    }
 }
 
 @Composable

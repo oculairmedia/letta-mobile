@@ -39,6 +39,9 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
+import com.letta.mobile.ui.components.choice.LettaSelectAllRow
+import com.letta.mobile.ui.components.foundation.LettaRowLabel
+import com.letta.mobile.ui.components.choice.LettaSelectionCount
 
 /**
  * "Choose agents" as a compact search picker instead of one checkbox per agent: the chosen agents
@@ -64,10 +67,27 @@ internal fun AgentScopePicker(agents: List<AgentChoice>, selected: Set<String>, 
                     ),
                 )
                 LettaDivider()
-                AgentMatches(agents.filter { agentMatches(query, it.name) }, selected, query, onToggle = toggle)
+                val matches = agents.filter { agentMatches(query, it.name) }
+                if (matches.size > 1) SelectAllMatches(matches, selected, onChange)
+                AgentMatches(matches, selected, query, onToggle = toggle)
             }
         }
     }
+}
+
+/**
+ * "Select all" over the agents the search shows: partly checked while some of them are chosen; it
+ * chooses all of them, or clears them when all are, leaving agents the search hides as they were.
+ */
+@Composable
+private fun SelectAllMatches(matches: List<AgentChoice>, selected: Set<String>, onChange: (Set<String>) -> Unit) {
+    val ids = matches.mapTo(mutableSetOf()) { it.id }
+    LettaSelectAllRow(
+        label = LettaRowLabel(PairingStrings.INVITE_SELECT_ALL_AGENTS),
+        count = LettaSelectionCount(chosen = ids.count { it in selected }, total = ids.size),
+        onSelectAll = { all -> onChange(if (all) selected + ids else selected - ids) },
+        modifier = Modifier.padding(horizontal = LettaDimens.Space.lg).testTag(PairingTags.INVITE_SELECT_ALL_AGENTS),
+    )
 }
 
 /** Every token typed appears in the agent's name, ignoring case; a blank query matches every agent. */

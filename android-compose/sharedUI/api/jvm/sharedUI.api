@@ -1713,6 +1713,7 @@ public final class com/letta/mobile/ui/chat/subagents/ActiveSubagentRingsTags {
 }
 
 public final class com/letta/mobile/ui/chat/subagents/BackgroundTasksPanelKt {
+	public static final fun BackgroundTasksLauncher (ILkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun BackgroundTasksPanel (Ljava/util/List;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun BackgroundTasksSidePane (Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun BackgroundTasksToggle (ILkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;ZLandroidx/compose/runtime/Composer;II)V
@@ -2702,6 +2703,52 @@ public final class com/letta/mobile/ui/components/beam/telemetry/BeamShaderTelem
 	public static final fun installBeamShaderTelemetry ()V
 }
 
+public final class com/letta/mobile/ui/components/choice/LettaChoiceListsKt {
+	public static final fun LettaCheckboxRow (Lcom/letta/mobile/ui/components/foundation/LettaRowLabel;Landroidx/compose/ui/state/ToggleableState;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaRadioList (Lcom/letta/mobile/ui/components/choice/LettaRadioChoice;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaSelectAllRow (Lcom/letta/mobile/ui/components/foundation/LettaRowLabel;Lcom/letta/mobile/ui/components/choice/LettaSelectionCount;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/components/choice/LettaChoiceOption {
+	public static final field $stable I
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Z
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)Lcom/letta/mobile/ui/components/choice/LettaChoiceOption;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/choice/LettaChoiceOption;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/components/choice/LettaChoiceOption;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getEnabled ()Z
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getTag ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/components/choice/LettaRadioChoice {
+	public static final field $stable I
+	public fun <init> (Ljava/util/List;Ljava/lang/String;ZLjava/lang/String;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;ZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/util/List;Ljava/lang/String;ZLjava/lang/String;)Lcom/letta/mobile/ui/components/choice/LettaRadioChoice;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/choice/LettaRadioChoice;Ljava/util/List;Ljava/lang/String;ZLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/components/choice/LettaRadioChoice;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEnabled ()Z
+	public final fun getError ()Ljava/lang/String;
+	public final fun getOptions ()Ljava/util/List;
+	public final fun getSelected ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/ui/components/choice/LettaSegment {
 	public static final field $stable I
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;Z)V
@@ -2746,6 +2793,21 @@ public final class com/letta/mobile/ui/components/choice/LettaSegmentedChoice {
 
 public final class com/letta/mobile/ui/components/choice/LettaSegmentedControlKt {
 	public static final fun LettaSegmentedControl (Lcom/letta/mobile/ui/components/choice/LettaSegmentedChoice;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/components/choice/LettaSelectionCount {
+	public static final field $stable I
+	public fun <init> (II)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun copy (II)Lcom/letta/mobile/ui/components/choice/LettaSelectionCount;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/choice/LettaSelectionCount;IIILjava/lang/Object;)Lcom/letta/mobile/ui/components/choice/LettaSelectionCount;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChosen ()I
+	public final fun getState ()Landroidx/compose/ui/state/ToggleableState;
+	public final fun getTotal ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/components/disclosure/ChevronEmphasis : java/lang/Enum {
@@ -6662,6 +6724,7 @@ public final class com/letta/mobile/ui/pairing/PairingStrings {
 	public static final field INVITE_CHOOSE_AT_LEAST_ONE Ljava/lang/String;
 	public static final field INVITE_DEVICE_NAME Ljava/lang/String;
 	public static final field INVITE_SEARCH_AGENTS Ljava/lang/String;
+	public static final field INVITE_SELECT_ALL_AGENTS Ljava/lang/String;
 	public static final field INVITE_SETTINGS_BODY Ljava/lang/String;
 	public static final field INVITE_SETTINGS_TOGGLE Ljava/lang/String;
 	public static final field INVITE_SHOW_CODE Ljava/lang/String;
@@ -6758,6 +6821,7 @@ public final class com/letta/mobile/ui/pairing/PairingTags {
 	public static final field INVITE_LINK Ljava/lang/String;
 	public static final field INVITE_NEW_CODE Ljava/lang/String;
 	public static final field INVITE_QR Ljava/lang/String;
+	public static final field INVITE_SELECT_ALL_AGENTS Ljava/lang/String;
 	public static final field INVITE_SETTINGS Ljava/lang/String;
 	public static final field INVITE_SHARE Ljava/lang/String;
 	public static final field INVITE_SHOW Ljava/lang/String;

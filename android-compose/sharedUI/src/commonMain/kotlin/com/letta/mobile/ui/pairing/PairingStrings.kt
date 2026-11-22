@@ -91,6 +91,7 @@ object PairingStrings {
     const val INVITE_ACCESS = "Which agents can it use?"
     const val INVITE_ALL_AGENTS = "All agents"
     const val INVITE_CHOOSE_AGENTS = "Choose agents"
+    const val INVITE_SELECT_ALL_AGENTS = "Select all"
     const val INVITE_CHOOSE_AT_LEAST_ONE = "Choose at least one agent."
     const val INVITE_SEARCH_AGENTS = "Search agents"
 
@@ -244,6 +245,7 @@ object PairingTags {
     const val INVITE_ERROR = "pairing_invite_error"
     const val INVITE_ALL_AGENTS = "pairing_invite_all_agents"
     const val INVITE_CHOOSE_AGENTS = "pairing_invite_choose_agents"
+    const val INVITE_SELECT_ALL_AGENTS = "pairing_invite_select_all_agents"
     const val INVITE_SETTINGS = "pairing_invite_settings"
     const val INVITE_AGENT_SEARCH = "pairing_invite_agent_search"
     const val INVITE_AGENT_LIST = "pairing_invite_agent_list"

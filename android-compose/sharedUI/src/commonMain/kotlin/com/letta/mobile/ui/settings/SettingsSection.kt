@@ -41,6 +41,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.settings.SettingsAction
 import com.letta.mobile.data.settings.SettingsDrafts
 import com.letta.mobile.data.settings.SettingsRow
+import com.letta.mobile.ui.components.choice.LettaChoiceOption
+import com.letta.mobile.ui.components.choice.LettaRadioChoice
+import com.letta.mobile.ui.components.choice.LettaRadioList
 import com.letta.mobile.ui.components.choice.LettaSegment
 import com.letta.mobile.ui.components.choice.LettaSegmentedChoice
 import com.letta.mobile.ui.components.choice.LettaSegmentedControl
@@ -142,10 +145,10 @@ object SettingsScope {
     @Composable
     fun ChoiceRow(row: SettingsRow.Choice) {
         val lock = LocalSettingsLock.current
-        if (row.segmentedOn(LocalLettaHost.current.input)) {
-            SegmentedChoice(row, lock)
-        } else {
-            ListChoice(row, lock)
+        when {
+            row.segmentedOn(LocalLettaHost.current.input) -> SegmentedChoice(row, lock)
+            row.radioList() -> RadioChoice(row, lock)
+            else -> ListChoice(row, lock)
         }
     }
 
@@ -357,6 +360,34 @@ private fun SegmentedChoice(row: SettingsRow.Choice, lock: String?) {
     }
 }
 
+/**
+ * A choice whose every option says what it means, and that is short enough to show whole: each option
+ * on its own row with its description, so they can be compared, instead of a menu showing one.
+ */
+internal fun SettingsRow.Choice.radioList(): Boolean =
+    !alwaysList && options.size <= RADIO_CHOICE_COUNT && options.all { !it.description.isNullOrBlank() }
+
+@Composable
+private fun RadioChoice(row: SettingsRow.Choice, lock: String?) {
+    val enabled = row.enabled && lock == null
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.xs).testTag(SettingsSectionTags.ROW_PREFIX + row.key),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+    ) {
+        RowWordsColumn(RowWords(row.title, lock ?: row.supporting), enabled)
+        LettaRadioList(
+            choice = LettaRadioChoice(
+                options = row.options.map {
+                    LettaChoiceOption(it.key, it.label, it.description, tag = SettingsSectionTags.OPTION_PREFIX + row.key + "-" + it.key)
+                },
+                selected = row.selected,
+                enabled = enabled,
+            ),
+            onSelect = row.onSelect,
+        )
+    }
+}
+
 @Composable
 private fun ListChoice(row: SettingsRow.Choice, lock: String?) {
     val enabled = row.enabled && lock == null
@@ -463,6 +494,9 @@ private const val SEARCHABLE_CHOICE_COUNT = 8
 
 /** A pointer shows a choice of this many options or fewer as a segmented control. */
 private const val SEGMENTED_CHOICE_COUNT = 3
+
+/** The most options a choice shows whole as a radio list; more go in its menu. */
+private const val RADIO_CHOICE_COUNT = 5
 
 /** Whether this choice draws as a segmented control on [input]: always when inline, never when always a list, else a short choice on a pointer. */
 internal fun SettingsRow.Choice.segmentedOn(input: LettaInput): Boolean {
