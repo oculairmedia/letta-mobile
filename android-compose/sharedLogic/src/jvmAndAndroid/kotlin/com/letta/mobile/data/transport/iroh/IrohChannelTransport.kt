@@ -983,6 +983,11 @@ class IrohChannelTransport(
         timeoutMs,
     )
 
+    /** The host pushes a conversation's registry to its viewers; this connection views one. */
+    override fun receivesSubagentPushes(scope: SubagentParentScope): Boolean =
+        SUBAGENT_PUSH_CAPABILITY in hostCapabilities &&
+            connectionSession.currentViewedConversationId()?.value == scope.parentConversationId
+
     override suspend fun dismissSubagent(
         scope: SubagentParentScope,
         toolCallId: ToolCallId,
@@ -1150,6 +1155,9 @@ class IrohChannelTransport(
         /** The close code of a terminal dial failure (WebSocket 1011, "server error"): no redial follows. */
         internal const val TERMINAL_FAILURE_CODE = 1011
         internal const val SUBAGENT_RPC_CAPABILITY = "subagent_registry_v1"
+
+        /** A host that pushes its subagent registry to conversation viewers (host `PUSH_CAPABILITY`). */
+        internal const val SUBAGENT_PUSH_CAPABILITY = "subagent_registry_push_v1"
         private const val SUBAGENT_RPC_UNSUPPORTED = "subagent registry is unavailable on this Iroh node"
         private const val CRON_RPC_UNSUPPORTED = "cron scheduling is unavailable on this Iroh node"
         private const val CRON_ADMIN_PATH = "/v1/cron"

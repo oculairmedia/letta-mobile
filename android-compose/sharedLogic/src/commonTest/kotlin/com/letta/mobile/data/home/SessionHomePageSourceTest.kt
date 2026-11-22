@@ -23,6 +23,7 @@ import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.ToolUpdateParams
 import com.letta.mobile.data.model.UsageStatistics
 import com.letta.mobile.data.repository.InMemoryAgentRepository
+import com.letta.mobile.data.repository.api.IAgentBlockRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ICronRepository
@@ -226,6 +227,7 @@ class SessionHomePageSourceTest {
         override val channelTransport: IChannelTransport = FakeIrohAdminTransport(),
         /** Every route by default (an Iroh session); letta-mobile-by4vm.13 tests narrow it. */
         override val capabilities: SessionCapabilities = SessionCapabilities(SessionRoute.entries.toSet()),
+        override val blockRepository: IAgentBlockRepository? = null,
     ) : SessionRepositoryGraph {
         override val id: Long = 1
         override val toolRepository: IToolRepository = tools

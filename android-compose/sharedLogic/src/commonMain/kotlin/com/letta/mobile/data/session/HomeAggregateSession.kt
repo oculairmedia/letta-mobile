@@ -15,6 +15,10 @@ internal class HomeAggregateSession {
 
     val isConnected: Boolean get() = connection != null
 
+    /** Whether the last [update] that reported a change moved to a different host (not just a reconnect). */
+    var hostChanged: Boolean = false
+        private set
+
     /** True when the host, connection generation or advertised capabilities have changed. */
     fun update(next: SessionRepositoryGraph): Boolean {
         val connected = next.channelTransport.state.value as? ChannelTransportState.Connected
@@ -25,6 +29,7 @@ internal class HomeAggregateSession {
         val hostChanged = hostChanged(next)
         val changed = hostChanged || connectionChanged(connected, nextGeneration) ||
             capabilitiesChanged(connected, nextFeatures, nextRoutes)
+        if (changed) this.hostChanged = hostChanged
         graph = next
         connection = connected
         transportGeneration = nextGeneration
