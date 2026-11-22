@@ -198,7 +198,7 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
     }
 
     /**
-     * letta-mobile-wbgpc: the catalog is the paged `block.list` sweep (29 pages for the live host's
+     * The catalog is the paged `block.list` sweep (29 pages for the live host's
      * 1,439 blocks), so it is listed again only when the authoritative count moved or the user asked.
      * A reconnect or a page entry past the TTL against an unchanged host costs one count read.
      */
