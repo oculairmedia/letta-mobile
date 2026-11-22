@@ -57,7 +57,10 @@ class LettaChoiceListsUiTest {
     @Test
     fun theWholeRowPicksAndEveryDescriptionShows() = runComposeUiTest {
         var selected by mutableStateOf("ask")
-        setContent { MaterialTheme { LettaRadioList(LettaRadioChoice(modes, selected, error = "Pick one to continue."), onSelect = { selected = it }) } }
+        setContent {
+            val choice = LettaRadioChoice(modes, selected, error = "Pick one to continue.")
+            MaterialTheme { LettaRadioList(choice, onSelect = { selected = it }) }
+        }
 
         onNodeWithText("File edits go ahead; anything else asks.").assertExists()
         onNodeWithText("The agent plans but changes nothing.").assertExists()

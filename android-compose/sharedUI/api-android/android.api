@@ -12865,6 +12865,12 @@ public final class com/letta/mobile/ui/theme/tokens/LettaControlTokens {
 	public final fun getSpinnerSm-D9Ej5fM ()F
 }
 
+public final class com/letta/mobile/ui/theme/tokens/LettaFeedbackMotion {
+	public static final field $stable I
+	public static final field COPIED_MILLIS J
+	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaFeedbackMotion;
+}
+
 public final class com/letta/mobile/ui/theme/tokens/LettaFieldTokens {
 	public static final field $stable I
 	public static final field BORDER_MILLIS I

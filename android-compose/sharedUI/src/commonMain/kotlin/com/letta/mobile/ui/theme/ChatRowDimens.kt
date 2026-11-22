@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.theme
 
 import androidx.compose.ui.unit.Dp
+import com.letta.mobile.ui.theme.tokens.LettaFeedbackMotion
 import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 import androidx.compose.ui.unit.dp
 
@@ -54,8 +55,8 @@ object ChatRowDimens {
     /** A docked (sticky) prompt's images shrink to thumbnails no taller than this. */
     val dockedPromptImageMaxHeight: Dp = 72.dp
 
-    /** How long the copy affordance shows its "copied" check, in ms. */
-    const val copiedFeedbackMillis: Long = 1200L
+    /** How long the copy affordance shows its "copied" check, in ms: the shared [LettaFeedbackMotion.COPIED_MILLIS]. */
+    const val copiedFeedbackMillis: Long = LettaFeedbackMotion.COPIED_MILLIS
 }
 
 /**

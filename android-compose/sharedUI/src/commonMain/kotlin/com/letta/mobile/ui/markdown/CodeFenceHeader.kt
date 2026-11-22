@@ -33,7 +33,7 @@ import com.letta.mobile.ui.components.foundation.LettaIconButton
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.text.writePlainText
-import com.letta.mobile.ui.theme.ChatRowDimens
+import com.letta.mobile.ui.theme.tokens.LettaFeedbackMotion
 import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
 import com.mikepenz.markdown.compose.LocalMarkdownColors
@@ -87,7 +87,7 @@ private fun CopyCodeButton(source: String) {
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) {
         if (copied) {
-            delay(ChatRowDimens.copiedFeedbackMillis)
+            delay(LettaFeedbackMotion.COPIED_MILLIS)
             copied = false
         }
     }

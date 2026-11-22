@@ -12,8 +12,7 @@ import kotlinx.serialization.json.contentOrNull
 import com.letta.mobile.util.Telemetry
 
 /**
- * Server-side page-size guard for message.list over Iroh
- * admin_rpc (letta-mobile-c4igq.9, letta-mobile-vzn89).
+ * Server-side page-size guard for message.list over Iroh admin_rpc.
  *
  * A ~60MB conversation transcript serialized into one admin_rpc response is
  * rejected by the frame layer (admin_rpc.stream.response_too_large,
