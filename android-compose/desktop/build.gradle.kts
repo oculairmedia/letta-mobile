@@ -594,7 +594,7 @@ nucleus.application {
     // Nucleus feeds `jvmArgs` to BOTH the `run` task and jpackage's
     // --java-options, so dev runs and installed builds stay in sync; verify a
     // packaged build with:
-    //   findstr add-opens "<install dir>\app\Meridian Desktop.cfg"
+    //   findstr add-opens "<install dir>\app\Letta Desktop.cfg"
     jvmArgs(
         "--add-opens=java.desktop/sun.awt=ALL-UNNAMED",
         "--add-opens=java.desktop/sun.awt.windows=ALL-UNNAMED",
@@ -669,22 +669,13 @@ nucleus.application {
         // linked. -PnucleusAotCache=false skips the training run for a quicker local package.
         // Keep the Windows AOT behavior. Linux starts without a machine-specific training cache.
         enableAotCache = providers.gradleProperty("nucleusAotCache").orNull?.toBoolean() ?: !isLinuxHost
-        // letta-mobile-z0ftp: packageName is install IDENTITY, not display. It names the jpackage
-        // launcher and .cfg, electron-builder's appId (`com.app.<packageName>`, which derives the
-        // Windows NSIS install GUID), the npm name, the Windows Nucleus app id and so the
-        // single-instance lock. Renaming it would install Baken beside Meridian instead of upgrading
-        // it in place. appName is the display name: productName (installer, Start Menu, uninstall
-        // entry), the Linux .desktop Name= and the macOS bundle name.
         packageName = "Meridian Desktop"
-        appName = "Baken"
         packageVersion = computeDesktopPackageVersion().get()
-        description = "Baken desktop client."
+        description = "Desktop client foundation for the Meridian AI platform."
         copyright = "Copyright (C) 2026 Oculair"
         vendor = "Oculair"
-        // File names only: the updater picks the installer by extension and arch from latest.yml.
-        artifactName = $$"baken-${version}-${os}-${arch}.${ext}"
-        // The scheme is identity (existing links and registrations); only its label is display.
-        protocol("Baken", "meridian")
+        artifactName = $$"${name}-${version}-${os}-${arch}.${ext}"
+        protocol("Meridian", "meridian")
 
         publish {
             github {
@@ -699,7 +690,7 @@ nucleus.application {
         windows {
             // Preserve the existing installer identity and discoverability
             // while moving packaging from Compose Desktop to Nucleus.
-            menuGroup = "Baken"
+            menuGroup = "Meridian"
             menu = true
             shortcut = true
             perUserInstall = true
@@ -722,7 +713,7 @@ nucleus.application {
         macOS {
             bundleID = "ca.oculair.meridian.desktop"
             appCategory = "public.app-category.productivity"
-            dockName = "Baken"
+            dockName = "Meridian"
             providers.environmentVariable("APPLE_SIGNING_IDENTITY").orNull?.let { signingIdentity ->
                 signing {
                     sign.set(true)
@@ -743,7 +734,6 @@ nucleus.application {
 
         linux {
             appCategory = "Utility"
-            // Identity: ties running windows to the installed launcher entry.
             startupWMClass = "Meridian Desktop"
         }
     }

@@ -390,7 +390,7 @@ jobs:
           test "${#images[@]}" -eq 1
           xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash ../scripts/desktop/linux-package-smoke.sh "${images[0]}"
           mkdir -p desktop/build/linux-release
-          name="baken-${ARTIFACT_TAG}-linux-x64.AppImage"
+          name="letta-desktop-${ARTIFACT_TAG}-linux-x64.AppImage"
           cp -f "${images[0]}" "desktop/build/linux-release/$name"
           cd desktop/build/linux-release
           sha256sum "$name" > "$name.sha256"

@@ -202,7 +202,7 @@ class PairInviteSession(
 
     companion object {
         const val NOT_ALLOWED = "This device is not allowed to invite others. Ask the host's administrator."
-        const val HOST_TOO_OLD = "This host does not support scan-to-pair yet. Update the Baken host."
+        const val HOST_TOO_OLD = "This host does not support scan-to-pair yet. Update the Meridian host."
         const val GENERIC_FAILURE = "The host could not complete the request."
         const val REVOKE_FAILED = "The host did not confirm the revocation. The device may still have access; try again."
         const val CANCEL_FAILED = "The host did not confirm the cancellation. The code may still work until it expires."

@@ -28,7 +28,7 @@ import com.letta.mobile.ui.theme.tokens.desktop.DesktopWindowTokens
 fun main() {
     initializeDesktopLifecycleMainThread()
     singleWindowApplication(
-        title = "Baken Canvas Workspace (Debug)",
+        title = "Meridian Canvas Workspace (Debug)",
         state = androidx.compose.ui.window.WindowState(width = DesktopWindowTokens.mainWidth, height = DesktopWindowTokens.mainHeight),
     ) {
         // Without this the canvas sees the pen as a mouse: flat pressure, no eraser end.
@@ -66,7 +66,7 @@ internal fun CanvasDebugWindow(
             open = false
             onClose?.invoke()
         },
-        title = "Baken Canvas Workspace (Debug)",
+        title = "Meridian Canvas Workspace (Debug)",
         state = rememberWindowState(width = DesktopWindowTokens.mainWidth, height = DesktopWindowTokens.mainHeight),
     ) {
         // Without this the canvas sees the pen as a mouse: flat pressure, no eraser end.

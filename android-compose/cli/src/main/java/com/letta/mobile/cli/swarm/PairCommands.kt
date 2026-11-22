@@ -20,7 +20,7 @@ import kotlinx.coroutines.runBlocking
  */
 class SwarmPairCommand(environment: SwarmCliEnvironment = SwarmCliEnvironment()) : SwarmCommand(
     "pair",
-    "Pair this machine as a device using a one-time invite (create one in the Baken app's pairing screen, or " +
+    "Pair this machine as a device using a one-time invite (create one in the Meridian app's pairing screen, or " +
         "`meridian peer invite --role chat --agents <agent-id> --ttl-ms 900000`). Pass `--invite -` to read it from stdin.",
     environment,
 ) {
@@ -120,7 +120,7 @@ class SwarmUnpairCommand(environment: SwarmCliEnvironment = SwarmCliEnvironment(
             return@runBlocking
         }
         echo("removed the local pairing; device node id: $nodeId")
-        echo("revoke it on the host: in the Baken app's paired devices, or `meridian peer revoke --node-id $nodeId --ticket <host>`")
+        echo("revoke it on the host: in the Meridian app's paired devices, or `meridian peer revoke --node-id $nodeId --ticket <host>`")
     }
 }
 
