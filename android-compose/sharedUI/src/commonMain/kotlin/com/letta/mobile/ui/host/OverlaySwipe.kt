@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun Modifier.swipeAwayOnTouch(enabled: Boolean, onDismiss: () -> Unit): Modifier {
     val dismiss = rememberUpdatedState(onDismiss)
-    val described = semantics { dismiss { dismiss.value(); true } }
+    val described = Modifier.semantics { dismiss { dismiss.value(); true } }
     if (!enabled) return this.then(described)
     val offset = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
