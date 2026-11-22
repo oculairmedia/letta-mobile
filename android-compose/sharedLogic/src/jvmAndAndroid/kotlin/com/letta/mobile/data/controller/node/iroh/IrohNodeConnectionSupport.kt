@@ -165,7 +165,9 @@ internal class ConversationViewerSubscription(
         // ALWAYS (re-)register while this connection still owns the endpoint
         // claim. A stale generation is rejected atomically, so late polling
         // from an overlapped reconnect cannot reclaim or evict its successor.
-        val joined = runCatching { registry.registerJoining(target, registration) }.getOrNull()
+        val joined = runCatching {
+            registry.registerJoining(com.letta.mobile.data.model.ConversationId(target), registration)
+        }.getOrNull()
         viewed = target.takeIf { joined != null }
         return joined == true
     }

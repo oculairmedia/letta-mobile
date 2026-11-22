@@ -182,7 +182,9 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
                     record(cache, SessionRoute.TOOLS, attempt { repo.countTools() }) { stats, count -> stats.copy(toolCount = count) }
                 } },
                 blockRepository?.let { repo -> async {
-                    record(cache, SessionRoute.BLOCKS, attempt { loadBlocks(repo, relist) }) { stats, count -> stats.copy(blockCount = count) }
+                    record(cache, SessionRoute.BLOCKS, attempt { loadBlocks(repo, relist) }) { stats, count ->
+                        stats.copy(blockCount = count)
+                    }
                 } },
                 runs?.let { repo -> async {
                     record(cache, SessionRoute.RUNS, attempt { loadUsage(repo) }) { stats, usage -> stats.copy(usage = usage) }

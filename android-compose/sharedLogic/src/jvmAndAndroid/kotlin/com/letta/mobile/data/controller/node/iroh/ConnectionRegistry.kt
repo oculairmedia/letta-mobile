@@ -132,21 +132,21 @@ class ConnectionRegistry {
      * [ViewerJoinedListener] hears it after the lock is released.
      */
     suspend fun register(conversationId: String, registration: ViewerRegistration): Boolean =
-        registerJoining(conversationId, registration) != null
+        registerJoining(ConversationId(conversationId), registration) != null
 
     /**
      * [register], answering whether this made the connection a NEW viewer of [conversationId]:
      * true for a join, false for a repeat of a registration already in place (a later
      * `message.list` page), null when the registration is stale and was refused.
      */
-    internal suspend fun registerJoining(conversationId: String, registration: ViewerRegistration): Boolean? {
+    internal suspend fun registerJoining(conversation: ConversationId, registration: ViewerRegistration): Boolean? {
         val joined = mutex.withLock {
             if (activeByEndpoint[registration.endpointId] !== registration) return null
-            val viewers = viewersByConversation.getOrPut(conversationId) { mutableMapOf() }
+            val viewers = viewersByConversation.getOrPut(conversation.value) { mutableMapOf() }
             val previous = viewers.put(registration.endpointId, registration)
             previous !== registration
         }
-        if (joined) joinListeners.forEach { it.onViewerJoined(conversationId, registration.viewer) }
+        if (joined) joinListeners.forEach { it.onViewerJoined(conversation.value, registration.viewer) }
         return joined
     }
 
