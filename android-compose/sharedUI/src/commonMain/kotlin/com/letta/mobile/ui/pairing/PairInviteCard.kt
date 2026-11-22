@@ -16,14 +16,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -37,6 +36,7 @@ import com.letta.mobile.data.pairing.MintedPairInvite
 import com.letta.mobile.data.pairing.PairInviteRequest
 import com.letta.mobile.data.pairing.PairedDevice
 import com.letta.mobile.data.pairing.QrModules
+import com.letta.mobile.ui.components.copy.LettaCopyButton
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
@@ -44,8 +44,6 @@ import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 import com.letta.mobile.ui.components.foundation.LettaRowLabel
 import com.letta.mobile.ui.components.foundation.LettaToggleRow
-import com.letta.mobile.ui.text.writePlainText
-import kotlinx.coroutines.launch
 import com.letta.mobile.ui.components.choice.LettaChoiceOption
 import com.letta.mobile.ui.components.choice.LettaRadioChoice
 import com.letta.mobile.ui.components.choice.LettaRadioList
@@ -250,26 +248,20 @@ private class LinkToggle(val showingLink: Boolean, val onToggle: () -> Unit)
 
 @Composable
 private fun LinkActions(invite: MintedPairInvite, toggle: LinkToggle?, onShare: ((String) -> Unit)?) {
-    val clipboard = LocalClipboard.current
-    val scope = rememberCoroutineScope()
-    var copied by remember(invite.inviteId) { mutableStateOf(false) }
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
         toggle?.let {
             TextButton(onClick = it.onToggle, modifier = Modifier.testTag(PairingTags.INVITE_TOGGLE_LINK)) {
                 Text(if (it.showingLink) PairingStrings.SHOW_QR else PairingStrings.SHOW_LINK)
             }
         }
-        TextButton(
-            onClick = {
-                scope.launch {
-                    clipboard.writePlainText(invite.pairLink)
-                    copied = true
-                }
-            },
-            modifier = Modifier.testTag(PairingTags.INVITE_COPY),
-        ) {
-            LettaIcon(LettaIcons.Copy, contentDescription = null)
-            Text(if (copied) PairingStrings.LINK_COPIED else PairingStrings.COPY_LINK)
+        // Keyed by the invite, so a new code never opens on the last one's "Copied".
+        key(invite.inviteId) {
+            LettaCopyButton(
+                text = invite.pairLink,
+                contentDescription = PairingStrings.COPY_LINK,
+                modifier = Modifier.testTag(PairingTags.INVITE_COPY),
+                glyph = LettaIconStyle(tint = MaterialTheme.colorScheme.primary),
+            )
         }
         onShare?.let { share ->
             TextButton(onClick = { share(invite.pairLink) }, modifier = Modifier.testTag(PairingTags.INVITE_SHARE)) {
