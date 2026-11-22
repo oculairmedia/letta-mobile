@@ -60,7 +60,7 @@ object MessageListPageGuard {
      * is its newest-first default). Both directions keep the rows nearest the request's cursor and
      * name the farthest kept row as the continuation: `next_after` ascending, `next_before` otherwise.
      */
-    fun boundPage(
+    internal fun boundPage(
         projected: JsonElement,
         ascending: Boolean,
         maxResponseBytes: Int,
