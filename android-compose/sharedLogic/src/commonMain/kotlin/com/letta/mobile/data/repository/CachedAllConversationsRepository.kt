@@ -33,7 +33,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /** A [CachedAllConversationsRepository.refresh] read: it answers every call numbered up to [startedAfterRequest]. */
-private data class ReadOutcome(val startedAfterRequest: Long, val failure: Throwable? = null)
 
 @Suppress("NoDetachedCoroutineLifecycle")
 fun defaultCachedAllConversationsRepositoryScope(): CoroutineScope =
@@ -74,7 +73,9 @@ open class CachedAllConversationsRepository(
     private val refreshRequests = atomic(0L)
 
     /** The last [refresh] read: the calls it answered and how it failed, written and read under [refreshMutex]. */
-    private var lastRead: ReadOutcome? = null
+    /** The newest request ticket the last finished read covered, and that read's failure (null when it succeeded). */
+    private var lastReadCovers: Long = -1L
+    private var lastReadFailure: Throwable? = null
     /** Replaced on a backend switch, so the next host is asked for visible recents again. */
     private var listing = newListing()
 
@@ -230,12 +231,11 @@ open class CachedAllConversationsRepository(
     override suspend fun refresh() {
         val ticket = refreshRequests.incrementAndGet()
         refreshMutex.withLock {
-            val covering = lastRead?.takeIf { it.startedAfterRequest >= ticket }
-            val outcome = covering ?: ReadOutcome(
-                startedAfterRequest = refreshRequests.value,
-                failure = runCatchingCancellable { refreshLocked() }.exceptionOrNull(),
-            ).also { lastRead = it }
-            outcome.failure?.let { throw it }
+            if (lastReadCovers < ticket) {
+                lastReadCovers = refreshRequests.value
+                lastReadFailure = runCatchingCancellable { refreshLocked() }.exceptionOrNull()
+            }
+            lastReadFailure?.let { throw it }
         }
     }
 
