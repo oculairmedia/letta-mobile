@@ -46,8 +46,8 @@ class SharedAppearanceWiringTest {
     @Test
     fun desktopAndWebOverOneHostShowTheSameAppearanceAndEachOthersChanges() = runBlocking {
         val host = RouterShellStateHost()
-        val desktop = desktopClient(MutableStateFlow(host.transport("desktop")))
-        val web = webClient(MutableStateFlow(host.transport("browser", IrohPeerCapabilities.CHAT_ROLE)))
+        val desktop = desktopClient(MutableStateFlow(host.transport(Endpoint("desktop"))))
+        val web = webClient(MutableStateFlow(host.transport(Endpoint("browser"), IrohPeerCapabilities.CHAT_ROLE)))
 
         assertEquals(ShellStateEditOutcome.APPLIED, desktop.edit { setTheme("DARK") })
         within { web.values.first { it.theme == "DARK" } }
@@ -68,12 +68,12 @@ class SharedAppearanceWiringTest {
         val second = RouterShellStateHost()
         seedTheme(first, "DARK")
         seedTheme(second, "LIGHT")
-        val transports = MutableStateFlow<IChannelTransport?>(first.transport("desktop"))
+        val transports = MutableStateFlow<IChannelTransport?>(first.transport(Endpoint("desktop")))
         val desktop = desktopClient(transports)
         within { desktop.values.first { it.theme == "DARK" } }
 
         // Another backend, whose transport has the very same session id and connection epoch as the first one had.
-        transports.value = second.transport("desktop")
+        transports.value = second.transport(Endpoint("desktop"))
 
         assertEquals("LIGHT", within { desktop.values.first { it.theme == "LIGHT" } }.theme)
     }
@@ -84,13 +84,13 @@ class SharedAppearanceWiringTest {
         val second = RouterShellStateHost()
         seed(first, "SAKURA")
         seed(second, "SPRING")
-        val channel = MutableStateFlow<IChannelTransport>(first.transport("browser", IrohPeerCapabilities.CHAT_ROLE))
+        val channel = MutableStateFlow<IChannelTransport>(first.transport(Endpoint("browser"), IrohPeerCapabilities.CHAT_ROLE))
         val graphs = graphsOver(channel)
         val web = hostAppearanceOver(channelShellStateLink(graphs.channelTransports()), InMemorySecureSettingsStore())
         scope.launch { web.run() }
         within { web.values.first { it.themePreset == "SAKURA" } }
 
-        channel.value = second.transport("browser", IrohPeerCapabilities.CHAT_ROLE)
+        channel.value = second.transport(Endpoint("browser"), IrohPeerCapabilities.CHAT_ROLE)
         graphs.rebuild()
 
         assertEquals("SPRING", within { web.values.first { it.themePreset == "SPRING" } }.themePreset)
@@ -100,13 +100,13 @@ class SharedAppearanceWiringTest {
     fun anEditTheHostCannotApplyIsRefusedAndNeverQueuedWhileTheLastValueKeepsShowing() = runBlocking {
         val host = RouterShellStateHost()
         val store = InMemorySecureSettingsStore()
-        val online = host.transport("desktop")
+        val online = host.transport(Endpoint("desktop"))
         val first = desktopClient(MutableStateFlow(online), store)
         first.edit { setTheme("DARK") }
         within { while (!store.getString(MIRROR_KEY).orEmpty().contains("DARK")) delay(POLL_MS) }
 
         // The same device after a restart with the host out of reach: the mirror shows, the edit is refused.
-        val cut = host.transport("desktop").also { it.cut() }
+        val cut = host.transport(Endpoint("desktop")).also { it.cut() }
         val restarted = desktopClient(MutableStateFlow(cut), store)
         assertEquals("DARK", restarted.values.first().theme, "the host's last value, from the mirror")
         assertEquals("DARK", restarted.current.theme)
@@ -129,13 +129,13 @@ class SharedAppearanceWiringTest {
 
     /** Puts [theme] on [host] through a throwaway client, as another device would. */
     private suspend fun seedTheme(host: RouterShellStateHost, theme: String) {
-        val applied = desktopClient(MutableStateFlow(host.transport("setup"))).edit { setTheme(theme) }
+        val applied = desktopClient(MutableStateFlow(host.transport(Endpoint("setup")))).edit { setTheme(theme) }
         assertEquals(ShellStateEditOutcome.APPLIED, applied)
     }
 
     /** Puts the colour [preset] on [host] through a throwaway client, as another device would. */
     private suspend fun seed(host: RouterShellStateHost, preset: String) {
-        val applied = desktopClient(MutableStateFlow(host.transport("setup"))).edit { setThemePreset(preset) }
+        val applied = desktopClient(MutableStateFlow(host.transport(Endpoint("setup")))).edit { setThemePreset(preset) }
         assertEquals(ShellStateEditOutcome.APPLIED, applied)
     }
 

@@ -65,10 +65,9 @@ private class AppearanceEdits(private val appearance: HostAppearance, private va
         report(appearance.setDynamicColor(enabled))
     }
 
-    /** One edit after the other: a refused preset changes nothing else, so dynamic colour is turned off only once it is taken. */
+    /** One proposal: the host takes the preset and dynamic colour turned off together or neither, and no device sees one alone. */
     suspend fun setPreset(preset: ThemePreset) {
-        val taken = report(appearance.setThemePreset(preset.name))
-        if (taken && preset != ThemePreset.DEFAULT) report(appearance.setDynamicColor(false))
+        report(appearance.selectThemePreset(preset.name, dynamicColor = false.takeIf { preset != ThemePreset.DEFAULT }))
     }
 
     private fun report(outcome: ShellStateEditOutcome): Boolean {

@@ -32,6 +32,12 @@ interface HostAppearance {
     /** Records [enabled] on the host. */
     suspend fun setDynamicColor(enabled: Boolean): ShellStateEditOutcome
 
+    /**
+     * Records the colour preset named [name] and, when [dynamicColor] is not null, dynamic colour, as one proposal: the host
+     * takes both or neither, and no other device sees one without the other.
+     */
+    suspend fun selectThemePreset(name: String, dynamicColor: Boolean?): ShellStateEditOutcome
+
     /** Follows the host's shell state and migrates the device-local choices, until cancelled. */
     suspend fun run()
 
@@ -46,6 +52,7 @@ interface HostAppearance {
             override suspend fun setTheme(name: String) = ShellStateEditOutcome.OFFLINE
             override suspend fun setThemePreset(name: String) = ShellStateEditOutcome.OFFLINE
             override suspend fun setDynamicColor(enabled: Boolean) = ShellStateEditOutcome.OFFLINE
+            override suspend fun selectThemePreset(name: String, dynamicColor: Boolean?) = ShellStateEditOutcome.OFFLINE
             override suspend fun run() = Unit
             override suspend fun clearLocal() = Unit
         }

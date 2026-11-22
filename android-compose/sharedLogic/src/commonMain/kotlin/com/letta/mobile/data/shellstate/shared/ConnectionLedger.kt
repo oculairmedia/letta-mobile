@@ -33,6 +33,9 @@ internal class ConnectionLedger(private val currentConnection: () -> String?) {
     /** Where a request issued now is issued. */
     fun issue() = Issue(generation.value, currentConnection())
 
+    /** Where a push received on [connection] is received: the current generation, and the connection that delivered it. */
+    fun receivedOn(connection: String?) = Issue(generation.value, connection)
+
     /** Whether [issued] is still the current generation and connection. */
     fun isCurrent(issued: Issue): Boolean = issued.generation == generation.value && issued.connection == currentConnection()
 

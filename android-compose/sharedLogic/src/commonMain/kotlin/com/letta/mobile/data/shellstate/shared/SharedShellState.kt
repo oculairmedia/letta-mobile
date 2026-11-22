@@ -119,9 +119,9 @@ class SharedShellState(
         // A push is bound to the connection it was received on: where it arrived is recorded before anything
         // suspends, and it is adopted only if that is still the current generation and connection, so one received
         // on A never becomes B's document. It never touches `live`.
-        link.pushes.onEach { frame ->
-            val receivedOn = ledger.issue()
-            decode(frame)?.let { adopt(it, receivedOn, live = false) }
+        link.originatedPushes.onEach { push ->
+            val receivedOn = ledger.receivedOn(push.connection)
+            decode(push.frame)?.let { adopt(it, receivedOn, live = false) }
         }.launchIn(this)
         var read: Job? = null
         link.connection.distinctUntilChanged().collect { session ->
@@ -248,7 +248,7 @@ class SharedShellState(
      * one issued on an earlier one changes nothing and says so in [Reply.current].
      */
     private suspend fun request(issued: Issue, method: String, params: JsonObject): Reply {
-        val outcome = runCatching { link.call(method, params) }
+        val outcome = runCatching { link.callOn(issued.connection, method, params) }
         (outcome.exceptionOrNull() as? CancellationException)?.let { throw it }
         val reply = outcome.getOrNull()
         val document = reply?.takeIf { it.success }?.result?.let(::decode)

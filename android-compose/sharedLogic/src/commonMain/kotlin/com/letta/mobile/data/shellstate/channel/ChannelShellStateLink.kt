@@ -1,6 +1,7 @@
 package com.letta.mobile.data.shellstate.channel
 
 import com.letta.mobile.data.shellstate.shared.ShellStateLink
+import com.letta.mobile.data.shellstate.shared.ShellStatePush
 import com.letta.mobile.data.shellstate.shared.ShellStateReply
 import com.letta.mobile.data.shellstate.wire.ShellStateWire
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -43,16 +44,29 @@ private class FollowingShellStateLink(private val transports: StateFlow<IChannel
     private val numbered = ArrayDeque<Pair<IChannelTransport, Long>>()
     private var issued = 0L
 
-    override suspend fun call(method: String, params: JsonObject): ShellStateReply {
-        val transport = checkNotNull(transports.value) { "No channel transport" }
-        return transport.adminRpc(method = method, path = "", body = params.toString())
-            .let { ShellStateReply(success = it.success, result = it.result, error = it.error) }
+    override suspend fun call(method: String, params: JsonObject): ShellStateReply =
+        send(checkNotNull(transports.value) { "No channel transport" }, method, params)
+
+    override suspend fun callOn(connection: String?, method: String, params: JsonObject): ShellStateReply {
+        // The transport is read once: the connection it is checked against is the one the request goes over.
+        val transport = transports.value
+        val bound = transport != null && connection != null && sessionOf(transport, transport.state.value) == connection
+        return if (transport != null && bound) send(transport, method, params) else ShellStateReply(success = false)
     }
 
-    override val pushes: Flow<JsonObject> = transports.flatMapLatest { transport ->
-        transport?.events?.mapNotNull { frame -> (frame as? ServerFrame.Unknown)?.takeIf { it.type == ShellStateWire.FRAME_TYPE }?.raw }
-            ?: emptyFlow()
+    private suspend fun send(transport: IChannelTransport, method: String, params: JsonObject): ShellStateReply =
+        transport.adminRpc(method = method, path = "", body = params.toString())
+            .let { ShellStateReply(success = it.success, result = it.result, error = it.error) }
+
+    override val originatedPushes: Flow<ShellStatePush> = transports.flatMapLatest { transport ->
+        transport?.events?.mapNotNull { frame ->
+            (frame as? ServerFrame.Unknown)?.takeIf { it.type == ShellStateWire.FRAME_TYPE }
+                // Named here, where the frame arrives from this transport, not where a buffered frame is read.
+                ?.let { ShellStatePush(it.raw, sessionOf(transport, transport.state.value)) }
+        } ?: emptyFlow()
     }
+
+    override val pushes: Flow<JsonObject> = originatedPushes.map { it.frame }
 
     override val connection: Flow<String?> = transports.flatMapLatest { transport ->
         transport?.state?.map { state -> sessionOf(transport, state) } ?: flowOf(null)

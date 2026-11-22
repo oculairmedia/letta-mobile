@@ -99,6 +99,8 @@ class HostAppearanceSectionTest {
         override suspend fun setTheme(name: String) = take { it.copy(theme = name) }
         override suspend fun setThemePreset(name: String) = take { it.copy(themePreset = name) }
         override suspend fun setDynamicColor(enabled: Boolean) = take { it.copy(dynamicColor = enabled) }
+        override suspend fun selectThemePreset(name: String, dynamicColor: Boolean?) =
+            take { it.copy(themePreset = name, dynamicColor = dynamicColor ?: it.dynamicColor) }
         override suspend fun run() = Unit
         override suspend fun clearLocal() = Unit
 

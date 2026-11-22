@@ -1,15 +1,15 @@
 package com.letta.mobile.data.shellstate.appearance
 
-import com.letta.mobile.data.clientstore.hostAppearanceOver
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.settings.AppearanceSettings
 import com.letta.mobile.data.settings.hostAppearanceSettings
 import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.data.shellstate.AppearanceKeys
+import com.letta.mobile.data.shellstate.AppearanceValues
 import com.letta.mobile.data.shellstate.HostAppearance
 import com.letta.mobile.data.shellstate.channel.channelShellStateLink
-import com.letta.mobile.data.storage.InMemorySecureSettingsStore
+import com.letta.mobile.data.shellstate.shared.SharedShellState
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -42,8 +42,8 @@ class HostAppearanceSettingsTest {
     @Test
     fun changingTheThemeHereChangesWhatTheHostHoldsAndWhatAnotherClientShows() = runBlocking {
         val host = RouterShellStateHost()
-        val here = client(host.transport("desktop"))
-        val other = client(host.transport("browser"))
+        val here = client(host.transport(Endpoint("desktop")))
+        val other = client(host.transport(Endpoint("browser")))
 
         here.section.theme!!.set(AppTheme.DARK)
 
@@ -56,7 +56,7 @@ class HostAppearanceSettingsTest {
     @Test
     fun aNonDefaultPresetTurnsDynamicColourOffAndTheDefaultLeavesItAsTheHostHoldsIt() = runBlocking {
         val host = RouterShellStateHost()
-        val here = client(host.transport("desktop"), dynamicColorSupported = true)
+        val here = client(host.transport(Endpoint("desktop")), dynamicColorSupported = true)
         here.section.dynamicColor!!.set(true)
         within { here.section.dynamicColor!!.current.first { it } }
 
@@ -70,11 +70,49 @@ class HostAppearanceSettingsTest {
     }
 
     @Test
+    fun aPresetAndTheDynamicColourItTurnsOffAreOneProposalSoNoDeviceSeesHalfOfIt() = runBlocking {
+        val host = RouterShellStateHost()
+        val here = client(host.transport(Endpoint("desktop")), dynamicColorSupported = true)
+        val watcher = client(host.transport(Endpoint("browser")))
+        here.section.dynamicColor!!.set(true)
+        within { while (host.entries()[AppearanceKeys.DYNAMIC_COLOR] != JsonPrimitive(true)) delay(POLL_MS) }
+        host.proposals.clear()
+        val seen = mutableListOf<AppearanceValues>()
+        scope.launch { watcher.appearance.values.collect { seen += it } }
+
+        here.section.themePreset!!.set(ThemePreset.OCEAN)
+        within { while (host.entries()[AppearanceKeys.THEME_PRESET] != JsonPrimitive("OCEAN")) delay(POLL_MS) }
+
+        assertEquals(listOf(listOf(AppearanceKeys.THEME_PRESET, AppearanceKeys.DYNAMIC_COLOR)), host.proposals, "one proposal, both keys")
+        assertEquals(JsonPrimitive(false), host.entries().getValue(AppearanceKeys.DYNAMIC_COLOR))
+        within { watcher.appearance.values.first { it.themePreset == "OCEAN" } }
+        assertTrue(seen.none { it.themePreset == "OCEAN" && it.dynamicColor == true }, "never the new preset with the old dynamic colour: $seen")
+    }
+
+    @Test
+    fun aRefusedPresetChangesNeitherTheHostsPresetNorItsDynamicColour() = runBlocking {
+        val host = RouterShellStateHost()
+        val link = host.transport(Endpoint("desktop"))
+        val here = client(link, dynamicColorSupported = true)
+        here.section.dynamicColor!!.set(true)
+        within { while (host.entries()[AppearanceKeys.DYNAMIC_COLOR] != JsonPrimitive(true)) delay(POLL_MS) }
+
+        link.cut()
+        here.section.themePreset!!.set(ThemePreset.OCEAN)
+        within { here.section.notice!!.first { it != null } }
+        link.restore()
+        delay(SETTLE_MS)
+
+        assertEquals(setOf(AppearanceKeys.DYNAMIC_COLOR), host.entries().keys)
+        assertEquals(JsonPrimitive(true), host.entries().getValue(AppearanceKeys.DYNAMIC_COLOR))
+    }
+
+    @Test
     fun theDynamicColourRowIsLeftOutWhereThePlatformHasNone() = runBlocking {
         val host = RouterShellStateHost()
 
-        val unsupported = client(host.transport("desktop")).section
-        val supported = client(host.transport("phone"), dynamicColorSupported = true).section
+        val unsupported = client(host.transport(Endpoint("desktop"))).section
+        val supported = client(host.transport(Endpoint("phone")), dynamicColorSupported = true).section
 
         assertNull(unsupported.dynamicColor)
         assertTrue(unsupported.theme != null && unsupported.themePreset != null, "theme and preset are still offered")
@@ -84,10 +122,10 @@ class HostAppearanceSettingsTest {
     @Test
     fun anEditTheHostCannotTakeIsRefusedWithTheReasonAndTheLastValueKeepsShowing() = runBlocking {
         val host = RouterShellStateHost()
-        val seed = client(host.transport("other"))
+        val seed = client(host.transport(Endpoint("other")))
         seed.section.theme!!.set(AppTheme.LIGHT)
         within { while (host.entries()[AppearanceKeys.THEME] != JsonPrimitive("LIGHT")) delay(POLL_MS) }
-        val link = host.transport("desktop")
+        val link = host.transport(Endpoint("desktop"))
         val here = client(link)
         within { here.section.theme!!.current.first { it == AppTheme.LIGHT } }
 
@@ -105,11 +143,16 @@ class HostAppearanceSettingsTest {
 
     private class Client(val appearance: HostAppearance, val section: AppearanceSettings)
 
+    /**
+     * A client of the host that is following it and has read its document, so an edit is sent at once instead of being
+     * refused as "not read yet": the wait is on the client's own state, not on time.
+     */
     private fun client(transport: IChannelTransport, dynamicColorSupported: Boolean = false): Client {
-        val appearance = hostAppearanceOver(channelShellStateLink(MutableStateFlow(transport)), InMemorySecureSettingsStore())
+        val shell = SharedShellState(channelShellStateLink(MutableStateFlow(transport)))
+        val appearance = SharedShellAppearance(shell)
         scope.launch { appearance.run() }
-        val section = hostAppearanceSettings(appearance, scope, dynamicColorSupported)
-        return Client(appearance, section)
+        runBlocking { within { shell.state.first { it.editable } } }
+        return Client(appearance, hostAppearanceSettings(appearance, scope, dynamicColorSupported))
     }
 
     private suspend fun <T> within(block: suspend () -> T): T = withTimeout(TIMEOUT_MS) { block() }

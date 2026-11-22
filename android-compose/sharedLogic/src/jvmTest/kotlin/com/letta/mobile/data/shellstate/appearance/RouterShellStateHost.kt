@@ -31,6 +31,13 @@ import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+/** A paired device's endpoint id, as the host's authenticated connection records it. */
+@JvmInline
+internal value class Endpoint(val id: String)
+
+/** One request as the host receives it: what is asked, with which params, and by whom. */
+private class HostCall(val method: String, val params: JsonObject, val from: Endpoint)
+
 /**
  * One real host: the production shell-state routes over a real state file, served through the real
  * [AdminRpcRouter] (capability matrix, allowlist, compare-and-set, push), shared by every [device] that pairs
@@ -55,7 +62,7 @@ internal class RouterShellStateHost(private val directory: Path = Files.createTe
     }
 
     /** A paired device: a link to this host that the test can cut and restore. */
-    fun device(endpoint: String): Device = Device(endpoint).also { devices += it }
+    fun device(endpoint: Endpoint): Device = Device(endpoint).also { devices += it }
 
     /**
      * A paired device as a client sees its channel transport: it answers `admin_rpc` through the real router after the
@@ -63,19 +70,20 @@ internal class RouterShellStateHost(private val directory: Path = Files.createTe
      * its params the way the real transports do ([appServerAdminRpcParams]), advertises what the router advertises while
      * connected, and receives the host's `shell_state_updated` pushes as the untyped host frames the real ingestors emit.
      */
-    fun transport(endpoint: String, role: Set<String> = IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE): PairedTransport =
+    fun transport(endpoint: Endpoint, role: Set<String> = IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE): PairedTransport =
         PairedTransport(endpoint, role).also { transports += it }
 
     /** The host's own entries, read through the route like any client: key to value. */
     suspend fun entries(): Map<String, kotlinx.serialization.json.JsonElement> {
-        val reply = dispatch(ShellStateWire.GET, JsonObject(emptyMap()), "reader")
+        val reply = dispatch(HostCall(ShellStateWire.GET, JsonObject(emptyMap()), Endpoint("reader")))
         return reply.result!!.jsonObject.getValue("entries").jsonObject.mapValues { it.value.jsonObject.getValue("value") }
     }
 
-    private suspend fun dispatch(method: String, params: JsonObject, endpoint: String): ShellStateReply {
-        if (method == ShellStateWire.PROPOSE) proposals += keysOf(params)
-        val context = AdminRpcRequestContext(authenticated = true, authenticatedEndpointId = endpoint)
-        val response = Json.parseToJsonElement(router.dispatch(AdminRpcInvocation("r", method, params, context))).jsonObject
+    private suspend fun dispatch(call: HostCall): ShellStateReply {
+        if (call.method == ShellStateWire.PROPOSE) proposals += keysOf(call.params)
+        val context = AdminRpcRequestContext(authenticated = true, authenticatedEndpointId = call.from.id)
+        val invocation = AdminRpcInvocation("r", call.method, call.params, context)
+        val response = Json.parseToJsonElement(router.dispatch(invocation)).jsonObject
         val ok = response.getValue("success").jsonPrimitive.boolean
         return ShellStateReply(ok, response["result"], response["error"]?.jsonPrimitive?.content)
     }
@@ -85,7 +93,7 @@ internal class RouterShellStateHost(private val directory: Path = Files.createTe
             ?.map { it.jsonObject.getValue(ShellStateWire.KEY).jsonPrimitive.content }.orEmpty()
 
     /** One device's link: advertises what the real router advertises while connected, and nothing when cut. */
-    inner class Device(private val endpoint: String) : ShellStateLink {
+    inner class Device(private val endpoint: Endpoint) : ShellStateLink {
         val connected = MutableStateFlow(true)
         val pushFrames = MutableSharedFlow<JsonObject>(extraBufferCapacity = 16)
         private var epoch = 1
@@ -106,12 +114,12 @@ internal class RouterShellStateHost(private val directory: Path = Files.createTe
 
         override suspend fun call(method: String, params: JsonObject): ShellStateReply {
             if (!connected.value) error("link is down")
-            return dispatch(method, params, endpoint)
+            return dispatch(HostCall(method, params, endpoint))
         }
     }
 
     /** One paired device's channel transport to this host; [cut] and [restore] drop and redial it (a new connection epoch). */
-    inner class PairedTransport(private val endpoint: String, private val role: Set<String>) : NoOpChannelTransport() {
+    inner class PairedTransport(private val endpoint: Endpoint, private val role: Set<String>) : NoOpChannelTransport() {
         private var epoch = 1L
         private val frames = kotlinx.coroutines.flow.MutableSharedFlow<ServerFrame>(extraBufferCapacity = 16)
         private val published = MutableStateFlow<ChannelTransportState>(up())
@@ -122,9 +130,10 @@ internal class RouterShellStateHost(private val directory: Path = Files.createTe
         val isUp: Boolean get() = published.value is ChannelTransportState.Connected
 
         private fun up() = ChannelTransportState.Connected(
-            serverId = "iroh-app-server", sessionId = "host-session", deviceId = endpoint, connectionEpoch = epoch,
+            serverId = "iroh-app-server", sessionId = "host-session", deviceId = endpoint.id, connectionEpoch = epoch,
         )
 
+        /** Delivers a `shell_state_updated` [frame] to this transport as the host would push it. */
         fun deliver(frame: JsonObject) {
             frames.tryEmit(ServerFrame.Unknown(type = frame.getValue("type").jsonPrimitive.content, raw = frame))
         }
@@ -144,7 +153,7 @@ internal class RouterShellStateHost(private val directory: Path = Files.createTe
             if (!IrohPeerCapabilities.isAllowed(role, required)) {
                 return AppServerInboundFrame.AdminRpcResponse(requestId = "r", success = false, error = "forbidden")
             }
-            val reply = dispatch(method, appServerAdminRpcParams(path, body), endpoint)
+            val reply = dispatch(HostCall(method, appServerAdminRpcParams(path, body), endpoint))
             return AppServerInboundFrame.AdminRpcResponse(
                 requestId = "r", success = reply.success, result = reply.result, error = reply.error,
             )

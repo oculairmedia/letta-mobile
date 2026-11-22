@@ -120,6 +120,7 @@ class HostAppearanceThemeTest {
         override suspend fun setTheme(name: String) = ShellStateEditOutcome.OFFLINE
         override suspend fun setThemePreset(name: String) = ShellStateEditOutcome.OFFLINE
         override suspend fun setDynamicColor(enabled: Boolean) = ShellStateEditOutcome.OFFLINE
+        override suspend fun selectThemePreset(name: String, dynamicColor: Boolean?) = ShellStateEditOutcome.OFFLINE
         override suspend fun run() = Unit
         override suspend fun clearLocal() = Unit
     }
