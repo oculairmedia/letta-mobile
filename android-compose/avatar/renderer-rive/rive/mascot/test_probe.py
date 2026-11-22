@@ -37,7 +37,9 @@ GOLDEN_SCENARIOS = ["enter-listening", "enter-thinking", "success", "error", "ho
                     # te3n1.5: the new states, every reaction, petting and reduceMotion.
                     "enter-working", "enter-dreaming", "poke", "dizzy", "sent", "toolStart",
                     "toolDone", "land", "wake", "yawn", "trick0", "trick1", "trick2", "trick3",
-                    "petting", "reduce-motion-idle", "reduce-motion-poke"]
+                    "petting", "reduce-motion-idle", "reduce-motion-poke",
+                    # letta-mobile-su08n
+                    "reduce-motion-success", "reduce-motion-toolDone"]
 
 PEAK_TOL = 0.05        # 5 % of the property's own range
 OVERSHOOT_TOL = 5.0    # percentage points
@@ -111,6 +113,37 @@ class ReducedMotion(unittest.TestCase):
         _s, _t, sig = probe.probe("reduce-motion-poke", quiet=True)
         for p in ("Squash.scaleX", "Squash.scaleY", "Squash.rotation", "Squash.x"):
             self.assertLess(sig[p]["range"], self.FLAT, f"{p} moved under reduceMotion")
+
+
+class Secondaries(unittest.TestCase):
+    """letta-mobile-su08n: the secondaries and the sparkle play at their moments, and reduceMotion
+    turns every one of them off. The plain moments are the control, so a probe that stopped
+    reading cannot pass for a calm rig."""
+    FLAT = 1e-3
+    NEW = ("Lag.x", "Lag.y", "Follow.scaleY", "Follow.rotation", "Star0.opacity")
+
+    def _ranges(self, name):
+        _s, table, sig = probe.probe(name, quiet=True)
+        self.assertFalse(table["missing"], table["missing"])
+        return {p: s["range"] for p, s in sig.items()}
+
+    def test_the_moments_carry_their_secondaries(self):
+        success = self._ranges("success")
+        self.assertGreater(success["Lag.y"], 5, "the face no longer trails the hop")
+        self.assertGreater(success["Follow.scaleY"], 0.02, "no follow-through on the landing")
+        self.assertGreater(success["Star0.opacity"], 0.9, "no sparkle at the apex")
+        self.assertGreater(self._ranges("toolDone")["Star0.opacity"], 0.9, "no sparkle when the agent finishes")
+        self.assertGreater(self._ranges("poke")["Lag.x"], 4, "the face no longer trails the squish")
+
+    def test_reduce_motion_turns_them_all_off(self):
+        for name in ("reduce-motion-poke", "reduce-motion-success", "reduce-motion-toolDone"):
+            ranges = self._ranges(name)
+            with self.subTest(scenario=name):
+                moving = {p: ranges[p] for p in self.NEW if ranges[p] > self.FLAT}
+                self.assertEqual(moving, {}, f"{name}: a secondary or a sparkle still plays")
+
+    def test_a_turning_entry_follows_through(self):
+        self.assertGreater(self._ranges("enter-thinking")["Follow.rotation"], 0.02)
 
 
 class ProbeDocument(unittest.TestCase):

@@ -13,13 +13,15 @@ Rive rules that bite here:
 """
 from textwrap import indent
 
+from svgpath import path_rml
 from rml import (LINEAR, OPACITY, REMAP_TIME, ROT, SINE, SX, SY, VM_LOOKX, VM_LOOKY, VM_MOUTH, X, Y,
                  animation, bind)
 from rig.body import fill, rrect
 from rig.chart import Chart, Pen
-from rig.constants import JX, LEAN_BASE, PLATE_WHITE, TUNABLES, TURN_ARC, TURN_LEAN_DEG, rad
+from rig.constants import (JX, LEAN_BASE, PLATE_WHITE, SPARKLE_COLOR, SPARKLE_STARS, TUNABLES, TURN_ARC,
+                           TURN_LEAN_DEG, art, rad)
 from rig.ids import (
-    ARC_NODE, AUTO_X, AUTO_Y, BODY_NODE, CONV_LISTEN_SCALE, CONV_LISTEN_Y, CONV_LOOK, CONV_MOUTH,
+    ARC_NODE, AUTO_X, LAG_NODE, SPARKLE_NODE, SPARKLE_STARS as SPARKLE_STAR_IDS, AUTO_Y, BODY_NODE, CONV_LISTEN_SCALE, CONV_LISTEN_Y, CONV_LOOK, CONV_MOUTH,
     CONV_TURN_ROT, CONV_TURN_X, CONV_TURN_Y, FACE, HOST_TURN, JOYSTICK, LEAN_NODE, LISTEN_NODE,
     PEEK_NODE, PLATE, PLATE_AB, PLATE_AUTO_X, PLATE_AUTO_Y, PLATE_BLINK, PLATE_EXPR, PLATE_IN_BLINK,
     PLATE_IN_EXPR, PLATE_LOOKX, PLATE_LOOKY, PLATE_OPEN, PLATE_SM, TRAIL1, TRAIL2, TURN_NODE,
@@ -52,6 +54,19 @@ def trail(name, sid):
 </Shape>'''
 
 
+def sparkles():
+    """The star glints (letta-mobile-su08n): three stars by the plate's top-right corner, invisible
+    until the Sparkle layer keys them. Inside Face, before the Plate, so they draw over the card
+    and ride every turn, lag and hop the plate does. Each star's size and place live on a node of
+    its own, never keyed, so the Sparkle layer keys a relative scale that ends at rest (1)."""
+    stars = [f'<Node x="{x}" y="{y}" scaleX="{size}" scaleY="{size}" name="Star{k}Place">\n'
+             + indent(path_rml(art("sparkle-star.svg"), f"Star{k}", sid, SPARKLE_COLOR, opacity=0), "    ")
+             + "\n</Node>"
+             for k, ((x, y, size), sid) in enumerate(zip(SPARKLE_STARS, SPARKLE_STAR_IDS))]
+    body = indent("\n".join(stars), "    ")
+    return f'<Node x="0" y="0" name="Sparkle" id="{SPARKLE_NODE}">\n{body}\n</Node>'
+
+
 def face():
     """The face assembly: the placement chain, the nested Plate with its inputs and remaps, trails."""
     # FacePlacement > Turn (keyed only by the joystick's TurnX/TurnY) > Face (keyed by state motion).
@@ -70,7 +85,9 @@ def face():
 <Node x="0" y="0" name="Turn" id="{TURN_NODE}">
 <Node x="0" y="0" name="Arc" id="{ARC_NODE}">
 <Node x="0" y="0" name="Peek" id="{PEEK_NODE}">
+<Node x="0" y="0" name="Lag" id="{LAG_NODE}">
 <Node x="0" y="0" name="Face" id="{FACE}">
+{indent(sparkles(), "    ")}
     <NestedArtboard artboardId="{PLATE_AB}" x="-100" y="-108" name="Plate" id="{PLATE}">
         <NestedStateMachine animationId="{PLATE_SM}" name="SM">
             <NestedNumber inputId="{PLATE_IN_EXPR}" nestedValue="0" name="expr" id="{PLATE_EXPR}"/>
@@ -89,6 +106,7 @@ def face():
         <NestedRemapAnimation animationId="{PLATE_AUTO_X}" time="0.5" name="AutoLookX" id="{AUTO_X}"/>
         <NestedRemapAnimation animationId="{PLATE_AUTO_Y}" time="0.5" name="AutoLookY" id="{AUTO_Y}"/>
     </NestedArtboard>
+</Node>
 </Node>
 </Node>
 </Node>
