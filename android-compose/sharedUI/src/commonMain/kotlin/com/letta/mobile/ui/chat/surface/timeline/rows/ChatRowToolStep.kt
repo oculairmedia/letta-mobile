@@ -301,8 +301,14 @@ private fun StepChanges(changes: ToolLineChanges) {
         modifier = Modifier.testTag(ChatRowTestTags.TOOL_STEP_CHANGES).clearAndSetSemantics { contentDescription = description },
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
-        Text(text = stringResource(Res.string.rows_tool_lines_added, changes.added), style = MaterialTheme.typography.labelMedium, color = successTint(), maxLines = 1)
-        Text(text = stringResource(Res.string.rows_tool_lines_removed, changes.removed), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error, maxLines = 1)
+        val style = MaterialTheme.typography.labelMedium
+        Text(stringResource(Res.string.rows_tool_lines_added, changes.added), style = style, color = successTint(), maxLines = 1)
+        Text(
+            stringResource(Res.string.rows_tool_lines_removed, changes.removed),
+            style = style,
+            color = MaterialTheme.colorScheme.error,
+            maxLines = 1,
+        )
     }
 }
 

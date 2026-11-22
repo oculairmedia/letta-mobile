@@ -33,7 +33,14 @@ import kotlin.test.assertTrue
  */
 class ToolStepLineSnapshotTest {
     private val calls = listOf(
-        UiToolCall(name = "Bash", arguments = """{"command":"./gradlew test"}""", result = "BUILD SUCCESSFUL", status = "success", toolCallId = "c1", executionTimeMs = 42_300L),
+        UiToolCall(
+            name = "Bash",
+            arguments = """{"command":"./gradlew test"}""",
+            result = "BUILD SUCCESSFUL",
+            status = "success",
+            toolCallId = "c1",
+            executionTimeMs = 42_300L,
+        ),
         UiToolCall(
             name = "Edit",
             arguments = """{"file_path":"src/commonMain/Composer.kt","old_string":"a\nb","new_string":"c\nd\ne"}""",
@@ -42,7 +49,13 @@ class ToolStepLineSnapshotTest {
             toolCallId = "c2",
             executionTimeMs = 120L,
         ),
-        UiToolCall(name = "Bash", arguments = """{"command":"cat missing.txt"}""", result = "No such file", status = "error", toolCallId = "c3"),
+        UiToolCall(
+            name = "Bash",
+            arguments = """{"command":"cat missing.txt"}""",
+            result = "No such file",
+            status = "error",
+            toolCallId = "c3",
+        ),
         UiToolCall(name = "Read", arguments = """{"file_path":"README.md"}""", result = null, status = null, toolCallId = "c4"),
     )
 

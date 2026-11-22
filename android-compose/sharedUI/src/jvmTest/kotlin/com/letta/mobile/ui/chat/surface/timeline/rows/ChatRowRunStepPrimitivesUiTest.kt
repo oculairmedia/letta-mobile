@@ -146,7 +146,13 @@ class ChatRowRunStepPrimitivesUiTest {
 
     @Test
     fun aSettledStepSaysHowLongItTookFromASecondUp() = runComposeUiTest {
-        showOpened(runOf(call("c1").copy(executionTimeMs = 2_400L), call("c2", command = "pwd").copy(executionTimeMs = 300L), call("c3", status = null)))
+        showOpened(
+            runOf(
+                call("c1").copy(executionTimeMs = 2_400L),
+                call("c2", command = "pwd").copy(executionTimeMs = 300L),
+                call("c3", status = null),
+            ),
+        )
 
         val durations = onAllNodesWithTag(ChatRowTestTags.TOOL_STEP_DURATION, useUnmergedTree = true)
         durations.assertCountEquals(1)
