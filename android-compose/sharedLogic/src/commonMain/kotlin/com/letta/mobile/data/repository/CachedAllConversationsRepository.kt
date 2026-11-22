@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.backend.RemoteRoute
+import com.letta.mobile.data.backend.ConversationListing
 import com.letta.mobile.data.backend.ConversationListingFactory
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
@@ -15,8 +16,10 @@ import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.runCatchingCancellable
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +31,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+
+/** A [CachedAllConversationsRepository.refresh] read: it answers every call numbered up to [startedAfterRequest]. */
+private data class ReadOutcome(val startedAfterRequest: Long, val failure: Throwable? = null)
 
 @Suppress("NoDetachedCoroutineLifecycle")
 fun defaultCachedAllConversationsRepositoryScope(): CoroutineScope =
@@ -63,6 +69,12 @@ open class CachedAllConversationsRepository(
     override val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
 
     private val refreshMutex = Mutex()
+
+    /** How many [refresh] calls have been made; a read that starts at N answers every call numbered up to N. */
+    private val refreshRequests = atomic(0L)
+
+    /** The last [refresh] read: the calls it answered and how it failed, written and read under [refreshMutex]. */
+    private var lastRead: ReadOutcome? = null
     /** Replaced on a backend switch, so the next host is asked for visible recents again. */
     private var listing = newListing()
 
@@ -94,7 +106,7 @@ open class CachedAllConversationsRepository(
             repositoryScope.launch {
                 observeConversationInvalidations(channelTransport.conversationChanges(), PUSH_COALESCE_WINDOW, ::applyPush)
             }
-            repositoryScope.launch { observeReconnectRefresh(channelTransport) { refreshAfterPush("reconnect") } }
+            repositoryScope.launch { observeReconnectRefresh(channelTransport) { refreshAfterReconnect() } }
         }
     }
 
@@ -174,6 +186,33 @@ open class CachedAllConversationsRepository(
         }
     }
 
+    /**
+     * A reconnect re-reads only the bounded recents page ([ConversationListing.reconnect]), O(1) calls whatever the
+     * roster: pushes sent while offline are lost and the recents page carries them. It does not stamp the list as
+     * fresh, so the drawer's next open still reads the pinned and opened agents' pages.
+     */
+    private suspend fun refreshAfterReconnect() {
+        try {
+            reconnectLocked()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            Telemetry.event(
+                TAG,
+                "conversation_updated.refresh_failed",
+                "trigger" attr "reconnect",
+                "error" attr (e.message ?: e.toString()),
+                level = Telemetry.Level.WARN,
+            )
+        }
+    }
+
+    private suspend fun reconnectLocked() = refreshMutex.withLock {
+        // An unopened list loads fresh when first shown.
+        if (!hasLoadedAtLeastOnce) return@withLock
+        publish(listing.reconnect())
+    }
+
     override suspend fun loadNextPage() = refreshMutex.withLock {
         if (!_hasMore.value) return@withLock
         if (!hasLoadedAtLeastOnce) return@withLock refreshLocked()
@@ -182,8 +221,22 @@ open class CachedAllConversationsRepository(
         publish(listed + _conversations.value.filterNot { row -> listed.any { it.id == row.id } })
     }
 
-    override suspend fun refresh() = refreshMutex.withLock {
-        refreshLocked()
+    /**
+     * Refreshes the list, one read in flight and at most one more waiting: a caller that asked while another read
+     * was still running shares the single read that follows it (or its failure) instead of queueing its own, so a
+     * burst of triggers (drawer, heartbeat, reconnect) never stacks one read per trigger. The read runs in the
+     * caller's own coroutine, so cancellation and the session proxy's retry see it as before.
+     */
+    override suspend fun refresh() {
+        val ticket = refreshRequests.incrementAndGet()
+        refreshMutex.withLock {
+            val covering = lastRead?.takeIf { it.startedAfterRequest >= ticket }
+            val outcome = covering ?: ReadOutcome(
+                startedAfterRequest = refreshRequests.value,
+                failure = runCatchingCancellable { refreshLocked() }.exceptionOrNull(),
+            ).also { lastRead = it }
+            outcome.failure?.let { throw it }
+        }
     }
 
     override suspend fun clearForBackendSwitch() {

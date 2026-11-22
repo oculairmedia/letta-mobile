@@ -1478,6 +1478,7 @@ public abstract interface class com/letta/mobile/data/backend/ConversationListin
 	public abstract fun getHasMore ()Z
 	public abstract fun loadMore-C7LexNE (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun loadMore-C7LexNE$default (Lcom/letta/mobile/data/backend/ConversationListing;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun reconnect (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun record (Ljava/util/List;Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun refresh (Ljava/util/List;Ljava/util/Set;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }

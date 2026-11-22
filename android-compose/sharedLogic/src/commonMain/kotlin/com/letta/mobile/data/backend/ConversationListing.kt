@@ -13,6 +13,12 @@ interface ConversationListing {
     /** Refreshes visible recents and requested agent pages, publishing recents before agent reads. */
     suspend fun refresh(roster: List<Agent>, pins: Set<AgentId>, publish: (List<Conversation>) -> Unit): List<Conversation>
 
+    /**
+     * Re-reads only the bounded visible recents after a reconnect, never an agent's page and never the roster.
+     * A host without recents keeps its per-agent reads for an explicit [refresh] only.
+     */
+    suspend fun reconnect(): List<Conversation>
+
     /** Reconciles changed conversation identities against the visible roster. */
     suspend fun changed(dirty: Map<ConversationId, AgentId?>, roster: List<Agent>): List<Conversation>
 

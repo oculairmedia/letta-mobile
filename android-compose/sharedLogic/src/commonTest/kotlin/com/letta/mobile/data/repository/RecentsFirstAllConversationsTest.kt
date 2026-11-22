@@ -106,7 +106,7 @@ class RecentsFirstAllConversationsTest {
     }
 
     @Test
-    fun aReconnectReReadsRecentsAndPinsOnly() = runTest {
+    fun aReconnectReReadsTheRecentsPageOnly() = runTest {
         val host = Host(hostRows())
         val repository = repository(host, backgroundScope)
         runCurrent()
@@ -118,7 +118,8 @@ class RecentsFirstAllConversationsTest {
         host.state.value = ChannelTransportState.Connected("server", "session", "device")
         runCurrent()
 
-        assertEquals(3, host.lists.size, "conversation.list calls after a reconnect: ${host.lists}")
+        // letta-mobile-fj56l: pinned agents are read when the list next opens, never on a reconnect.
+        assertEquals(listOf<Read>(Read.Recents), host.lists, "conversation.list calls after a reconnect")
     }
 
     @Test
