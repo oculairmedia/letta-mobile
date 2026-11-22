@@ -1057,6 +1057,10 @@ Dependency-free projections of read-only StateFlow values. DerivedStateFlow obse
 
 Projects the trusted session graph's backend namespace for a pin binding. Session identity comes from the host graph, never the active row or a legacy pin string.
 
+# Package com.letta.mobile.data.home.greeting
+
+The Home greeting's state machine: a pure, seeded reducer ([GreetingPlay](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.home.greeting/-greeting-play/index.html)) from agent moods, user input and connection state to per-actor intents for the mascots and the Baken mark. Reactions spread to neighbours and fade through habituation; time comes only from ticks.
+
 # Package com.letta.mobile.data.home.shortcut
 
 Existing Home shortcut identities, separated from Home controllers and storage. The original HomeShortcut source alias remains available; persistence names are unchanged.
