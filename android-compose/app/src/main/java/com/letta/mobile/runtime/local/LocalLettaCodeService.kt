@@ -43,7 +43,7 @@ class LocalLettaCodeService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_notify_sync)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.lettacode_runtime_service_notification_title))
             .setContentText(getString(R.string.lettacode_runtime_service_notification_text))
             .setContentIntent(pendingIntent)

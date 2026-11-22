@@ -3,32 +3,39 @@ package com.letta.mobile.ui.theme
 import com.letta.mobile.data.model.ThemePreset
 
 object LettaColorTokens {
-    // Neutrals — "cool slate" retune (2026-06-23): a subtle cool blue-grey
-    // undertone over the older true-greys. Teal primary #00BFA5 unchanged.
-    // Single source of truth for both desktop and Android (default preset).
-    const val DARK_SURFACE = 0xFF13161B
-    const val DARK_SURFACE_VARIANT = 0xFF1A1E25
-    const val DARK_SURFACE_CONTAINER = 0xFF1A1E25
-    const val DARK_PRIMARY = 0xFF00BFA5
-    const val DARK_PRIMARY_VARIANT = 0xFF0E8C7E
-    const val DARK_ON_SURFACE = 0xFFE6E9EF
-    const val DARK_ON_SURFACE_VARIANT = 0xFFAEB6C2
-    const val DARK_ON_SURFACE_MUTED = 0xFF717A87
+    // Baken brand: Buoy Vermilion primary over the "North Sea Buoy"
+    // deep-sea neutrals from the Baken brand kit. Text on the vermilion primary is white in both themes.
+    // Single source of truth for every client (default preset).
+    const val DARK_SURFACE = 0xFF13212D
+    const val DARK_SURFACE_VARIANT = 0xFF1A2B39
+    const val DARK_SURFACE_CONTAINER = 0xFF1A2B39
+    const val DARK_PRIMARY = 0xFFEE5A3F
+    const val DARK_PRIMARY_VARIANT = 0xFFB8432E
+    const val DARK_ON_PRIMARY = 0xFFFFFFFF
+    const val DARK_ON_SURFACE = 0xFFE8EFF4
+    const val DARK_ON_SURFACE_VARIANT = 0xFFA9BAC8
+    const val DARK_ON_SURFACE_MUTED = 0xFF7F96A8
     const val DARK_ERROR = 0xFFCF6679
     const val DARK_ON_ERROR = 0xFF000000
-    const val DARK_BACKGROUND = 0xFF0B0D11
-    const val DARK_OUTLINE = 0xFF3A414E
+    const val DARK_BACKGROUND = 0xFF0D1821
+    const val DARK_OUTLINE = 0xFF3A4E5E
 
-    const val LIGHT_SURFACE = 0xFFF5F7FA
-    const val LIGHT_SURFACE_VARIANT = 0xFFEAEEF3
-    const val LIGHT_SURFACE_CONTAINER = 0xFFDDE3EA
-    const val LIGHT_PRIMARY = 0xFF00897B
-    const val LIGHT_ON_SURFACE = 0xFF161A20
-    const val LIGHT_ON_SURFACE_VARIANT = 0xFF4A5360
+    const val LIGHT_SURFACE = 0xFFF7FAFC
+    const val LIGHT_SURFACE_VARIANT = 0xFFE8EEF2
+    const val LIGHT_SURFACE_CONTAINER = 0xFFD7E0E7
+    const val LIGHT_PRIMARY = 0xFFE04A32
+    const val LIGHT_ON_PRIMARY = 0xFFFFFFFF
+    const val LIGHT_ON_SURFACE = 0xFF10202C
+    const val LIGHT_ON_SURFACE_VARIANT = 0xFF44586A
+    const val LIGHT_ON_SURFACE_MUTED = 0xFF586E7F
     const val LIGHT_ERROR = 0xFFB00020
     const val LIGHT_ON_ERROR = 0xFFFFFFFF
-    const val LIGHT_BACKGROUND = 0xFFFBFCFD
-    const val LIGHT_OUTLINE = 0xFFB4BCC8
+    const val LIGHT_BACKGROUND = 0xFFEFF3F6
+    const val LIGHT_OUTLINE = 0xFFADBCC8
+
+    // The Baken mark's stones: the pale/petrol stone and the vermilion pebble, per theme (kit svg/baken-mark-*.svg).
+    const val DARK_MARK_STONE = 0xFFDCE6EE
+    const val LIGHT_MARK_STONE = 0xFF163044
 
     // Voice mode's two voices: the person in a cool blue, the agent in a warm rose, far apart in hue
     // from each other and from the teal the run's thinking glow uses. The light values are deepened
@@ -48,14 +55,13 @@ object LettaColorTokens {
     const val TEAL_ACCENT = 0xFF1DE9B6
     const val CYAN_ACCENT = 0xFF00E5FF
 
-    // Surface levels (dark) used by the desktop scheme + template chrome
-    // (cool-slate retune).
-    const val DARK_SURFACE_CONTAINER_LOWEST = 0xFF0D0F13
-    const val DARK_SURFACE_CONTAINER_LOW = 0xFF13161B
-    const val DARK_SURFACE_CONTAINER_DEFAULT = 0xFF1A1E25
-    const val DARK_SURFACE_CONTAINER_HIGH = 0xFF242A33
-    const val DARK_SURFACE_CONTAINER_HIGHEST = 0xFF2E343F
-    const val DARK_OUTLINE_VARIANT = 0xFF2A2F39
+    // Surface levels (dark) used by the desktop scheme + template chrome (North Sea Buoy deep-sea family).
+    const val DARK_SURFACE_CONTAINER_LOWEST = 0xFF0A131B
+    const val DARK_SURFACE_CONTAINER_LOW = 0xFF13212D
+    const val DARK_SURFACE_CONTAINER_DEFAULT = 0xFF1A2B39
+    const val DARK_SURFACE_CONTAINER_HIGH = 0xFF233645
+    const val DARK_SURFACE_CONTAINER_HIGHEST = 0xFF2C4152
+    const val DARK_OUTLINE_VARIANT = 0xFF263A4A
 
     // Memory-block category tokens (Phase 6 / §1.1b). Distinct from agentA/B/C
     // (subagent identity) — these color-code memory blocks by category.
@@ -86,7 +92,7 @@ object LettaThemeTokens {
     val default = LettaThemePresetTokens(
         light = LettaThemePaletteTokens(
             primaryArgb = LettaColorTokens.LIGHT_PRIMARY,
-            primaryContainerArgb = 0xFFB2DFDB,
+            primaryContainerArgb = 0xFFFAD5CD,
             secondaryArgb = 0xFF00ACC1,
             tertiaryArgb = 0xFF0091EA,
             backgroundArgb = LettaColorTokens.LIGHT_BACKGROUND,

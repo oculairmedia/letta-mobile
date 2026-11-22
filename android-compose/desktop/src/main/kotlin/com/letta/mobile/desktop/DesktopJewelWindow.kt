@@ -20,6 +20,7 @@ import androidx.compose.ui.window.WindowState
 import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
 import com.letta.mobile.ui.components.foundation.LocalMenuActionScope
 import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.icons.BakenAppIcon
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.host.desktopPointer
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeader
@@ -62,10 +63,12 @@ internal fun DesktopJewelWindow(
 ) {
     DesktopJewelTheme {
         val dark = rememberHostDark(LocalDesktopHostAppearance.current, isSystemInDarkMode())
+        val windowIcon = remember { BakenAppIcon.painter() }
         DecoratedWindow(
             onCloseRequest = onCloseRequest,
             state = state,
             title = title,
+            icon = windowIcon,
         ) {
             // The pen, read from Windows Ink and posted as ordinary mouse input, so it can draw
             // AND press things. AWT reports no stylus of its own — measured, see

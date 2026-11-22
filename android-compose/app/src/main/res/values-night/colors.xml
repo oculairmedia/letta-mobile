@@ -4,10 +4,12 @@
       Mirror of the design-system color tokens used by the system splash
       and the activity window background. The splash window runs before
       Compose, so it cannot read LettaTheme.Color values at runtime; these
-      XML resources must match LettaColorTokens.LIGHT_BACKGROUND / DarkBackground and
-      LightOnSurface / DarkOnSurface tokens defined in
-      designsystem/.../theme/Color.kt. Keep them in sync.
+      XML resources must match LettaColorTokens.DARK_BACKGROUND / DARK_ON_SURFACE and the
+      Baken mark's DARK_MARK_STONE / DARK_PRIMARY tokens defined in
+      sharedLogic/.../ui/theme/ThemeTokens.kt. Keep them in sync.
     -->
-    <color name="letta_background">#FF0A0A0A</color>
-    <color name="letta_on_background">#FFE0E0E0</color>
+    <color name="letta_background">#FF0D1821</color>
+    <color name="letta_on_background">#FFE8EFF4</color>
+    <color name="letta_mark_stone">#FFDCE6EE</color>
+    <color name="letta_mark_pebble">#FFEE5A3F</color>
 </resources>

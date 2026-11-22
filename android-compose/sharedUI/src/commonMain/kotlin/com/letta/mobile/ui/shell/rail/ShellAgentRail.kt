@@ -28,9 +28,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -133,7 +130,7 @@ private val railParts: Map<RuntimeViewId, ShellRailPart> = mapOf(
 private fun RailHomePart(frame: ShellRailFrame) {
     val actions = frame.actions
     RailHeaderRow(onClick = actions.onHome, label = "Home".takeIf { frame.state.expanded }) {
-        RailActionIcon(icon = Icons.Outlined.Home, description = "Home", selected = frame.state.homeSelected, onClick = actions.onHome)
+        RailActionIcon(icon = LettaIcons.Home, description = "Home", selected = frame.state.homeSelected, onClick = actions.onHome)
     }
 }
 

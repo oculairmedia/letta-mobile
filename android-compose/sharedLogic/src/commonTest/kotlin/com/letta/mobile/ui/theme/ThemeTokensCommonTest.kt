@@ -19,8 +19,18 @@ class ThemeTokensCommonTest {
     fun `default preset preserves primary brand colors`() {
         val tokens = LettaThemeTokens.preset(ThemePreset.DEFAULT)
 
-        assertEquals(0xFF00897B, tokens.light.primaryArgb)
-        assertEquals(0xFF00BFA5, tokens.dark.primaryArgb)
+        assertEquals(0xFFE04A32, tokens.light.primaryArgb)
+        assertEquals(0xFFEE5A3F, tokens.dark.primaryArgb)
+    }
+
+    @Test
+    fun `default preset sits on the North Sea Buoy backgrounds`() {
+        val tokens = LettaThemeTokens.preset(ThemePreset.DEFAULT)
+
+        assertEquals(0xFFEFF3F6, tokens.light.backgroundArgb)
+        assertEquals(0xFF0D1821, tokens.dark.backgroundArgb)
+        assertEquals(0xFF10202C, LettaColorTokens.LIGHT_ON_SURFACE)
+        assertEquals(0xFFE8EFF4, LettaColorTokens.DARK_ON_SURFACE)
     }
 
     @Test

@@ -61,9 +61,9 @@ fun lettaColorScheme(dark: Boolean, highContrast: Boolean = false, preset: Theme
 
 private fun lettaDarkScheme(): ColorScheme = darkColorScheme(
     primary = Color(LettaColorTokens.DARK_PRIMARY),
-    onPrimary = Color(0xFF06302B),
+    onPrimary = Color(LettaColorTokens.DARK_ON_PRIMARY),
     primaryContainer = Color(LettaColorTokens.DARK_PRIMARY_VARIANT),
-    onPrimaryContainer = Color(0xFFE6F4F1),
+    onPrimaryContainer = Color(LettaColorTokens.DARK_ON_PRIMARY),
     secondary = Color(LettaColorTokens.TEAL_ACCENT),
     onSecondary = Color(0xFF06302B),
     secondaryContainer = Color(LettaColorTokens.DARK_SURFACE_CONTAINER_HIGH),
@@ -93,11 +93,11 @@ private fun lettaDarkScheme(): ColorScheme = darkColorScheme(
 
 private fun lettaLightScheme(): ColorScheme = lightColorScheme(
     primary = Color(LettaColorTokens.LIGHT_PRIMARY),
-    onPrimary = Color.White,
+    onPrimary = Color(LettaColorTokens.LIGHT_ON_PRIMARY),
     primaryContainer = Color(LettaColorTokens.LIGHT_PRIMARY).copy(alpha = LIGHT_PRIMARY_CONTAINER_TINT),
     onPrimaryContainer = Color(LettaColorTokens.LIGHT_ON_SURFACE),
     secondary = Color(LettaColorTokens.LIGHT_PRIMARY),
-    onSecondary = Color.White,
+    onSecondary = Color(LettaColorTokens.LIGHT_ON_PRIMARY),
     secondaryContainer = Color(LettaColorTokens.LIGHT_SURFACE_CONTAINER),
     onSecondaryContainer = Color(LettaColorTokens.LIGHT_ON_SURFACE),
     tertiary = Color(0xFF007D8A),

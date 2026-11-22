@@ -144,7 +144,6 @@ import com.composables.icons.lucide.WifiOff
 import com.composables.icons.lucide.ArchiveRestore
 import com.composables.icons.lucide.CircleCheckBig
 import com.composables.icons.lucide.CircleStop
-import com.composables.icons.lucide.House
 import com.composables.icons.lucide.Network
 
 /**
@@ -346,7 +345,8 @@ object LettaIcons {
     val ChatBubbleOutline: ImageVector get() = Lucide.MessageCircle
     val Description: ImageVector get() = Lucide.FileText
     val Group: ImageVector get() = Lucide.Users
-    val Home: ImageVector get() = Lucide.House
+    /** Home is the Baken mark, one ink so the slot's tint recolours it. */
+    val Home: ImageVector get() = BakenMark.mono
     val Hub: ImageVector get() = Lucide.Network
     val PushPin: ImageVector get() = Lucide.Pin
     val Schedule: ImageVector get() = Lucide.Clock
