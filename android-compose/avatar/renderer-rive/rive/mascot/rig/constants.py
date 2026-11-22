@@ -246,3 +246,70 @@ def expression_layer(*parts):
                                  for t in STATES if t != s])
               for i, s in enumerate(STATES)]
     return Layer(name, lid, node_ids["idle"], states=states).rml()
+
+
+# --- secondaries and sparkle (letta-mobile-su08n) ------------------------------------------------
+# Emmanuel's pick: "moments + loops" secondaries and "star glints" sparkle.
+#
+# LOOP_LAG_FRAMES: in these sustained loops the face trails the body by this many frames - the
+# plate's motion is the body's, phase-shifted, so it arrives a beat late at every extreme (overlap,
+# MOTION-REFERENCES 3.3). Faint on purpose: at most ~2 px of separation on the 11 px breath bob.
+# A state not listed moves face and body together, as before. reduceMotion holds the loop's frame 0.
+LOOP_LAG_FRAMES = {"idle": 14, "listening": 14, "speaking": 14, "thinking": 12, "working": 8}
+
+# OVERLAP: per moment, the secondary action on top of the main beat, as keyframe tracks
+# [(frame, value[, bezier])]. Frames are counted from the trigger, on the main beat's own clock
+# (rig/motion.py react_animations / momentary_animations), so every extreme lands a few frames
+# AFTER the primary one it follows through. Properties:
+#   lag_x, lag_y      px    the face trailing the body (Lag node, inside the face chain)
+#   follow            x     the body's follow-through squash about the feet (Follow; scaleY,
+#                           scaleX = 1/scaleY so the volume holds)
+#   blink             -     frames at which the plate blinks off the beat (a squint at the apex,
+#                           a blink after a landing)
+# Every track starts and ends at rest, so the layer hands nothing back.
+OVERLAP = {
+    # success hop: crouch @5, apex @18, land @34 (800 ms, 48 frames).
+    "success": {"n": 52,
+                "lag_y": [(0, 0), (5, 0), (10, 6), (18, 0), (22, -4), (34, 0), (38, 5), (44, -2), (52, 0)],
+                "follow": [(0, 1), (34, 1), (38, 0.965), (43, 1.015), (48, 0.995), (52, 1)],
+                "blink": [19]},
+    # poke: squish @4, rebound @12 (420 ms).
+    "poke": {"n": 30,
+             "lag_x": [(0, 0), (4, 0), (8, -5), (14, 3), (20, -1), (30, 0)],
+             "follow": [(0, 1), (12, 1), (16, 1.02), (22, 0.99), (30, 1)]},
+    # sent: dip @5, lift @13 (350 ms).
+    "sent": {"n": 26,
+             "lag_y": [(0, 0), (5, 0), (8, 3), (15, -3), (20, 1), (26, 0)]},
+    # toolStart: hop @9 (300 ms).
+    "toolStart": {"n": 24,
+                  "lag_y": [(0, 0), (6, 0), (10, 4), (15, -2), (24, 0)],
+                  "follow": [(0, 1), (14, 1), (17, 0.98), (21, 1.01), (24, 1)]},
+    # toolDone: the nod @5 (250 ms) - the face nods once more, smaller, after the head.
+    "toolDone": {"n": 22,
+                 "lag_y": [(0, 0), (5, 0), (9, 2.5), (14, -1), (22, 0)]},
+    # land: the arrival squash @2 and its settle (300-500 ms by impact).
+    "land": {"n": 32,
+             "lag_y": [(0, 0), (2, 0), (5, 5), (12, -2), (20, 0.5), (32, 0)],
+             "follow": [(0, 1), (14, 1), (18, 1.02), (24, 0.99), (32, 1)],
+             "blink": [6]},
+    # wake: the tall stretch peaks @15 (700 ms).
+    "wake": {"n": 46,
+             "lag_y": [(0, 0), (12, 0), (18, 4), (27, -3), (35, 1), (46, 0)],
+             "follow": [(0, 1), (28, 1), (32, 1.015), (38, 0.995), (46, 1)]},
+}
+
+# The turn's follow-through: a turning entry (rig/motion.py TURNING) rolls the body this far past
+# the direction of the turn and settles by the entry's end, while the plate leads.
+TURN_FOLLOW_DEG = 1.5
+
+# SPARKLE: star glints at the moments that earn them, and nowhere else (never in a loop).
+# Three small four-point stars by the plate's top-right corner (positions in Face px; radius is
+# the star's scale against art/sparkle-star.svg's 10 px), popping in a stagger and twinkling out.
+SPARKLE_STARS = [(74, -80, 1.1), (96, -52, 0.7), (50, -100, 0.55)]
+SPARKLE_STAGGER = 3                # frames between one star and the next
+SPARKLE_FRAMES = 24                # one star's life: pop, twinkle, gone (400 ms)
+SPARKLE_SPIN_DEG = 45              # a quarter turn of the four points over its life
+SPARKLE_COLOR = "FFFFFFFF"
+# The frame of the main beat each sparkle lands on: the hop's apex, the nod's bottom, the
+# stretch's peak.
+SPARKLE_AT = {"success": 18, "toolDone": 5, "wake": 15}
