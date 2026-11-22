@@ -82,7 +82,7 @@ object AgentAdminHandlers {
     }
 
     /**
-     * letta-mobile-hvpdq: rows already cut to [AGENT_LIST_FIELDS], so neither the wire nor the held
+     * Rows already cut to [AGENT_LIST_FIELDS], so neither the wire nor the held
      * roster carries the system prompt, message ids, tools or compaction settings (2.06 MB of the
      * 2.10 MB a live 136-agent roster weighed). Detail is `agent.get`'s job.
      */

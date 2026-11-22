@@ -87,7 +87,7 @@ class AgentAdminHandlersTest {
     }
 
     /**
-     * letta-mobile-hvpdq: a 136-agent roster swept the way clients sweep it (pages of 50) carries
+     * A 136-agent roster swept the way clients sweep it (pages of 50) carries
      * only the list fields, inside a byte budget, with every kept value unchanged.
      */
     @Test

@@ -19,7 +19,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 /**
- * letta-mobile-hvpdq: the roster decodes the host's slim `agent.list` rows (agent.list/slim-list-v1)
+ * The roster decodes the host's slim `agent.list` rows (agent.list/slim-list-v1)
  * with every list field intact, and the detail a screen opens comes from `agent.get`.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
