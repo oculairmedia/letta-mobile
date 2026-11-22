@@ -67,3 +67,15 @@ fun channelFeedRows(
     conversation: com.letta.mobile.data.model.ConversationId,
 ): com.letta.mobile.data.feed.client.FeedRowsFactory? =
     com.letta.mobile.data.feed.client.FeedTimelineSource.rowsFor(channelFeedLink(transport), agent, conversation)
+
+/** [channelFeedRows] for the conversation a ledger [scope] names, over [transport] when there is one; null keeps the ledger. */
+fun channelFeedRows(
+    transport: IChannelTransport?,
+    scope: com.letta.mobile.data.timeline.snapshot.TimelineScope,
+): com.letta.mobile.data.feed.client.FeedRowsFactory? {
+    val agent = scope.agentId ?: return null
+    transport ?: return null
+    return channelFeedRows(
+        transport, com.letta.mobile.data.model.AgentId(agent), com.letta.mobile.data.model.ConversationId(scope.conversationId),
+    )
+}

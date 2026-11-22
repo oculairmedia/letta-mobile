@@ -48,7 +48,6 @@ class AndroidCanonicalTimelineRuntime(
     private val storage: TimelineOwnedStorageFactory,
     private val graphScope: kotlinx.coroutines.CoroutineScope,
     private val writers: CanonicalConversationWriters = CanonicalConversationWriters(),
-    /** The session channel the host feed is read over; null keeps every conversation on the ledger. */
     private val feedTransport: com.letta.mobile.data.transport.api.IChannelTransport? = null,
 ) {
     private val maintenanceJob = kotlinx.coroutines.SupervisorJob(graphScope.coroutineContext[kotlinx.coroutines.Job])
@@ -83,21 +82,11 @@ class AndroidCanonicalTimelineRuntime(
         private val feedTransport: com.letta.mobile.data.transport.api.IChannelTransport? = null,
     ) {
         fun bindPresentation(host: com.letta.mobile.feature.chat.screen.ChatPagingHost) {
-            host.bindCanonical(
-                coordinator,
-                resolveOwner = { agent, conversation ->
-                    check(owner.selection.scope.agentId == agent && owner.selection.scope.conversationId == conversation)
-                    check(coordinator.current(owner.selection.scope) === owner) { "Retired presentation owner" }
-                    owner
-                },
-                feedRows = { agent, conversation ->
-                    feedTransport?.let {
-                        com.letta.mobile.data.feed.channel.channelFeedRows(
-                            it, com.letta.mobile.data.model.AgentId(agent), ConversationId(conversation),
-                        )
-                    }
-                },
-            )
+            host.bindCanonical(coordinator, { com.letta.mobile.data.feed.channel.channelFeedRows(feedTransport, owner.selection.scope) }) { agent, conversation ->
+                check(owner.selection.scope.agentId == agent && owner.selection.scope.conversationId == conversation)
+                check(coordinator.current(owner.selection.scope) === owner) { "Retired presentation owner" }
+                owner
+            }
         }
     }
 

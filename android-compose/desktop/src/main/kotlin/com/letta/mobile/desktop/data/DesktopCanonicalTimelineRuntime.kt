@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.data
 
+import com.letta.mobile.data.feed.channel.channelFeedRows
 import com.letta.mobile.data.timeline.CanonicalTimelineCoordinator
 import com.letta.mobile.data.timeline.CanonicalExternalTransportWriter
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
@@ -28,6 +29,7 @@ import kotlinx.coroutines.withContext
 class DesktopCanonicalTimelineRuntime internal constructor(
     private val coordinator: CanonicalTimelineCoordinator,
     private val backendId: String,
+    private val feedTransport: com.letta.mobile.data.transport.api.IChannelTransport? = null,
 ) {
     private val mutex = Mutex()
     private val owners = mutableMapOf<TimelineScope, CanonicalTimelineCoordinator.Owner>()
@@ -43,19 +45,13 @@ class DesktopCanonicalTimelineRuntime internal constructor(
         conversationId: String,
         uiScope: CoroutineScope,
         target: String? = null,
-        feedTransport: com.letta.mobile.data.transport.api.IChannelTransport? = null,
     ): CanonicalTimelinePresentation {
         val scope = TimelineScope(backendId, conversationId, agentId)
         val owner = mutex.withLock {
             check(!closed) { "Desktop canonical timeline runtime is retired" }
             owners.getOrPut(scope) { coordinator.acquire(scope) }
         }
-        val feed = feedTransport?.let {
-            com.letta.mobile.data.feed.channel.channelFeedRows(
-                it, com.letta.mobile.data.model.AgentId(agentId), com.letta.mobile.data.model.ConversationId(conversationId),
-            )
-        }
-        return openDesktopCanonicalPresentation(coordinator, owner, uiScope, target, feed)
+        return openDesktopCanonicalPresentation(coordinator, owner, uiScope, target, channelFeedRows(feedTransport, scope))
     }
 
     /**
@@ -113,8 +109,9 @@ fun createDesktopCanonicalTimelineRuntime(
     transport: TimelineTransport,
     backendId: String,
     ledgerDirectory: Path = defaultDesktopTimelineLedgerDirectory(),
+    feedTransport: com.letta.mobile.data.transport.api.IChannelTransport? = null,
 ): DesktopCanonicalTimelineRuntime =
-    DesktopCanonicalTimelineRuntime(createDesktopCanonicalTimelineCoordinator(ledgerDirectory, transport), backendId)
+    DesktopCanonicalTimelineRuntime(createDesktopCanonicalTimelineCoordinator(ledgerDirectory, transport), backendId, feedTransport)
 
 fun defaultDesktopTimelineLedgerDirectory(): Path =
     Path.of(System.getProperty("user.home"), ".letta-mobile", "timeline-ledger")

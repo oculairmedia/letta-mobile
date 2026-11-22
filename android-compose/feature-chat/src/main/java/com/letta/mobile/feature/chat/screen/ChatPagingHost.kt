@@ -14,14 +14,11 @@ class ChatPagingHost @Inject constructor() {
 
     fun bindCanonical(
         coordinator: com.letta.mobile.data.timeline.CanonicalTimelineCoordinator,
+        feedRows: () -> com.letta.mobile.data.feed.client.FeedRowsFactory? = { null },
         resolveOwner: suspend (String, String) -> com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner,
-        /** The host feed's rows for (agent, conversation), or null when its host does not serve and push the feed. */
-        feedRows: (String, String) -> com.letta.mobile.data.feed.client.FeedRowsFactory? = { _, _ -> null },
     ) {
         openCanonical = { agent, conversation, target, uiScope ->
-            createCanonicalChatPagingPresentation(
-                coordinator, resolveOwner(agent, conversation), uiScope, target, feedRows(agent, conversation),
-            )
+            createCanonicalChatPagingPresentation(coordinator, resolveOwner(agent, conversation), uiScope, target, feedRows())
         }
     }
 

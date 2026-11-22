@@ -21,24 +21,21 @@ import kotlinx.coroutines.sync.withLock
 class DesktopCanonicalTimelineHost(
     private val backendId: String = DESKTOP_CANONICAL_BACKEND_ID,
     private val ledgerDirectory: Path = defaultDesktopTimelineLedgerDirectory(),
+    private val feedTransport: IChannelTransport? = null, // The live frame source the host feed is read over.
 ) {
     private val mutex = Mutex()
     private val runtimes = mutableMapOf<TimelineTransport, DesktopCanonicalTimelineRuntime>()
     private var closed = false
-
-    /** The channel the host feed is read over; set by [installOn] (the live frame source). */
-    @Volatile private var feedTransport: IChannelTransport? = null
-
     suspend fun open(request: DesktopCanonicalOpenRequest): CanonicalTimelinePresentation {
         val runtime = mutex.withLock {
             check(!closed) { "Desktop canonical timeline host is closed" }
             runtimeFor(request.transport)
         }
-        return runtime.open(request.agentId, request.conversationId, request.scope, feedTransport = feedTransport)
+        return runtime.open(request.agentId, request.conversationId, request.scope)
     }
 
     private fun runtimeFor(transport: TimelineTransport): DesktopCanonicalTimelineRuntime =
-        runtimes.getOrPut(transport) { createDesktopCanonicalTimelineRuntime(transport, backendId, ledgerDirectory) }
+        runtimes.getOrPut(transport) { createDesktopCanonicalTimelineRuntime(transport, backendId, ledgerDirectory, feedTransport) }
 
     /**
      * Routes the controller's conversation selection through this host. Only a backend whose frame
@@ -47,7 +44,6 @@ class DesktopCanonicalTimelineHost(
      */
     internal fun installOn(controller: DesktopChatController, send: DesktopCanonicalSendInstall) {
         controller.canonicalEligible = ::servesConversation
-        feedTransport = send.frameSource
         // Reading history and writing to it are installed together on purpose. A route that can
         // page but not send is a transcript the user cannot reply in, and nothing downstream would
         // report that as broken.
