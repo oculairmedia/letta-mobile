@@ -17,6 +17,7 @@ import com.letta.mobile.sharedui.resources.fork_dialog_cancel
 import com.letta.mobile.sharedui.resources.fork_dialog_confirm
 import com.letta.mobile.sharedui.resources.fork_dialog_name
 import com.letta.mobile.sharedui.resources.fork_dialog_title
+import com.letta.mobile.ui.host.purpose.PanePurpose
 import com.letta.mobile.ui.host.LettaAlertPane
 import com.letta.mobile.ui.host.LettaAlertSpec
 import com.letta.mobile.ui.host.LettaPaneButton
@@ -50,7 +51,13 @@ fun ForkNameDialog(
         ),
         dismiss = LettaPaneButton(stringResource(Res.string.fork_dialog_cancel), onDismiss),
     )
-    LettaAlertPane(LettaAlertSpec(stringResource(Res.string.fork_dialog_title), buttons, testTag = ForkNameDialogTags.DIALOG), onDismiss) {
+    val spec = LettaAlertSpec(
+        stringResource(Res.string.fork_dialog_title),
+        buttons,
+        testTag = ForkNameDialogTags.DIALOG,
+        purpose = PanePurpose.Form,
+    )
+    LettaAlertPane(spec, onDismiss) {
         Text(stringResource(Res.string.fork_dialog_body), style = MaterialTheme.typography.bodyMedium)
         OutlinedTextField(
             value = name,

@@ -8,6 +8,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
+import com.letta.mobile.ui.host.purpose.PanePurpose
 import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.shell.ShellLongPressMenu
 import com.letta.mobile.ui.shell.shellHoverTimeLabel
@@ -85,6 +86,8 @@ class PaneSpec(
     val testTag: String? = null,
     /** Applied to the container's frame (a menu's tag, a sheet's semantics). */
     val modifier: Modifier = Modifier,
+    /** What the pane is for, which decides how it may be dismissed ([PanePurpose]). */
+    val purpose: PanePurpose = PanePurpose.Info,
 )
 
 /** A host's container for one pane kind. */

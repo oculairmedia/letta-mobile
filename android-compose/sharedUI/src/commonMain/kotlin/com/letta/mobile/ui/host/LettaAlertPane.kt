@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.host.purpose.PanePurpose
 
 /** One button of a pane's action row; a [destructive] one reads in the error colour. */
 @Immutable
@@ -51,6 +52,8 @@ class LettaAlertSpec(
     val kind: LettaPaneKind = LettaPaneKind.Alert,
     val icon: ImageVector? = null,
     val testTag: String? = null,
+    /** How it may be dismissed: a form or a question that must be answered keeps a stray tap from closing it. */
+    val purpose: PanePurpose = PanePurpose.Info,
 )
 
 /**
@@ -60,7 +63,7 @@ class LettaAlertSpec(
  */
 @Composable
 fun LettaAlertPane(spec: LettaAlertSpec, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    LettaPane(spec.kind, onDismiss = onDismiss, title = spec.title, testTag = spec.testTag) {
+    LettaPane(spec.kind, onDismiss = onDismiss, title = spec.title, testTag = spec.testTag, purpose = spec.purpose) {
         Column(
             modifier = Modifier.weight(1f, fill = false).fillMaxWidth().padding(horizontal = LettaDimens.Space.xl),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),

@@ -22,6 +22,7 @@ import com.letta.mobile.data.secrets.client.SecretRequestScope
 import com.letta.mobile.data.secrets.request.SecretRequestRecord
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.secret_form_title
+import com.letta.mobile.ui.host.purpose.PanePurpose
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.LettaDimens
@@ -144,6 +145,9 @@ private fun SecretRequestFormPane(request: SecretRequestRecord, host: SecretRequ
         onDismiss = onClose,
         title = stringResource(Res.string.secret_form_title),
         testTag = SecretRequestModuleTags.FORM_PANE,
+        // A typed secret is never lost to a stray tap. Not Required: closing returns to the request's
+        // card, which stays pending, so the person can always step away.
+        purpose = PanePurpose.Form,
     ) {
         SecretRequestForm(
             controller,

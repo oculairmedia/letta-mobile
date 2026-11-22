@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import com.letta.mobile.data.memory.graph.MemoryBlockDeletion
 import com.letta.mobile.data.memory.graph.MemoryBlockDraft
 import com.letta.mobile.data.memory.graph.MemoryBlockLifecycleActions
+import com.letta.mobile.ui.host.purpose.PanePurpose
 import com.letta.mobile.ui.host.LettaAlertPane
 import com.letta.mobile.ui.host.LettaAlertSpec
 import com.letta.mobile.ui.host.LettaPaneButton
@@ -39,7 +40,8 @@ private fun MemoryBlockCreateDialog(draft: MemoryBlockDraft, actions: MemoryBloc
         confirm = LettaPaneButton(if (draft.isSaving) "Creating…" else "Create", actions::submitCreate, enabled = draft.canSubmit),
         dismiss = LettaPaneButton("Cancel", actions::cancelCreate, enabled = !draft.isSaving),
     )
-    LettaAlertPane(LettaAlertSpec("New memory block", buttons, kind = LettaPaneKind.Dialog), actions::cancelCreate) {
+    val spec = LettaAlertSpec("New memory block", buttons, kind = LettaPaneKind.Dialog, purpose = PanePurpose.Form)
+    LettaAlertPane(spec, actions::cancelCreate) {
         // Only flag the label once the user has typed something.
         val labelError = draft.labelError.takeIf { draft.label.isNotEmpty() }
         OutlinedTextField(

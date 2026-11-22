@@ -24,6 +24,7 @@ import com.letta.mobile.data.settings.SettingsConfirmText
 import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
+import com.letta.mobile.ui.host.purpose.PanePurpose
 import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
@@ -127,7 +128,13 @@ private fun projectChatActions(project: ProjectSummary, actions: ProjectsListAct
 @Composable
 internal fun ProjectEditorPane(editor: ProjectEditor, knownPaths: List<String>, actions: ProjectEditorActions) {
     val draft = editor.draft
-    LettaPane(LettaPaneKind.Modal, onDismiss = actions.onClose, title = if (editor.creating) "New project" else "Project settings", testTag = ProjectsPageTags.EDITOR) {
+    LettaPane(
+        LettaPaneKind.Modal,
+        onDismiss = actions.onClose,
+        title = if (editor.creating) "New project" else "Project settings",
+        testTag = ProjectsPageTags.EDITOR,
+        purpose = PanePurpose.Form,
+    ) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(LettaDimens.Space.lg)) {
             SettingsSection(SettingsHeader("project-form", draft.name.ifBlank { "Project" }, showTitle = !editor.creating)) {
                 if (editor.creating) {
