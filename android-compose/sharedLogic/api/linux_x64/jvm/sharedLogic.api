@@ -19945,7 +19945,7 @@ public final class com/letta/mobile/data/controller/node/iroh/ConnectionRegistry
 	public final fun claim (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun connections (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun conversationCount (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun isViewed (Ljava/lang/String;)Z
+	public final fun isViewed-LfPRSJk (Ljava/lang/String;)Z
 	public final fun register (Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun register (Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/ViewerRegistration;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun release (Lcom/letta/mobile/data/controller/node/iroh/ViewerRegistration;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -20334,7 +20334,7 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint {
 	public final fun conversationViewers ()Lkotlin/jvm/functions/Function2;
 	public final fun create (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun getAdminRpcRouter ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;
-	public final fun isConversationViewed (Ljava/lang/String;)Z
+	public final fun isConversationViewed-LfPRSJk (Ljava/lang/String;)Z
 	public final fun nodeIdHex ()Ljava/lang/String;
 	public final fun shutdown (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun start (Lcom/letta/mobile/data/controller/AppServerController;)V

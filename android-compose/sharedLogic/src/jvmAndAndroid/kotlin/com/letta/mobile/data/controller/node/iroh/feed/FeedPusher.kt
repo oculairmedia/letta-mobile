@@ -36,7 +36,7 @@ class FeedPusher(
     private val scope: CoroutineScope,
     private val journal: FeedJournalStore,
     private val viewersFor: ConversationViewers,
-    private val isViewed: (conversation: String) -> Boolean,
+    private val isViewed: (conversation: ConversationId) -> Boolean,
     private val frameBudgetMs: Long = FRAME_BUDGET_MS,
 ) {
     private val lock = Any()
@@ -52,7 +52,7 @@ class FeedPusher(
 
     /** The journal wrote to [key]; its head was [before] first. Cheap, and free when nobody views the conversation. */
     private fun appended(key: JournalKey, before: Long) {
-        if (namesOf(key).none(isViewed)) return
+        if (namesOf(key).none { isViewed(ConversationId(it)) }) return
         val start = synchronized(lock) {
             val idle = dirty.isEmpty()
             // Writers of one conversation can report out of order; the lowest head is where the frame must continue from.

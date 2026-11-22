@@ -172,7 +172,7 @@ class FeedTimelineSourceTest {
         settle()
 
         assertTrue(source.rows.value.isEmpty(), "the host refused the read: no rows")
-        assertFalse(host.registry.isViewed(conversationId.value), "a refused read leaves no viewer behind")
+        assertFalse(host.registry.isViewed(conversationId), "a refused read leaves no viewer behind")
         assertTrue(stranger.received.isEmpty(), "nothing was pushed to it")
     }
 

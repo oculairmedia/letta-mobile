@@ -113,8 +113,8 @@ class ConnectionRegistry {
     /** The conversations with a viewer, readable without the lock so a writer can skip work nobody would receive. */
     @Volatile private var viewedNow: Set<String> = emptySet()
 
-    /** Whether any connection currently views [conversationId], exactly as registered. */
-    fun isViewed(conversationId: String): Boolean = conversationId in viewedNow
+    /** Whether any connection currently views [conversation], exactly as registered. */
+    fun isViewed(conversation: ConversationId): Boolean = conversation.value in viewedNow
 
     /**
      * Atomically claims [viewer.connectionId] for this connection generation.
