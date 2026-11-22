@@ -19,12 +19,11 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.runCatchingCancellable
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +31,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+
+/** A [CachedAllConversationsRepository.refresh] read: it answers every call numbered up to [startedAfterRequest]. */
+private data class ReadOutcome(val startedAfterRequest: Long, val failure: Throwable? = null)
 
 @Suppress("NoDetachedCoroutineLifecycle")
 fun defaultCachedAllConversationsRepositoryScope(): CoroutineScope =
@@ -68,9 +70,11 @@ open class CachedAllConversationsRepository(
 
     private val refreshMutex = Mutex()
 
-    /** The refresh waiting for [refreshMutex], shared by every [refresh] caller that arrived since it was queued. */
-    private var pendingRefresh: Deferred<Result<Unit>>? = null
-    private val pendingLock = Mutex()
+    /** How many [refresh] calls have been made; a read that starts at N answers every call numbered up to N. */
+    private val refreshRequests = atomic(0L)
+
+    /** The last [refresh] read: the calls it answered and how it failed, written and read under [refreshMutex]. */
+    private var lastRead: ReadOutcome? = null
     /** Replaced on a backend switch, so the next host is asked for visible recents again. */
     private var listing = newListing()
 
@@ -218,22 +222,21 @@ open class CachedAllConversationsRepository(
     }
 
     /**
-     * Refreshes the list, one read in flight and at most one more waiting: callers arriving while a read runs
-     * share the single read that follows it, so a burst of triggers (drawer, heartbeat, reconnect) never stacks
-     * one read per trigger.
+     * Refreshes the list, one read in flight and at most one more waiting: a caller that asked while another read
+     * was still running shares the single read that follows it (or its failure) instead of queueing its own, so a
+     * burst of triggers (drawer, heartbeat, reconnect) never stacks one read per trigger. The read runs in the
+     * caller's own coroutine, so cancellation and the session proxy's retry see it as before.
      */
     override suspend fun refresh() {
-        val read = pendingLock.withLock {
-            pendingRefresh ?: repositoryScope.async { runCatchingCancellable { readOncePending() } }
-                .also { pendingRefresh = it }
+        val ticket = refreshRequests.incrementAndGet()
+        refreshMutex.withLock {
+            val covering = lastRead?.takeIf { it.startedAfterRequest >= ticket }
+            val outcome = covering ?: ReadOutcome(
+                startedAfterRequest = refreshRequests.value,
+                failure = runCatchingCancellable { refreshLocked() }.exceptionOrNull(),
+            ).also { lastRead = it }
+            outcome.failure?.let { throw it }
         }
-        read.await().getOrThrow()
-    }
-
-    /** Takes the waiting read's place as the one in flight; later callers queue a fresh read behind it. */
-    private suspend fun readOncePending() = refreshMutex.withLock {
-        pendingLock.withLock { pendingRefresh = null }
-        refreshLocked()
     }
 
     override suspend fun clearForBackendSwitch() {
