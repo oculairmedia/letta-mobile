@@ -14,6 +14,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
@@ -62,10 +65,12 @@ internal fun DesktopJewelWindow(
 ) {
     DesktopJewelTheme {
         val dark = rememberHostDark(LocalDesktopHostAppearance.current, isSystemInDarkMode())
+        val windowIcon = remember { bakenWindowIcon() }
         DecoratedWindow(
             onCloseRequest = onCloseRequest,
             state = state,
             title = title,
+            icon = windowIcon,
         ) {
             // The pen, read from Windows Ink and posted as ordinary mouse input, so it can draw
             // AND press things. AWT reports no stylus of its own — measured, see
@@ -179,3 +184,13 @@ private fun decoratedWindowStyle(colorScheme: ColorScheme) = DecoratedWindowStyl
     ),
     metrics = DecoratedWindowMetrics(borderWidth = 1.dp),
 )
+
+/** The Baken app icon (letta-mobile-0sb6o, kit svg/baken-app-icon-lit.svg) for the window and taskbar; null if absent. */
+private fun bakenWindowIcon(): Painter? =
+    DesktopJewelWindowIcon::class.java.getResourceAsStream(BAKEN_WINDOW_ICON)?.use { stream ->
+        BitmapPainter(org.jetbrains.skia.Image.makeFromEncoded(stream.readBytes()).toComposeImageBitmap())
+    }
+
+private object DesktopJewelWindowIcon
+
+private const val BAKEN_WINDOW_ICON = "/icons/baken-window.png"

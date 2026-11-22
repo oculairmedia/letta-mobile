@@ -58,7 +58,7 @@ class ApprovalNotificationPublisher @Inject constructor(
         )
         val body = AttentionCopy.approvalBody(event)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(AttentionCopy.approvalTitle(agentName))
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))

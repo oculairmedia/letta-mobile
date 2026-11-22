@@ -24,19 +24,21 @@ data class PresetThemeColors(
 private val DefaultThemeColors = LettaThemeTokens.default.toGeneratedThemeColors().let { generated ->
     PresetThemeColors(
         lightScheme = generated.lightScheme.copy(
-            onPrimaryContainer = Color(0xFF004D40),
+            onPrimary = Color(LettaColorTokens.LIGHT_ON_PRIMARY),
+            onPrimaryContainer = LightOnSurface,
             secondaryContainer = LightSurfaceContainer,
-            outlineVariant = Color(0xFFE0E0E0),
+            outlineVariant = LightSurfaceContainer,
             inversePrimary = DarkPrimary,
             surfaceContainerHigh = LightSurfaceContainer,
-            surfaceContainerHighest = Color(0xFFD6D6D6),
+            surfaceContainerHighest = Color(LettaColorTokens.LIGHT_OUTLINE),
         ),
         darkScheme = generated.darkScheme.copy(
-            outlineVariant = Color(0xFF303030),
+            onPrimary = Color(LettaColorTokens.DARK_ON_PRIMARY),
+            outlineVariant = Color(LettaColorTokens.DARK_OUTLINE_VARIANT),
             inversePrimary = LightPrimary,
-            surfaceContainerLowest = Color(0xFF0D0D0D),
+            surfaceContainerLowest = Color(LettaColorTokens.DARK_SURFACE_CONTAINER_LOWEST),
             surfaceContainerHigh = DarkSurfaceContainer,
-            surfaceContainerHighest = Color(0xFF353535),
+            surfaceContainerHighest = Color(LettaColorTokens.DARK_SURFACE_CONTAINER_HIGHEST),
         ),
     )
 }

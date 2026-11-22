@@ -66,7 +66,7 @@ class HostAppearanceThemeTest {
     fun theHostsPresetIsTheOneDrawn() {
         assertTrue(hueDistance(drawn(AppearanceValues("DARK", "OCEAN"), systemDark = true).first, OCEAN_DARK_PRIMARY) < HUE_TOLERANCE)
         assertTrue(hueDistance(drawn(AppearanceValues("DARK", "SAKURA"), systemDark = true).first, SAKURA_DARK_PRIMARY) < HUE_TOLERANCE)
-        assertTrue(hueDistance(drawn(AppearanceValues("DARK", "DEFAULT"), systemDark = true).first, TEAL_DARK_PRIMARY) < HUE_TOLERANCE)
+        assertTrue(hueDistance(drawn(AppearanceValues("DARK", "DEFAULT"), systemDark = true).first, VERMILION_DARK_PRIMARY) < HUE_TOLERANCE)
     }
 
     @Test
@@ -74,7 +74,7 @@ class HostAppearanceThemeTest {
         val (primary, background) = drawn(AppearanceValues.NONE, systemDark = true)
 
         assertTrue(isDark(background))
-        assertTrue(hueDistance(primary, TEAL_DARK_PRIMARY) < HUE_TOLERANCE)
+        assertTrue(hueDistance(primary, VERMILION_DARK_PRIMARY) < HUE_TOLERANCE)
     }
 
     @Test
@@ -82,7 +82,7 @@ class HostAppearanceThemeTest {
         val (primary, background) = drawn(AppearanceValues(theme = "SOLARIZED", themePreset = "NEON"), systemDark = true)
 
         assertTrue(isDark(background), "an unknown theme is SYSTEM, which follows the dark OS")
-        assertTrue(hueDistance(primary, TEAL_DARK_PRIMARY) < HUE_TOLERANCE)
+        assertTrue(hueDistance(primary, VERMILION_DARK_PRIMARY) < HUE_TOLERANCE)
     }
 
     @Test
@@ -132,6 +132,6 @@ class HostAppearanceThemeTest {
         const val HUE_TOLERANCE = 6f
         const val OCEAN_DARK_PRIMARY = 0xFF6FD8F6
         const val SAKURA_DARK_PRIMARY = 0xFFF0A8C1
-        const val TEAL_DARK_PRIMARY = 0xFF00BFA5
+        const val VERMILION_DARK_PRIMARY = 0xFFEE5A3F
     }
 }
