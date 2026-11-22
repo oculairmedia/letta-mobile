@@ -5,9 +5,9 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalClipboard
 import com.letta.mobile.data.chat.projection.BranchActionSupport
 import com.letta.mobile.data.chat.projection.MessageActionAvailability
 import com.letta.mobile.data.chat.projection.messageActionAvailability
@@ -23,6 +23,8 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.text.writePlainText
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
 /** The branch actions the owner supports, as the message-action policy reads them. */
@@ -113,14 +115,16 @@ fun MessageMenuPopup(menu: MessageMenu) {
             onDismiss = { menu.naming = false },
         )
     }
+    // Held above the open check: picking Copy closes the menu, and the copy must outlive it.
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     if (!menu.open) return
-    LettaPopupMenu(expanded = true, onDismiss = { menu.open = false }, items = menuItems(menu))
+    val copyText: (String) -> Unit = { text -> scope.launch { clipboard.writePlainText(text) } }
+    LettaPopupMenu(expanded = true, onDismiss = { menu.open = false }, items = menuItems(menu, copyText))
 }
 
 @Composable
-private fun menuItems(menu: MessageMenu): List<LettaMenuItem> {
-    @Suppress("DEPRECATION")
-    val clipboard = LocalClipboardManager.current
+private fun menuItems(menu: MessageMenu, copyText: (String) -> Unit): List<LettaMenuItem> {
     val message = menu.message
     val actions = menu.actions
     val available = menu.availability
@@ -134,6 +138,6 @@ private fun menuItems(menu: MessageMenu): List<LettaMenuItem> {
         if (available.canRerun) add(LettaMenuItem(label = rerun, icon = LettaIcons.Refresh) { actions.rerunInFork(message) })
         if (available.canSendAgain) add(LettaMenuItem(label = sendAgain, icon = LettaIcons.Send) { actions.sendAgain(message) })
         if (available.canFork) add(LettaMenuItem(label = fork, icon = LettaIcons.ForkRight, onClick = menu::startFork))
-        if (available.canCopy) add(LettaMenuItem(label = copy, icon = LettaIcons.Copy) { clipboard.setText(AnnotatedString(message.content)) })
+        if (available.canCopy) add(LettaMenuItem(label = copy, icon = LettaIcons.Copy) { copyText(message.content) })
     }
 }

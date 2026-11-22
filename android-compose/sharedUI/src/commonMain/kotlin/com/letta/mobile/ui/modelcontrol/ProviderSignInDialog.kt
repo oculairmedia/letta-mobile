@@ -15,16 +15,16 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.data.repository.modelcontrol.ConnectableProvider
 import com.letta.mobile.data.repository.modelcontrol.ProviderSignInController
@@ -37,8 +37,10 @@ import com.letta.mobile.ui.host.LettaPaneButtons
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.components.foundation.LettaBusyBar
+import com.letta.mobile.ui.text.writePlainText
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.tokens.LettaTextAccents
+import kotlinx.coroutines.launch
 
 /** Callbacks of [ProviderSignInDialog]; [bind] wires them to the shared sign-in controller. */
 data class ProviderSignInActions(
@@ -87,11 +89,12 @@ object ProviderSignInTags {
 fun ProviderSignInDialog(state: ProviderSignInState, actions: ProviderSignInActions) {
     val provider = state.provider ?: return
     val uriHandler = LocalUriHandler.current
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     val platform = SignInPlatform(
         // A host without a browser throws; the link stays visible to copy instead.
         openUrl = { url -> runCatching { uriHandler.openUri(url) } },
-        copy = { text -> clipboard.setText(AnnotatedString(text)) },
+        copy = { text -> scope.launch { clipboard.writePlainText(text) } },
     )
     val finished = state is ProviderSignInState.Connected || state is ProviderSignInState.Failed
     val buttons = LettaPaneButtons(

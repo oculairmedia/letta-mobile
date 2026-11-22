@@ -20,11 +20,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -32,7 +33,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.data.pairing.InviteCountdown
 import com.letta.mobile.data.pairing.InvitePhase
@@ -47,6 +47,8 @@ import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 import com.letta.mobile.ui.components.foundation.LettaRowLabel
 import com.letta.mobile.ui.components.foundation.LettaToggleRow
+import com.letta.mobile.ui.text.writePlainText
+import kotlinx.coroutines.launch
 
 /** An agent the inviter may share with the new device. */
 data class AgentChoice(val id: String, val name: String)
@@ -256,7 +258,8 @@ private class LinkToggle(val showingLink: Boolean, val onToggle: () -> Unit)
 
 @Composable
 private fun LinkActions(invite: MintedPairInvite, toggle: LinkToggle?, onShare: ((String) -> Unit)?) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     var copied by remember(invite.inviteId) { mutableStateOf(false) }
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
         toggle?.let {
@@ -265,7 +268,12 @@ private fun LinkActions(invite: MintedPairInvite, toggle: LinkToggle?, onShare: 
             }
         }
         TextButton(
-            onClick = { clipboard.setText(AnnotatedString(invite.pairLink)); copied = true },
+            onClick = {
+                scope.launch {
+                    clipboard.writePlainText(invite.pairLink)
+                    copied = true
+                }
+            },
             modifier = Modifier.testTag(PairingTags.INVITE_COPY),
         ) {
             LettaIcon(LettaIcons.Copy, contentDescription = null)
