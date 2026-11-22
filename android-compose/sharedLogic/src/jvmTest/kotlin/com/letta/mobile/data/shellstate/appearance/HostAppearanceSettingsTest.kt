@@ -83,10 +83,12 @@ class HostAppearanceSettingsTest {
         here.section.themePreset!!.set(ThemePreset.OCEAN)
         within { while (host.entries()[AppearanceKeys.THEME_PRESET] != JsonPrimitive("OCEAN")) delay(POLL_MS) }
 
-        assertEquals(listOf(listOf(AppearanceKeys.THEME_PRESET, AppearanceKeys.DYNAMIC_COLOR)), host.proposals, "one proposal, both keys")
+        val bothKeys = listOf(AppearanceKeys.THEME_PRESET, AppearanceKeys.DYNAMIC_COLOR)
+        assertEquals(listOf(bothKeys), host.proposals, "one proposal, both keys")
         assertEquals(JsonPrimitive(false), host.entries().getValue(AppearanceKeys.DYNAMIC_COLOR))
         within { watcher.appearance.values.first { it.themePreset == "OCEAN" } }
-        assertTrue(seen.none { it.themePreset == "OCEAN" && it.dynamicColor == true }, "never the new preset with the old dynamic colour: $seen")
+        val half = seen.filter { it.themePreset == "OCEAN" && it.dynamicColor == true }
+        assertTrue(half.isEmpty(), "never the new preset with the old dynamic colour: $half")
     }
 
     @Test
