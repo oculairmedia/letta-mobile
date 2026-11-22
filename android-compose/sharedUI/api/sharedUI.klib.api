@@ -10041,7 +10041,7 @@ final object com.letta.mobile.ui.icons/BakenMark { // com.letta.mobile.ui.icons/
     final val mono // com.letta.mobile.ui.icons/BakenMark.mono|{}mono[0]
         final fun <get-mono>(): androidx.compose.ui.graphics.vector/ImageVector // com.letta.mobile.ui.icons/BakenMark.mono.<get-mono>|<get-mono>(){}[0]
 
-    final fun brand(kotlin/Boolean): androidx.compose.ui.graphics.vector/ImageVector // com.letta.mobile.ui.icons/BakenMark.brand|brand(kotlin.Boolean){}[0]
+    final fun brand(androidx.compose.ui.graphics/Color, androidx.compose.ui.graphics/Color): androidx.compose.ui.graphics.vector/ImageVector // com.letta.mobile.ui.icons/BakenMark.brand|brand(androidx.compose.ui.graphics.Color;androidx.compose.ui.graphics.Color){}[0]
 }
 
 final object com.letta.mobile.ui.icons/LettaIcons { // com.letta.mobile.ui.icons/LettaIcons|null[0]

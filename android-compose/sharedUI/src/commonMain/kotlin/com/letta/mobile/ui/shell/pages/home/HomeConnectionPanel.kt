@@ -13,6 +13,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.letta.mobile.ui.theme.LettaColorTokens
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
@@ -104,7 +108,7 @@ private fun ConnectionHeadline(headline: String?, wordmark: String) {
     } else {
         // The brand spot: the two-colour Baken mark (its own stone and vermilion, not tinted) over the wordmark.
         Image(
-            imageVector = BakenMark.brand(dark = MaterialTheme.colorScheme.background.luminance() < LIGHT_BACKGROUND_LUMINANCE),
+            imageVector = bakenBrandMark(dark = MaterialTheme.colorScheme.background.luminance() < LIGHT_BACKGROUND_LUMINANCE),
             contentDescription = null,
             modifier = Modifier.size(ShellDimens.heroMark),
         )
@@ -152,3 +156,13 @@ internal fun connectionHeroBody(status: ChatScreenStatus): String = when (status
 
 /** A background brighter than this is a light theme: the mark takes its petrol stone, else its pale one. */
 private const val LIGHT_BACKGROUND_LUMINANCE = 0.5f
+
+/** The two-colour Baken mark in this theme's stone and vermilion (design tokens), built once per theme. */
+@Composable
+private fun bakenBrandMark(dark: Boolean): ImageVector = remember(dark) {
+    if (dark) {
+        BakenMark.brand(Color(LettaColorTokens.DARK_MARK_STONE), Color(LettaColorTokens.DARK_PRIMARY))
+    } else {
+        BakenMark.brand(Color(LettaColorTokens.LIGHT_MARK_STONE), Color(LettaColorTokens.LIGHT_PRIMARY))
+    }
+}

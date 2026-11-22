@@ -3,7 +3,7 @@ package com.letta.mobile.ui.theme
 import com.letta.mobile.data.model.ThemePreset
 
 object LettaColorTokens {
-    // Baken brand (letta-mobile-0sb6o, 2026-11-22): Buoy Vermilion primary over the "North Sea Buoy"
+    // Baken brand: Buoy Vermilion primary over the "North Sea Buoy"
     // deep-sea neutrals from the Baken brand kit. Text on the vermilion primary is white in both themes.
     // Single source of truth for every client (default preset).
     const val DARK_SURFACE = 0xFF13212D
