@@ -71,6 +71,9 @@ object Telemetry {
     val renderDiagEnabled = TelemetryFlag(false)
     // Bounded chat-open ordering trace. Off by default; enable per device when reproducing startup jitter.
     val chatHydrationTraceEnabled = TelemetryFlag(false)
+    // Stage-by-stage timeline open latency (see TimelineOpenTrace). Off by default; enable on-device with
+    // `adb shell setprop log.tag.LettaTimelineOpenTrace VERBOSE` (no rebuild).
+    val timelineOpenTraceEnabled = TelemetryFlag(false)
     // Per-gate Iroh frame-flow content-length diagnostic (see IrohFrameFlowDiagnostics).
     val frameFlowDiagEnabled = TelemetryFlag(false)
 
@@ -86,6 +89,7 @@ object Telemetry {
     private const val TIMELINE_SYNC_GATE_DEBUG_TAG = "LettaTimelineSyncGate"
     private const val RENDER_DIAG_TAG = "LettaRenderDiag"
     private const val CHAT_HYDRATION_TRACE_TAG = "LettaChatHydrationTrace"
+    private const val TIMELINE_OPEN_TRACE_TAG = "LettaTimelineOpenTrace"
     private const val FRAME_FLOW_DIAG_TAG = "LettaFrameFlowDiag"
     private const val TAG_PREFIX = "Telemetry"
     private const val TRACE_MAX_LEN = 127
@@ -116,6 +120,9 @@ object Telemetry {
 
     fun isChatHydrationTraceEnabled(): Boolean =
         chatHydrationTraceEnabled.get() || (delegate?.isLoggable(CHAT_HYDRATION_TRACE_TAG, 2) ?: false)
+
+    fun isTimelineOpenTraceEnabled(): Boolean =
+        timelineOpenTraceEnabled.get() || (delegate?.isLoggable(TIMELINE_OPEN_TRACE_TAG, 2) ?: false)
 
     fun isFrameFlowDiagEnabled(): Boolean =
         frameFlowDiagEnabled.get() || (delegate?.isLoggable(FRAME_FLOW_DIAG_TAG, 2) ?: false)

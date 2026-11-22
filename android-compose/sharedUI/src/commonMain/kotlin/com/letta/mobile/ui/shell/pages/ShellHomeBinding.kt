@@ -17,6 +17,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.util.TimelineOpenTrace
 import com.letta.mobile.data.presence.runningAgentIds
 import com.letta.mobile.data.session.agentRosterOrEmpty
 import com.letta.mobile.data.session.SessionRepositoryGraph
@@ -148,7 +149,11 @@ private fun HomePageOptions.withPromptBar(): HomePageOptions =
 private fun homeNavigation(graph: SessionRepositoryGraph, host: ShellPageHost): HomePageNavigation {
     val router = host.navigator
     val workspace = router.state
-    val openConversation = { id: String -> router.openConversation(ConversationId(id)) }
+    // A pick from Home's Recent list is where an open begins, as the drawer's is (open-latency trace).
+    val openConversation = { id: String ->
+        TimelineOpenTrace.requested(ConversationId(id))
+        router.openConversation(ConversationId(id))
+    }
     return HomePageNavigation(
         onSubmitPrompt = { text ->
             val rosterAgent = graph.agentRosterOrEmpty().value.firstOrNull()?.id
