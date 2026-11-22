@@ -103,7 +103,8 @@ internal class IrohLivenessProbe(
      *  2. It is an endless supervision loop, so it must never count as outstanding
      *     structured-concurrency work for whoever owns the transport's scope.
      * Its lifetime is still explicit: [stop] cancels the job on any non-Ready
-     * transition and on disconnect.
+     * transition and on disconnect, and the transport passes a scope whose job is a
+     * child of its own lifetime, so an owner that ends without either ends the loop too.
      */
     private val scope = runtime.scope
 

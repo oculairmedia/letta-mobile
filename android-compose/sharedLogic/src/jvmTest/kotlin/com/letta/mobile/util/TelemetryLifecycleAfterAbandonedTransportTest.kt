@@ -13,21 +13,23 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * TEMPORARY ordering repro (never committed): an earlier transport test whose owner scope ends without
- * disconnect/close (what runTest-scoped transport tests do), then the lifecycle test in the same JVM.
+ * An earlier transport whose owner scope ends without disconnect()/close() (what runTest-scoped
+ * transport tests do) must not keep writing liveness telemetry into whichever history a later test
+ * installs. Runs the lifecycle scenario in the same JVM after abandoning such a transport.
  */
-class ZzForeignTrafficReproTest {
+class TelemetryLifecycleAfterAbandonedTransportTest {
     @Test
-    fun lifecycleScenarioAfterLeakedTransportTest() {
-        leakTransport()
+    fun lifecycleScenarioAfterAnAbandonedTransport() {
+        abandonTransport()
         val test = TelemetryLifecycleTest()
         repeat(ITERATIONS) { test.existingCollectorsFollowReplacementAndObsoleteCloseCannotDetachNewOwner() }
     }
 
-    private fun leakTransport() = runBlocking {
+    private fun abandonTransport() = runBlocking {
         val owner = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val config = IrohConnectConfig("iroh://ticket", "token", "device", "client")
         val transport = IrohChannelTransport(
@@ -54,7 +56,7 @@ class ZzForeignTrafficReproTest {
         owner.coroutineContext[Job]!!.cancel()
         val deadline = System.nanoTime() + 2_000_000_000L
         while (transport.isLivenessProbeArmed && System.nanoTime() < deadline) delay(5)
-        println("REPRO probeStillArmedAfterOwnerEnded=${transport.isLivenessProbeArmed}")
+        assertFalse(transport.isLivenessProbeArmed, "the liveness loop outlived the transport's owner")
     }
 
     private companion object { const val ITERATIONS = 300 }

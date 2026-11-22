@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
+import com.letta.mobile.data.model.mergeRosterRows
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.observeAgentUpdates
 import com.letta.mobile.data.repository.observeReconnectRefresh
@@ -89,8 +90,9 @@ class IrohAgentRepository(
     private suspend fun refreshAgentsLocked() {
         refreshingFlow.value = true
         try {
-            val newAgents = directory().listAgents()
             val currentAgents = agentsFlow.value
+            // A slim list row refreshes the list fields of a cached record and keeps its detail.
+            val newAgents = mergeRosterRows(currentAgents, directory().listAgents())
 
             // Diff against the cached list to avoid unnecessary StateFlow emissions.
             // StateFlow notifies collectors on every assignment, which triggers

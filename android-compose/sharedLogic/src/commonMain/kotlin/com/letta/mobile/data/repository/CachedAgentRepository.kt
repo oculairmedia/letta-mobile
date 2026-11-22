@@ -11,6 +11,7 @@ import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
+import com.letta.mobile.data.model.mergeRosterRows
 import com.letta.mobile.data.repository.api.AgentIrohSource
 import com.letta.mobile.data.repository.api.AgentLocalCache
 import com.letta.mobile.data.repository.api.AgentRemoteSource
@@ -226,8 +227,9 @@ open class CachedAgentRepository(
 
     private fun publishRosterLocked(fresh: List<Agent>, completed: Boolean) {
         // A targeted read, push or deletion after this list started wins over its older snapshot.
+        // A slim list row refreshes the list fields of a cached record and keeps its detail.
         val current = _agents.value.filter { it.id in changedDuringRefresh }
-        _agents.value = fresh.filterNot { it.id in changedDuringRefresh } + current
+        _agents.value = mergeRosterRows(_agents.value, fresh.filterNot { it.id in changedDuringRefresh }) + current
         cachePublicationRevision += 1
         detailedAgents.retainAll(changedDuringRefresh)
         agentFetchedAt.keys.retainAll(_agents.value.map { it.id }.toSet())
