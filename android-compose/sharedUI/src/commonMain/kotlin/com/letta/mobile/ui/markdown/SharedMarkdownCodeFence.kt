@@ -19,6 +19,13 @@ fun interface MermaidDiagramRenderer {
 
 val LocalMermaidDiagramRenderer = staticCompositionLocalOf<MermaidDiagramRenderer?> { null }
 
+/** Test tags of a code fence's header. */
+internal object CodeFenceTags {
+    const val HEADER: String = "code-fence-header"
+    const val LANGUAGE: String = "code-fence-language"
+    const val COPY: String = "code-fence-copy"
+}
+
 internal enum class CodeFenceRenderer {
     MermaidDiagram,
     Code,
@@ -48,7 +55,8 @@ private fun shouldRenderMermaidDiagram(
 }
 
 /**
- * Code blocks as the renderer draws them; code fences too, but a complete Mermaid fence as a diagram;
+ * Code blocks as the renderer draws them; code fences too, under a header with their language and a
+ * Copy ([CodeFenceWithHeader]), but a complete Mermaid fence as a diagram;
  * tables as the renderer draws them, free to break out of the column ([SharedMarkdownTable]).
  */
 @Composable
@@ -84,10 +92,12 @@ private fun SharedCodeFence(
             content = model.content,
             node = model.node,
         )
-        CodeFenceRenderer.Code -> MarkdownCodeFence(
-            content = model.content,
-            node = model.node,
-        )
+        CodeFenceRenderer.Code -> CodeFenceWithHeader(language, source) {
+            MarkdownCodeFence(
+                content = model.content,
+                node = model.node,
+            )
+        }
     }
 }
 
