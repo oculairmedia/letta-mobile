@@ -653,7 +653,7 @@ class AppServerServeIrohCommand : CliktCommand(
             serviceCredentialRoutes = com.letta.mobile.data.controller.node.iroh.servicecredentials.ServiceCredentialRoutes.forHost(
                 hostStateDirectory,
             ),
-            feedRoutes = com.letta.mobile.data.controller.node.iroh.feed.FeedRoutes.forHost(feedJournal),
+            feedRoutes = com.letta.mobile.data.controller.node.iroh.feed.FeedRoutes.forHost(feedJournal, pushes = true),
         )
         notebookGrantsFile?.let { file ->
             val store = requireNotNull(notebooks) { "Notebook grants require a notebook store" }
@@ -677,6 +677,10 @@ class AppServerServeIrohCommand : CliktCommand(
         conversationChanges.attach(endpoint.conversationChangeTarget())
         pinsPublisher.attach(endpoint::broadcastPinsUpdated)
         shellStatePublisher.attach(endpoint::broadcastShellStateUpdated)
+        // The journal's writes reach the connections viewing their conversation, as feed_delta frames; it registers itself on the journal.
+        com.letta.mobile.data.controller.node.iroh.feed.FeedPusher(
+            scope, feedJournal, endpoint.conversationViewers(), endpoint::isConversationViewed,
+        )
         println(
             "[iroh-app-server] admin_rpc handlers registered " +
                 "(methods: ${adminRpcRouter.methodCount}, " +

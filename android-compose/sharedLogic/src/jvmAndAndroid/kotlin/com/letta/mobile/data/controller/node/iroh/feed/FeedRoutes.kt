@@ -28,8 +28,25 @@ import kotlinx.serialization.json.longOrNull
  * capability matrix gates the method (`chat.read`) before it gets here.
  */
 object FeedRoutes {
-    /** The route over [journal], the same journal the host's turns write to. */
-    fun forHost(journal: FeedJournalStore): AdminRpcRoutes = FeedRouteSet(journal)
+    /**
+     * The route over [journal], the same journal the host's turns write to. [pushes] says a [FeedPusher] runs over it too, so
+     * the host also advertises [ConversationFeedWire.PUSH_CAPABILITY].
+     */
+    fun forHost(journal: FeedJournalStore, pushes: Boolean = false): AdminRpcRoutes = FeedRouteSet(journal, pushes)
+}
+
+/**
+ * Whether a peer with [context] may read the feed of [agent]'s conversation that it names [conversation], the rule
+ * `feed.subscribe` and the live push share. A peer bound to conversations (not unrestricted) may not name the bare `default`:
+ * it names no agent, so which journal it selects would come from the request, not from the peer's binding. An agent-scoped
+ * peer may read only the journals of agents in its scope.
+ */
+internal fun mayReadFeed(conversation: String, agent: AgentId?, context: AdminRpcRequestContext): Boolean {
+    val bareDefault = conversation == IdFormats.DEFAULT_CONVERSATION_ID
+    val bound = context.authorizedConversationIds != null
+    val conversationAllowed = context.canAccessConversation(conversation) && !(bareDefault && bound)
+    val agentAllowed = agent == null || IrohPeerCapabilities.isAgentInScope(context.authorizedAgentIds, agent.value)
+    return conversationAllowed && agentAllowed
 }
 
 /**
@@ -38,12 +55,12 @@ object FeedRoutes {
  * journal is read under that owner's key, so a conversation id cannot be borrowed across agents. For an agent-scoped peer an
  * owner that cannot be resolved is a refusal, never an empty page. Telemetry carries the outcome and counts, never an id.
  */
-internal class FeedRouteSet(private val journal: FeedJournalStore) : AdminRpcRoutes {
+internal class FeedRouteSet(private val journal: FeedJournalStore, private val pushes: Boolean = false) : AdminRpcRoutes {
     override fun register(router: AdminRpcRouter) {
         router.registerScoped(ConversationFeedWire.SUBSCRIBE) { params, context ->
             if (!journal.epochPersisted) refuse(OUTCOME_UNAVAILABLE, UNAVAILABLE)
             val request = FeedRequest.parse(params)
-            if (!mayRead(request, context)) refuse(OUTCOME_CONVERSATION_SCOPE, DENIED_CONVERSATION)
+            if (!mayReadFeed(request.conversation.value, null, context)) refuse(OUTCOME_CONVERSATION_SCOPE, DENIED_CONVERSATION)
             val page = pageFor(request, context)
             Telemetry.event(
                 TAG, "request.answered", "outcome" attr OUTCOME_OK, "mode" attr page.mode, "entries" attr page.entries.size,
@@ -52,18 +69,7 @@ internal class FeedRouteSet(private val journal: FeedJournalStore) : AdminRpcRou
             LettaJson.wire.encodeToJsonElement(FeedPage.serializer(), page)
         }
         router.featureCapabilities += ConversationFeedWire.CAPABILITY
-    }
-
-    /**
-     * The peer may read the conversation (the scope `message.list` applies). A peer whose scope is bound to conversations (not
-     * unrestricted) may not read the bare `default` at all: it names no agent, so which agent's journal it selects would come
-     * from the request, not from the peer's own binding. Such a peer reads its `conv-default-<agent>` alias, whose owner is
-     * part of the id.
-     */
-    private fun mayRead(request: FeedRequest, context: AdminRpcRequestContext): Boolean {
-        val bareDefault = request.conversation.value == IdFormats.DEFAULT_CONVERSATION_ID
-        val bound = context.authorizedConversationIds != null
-        return context.canAccessConversation(request.conversation.value) && !(bareDefault && bound)
+        if (pushes) router.featureCapabilities += ConversationFeedWire.PUSH_CAPABILITY
     }
 
     private fun pageFor(request: FeedRequest, context: AdminRpcRequestContext): FeedPage {

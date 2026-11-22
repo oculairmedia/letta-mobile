@@ -170,6 +170,9 @@ class IrohNodeEndpoint(
         connectionRegistry.broadcast(frame) { it.receivesConversationActivity(AgentId(activity.agentId)) }
     }
 
+    /** Whether any connection views [conversationId] as registered, so a push to its viewers can be skipped when none do. */
+    fun isConversationViewed(conversationId: String): Boolean = connectionRegistry.isViewed(conversationId)
+
     /** The live viewers of each conversation, for pushes that must reach only that conversation's viewers. */
     fun conversationViewers(): ConversationViewers = { conversation -> connectionRegistry.viewersFor(conversation.value) }
 

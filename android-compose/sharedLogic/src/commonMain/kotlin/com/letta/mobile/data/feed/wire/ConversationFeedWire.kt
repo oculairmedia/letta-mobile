@@ -16,8 +16,27 @@ object ConversationFeedWire {
     /** Every v1 method. */
     val METHODS: Set<String> = setOf(SUBSCRIBE)
 
-    /** Frame type reserved for live pushes. A v1 host never sends it; a client ignores it. */
+    /**
+     * Advertised, besides [CAPABILITY], by a host that also pushes [FRAME_TYPE] frames. A client that renders the
+     * feed needs both: a host with [CAPABILITY] alone can be read from a cursor but never tells a viewer that
+     * something was appended.
+     */
+    const val PUSH_CAPABILITY: String = "conversation_feed_push_v1"
+
+    /** Frame type of the live push: the entries appended to one conversation's journal since the host's last push to it. */
     const val FRAME_TYPE: String = "feed_delta"
+
+    /** Frame field: the conversation as the journal keys it (the bare `default` for an agent's default conversation). */
+    const val CONVERSATION: String = "conversation"
+
+    /** Frame field: the seq of the newest entry the frame carries, or the journal's head when it carries none (a resync marker). */
+    const val FRAME_SEQ: String = "seq"
+
+    /** Frame field: the seq the frame continues from; a viewer whose cursor is below it missed entries and resyncs. */
+    const val AFTER_SEQ: String = "after_seq"
+
+    /** Frame field: the pushed entries, oldest first; empty in a resync marker. */
+    const val ENTRIES: String = "entries"
 
     /** Param: the conversation to read. */
     const val CONVERSATION_ID: String = "conversation_id"

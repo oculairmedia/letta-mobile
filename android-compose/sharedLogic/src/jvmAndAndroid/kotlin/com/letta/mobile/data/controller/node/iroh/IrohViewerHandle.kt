@@ -62,6 +62,7 @@ internal class IrohViewerHandle(
     private val agentEventsGate: () -> Boolean = { false },
     private val conversationActivityGate: (String) -> Boolean = { false },
     private val conversationEventsGate: () -> Boolean = { false },
+    private val feedPushGate: () -> Boolean = { false },
 ) : ViewerHandle {
     /**
      * The connection's admin RPC context while it is authenticated, null otherwise; evaluated at send time for
@@ -76,6 +77,8 @@ internal class IrohViewerHandle(
         receivesConversationEvents() && conversationActivityGate(agentId.value)
 
     override fun receivesConversationEvents(): Boolean = conversationEventsGate()
+
+    override fun receivesFeedPushes(): Boolean = feedPushGate()
 
     override fun adminContext(): AdminRpcRequestContext? = adminContextGate()
 

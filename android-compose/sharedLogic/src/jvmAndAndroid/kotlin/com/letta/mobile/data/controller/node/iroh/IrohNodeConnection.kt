@@ -4,6 +4,7 @@ import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.extras.relay.AppToolRelay
 import com.letta.mobile.data.controller.extras.relay.AppToolRelayLink
+import com.letta.mobile.data.feed.wire.ConversationFeedWire
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId as ModelConversationId
 import com.letta.mobile.data.runtime.TurnInputAcknowledgement
@@ -222,6 +223,8 @@ class IrohNodeConnection(
                 com.letta.mobile.data.transport.ServerFrame.ConversationActivity.CAPABILITY in peerCapabilities.get() &&
                     IrohPeerCapabilities.isAgentInScope(sessionAuth.agentScope(), agentId)
             },
+            // A feed push is for a peer that advertised it handles one; its own scope is checked per push.
+            feedPushGate = { authenticated.get() && ConversationFeedWire.PUSH_CAPABILITY in peerCapabilities.get() },
             conversationEventsGate = {
                 val capabilities = effectiveCapabilities()
                 authenticated.get() &&
@@ -424,11 +427,11 @@ class IrohNodeConnection(
     }
 
     /**
-     * The OBSERVER signal: a connection that hydrates conversation X with `message.list`
-     * becomes X's viewer (de-scoping any prior conversation), on either admin_rpc path.
+     * The OBSERVER signal: a connection that hydrates conversation X with `message.list` (or reads its feed with
+     * `feed.subscribe`, so it is told of later entries) becomes X's viewer (de-scoping any prior conversation), on either admin_rpc path.
      */
     private suspend fun observeAdminMethod(method: String, params: JsonObject?): (suspend (Boolean) -> Unit)? {
-        if (method != "message.list") return null
+        if (method != "message.list" && method != ConversationFeedWire.SUBSCRIBE) return null
         val conversationId = params?.get("conversation_id")?.let { (it as? JsonPrimitive)?.contentOrNull }
         if (conversationId.isNullOrEmpty()) return null
         val subscription = viewerSubscription ?: return null

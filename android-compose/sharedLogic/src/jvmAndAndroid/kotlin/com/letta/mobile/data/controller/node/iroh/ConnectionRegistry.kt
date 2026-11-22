@@ -51,6 +51,12 @@ interface ViewerHandle {
      */
     fun receivesShellStateEvents(): Boolean = receivesHostWideEvents()
 
+    /**
+     * Whether this connection asked for `feed_delta` pushes (it advertised the feed push capability). The feed's own
+     * authorization (conversation scope, owning agent in scope) is checked separately, per push. Default: no.
+     */
+    fun receivesFeedPushes(): Boolean = false
+
     private fun receivesHostWideEvents(): Boolean {
         val context = adminContext() ?: return false
         return context.authenticated && context.authorizedAgentIds == null && receivesAgentEvents()
@@ -104,6 +110,12 @@ class ConnectionRegistry {
     // conversationId -> canonical endpoint identity -> current registration
     private val viewersByConversation = mutableMapOf<String, MutableMap<String, ViewerRegistration>>()
 
+    /** The conversations with a viewer, readable without the lock so a writer can skip work nobody would receive. */
+    @Volatile private var viewedNow: Set<String> = emptySet()
+
+    /** Whether any connection currently views [conversationId], exactly as registered. */
+    fun isViewed(conversationId: String): Boolean = conversationId in viewedNow
+
     /**
      * Atomically claims [viewer.connectionId] for this connection generation.
      * A reconnect supersedes every subscription owned by the previous generation.
@@ -121,6 +133,7 @@ class ConnectionRegistry {
         val active = activeByEndpoint[viewer.connectionId]
         val registration = if (active?.viewer === viewer) active else claimLocked(viewer)
         viewersByConversation.getOrPut(conversationId) { mutableMapOf() }[registration.endpointId] = registration
+        publishViewed()
         registration
     }
 
@@ -144,6 +157,7 @@ class ConnectionRegistry {
             if (activeByEndpoint[registration.endpointId] !== registration) return null
             val viewers = viewersByConversation.getOrPut(conversation.value) { mutableMapOf() }
             val previous = viewers.put(registration.endpointId, registration)
+            publishViewed()
             previous !== registration
         }
         if (joined) joinListeners.forEach { it.onViewerJoined(conversation.value, registration.viewer) }
@@ -164,6 +178,7 @@ class ConnectionRegistry {
             val registration = viewers[viewer.connectionId]
             if (registration?.viewer === viewer) viewers.remove(viewer.connectionId)
             if (viewers.isEmpty()) viewersByConversation.remove(conversationId)
+            publishViewed()
         }
     }
 
@@ -209,5 +224,10 @@ class ConnectionRegistry {
             if (viewers.isEmpty()) emptied += conversationId
         }
         emptied.forEach(viewersByConversation::remove)
+        publishViewed()
+    }
+
+    private fun publishViewed() {
+        viewedNow = viewersByConversation.keys.toSet()
     }
 }

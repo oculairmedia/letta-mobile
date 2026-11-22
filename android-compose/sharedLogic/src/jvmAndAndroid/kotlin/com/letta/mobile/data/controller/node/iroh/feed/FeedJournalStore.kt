@@ -54,6 +54,12 @@ class FeedJournalStore internal constructor(
      */
     val epochPersisted: Boolean = issued.persisted
 
+    /**
+     * Told after every entry a turn writes, outside the store lock, with the journal's key and its head before the write (the
+     * seq a viewer that was caught up holds). The live push sets it; it must not block. The default does nothing.
+     */
+    @Volatile internal var onAppended: (JournalKey, Long) -> Unit = { _, _ -> }
+
     private val editor = FeedLogEditor(files, retention, FeedEpoch(epoch))
     private val pager = FeedPager(FeedEpoch(epoch))
     private val logs = FeedLogCache(retention.maxLoadedLogs, floors, editor)
@@ -107,12 +113,15 @@ class FeedJournalStore internal constructor(
         override fun append(deltaJson: String) {
             val delta = parseDelta(deltaJson) ?: return
             guarded("append") {
-                synchronized(lock) {
+                val before = synchronized(lock) {
+                    val head = heldLog().headSeq.value
                     val log = openLocked()
                     editor.append(log, turn, delta)
                     logs.touch(log)
                     logs.trim()
+                    head
                 }
+                onAppended(key, before)
             }
         }
 
@@ -129,13 +138,16 @@ class FeedJournalStore internal constructor(
         }
 
         override fun close(terminalObserved: Boolean) = guarded("close") {
-            synchronized(lock) {
-                if (!opened) return@synchronized
+            val before = synchronized(lock) {
+                if (!opened) return@synchronized null
                 opened = false
                 finished = true
+                val head = heldLog().headSeq.value
                 editor.close(heldLog(), turn, TurnEnd(terminalObserved))
                 afterTurnEnded()
+                head
             }
+            before?.let { onAppended(key, it) }
         }
 
         /** The log this writer works on; once the turn is open it is pinned in the cache by its running turn, so it is the same instance throughout. */
