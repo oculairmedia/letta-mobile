@@ -45,8 +45,10 @@ internal val LocalComposerCompanion = staticCompositionLocalOf { true }
  * character over and closing it flies it back. The slot closes while the character stands
  * elsewhere, giving the prompt its full width back, and reopens as it returns.
  *
- * The prompt keeps its centred max width; the slot is added to the row's, so the pair is centred
- * together. Without a mascot for the conversation's agent the row is just [content].
+ * The pair keeps the chat column's max width: the mascot takes its slot at the column's start and the
+ * prompt narrows by the slot, so the prompt's end lines up with the column (the transcript, the
+ * chips and the hints above and below it) whether or not the mascot is there. Without a mascot for
+ * the conversation's agent the row is just [content].
  */
 @Composable
 internal fun ComposerCompanionRow(model: ComposerModel, content: @Composable () -> Unit) {
@@ -61,7 +63,9 @@ internal fun ComposerCompanionRow(model: ComposerModel, content: @Composable () 
     )
     Row(
         // Order matters: widthIn BEFORE fillMaxWidth, or fillMaxWidth pins min == max and the cap is lost.
-        modifier = Modifier.widthIn(max = composerBarMaxWidth() + slot).fillMaxWidth(),
+        // The slot comes out of the column's width, not on top of it: a wider row would push the
+        // prompt's end past the column.
+        modifier = Modifier.widthIn(max = composerBarMaxWidth()).fillMaxWidth(),
         // The companion's anchor occupies the seat box, so bottom-aligning it leaves the visible
         // character above the prompt's midpoint as the card grows taller than the seat.
         verticalAlignment = Alignment.CenterVertically,

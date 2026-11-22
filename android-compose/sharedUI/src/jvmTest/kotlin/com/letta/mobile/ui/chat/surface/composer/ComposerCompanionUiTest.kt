@@ -35,6 +35,7 @@ import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.theme.ChatMascotDimens
 import kotlin.math.abs
+import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -233,5 +234,18 @@ class ComposerCompanionUiTest {
         )
 
         assertCompanionCenteredOn(ComposerTestTags.CARD)
+    }
+
+    @Test
+    fun theMascotAndThePromptTogetherKeepTheChatColumnsWidth() = runComposeUiTest {
+        showMeasuredPanel(mode = ChatSurfaceMode.FullScreen, width = 1200.dp, composer = ChatComposerUiState(text = "Prompt"))
+
+        val slot = onNodeWithTag(ComposerCompanionTags.SLOT).fetchSemanticsNode().boundsInRoot
+        val card = onNodeWithTag(ComposerTestTags.CARD).fetchSemanticsNode().boundsInRoot
+        val column = with(density) { ChatColumnMaxWidth.toPx() }
+        // The slot comes out of the column: from the mascot's start to the prompt's end is the column,
+        // so the prompt's end lines up with the transcript's instead of overshooting by the slot.
+        assertTrue(abs((card.right - slot.left) - column) <= 1f, "mascot + prompt span ${card.right - slot.left} px; column is $column px")
+        assertTrue(slot.width > 0f, "the mascot's slot is open")
     }
 }
