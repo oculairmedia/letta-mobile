@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.feed.wire.ConversationFeedWire
 import com.letta.mobile.data.pins.wire.AgentPinsWire
 import com.letta.mobile.data.shellstate.wire.ShellStateWire
 import com.letta.mobile.util.attr
@@ -682,11 +683,11 @@ internal class IrohObserverIngestor(
             com.letta.mobile.data.runtime.PermissionModeRpc.FRAME_TYPE,
             // The host's pinned-agents and shell-state pushes: no typed frame, they stay ServerFrame.Unknown for
             // the shared pins and the shared shell state.
-            AgentPinsWire.FRAME_TYPE, ShellStateWire.FRAME_TYPE,
+            AgentPinsWire.FRAME_TYPE, ShellStateWire.FRAME_TYPE, ConversationFeedWire.FRAME_TYPE,
         )
 
         /** The pushes that stay [ServerFrame.Unknown] for the shared clients that decode their own raw body. */
-        private val UNTYPED_HOST_PUSH_TYPES = setOf(AgentPinsWire.FRAME_TYPE, ShellStateWire.FRAME_TYPE)
+        private val UNTYPED_HOST_PUSH_TYPES = setOf(AgentPinsWire.FRAME_TYPE, ShellStateWire.FRAME_TYPE, ConversationFeedWire.FRAME_TYPE)
 
         /** Longer than the engine's settle window (1.5 s), so a healthy engine always wins. */
         internal const val OBSERVER_TERMINAL_GRACE_MS = 3_000L

@@ -80,7 +80,9 @@ class FeedJournalStore internal constructor(
         val own = log.entries.filter { it.turn == turnId }
         val skipped = own.count { it.pointer != null }
         if (skipped > 0) Telemetry.event(TAG, "replay.pointer_skipped", "count" attr skipped)
-        InitiatorReplay(own.filter { it.isStreamDelta }.map { it.payload.toString() }, state.terminalObserved) { delivered(key, turnId) }
+        // The user echo is the initiator's own prompt, which it re-owns; replaying it would only restate it.
+        val replayed = own.filter { it.isStreamDelta && !it.isUserEcho }
+        InitiatorReplay(replayed.map { it.payload.toString() }, state.terminalObserved) { delivered(key, turnId) }
     }
 
     /**

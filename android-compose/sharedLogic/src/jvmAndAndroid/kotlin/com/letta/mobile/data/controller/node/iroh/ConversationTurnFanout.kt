@@ -453,11 +453,9 @@ internal class ConversationTurnFanout(
      * Content parts (images) are carried verbatim: when [contentParts] is a JSON
      * array we forward it as `content`; otherwise the plain [text] string.
      *
-     * NOT parked: parking replays the INITIATOR's own live turn tail on
-     * redial; the user echo is derived deterministically from the resent input
-     * and the reconnecting initiator re-owns its optimistic row, so echoing it is
-     * pure fanout — it must NOT count toward initiator parking (which stays
-     * scoped to assistant/tool/terminal deltas). Uses [broadcastDeltaBodyNoPark].
+     * Journaled but never replayed: the feed records the echo so a viewer that reads it sees the prompt, while the
+     * initiator's redial replay skips it (the echo is derived deterministically from the resent input and the
+     * reconnecting initiator re-owns its optimistic row). Uses [broadcastDeltaBodyNoPark] for the fanout.
      */
     suspend fun broadcastUserEcho(
         clientMessageId: String,
@@ -479,7 +477,11 @@ internal class ConversationTurnFanout(
             put("seq_id", USER_ECHO_SEQ_ID)
             put("content", content)
         }
-        broadcastDeltaBodyNoPark(synthesizedIdentity.stampDelta(delta))
+        val stamped = synthesizedIdentity.stampDelta(delta)
+        // The feed is the sole row source of its viewers, so the prompt belongs in the journal too. It stays out of the
+        // initiator's redial replay (the initiator re-owns its optimistic row; see FeedJournalStore.replayForInitiator).
+        trackInitiatorFrame(stamped.toString())
+        broadcastDeltaBodyNoPark(stamped)
     }
 
     /**

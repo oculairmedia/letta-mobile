@@ -197,6 +197,9 @@ class IrohNodeConnection(
      */
     private var viewerSubscription: ConversationViewerSubscription? = null
 
+    /** This connection has called `feed.subscribe`: only then is it pushed `feed_delta` frames, so a client that never reads the feed never receives them. */
+    private val readsFeed = java.util.concurrent.atomic.AtomicBoolean(false)
+
     /**
      * Build this connection's [selfViewer] once, bound to the turn
      * stream's [SendStream]. Idempotent — later calls return the existing handle
@@ -223,8 +226,8 @@ class IrohNodeConnection(
                 com.letta.mobile.data.transport.ServerFrame.ConversationActivity.CAPABILITY in peerCapabilities.get() &&
                     IrohPeerCapabilities.isAgentInScope(sessionAuth.agentScope(), agentId)
             },
-            // A feed push is for a peer that advertised it handles one; its own scope is checked per push.
-            feedPushGate = { authenticated.get() && ConversationFeedWire.PUSH_CAPABILITY in peerCapabilities.get() },
+            // A feed push is for a peer that has read the feed (feed.subscribe); its own scope is checked per push.
+            feedPushGate = { authenticated.get() && readsFeed.get() },
             conversationEventsGate = {
                 val capabilities = effectiveCapabilities()
                 authenticated.get() &&
@@ -431,6 +434,7 @@ class IrohNodeConnection(
      * `feed.subscribe`, so it is told of later entries) becomes X's viewer (de-scoping any prior conversation), on either admin_rpc path.
      */
     private suspend fun observeAdminMethod(method: String, params: JsonObject?): (suspend (Boolean) -> Unit)? {
+        if (method == ConversationFeedWire.SUBSCRIBE) readsFeed.set(true)
         if (method != "message.list" && method != ConversationFeedWire.SUBSCRIBE) return null
         val conversationId = params?.get("conversation_id")?.let { (it as? JsonPrimitive)?.contentOrNull }
         if (conversationId.isNullOrEmpty()) return null

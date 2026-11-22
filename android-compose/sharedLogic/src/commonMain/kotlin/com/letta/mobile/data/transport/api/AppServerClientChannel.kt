@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.api
 
+import com.letta.mobile.data.feed.wire.ConversationFeedWire
 import com.letta.mobile.data.pins.wire.AgentPinsWire
 import com.letta.mobile.data.shellstate.wire.ShellStateWire
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -93,7 +94,7 @@ class AppServerClientChannel(
                 }
 
         /** Host pushes with no typed frame; the shared pins and shell state decode their own raw body. */
-        private val UNTYPED_HOST_PUSH_TYPES = setOf(AgentPinsWire.FRAME_TYPE, ShellStateWire.FRAME_TYPE)
+        private val UNTYPED_HOST_PUSH_TYPES = setOf(AgentPinsWire.FRAME_TYPE, ShellStateWire.FRAME_TYPE, ConversationFeedWire.FRAME_TYPE)
 
         /**
          * The client's connection as a transport state. A client whose reconnect owner numbers its connections

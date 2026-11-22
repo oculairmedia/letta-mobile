@@ -6,6 +6,8 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.resolveConversationReadTarget
 import java.nio.file.Path
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 /**
  * One conversation's journal, as the host keys it: the owning agent and the conversation. An agent's default
@@ -69,6 +71,9 @@ internal class FeedEntry(
     var persisted: Boolean = false
 
     val isStreamDelta: Boolean get() = kind == ConversationFeedWire.KIND_STREAM_DELTA && payload != null
+
+    /** The synthesized `user_message` echo of the turn's prompt. */
+    val isUserEcho: Boolean get() = (payload?.get("message_type") as? JsonPrimitive)?.contentOrNull == USER_MESSAGE_TYPE
 }
 
 /** What the host knows of one turn of a journal. */
@@ -177,3 +182,5 @@ internal class FeedLog(val key: JournalKey, val file: Path?) {
         baseSeq = dropped.seq
     }
 }
+
+private const val USER_MESSAGE_TYPE = "user_message"
