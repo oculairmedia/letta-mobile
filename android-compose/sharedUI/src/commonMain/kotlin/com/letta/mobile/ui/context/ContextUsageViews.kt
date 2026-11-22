@@ -25,9 +25,9 @@ import com.letta.mobile.data.context.ContextWindowUsage
 import com.letta.mobile.data.context.formatContextShare
 import com.letta.mobile.data.context.formatContextTokens
 import com.letta.mobile.ui.theme.AgentContextDimens
-import com.letta.mobile.ui.theme.ChatComposerColors
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.tokens.LettaContextPalette
 import com.letta.mobile.ui.theme.tokens.LettaTextAccents
 
 /*
@@ -135,18 +135,21 @@ private fun ContextUsageRow(segment: ContextWindowSegment) {
 }
 
 @Composable
-internal fun contextSegmentColor(kind: ContextWindowSegmentKind): Color = when (kind) {
-    ContextWindowSegmentKind.System -> ChatComposerColors.contextSystem
-    ContextWindowSegmentKind.ToolDefinitions -> ChatComposerColors.contextToolDefinitions
-    ContextWindowSegmentKind.ToolRules -> ChatComposerColors.contextToolRules
-    ContextWindowSegmentKind.CoreMemory -> ChatComposerColors.contextCoreMemory
-    ContextWindowSegmentKind.MemoryFiles -> ChatComposerColors.contextMemoryFiles
-    ContextWindowSegmentKind.Directories -> ChatComposerColors.contextDirectories
-    ContextWindowSegmentKind.SummaryMemory -> ChatComposerColors.contextSummaryMemory
-    ContextWindowSegmentKind.ExternalMemorySummary -> ChatComposerColors.contextExternalSummary
-    ContextWindowSegmentKind.Messages -> ChatComposerColors.contextMessages
-    ContextWindowSegmentKind.Unitemised -> ChatComposerColors.contextUnitemised
-    ContextWindowSegmentKind.FreeSpace -> MaterialTheme.colorScheme.surfaceContainerHighest
+internal fun contextSegmentColor(kind: ContextWindowSegmentKind): Color {
+    val palette = LettaContextPalette.forSurface(MaterialTheme.colorScheme.surface)
+    return when (kind) {
+        ContextWindowSegmentKind.System -> palette.system
+        ContextWindowSegmentKind.ToolDefinitions -> palette.toolDefinitions
+        ContextWindowSegmentKind.ToolRules -> palette.toolRules
+        ContextWindowSegmentKind.CoreMemory -> palette.coreMemory
+        ContextWindowSegmentKind.MemoryFiles -> palette.memoryFiles
+        ContextWindowSegmentKind.Directories -> palette.directories
+        ContextWindowSegmentKind.SummaryMemory -> palette.summaryMemory
+        ContextWindowSegmentKind.ExternalMemorySummary -> palette.externalSummary
+        ContextWindowSegmentKind.Messages -> palette.messages
+        ContextWindowSegmentKind.Unitemised -> palette.unitemised
+        ContextWindowSegmentKind.FreeSpace -> MaterialTheme.colorScheme.surfaceContainerHighest
+    }
 }
 
 /** Keeps sub-percent sections visible in the bar instead of collapsing to nothing. */

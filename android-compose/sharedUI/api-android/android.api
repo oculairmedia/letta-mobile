@@ -12038,33 +12038,16 @@ public final class com/letta/mobile/ui/theme/ChatBubbleShapes {
 	public static synthetic fun user$default (Lcom/letta/mobile/ui/theme/ChatBubbleShapes;ZILjava/lang/Object;)Landroidx/compose/foundation/shape/RoundedCornerShape;
 }
 
-public final class com/letta/mobile/ui/theme/ChatComposerColors {
-	public static final field $stable I
-	public static final field INSTANCE Lcom/letta/mobile/ui/theme/ChatComposerColors;
-	public final fun getContextCoreMemory-0d7_KjU ()J
-	public final fun getContextDirectories-0d7_KjU ()J
-	public final fun getContextExternalSummary-0d7_KjU ()J
-	public final fun getContextMemoryFiles-0d7_KjU ()J
-	public final fun getContextMessages-0d7_KjU ()J
-	public final fun getContextSummaryMemory-0d7_KjU ()J
-	public final fun getContextSystem-0d7_KjU ()J
-	public final fun getContextToolDefinitions-0d7_KjU ()J
-	public final fun getContextToolRules-0d7_KjU ()J
-	public final fun getContextUnitemised-0d7_KjU ()J
-}
-
 public final class com/letta/mobile/ui/theme/ChatComposerDimens {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/ChatComposerDimens;
 	public static final field hintAlpha F
 	public static final field previewScrimAlpha F
-	public static final field scrimAlpha F
 	public final fun getAttachmentThumbnail-D9Ej5fM ()F
 	public final fun getContextPopoverWidth-D9Ej5fM ()F
 	public final fun getContextShareColumn-D9Ej5fM ()F
 	public final fun getControlsWrapBreakpoint-D9Ej5fM ()F
 	public final fun getDockedFieldMaxHeight-D9Ej5fM ()F
-	public final fun getEffortPopoverWidth-D9Ej5fM ()F
 	public final fun getMentionPickerMaxHeight-D9Ej5fM ()F
 	public final fun getPermissionModePopoverWidth-D9Ej5fM ()F
 	public final fun getPopoverGap-D9Ej5fM ()F

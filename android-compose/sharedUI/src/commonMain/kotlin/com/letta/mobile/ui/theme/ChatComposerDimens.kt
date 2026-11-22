@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.theme
 
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -25,7 +24,6 @@ object ChatComposerDimens {
     /** How far above its chip a composer popover sits. */
     val popoverGap: Dp = 6.dp
 
-    val effortPopoverWidth: Dp = 230.dp
     val permissionModePopoverWidth: Dp = 280.dp
     val contextPopoverWidth: Dp = 330.dp
 
@@ -43,9 +41,6 @@ object ChatComposerDimens {
 
     /** Upward travel before the swipe claims the gesture from the card. */
     val swipeSlop: Dp = 12.dp
-
-    /** The model sheet's dimming scrim over the page. */
-    const val scrimAlpha: Float = 0.45f
 
     /** The attachment preview's scrim. */
     const val previewScrimAlpha: Float = 0.72f
@@ -120,22 +115,4 @@ object TouchComposerDimens {
     val sheetItemCorner: Dp = LettaShapeTokens.ACTION_RADIUS.dp
     val sheetItemPressedElevation: Dp = LettaElevationTokens.ACTION_SHEET_ITEM_PRESSED.dp
     val sheetItemPressedCorner: Dp = LettaShapeTokens.LIST_RADIUS.dp
-}
-
-/**
- * Fixed hues for the context-window breakdown: it needs one distinguishable colour per
- * section, and the M3 scheme only offers a handful of accents. Mid-saturation so they hold
- * up on light and dark surfaces. Lifted from desktop's DesktopComposerContextUsage.
- */
-object ChatComposerColors {
-    val contextSystem: Color = Color(0xFFF0A030)
-    val contextToolDefinitions: Color = Color(0xFF4C8DFF)
-    val contextToolRules: Color = Color(0xFF7C6CF0)
-    val contextCoreMemory: Color = Color(0xFF34C08A)
-    val contextMemoryFiles: Color = Color(0xFF2FB0C7)
-    val contextDirectories: Color = Color(0xFFB07CF0)
-    val contextSummaryMemory: Color = Color(0xFFE06CB0)
-    val contextExternalSummary: Color = Color(0xFFD9534F)
-    val contextMessages: Color = Color(0xFFE8622F)
-    val contextUnitemised: Color = Color(0xFF8A93A6)
 }
