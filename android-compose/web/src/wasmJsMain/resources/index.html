@@ -8,12 +8,14 @@
     <meta name="description" content="Manage Letta agents and conversations from the browser.">
     <title>Letta Web</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png">
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png" sizes="180x180">
     <!-- letta-mobile-6l2ek: the system bars take the app's own background (LettaColorTokens
          LIGHT_BACKGROUND / DARK_BACKGROUND), so the installed app reads edge to edge. -->
-    <meta name="theme-color" content="#FBFCFD" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#0B0D11" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#EFF3F6" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0D1821" media="(prefers-color-scheme: dark)">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Letta">
@@ -25,7 +27,7 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #FBFCFD;
+            background-color: #EFF3F6;
             color-scheme: light dark;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
@@ -37,7 +39,7 @@
                 env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
         }
         @media (prefers-color-scheme: dark) {
-            html, body { background-color: #0B0D11; }
+            html, body { background-color: #0D1821; }
         }
     </style>
     <script type="module">

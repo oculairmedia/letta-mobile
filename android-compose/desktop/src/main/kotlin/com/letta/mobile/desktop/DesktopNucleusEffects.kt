@@ -1,7 +1,5 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.DisposableEffect
@@ -31,6 +29,7 @@ import dev.nucleusframework.media.control.MediaPlaybackStatus
 import dev.nucleusframework.taskbarprogress.TaskbarProgress
 import dev.nucleusframework.composenativetray.tray.api.Tray
 import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.ui.icons.BakenMark
 import com.letta.mobile.data.model.UiMessage
 import java.awt.Frame
 import java.awt.Window
@@ -452,7 +451,8 @@ private fun DesktopTray(
     actions: DesktopTrayActions,
 ) {
     Tray(
-        icon = Icons.Outlined.SmartToy,
+        // The Baken mark in one ink: the tray tints it to the system's light or dark taskbar.
+        icon = BakenMark.mono,
         tooltip = if (isAgentWorking) "Letta Desktop — agent working" else "Letta Desktop",
         primaryAction = actions.onShow,
     ) {

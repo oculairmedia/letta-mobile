@@ -30,7 +30,7 @@ class ThemeColorsTest {
     @Test
     fun `presetThemeColors DEFAULT is lightColorScheme based`() {
         val scheme = presetThemeColors(ThemePreset.DEFAULT).lightScheme
-        assertEquals(Color(0xFF00897B), scheme.primary)
+        assertEquals(Color(0xFFE04A32), scheme.primary)
     }
 
     @Test

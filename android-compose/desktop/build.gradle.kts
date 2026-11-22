@@ -690,6 +690,8 @@ nucleus.application {
         windows {
             // Preserve the existing installer identity and discoverability
             // while moving packaging from Compose Desktop to Nucleus.
+            // The Baken app icon (letta-mobile-0sb6o): 16-256 px, rendered from the kit's svg/baken-app-icon-lit.svg.
+            iconFile.set(project.file("icons/baken.ico"))
             menuGroup = "Meridian"
             menu = true
             shortcut = true
@@ -733,6 +735,8 @@ nucleus.application {
         }
 
         linux {
+            // The Baken app icon at 512 px (kit svg/baken-app-icon-lit.svg), used for the .desktop entry.
+            iconFile.set(project.file("icons/baken.png"))
             appCategory = "Utility"
             startupWMClass = "Meridian Desktop"
         }

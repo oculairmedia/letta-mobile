@@ -113,7 +113,7 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
         agentBColor = Color(if (isLightTheme) 0xFF1A73E8 else 0xFF4C9AFF),
         agentCColor = Color(if (isLightTheme) 0xFFC03D8E else 0xFFE36FB3),
         // Muted captions + memory-block category colors (fixed brand values).
-        onSurfaceMutedColor = Color(if (isLightTheme) 0xFF6B7480 else 0xFF717A87),
+        onSurfaceMutedColor = Color(if (isLightTheme) LettaColorTokens.LIGHT_ON_SURFACE_MUTED else LettaColorTokens.DARK_ON_SURFACE_MUTED),
         categoryPersonaColor = Color(0xFF00BFA5),
         categoryHumanColor = Color(if (isLightTheme) 0xFF2F6FB0 else 0xFF5C9BD6),
         categoryOnboardingColor = Color(if (isLightTheme) 0xFF9A6A1F else 0xFFD1A05A),

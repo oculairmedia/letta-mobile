@@ -123,7 +123,7 @@ class ChatPushService : LifecycleService() {
         )
 
         val notification: Notification = NotificationCompat.Builder(this, SERVICE_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_notify_sync)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.push_service_notification_title))
             .setContentText(getString(R.string.push_service_notification_text))
             .setContentIntent(pendingIntent)
