@@ -4,9 +4,16 @@ import com.letta.mobile.data.home.SessionHomePageSourceTest.FakeRuns
 import com.letta.mobile.data.home.SessionHomePageSourceTest.FakeTools
 import com.letta.mobile.data.home.SessionHomePageSourceTest.FixedGraphProvider
 import com.letta.mobile.data.home.SessionHomePageSourceTest.HomeGraph
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockCreateParams
+import com.letta.mobile.data.model.BlockId
+import com.letta.mobile.data.model.BlockListParams
+import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
+import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.api.FrameCollectorOverflowAwareChannelTransport
@@ -319,6 +326,107 @@ class HomeAggregateCachingTest {
         assertEquals(1, runs.stepCalls, "probe unsupported steps once, before launching the other 99 reads")
         assertNull(source.stats.value.usage, "unsupported steps must not report fake zero token usage")
         source.close()
+    }
+
+    /**
+     * letta-mobile-wbgpc: Home's block catalog is the paged `block.list` sweep (29 pages for the
+     * live host's 1,439 blocks). The 2026-11-22 host log shows that sweep repeated after every
+     * reconnect and every Home entry past the TTL, although nothing changed. Ten minutes of
+     * reconnects against an unchanged host must cost one count read each and no second sweep.
+     */
+    @Test
+    fun reconnectsAgainstAnUnchangedHostDoNotRelistTheBlockCatalog() = runTest {
+        val clock = TestClock()
+        val blocks = FakeBlocks(total = BLOCK_TOTAL)
+        val transport = CountingTransport()
+        val source = SessionHomePageSource(
+            FixedGraphProvider(HomeGraph(channelTransport = transport, blockRepository = blocks)), backgroundScope, clock = clock,
+        )
+        source.start()
+        source.loadIfStale()
+        runCurrent()
+        assertEquals(1, blocks.listCalls, "the first open lists the catalog")
+
+        repeat(IDLE_RECONNECTS) { reconnect ->
+            clock.instant += IDLE_STEP
+            transport.frameCollectorConnectionGeneration += 1
+            transport.connection.value = ChannelTransportState.Connecting(reconnecting = true)
+            runCurrent()
+            transport.connection.value = ChannelTransportState.Connected("server", "session-$reconnect", "device")
+            runCurrent()
+            source.loadIfStale()
+            runCurrent()
+        }
+
+        assertEquals(1, blocks.listCalls, "an unchanged host is not swept again")
+        assertEquals(1 + IDLE_RECONNECTS, blocks.countCalls, "one count read per open or reconnect")
+        assertEquals(BLOCK_TOTAL, source.catalog.value.blocks.size, "the catalog survives the reconnects")
+        source.close()
+    }
+
+    @Test
+    fun aChangedCountOrAnExplicitRefreshRelistsTheBlockCatalog() = runTest {
+        val clock = TestClock()
+        val blocks = FakeBlocks(total = BLOCK_TOTAL)
+        val source = SessionHomePageSource(
+            FixedGraphProvider(HomeGraph(blockRepository = blocks)), backgroundScope, clock = clock,
+        )
+        source.start()
+        source.loadIfStale()
+        runCurrent()
+
+        blocks.total = BLOCK_TOTAL + 1
+        clock.instant += IDLE_STEP
+        source.loadIfStale()
+        runCurrent()
+        assertEquals(2, blocks.listCalls, "a new block is listed")
+        assertEquals(BLOCK_TOTAL + 1, source.catalog.value.blocks.size)
+
+        source.refresh()
+        runCurrent()
+        assertEquals(3, blocks.listCalls, "pull to refresh always lists")
+        source.close()
+    }
+
+    /** Counts the two block reads Home makes; [total] blocks, each a distinct id. */
+    private class FakeBlocks(var total: Int) : IBlockRepository {
+        var countCalls = 0
+        var listCalls = 0
+
+        override suspend fun countBlocks(): Int {
+            countCalls += 1
+            return total
+        }
+
+        override suspend fun listAllBlocks(params: BlockListParams): List<Block> {
+            listCalls += 1
+            return List(total) { Block(id = BlockId("block-$it"), label = "label-$it", value = "") }
+        }
+
+        override suspend fun getBlocks(agentId: String): List<Block> = unused()
+        override suspend fun retrieveBlock(blockId: String): Block = unused()
+        override suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block = unused()
+        override suspend fun updateGlobalBlock(
+            blockId: String,
+            params: BlockUpdateParams,
+            clearDescription: Boolean,
+            clearLimit: Boolean,
+        ): Block = unused()
+        override suspend fun createBlock(params: BlockCreateParams): Block = unused()
+        override suspend fun deleteBlock(blockId: String) = unused()
+        override suspend fun attachBlock(agentId: String, blockId: String) = unused()
+        override suspend fun detachBlock(agentId: String, blockId: String) = unused()
+        override suspend fun listAgentsForBlock(blockId: String): List<Agent> = unused()
+        override suspend fun attachIdentityToBlock(blockId: String, identityId: String): Block = unused()
+        override suspend fun detachIdentityFromBlock(blockId: String, identityId: String): Block = unused()
+
+        private fun unused(): Nothing = error("Home does not call this")
+    }
+
+    private companion object {
+        const val BLOCK_TOTAL = 1_439
+        const val IDLE_RECONNECTS = 10
+        val IDLE_STEP = 61.seconds
     }
 
     private class TestClock : Clock {

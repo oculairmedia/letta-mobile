@@ -73,6 +73,8 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
     private val catalogFlow = MutableStateFlow(HomeSearchCatalog())
     private val statsFlow = MutableStateFlow(HomeStats())
     private val blocks = MutableStateFlow<List<Block>>(emptyList())
+    /** The block count [blocks] was listed at; null until listed for this host. */
+    private var blocksListedAtCount: Int? = null
     private var followJob: Job? = null
     private var statsJob: Job? = null
     private var statsGraph: Graph? = null
@@ -140,7 +142,7 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
         }
         if (!shouldLoadStats(force, automatic)) return
         val cache = aggregateCache
-        statsJob = scope.launch { loadStats(graph, cache) }
+        statsJob = scope.launch { loadStats(graph, cache, relist = force) }
     }
 
     private fun shouldLoadStats(force: Boolean, automatic: Boolean): Boolean {
@@ -155,8 +157,11 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
         statsJob?.cancel()
         statsJob = null
         aggregateCache = HomeAggregateCache(clock)
-        blocks.value = emptyList()
         statsFlow.value = HomeStats()
+        // A reconnect to the same host keeps the block catalog; its next count read decides a relist.
+        if (!session.hostChanged) return
+        blocks.value = emptyList()
+        blocksListedAtCount = null
     }
 
     /**
@@ -164,7 +169,7 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
      * figure that fails (say a route the backend has no admin_rpc path for under iroh://) stays null,
      * so its tile drops out; [HomeStats.error] is raised only when every figure failed.
      */
-    private suspend fun loadStats(graph: Graph, cache: HomeAggregateCache) {
+    private suspend fun loadStats(graph: Graph, cache: HomeAggregateCache, relist: Boolean) {
         statsFlow.value = HomeStats(loading = true)
         // letta-mobile-by4vm.13: a figure the session does not serve is not asked for; its tile drops out.
         val tools = graph.ifSupported(SessionRoute.TOOLS) { toolRepository }?.takeIf { cache.supports(SessionRoute.TOOLS) }
@@ -177,7 +182,7 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
                     record(cache, SessionRoute.TOOLS, attempt { repo.countTools() }) { stats, count -> stats.copy(toolCount = count) }
                 } },
                 blockRepository?.let { repo -> async {
-                    record(cache, SessionRoute.BLOCKS, attempt { loadBlocks(repo) }) { stats, count -> stats.copy(blockCount = count) }
+                    record(cache, SessionRoute.BLOCKS, attempt { loadBlocks(repo, relist) }) { stats, count -> stats.copy(blockCount = count) }
                 } },
                 runs?.let { repo -> async {
                     record(cache, SessionRoute.RUNS, attempt { loadUsage(repo) }) { stats, usage -> stats.copy(usage = usage) }
@@ -190,12 +195,19 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
         statsFlow.update { it.copy(loading = false, error = error) }
     }
 
-    private suspend fun loadBlocks(repository: IBlockRepository): Int {
+    /**
+     * letta-mobile-wbgpc: the catalog is the paged `block.list` sweep (29 pages for the live host's
+     * 1,439 blocks), so it is listed again only when the authoritative count moved or the user asked.
+     * A reconnect or a page entry past the TTL against an unchanged host costs one count read.
+     */
+    private suspend fun loadBlocks(repository: IBlockRepository, relist: Boolean): Int {
         val count = repository.countBlocks()
         currentCoroutineContext().ensureActive()
+        if (!relist && count == blocksListedAtCount) return count
         val loaded = repository.listAllBlocks()
         currentCoroutineContext().ensureActive()
         blocks.value = loaded
+        blocksListedAtCount = count
         return count
     }
 
