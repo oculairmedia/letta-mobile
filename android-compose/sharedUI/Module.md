@@ -323,6 +323,8 @@ Home dashboard and compact/expanded content sections. [HomePage](https://oculair
 
 The shared page requests fresh backend figures when entered, without repeating on ordinary recomposition. It offers Retry in its error banner and pull-to-refresh on touch hosts; there is no permanent header refresh button. Reconnection refresh belongs to the shared session source.
 
+The page can lead with a greeting (a short line, the Baken mark through [BrandMarkHost](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.pages.home/-brand-mark-host/index.html) and a few agent mascots). Its behaviour is the shared greeting reducer's intents played through each mascot's director; no scripted sequences live here.
+
 # Package com.letta.mobile.ui.shell.pages.memfs
 
 MemFS file browser, editor and history/diff views. Supply MemFS editor/list/history state and actions; file I/O and conflict resolution authority stay in the shared controller/backend layer.

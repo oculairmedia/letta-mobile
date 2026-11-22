@@ -9476,6 +9476,14 @@ public final class com/letta/mobile/ui/shell/pages/conversations/ConversationsPa
 	public final fun filter (Lcom/letta/mobile/ui/shell/sidebar/ShellArchiveFilter;)Ljava/lang/String;
 }
 
+public abstract interface class com/letta/mobile/ui/shell/pages/home/BrandMarkHost {
+	public abstract fun Mark (Lcom/letta/mobile/data/home/greeting/GreetingMarkIntent;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;I)V
+}
+
+public final class com/letta/mobile/ui/shell/pages/home/BrandMarkHostKt {
+	public static final fun getLocalBrandMarkHost ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
 public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeConnectionPanelKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeConnectionPanelKt;
 	public fun <init> ()V
@@ -9538,6 +9546,32 @@ public final class com/letta/mobile/ui/shell/pages/home/HomeConnectionState {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/shell/pages/home/HomeGreetingOptions {
+	public static final field $stable I
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/home/greeting/GreetingConnection;Ljava/lang/Integer;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/home/greeting/GreetingConnection;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/home/greeting/GreetingConnection;
+	public final fun component2 ()Ljava/lang/Integer;
+	public final fun copy (Lcom/letta/mobile/data/home/greeting/GreetingConnection;Ljava/lang/Integer;)Lcom/letta/mobile/ui/shell/pages/home/HomeGreetingOptions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/pages/home/HomeGreetingOptions;Lcom/letta/mobile/data/home/greeting/GreetingConnection;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/pages/home/HomeGreetingOptions;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConnection ()Lcom/letta/mobile/data/home/greeting/GreetingConnection;
+	public final fun getHour ()Ljava/lang/Integer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/shell/pages/home/HomeGreetingTags {
+	public static final field $stable I
+	public static final field GREETING Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/home/HomeGreetingTags;
+	public static final field LINE Ljava/lang/String;
+	public static final field MARK Ljava/lang/String;
+	public static final field STAGE Ljava/lang/String;
+	public final fun mascot (Ljava/lang/String;)Ljava/lang/String;
+}
+
 public final class com/letta/mobile/ui/shell/pages/home/HomePageCallbacks {
 	public static final field $stable I
 	public fun <init> (Lcom/letta/mobile/data/home/HomePageActions;Lcom/letta/mobile/ui/shell/pages/home/HomePageNavigation;)V
@@ -9588,8 +9622,8 @@ public final class com/letta/mobile/ui/shell/pages/home/HomePageNavigation {
 public final class com/letta/mobile/ui/shell/pages/home/HomePageOptions {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (ZZZLjava/lang/String;Lkotlin/jvm/functions/Function5;Ljava/util/Map;Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/data/model/UiGeneratedComponent;)V
-	public synthetic fun <init> (ZZZLjava/lang/String;Lkotlin/jvm/functions/Function5;Ljava/util/Map;Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/data/model/UiGeneratedComponent;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZZZLjava/lang/String;Lkotlin/jvm/functions/Function5;Ljava/util/Map;Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/data/model/UiGeneratedComponent;Lcom/letta/mobile/ui/shell/pages/home/HomeGreetingOptions;)V
+	public synthetic fun <init> (ZZZLjava/lang/String;Lkotlin/jvm/functions/Function5;Ljava/util/Map;Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/data/model/UiGeneratedComponent;Lcom/letta/mobile/ui/shell/pages/home/HomeGreetingOptions;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
 	public final fun component2 ()Z
 	public final fun component3 ()Z
@@ -9598,11 +9632,13 @@ public final class com/letta/mobile/ui/shell/pages/home/HomePageOptions {
 	public final fun component6 ()Ljava/util/Map;
 	public final fun component7 ()Lkotlin/jvm/functions/Function3;
 	public final fun component8 ()Lcom/letta/mobile/data/model/UiGeneratedComponent;
-	public final fun copy (ZZZLjava/lang/String;Lkotlin/jvm/functions/Function5;Ljava/util/Map;Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/data/model/UiGeneratedComponent;)Lcom/letta/mobile/ui/shell/pages/home/HomePageOptions;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/pages/home/HomePageOptions;ZZZLjava/lang/String;Lkotlin/jvm/functions/Function5;Ljava/util/Map;Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/data/model/UiGeneratedComponent;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/pages/home/HomePageOptions;
+	public final fun component9 ()Lcom/letta/mobile/ui/shell/pages/home/HomeGreetingOptions;
+	public final fun copy (ZZZLjava/lang/String;Lkotlin/jvm/functions/Function5;Ljava/util/Map;Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/data/model/UiGeneratedComponent;Lcom/letta/mobile/ui/shell/pages/home/HomeGreetingOptions;)Lcom/letta/mobile/ui/shell/pages/home/HomePageOptions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/pages/home/HomePageOptions;ZZZLjava/lang/String;Lkotlin/jvm/functions/Function5;Ljava/util/Map;Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/data/model/UiGeneratedComponent;Lcom/letta/mobile/ui/shell/pages/home/HomeGreetingOptions;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/pages/home/HomePageOptions;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getComposerPlaceholder ()Ljava/lang/String;
 	public final fun getDocument ()Lcom/letta/mobile/data/model/UiGeneratedComponent;
+	public final fun getGreeting ()Lcom/letta/mobile/ui/shell/pages/home/HomeGreetingOptions;
 	public final fun getHeaderActions ()Lkotlin/jvm/functions/Function3;
 	public final fun getOrbIndexByAgentId ()Ljava/util/Map;
 	public final fun getPromptBar ()Lkotlin/jvm/functions/Function5;
@@ -9652,6 +9688,12 @@ public final class com/letta/mobile/ui/shell/pages/home/HomePageTags {
 	public final fun sort (Lcom/letta/mobile/data/home/FleetSortKey;)Ljava/lang/String;
 	public final fun stat (Ljava/lang/String;)Ljava/lang/String;
 	public final fun unpin (Lcom/letta/mobile/data/home/HomePinnedItem;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/shell/pages/home/PlaceholderBrandMark : com/letta/mobile/ui/shell/pages/home/BrandMarkHost {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/home/PlaceholderBrandMark;
+	public fun Mark (Lcom/letta/mobile/data/home/greeting/GreetingMarkIntent;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;I)V
 }
 
 public final class com/letta/mobile/ui/shell/pages/memfs/ComposableSingletons$MemfsPageEditorKt {
