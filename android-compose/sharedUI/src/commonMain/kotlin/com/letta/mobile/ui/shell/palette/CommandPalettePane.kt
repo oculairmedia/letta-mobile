@@ -8,35 +8,34 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import com.letta.mobile.data.search.MessageSearchSelection
+import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.foundation.LettaDivider
 import com.letta.mobile.ui.components.foundation.LettaKbd
-import com.letta.mobile.ui.components.foundation.LettaSpinner
-import com.letta.mobile.ui.components.picker.PickerEmpty
-import com.letta.mobile.ui.host.LettaInput
-import com.letta.mobile.ui.host.LocalLettaHost
-import com.letta.mobile.ui.shell.header.rememberUnifiedSearch
-import com.letta.mobile.ui.theme.LettaDimens
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import com.letta.mobile.ui.components.picker.LettaPicker
 import com.letta.mobile.ui.components.picker.LettaPickerSpec
 import com.letta.mobile.ui.components.picker.PickMode
 import com.letta.mobile.ui.components.picker.PickerCallbacks
+import com.letta.mobile.ui.components.picker.PickerEmpty
 import com.letta.mobile.ui.components.picker.PickerItem
+import com.letta.mobile.ui.components.picker.PickerLoad
 import com.letta.mobile.ui.components.picker.PickerPane
 import com.letta.mobile.ui.components.picker.PickerSearch
 import com.letta.mobile.ui.components.picker.PickerSection
 import com.letta.mobile.ui.components.picker.PickerSlots
 import com.letta.mobile.ui.components.picker.PickerTags
-import com.letta.mobile.data.search.MessageSearchSelection
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.search.LettaSearchChipRows
 import com.letta.mobile.ui.search.LettaSearchRow
 import com.letta.mobile.ui.search.LettaSearchRowLeading
@@ -48,6 +47,8 @@ import com.letta.mobile.ui.shell.header.UnifiedSearchQuery
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.header.UnifiedSearchSurface
 import com.letta.mobile.ui.shell.header.UnifiedShellSearch
+import com.letta.mobile.ui.shell.header.rememberUnifiedSearch
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** Test tags of the command palette and the quick-query bar. */
 object CommandPaletteTags {
@@ -141,6 +142,7 @@ fun CommandPalettePane(sources: UnifiedSearchSources, onOpen: (UnifiedSearchHit)
             mode = PickMode.Command,
             filterLocally = false,
             search = PickerSearch(COMMAND_PALETTE_PLACEHOLDER),
+            load = if (results.searchingMessages) PickerLoad.Loading else PickerLoad.Ready,
             empty = paletteEmpty(query, results.searchingMessages),
             tags = PaletteTags,
         ),
@@ -157,7 +159,7 @@ fun CommandPalettePane(sources: UnifiedSearchSources, onOpen: (UnifiedSearchHit)
             leading = { PaletteRowLeading(it.value) },
             header = {
                 LettaSearchChipRows(chips)
-                if (results.searchingMessages) PaletteSearching()
+                if (results.searchingMessages && results.sections.isNotEmpty()) PaletteSearching()
             },
             footer = if (pointer) ({ PaletteKeys() }) else null,
         ),
@@ -173,21 +175,19 @@ internal fun paletteEmpty(query: String, searchingMessages: Boolean): PickerEmpt
 
 private fun paletteNoMatch(query: String): String = "No matches for “${query.trim()}”"
 
-/** The line under the search while message text is still being searched; announced politely. */
+/**
+ * The line under the search while message text is still being searched, announced politely. The picker's
+ * own busy bar (its loading state) shows the progress; with nothing else matched, the empty state says it.
+ */
 @Composable
 private fun PaletteSearching() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs)
-            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
+    LettaEmptyHint(
+        PALETTE_SEARCHING,
+        Modifier
+            .padding(horizontal = LettaDimens.Space.lg)
+            .semantics { liveRegion = LiveRegionMode.Polite }
             .testTag(CommandPaletteTags.SEARCHING),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        LettaSpinner(size = LettaDimens.Control.spinnerSm)
-        Text(PALETTE_SEARCHING, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+    )
 }
 
 /** The palette's foot on a pointer host: the keys it answers to, each as a key cap. */

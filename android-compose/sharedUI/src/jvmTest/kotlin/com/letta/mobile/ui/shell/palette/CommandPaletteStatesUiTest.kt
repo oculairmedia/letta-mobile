@@ -97,12 +97,15 @@ class CommandPaletteStatesUiTest {
         }
     }
 
-    private fun snapshot(name: String, dark: Boolean, host: LettaHost, width: Int, typed: String) =
-        runDesktopComposeUiTest(width = width, height = WINDOW_HEIGHT) {
-            setContent { Palette(host, dark) }
-            if (typed.isNotEmpty()) onNodeWithTag(CommandPaletteTags.SEARCH).performTextInput(typed)
+    /** One palette to render: its file [name], the [host] it sits in, the window [width] and the query [typed]. */
+    private class Shot(val name: String, val host: LettaHost, val width: Int, val typed: String = "")
+
+    private fun snapshot(shot: Shot, dark: Boolean) =
+        runDesktopComposeUiTest(width = shot.width, height = WINDOW_HEIGHT) {
+            setContent { Palette(shot.host, dark) }
+            if (shot.typed.isNotEmpty()) onNodeWithTag(CommandPaletteTags.SEARCH).performTextInput(shot.typed)
             waitForIdle()
-            val out = File("build/palette-snapshots").apply { mkdirs() }.resolve("$name-${if (dark) "dark" else "light"}.png")
+            val out = File("build/palette-snapshots").apply { mkdirs() }.resolve("${shot.name}-${if (dark) "dark" else "light"}.png")
             // The pane draws in a window of its own: the last root.
             ImageIO.write(onAllNodes(isRoot()).onLast().captureToImage().toAwtImage(), "png", out)
             assertTrue(out.length() > 0)
@@ -110,12 +113,13 @@ class CommandPaletteStatesUiTest {
 
     @Test
     fun thePaletteOnAPhoneAndADesktop() {
-        listOf(false, true).forEach { dark ->
-            snapshot("touch-360dp", dark, LettaHost(input = LettaInput.Touch), width = 360, typed = "")
-            snapshot("pointer-760dp", dark, LettaHost.Pointer, width = 760, typed = "")
-            snapshot("pointer-1200dp-nomatch", dark, LettaHost.Pointer, width = 1200, typed = "zzz")
-            snapshot("pointer-700dp", dark, LettaHost.Pointer, width = 700, typed = "se")
-        }
+        val shots = listOf(
+            Shot("touch-360dp", LettaHost(input = LettaInput.Touch), width = 360),
+            Shot("pointer-760dp", LettaHost.Pointer, width = 760),
+            Shot("pointer-1200dp-nomatch", LettaHost.Pointer, width = 1200, typed = "zzz"),
+            Shot("pointer-700dp", LettaHost.Pointer, width = 700, typed = "se"),
+        )
+        listOf(false, true).forEach { dark -> shots.forEach { snapshot(it, dark) } }
     }
 
     private companion object {

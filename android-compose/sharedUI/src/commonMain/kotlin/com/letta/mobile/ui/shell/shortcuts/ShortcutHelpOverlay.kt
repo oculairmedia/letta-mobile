@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import com.letta.mobile.ui.components.foundation.LettaKbd
 import com.letta.mobile.ui.host.LettaAlertPane
 import com.letta.mobile.ui.host.LettaAlertSpec
 import com.letta.mobile.ui.host.LettaPaneButton
@@ -62,10 +63,18 @@ private fun ShortcutRow(shortcut: ShellShortcut, platform: ShortcutPlatform) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(shortcut.label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-        Text(
-            text = shortcut.helpLabel(platform),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        ShortcutChordLabel(shortcut, platform)
+    }
+}
+
+/** The entry's chord as a key cap, with the web's alternate noted beside it when the browser differs. */
+@Composable
+private fun ShortcutChordLabel(shortcut: ShellShortcut, platform: ShortcutPlatform) {
+    val alternate = shortcut.webAlternate?.takeIf { platform != ShortcutPlatform.Web }
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
+        LettaKbd(shortcut.chordOn(platform).label())
+        alternate?.let {
+            Text("(web: ${it.label()})", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
