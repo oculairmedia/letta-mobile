@@ -57,8 +57,9 @@ class FeedPresentationSelectionTest {
             return TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration, emptyList(), null, false, 0)
         }
 
-        override suspend fun sendConversationMessage(conversationId: ConversationId, request: MessageCreateRequest): Flow<LettaMessage> =
-            error("no send here")
+        override suspend fun sendConversationMessage(
+            conversationId: ConversationId, request: MessageCreateRequest,
+        ): Flow<LettaMessage> = error("no send here")
 
         override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> = error("no stream here")
 
@@ -87,7 +88,11 @@ class FeedPresentationSelectionTest {
 
     private fun ChatRenderItem.text(): String = messagesInOrder().joinToString { it.content }
 
-    private class Opened(val coordinator: CanonicalTimelineCoordinator, val owner: CanonicalTimelineCoordinator.Owner, val ledger: LedgerPages)
+    private class Opened(
+        val coordinator: CanonicalTimelineCoordinator,
+        val owner: CanonicalTimelineCoordinator.Owner,
+        val ledger: LedgerPages,
+    )
 
     private suspend fun ledgerFor(conversation: ConversationId): Opened {
         val ledger = LedgerPages()
@@ -156,7 +161,8 @@ class FeedPresentationSelectionTest {
         val opened = ledgerFor(conv.conversation)
         val presentation = open(opened, host.device("phone"), conv.conversation)
         settle()
-        opened.coordinator.appendPending(opened.owner, CanonicalPendingLocalStore.Record("cm-9", "Hi there", emptyList(), "2026-01-01T00:00:00Z"))
+        val prompt = CanonicalPendingLocalStore.Record("cm-9", "Hi there", emptyList(), "2026-01-01T00:00:00Z")
+        opened.coordinator.appendPending(opened.owner, prompt)
         settle()
         assertEquals(listOf("Hi there"), presentation.live.value.map { it.text() }, "an unsent prompt is drawn from pending")
 

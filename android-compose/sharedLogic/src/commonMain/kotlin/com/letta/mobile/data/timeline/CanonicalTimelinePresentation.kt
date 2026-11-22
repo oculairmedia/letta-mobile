@@ -53,7 +53,7 @@ class CanonicalTimelinePresentation private constructor(
     parentScope: CoroutineScope,
     val missingTarget: String?,
     private val settledProjectionAdapter: TimelineSettledProjectionAdapter,
-    feed: ((CoroutineScope) -> StateFlow<List<ChatRenderItem>?>)? = null,
+    feed: TimelineFeedRows? = null,
 ) {
     private val job = SupervisorJob(parentScope.coroutineContext[Job])
     private val scope = parentScope + job
@@ -545,7 +545,7 @@ class CanonicalTimelinePresentation private constructor(
              * The host feed's rows, built in the presentation's own scope (so they stop with it), when the conversation is
              * read through the feed; null reads it from the ledger. A target (search, deep link) always reads the ledger.
              */
-            feed: ((CoroutineScope) -> StateFlow<List<ChatRenderItem>?>)? = null,
+            feed: TimelineFeedRows? = null,
         ): CanonicalTimelinePresentation {
             val throughFeed = feed?.takeIf { target == null }
             val requested = coordinator.attach(owner, target)
@@ -574,6 +574,9 @@ private fun TimelinePageKey.ledgerTimestamp(): String =
     if (order > 0) Instant.fromEpochMilliseconds(order).toString() else ""
 
 private const val SETTLE_POLLS_PER_QUIET_PERIOD = 5
+
+/** A conversation's rows from the host feed, built in the scope given; null until its first read (FeedTimelineSource.rowsFor). */
+typealias TimelineFeedRows = (CoroutineScope) -> StateFlow<List<ChatRenderItem>?>
 
 /** The feed's history is the feed itself: nothing to page in either direction. */
 private val FEED_HISTORY_COMPLETE = androidx.paging.LoadStates(

@@ -28,6 +28,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+/** Builds and starts one conversation's feed rows in the scope it is given; null rows until the first read finished. */
+typealias FeedRowsFactory = (CoroutineScope) -> StateFlow<List<ChatRenderItem>?>
+
 /** What the feed path did to the list, so the old and the feed path can be compared on a device. */
 data class FeedTimelineMetrics(
     /** Times the list was published with a change. */
@@ -224,8 +227,10 @@ class FeedTimelineSource(
          * The rows a presentation draws for [conversation] over [link] when its host serves and pushes the feed, else null
          * (the presentation then keeps the ledger). Each call of the result starts one source in the scope it is given.
          */
-        fun rowsFor(link: FeedLink, agent: AgentId, conversation: ConversationId): ((CoroutineScope) -> StateFlow<List<ChatRenderItem>?>)? =
-            if (!isAvailable(link)) null else { scope -> FeedTimelineSource(link, agent, conversation, scope).also { it.start() }.presented }
+        fun rowsFor(link: FeedLink, agent: AgentId, conversation: ConversationId): FeedRowsFactory? = when {
+            isAvailable(link) -> { scope -> FeedTimelineSource(link, agent, conversation, scope).also { it.start() }.presented }
+            else -> null
+        }
 
         private const val TAG = "FeedTimeline"
 

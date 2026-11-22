@@ -111,7 +111,7 @@ class CanonicalTimelineCoordinator(
         internal val feedViews = mutableSetOf<Presentation>()
 
         /** Whether a presentation reads this conversation through the host feed. */
-        val readsFeed: Boolean get() = feedViews.isNotEmpty()
+        internal val readsFeed: Boolean get() = feedViews.isNotEmpty()
     }
 
     class Presentation internal constructor(val owner: Owner, val anchor: TimelinePageKey?)
@@ -199,10 +199,15 @@ class CanonicalTimelineCoordinator(
     /** Whether a presentation reads [owner]'s conversation through the host feed. */
     suspend fun readsThroughFeed(owner: Owner): Boolean = mutex.withLock { owner.readsFeed }
 
-    /** Confirms the sends whose echo the host feed carried ([CanonicalTimelineSession.confirmFeedEchoes]). */
+    /**
+     * The host feed carried the user echo of each of [otids]: their sends are confirmed, as a ledger echo confirms them. A
+     * feed-backed conversation reconciles nothing, so this is the only way its prompts leave the pending store.
+     */
     internal suspend fun confirmFeedEchoes(owner: Owner, otids: Set<String>): Boolean {
         if (otids.isEmpty() || mutex.withLock { owners[owner.selection.scope] !== owner }) return false
-        return owner.session.confirmFeedEchoes(otids)
+        val confirmed = store.confirmPendingEchoes(owner.selection.scope, otids)
+        if (confirmed) owner.session.refreshPending()
+        return confirmed
     }
 
     /** Search resolves a viewport anchor without replacing the conversation's ingestion generation. */
@@ -386,16 +391,6 @@ class CanonicalTimelineSession(
         recoveryCandidates -= MessageId(otid)
         mutablePending.value = pendingStore.load(scope)
         retry
-    }
-
-    /**
-     * The host feed carries the user echo of each of [otids]: their sends are confirmed, as a ledger echo confirms them. A
-     * feed-backed conversation reconciles nothing, so this is the only way its prompts leave the pending store.
-     */
-    internal suspend fun confirmFeedEchoes(otids: Set<String>): Boolean = pendingMutex.withLock {
-        val confirmed = pendingStore.confirmEchoes(scope, otids)
-        if (confirmed) mutablePending.value = pendingStore.load(scope)
-        confirmed
     }
 
     internal suspend fun discardFailed(identity: MessageId): Boolean = pendingMutex.withLock {

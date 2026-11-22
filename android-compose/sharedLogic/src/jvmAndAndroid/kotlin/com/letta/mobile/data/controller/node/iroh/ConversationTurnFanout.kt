@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.runtime.turnStreamIdentityFor
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -627,7 +628,7 @@ internal class ConversationTurnFanout(
                     initiators += viewer
                 // A feed reader takes this conversation from feed_delta alone: streaming it too would send every row twice.
                 // The live initiator above keeps its own turn's stream (its send and redial parking ride on it).
-                viewer.readsFeedOf(conversationId) -> Unit
+                viewer.readsFeedOf(ConversationId(conversationId)) -> Unit
                 else -> observers += viewer
             }
         }

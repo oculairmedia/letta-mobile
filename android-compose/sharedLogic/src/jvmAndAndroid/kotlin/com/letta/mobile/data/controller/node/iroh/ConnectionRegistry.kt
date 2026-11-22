@@ -58,11 +58,11 @@ interface ViewerHandle {
     fun receivesFeedPushes(): Boolean = false
 
     /**
-     * Whether this connection reads [conversationId] through the feed (it called `feed.subscribe` for it). Such a viewer takes
+     * Whether this connection reads [conversation] through the feed (it called `feed.subscribe` for it). Such a viewer takes
      * that conversation's turns from `feed_delta` alone, so the turn fanout leaves it out of its `stream_delta` observers: one
      * copy of every row, folded once. Default: no, so every other connection keeps the stream fanout.
      */
-    fun readsFeedOf(conversationId: String): Boolean = false
+    fun readsFeedOf(conversation: ConversationId): Boolean = false
 
     private fun receivesHostWideEvents(): Boolean {
         val context = adminContext() ?: return false

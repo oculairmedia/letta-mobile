@@ -65,5 +65,5 @@ fun channelFeedRows(
     transport: IChannelTransport,
     agent: com.letta.mobile.data.model.AgentId,
     conversation: com.letta.mobile.data.model.ConversationId,
-): ((kotlinx.coroutines.CoroutineScope) -> kotlinx.coroutines.flow.StateFlow<List<com.letta.mobile.data.chat.projection.ChatRenderItem>?>)? =
+): com.letta.mobile.data.feed.client.FeedRowsFactory? =
     com.letta.mobile.data.feed.client.FeedTimelineSource.rowsFor(channelFeedLink(transport), agent, conversation)

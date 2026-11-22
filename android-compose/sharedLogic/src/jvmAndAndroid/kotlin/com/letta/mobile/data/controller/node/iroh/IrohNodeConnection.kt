@@ -201,7 +201,7 @@ class IrohNodeConnection(
     private val readsFeed = java.util.concurrent.atomic.AtomicBoolean(false)
 
     /** The conversations this connection has read with `feed.subscribe`: it takes their turns from the feed, not the stream fanout. */
-    private val feedConversations: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+    private val feedConversations: MutableSet<ModelConversationId> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     /**
      * Build this connection's [selfViewer] once, bound to the turn
@@ -457,7 +457,7 @@ class IrohNodeConnection(
         return { succeeded ->
             settle(succeeded)
             // Only a read the host answered makes this connection a feed reader of the conversation (a refused one keeps the stream).
-            if (succeeded && method == ConversationFeedWire.SUBSCRIBE) feedConversations += conversationId
+            if (succeeded && method == ConversationFeedWire.SUBSCRIBE) feedConversations += ModelConversationId(conversationId)
             if (!succeeded) {
                 Telemetry.event(
                     "IrohNode", "viewer.registration_rolled_back",

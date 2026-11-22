@@ -32,7 +32,9 @@ class FeedViewerStreamSplitTest {
         }
 
         fun streamDeltas(): Int {
-            val decoder = IrohFrameCodec.Decoder(IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES, IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES)
+            val decoder = IrohFrameCodec.Decoder(
+                IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES, IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES,
+            )
             return chunks.flatMap { decoder.feed(it) }
                 .count { Json.parseToJsonElement(it).jsonObject["type"]?.jsonPrimitive?.content == "stream_delta" }
         }
@@ -45,7 +47,7 @@ class FeedViewerStreamSplitTest {
         streamWriteMutex = Mutex(),
         frameParts = { false },
         maxFrameBytes = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES,
-    ).also { handle -> handle.feedReaderGate = { it in feedReads } }
+    ).also { handle -> handle.feedReaderGate = { it.value in feedReads } }
 
     private fun frame(seq: Long, delta: kotlinx.serialization.json.JsonObject) = RuntimeEventPayload.RemoteStreamFrame(
         frameId = "f-$seq", messageId = null, messageType = null,

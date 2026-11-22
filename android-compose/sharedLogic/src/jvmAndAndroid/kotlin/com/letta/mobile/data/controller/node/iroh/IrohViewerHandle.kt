@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
@@ -72,7 +73,7 @@ internal class IrohViewerHandle(
 
     /** Whether this connection reads a conversation through the feed; evaluated at send time. Set like [feedPushGate]. */
     @Volatile
-    var feedReaderGate: (String) -> Boolean = { false }
+    var feedReaderGate: (ConversationId) -> Boolean = { false }
 
     /**
      * The connection's admin RPC context while it is authenticated, null otherwise; evaluated at send time for
@@ -90,7 +91,7 @@ internal class IrohViewerHandle(
 
     override fun receivesFeedPushes(): Boolean = feedPushGate()
 
-    override fun readsFeedOf(conversationId: String): Boolean = feedReaderGate(conversationId)
+    override fun readsFeedOf(conversation: ConversationId): Boolean = feedReaderGate(conversation)
 
     override fun adminContext(): AdminRpcRequestContext? = adminContextGate()
 

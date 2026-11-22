@@ -21135,6 +21135,7 @@ public abstract interface class com/letta/mobile/data/controller/node/iroh/Viewe
 public abstract interface class com/letta/mobile/data/controller/node/iroh/ViewerHandle {
 	public fun adminContext ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
 	public abstract fun getConnectionId ()Ljava/lang/String;
+	public fun readsFeedOf-LfPRSJk (Ljava/lang/String;)Z
 	public fun receivesAgentEvents ()Z
 	public fun receivesConversationActivity-qkT7gGE (Ljava/lang/String;)Z
 	public fun receivesConversationEvents ()Z
@@ -21146,6 +21147,7 @@ public abstract interface class com/letta/mobile/data/controller/node/iroh/Viewe
 
 public final class com/letta/mobile/data/controller/node/iroh/ViewerHandle$DefaultImpls {
 	public static fun adminContext (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
+	public static fun readsFeedOf-LfPRSJk (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Ljava/lang/String;)Z
 	public static fun receivesAgentEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
 	public static fun receivesConversationActivity-qkT7gGE (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Ljava/lang/String;)Z
 	public static fun receivesConversationEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
@@ -23400,6 +23402,7 @@ public final class com/letta/mobile/data/dreaming/DreamingState {
 
 public final class com/letta/mobile/data/feed/channel/ChannelFeedLinkKt {
 	public static final fun channelFeedLink (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Lcom/letta/mobile/data/feed/client/FeedLink;
+	public static final fun channelFeedRows-bONJEPk (Lcom/letta/mobile/data/transport/api/IChannelTransport;Ljava/lang/String;Ljava/lang/String;)Lkotlin/jvm/functions/Function1;
 	public static final fun channelFeedTimelineSource-8oP-BNM (Lcom/letta/mobile/data/transport/api/IChannelTransport;Ljava/lang/String;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;)Lcom/letta/mobile/data/feed/client/FeedTimelineSource;
 	public static synthetic fun channelFeedTimelineSource-8oP-BNM$default (Lcom/letta/mobile/data/transport/api/IChannelTransport;Ljava/lang/String;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/letta/mobile/data/feed/client/FeedTimelineSource;
 }
@@ -23542,6 +23545,7 @@ public final class com/letta/mobile/data/feed/client/FeedTimelineSource {
 	public synthetic fun <init> (Lcom/letta/mobile/data/feed/client/FeedLink;Ljava/lang/String;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCursor ()Lcom/letta/mobile/data/feed/wire/FeedCursor;
 	public final fun getMetrics ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getPresented ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getRows ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun start ()V
 	public final fun stop ()V
@@ -23549,6 +23553,7 @@ public final class com/letta/mobile/data/feed/client/FeedTimelineSource {
 
 public final class com/letta/mobile/data/feed/client/FeedTimelineSource$Companion {
 	public final fun isAvailable (Lcom/letta/mobile/data/feed/client/FeedLink;)Z
+	public final fun rowsFor-bONJEPk (Lcom/letta/mobile/data/feed/client/FeedLink;Ljava/lang/String;Ljava/lang/String;)Lkotlin/jvm/functions/Function1;
 }
 
 public final class com/letta/mobile/data/feed/wire/ConversationFeedWire {
@@ -57613,6 +57618,7 @@ public final class com/letta/mobile/data/timeline/CanonicalTimelineCoordinator {
 	public final fun locate-ZOdZ-3s (Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun markPending (Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Ljava/lang/String;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Ljava/lang/Long;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun markPending$default (Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator;Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Ljava/lang/String;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Ljava/lang/Long;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun readsThroughFeed (Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun reconcileRecent (Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun reconcileRecentDetailed (Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun retire (Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -57689,6 +57695,7 @@ public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation 
 	public final fun getSettled ()Lkotlinx/coroutines/flow/Flow;
 	public final fun getTarget ()Lkotlinx/coroutines/flow/MutableStateFlow;
 	public final fun getViewport ()Lkotlin/Pair;
+	public final fun isFeedBacked ()Z
 	public final fun isOpenTraced ()Z
 	public final fun navigate (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun onResidentRows (Ljava/util/List;)V
@@ -57703,8 +57710,8 @@ public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation 
 
 public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation$Companion {
 	public final fun assemble (Ljava/util/List;Ljava/util/List;)Lcom/letta/mobile/data/chat/projection/TimelineRowAssembly;
-	public final fun open-o2nkW-g (Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator;Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Lkotlinx/coroutines/CoroutineScope;Ljava/lang/String;Lcom/letta/mobile/data/timeline/TimelineSettledProjectionAdapter;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun open-o2nkW-g$default (Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Companion;Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator;Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Lkotlinx/coroutines/CoroutineScope;Ljava/lang/String;Lcom/letta/mobile/data/timeline/TimelineSettledProjectionAdapter;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun open-XwiRZt8 (Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator;Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Lkotlinx/coroutines/CoroutineScope;Ljava/lang/String;Lcom/letta/mobile/data/timeline/TimelineSettledProjectionAdapter;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun open-XwiRZt8$default (Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Companion;Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator;Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Lkotlinx/coroutines/CoroutineScope;Ljava/lang/String;Lcom/letta/mobile/data/timeline/TimelineSettledProjectionAdapter;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row {

@@ -74,7 +74,7 @@ class FeedTimelineRecompositionTest {
         val withNeighbours = compositionsPerToken(older)
         assertEquals(tokens.size, alone.size)
         assertTrue(alone.all { it > 0 }, "each token redraws the growing row: $alone")
-        assertEquals(alone, withNeighbours, "a token never redraws a neighbour: alone=$alone, with six neighbours=$withNeighbours")
+        assertEquals(alone, withNeighbours, "a token never redraws a neighbour: alone=$alone, six neighbours=$withNeighbours")
     }
 
     /** Row compositions per token while the feed grows its newest row above [settledRows]. */
@@ -113,7 +113,9 @@ class FeedTimelineRecompositionTest {
             MaterialTheme {
                 Box(Modifier.size(width = 420.dp, height = 1600.dp)) {
                     ChatTimeline(
-                        state = ChatUiState(conversationState = ConversationState.Ready("feed-conversation"), isLoadingMessages = false),
+                        state = ChatUiState(
+                            conversationState = ConversationState.Ready("feed-conversation"), isLoadingMessages = false,
+                        ),
                         pagedTimeline = presentation,
                         actions = RecordingChatActions(),
                         capabilities = ChatSurfaceCapabilities.Default,
