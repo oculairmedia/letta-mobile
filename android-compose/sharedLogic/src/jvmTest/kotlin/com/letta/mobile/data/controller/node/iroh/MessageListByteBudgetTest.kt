@@ -60,7 +60,10 @@ class MessageListByteBudgetTest {
                 cursor?.let { put(if (ascending) "after" else "before", it) }
             }
             val envelope = Json.parseToJsonElement(
-                router.dispatch("walk", "message.list", params, AdminRpcRequestContext(authenticated = true, supportsFrameParts = framePart)),
+                router.dispatch(
+                    "walk", "message.list", params,
+                    AdminRpcRequestContext(authenticated = true, supportsFrameParts = framePart),
+                ),
             ).jsonObject
             assertEquals(true, envelope.getValue("success").jsonPrimitive.booleanOrNull, envelope.toString().take(300))
             val result = envelope.getValue("result")
@@ -147,7 +150,10 @@ class MessageListByteBudgetTest {
                     add(buildJsonObject { put("type", "text"); put("text", "viewed") })
                     add(buildJsonObject {
                         put("type", "image")
-                        put("source", buildJsonObject { put("type", "base64"); put("media_type", "image/png"); put("data", "A".repeat(IMAGE_BYTES)) })
+                        put(
+                            "source",
+                            buildJsonObject { put("type", "base64"); put("media_type", "image/png"); put("data", "A".repeat(IMAGE_BYTES)) },
+                        )
                     })
                 })
             },
@@ -158,7 +164,11 @@ class MessageListByteBudgetTest {
         chat()
         call("long")
         repeat(2) { add(row(next("assistant"), "assistant_message") { put("content", text("x".repeat(LARGE_ASSISTANT_BYTES))) }) }
-        add(row(next("return"), "tool_return_message") { put("tool_call_id", "long"); put("status", "success"); put("tool_return", "done") })
+        add(
+            row(next("return"), "tool_return_message") {
+                put("tool_call_id", "long"); put("status", "success"); put("tool_return", "done")
+            },
+        )
         repeat(2) { chat() }
         add(row(next("assistant"), "assistant_message") { put("content", text("y".repeat(LARGE_ASSISTANT_BYTES))) })
         repeat(20) { chat() }
