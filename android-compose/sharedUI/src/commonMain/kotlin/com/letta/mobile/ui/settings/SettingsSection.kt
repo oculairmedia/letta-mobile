@@ -17,8 +17,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import com.letta.mobile.ui.components.choice.LettaSegment
-import com.letta.mobile.ui.components.choice.LettaSegmentedControl
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -43,6 +41,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.settings.SettingsAction
 import com.letta.mobile.data.settings.SettingsDrafts
 import com.letta.mobile.data.settings.SettingsRow
+import com.letta.mobile.ui.components.choice.LettaSegment
+import com.letta.mobile.ui.components.choice.LettaSegmentedChoice
+import com.letta.mobile.ui.components.choice.LettaSegmentedControl
 import com.letta.mobile.ui.components.foundation.LettaCard
 import com.letta.mobile.ui.components.foundation.LettaRowLabel
 import com.letta.mobile.ui.components.foundation.LettaToggleRow
@@ -342,12 +343,14 @@ private fun SegmentedChoice(row: SettingsRow.Choice, lock: String?) {
     ) {
         RowWordsColumn(RowWords(row.title, lock ?: row.supporting ?: current?.description), enabled)
         LettaSegmentedControl(
-            segments = row.options.map { LettaSegment(it.key, it.label) },
-            selected = row.selected,
+            choice = LettaSegmentedChoice(
+                segments = row.options.map { LettaSegment(it.key, it.label) },
+                selected = row.selected,
+                enabled = enabled,
+                tagPrefix = SettingsSectionTags.OPTION_PREFIX + row.key + "-",
+            ),
             onSelect = row.onSelect,
             modifier = Modifier.fillMaxWidth(),
-            enabled = enabled,
-            tagPrefix = SettingsSectionTags.OPTION_PREFIX + row.key + "-",
         )
     }
 }

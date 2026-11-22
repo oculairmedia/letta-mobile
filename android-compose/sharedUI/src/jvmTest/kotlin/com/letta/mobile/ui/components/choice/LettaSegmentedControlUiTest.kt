@@ -64,7 +64,7 @@ class LettaSegmentedControlUiTest {
         var selected by mutableStateOf("SYSTEM")
         setContent {
             MaterialTheme {
-                LettaSegmentedControl(segments, selected, onSelect = { selected = it }, tagPrefix = TAG)
+                LettaSegmentedControl(LettaSegmentedChoice(segments, selected, tagPrefix = TAG), onSelect = { selected = it })
             }
         }
         onNodeWithTag(TAG + "SYSTEM").assertIsSelected()
@@ -80,11 +80,13 @@ class LettaSegmentedControlUiTest {
         setContent {
             MaterialTheme {
                 LettaSegmentedControl(
-                    listOf(LettaSegment("list", "List view", LettaIcons.Menu), LettaSegment("grid", "Grid view", LettaIcons.Apps)),
-                    selected = "list",
+                    LettaSegmentedChoice(
+                        listOf(LettaSegment("list", "List view", LettaIcons.Menu), LettaSegment("grid", "Grid view", LettaIcons.Apps)),
+                        selected = "list",
+                        iconOnly = true,
+                        tagPrefix = TAG,
+                    ),
                     onSelect = {},
-                    iconOnly = true,
-                    tagPrefix = TAG,
                 )
             }
         }
@@ -120,8 +122,10 @@ class LettaSegmentedControlUiTest {
                     ) {
                         AppearanceSettingsSection(rememberHostAppearanceSettings(host))
                         LettaSegmentedControl(
-                            listOf(LettaSegment("list", "List", LettaIcons.Menu), LettaSegment("grid", "Grid", LettaIcons.Apps)),
-                            selected = "grid",
+                            LettaSegmentedChoice(
+                                listOf(LettaSegment("list", "List", LettaIcons.Menu), LettaSegment("grid", "Grid", LettaIcons.Apps)),
+                                selected = "grid",
+                            ),
                             onSelect = {},
                             modifier = Modifier.fillMaxWidth(),
                         )

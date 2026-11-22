@@ -22,34 +22,26 @@ import com.letta.mobile.ui.theme.tokens.LettaStrokeTokens
  * System, Light, Dark), a view, a scope. For more than about four options, or long labels, use a
  * list or a picker instead. It fills the width it is given, each segment an equal share.
  *
- * [iconOnly] draws each segment's icon without its label (the label is still what a screen reader
- * says); every segment then needs an icon. Each segment is a radio button to assistive technology,
- * and is tagged `tagPrefix + key` when [tagPrefix] is given.
+ * [choice] says what is shown (see [LettaSegmentedChoice]); [onSelect] gets the picked segment's key.
+ * Each segment is a radio button to assistive technology.
  */
 @Composable
-fun LettaSegmentedControl(
-    segments: List<LettaSegment>,
-    selected: String,
-    onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    iconOnly: Boolean = false,
-    tagPrefix: String? = null,
-) {
+fun LettaSegmentedControl(choice: LettaSegmentedChoice, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
     SingleChoiceSegmentedButtonRow(modifier) {
-        segments.forEachIndexed { index, segment ->
-            val tagged = tagPrefix?.let { Modifier.testTag(it + segment.key) } ?: Modifier
+        choice.segments.forEachIndexed { index, segment ->
+            val selected = segment.key == choice.selected
+            val tagged = choice.tagPrefix?.let { Modifier.testTag(it + segment.key) } ?: Modifier
             SegmentedButton(
-                selected = segment.key == selected,
-                onClick = { if (segment.key != selected) onSelect(segment.key) },
-                enabled = enabled && segment.enabled,
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = segments.size),
+                selected = selected,
+                onClick = { if (!selected) onSelect(segment.key) },
+                enabled = choice.enabled && segment.enabled,
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = choice.segments.size),
                 colors = lettaSegmentColors(),
                 border = SegmentedButtonDefaults.borderStroke(MaterialTheme.colorScheme.outlineVariant, LettaStrokeTokens.hairline),
-                icon = { SegmentIcon(segment, selected = segment.key == selected, iconOnly = iconOnly) },
-                modifier = if (iconOnly) tagged.semantics { contentDescription = segment.label } else tagged,
+                icon = { SegmentIcon(segment, selected, choice) },
+                modifier = if (choice.iconOnly) tagged.semantics { contentDescription = segment.label } else tagged,
             ) {
-                if (!iconOnly) Text(segment.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (!choice.iconOnly) Text(segment.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -57,11 +49,11 @@ fun LettaSegmentedControl(
 
 /** The segment's own icon when it has one; otherwise the check Material puts on the selected segment. */
 @Composable
-private fun SegmentIcon(segment: LettaSegment, selected: Boolean, iconOnly: Boolean) {
+private fun SegmentIcon(segment: LettaSegment, selected: Boolean, choice: LettaSegmentedChoice) {
     val icon = segment.icon
     if (icon != null) {
         LettaIcon(icon, contentDescription = null, style = LettaIconStyle(LettaControlTokens.icon))
-    } else if (!iconOnly) {
+    } else if (!choice.iconOnly && choice.showCheck) {
         SegmentedButtonDefaults.Icon(active = selected)
     }
 }

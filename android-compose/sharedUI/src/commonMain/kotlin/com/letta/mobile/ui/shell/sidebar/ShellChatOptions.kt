@@ -3,14 +3,13 @@ package com.letta.mobile.ui.shell.sidebar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import com.letta.mobile.ui.components.choice.LettaSegment
+import com.letta.mobile.ui.components.choice.LettaSegmentedChoice
+import com.letta.mobile.ui.components.choice.LettaSegmentedControl
 import com.letta.mobile.ui.components.foundation.LettaRowLabel
 import com.letta.mobile.ui.components.foundation.LettaToggleRow
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
@@ -67,9 +66,12 @@ object ShellChatOptionsTags {
     const val DOWNLOAD = "shell-chat-options-download"
     const val ARCHIVED = "shell-archived-chats"
 
-    fun textSize(size: ChatTextSize) = "shell-chat-options-text-${size.name}"
+    const val TEXT_PREFIX = "shell-chat-options-text-"
+    const val GLOW_PREFIX = "shell-chat-options-glow-"
 
-    fun glow(style: ThinkingGlowStyle) = "shell-chat-options-glow-${style.name}"
+    fun textSize(size: ChatTextSize) = TEXT_PREFIX + size.name
+
+    fun glow(style: ThinkingGlowStyle) = GLOW_PREFIX + style.name
 
     fun restore(id: String) = "shell-archived-restore-$id"
 }
@@ -115,9 +117,9 @@ private fun ShellChatOptionsContent(state: ShellChatOptionsState, actions: Shell
             modifier = Modifier.testTag(ShellChatOptionsTags.USAGE),
         )
         LettaSectionLabel("Text size")
-        SegmentedChoice(TEXT_SIZE_SEGMENTS, state.textSize, actions.onTextSizeChange)
+        SegmentedChoice(TEXT_SIZE_SEGMENTS, state.textSize, ShellChatOptionsTags.TEXT_PREFIX, actions.onTextSizeChange)
         LettaSectionLabel("Thinking glow")
-        SegmentedChoice(GLOW_SEGMENTS, display.thinkingGlow) { actions.onDisplayChange(display.copy(thinkingGlow = it)) }
+        SegmentedChoice(GLOW_SEGMENTS, display.thinkingGlow, ShellChatOptionsTags.GLOW_PREFIX) { actions.onDisplayChange(display.copy(thinkingGlow = it)) }
         if (state.offersAutoPin) {
             LettaSectionLabel("Chats")
             LettaToggleRow(
@@ -131,29 +133,27 @@ private fun ShellChatOptionsContent(state: ShellChatOptionsState, actions: Shell
 }
 
 /**
- * One choice of a few [options] as a segmented row. No check mark, so four short labels fit a
- * phone's dialog on one line; the selected segment's fill says which is on.
+ * One choice of a few options as a segmented row: the shared [LettaSegmentedControl], each segment
+ * tagged `tagPrefix + the value's name`. No check mark, so four short labels fit a phone's dialog on
+ * one line; the selected segment's fill says which is on.
  */
 @Composable
-private fun <T> SegmentedChoice(segments: List<Segment<T>>, selected: T, onSelect: (T) -> Unit) {
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        segments.forEachIndexed { index, segment ->
-            SegmentedButton(
-                selected = segment.value == selected,
-                onClick = { onSelect(segment.value) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = segments.size),
-                modifier = Modifier.testTag(segment.tag),
-                icon = {},
-            ) {
-                Text(segment.label, maxLines = 1)
-            }
-        }
-    }
+private fun <T : Enum<T>> SegmentedChoice(segments: List<Segment<T>>, selected: T, tagPrefix: String, onSelect: (T) -> Unit) {
+    LettaSegmentedControl(
+        choice = LettaSegmentedChoice(
+            segments = segments.map { LettaSegment(it.value.name, it.label) },
+            selected = selected.name,
+            showCheck = false,
+            tagPrefix = tagPrefix,
+        ),
+        onSelect = { key -> segments.firstOrNull { it.value.name == key }?.let { onSelect(it.value) } },
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
-/** One segment of a [SegmentedChoice]: the value it picks, its label and its test tag. */
+/** One segment of a [SegmentedChoice]: the value it picks and its label. */
 @Immutable
-private class Segment<T>(val value: T, val label: String, val tag: String)
+private class Segment<T>(val value: T, val label: String)
 
-private val TEXT_SIZE_SEGMENTS = ChatTextSize.entries.map { Segment(it, it.label, ShellChatOptionsTags.textSize(it)) }
-private val GLOW_SEGMENTS = ThinkingGlowStyle.entries.map { Segment(it, it.label, ShellChatOptionsTags.glow(it)) }
+private val TEXT_SIZE_SEGMENTS = ChatTextSize.entries.map { Segment(it, it.label) }
+private val GLOW_SEGMENTS = ThinkingGlowStyle.entries.map { Segment(it, it.label) }

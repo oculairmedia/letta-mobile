@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,6 +38,9 @@ import com.letta.mobile.sharedui.resources.document_workspace_unavailable
 import com.letta.mobile.sharedui.resources.document_workspace_unsupported_references
 import com.letta.mobile.ui.canvas.notes.NotebookNoteEditorContent
 import com.letta.mobile.ui.canvas.references.NotebookReferencePreview
+import com.letta.mobile.ui.components.choice.LettaSegment
+import com.letta.mobile.ui.components.choice.LettaSegmentedChoice
+import com.letta.mobile.ui.components.choice.LettaSegmentedControl
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.components.foundation.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
@@ -98,25 +98,24 @@ private fun WorkspaceHeader(controller: DocumentWorkspaceController, state: Docu
     }
 }
 
+private const val PRESENTATION_TAG_PREFIX = "document-presentation-"
+
 @Composable
 private fun PresentationSelector(controller: DocumentWorkspaceController, state: DocumentWorkspaceState) {
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(LettaDimens.Space.sm)) {
-        DocumentPresentation.entries.forEachIndexed { index, presentation ->
-            SegmentedButton(
-                selected = state.presentation == presentation,
-                onClick = { controller.present(presentation) },
-                enabled = state.current != null,
-                shape = SegmentedButtonDefaults.itemShape(index, DocumentPresentation.entries.size),
-                modifier = Modifier.testTag("document-presentation-${presentation.name.lowercase()}"),
-            ) {
-                Text(stringResource(if (presentation == DocumentPresentation.NOTE) {
-                    Res.string.document_workspace_note
-                } else {
-                    Res.string.document_workspace_references
-                }))
-            }
-        }
-    }
+    val note = stringResource(Res.string.document_workspace_note)
+    val references = stringResource(Res.string.document_workspace_references)
+    LettaSegmentedControl(
+        choice = LettaSegmentedChoice(
+            segments = DocumentPresentation.entries.map {
+                LettaSegment(it.name.lowercase(), if (it == DocumentPresentation.NOTE) note else references)
+            },
+            selected = state.presentation.name.lowercase(),
+            enabled = state.current != null,
+            tagPrefix = PRESENTATION_TAG_PREFIX,
+        ),
+        onSelect = { key -> DocumentPresentation.entries.firstOrNull { it.name.lowercase() == key }?.let(controller::present) },
+        modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.sm),
+    )
 }
 
 @Composable
