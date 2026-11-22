@@ -155,14 +155,14 @@ data class Agent(
      * (docs/reference/contracts/agent.list/slim-list-v1.md): no system prompt, memory, tools or
      * other detail. Such a row cannot stand in for a detail read.
      */
-    val isListRow: Boolean get() = this == listFields()
+    internal val isListRow: Boolean get() = this == listFields()
 
     /**
      * This record with [row]'s list fields laid over it. A slim [row] refreshes identity, model and
      * activity while every detail field this record holds survives; a full [row] (an older host)
      * replaces the record outright.
      */
-    fun withListFieldsOf(row: Agent): Agent = if (!row.isListRow || row.id != id) row else copy(
+    internal fun withListFieldsOf(row: Agent): Agent = if (!row.isListRow || row.id != id) row else copy(
         name = row.name,
         description = row.description,
         metadata = row.metadata,
@@ -195,7 +195,7 @@ data class Agent(
 }
 
 /** [rows] from a roster read, each merged over the record [cached] already holds for its id. */
-fun mergeRosterRows(cached: List<Agent>, rows: List<Agent>): List<Agent> {
+internal fun mergeRosterRows(cached: List<Agent>, rows: List<Agent>): List<Agent> {
     val byId = cached.associateBy { it.id }
     return rows.map { row -> byId[row.id]?.withListFieldsOf(row) ?: row }
 }
