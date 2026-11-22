@@ -40,6 +40,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 import com.letta.mobile.ui.components.choice.LettaSelectAllRow
+import com.letta.mobile.ui.components.foundation.LettaRowLabel
+import com.letta.mobile.ui.components.choice.LettaSelectionCount
 
 /**
  * "Choose agents" as a compact search picker instead of one checkbox per agent: the chosen agents
@@ -81,9 +83,8 @@ internal fun AgentScopePicker(agents: List<AgentChoice>, selected: Set<String>, 
 private fun SelectAllMatches(matches: List<AgentChoice>, selected: Set<String>, onChange: (Set<String>) -> Unit) {
     val ids = matches.mapTo(mutableSetOf()) { it.id }
     LettaSelectAllRow(
-        label = PairingStrings.INVITE_SELECT_ALL_AGENTS,
-        chosen = ids.count { it in selected },
-        total = ids.size,
+        label = LettaRowLabel(PairingStrings.INVITE_SELECT_ALL_AGENTS),
+        count = LettaSelectionCount(chosen = ids.count { it in selected }, total = ids.size),
         onSelectAll = { all -> onChange(if (all) selected + ids else selected - ids) },
         modifier = Modifier.padding(horizontal = LettaDimens.Space.lg).testTag(PairingTags.INVITE_SELECT_ALL_AGENTS),
     )

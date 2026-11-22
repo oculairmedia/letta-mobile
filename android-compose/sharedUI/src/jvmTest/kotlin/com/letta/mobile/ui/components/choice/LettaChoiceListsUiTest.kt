@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.settings.SettingsOption
 import com.letta.mobile.data.settings.SettingsRow
+import com.letta.mobile.ui.components.foundation.LettaRowLabel
 import com.letta.mobile.ui.settings.radioList
 import com.letta.mobile.ui.theme.SharedMaterialTheme
 import java.io.File
@@ -56,7 +57,7 @@ class LettaChoiceListsUiTest {
     @Test
     fun theWholeRowPicksAndEveryDescriptionShows() = runComposeUiTest {
         var selected by mutableStateOf("ask")
-        setContent { MaterialTheme { LettaRadioList(modes, selected, onSelect = { selected = it }, error = "Pick one to continue.") } }
+        setContent { MaterialTheme { LettaRadioList(LettaRadioChoice(modes, selected, error = "Pick one to continue."), onSelect = { selected = it }) } }
 
         onNodeWithText("File edits go ahead; anything else asks.").assertExists()
         onNodeWithText("The agent plans but changes nothing.").assertExists()
@@ -76,7 +77,7 @@ class LettaChoiceListsUiTest {
         val calls = mutableListOf<Boolean>()
         setContent {
             MaterialTheme {
-                LettaSelectAllRow("Select all", chosen = chosen, total = 3, onSelectAll = { all ->
+                LettaSelectAllRow(LettaRowLabel("Select all"), LettaSelectionCount(chosen, total = 3), onSelectAll = { all ->
                     calls += all
                     chosen = if (all) 3 else 0
                 }, modifier = Modifier.testTag(ALL))
@@ -111,10 +112,10 @@ class LettaChoiceListsUiTest {
                     Modifier.width(width).background(MaterialTheme.colorScheme.background).padding(16.dp).testTag(FRAME),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    LettaRadioList(modes, selected = "edits", onSelect = {})
-                    LettaSelectAllRow("Select all", chosen = 1, total = 3, onSelectAll = {})
-                    LettaCheckboxRow("Research agent", ToggleableState.On, onClick = {})
-                    LettaCheckboxRow("Writer", ToggleableState.Off, onClick = {}, description = "Drafts and edits documents.")
+                    LettaRadioList(LettaRadioChoice(modes, selected = "edits"), onSelect = {})
+                    LettaSelectAllRow(LettaRowLabel("Select all"), LettaSelectionCount(chosen = 1, total = 3), onSelectAll = {})
+                    LettaCheckboxRow(LettaRowLabel("Research agent"), ToggleableState.On, onClick = {})
+                    LettaCheckboxRow(LettaRowLabel("Writer", "Drafts and edits documents."), ToggleableState.Off, onClick = {})
                 }
             }
         }

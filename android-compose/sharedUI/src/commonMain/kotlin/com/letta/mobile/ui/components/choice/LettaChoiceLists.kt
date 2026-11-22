@@ -22,6 +22,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.state.ToggleableState
+import com.letta.mobile.ui.components.foundation.LettaRowLabel
+import com.letta.mobile.ui.components.foundation.LettaRowWords
 import com.letta.mobile.ui.theme.tokens.LettaControlTokens
 import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
 
@@ -29,113 +31,75 @@ import com.letta.mobile.ui.theme.tokens.LettaSpaceTokens
  * A single choice shown as a list, each option on its own row with its [LettaChoiceOption.description]
  * under it, so the options can be compared at a glance (where a dropdown shows only the current one).
  * The whole row picks; it is a radio button to assistive technology, and the list is one group.
- * [error] is a problem with the choice as a whole, shown under the list and announced. Use segments
+ * [LettaRadioChoice.error] is a problem with the choice as a whole. Use segments
  * ([LettaSegmentedControl]) for a few short options with nothing to explain.
  */
 @Composable
-fun LettaRadioList(
-    options: List<LettaChoiceOption>,
-    selected: String?,
-    onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    error: String? = null,
-) {
+fun LettaRadioList(choice: LettaRadioChoice, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier.selectableGroup()) {
-        options.forEach { option ->
-            val chosen = option.key == selected
+        choice.options.forEach { option ->
+            val chosen = option.key == choice.selected
+            val enabled = choice.enabled && option.enabled
+            val picks = Modifier.selectable(
+                selected = chosen,
+                enabled = enabled,
+                role = Role.RadioButton,
+                onClick = { if (!chosen) onSelect(option.key) },
+            )
             ChoiceRowFrame(
-                interaction = Modifier.selectable(
-                    selected = chosen,
-                    enabled = enabled && option.enabled,
-                    role = Role.RadioButton,
-                    onClick = { if (!chosen) onSelect(option.key) },
-                ),
-                tag = option.tag,
-                words = ChoiceWords(option.label, option.description),
-            ) { RadioButton(selected = chosen, onClick = null, enabled = enabled && option.enabled) }
+                label = LettaRowLabel(option.label, option.description, enabled, supportingMaxLines = Int.MAX_VALUE),
+                modifier = picks.then(option.tag?.let { Modifier.testTag(it) } ?: Modifier),
+            ) { RadioButton(selected = chosen, onClick = null, enabled = enabled) }
         }
-        error?.let { ChoiceError(it) }
+        choice.error?.let { ChoiceError(it) }
     }
 }
 
 /**
- * One checkbox on its own row: [label], an optional [description] under it, and the box in [state]
- * (on, off, or partly: some of what it stands for is chosen). The whole row toggles through [onClick];
- * it is one checkbox to assistive technology.
+ * One checkbox on its own row: the [label] (its supporting line is the description) and the box in
+ * [state] (on, off, or partly: some of what it stands for is chosen). The whole row toggles through
+ * [onClick]; it is one checkbox to assistive technology. A disabled label disables the box.
  */
 @Composable
-fun LettaCheckboxRow(
-    label: String,
-    state: ToggleableState,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    description: String? = null,
-    enabled: Boolean = true,
-) {
-    ChoiceRowFrame(
-        interaction = modifier.triStateToggleable(state = state, enabled = enabled, role = Role.Checkbox, onClick = onClick),
-        tag = null,
-        words = ChoiceWords(label, description),
-    ) { TriStateCheckbox(state = state, onClick = null, enabled = enabled) }
+fun LettaCheckboxRow(label: LettaRowLabel, state: ToggleableState, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val toggles = Modifier.triStateToggleable(state = state, enabled = label.enabled, role = Role.Checkbox, onClick = onClick)
+    ChoiceRowFrame(label = label, modifier = modifier.then(toggles)) {
+        TriStateCheckbox(state = state, onClick = null, enabled = label.enabled)
+    }
 }
 
 /**
- * The "select all" row above a list of checkboxes: on when all [total] are chosen, off when none,
- * partly when some. Picking it chooses all of them, or, when all are already chosen, clears them;
- * [onSelectAll] gets which.
+ * The "select all" row above a list of checkboxes: on when all are chosen, off when none, partly when
+ * some (see [LettaSelectionCount]). Picking it chooses all of them, or, when all are already chosen,
+ * clears them; [onSelectAll] gets which. With nothing to choose the row is disabled.
  */
 @Composable
-fun LettaSelectAllRow(
-    label: String,
-    chosen: Int,
-    total: Int,
-    onSelectAll: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-) {
-    val state = when {
-        total == 0 || chosen == 0 -> ToggleableState.Off
-        chosen >= total -> ToggleableState.On
-        else -> ToggleableState.Indeterminate
-    }
+fun LettaSelectAllRow(label: LettaRowLabel, count: LettaSelectionCount, onSelectAll: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    val state = count.state
     LettaCheckboxRow(
-        label = label,
+        label = label.copy(enabled = label.enabled && count.total > 0),
         state = state,
         onClick = { onSelectAll(state != ToggleableState.On) },
         modifier = modifier,
-        enabled = enabled && total > 0,
     )
 }
 
-/** A choice row's label and the optional line under it. */
-private class ChoiceWords(val label: String, val description: String?)
-
-/** The shared row of a radio list or a checkbox: the control first, then the words, the whole row the target. */
+/**
+ * The shared row of a radio list or a checkbox: the control first, then the label's words as every
+ * settings row draws them, the whole row the target ([modifier] carries its interaction).
+ */
 @Composable
-private fun ChoiceRowFrame(interaction: Modifier, tag: String?, words: ChoiceWords, control: @Composable () -> Unit) {
+private fun ChoiceRowFrame(label: LettaRowLabel, modifier: Modifier, control: @Composable () -> Unit) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .heightIn(min = LettaControlTokens.minTouchTarget)
-            .then(interaction)
-            .then(tag?.let { Modifier.testTag(it) } ?: Modifier)
             .padding(vertical = LettaSpaceTokens.xs),
         horizontalArrangement = Arrangement.spacedBy(LettaSpaceTokens.sm),
-        verticalAlignment = if (words.description == null) Alignment.CenterVertically else Alignment.Top,
+        verticalAlignment = if (label.supporting == null) Alignment.CenterVertically else Alignment.Top,
     ) {
         control()
-        // The control is a 24 dp glyph (no touch box of its own: the row is the target); the
-        // label's first line centres on it.
-        Column(
-            Modifier.weight(1f).padding(top = LettaSpaceTokens.hair),
-            verticalArrangement = Arrangement.spacedBy(LettaSpaceTokens.hair),
-        ) {
-            Text(words.label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-            words.description?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
+        LettaRowWords(label, Modifier.weight(1f))
     }
 }
 

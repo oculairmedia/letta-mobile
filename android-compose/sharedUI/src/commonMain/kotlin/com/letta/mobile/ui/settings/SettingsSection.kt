@@ -41,6 +41,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.settings.SettingsAction
 import com.letta.mobile.data.settings.SettingsDrafts
 import com.letta.mobile.data.settings.SettingsRow
+import com.letta.mobile.ui.components.choice.LettaChoiceOption
+import com.letta.mobile.ui.components.choice.LettaRadioChoice
+import com.letta.mobile.ui.components.choice.LettaRadioList
 import com.letta.mobile.ui.components.choice.LettaSegment
 import com.letta.mobile.ui.components.choice.LettaSegmentedChoice
 import com.letta.mobile.ui.components.choice.LettaSegmentedControl
@@ -375,12 +378,14 @@ private fun RadioChoice(row: SettingsRow.Choice, lock: String?) {
     ) {
         RowWordsColumn(RowWords(row.title, lock ?: row.supporting), enabled)
         LettaRadioList(
-            options = row.options.map {
-                LettaChoiceOption(it.key, it.label, it.description, tag = SettingsSectionTags.OPTION_PREFIX + row.key + "-" + it.key)
-            },
-            selected = row.selected,
+            choice = LettaRadioChoice(
+                options = row.options.map {
+                    LettaChoiceOption(it.key, it.label, it.description, tag = SettingsSectionTags.OPTION_PREFIX + row.key + "-" + it.key)
+                },
+                selected = row.selected,
+                enabled = enabled,
+            ),
             onSelect = row.onSelect,
-            enabled = enabled,
         )
     }
 }

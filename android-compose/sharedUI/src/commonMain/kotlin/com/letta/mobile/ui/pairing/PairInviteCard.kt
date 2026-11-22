@@ -47,6 +47,7 @@ import com.letta.mobile.ui.components.foundation.LettaToggleRow
 import com.letta.mobile.ui.text.writePlainText
 import kotlinx.coroutines.launch
 import com.letta.mobile.ui.components.choice.LettaChoiceOption
+import com.letta.mobile.ui.components.choice.LettaRadioChoice
 import com.letta.mobile.ui.components.choice.LettaRadioList
 
 /** An agent the inviter may share with the new device. */
@@ -125,8 +126,7 @@ private fun InviteForm(agents: List<AgentChoice>, enabled: Boolean, onMint: (Pai
     )
     Text(PairingStrings.INVITE_ACCESS, style = MaterialTheme.typography.labelLarge)
     LettaRadioList(
-        options = form.options.map { LettaChoiceOption(it.name, it.label, tag = it.tag) },
-        selected = form.scope.name,
+        choice = LettaRadioChoice(form.options.map { LettaChoiceOption(it.name, it.label, tag = it.tag) }, selected = form.scope.name),
         onSelect = { key -> form.scope = AgentScopeOption.valueOf(key) },
     )
     if (form.choosing) AgentScopePicker(agents, form.selected) { form.selected = it }
