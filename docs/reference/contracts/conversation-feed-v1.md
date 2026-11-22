@@ -1,6 +1,6 @@
 # Conversation feed v1: the host's durable, resumable record of every turn
 
-Status: **v1, host journal, `feed.subscribe` and the live `feed_delta` push implemented; the shared client (`FeedTimelineSource`) renders from them behind the capabilities. Turn commands and removing the old client path are later stages.**
+Status: **v1, host journal, `feed.subscribe` and the live `feed_delta` push implemented; the shared chat presentation draws a conversation from them behind the capabilities, and a feed reader leaves the `stream_delta` fanout for it. Turn commands and removing the old client path are later stages.**
 Epic: letta-mobile-p3hlw (host owns turns and the canonical timeline; clients become views).
 
 Fixtures: `android-compose/sharedLogic/src/commonTest/resources/contracts/feed.subscribe/feed-v1.json`, with a short
@@ -158,6 +158,16 @@ exactly as `pins_updated` and `shell_state_updated` are gated per viewer:
 
 A peer that fails any check receives nothing and is not told why. Telemetry carries counts only, never ids.
 
+### Feed readers leave the stream fanout
+
+A connection whose `feed.subscribe` for a conversation succeeded is a **feed reader** of it for the rest of the connection.
+The turn fanout sends a feed reader **no `stream_delta` frames** for that conversation: it takes the conversation's turns from
+`feed_delta` alone, so no row travels twice and no row is folded twice. Every other connection keeps the `stream_delta`
+fanout unchanged: one that never read the feed, one that reads another conversation's feed, and the turn's own **initiator**
+(its send and its redial parking ride on its own stream; a client that initiates a turn on a feed-backed conversation folds
+nothing from that stream into its list). A refused `feed.subscribe` makes no feed reader. Test:
+`FeedViewerStreamSplitTest`.
+
 ### The frame
 
 ```json
@@ -205,7 +215,16 @@ journal, and lists the exact frames each viewer received (and that the others re
 ## Client
 
 `FeedTimelineSource` renders one conversation from the feed alone, behind both capabilities (`FeedTimelineSource.isAvailable`);
-against any other host the old path stays in place. It reads `feed.subscribe` pages and applies `feed_delta` frames by the rules
+against any other host the old path stays in place.
+
+**Selection, per conversation (until the old path is removed).** The shared `CanonicalTimelinePresentation` is opened with the
+feed's rows (`FeedTimelineSource.rowsFor`, bound to the session channel by `channelFeedRows`) when the host advertises both
+capabilities, and without them otherwise; Android and desktop only pass their channel. A feed-backed presentation draws the
+feed's rows plus the prompts still being sent, pages no ledger history, and while it is attached the ledger runs no
+`message.list` reconcile and no turn-end repair for that conversation: one writer, never two. A prompt the feed echoes leaves
+the pending store. A presentation opened on a target message (search, deep link) reads the ledger. Older history for a
+feed-backed conversation is what the journal retains (see Retention); turns this host never journaled do not appear.
+Tests: `FeedPresentationSelectionTest`, `FeedTimelineRecompositionTest`. It reads `feed.subscribe` pages and applies `feed_delta` frames by the rules
 above, folds each entry with the live reducer and projection the app already uses (so a row has the id, run and key it has
 everywhere), and publishes one ordered list. A cumulative snapshot replaces its row where it stands: a row keeps its key and
 its instance unless its own content changed, so the list under it redraws only that row. `FeedTimelineMetrics` counts list

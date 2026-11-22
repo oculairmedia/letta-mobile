@@ -4,7 +4,7 @@
   "capability": "conversation_feed_push_v1",
   "required_capability": "chat.read",
   "spec": "docs/reference/contracts/conversation-feed-v1.md",
-  "note": "Synthetic ids only. The host's clock is fixed so its epoch is 1000. Each case registers its viewers on the real connection registry, writes the turns through the journal's writer, lets one frame budget pass and lists the frames each viewer received. A viewer is {conversation: the id it views, pushes: it has read the feed, authorized_agent_ids: its agent scope or null, bound_conversation_ids: its conversation scope or null}. A write is {agent_id, conversation_id, turn, deltas, close}; a delta {synthetic_tool_return_bytes: n, tool_call_id: id} is not used here.",
+  "note": "Synthetic ids only. The host's clock is fixed so its epoch is 1000. Each case registers its viewers on the real connection registry, writes the turns through the journal's writer, lets one frame budget pass and lists the frames each viewer received. A connection that reads a conversation through the feed receives no stream_delta fanout for it (FeedViewerStreamSplitTest); these cases list feed_delta frames only. A viewer is {conversation: the id it views, pushes: it has read the feed, authorized_agent_ids: its agent scope or null, bound_conversation_ids: its conversation scope or null}. A write is {agent_id, conversation_id, turn, deltas, close}; a delta {synthetic_tool_return_bytes: n, tool_call_id: id} is not used here.",
   "cases": [
     {
       "name": "one frame carries everything written within a frame budget",
