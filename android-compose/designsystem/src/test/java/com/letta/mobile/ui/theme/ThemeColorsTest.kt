@@ -132,27 +132,31 @@ class ThemeColorsTest {
     }
 
     @Test
-    fun `deriveCustomColors warning colors harmonize from tertiary`() {
+    fun `deriveCustomColors warning is the amber token harmonized to primary, never tertiary`() {
         val scheme = lightColorScheme(
             primary = Color(0xFF00897B),
-            tertiary = Color(0xFFE0AA22),
-            tertiaryContainer = Color(0xFFEEDDCC),
-            onTertiaryContainer = Color(0xFF332211),
+            tertiary = Color(0xFF00E5FF),
+            tertiaryContainer = Color(0xFFC7F1F5),
+            onTertiaryContainer = Color(0xFF002F34),
         )
         val custom = deriveCustomColors(scheme)
-        assertEquals(Color(0xFF332211), custom.warningTextColor)
-        assertEquals(
-            HctColorHarmonizer.harmonize(Color(0xFFE0AA22), Color(0xFF00897B)),
-            custom.harmonizedWarning,
-        )
+        val ink = Color(LettaColorTokens.LIGHT_WARNING)
+        assertEquals(ink, custom.warningTextColor)
+        assertEquals(HctColorHarmonizer.harmonize(ink, Color(0xFF00897B)), custom.harmonizedWarning)
         assertEquals(
             HctColorHarmonizer.harmonizeContainer(
-                containerColor = Color(0xFFEEDDCC),
+                containerColor = Color(LettaColorTokens.LIGHT_WARNING_CONTAINER),
                 seedColor = Color(0xFF00897B),
-                contentColor = Color(0xFF332211),
+                contentColor = ink,
             ),
             custom.warningContainerColor,
         )
+    }
+
+    @Test
+    fun `deriveCustomColors dark warning is the dark amber`() {
+        val custom = deriveCustomColors(lightColorScheme(background = Color(0xFF111111)))
+        assertEquals(Color(LettaColorTokens.DARK_WARNING), custom.warningTextColor)
     }
 
     @Test

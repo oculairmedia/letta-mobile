@@ -81954,6 +81954,8 @@ public final class com/letta/mobile/ui/theme/LettaColorTokens {
 	public static final field DARK_SURFACE_VARIANT J
 	public static final field DARK_VOICE_AGENT J
 	public static final field DARK_VOICE_YOU J
+	public static final field DARK_WARNING J
+	public static final field DARK_WARNING_CONTAINER J
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaColorTokens;
 	public static final field LIGHT_BACKGROUND J
 	public static final field LIGHT_ERROR J
@@ -81967,6 +81969,8 @@ public final class com/letta/mobile/ui/theme/LettaColorTokens {
 	public static final field LIGHT_SURFACE_VARIANT J
 	public static final field LIGHT_VOICE_AGENT J
 	public static final field LIGHT_VOICE_YOU J
+	public static final field LIGHT_WARNING J
+	public static final field LIGHT_WARNING_CONTAINER J
 	public static final field TEAL_ACCENT J
 }
 

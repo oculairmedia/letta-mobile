@@ -138,6 +138,10 @@ fun lettaCustomColors(scheme: ColorScheme): CustomColors =
         textLink = scheme.primary,
         textOnPrimary = scheme.onPrimary,
         errorTextColor = scheme.error,
+        warningTextColor = warningInk(scheme),
+        warningContainerColor = warningContainer(scheme),
+        harmonizedWarning = warningInk(scheme),
+        harmonizedWarningContainer = warningContainer(scheme),
         successColor = Color(0xFF46C08F),
         onSuccessColor = Color(0xFF06302B),
         runningColor = Color(0xFFE0A458),
@@ -164,6 +168,14 @@ fun lettaCustomColors(scheme: ColorScheme): CustomColors =
         borderFocused = scheme.primary,
         borderCritical = scheme.error,
     )
+
+/** The amber warning ink of [scheme]'s brightness ([LettaColorTokens.LIGHT_WARNING] / DARK_WARNING). */
+private fun warningInk(scheme: ColorScheme): Color =
+    Color(if (scheme.isLight()) LettaColorTokens.LIGHT_WARNING else LettaColorTokens.DARK_WARNING)
+
+/** The amber warning container of [scheme]'s brightness, which [warningInk] reads on. */
+private fun warningContainer(scheme: ColorScheme): Color =
+    Color(if (scheme.isLight()) LettaColorTokens.LIGHT_WARNING_CONTAINER else LettaColorTokens.DARK_WARNING_CONTAINER)
 
 /**
  * The compact type scale for desktop and the web: Material 3's roles, 2 to 5 sp smaller, for more words

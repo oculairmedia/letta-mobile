@@ -34,14 +34,18 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
         seedColor = colorScheme.primary,
         contentColor = colorScheme.onErrorContainer,
     )
+    // Warning is a fixed amber (LettaColorTokens), harmonized toward the scheme's primary, never the
+    // scheme's tertiary: in the teal presets that is a calm accent, not a warning.
+    val warningInk = Color(if (isLightTheme) LettaColorTokens.LIGHT_WARNING else LettaColorTokens.DARK_WARNING)
+    val warningContainer = Color(if (isLightTheme) LettaColorTokens.LIGHT_WARNING_CONTAINER else LettaColorTokens.DARK_WARNING_CONTAINER)
     val harmonizedWarning = HctColorHarmonizer.harmonize(
-        stateColor = colorScheme.tertiary,
+        stateColor = warningInk,
         seedColor = colorScheme.primary,
     )
     val harmonizedWarningContainer = HctColorHarmonizer.harmonizeContainer(
-        containerColor = colorScheme.tertiaryContainer,
+        containerColor = warningContainer,
         seedColor = colorScheme.primary,
-        contentColor = colorScheme.onTertiaryContainer,
+        contentColor = warningInk,
     )
     val harmonizedSuccess = HctColorHarmonizer.harmonize(
         stateColor = colorScheme.primary,
@@ -80,7 +84,7 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
         errorContainerColor = harmonizedErrorContainer,
         harmonizedError = harmonizedError,
         harmonizedErrorContainer = harmonizedErrorContainer,
-        warningTextColor = colorScheme.onTertiaryContainer,
+        warningTextColor = warningInk,
         warningContainerColor = harmonizedWarningContainer,
         harmonizedWarning = harmonizedWarning,
         harmonizedWarningContainer = harmonizedWarningContainer,
