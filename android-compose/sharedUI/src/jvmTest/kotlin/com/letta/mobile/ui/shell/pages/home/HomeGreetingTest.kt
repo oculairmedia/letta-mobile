@@ -31,9 +31,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Home's greeting at every viewport: two lines over a tight, organic lineup. Bodies sit within a
- * step of each other, never overlap past a set share, never leave the stage, and stand the same way
- * every time for the same agents.
+ * Home's greeting at every viewport: two lines over an organic lineup that spans the stage. The
+ * leftover width is shared evenly between the members, bodies never overlap past a set share, never
+ * leave the stage, and stand the same way every time for the same agents.
  */
 class HomeGreetingTest {
     private val pool = (1..GREETING_POOL).map { HomeAgentRef("agent-$it", "Agent $it") }
@@ -46,19 +46,60 @@ class HomeGreetingTest {
     }
 
     @Test
-    fun theLineupIsTightAtEveryViewport() {
+    fun theLineupIsEvenAtEveryViewport() {
         VIEWPORTS.forEach { width ->
             listOf(false, true).forEach { huddled ->
                 val spots = greetingLineup(members, width, huddled)
+                val gaps = spots.map(::body).zipWithNext { a, b -> b.first - a.second }
+                // The leftover width is shared evenly, so the gaps differ only by each member's own step.
+                assertTrue((gaps.max() - gaps.min()).value <= (ShellDimens.homeLineupNudge * 2).value + EDGE, "uneven gaps $gaps at $width")
                 spots.map(::body).zipWithNext().forEach { (a, b) ->
                     val gap = b.first - a.second
-                    assertTrue(gap <= ShellDimens.homeLineupNudge, "gap $gap at $width")
                     val smaller = min(a.second - a.first, b.second - b.first)
                     assertTrue(-gap <= smaller * MAX_OVERLAP_SHARE, "overlap ${-gap} at $width")
                 }
                 spots.map(::body).forEach { (left, right) -> assertTrue(left >= 0.dp && right <= width, "clipped at $width") }
             }
         }
+    }
+
+    @Test
+    fun threeMembersOnAWideStageSpanItFromStartToEnd() {
+        val spots = greetingLineup(members.take(3), VIEWPORTS.last())
+        assertEquals(3, spots.size)
+        assertEquals(0f, body(spots.first()).first.value, EDGE, "the first body stands at the start edge")
+        assertEquals(VIEWPORTS.last().value, body(spots.last()).second.value, EDGE, "the last body stands at the end edge")
+        // The leftover width is shared out evenly: the gaps differ only by their own step of character.
+        val gaps = spots.map(::body).zipWithNext { a, b -> b.first - a.second }
+        assertTrue((gaps.max() - gaps.min()).value <= (ShellDimens.homeLineupNudge * 2).value + EDGE, "even gaps $gaps")
+    }
+
+    @Test
+    fun aLoneMemberStaysAtTheStart() {
+        val spot = greetingLineup(members.take(1), VIEWPORTS.last()).single()
+        assertEquals(0f, body(spot).first.value, EDGE)
+    }
+
+    @Test
+    fun anOverflowingCrewIsStillCutOffAndSpansTheStage() {
+        val width = VIEWPORTS.first()
+        val spots = greetingLineup(members, width)
+        assertTrue(spots.size < members.size, "the crew is cut off at $width")
+        assertEquals(members.take(spots.size).map { it.id }, spots.map { it.id }, "the ones that fit, in order")
+        assertEquals(0f, body(spots.first()).first.value, EDGE)
+        assertEquals(width.value, body(spots.last()).second.value, EDGE)
+    }
+
+    @Test
+    fun aHuddleDrawsTheRowTogetherInsideTheStage() {
+        val width = VIEWPORTS.last()
+        val settled = greetingLineup(members.take(3), width).map(::body)
+        val huddled = greetingLineup(members.take(3), width, huddled = true).map(::body)
+        settled.zipWithNext().zip(huddled.zipWithNext()).forEach { (s, h) ->
+            val closed = (s.second.first - s.first.second) - (h.second.first - h.first.second)
+            assertEquals((ShellDimens.homeLineupNudge * 2).value, closed.value, EDGE, "each gap closes by two steps")
+        }
+        assertTrue(huddled.first().first > 0.dp && huddled.last().second < width, "the huddle stays inside the stage")
     }
 
     @Test
@@ -139,6 +180,8 @@ class HomeGreetingTest {
         const val GREETING_POOL = 12
         const val EVENING = 19
         const val MAX_OVERLAP_SHARE = 0.15f
+        /** Dp rounding when comparing an edge. */
+        const val EDGE = 0.01f
         val PHONE_CAST = 4..7
         /** A tilted tile's bounds grow by about this much; the body inside it does not. */
         val TOLERANCE = 2.dp

@@ -2,7 +2,10 @@
 
 package com.letta.mobile.ui.shell.header
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -11,6 +14,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -21,6 +25,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Modifier
+import com.letta.mobile.ui.components.LETTA_PAGE_TITLE_TAG
+import com.letta.mobile.ui.components.LettaPageHeader
 import com.letta.mobile.data.home.FleetSortKey
 import com.letta.mobile.data.home.HomePageActions
 import com.letta.mobile.data.home.HomeShortcut
@@ -28,6 +36,8 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LettaPaneTags
+import com.letta.mobile.ui.host.LocalPaneWindowClass
+import com.letta.mobile.ui.host.PaneWindowClass
 import com.letta.mobile.ui.host.ProvideLettaHost
 import com.letta.mobile.ui.search.LettaSearchConfig
 import com.letta.mobile.ui.search.LettaSearchOpenRequest
@@ -243,6 +253,31 @@ class ShellHeaderTest {
         assertEquals("", queries.last(), "leaving the bar clears the page's filter")
     }
 
+    /** A bar with no leading control starts its title exactly where the page's own title starts, phone and desktop. */
+    @Test
+    fun aBarTitleWithoutNavLinesUpWithThePageContentEdge() = runComposeUiTest {
+        var window by mutableStateOf(PaneWindowClass.Compact)
+        setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalPaneWindowClass provides window) {
+                    ProvideLettaHost(if (window == PaneWindowClass.Compact) LettaHost.Touch else LettaHost.Pointer) {
+                        Column(Modifier.width(if (window == PaneWindowClass.Compact) PHONE_WIDTH else DESKTOP_WIDTH)) {
+                            ShellHeader(title = HeaderTitle.Text("Baken"))
+                            LettaPageHeader(title = "Home")
+                        }
+                    }
+                }
+            }
+        }
+        PaneWindowClass.entries.forEach { windowClass ->
+            window = windowClass
+            waitForIdle()
+            val bar = onNodeWithTag(ShellHeaderTags.TITLE).getUnclippedBoundsInRoot().left
+            val page = onNodeWithTag(LETTA_PAGE_TITLE_TAG).getUnclippedBoundsInRoot().left
+            assertEquals(page.value, bar.value, EDGE_TOLERANCE, "bar title at $bar, page title at $page ($windowClass)")
+        }
+    }
+
     private class RecordingHome : HomePageActions {
         val queries = mutableListOf<String>()
 
@@ -261,5 +296,11 @@ class ShellHeaderTest {
         override fun setShortcutPinned(shortcut: HomeShortcut, pinned: Boolean) = Unit
 
         override fun setAgentPinned(agentId: String, pinned: Boolean) = Unit
+    }
+
+    private companion object {
+        val PHONE_WIDTH = 411.dp
+        val DESKTOP_WIDTH = 1200.dp
+        const val EDGE_TOLERANCE = 0.5f
     }
 }
