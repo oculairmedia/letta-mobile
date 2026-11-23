@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.shell.sidebar
 
+import com.letta.mobile.brand.Brand
 import com.letta.mobile.ui.host.LocalHostTitlesPage
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -71,7 +72,6 @@ import com.letta.mobile.sharedui.resources.shared_notes_hide
 import com.letta.mobile.sharedui.resources.shared_notes_show
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
-import com.letta.mobile.sharedui.resources.shell_workspace_title
 
 /** Test tags for the agent panel's parts. */
 object ShellAgentPanelTags {
@@ -231,7 +231,7 @@ private fun ShellPanelTitleSlot(state: ShellAgentPanelState, onEditAgent: () -> 
     ) { home ->
         if (home) {
             Text(
-                text = stringResource(Res.string.shell_workspace_title),
+                text = Brand.NAME,
                 style = LettaTextStyles.titleMediumSemibold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,

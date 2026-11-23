@@ -16,6 +16,8 @@ plugins {
     // dependency — Compose UI + compiler live in :sharedUI.
     id("io.gitlab.arturbosch.detekt")
     id("org.jetbrains.kotlinx.kover")
+    // The `brand` extension: the product name from branding/brand.properties.
+    id("com.letta.mobile.brand")
     // Kotzilla plugin intentionally NOT applied here. The plugin generates
     // code into commonMain that pulls in JVM/Android-only SDK classes
     // (`io.kotzilla.sdk.*`), which breaks Kotlin/Native (hostNative) test
@@ -52,6 +54,14 @@ tasks.withType<Test>().configureEach {
     environment("LETTA_TOKEN", "letta-trust-test-planted-host-token")
 }
 
+// The runtime `Brand` object (com.letta.mobile.brand.Brand.NAME), generated from branding/brand.properties
+// so every client reads the product name from that one file. DisplayNames.PRODUCT is Brand.NAME.
+val generateBrandSource = tasks.register<com.letta.mobile.brand.GenerateBrandSourceTask>("generateBrandSource") {
+    packageName = "com.letta.mobile.brand"
+    source = brand.kotlinSource("com.letta.mobile.brand")
+    outputDirectory = layout.buildDirectory.dir("generated/brand/commonMain/kotlin")
+}
+
 kotlin {
     android {
         namespace = "com.letta.mobile.sharedlogic"
@@ -77,6 +87,8 @@ kotlin {
 
     sourceSets {
         commonMain {
+            // The generated `Brand` object (see generateBrandSource below).
+            kotlin.srcDir(generateBrandSource)
             dependencies {
                 api(project(":core:ids"))
                 api(project(":core:runtime"))

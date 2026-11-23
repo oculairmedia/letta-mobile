@@ -13,7 +13,11 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 /**
- * letta-mobile-z0ftp: the product is called Baken. No shipped display string may still say "Meridian".
+ * The product is called Baken. No shipped display string may still say "Meridian".
+ *
+ * The name has one source, `branding/brand.properties`: the Android launcher label, the desktop packaging
+ * values, the web title and manifest, and the generated runtime `Brand.NAME` all read it. These tests check
+ * the values through that file and the wiring or generated output that carries them, not repeated literals.
  *
  * Identities that carry the old name stay as they are, because changing them breaks updates or loses data:
  * the Android applicationId, the desktop package/launcher name (`packageName`, which also derives the Windows
@@ -26,10 +30,37 @@ class ProductNameDisplayGuardTest {
     private val compose: Path = root.resolve("android-compose")
 
     @Test
-    fun `Android launcher labels name the product Baken`() {
-        assertEquals("Baken", appName("main"))
-        assertEquals("Baken Dev", appName("debug"))
-        assertEquals("Baken Sideload", appName("sideloadDebug"))
+    fun `the brand source names the product Baken with Dev and Sideload launcher labels`() {
+        assertEquals("Baken", brandName())
+        assertEquals("Dev", brand("brand.label.debug"))
+        assertEquals("Sideload", brand("brand.label.sideloadDebug"))
+    }
+
+    @Test
+    fun `Android launcher labels and icons come from the brand source`() {
+        val gradle = compose.resolve("app/build.gradle.kts").readText()
+        check("brand.androidLabel(variant.name, variant.buildType)" in gradle) { "app_name must be generated per variant" }
+        check("res.directories.add(rootProject.file(brand.androidRes)" in gradle) { "launcher icons must come from branding/android" }
+        val hardcoded = sourceSets(compose.resolve("app/src")).map { it.resolve("res") }
+            .flatMap { dir -> files(dir) { it.extension == "xml" } }
+            .filter { APP_NAME.containsMatchIn(it.readText().withoutXmlComments()) }
+            .map(::relative)
+        check(hardcoded.isEmpty()) { "app_name is generated from the brand source; remove it from $hardcoded" }
+        val copies = files(compose.resolve("app/src/main/res/drawable")) {
+            it.name.startsWith("ic_launcher_") || it.name == "ic_notification.xml"
+        }
+        check(copies.isEmpty()) { "brand icons live in branding/android only: ${copies.map(::relative)}" }
+    }
+
+    @Test
+    fun `the generated runtime Brand object carries the brand name`() {
+        val gradle = compose.resolve("sharedLogic/build.gradle.kts").readText()
+        check("kotlin.srcDir(generateBrandSource)" in gradle) { "sharedLogic must compile the generated Brand object" }
+        val generated = compose.resolve("sharedLogic/build/generated/brand/commonMain/kotlin/com/letta/mobile/brand/Brand.kt")
+        check(Files.isRegularFile(generated)) { "missing ${relative(generated)}; sharedLogic:jvmMainClasses generates it" }
+        check("const val NAME: String = \"${brandName()}\"" in generated.readText()) { "Brand.NAME must equal brand.name" }
+        val displayNames = compose.resolve("sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/DisplayNames.kt")
+        check("const val PRODUCT = Brand.NAME" in displayNames.readText()) { "DisplayNames.PRODUCT must be Brand.NAME" }
     }
 
     @Test
@@ -63,10 +94,13 @@ class ProductNameDisplayGuardTest {
 
     @Test
     fun `web page title and install manifest name the product Baken`() {
+        check("identity.expand(line)" in compose.resolve("web/build.gradle.kts").readText()) {
+            "web must fill $BRAND_TOKEN in index.html and the manifest from the brand source"
+        }
         val web = compose.resolve("web/src/wasmJsMain/resources")
-        val title = Regex("<title>(.*)</title>").find(web.resolve("index.html").readText())?.groupValues?.get(1)
-        assertEquals("Baken", title)
-        val manifest = web.resolve("manifest.webmanifest").readText()
+        val html = web.resolve("index.html").readText().branded()
+        assertEquals("Baken", Regex("<title>(.*)</title>").find(html)?.groupValues?.get(1))
+        val manifest = web.resolve("manifest.webmanifest").readText().branded()
         assertEquals("Baken", manifest.jsonString("name"))
         assertEquals("Baken", manifest.jsonString("short_name"))
     }
@@ -75,8 +109,11 @@ class ProductNameDisplayGuardTest {
     fun `desktop packaging displays Baken`() {
         val gradle = compose.resolve("desktop/build.gradle.kts")
         val text = gradle.readText()
-        assertEquals("Baken", text.gradleString("appName"))
-        assertEquals("Baken", text.gradleString("dockName"))
+        assertEquals("Baken", brandName())
+        listOf("appName = brand.name", "dockName = brand.name", "menuGroup = brand.name", "protocol(brand.name, \"meridian\")")
+            .forEach { check(it in text) { "desktop/build.gradle.kts must read the display name from the brand: `$it`" } }
+        listOf("brand.iconIco", "brand.iconIcns", "brand.iconPng")
+            .forEach { check("iconFile.set(rootProject.file($it))" in text) { "desktop installer icons come from $it" } }
         check(text.gradleString("artifactName")?.startsWith("baken-") == true) {
             "installer/AppImage file names must start with baken-, found ${text.gradleString("artifactName")}"
         }
@@ -99,13 +136,16 @@ class ProductNameDisplayGuardTest {
         assertEquals("44e25263-67d4-443c-b85c-655a41118add", text.gradleString("upgradeUuid"))
         assertEquals("ca.oculair.meridian.desktop", text.gradleString("bundleID"))
         check("-Dnucleus.app.id=ca.oculair.meridian.desktop" in text) { "the Linux Nucleus app id must not move" }
-        check("protocol(\"Baken\", \"meridian\")" in text) { "the deep-link scheme stays meridian://" }
+        check("protocol(brand.name, \"meridian\")" in text) { "the deep-link scheme stays meridian://" }
     }
 
-    private fun appName(sourceSet: String): String? {
-        val strings = compose.resolve("app/src/$sourceSet/res/values/strings.xml").readText()
-        return Regex("""<string name="app_name">([^<]*)</string>""").find(strings)?.groupValues?.get(1)
-    }
+    private fun brand(key: String): String? =
+        Regex("""(?m)^\s*${Regex.escape(key)}\s*=\s*(.*?)\s*$""")
+            .find(compose.resolve("branding/brand.properties").readText())?.groupValues?.get(1)
+
+    private fun brandName(): String = requireNotNull(brand("brand.name")) { "branding/brand.properties has no brand.name" }
+
+    private fun String.branded(): String = replace(BRAND_TOKEN, brandName())
 
     private fun literalHits(file: Path): List<String> = file.readText().literalHitsIn().map { (line, text) -> "${relative(file)}:$line: $text" }
 
@@ -121,7 +161,6 @@ class ProductNameDisplayGuardTest {
 
     private fun relative(file: Path): String = compose.relativize(file).invariantSeparatorsPathString
 
-    
     private fun String.withoutXmlComments(): String = replace(Regex("<!--.*?-->", RegexOption.DOT_MATCHES_ALL), "")
 
     private fun String.jsonString(key: String): String? =
@@ -141,6 +180,8 @@ class ProductNameDisplayGuardTest {
         val OLD_NAME = Regex("""\bMeridian\b""")
         val STRING_LITERAL = Regex(""""(?:[^"\\]|\\.)*"""")
         const val RAW_QUOTE = "\"\"\""
+        const val BRAND_TOKEN = "@BRAND_NAME@"
+        val APP_NAME = Regex("""<string\s+name="app_name"""")
 
         /**
          * The old name inside string literals of this source, as (1-based line, matched text): ordinary quoted strings on

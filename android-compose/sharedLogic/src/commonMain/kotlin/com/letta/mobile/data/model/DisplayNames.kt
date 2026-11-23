@@ -1,5 +1,7 @@
 package com.letta.mobile.data.model
 
+import com.letta.mobile.brand.Brand
+
 /**
  * Human fallbacks for entity display names. Raw ids ("agent-c356b8f2-…") must
  * never reach user-visible text: they read as errors, they are unsearchable by
@@ -12,9 +14,10 @@ object DisplayNames {
 
     /**
      * The product's display name: the title a surface shows when no agent is focused or named (the
-     * shell's top bar, the drawer's panel, a recent conversation whose agent has no name).
+     * shell's top bar, the drawer's panel, a recent conversation whose agent has no name). It is
+     * [Brand.NAME], generated from branding/brand.properties.
      */
-    const val PRODUCT = "Baken"
+    const val PRODUCT = Brand.NAME
 
     /** The product's wordmark as the brand kit sets it (lowercase), on Home's connection hero on every client. */
     val WORDMARK: String = PRODUCT.lowercase()

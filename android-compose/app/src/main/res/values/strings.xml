@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Baken</string>
-    
+    <!-- app_name is generated per variant from branding/brand.properties (see app/build.gradle.kts). -->
     <string name="common_conversations">Conversations</string>
     <string name="common_agents">Agents</string>
     <string name="common_settings">Settings</string>

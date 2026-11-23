@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.shell.workspace
 
+import com.letta.mobile.brand.Brand
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
@@ -12,7 +13,6 @@ import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.shell_open_navigation
-import com.letta.mobile.sharedui.resources.shell_workspace_title
 import com.letta.mobile.ui.chat.AgentIdentity
 import com.letta.mobile.ui.chat.AgentIdentityPill
 import com.letta.mobile.ui.host.LocalLettaHost
@@ -51,7 +51,7 @@ internal fun ShellMinimalWorkspaceHeader(
         ShellHeader(
             title = minimal.identity
                 ?.let { identity -> HeaderTitle.Custom { AgentIdentityPill(identity) } }
-                ?: HeaderTitle.Text(title ?: stringResource(Res.string.shell_workspace_title)),
+                ?: HeaderTitle.Text(title ?: Brand.NAME),
             modifier = modifier,
             search = search,
             controls = HeaderControls(actions = listOf(HeaderAction.Custom { ShellDrawerMenuButton(minimal.onOpenNavigation) })),

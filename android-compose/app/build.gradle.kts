@@ -20,6 +20,8 @@ plugins {
     id("androidx.baselineprofile")
     id("com.mikepenz.aboutlibraries.plugin.android")
     id("org.jetbrains.kotlinx.kover") // version inherited from root
+    // The `brand` extension: launcher label and icons from branding/brand.properties.
+    id("com.letta.mobile.brand")
 }
 
 // Kotzilla observability — debug builds only, gated via Gradle property.
@@ -182,6 +184,14 @@ androidComponents {
     onVariants(selector().withBuildType("debug").withFlavor("distribution" to "root")) { variant ->
         // Keep the existing root development install/data separate from the Play identity.
         variant.applicationId.set("com.letta.mobile.dev")
+    }
+    // The launcher label (`@string/app_name`) comes from the brand source, per variant: root-debug and
+    // sideload-debug install side by side, so brand.properties gives them different suffixes.
+    onVariants { variant ->
+        variant.resValues.put(
+            variant.makeResValueKey("string", "app_name"),
+            com.android.build.api.variant.ResValue(brand.androidLabel(variant.name, variant.buildType)),
+        )
     }
 }
 
@@ -362,6 +372,8 @@ android {
             kotlin.directories += "src/test/java"
         }
         getByName("main") {
+            // Adaptive launcher (background, foreground, monochrome) and notification icon from the brand source.
+            res.directories.add(rootProject.file(brand.androidRes).absolutePath)
             // Iroh QUIC transport native lib (libiroh_ffi.so + libjnidispatch.so)
             // is required by every build variant that exposes Iroh transport;
             // it must not be coupled to the unrelated embedded LettaCode native flag.

@@ -47,7 +47,7 @@ private val DESKTOP_DENSITY_SCALE: Float =
     System.getProperty("letta.desktop.density")?.toFloatOrNull()?.takeIf { it in 0.5f..1.0f } ?: 0.8f
 
 internal const val LETTA_WINDOWS_AUMID = "com.letta.desktop"
-internal const val DESKTOP_APP_NAME = "${com.letta.mobile.data.model.DisplayNames.PRODUCT} Desktop"
+internal const val DESKTOP_APP_NAME = com.letta.mobile.data.model.DisplayNames.PRODUCT
 fun main(args: Array<String>) {
     com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder()).use {
         installBeamShaderTelemetry()

@@ -23,6 +23,10 @@ overviews describe responsibilities, not deployment health or remote-server capa
 
 Host App Server command specifications and argument validation shared by the command-line entry points. Keep process launching in host bindings; construct validated arguments with `buildAppServerServeCommand` and configure them through [AppServerServeSpec](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.appserver/-app-server-serve-spec/index.html). Smoke-run scenarios live in the separate `:appserver-testkit` module.
 
+# Package com.letta.mobile.brand
+
+The product's display identity at runtime. `Brand` is generated at build time from `branding/brand.properties` (the `com.letta.mobile.brand` Gradle plugin), so window titles, the shell header, notifications and `DisplayNames.PRODUCT` read the product name from that one file. Nothing here is edited by hand.
+
 # Package com.letta.mobile.data.chat.layout
 
 Stable view identities for the shared chat content lane. The shell layout owns their order and protects the transcript and composer; chat presentation owns responsive docking, overlays and gestures. No transient run state is persisted in the layout.

@@ -83,6 +83,8 @@ plugins {
     // commonMain that pulls in JVM/Android-only SDK classes â€” applying
     // it there breaks Kotlin/Native test targets.
     id("io.kotzilla.kotzilla-plugin")
+    // The `brand` extension: product name and icon paths from branding/brand.properties.
+    id("com.letta.mobile.brand")
 }
 
 composeCompiler {
@@ -212,13 +214,21 @@ val stageDesktopMermaidNative = tasks.register<Sync>("stageDesktopMermaidNative"
     into(mermaidNativeDir)
 }
 
+// The window/taskbar icon (sharedUI's BakenAppIcon reads /icons/baken-app-icon.png) is the brand
+// source's PNG, the same file the installers use, staged onto the desktop classpath.
+val stageDesktopBrandIcon = tasks.register<Sync>("stageDesktopBrandIcon") {
+    from(rootProject.file(brand.iconPng)) { rename { "baken-app-icon.png" } }
+    into(layout.buildDirectory.dir("generated/brand-resources/icons"))
+}
+
 sourceSets.main {
     resources.srcDir(mermaidNativeDir)
     resources.srcDir(tabletNativeDir)
+    resources.srcDir(stageDesktopBrandIcon.map { it.destinationDir.parentFile })
 }
 
 tasks.named("processResources") {
-    dependsOn(stageDesktopMermaidNative, stageDesktopTabletNative)
+    dependsOn(stageDesktopMermaidNative, stageDesktopTabletNative, stageDesktopBrandIcon)
 }
 
 // Keep the Java API and every non-Linux native member from the pinned upstream
@@ -674,17 +684,18 @@ nucleus.application {
         // Windows NSIS install GUID), the npm name, the Windows Nucleus app id and so the
         // single-instance lock. Renaming it would install Baken beside Meridian instead of upgrading
         // it in place. appName is the display name: productName (installer, Start Menu, uninstall
-        // entry), the Linux .desktop Name= and the macOS bundle name.
+        // entry), the Linux .desktop Name= and the macOS bundle name. Display values come from the
+        // brand source (branding/brand.properties).
         packageName = "Meridian Desktop"
-        appName = "Baken"
+        appName = brand.name
         packageVersion = computeDesktopPackageVersion().get()
-        description = "Baken desktop client."
+        description = "${brand.name} desktop client."
         copyright = "Copyright (C) 2026 Oculair"
         vendor = "Oculair"
         // File names only: the updater picks the installer by extension and arch from latest.yml.
         artifactName = $$"baken-${version}-${os}-${arch}.${ext}"
         // The scheme is identity (existing links and registrations); only its label is display.
-        protocol("Baken", "meridian")
+        protocol(brand.name, "meridian")
 
         publish {
             github {
@@ -699,9 +710,9 @@ nucleus.application {
         windows {
             // Preserve the existing installer identity and discoverability
             // while moving packaging from Compose Desktop to Nucleus.
-            // The Baken app icon: 16-256 px, rendered from the kit's svg/baken-app-icon-lit.svg.
-            iconFile.set(project.file("icons/baken.ico"))
-            menuGroup = "Baken"
+            // The app icon, 16-256 px, from the brand source.
+            iconFile.set(rootProject.file(brand.iconIco))
+            menuGroup = brand.name
             menu = true
             shortcut = true
             perUserInstall = true
@@ -724,7 +735,8 @@ nucleus.application {
         macOS {
             bundleID = "ca.oculair.meridian.desktop"
             appCategory = "public.app-category.productivity"
-            dockName = "Baken"
+            dockName = brand.name
+            iconFile.set(rootProject.file(brand.iconIcns))
             providers.environmentVariable("APPLE_SIGNING_IDENTITY").orNull?.let { signingIdentity ->
                 signing {
                     sign.set(true)
@@ -744,8 +756,8 @@ nucleus.application {
         }
 
         linux {
-            // The Baken app icon at 512 px (kit svg/baken-app-icon-lit.svg), used for the .desktop entry.
-            iconFile.set(project.file("icons/baken.png"))
+            // The app icon at 512 px from the brand source, used for the .desktop entry.
+            iconFile.set(rootProject.file(brand.iconPng))
             appCategory = "Utility"
             // Identity: ties running windows to the installed launcher entry.
             startupWMClass = "Meridian Desktop"

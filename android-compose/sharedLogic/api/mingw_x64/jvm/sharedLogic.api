@@ -42,6 +42,11 @@ public final class com/letta/mobile/appserver/AppServerServeSpecKt {
 	public static final fun formatProcessCommand (Ljava/util/List;)Ljava/lang/String;
 }
 
+public final class com/letta/mobile/brand/Brand {
+	public static final field INSTANCE Lcom/letta/mobile/brand/Brand;
+	public static final field NAME Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/a2ui/A2uiAction {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/data/a2ui/A2uiActionOrigin;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/data/a2ui/A2uiActionOrigin;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
