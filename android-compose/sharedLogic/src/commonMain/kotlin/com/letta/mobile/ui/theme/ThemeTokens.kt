@@ -60,12 +60,15 @@ object LettaColorTokens {
     // on its theme's surfaces; its ink and container pair read at 4.5:1 or more.
     const val DARK_SECONDARY = 0xFF7A96AA
     const val DARK_ON_SECONDARY = 0xFF0D1821
+    // The selected surface (a chosen chip, segment or picker row): a petrol step above the surfaces, onSurface ink.
+    const val DARK_SECONDARY_CONTAINER = 0xFF243F52
     const val DARK_TERTIARY = 0xFF9FB4C4
     const val DARK_ON_TERTIARY = 0xFF0D1821
     const val DARK_TERTIARY_CONTAINER = 0xFF263B4B
     const val DARK_ON_TERTIARY_CONTAINER = 0xFFDCE6EE
     const val LIGHT_SECONDARY = 0xFF3D5A70
     const val LIGHT_ON_SECONDARY = 0xFFFFFFFF
+    const val LIGHT_SECONDARY_CONTAINER = 0xFFC8D7E3
     const val LIGHT_TERTIARY = 0xFF4F6B80
     const val LIGHT_ON_TERTIARY = 0xFFFFFFFF
     const val LIGHT_TERTIARY_CONTAINER = 0xFFD8E3EC

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Meridian</string>
+    <string name="app_name">Baken</string>
     
     <string name="common_conversations">Conversations</string>
     <string name="common_agents">Agents</string>
@@ -132,14 +132,14 @@
     <string name="screen_project_bug_report_attachment_recording">Record screen</string>
     <string name="screen_project_bug_report_recent_meta">%1$s severity • %2$s</string>
     <string name="channel_notifications_name">Agent updates</string>
-    <string name="channel_notifications_description">Background delivery for new Letta messages</string>
+    <string name="channel_notifications_description">Background delivery for new Baken messages</string>
     <string name="approval_notifications_channel_name">Approval requests</string>
     <string name="approval_notifications_channel_description">An agent is paused until you allow or deny a tool call</string>
-    <string name="channel_notifications_fallback_title">Letta update</string>
+    <string name="channel_notifications_fallback_title">Baken update</string>
     <string name="channel_notifications_fallback_text">Open the conversation to see the latest update.</string>
     <string name="push_service_channel_name">Live chat sync</string>
     <string name="push_service_channel_description">Keeps the app connected to the Letta server so incoming messages arrive in real time.</string>
-    <string name="push_service_notification_title">Letta chat sync active</string>
+    <string name="push_service_notification_title">Baken chat sync active</string>
     <string name="push_service_notification_text">Listening for new messages.</string>
     <string name="lettacode_runtime_service_channel_name">Local LettaCode runtime</string>
     <string name="lettacode_runtime_service_channel_description">Runs the embedded LettaCode local runtime while local chat is active.</string>

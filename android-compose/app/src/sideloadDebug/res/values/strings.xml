@@ -10,5 +10,5 @@
       launcher icons on the same device. Keep this distinct from root-debug's
       "Meridian Dev" so the sideload build is recognizable at a glance.
     -->
-    <string name="app_name">Meridian Sideload</string>
+    <string name="app_name">Baken Sideload</string>
 </resources>

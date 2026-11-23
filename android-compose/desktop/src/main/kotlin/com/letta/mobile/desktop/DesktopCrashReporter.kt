@@ -60,7 +60,7 @@ object DesktopCrashReporter {
             !message.contains(' ') &&
             (message.contains('/') || message.contains('$'))
         return if (throwable is LinkageError || looksLikeInternalClassName) {
-            "Letta Desktop hit a code-loading error. This usually means the app " +
+            "$DESKTOP_APP_NAME hit a code-loading error. This usually means the app " +
                 "needs to be restarted or reinstalled after an update."
         } else {
             message.ifEmpty { throwable::class.simpleName ?: "Unexpected error" }

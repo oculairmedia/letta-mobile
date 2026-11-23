@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import com.letta.mobile.ui.components.foundation.lettaSliderColors
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.theme.LettaDimens
@@ -83,6 +84,7 @@ fun StepSlider(spec: StepSliderSpec, callbacks: StepSliderCallbacks, modifier: M
             enabled = enabled,
             valueRange = 0f..lastIndex.toFloat(),
             steps = (spec.count - 2).coerceAtLeast(0),
+            colors = lettaSliderColors(),
             modifier = Modifier
                 .weight(1f)
                 .testTag(spec.sliderTag)

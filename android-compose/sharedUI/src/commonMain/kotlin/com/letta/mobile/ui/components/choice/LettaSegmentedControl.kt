@@ -1,11 +1,13 @@
 package com.letta.mobile.ui.components.choice
 
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -54,15 +56,20 @@ private fun SegmentIcon(segment: LettaSegment, selected: Boolean, choice: LettaS
     if (icon != null) {
         LettaIcon(icon, contentDescription = null, style = LettaIconStyle(LettaControlTokens.icon))
     } else if (!choice.iconOnly && choice.showCheck) {
-        SegmentedButtonDefaults.Icon(active = selected)
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
+            SegmentedButtonDefaults.Icon(active = selected)
+        }
     }
 }
 
-/** The selected segment in the secondary container; the rest on the surface behind them. */
+/**
+ * The selected segment on the neutral petrol selected surface (secondaryContainer) with onSurface words; the rest on
+ * the surface behind them. The selected segment's check is the brand primary (see [SegmentIcon]).
+ */
 @Composable
 private fun lettaSegmentColors() = SegmentedButtonDefaults.colors(
     activeContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-    activeContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    activeContentColor = MaterialTheme.colorScheme.onSurface,
     inactiveContainerColor = Color.Transparent,
     inactiveContentColor = MaterialTheme.colorScheme.onSurface,
 )
