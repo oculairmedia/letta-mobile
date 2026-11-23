@@ -3199,6 +3199,67 @@ public final class com/letta/mobile/ui/components/foundation/LettaToggleRowKt {
 	public static final fun LettaToggleRow (Lcom/letta/mobile/ui/components/foundation/LettaRowLabel;ZLkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
 
+public final class com/letta/mobile/ui/components/gesture/SwipeAwayAxis : java/lang/Enum {
+	public static final field Horizontal Lcom/letta/mobile/ui/components/gesture/SwipeAwayAxis;
+	public static final field Vertical Lcom/letta/mobile/ui/components/gesture/SwipeAwayAxis;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/components/gesture/SwipeAwayAxis;
+	public static fun values ()[Lcom/letta/mobile/ui/components/gesture/SwipeAwayAxis;
+}
+
+public final class com/letta/mobile/ui/components/gesture/SwipeAwayExit : java/lang/Enum {
+	public static final field InPlace Lcom/letta/mobile/ui/components/gesture/SwipeAwayExit;
+	public static final field OffEdge Lcom/letta/mobile/ui/components/gesture/SwipeAwayExit;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/components/gesture/SwipeAwayExit;
+	public static fun values ()[Lcom/letta/mobile/ui/components/gesture/SwipeAwayExit;
+}
+
+public final class com/letta/mobile/ui/components/gesture/SwipeAwayKt {
+	public static final fun swipeAway (Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/gesture/SwipeAwaySpec;ZLkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;II)Landroidx/compose/ui/Modifier;
+}
+
+public final class com/letta/mobile/ui/components/gesture/SwipeAwayRelease {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/ui/components/gesture/SwipeAwayExit;II)V
+	public final fun getExit ()Lcom/letta/mobile/ui/components/gesture/SwipeAwayExit;
+	public final fun getExitMillis ()I
+	public final fun getSettleMillis ()I
+}
+
+public final class com/letta/mobile/ui/components/gesture/SwipeAwaySpec {
+	public static final field $stable I
+	public static final field Companion Lcom/letta/mobile/ui/components/gesture/SwipeAwaySpec$Companion;
+	public static final field FULL_FADE F
+	public fun <init> (Lcom/letta/mobile/ui/components/gesture/SwipeAwayThreshold;Lcom/letta/mobile/ui/components/gesture/SwipeAwayRelease;Lcom/letta/mobile/ui/components/gesture/SwipeAwayAxis;F)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/components/gesture/SwipeAwayThreshold;Lcom/letta/mobile/ui/components/gesture/SwipeAwayRelease;Lcom/letta/mobile/ui/components/gesture/SwipeAwayAxis;FILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAxis ()Lcom/letta/mobile/ui/components/gesture/SwipeAwayAxis;
+	public final fun getFade ()F
+	public final fun getRelease ()Lcom/letta/mobile/ui/components/gesture/SwipeAwayRelease;
+	public final fun getThreshold ()Lcom/letta/mobile/ui/components/gesture/SwipeAwayThreshold;
+}
+
+public final class com/letta/mobile/ui/components/gesture/SwipeAwaySpec$Companion {
+}
+
+public abstract interface class com/letta/mobile/ui/components/gesture/SwipeAwayThreshold {
+	public abstract fun px (Landroidx/compose/ui/unit/Density;F)F
+}
+
+public final class com/letta/mobile/ui/components/gesture/SwipeAwayThreshold$Distance : com/letta/mobile/ui/components/gesture/SwipeAwayThreshold {
+	public static final field $stable I
+	public synthetic fun <init> (FLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getDistance-D9Ej5fM ()F
+	public fun px (Landroidx/compose/ui/unit/Density;F)F
+}
+
+public final class com/letta/mobile/ui/components/gesture/SwipeAwayThreshold$Fraction : com/letta/mobile/ui/components/gesture/SwipeAwayThreshold {
+	public static final field $stable I
+	public fun <init> (F)V
+	public final fun getFraction ()F
+	public fun px (Landroidx/compose/ui/unit/Density;F)F
+}
+
 public final class com/letta/mobile/ui/components/list/RosterAction {
 	public static final field $stable I
 	public fun <init> (Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;Lkotlin/jvm/functions/Function0;)V
@@ -12177,6 +12238,7 @@ public final class com/letta/mobile/ui/theme/ChatHeadDimens {
 	public static final field popupMaxWidthFraction F
 	public static final field popupPeekLines I
 	public static final field popupSwipeDismissFraction F
+	public static final field popupSwipeFade F
 	public static final field snapMillis I
 	public final fun getAvatar-D9Ej5fM ()F
 	public final fun getBottomClearance-D9Ej5fM ()F

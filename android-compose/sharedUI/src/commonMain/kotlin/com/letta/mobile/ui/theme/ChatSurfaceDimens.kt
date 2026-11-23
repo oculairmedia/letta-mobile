@@ -131,6 +131,9 @@ object ChatHeadDimens {
     /** A horizontal swipe past this share of the popup's width dismisses it. */
     const val popupSwipeDismissFraction: Float = 0.35f
 
+    /** How much a popup swiped its full width fades: it stays a little visible as it goes. */
+    const val popupSwipeFade: Float = 0.6f
+
     /** The head's lift off the canvas. */
     val elevation: Dp = 6.dp
 

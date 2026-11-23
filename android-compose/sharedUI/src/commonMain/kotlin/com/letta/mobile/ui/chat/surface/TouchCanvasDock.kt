@@ -9,7 +9,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -92,6 +91,11 @@ import com.letta.mobile.sharedui.resources.chat_surface_docked_reply_expand
 import com.letta.mobile.sharedui.resources.chat_surface_head
 import com.letta.mobile.sharedui.resources.chat_surface_head_agent
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.ui.components.gesture.SwipeAwayExit
+import com.letta.mobile.ui.components.gesture.SwipeAwayRelease
+import com.letta.mobile.ui.components.gesture.SwipeAwaySpec
+import com.letta.mobile.ui.components.gesture.SwipeAwayThreshold
+import com.letta.mobile.ui.components.gesture.swipeAway
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchor
 import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
 import com.letta.mobile.ui.mascot.AgentAvatar
@@ -100,10 +104,10 @@ import com.letta.mobile.ui.theme.ChatHeadDimens
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.TouchComposerDimens
 import com.letta.mobile.ui.theme.headAnchoredShape
-import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -490,7 +494,7 @@ private fun PopupCard(reply: PopupTurn, content: TouchHeadContent, style: PopupC
     val scheme = MaterialTheme.colorScheme
     val shape = remember(style.placement.headOnRight, style.below) { popupShape(style) }
     Surface(
-        modifier = Modifier.testTag(TOUCH_POPUP_TAG).then(rememberSwipeToDismiss(style.motion, reply.dismiss)),
+        modifier = Modifier.testTag(TOUCH_POPUP_TAG).swipeAway(PopupSwipe, onDismiss = reply.dismiss),
         shape = shape,
         color = scheme.surfaceContainerHigh,
         contentColor = scheme.onSurface,
@@ -513,33 +517,18 @@ private fun popupShape(style: PopupCardStyle): Shape {
 
 /**
  * Swiping the card sideways drags it with the finger, fading as it goes; let go past
- * [ChatHeadDimens.popupSwipeDismissFraction] of its width and it is dismissed, short of that it
- * eases back (snaps, under reduced motion).
+ * [ChatHeadDimens.popupSwipeDismissFraction] of its width and it is dismissed where it is (its pop
+ * exit takes it away), short of that it eases back (snaps, under reduced motion).
  */
-@Composable
-private fun rememberSwipeToDismiss(motion: ChatRowMotion, onDismiss: () -> Unit): Modifier {
-    val offset = remember { Animatable(0f) }
-    val scope = rememberCoroutineScope()
-    val currentDismiss by rememberUpdatedState(onDismiss)
-    val currentMotion by rememberUpdatedState(motion)
-    val settle: () -> Unit = { scope.launch { offset.animateTo(0f, currentMotion.contentSize()) } }
-    return Modifier
-        .graphicsLayer {
-            translationX = offset.value
-            alpha = 1f - (abs(offset.value) / size.width.coerceAtLeast(1f)).coerceIn(0f, 1f) * SWIPE_FADE
-        }
-        .pointerInput(Unit) {
-            detectHorizontalDragGestures(
-                onDragEnd = {
-                    if (abs(offset.value) > size.width * ChatHeadDimens.popupSwipeDismissFraction) currentDismiss() else settle()
-                },
-                onDragCancel = settle,
-            ) { change, amount ->
-                change.consume()
-                scope.launch { offset.snapTo(offset.value + amount) }
-            }
-        }
-}
+private val PopupSwipe = SwipeAwaySpec(
+    threshold = SwipeAwayThreshold.Fraction(ChatHeadDimens.popupSwipeDismissFraction),
+    release = SwipeAwayRelease(
+        SwipeAwayExit.InPlace,
+        exitMillis = LettaMotionTokens.EXIT_MILLIS,
+        settleMillis = LettaMotionTokens.CONTENT_SIZE_MILLIS,
+    ),
+    fade = ChatHeadDimens.popupSwipeFade,
+)
 
 /** What the popup says, as one announcement: the reply (with who says it) and the working line. */
 @Composable
@@ -693,10 +682,6 @@ internal fun TouchInputTray(content: @Composable ColumnScope.() -> Unit) {
 private const val INPUT_TRAY_MAX_HEIGHT_FRACTION = 0.6f
 
 private const val HALF = 0.5f
-
-
-/** How much a fully swiped popup fades. */
-private const val SWIPE_FADE = 0.6f
 
 /** The popup measures at most this much of a reply to size itself; a longer one fills its width. */
 private const val PEEK_MEASURE_CHARS = 160
