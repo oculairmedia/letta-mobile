@@ -210,9 +210,10 @@ fun LettaChatTheme(
     // accordingly so it doesn't churn on fontScale-only changes.
     val chatColors = remember(colorScheme) {
         ChatColors(
-            userBubble = colorScheme.primaryContainer,
-            userText = colorScheme.onPrimaryContainer,
-            userRoleLabel = colorScheme.onPrimaryContainer.copy(alpha = 0.86f),
+            // The neutral user bubble every client draws (lettaUserBubble), with onSurface text: no vermilion fill.
+            userBubble = lettaUserBubble(colorScheme),
+            userText = colorScheme.onSurface,
+            userRoleLabel = colorScheme.onSurfaceVariant,
             agentBubble = colorScheme.surfaceContainerLow,
             agentText = colorScheme.onSurface,
             agentRoleLabel = colorScheme.primary,

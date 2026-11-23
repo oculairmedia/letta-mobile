@@ -31,6 +31,7 @@ import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import com.letta.mobile.ui.chat.surface.sendflight.SendFlightTestTags
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
 import com.letta.mobile.ui.theme.ChatMotionTokens
+import com.letta.mobile.ui.theme.lettaUserBubble
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -87,7 +88,7 @@ class SendFlightChatSurfaceTest {
         mainClock.autoAdvance = false
         setPointerContent {
             MaterialTheme {
-                bubbleFill = MaterialTheme.colorScheme.primaryContainer
+                bubbleFill = lettaUserBubble(MaterialTheme.colorScheme)
                 ChatSurface(
                     port = port,
                     presentation = presentation,
@@ -115,8 +116,8 @@ class SendFlightChatSurfaceTest {
         assertTrue(abs(row.left - ghost.left) <= PIXEL_TOLERANCE, "on its start edge, right-aligned as the bubble ($ghost vs $row)")
         assertTrue(abs(row.width - ghost.width) <= PIXEL_TOLERANCE, "at the bubble's width ($ghost vs $row)")
         assertTrue(abs(row.height - ghost.height) <= PIXEL_TOLERANCE, "at the bubble's height ($ghost vs $row)")
-        // Landed, the ghost IS the bubble: the primaryContainer fill, not the old grey card.
-        assertTrue(fillPixels(ghost, bubbleFill) > (ghost.width * ghost.height) / 2, "the ghost lands as the teal bubble")
+        // Landed, the ghost IS the bubble: the neutral user bubble fill, not the old grey card.
+        assertTrue(fillPixels(ghost, bubbleFill) > (ghost.width * ghost.height) / 2, "the ghost lands as the user bubble")
 
         mainClock.advanceTimeBy(ChatMotionTokens.SendFlight.HANDOFF_MILLIS + FRAME_SLACK)
         assertEquals(0, ghosts(), "the ghost hands off to the row")
@@ -130,7 +131,7 @@ class SendFlightChatSurfaceTest {
         mainClock.autoAdvance = false
         setPointerContent {
             MaterialTheme {
-                bubbleFill = MaterialTheme.colorScheme.primaryContainer
+                bubbleFill = lettaUserBubble(MaterialTheme.colorScheme)
                 ChatSurface(
                     port = port,
                     presentation = ChatSurfacePresentation.ChatFirst,

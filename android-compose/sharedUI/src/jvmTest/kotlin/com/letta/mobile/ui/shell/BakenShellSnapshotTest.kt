@@ -24,6 +24,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
+import com.letta.mobile.ui.chat.AgentSphere
+import com.letta.mobile.ui.chat.surface.timeline.rows.RenderRow
+import com.letta.mobile.ui.chat.surface.timeline.rows.message
+import com.letta.mobile.ui.chat.surface.timeline.rows.single
 import com.letta.mobile.ui.shell.pages.home.HomeConnectionPanel
 import com.letta.mobile.ui.shell.pages.home.HomeConnectionState
 import com.letta.mobile.ui.shell.rail.ShellAgentRail
@@ -38,9 +42,9 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * letta-mobile-0sb6o: the shell in the Baken brand (Home rail with the Baken mark, the Home hero with the two-colour
- * mark and the wordmark, a vermilion primary action and a composer) rendered in both themes to build/baken-shell-snapshots
- * for review.
+ * The shell in the Baken brand (Home rail with the Baken mark, the Home hero with the two-colour mark and the wordmark,
+ * a vermilion primary action and a composer) and a short chat (the user's neutral bubble, the assistant sphere),
+ * rendered in both themes to build/baken-shell-snapshots for review.
  */
 class BakenShellSnapshotTest {
     private val entries = ShellRailMapping.entries(
@@ -72,8 +76,35 @@ class BakenShellSnapshotTest {
         assertTrue(out.length() > 0)
     }
 
+    /** A short chat (the user's neutral bubble, the agent's reply under the vermilion-to-petrol sphere) in one theme. */
+    private fun chatSnapshot(dark: Boolean) = runDesktopComposeUiTest(width = WINDOW_WIDTH, height = WINDOW_HEIGHT) {
+        setContent {
+            SharedMaterialTheme(darkTheme = dark) {
+                Column(
+                    Modifier.size(CHAT_WIDTH.dp, CHAT_HEIGHT.dp).background(MaterialTheme.colorScheme.background).padding(16.dp)
+                        .testTag(FRAME),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    RenderRow(single(message("u1", "user", "Plan a taco night for six")))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AgentSphere(size = 28.dp)
+                        Text("Sure: three fillings, two salsas, and a lime crema.", color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    RenderRow(single(message("u2", "user", "Make one of them vegetarian")))
+                }
+            }
+        }
+        waitForIdle()
+        val out = File("build/baken-shell-snapshots").apply { mkdirs() }.resolve("chat-${if (dark) "dark" else "light"}.png")
+        ImageIO.write(onNodeWithTag(FRAME).captureToImage().toAwtImage(), "png", out)
+        assertTrue(out.length() > 0)
+    }
+
     @Test
     fun shellInBothThemes() = listOf(true, false).forEach(::snapshot)
+
+    @Test
+    fun chatInBothThemes() = listOf(true, false).forEach(::chatSnapshot)
 
     private companion object {
         const val FRAME = "baken-shell-frame"
@@ -82,5 +113,7 @@ class BakenShellSnapshotTest {
         const val FRAME_WIDTH = 760
         const val FRAME_HEIGHT = 600
         const val CONTENT_WIDTH = 680
+        const val CHAT_WIDTH = 520
+        const val CHAT_HEIGHT = 320
     }
 }

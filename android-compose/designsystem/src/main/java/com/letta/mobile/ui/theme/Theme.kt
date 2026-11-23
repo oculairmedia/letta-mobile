@@ -26,7 +26,7 @@ private fun warningInk(isLightTheme: Boolean): Color =
 
 /**
  * Warning is a fixed amber (LettaColorTokens), harmonized toward the scheme's primary, never the scheme's
- * tertiary: in the teal presets that is a calm accent, not a warning. Returns the ink and its container.
+ * tertiary: in the brand palette that is the calm steel mist, not a warning. Returns the ink and its container.
  */
 private fun harmonizedWarningPair(colorScheme: ColorScheme, isLightTheme: Boolean): Pair<Color, Color> {
     val warningInk = warningInk(isLightTheme)
@@ -79,7 +79,7 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
         alpha = if (isLightTheme) 0.18f else 0.28f,
     ).compositeOver(colorScheme.surfaceContainerHigh)
     return CustomColors(
-        userBubbleBgColor = colorScheme.primaryContainer,
+        userBubbleBgColor = lettaUserBubble(colorScheme),
         agentBubbleBgColor = colorScheme.surfaceContainerLow,
         reasoningBubbleBgColor = colorScheme.tertiaryContainer.copy(alpha = REASONING_BUBBLE_FILL_ALPHA),
         toolBubbleBgColor = colorScheme.secondaryContainer,
@@ -114,7 +114,7 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
         agentCColor = Color(if (isLightTheme) 0xFFC03D8E else 0xFFE36FB3),
         // Muted captions + memory-block category colors (fixed brand values).
         onSurfaceMutedColor = Color(if (isLightTheme) LettaColorTokens.LIGHT_ON_SURFACE_MUTED else LettaColorTokens.DARK_ON_SURFACE_MUTED),
-        categoryPersonaColor = Color(0xFF00BFA5),
+        categoryPersonaColor = lettaCategoryPersona(colorScheme),
         categoryHumanColor = Color(if (isLightTheme) 0xFF2F6FB0 else 0xFF5C9BD6),
         categoryOnboardingColor = Color(if (isLightTheme) 0xFF9A6A1F else 0xFFD1A05A),
         categoryProjectColor = Color(if (isLightTheme) 0xFF6E5BB8 else 0xFF9B8AE0),
@@ -136,6 +136,27 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
         borderDefault = colorScheme.outlineVariant,
         borderFocused = colorScheme.primary,
         borderCritical = harmonizedError,
+    )
+}
+
+/**
+ * The scheme LettaTheme draws: [base] with the accent contrast boost. On the brand palette (Default, no wallpaper
+ * colours) the support roles stay the kit's own slate and mist: the boost's saturation floor would turn the muted
+ * slate into a vivid blue, and vermilion is the only accent.
+ */
+@VisibleForTesting
+internal fun lettaThemeScheme(base: ColorScheme, brandPalette: Boolean): ColorScheme {
+    val boosted = base.withLettaContrastBoost()
+    if (!brandPalette) return boosted
+    return boosted.copy(
+        secondary = base.secondary,
+        onSecondary = base.onSecondary,
+        secondaryContainer = base.secondaryContainer,
+        onSecondaryContainer = base.onSecondaryContainer,
+        tertiary = base.tertiary,
+        onTertiary = base.onTertiary,
+        tertiaryContainer = base.tertiaryContainer,
+        onTertiaryContainer = base.onTertiaryContainer,
     )
 }
 
@@ -161,14 +182,16 @@ fun LettaTheme(
     }
 
     val presetColors = presetThemeColors(themePreset)
-    val baseColorScheme = if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    val wallpaperColors = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val baseColorScheme = if (wallpaperColors) {
         dynamicColorSchemeForApi31(context, useDarkTheme)
     } else {
         if (useDarkTheme) presetColors.darkScheme else presetColors.lightScheme
     }
     ProvideAccessibilityPolicy {
         val highContrast = LocalHighContrast.current
-        val colorScheme = baseColorScheme.withLettaContrastBoost().let { boosted ->
+        val brandPalette = !wallpaperColors && themePreset == ThemePreset.DEFAULT
+        val colorScheme = lettaThemeScheme(baseColorScheme, brandPalette).let { boosted ->
             if (highContrast) boosted.withHighContrast() else boosted
         }
         val customColors = deriveCustomColors(colorScheme)

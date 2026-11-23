@@ -11,6 +11,12 @@ package com.letta.mobile.data.model
 object DisplayNames {
 
     /**
+     * The product's display name: the title a surface shows when no agent is focused or named (the
+     * shell's top bar, the drawer's panel, a recent conversation whose agent has no name).
+     */
+    const val PRODUCT = "Baken"
+
+    /**
      * The agent's name when it has a usable one, else "Agent <short-id>".
      * A "name" that is itself the raw id (upstream fallback already applied)
      * counts as unusable.

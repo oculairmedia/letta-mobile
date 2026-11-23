@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,14 +65,14 @@ private fun lettaDarkScheme(): ColorScheme = darkColorScheme(
     onPrimary = Color(LettaColorTokens.DARK_ON_PRIMARY),
     primaryContainer = Color(LettaColorTokens.DARK_PRIMARY_VARIANT),
     onPrimaryContainer = Color(LettaColorTokens.DARK_ON_PRIMARY),
-    secondary = Color(LettaColorTokens.TEAL_ACCENT),
-    onSecondary = Color(0xFF06302B),
+    secondary = Color(LettaColorTokens.DARK_SECONDARY),
+    onSecondary = Color(LettaColorTokens.DARK_ON_SECONDARY),
     secondaryContainer = Color(LettaColorTokens.DARK_SURFACE_CONTAINER_HIGH),
     onSecondaryContainer = Color(LettaColorTokens.DARK_ON_SURFACE),
-    tertiary = Color(LettaColorTokens.CYAN_ACCENT),
-    onTertiary = Color(0xFF002B30),
-    tertiaryContainer = Color(0xFF143C42),
-    onTertiaryContainer = Color(0xFFCFF6FB),
+    tertiary = Color(LettaColorTokens.DARK_TERTIARY),
+    onTertiary = Color(LettaColorTokens.DARK_ON_TERTIARY),
+    tertiaryContainer = Color(LettaColorTokens.DARK_TERTIARY_CONTAINER),
+    onTertiaryContainer = Color(LettaColorTokens.DARK_ON_TERTIARY_CONTAINER),
     background = Color(LettaColorTokens.DARK_BACKGROUND),
     onBackground = Color(LettaColorTokens.DARK_ON_SURFACE),
     surface = Color(LettaColorTokens.DARK_SURFACE),
@@ -96,14 +97,14 @@ private fun lettaLightScheme(): ColorScheme = lightColorScheme(
     onPrimary = Color(LettaColorTokens.LIGHT_ON_PRIMARY),
     primaryContainer = Color(LettaColorTokens.LIGHT_PRIMARY).copy(alpha = LIGHT_PRIMARY_CONTAINER_TINT),
     onPrimaryContainer = Color(LettaColorTokens.LIGHT_ON_SURFACE),
-    secondary = Color(LettaColorTokens.LIGHT_PRIMARY),
-    onSecondary = Color(LettaColorTokens.LIGHT_ON_PRIMARY),
+    secondary = Color(LettaColorTokens.LIGHT_SECONDARY),
+    onSecondary = Color(LettaColorTokens.LIGHT_ON_SECONDARY),
     secondaryContainer = Color(LettaColorTokens.LIGHT_SURFACE_CONTAINER),
     onSecondaryContainer = Color(LettaColorTokens.LIGHT_ON_SURFACE),
-    tertiary = Color(0xFF007D8A),
-    onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFC7F1F5),
-    onTertiaryContainer = Color(0xFF002F34),
+    tertiary = Color(LettaColorTokens.LIGHT_TERTIARY),
+    onTertiary = Color(LettaColorTokens.LIGHT_ON_TERTIARY),
+    tertiaryContainer = Color(LettaColorTokens.LIGHT_TERTIARY_CONTAINER),
+    onTertiaryContainer = Color(LettaColorTokens.LIGHT_ON_TERTIARY_CONTAINER),
     background = Color(LettaColorTokens.LIGHT_BACKGROUND),
     onBackground = Color(LettaColorTokens.LIGHT_ON_SURFACE),
     surface = Color(LettaColorTokens.LIGHT_SURFACE),
@@ -126,7 +127,7 @@ private fun lettaLightScheme(): ColorScheme = lightColorScheme(
 /** The Letta [CustomColors] derived from a [lettaColorScheme] (fixed brand status/agent colours). */
 fun lettaCustomColors(scheme: ColorScheme): CustomColors =
     CustomColors(
-        userBubbleBgColor = scheme.primaryContainer,
+        userBubbleBgColor = lettaUserBubble(scheme),
         agentBubbleBgColor = scheme.surfaceContainerLow,
         reasoningBubbleBgColor = scheme.tertiaryContainer.copy(alpha = 0.72f),
         toolBubbleBgColor = scheme.surfaceContainer,
@@ -152,7 +153,7 @@ fun lettaCustomColors(scheme: ColorScheme): CustomColors =
         agentBColor = Color(0xFF4C9AFF),
         agentCColor = Color(0xFFE36FB3),
         onSurfaceMutedColor = scheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.muted),
-        categoryPersonaColor = Color(LettaColorTokens.DARK_CATEGORY_PERSONA),
+        categoryPersonaColor = lettaCategoryPersona(scheme),
         categoryHumanColor = Color(LettaColorTokens.DARK_CATEGORY_HUMAN),
         categoryOnboardingColor = Color(LettaColorTokens.DARK_CATEGORY_ONBOARDING),
         categoryProjectColor = Color(LettaColorTokens.DARK_CATEGORY_PROJECT),
@@ -168,6 +169,26 @@ fun lettaCustomColors(scheme: ColorScheme): CustomColors =
         borderFocused = scheme.primary,
         borderCritical = scheme.error,
     )
+
+/**
+ * The user's chat bubble on [scheme]: a neutral surface, never the vermilion. On the brand palette it is the named
+ * token (LettaColorTokens.DARK_USER_BUBBLE, a deep-sea step above the agent's bubble, or LIGHT_USER_BUBBLE, a soft
+ * mist); on any other scheme (a preset, Android's wallpaper colours) it is that scheme's surface lifted toward its
+ * ink by the same small step, so it stays neutral there too. Text on it is `onSurface`. Every client (desktop and
+ * web through [lettaCustomColors], Android through its custom colours and LettaChatTheme, the shared timeline rows)
+ * reads the bubble from here.
+ */
+fun lettaUserBubble(scheme: ColorScheme): Color = when (scheme.surface) {
+    Color(LettaColorTokens.DARK_SURFACE) -> Color(LettaColorTokens.DARK_USER_BUBBLE)
+    Color(LettaColorTokens.LIGHT_SURFACE) -> Color(LettaColorTokens.LIGHT_USER_BUBBLE)
+    else -> scheme.onSurface
+        .copy(alpha = if (scheme.isLight()) LIGHT_USER_BUBBLE_LIFT else DARK_USER_BUBBLE_LIFT)
+        .compositeOver(scheme.surface)
+}
+
+/** The persona memory category's colour on [scheme]: the brand's vermilion family, deepened on a light theme. */
+fun lettaCategoryPersona(scheme: ColorScheme): Color =
+    Color(if (scheme.isLight()) LettaColorTokens.LIGHT_CATEGORY_PERSONA else LettaColorTokens.DARK_CATEGORY_PERSONA)
 
 /** The amber warning ink of [scheme]'s brightness ([LettaColorTokens.LIGHT_WARNING] / DARK_WARNING). */
 private fun warningInk(scheme: ColorScheme): Color =
@@ -225,6 +246,10 @@ val SharedShapes: Shapes = Shapes(
  * (the user's bubble, a selected row), not content, so it sits far below the content alpha floor.
  */
 private const val LIGHT_PRIMARY_CONTAINER_TINT = 0.16f
+
+/** How far a non-brand scheme's user bubble lifts its surface toward its ink, per theme. */
+private const val LIGHT_USER_BUBBLE_LIFT = 0.1f
+private const val DARK_USER_BUBBLE_LIFT = 0.05f
 
 /** Whether [this] is a light scheme: its surface is light. */
 private fun ColorScheme.isLight(): Boolean = surface.luminance() > LIGHT_SURFACE_LUMINANCE

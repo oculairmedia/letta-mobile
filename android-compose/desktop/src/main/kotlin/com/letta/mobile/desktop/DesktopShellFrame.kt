@@ -21,6 +21,7 @@ import com.letta.mobile.data.memory.graph.MemoryPageState
 import com.letta.mobile.data.tools.ToolLibraryState
 import com.letta.mobile.desktop.workspace.rememberDesktopFileMentions
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.presence.presenceByAgent
@@ -178,7 +179,7 @@ private fun selectedAgentName(
     chatState: DesktopChatSurfaceState,
 ): String {
     val railName = railAgents.firstOrNull { it.first == selectedAgentId }?.second
-    return railName ?: chatState.selectedConversation?.agentName ?: "Letta"
+    return railName ?: chatState.selectedConversation?.agentName ?: DisplayNames.PRODUCT
 }
 
 @Composable
