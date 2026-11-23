@@ -180,8 +180,9 @@ internal class HomePageScope(
     val hasCompactHeader: Boolean
         get() = drawsHeaderControls || state.stats.error != null
 
+    /** Anything the header row would draw: the title, search, or actions the host supplied (kept even when the greeting replaces the title). */
     private val drawsHeaderControls: Boolean
-        get() = showsTitle || options.showSearch
+        get() = showsTitle || options.showSearch || options.headerActions != null
 
     /**
      * Home draws its "Home" heading only without a greeting: the greeting opens the page and is its
