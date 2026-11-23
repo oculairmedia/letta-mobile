@@ -2592,7 +2592,6 @@ public final class com/letta/mobile/ui/components/LettaPageHeaderKt {
 	public static final field LETTA_PAGE_PRIMARY_ACTION_TAG Ljava/lang/String;
 	public static final field LETTA_PAGE_TITLE_TAG Ljava/lang/String;
 	public static final fun LettaPageHeader (Ljava/lang/String;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/foundation/LettaMenuItem;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
-	public static final fun lettaPageGutter (Z)F
 }
 
 public final class com/letta/mobile/ui/components/LettaPopupMenuKt {
@@ -12836,6 +12835,10 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Type {
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaDimens$Type;
 	public final fun getCaption-XSAIIZE ()J
 	public final fun getMicro-XSAIIZE ()J
+}
+
+public final class com/letta/mobile/ui/theme/LettaDimensKt {
+	public static final fun lettaPageGutter (Z)F
 }
 
 public final class com/letta/mobile/ui/theme/PlatformAccessibility_jvmKt {

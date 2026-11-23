@@ -22,10 +22,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.host.LocalHostTitlesPage
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.lettaPageGutter
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.components.foundation.LettaMenuItem
@@ -86,8 +86,6 @@ fun LettaPageHeader(
     }
 }
 
-/** The page's side inset: rows under the header (filters, legends, lists) line up on it too. */
-fun lettaPageGutter(wide: Boolean): Dp = if (wide) LettaDimens.Space.xl else LettaDimens.Space.lg
 
 /** Test tag of [LettaPageHeader]'s title. */
 const val LETTA_PAGE_TITLE_TAG = "letta_page_header_title"

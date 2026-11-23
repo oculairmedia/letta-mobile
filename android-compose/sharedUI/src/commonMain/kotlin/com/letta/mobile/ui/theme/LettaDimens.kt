@@ -290,3 +290,6 @@ object LettaDimens {
         val caption: TextUnit = 12.sp
     }
 }
+
+/** The page's side inset: the bar title and the rows under the header (filters, legends, lists) line up on it. */
+fun lettaPageGutter(wide: Boolean): Dp = if (wide) LettaDimens.Space.xl else LettaDimens.Space.lg

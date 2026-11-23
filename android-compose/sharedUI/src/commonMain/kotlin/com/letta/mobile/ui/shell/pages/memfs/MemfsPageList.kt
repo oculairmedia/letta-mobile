@@ -1,6 +1,6 @@
 package com.letta.mobile.ui.shell.pages.memfs
 
-import com.letta.mobile.ui.components.lettaPageGutter
+import com.letta.mobile.ui.theme.lettaPageGutter
 import com.letta.mobile.ui.components.LettaRefreshAction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box

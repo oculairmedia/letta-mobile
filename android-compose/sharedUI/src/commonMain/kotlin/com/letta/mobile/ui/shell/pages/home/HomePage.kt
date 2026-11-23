@@ -44,7 +44,7 @@ import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 import com.letta.mobile.ui.components.LettaRefreshable
-import com.letta.mobile.ui.components.lettaPageGutter
+import com.letta.mobile.ui.theme.lettaPageGutter
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**

@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.memory
 
 import com.letta.mobile.ui.components.foundation.LettaPanel
-import com.letta.mobile.ui.components.lettaPageGutter
+import com.letta.mobile.ui.theme.lettaPageGutter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.horizontalScroll

@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.Role
 import com.letta.mobile.ui.components.foundation.LettaButtonIcon
 import com.letta.mobile.ui.components.foundation.LettaIconButton
-import com.letta.mobile.ui.components.lettaPageGutter
+import com.letta.mobile.ui.theme.lettaPageGutter
 import com.letta.mobile.ui.host.PaneWindowClass
 import com.letta.mobile.ui.host.currentPaneWindowClass
 import com.letta.mobile.ui.host.LettaInput
