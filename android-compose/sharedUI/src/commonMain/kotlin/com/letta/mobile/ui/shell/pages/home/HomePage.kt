@@ -29,6 +29,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.a2ui.toA2uiSurfaceStateOrNull
 import com.letta.mobile.data.home.FleetRecentConversation
@@ -92,7 +94,9 @@ fun HomePage(
     }
     var editingPins by remember { mutableStateOf(false) }
     val lane = LocalHomeLane.current
-    BoxWithConstraints(base) {
+    // Without its heading the page still announces itself as Home to assistive tech.
+    val named = if (options.greeting != null) base.semantics { paneTitle = HOME_PAGE_NAME } else base
+    BoxWithConstraints(named) {
         val page = HomePageScope(
             state = state,
             callbacks = callbacks,
@@ -131,7 +135,8 @@ data class HomePageNavigation(
 
 /**
  * Host presentation choices: [showTitle] false when the host already titles the screen (the shell
- * binding clears it under a window header that names the page);
+ * binding clears it under a window header that names the page; a [greeting] drops it too, as the
+ * greeting is the page's heading);
  * [showSearch] false when the host's own app bar carries the search; [touch] grows the controls to
  * touch-target size; [orbIndexByAgentId] colours the agent orbs; [headerActions] are the host's own
  * header controls (such as a backend chip); [document] replaces the page with a mod's
@@ -176,7 +181,14 @@ internal class HomePageScope(
         get() = drawsHeaderControls || state.stats.error != null
 
     private val drawsHeaderControls: Boolean
-        get() = options.showTitle || options.showSearch
+        get() = showsTitle || options.showSearch
+
+    /**
+     * Home draws its "Home" heading only without a greeting: the greeting opens the page and is its
+     * heading (the window's bar already names the app), so a second big title above it is dropped.
+     */
+    val showsTitle: Boolean
+        get() = options.showTitle && options.greeting == null
 
     /** The lane holds the composer and the host gave one; a compact page docks it below the list. */
     val hasComposer: Boolean

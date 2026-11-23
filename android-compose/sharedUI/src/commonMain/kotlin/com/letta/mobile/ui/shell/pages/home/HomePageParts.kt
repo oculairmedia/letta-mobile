@@ -24,7 +24,7 @@ internal fun HomeHeader(page: HomePageScope) {
         null
     }
     LettaPageHeader(
-        title = PAGE_TITLE.takeIf { page.options.showTitle },
+        title = HOME_PAGE_NAME.takeIf { page.showsTitle },
         context = search,
         actions = page.options.headerActions,
     ) {
@@ -62,7 +62,8 @@ internal fun HomePromptBar(page: HomePageScope, modifier: Modifier = Modifier) {
     bar(page.options.composerPlaceholder, page.navigation.onSubmitPrompt, modifier.fillMaxWidth().testTag(HomePageTags.COMPOSER))
 }
 
-private const val PAGE_TITLE = "Home"
+/** The page's name: its heading when it has no greeting, else its pane title for assistive tech. */
+internal const val HOME_PAGE_NAME = "Home"
 /** What Home searches, for a host field (desktop's header) that searches the page in its place. */
 const val HomeSearchPlaceholder: String = "Search agents, tools, blocks and messages"
 

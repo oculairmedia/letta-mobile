@@ -21,10 +21,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
@@ -234,8 +238,8 @@ class BakenShellSnapshotTest {
     fun shellInBothThemes() = listOf(true, false).forEach(::snapshot)
 
     /**
-     * The phone's Home under its minimal header: the bar's "Baken" starts on the same edge as the page's
-     * "Home" and the greeting under it, and the greeting's lineup spans the page.
+     * The phone's Home under its minimal header: no "Home" heading (the greeting opens the page and is its
+     * heading), the bar's "Baken" starts on the same edge as the greeting, and the lineup spans the page.
      */
     @Test
     fun homeAtPhoneWidthLinesTheBarTitleUpWithThePage() = runDesktopComposeUiTest(width = WINDOW_WIDTH, height = WINDOW_HEIGHT) {
@@ -263,10 +267,11 @@ class BakenShellSnapshotTest {
         }
         waitForIdle()
         val bar = onNodeWithTag(ShellHeaderTags.TITLE).getUnclippedBoundsInRoot().left
-        val page = onNodeWithTag(LETTA_PAGE_TITLE_TAG).getUnclippedBoundsInRoot().left
         val greeting = onNodeWithTag(HomeGreetingTags.LINE).getUnclippedBoundsInRoot().left
-        assertEquals(page.value, bar.value, EDGE_TOLERANCE, "bar title at $bar, page title at $page")
-        assertEquals(page.value, greeting.value, EDGE_TOLERANCE, "greeting at $greeting, page title at $page")
+        assertEquals(greeting.value, bar.value, EDGE_TOLERANCE, "bar title at $bar, greeting at $greeting")
+        onNodeWithTag(LETTA_PAGE_TITLE_TAG).assertDoesNotExist()
+        onNodeWithText("Home").assertDoesNotExist()
+        onNodeWithTag(HomeGreetingTags.LINE).assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
         val out = File("build/baken-shell-snapshots").apply { mkdirs() }.resolve("home-phone-dark.png")
         ImageIO.write(onNodeWithTag(FRAME).captureToImage().toAwtImage(), "png", out)
         assertTrue(out.length() > 0)
