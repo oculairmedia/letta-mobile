@@ -3166,6 +3166,10 @@ public final class com/letta/mobile/ui/components/foundation/LettaSectionLabelKt
 	public static final fun lettaSectionTitle (Ljava/lang/String;Ljava/lang/Integer;)Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/components/foundation/LettaSliderColorsKt {
+	public static final fun lettaSliderColors (Landroidx/compose/runtime/Composer;I)Landroidx/compose/material3/SliderColors;
+}
+
 public final class com/letta/mobile/ui/components/foundation/LettaStatusDotKt {
 	public static final fun LettaStatusDot (Lcom/letta/mobile/ui/theme/tokens/LettaStatusTone;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaStatusDot-3J-VO9M (JLandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
@@ -12672,9 +12676,11 @@ public final class com/letta/mobile/ui/theme/SharedMaterialThemeKt {
 	public static final fun SharedMaterialTheme (ZLcom/letta/mobile/data/model/ThemePreset;Landroidx/compose/material3/Typography;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun getSharedShapes ()Landroidx/compose/material3/Shapes;
 	public static final fun getSharedTypography ()Landroidx/compose/material3/Typography;
+	public static final fun lettaCategoryPersona (Landroidx/compose/material3/ColorScheme;)J
 	public static final fun lettaColorScheme (ZZLcom/letta/mobile/data/model/ThemePreset;)Landroidx/compose/material3/ColorScheme;
 	public static synthetic fun lettaColorScheme$default (ZZLcom/letta/mobile/data/model/ThemePreset;ILjava/lang/Object;)Landroidx/compose/material3/ColorScheme;
 	public static final fun lettaCustomColors (Landroidx/compose/material3/ColorScheme;)Lcom/letta/mobile/ui/theme/tokens/CustomColors;
+	public static final fun lettaUserBubble (Landroidx/compose/material3/ColorScheme;)J
 }
 
 public final class com/letta/mobile/ui/theme/TouchComposerDimens {

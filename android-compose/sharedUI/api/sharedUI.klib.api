@@ -283,28 +283,6 @@ final enum class com.letta.mobile.ui.components.disclosure/ChevronIndication : k
     final fun values(): kotlin/Array<com.letta.mobile.ui.components.disclosure/ChevronIndication> // com.letta.mobile.ui.components.disclosure/ChevronIndication.values|values#static(){}[0]
 }
 
-final enum class com.letta.mobile.ui.components.gesture/SwipeAwayAxis : kotlin/Enum<com.letta.mobile.ui.components.gesture/SwipeAwayAxis> { // com.letta.mobile.ui.components.gesture/SwipeAwayAxis|null[0]
-    enum entry Horizontal // com.letta.mobile.ui.components.gesture/SwipeAwayAxis.Horizontal|null[0]
-    enum entry Vertical // com.letta.mobile.ui.components.gesture/SwipeAwayAxis.Vertical|null[0]
-
-    final val entries // com.letta.mobile.ui.components.gesture/SwipeAwayAxis.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.ui.components.gesture/SwipeAwayAxis> // com.letta.mobile.ui.components.gesture/SwipeAwayAxis.entries.<get-entries>|<get-entries>#static(){}[0]
-
-    final fun valueOf(kotlin/String): com.letta.mobile.ui.components.gesture/SwipeAwayAxis // com.letta.mobile.ui.components.gesture/SwipeAwayAxis.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<com.letta.mobile.ui.components.gesture/SwipeAwayAxis> // com.letta.mobile.ui.components.gesture/SwipeAwayAxis.values|values#static(){}[0]
-}
-
-final enum class com.letta.mobile.ui.components.gesture/SwipeAwayExit : kotlin/Enum<com.letta.mobile.ui.components.gesture/SwipeAwayExit> { // com.letta.mobile.ui.components.gesture/SwipeAwayExit|null[0]
-    enum entry InPlace // com.letta.mobile.ui.components.gesture/SwipeAwayExit.InPlace|null[0]
-    enum entry OffEdge // com.letta.mobile.ui.components.gesture/SwipeAwayExit.OffEdge|null[0]
-
-    final val entries // com.letta.mobile.ui.components.gesture/SwipeAwayExit.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.ui.components.gesture/SwipeAwayExit> // com.letta.mobile.ui.components.gesture/SwipeAwayExit.entries.<get-entries>|<get-entries>#static(){}[0]
-
-    final fun valueOf(kotlin/String): com.letta.mobile.ui.components.gesture/SwipeAwayExit // com.letta.mobile.ui.components.gesture/SwipeAwayExit.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<com.letta.mobile.ui.components.gesture/SwipeAwayExit> // com.letta.mobile.ui.components.gesture/SwipeAwayExit.values|values#static(){}[0]
-}
-
 final enum class com.letta.mobile.ui.components.picker/PickMode : kotlin/Enum<com.letta.mobile.ui.components.picker/PickMode> { // com.letta.mobile.ui.components.picker/PickMode|null[0]
     enum entry Command // com.letta.mobile.ui.components.picker/PickMode.Command|null[0]
     enum entry Multi // com.letta.mobile.ui.components.picker/PickMode.Multi|null[0]
@@ -1297,28 +1275,6 @@ sealed interface com.letta.mobile.ui.chat.subagents/SubagentTodoSheetState { // 
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.chat.subagents/SubagentTodoSheetState.Loading.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.ui.chat.subagents/SubagentTodoSheetState.Loading.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.ui.chat.subagents/SubagentTodoSheetState.Loading.toString|toString(){}[0]
-    }
-}
-
-sealed interface com.letta.mobile.ui.components.gesture/SwipeAwayThreshold { // com.letta.mobile.ui.components.gesture/SwipeAwayThreshold|null[0]
-    abstract fun px(androidx.compose.ui.unit/Density, kotlin/Float): kotlin/Float // com.letta.mobile.ui.components.gesture/SwipeAwayThreshold.px|px(androidx.compose.ui.unit.Density;kotlin.Float){}[0]
-
-    final class Distance : com.letta.mobile.ui.components.gesture/SwipeAwayThreshold { // com.letta.mobile.ui.components.gesture/SwipeAwayThreshold.Distance|null[0]
-        constructor <init>(androidx.compose.ui.unit/Dp) // com.letta.mobile.ui.components.gesture/SwipeAwayThreshold.Distance.<init>|<init>(androidx.compose.ui.unit.Dp){}[0]
-
-        final val distance // com.letta.mobile.ui.components.gesture/SwipeAwayThreshold.Distance.distance|{}distance[0]
-            final fun <get-distance>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.components.gesture/SwipeAwayThreshold.Distance.distance.<get-distance>|<get-distance>(){}[0]
-
-        final fun px(androidx.compose.ui.unit/Density, kotlin/Float): kotlin/Float // com.letta.mobile.ui.components.gesture/SwipeAwayThreshold.Distance.px|px(androidx.compose.ui.unit.Density;kotlin.Float){}[0]
-    }
-
-    final class Fraction : com.letta.mobile.ui.components.gesture/SwipeAwayThreshold { // com.letta.mobile.ui.components.gesture/SwipeAwayThreshold.Fraction|null[0]
-        constructor <init>(kotlin/Float) // com.letta.mobile.ui.components.gesture/SwipeAwayThreshold.Fraction.<init>|<init>(kotlin.Float){}[0]
-
-        final val fraction // com.letta.mobile.ui.components.gesture/SwipeAwayThreshold.Fraction.fraction|{}fraction[0]
-            final fun <get-fraction>(): kotlin/Float // com.letta.mobile.ui.components.gesture/SwipeAwayThreshold.Fraction.fraction.<get-fraction>|<get-fraction>(){}[0]
-
-        final fun px(androidx.compose.ui.unit/Density, kotlin/Float): kotlin/Float // com.letta.mobile.ui.components.gesture/SwipeAwayThreshold.Fraction.px|px(androidx.compose.ui.unit.Density;kotlin.Float){}[0]
     }
 }
 
@@ -3763,35 +3719,6 @@ final class com.letta.mobile.ui.components.foundation/LettaSwatch { // com.letta
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.components.foundation/LettaSwatch.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.ui.components.foundation/LettaSwatch.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.ui.components.foundation/LettaSwatch.toString|toString(){}[0]
-}
-
-final class com.letta.mobile.ui.components.gesture/SwipeAwayRelease { // com.letta.mobile.ui.components.gesture/SwipeAwayRelease|null[0]
-    constructor <init>(com.letta.mobile.ui.components.gesture/SwipeAwayExit, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components.gesture/SwipeAwayRelease.<init>|<init>(com.letta.mobile.ui.components.gesture.SwipeAwayExit;kotlin.Int;kotlin.Int){}[0]
-
-    final val exit // com.letta.mobile.ui.components.gesture/SwipeAwayRelease.exit|{}exit[0]
-        final fun <get-exit>(): com.letta.mobile.ui.components.gesture/SwipeAwayExit // com.letta.mobile.ui.components.gesture/SwipeAwayRelease.exit.<get-exit>|<get-exit>(){}[0]
-    final val exitMillis // com.letta.mobile.ui.components.gesture/SwipeAwayRelease.exitMillis|{}exitMillis[0]
-        final fun <get-exitMillis>(): kotlin/Int // com.letta.mobile.ui.components.gesture/SwipeAwayRelease.exitMillis.<get-exitMillis>|<get-exitMillis>(){}[0]
-    final val settleMillis // com.letta.mobile.ui.components.gesture/SwipeAwayRelease.settleMillis|{}settleMillis[0]
-        final fun <get-settleMillis>(): kotlin/Int // com.letta.mobile.ui.components.gesture/SwipeAwayRelease.settleMillis.<get-settleMillis>|<get-settleMillis>(){}[0]
-}
-
-final class com.letta.mobile.ui.components.gesture/SwipeAwaySpec { // com.letta.mobile.ui.components.gesture/SwipeAwaySpec|null[0]
-    constructor <init>(com.letta.mobile.ui.components.gesture/SwipeAwayThreshold, com.letta.mobile.ui.components.gesture/SwipeAwayRelease, com.letta.mobile.ui.components.gesture/SwipeAwayAxis = ..., kotlin/Float = ...) // com.letta.mobile.ui.components.gesture/SwipeAwaySpec.<init>|<init>(com.letta.mobile.ui.components.gesture.SwipeAwayThreshold;com.letta.mobile.ui.components.gesture.SwipeAwayRelease;com.letta.mobile.ui.components.gesture.SwipeAwayAxis;kotlin.Float){}[0]
-
-    final val axis // com.letta.mobile.ui.components.gesture/SwipeAwaySpec.axis|{}axis[0]
-        final fun <get-axis>(): com.letta.mobile.ui.components.gesture/SwipeAwayAxis // com.letta.mobile.ui.components.gesture/SwipeAwaySpec.axis.<get-axis>|<get-axis>(){}[0]
-    final val fade // com.letta.mobile.ui.components.gesture/SwipeAwaySpec.fade|{}fade[0]
-        final fun <get-fade>(): kotlin/Float // com.letta.mobile.ui.components.gesture/SwipeAwaySpec.fade.<get-fade>|<get-fade>(){}[0]
-    final val release // com.letta.mobile.ui.components.gesture/SwipeAwaySpec.release|{}release[0]
-        final fun <get-release>(): com.letta.mobile.ui.components.gesture/SwipeAwayRelease // com.letta.mobile.ui.components.gesture/SwipeAwaySpec.release.<get-release>|<get-release>(){}[0]
-    final val threshold // com.letta.mobile.ui.components.gesture/SwipeAwaySpec.threshold|{}threshold[0]
-        final fun <get-threshold>(): com.letta.mobile.ui.components.gesture/SwipeAwayThreshold // com.letta.mobile.ui.components.gesture/SwipeAwaySpec.threshold.<get-threshold>|<get-threshold>(){}[0]
-
-    final object Companion { // com.letta.mobile.ui.components.gesture/SwipeAwaySpec.Companion|null[0]
-        final const val FULL_FADE // com.letta.mobile.ui.components.gesture/SwipeAwaySpec.Companion.FULL_FADE|{}FULL_FADE[0]
-            final fun <get-FULL_FADE>(): kotlin/Float // com.letta.mobile.ui.components.gesture/SwipeAwaySpec.Companion.FULL_FADE.<get-FULL_FADE>|<get-FULL_FADE>(){}[0]
-    }
 }
 
 final class com.letta.mobile.ui.components.list/RosterAction { // com.letta.mobile.ui.components.list/RosterAction|null[0]
@@ -12602,8 +12529,6 @@ final object com.letta.mobile.ui.theme/ChatHeadDimens { // com.letta.mobile.ui.t
         final fun <get-popupPeekLines>(): kotlin/Int // com.letta.mobile.ui.theme/ChatHeadDimens.popupPeekLines.<get-popupPeekLines>|<get-popupPeekLines>(){}[0]
     final const val popupSwipeDismissFraction // com.letta.mobile.ui.theme/ChatHeadDimens.popupSwipeDismissFraction|{}popupSwipeDismissFraction[0]
         final fun <get-popupSwipeDismissFraction>(): kotlin/Float // com.letta.mobile.ui.theme/ChatHeadDimens.popupSwipeDismissFraction.<get-popupSwipeDismissFraction>|<get-popupSwipeDismissFraction>(){}[0]
-    final const val popupSwipeFade // com.letta.mobile.ui.theme/ChatHeadDimens.popupSwipeFade|{}popupSwipeFade[0]
-        final fun <get-popupSwipeFade>(): kotlin/Float // com.letta.mobile.ui.theme/ChatHeadDimens.popupSwipeFade.<get-popupSwipeFade>|<get-popupSwipeFade>(){}[0]
     final const val snapMillis // com.letta.mobile.ui.theme/ChatHeadDimens.snapMillis|{}snapMillis[0]
         final fun <get-snapMillis>(): kotlin/Int // com.letta.mobile.ui.theme/ChatHeadDimens.snapMillis.<get-snapMillis>|<get-snapMillis>(){}[0]
 
@@ -13458,10 +13383,6 @@ final val com.letta.mobile.ui.components.foundation/com_letta_mobile_ui_componen
 final val com.letta.mobile.ui.components.foundation/com_letta_mobile_ui_components_foundation_LettaRowLabel$stableprop // com.letta.mobile.ui.components.foundation/com_letta_mobile_ui_components_foundation_LettaRowLabel$stableprop|#static{}com_letta_mobile_ui_components_foundation_LettaRowLabel$stableprop[0]
 final val com.letta.mobile.ui.components.foundation/com_letta_mobile_ui_components_foundation_LettaSearchOptions$stableprop // com.letta.mobile.ui.components.foundation/com_letta_mobile_ui_components_foundation_LettaSearchOptions$stableprop|#static{}com_letta_mobile_ui_components_foundation_LettaSearchOptions$stableprop[0]
 final val com.letta.mobile.ui.components.foundation/com_letta_mobile_ui_components_foundation_LettaSwatch$stableprop // com.letta.mobile.ui.components.foundation/com_letta_mobile_ui_components_foundation_LettaSwatch$stableprop|#static{}com_letta_mobile_ui_components_foundation_LettaSwatch$stableprop[0]
-final val com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayRelease$stableprop // com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayRelease$stableprop|#static{}com_letta_mobile_ui_components_gesture_SwipeAwayRelease$stableprop[0]
-final val com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwaySpec$stableprop // com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwaySpec$stableprop|#static{}com_letta_mobile_ui_components_gesture_SwipeAwaySpec$stableprop[0]
-final val com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Distance$stableprop // com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Distance$stableprop|#static{}com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Distance$stableprop[0]
-final val com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Fraction$stableprop // com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Fraction$stableprop|#static{}com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Fraction$stableprop[0]
 final val com.letta.mobile.ui.components.list/com_letta_mobile_ui_components_list_RosterAction$stableprop // com.letta.mobile.ui.components.list/com_letta_mobile_ui_components_list_RosterAction$stableprop|#static{}com_letta_mobile_ui_components_list_RosterAction$stableprop[0]
 final val com.letta.mobile.ui.components.list/com_letta_mobile_ui_components_list_RosterActions$stableprop // com.letta.mobile.ui.components.list/com_letta_mobile_ui_components_list_RosterActions$stableprop|#static{}com_letta_mobile_ui_components_list_RosterActions$stableprop[0]
 final val com.letta.mobile.ui.components.list/com_letta_mobile_ui_components_list_RosterKeyCommand_Activate$stableprop // com.letta.mobile.ui.components.list/com_letta_mobile_ui_components_list_RosterKeyCommand_Activate$stableprop|#static{}com_letta_mobile_ui_components_list_RosterKeyCommand_Activate$stableprop[0]
@@ -14150,7 +14071,6 @@ final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.chat.branch/onSecon
 final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.components.beam/lettaBorderBeam(com.letta.mobile.ui.components.beam/LettaBeamSpec, kotlin/Boolean = ...): androidx.compose.ui/Modifier // com.letta.mobile.ui.components.beam/lettaBorderBeam|lettaBorderBeam@androidx.compose.ui.Modifier(com.letta.mobile.ui.components.beam.LettaBeamSpec;kotlin.Boolean){}[0]
 final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.components.foundation/lettaClickable(androidx.compose.ui.semantics/Role, kotlin/String? = ..., androidx.compose.ui.graphics/Shape, kotlin/Function0<kotlin/Unit>?): androidx.compose.ui/Modifier // com.letta.mobile.ui.components.foundation/lettaClickable|lettaClickable@androidx.compose.ui.Modifier(androidx.compose.ui.semantics.Role;kotlin.String?;androidx.compose.ui.graphics.Shape;kotlin.Function0<kotlin.Unit>?){}[0]
 final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.components.foundation/lettaClickable(androidx.compose.ui.semantics/Role, kotlin/String? = ..., com.letta.mobile.ui.components.foundation/LettaClickTarget = ..., kotlin/Function0<kotlin/Unit>?): androidx.compose.ui/Modifier // com.letta.mobile.ui.components.foundation/lettaClickable|lettaClickable@androidx.compose.ui.Modifier(androidx.compose.ui.semantics.Role;kotlin.String?;com.letta.mobile.ui.components.foundation.LettaClickTarget;kotlin.Function0<kotlin.Unit>?){}[0]
-final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.components.gesture/swipeAway(com.letta.mobile.ui.components.gesture/SwipeAwaySpec, kotlin/Boolean, kotlin/Function0<kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int): androidx.compose.ui/Modifier // com.letta.mobile.ui.components.gesture/swipeAway|swipeAway@androidx.compose.ui.Modifier(com.letta.mobile.ui.components.gesture.SwipeAwaySpec;kotlin.Boolean;kotlin.Function0<kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.components.picker/pickerRowSemantics(com.letta.mobile.ui.components.picker/PickerRowState): androidx.compose.ui/Modifier // com.letta.mobile.ui.components.picker/pickerRowSemantics|pickerRowSemantics@androidx.compose.ui.Modifier(com.letta.mobile.ui.components.picker.PickerRowState){}[0]
 final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.components/lettaFadingEdges(kotlin/Float, kotlin/Float, androidx.compose.ui.unit/Dp, androidx.compose.ui.unit/Dp): androidx.compose.ui/Modifier // com.letta.mobile.ui.components/lettaFadingEdges|lettaFadingEdges@androidx.compose.ui.Modifier(kotlin.Float;kotlin.Float;androidx.compose.ui.unit.Dp;androidx.compose.ui.unit.Dp){}[0]
 final fun (androidx.compose.ui/Modifier).com.letta.mobile.ui.components/lettaHorizontalFadingEdges(kotlin/Float, kotlin/Float, androidx.compose.ui.unit/Dp): androidx.compose.ui/Modifier // com.letta.mobile.ui.components/lettaHorizontalFadingEdges|lettaHorizontalFadingEdges@androidx.compose.ui.Modifier(kotlin.Float;kotlin.Float;androidx.compose.ui.unit.Dp){}[0]
@@ -14560,10 +14480,7 @@ final fun com.letta.mobile.ui.components.foundation/lettaInlineTarget(androidx.c
 final fun com.letta.mobile.ui.components.foundation/lettaPanelBorder(androidx.compose.runtime/Composer?, kotlin/Int): androidx.compose.foundation/BorderStroke // com.letta.mobile.ui.components.foundation/lettaPanelBorder|lettaPanelBorder(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components.foundation/lettaRowTarget(androidx.compose.runtime/Composer?, kotlin/Int): com.letta.mobile.ui.components.foundation/LettaClickTarget // com.letta.mobile.ui.components.foundation/lettaRowTarget|lettaRowTarget(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components.foundation/lettaSectionTitle(kotlin/String, kotlin/Int?): kotlin/String // com.letta.mobile.ui.components.foundation/lettaSectionTitle|lettaSectionTitle(kotlin.String;kotlin.Int?){}[0]
-final fun com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayRelease$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayRelease$stableprop_getter|com_letta_mobile_ui_components_gesture_SwipeAwayRelease$stableprop_getter(){}[0]
-final fun com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwaySpec$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwaySpec$stableprop_getter|com_letta_mobile_ui_components_gesture_SwipeAwaySpec$stableprop_getter(){}[0]
-final fun com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Distance$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Distance$stableprop_getter|com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Distance$stableprop_getter(){}[0]
-final fun com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Fraction$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Fraction$stableprop_getter|com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Fraction$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.components.foundation/lettaSliderColors(androidx.compose.runtime/Composer?, kotlin/Int): androidx.compose.material3/SliderColors // com.letta.mobile.ui.components.foundation/lettaSliderColors|lettaSliderColors(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components.list/RosterListRow(com.letta.mobile.ui.components.row/LettaListRowSpec, com.letta.mobile.ui.components.list/RosterRowState, com.letta.mobile.ui.components.list/RosterRowSlots?, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components.list/RosterListRow|RosterListRow(com.letta.mobile.ui.components.row.LettaListRowSpec;com.letta.mobile.ui.components.list.RosterRowState;com.letta.mobile.ui.components.list.RosterRowSlots?;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components.list/RosterRenameField(com.letta.mobile.ui.components.list/RosterRenameRequest, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components.list/RosterRenameField|RosterRenameField(com.letta.mobile.ui.components.list.RosterRenameRequest;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components.list/com_letta_mobile_ui_components_list_RosterAction$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components.list/com_letta_mobile_ui_components_list_RosterAction$stableprop_getter|com_letta_mobile_ui_components_list_RosterAction$stableprop_getter(){}[0]
@@ -15402,8 +15319,10 @@ final fun com.letta.mobile.ui.theme/com_letta_mobile_ui_theme_LettaDimens_Stroke
 final fun com.letta.mobile.ui.theme/com_letta_mobile_ui_theme_LettaDimens_Type$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme/com_letta_mobile_ui_theme_LettaDimens_Type$stableprop_getter|com_letta_mobile_ui_theme_LettaDimens_Type$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.theme/com_letta_mobile_ui_theme_PresetThemeColors$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme/com_letta_mobile_ui_theme_PresetThemeColors$stableprop_getter|com_letta_mobile_ui_theme_PresetThemeColors$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.theme/com_letta_mobile_ui_theme_TouchComposerDimens$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme/com_letta_mobile_ui_theme_TouchComposerDimens$stableprop_getter|com_letta_mobile_ui_theme_TouchComposerDimens$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.theme/lettaCategoryPersona(androidx.compose.material3/ColorScheme): androidx.compose.ui.graphics/Color // com.letta.mobile.ui.theme/lettaCategoryPersona|lettaCategoryPersona(androidx.compose.material3.ColorScheme){}[0]
 final fun com.letta.mobile.ui.theme/lettaColorScheme(kotlin/Boolean, kotlin/Boolean = ..., com.letta.mobile.data.model/ThemePreset = ...): androidx.compose.material3/ColorScheme // com.letta.mobile.ui.theme/lettaColorScheme|lettaColorScheme(kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.model.ThemePreset){}[0]
 final fun com.letta.mobile.ui.theme/lettaCustomColors(androidx.compose.material3/ColorScheme): com.letta.mobile.ui.theme.tokens/CustomColors // com.letta.mobile.ui.theme/lettaCustomColors|lettaCustomColors(androidx.compose.material3.ColorScheme){}[0]
+final fun com.letta.mobile.ui.theme/lettaUserBubble(androidx.compose.material3/ColorScheme): androidx.compose.ui.graphics/Color // com.letta.mobile.ui.theme/lettaUserBubble|lettaUserBubble(androidx.compose.material3.ColorScheme){}[0]
 final fun com.letta.mobile.ui.theme/presetThemeColors(com.letta.mobile.data.model/ThemePreset): com.letta.mobile.ui.theme/PresetThemeColors // com.letta.mobile.ui.theme/presetThemeColors|presetThemeColors(com.letta.mobile.data.model.ThemePreset){}[0]
 final fun com.letta.mobile.ui.theme/rememberHostDark(com.letta.mobile.data.shellstate/HostAppearance, kotlin/Boolean, kotlin/Boolean?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int): kotlin/Boolean // com.letta.mobile.ui.theme/rememberHostDark|rememberHostDark(com.letta.mobile.data.shellstate.HostAppearance;kotlin.Boolean;kotlin.Boolean?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.theme/rememberReducedMotionEnabled(androidx.compose.runtime/Composer?, kotlin/Int): kotlin/Boolean // com.letta.mobile.ui.theme/rememberReducedMotionEnabled|rememberReducedMotionEnabled(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
