@@ -191,6 +191,17 @@ class FleetModelsTest {
     }
 
     @Test
+    fun aRecentConversationWithNoAgentNameReadsAsTheProduct() {
+        val result = overview(
+            conversations = listOf(
+                conversation("c-1", "agent-gone", agentName = "", updatedAt = "2026-07-26T11:00:00Z").copy(agentId = null),
+            ),
+            agents = emptyList(),
+        )
+        assertEquals("Baken", result.recent.single().agentName)
+    }
+
+    @Test
     fun anUnresolvedAgentNameIsFlaggedAsAnIdFallback() {
         val result = overview(
             conversations = listOf(

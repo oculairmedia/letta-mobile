@@ -178,7 +178,7 @@ private fun selectedAgentName(
     chatState: DesktopChatSurfaceState,
 ): String {
     val railName = railAgents.firstOrNull { it.first == selectedAgentId }?.second
-    return railName ?: chatState.selectedConversation?.agentName ?: "Letta"
+    return railName ?: chatState.selectedConversation?.agentName ?: com.letta.mobile.data.model.DisplayNames.PRODUCT
 }
 
 @Composable
@@ -329,7 +329,7 @@ internal fun rememberDesktopHomeHost(context: DesktopShellContext, frame: Deskto
 /** The connection hero while the backend is not there yet (connecting, unconfigured, offline); null once it is. */
 private fun DesktopChatSurfaceState.homeConnection(onRetry: () -> Unit): ShellHomeConnection? =
     if (connectionState in ConnectionPendingStates) {
-        ShellHomeConnection(HomeConnectionState(chatScreenStatus, errorMessage, loading = isLoading), onRetry, wordmark = "LETTA DESKTOP")
+        ShellHomeConnection(HomeConnectionState(chatScreenStatus, errorMessage, loading = isLoading), onRetry)
     } else {
         null
     }

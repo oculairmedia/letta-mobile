@@ -62,6 +62,7 @@ import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.lettaUserBubble
 import kotlinx.collections.immutable.toImmutableList
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -102,9 +103,9 @@ private fun promptBubbleStyle(interAgent: Boolean, grouping: PromptGrouping): Pr
         )
     } else {
         PromptBubbleStyle(
-            container = scheme.primaryContainer,
-            content = scheme.onPrimaryContainer,
-            label = scheme.onPrimaryContainer.copy(alpha = ChatRowAlpha.userRoleLabel),
+            container = lettaUserBubble(scheme),
+            content = scheme.onSurface,
+            label = scheme.onSurface.copy(alpha = ChatRowAlpha.userRoleLabel),
             role = Res.string.rows_role_you,
             shape = shape,
         )
@@ -130,7 +131,7 @@ internal data class PromptGrouping(val leads: Boolean, val continues: Boolean) {
 
 /**
  * The user's prompt as the Android timeline draws it (feature-chat
- * ChatMessageItem + MessageBubbleSurface): an end-aligned primaryContainer bubble, at most 88%
+ * ChatMessageItem + MessageBubbleSurface): an end-aligned neutral bubble (lettaUserBubble), at most 88%
  * of the column and sized to its text, with a tight top-end corner and a "You" label. Another
  * agent's message reads "Inter-agent" in the tertiary tint, its provenance (sender -> recipient,
  * expandable to its metadata) the bubble's header line, inside it.

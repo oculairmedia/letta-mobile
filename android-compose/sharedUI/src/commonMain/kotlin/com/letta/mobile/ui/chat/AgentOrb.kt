@@ -40,7 +40,7 @@ import com.letta.mobile.ui.components.foundation.lettaClickable
 /**
  * Gradient agent identity orbs, matching the Penpot "App Mockups v2" desktop
  * boards. Rail/sidebar avatars use the diagonal linear gradients; the chat
- * agent avatar uses the radial teal "sphere" with a soft highlight.
+ * agent avatar uses the radial vermilion-to-petrol "sphere" with a soft highlight.
  */
 
 /** Brush for the agent orb at [index] (cycles through the palette). */
@@ -91,8 +91,9 @@ fun AgentOrb(
 }
 
 /**
- * The radial teal "sphere" used as the assistant avatar in the chat thread:
- * #7CF0DE -> #00BFA5 (0.55) -> #00897B with a small white highlight top-left.
+ * The radial "sphere" used as the assistant avatar in the chat thread, from the brand tokens: the
+ * vermilion's lit face -> Buoy Vermilion (0.55) -> the mark's deep petrol stone, with a small white
+ * highlight top-left.
  */
 @Composable
 fun AgentSphere(

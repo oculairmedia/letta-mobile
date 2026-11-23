@@ -94,7 +94,7 @@ class ChannelNotificationPublisher @Inject constructor(
         val notificationTag = notificationTagForConversation(notification.conversationId)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(content.title)
             .setContentText(content.messageText)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content.messageText))

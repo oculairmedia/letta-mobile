@@ -30273,9 +30273,11 @@ public final class com/letta/mobile/data/model/CronTaskStatus {
 
 public final class com/letta/mobile/data/model/DisplayNames {
 	public static final field INSTANCE Lcom/letta/mobile/data/model/DisplayNames;
+	public static final field PRODUCT Ljava/lang/String;
 	public final fun agent (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 	public final fun agent (Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/String;
 	public final fun disambiguateAgentFallbacks (Ljava/util/List;)Ljava/util/List;
+	public final fun getWORDMARK ()Ljava/lang/String;
 	public final fun isAgentFallback (Ljava/lang/String;)Z
 	public final fun shortId (Ljava/lang/String;)Ljava/lang/String;
 	public final fun shortId (Ljava/lang/String;I)Ljava/lang/String;
@@ -82162,7 +82164,6 @@ public final class com/letta/mobile/ui/theme/LettaChatTokens {
 }
 
 public final class com/letta/mobile/ui/theme/LettaColorTokens {
-	public static final field CYAN_ACCENT J
 	public static final field DARK_BACKGROUND J
 	public static final field DARK_CATEGORY_ARCHIVAL J
 	public static final field DARK_CATEGORY_HUMAN J
@@ -82170,14 +82171,21 @@ public final class com/letta/mobile/ui/theme/LettaColorTokens {
 	public static final field DARK_CATEGORY_PERSONA J
 	public static final field DARK_CATEGORY_PROJECT J
 	public static final field DARK_ERROR J
+	public static final field DARK_MARK_STONE J
 	public static final field DARK_ON_ERROR J
+	public static final field DARK_ON_PRIMARY J
+	public static final field DARK_ON_SECONDARY J
 	public static final field DARK_ON_SURFACE J
 	public static final field DARK_ON_SURFACE_MUTED J
 	public static final field DARK_ON_SURFACE_VARIANT J
+	public static final field DARK_ON_TERTIARY J
+	public static final field DARK_ON_TERTIARY_CONTAINER J
 	public static final field DARK_OUTLINE J
 	public static final field DARK_OUTLINE_VARIANT J
 	public static final field DARK_PRIMARY J
 	public static final field DARK_PRIMARY_VARIANT J
+	public static final field DARK_SECONDARY J
+	public static final field DARK_SECONDARY_CONTAINER J
 	public static final field DARK_SURFACE J
 	public static final field DARK_SURFACE_CONTAINER J
 	public static final field DARK_SURFACE_CONTAINER_DEFAULT J
@@ -82186,26 +82194,42 @@ public final class com/letta/mobile/ui/theme/LettaColorTokens {
 	public static final field DARK_SURFACE_CONTAINER_LOW J
 	public static final field DARK_SURFACE_CONTAINER_LOWEST J
 	public static final field DARK_SURFACE_VARIANT J
+	public static final field DARK_TERTIARY J
+	public static final field DARK_TERTIARY_CONTAINER J
+	public static final field DARK_USER_BUBBLE J
 	public static final field DARK_VOICE_AGENT J
 	public static final field DARK_VOICE_YOU J
 	public static final field DARK_WARNING J
 	public static final field DARK_WARNING_CONTAINER J
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaColorTokens;
 	public static final field LIGHT_BACKGROUND J
+	public static final field LIGHT_CATEGORY_PERSONA J
 	public static final field LIGHT_ERROR J
+	public static final field LIGHT_MARK_STONE J
 	public static final field LIGHT_ON_ERROR J
+	public static final field LIGHT_ON_PRIMARY J
+	public static final field LIGHT_ON_SECONDARY J
 	public static final field LIGHT_ON_SURFACE J
+	public static final field LIGHT_ON_SURFACE_MUTED J
 	public static final field LIGHT_ON_SURFACE_VARIANT J
+	public static final field LIGHT_ON_TERTIARY J
+	public static final field LIGHT_ON_TERTIARY_CONTAINER J
 	public static final field LIGHT_OUTLINE J
 	public static final field LIGHT_PRIMARY J
+	public static final field LIGHT_SECONDARY J
+	public static final field LIGHT_SECONDARY_CONTAINER J
 	public static final field LIGHT_SURFACE J
 	public static final field LIGHT_SURFACE_CONTAINER J
+	public static final field LIGHT_SURFACE_CONTAINER_HIGHEST J
 	public static final field LIGHT_SURFACE_VARIANT J
+	public static final field LIGHT_TERTIARY J
+	public static final field LIGHT_TERTIARY_CONTAINER J
+	public static final field LIGHT_USER_BUBBLE J
 	public static final field LIGHT_VOICE_AGENT J
 	public static final field LIGHT_VOICE_YOU J
 	public static final field LIGHT_WARNING J
 	public static final field LIGHT_WARNING_CONTAINER J
-	public static final field TEAL_ACCENT J
+	public static final field PRIMARY_HIGHLIGHT J
 }
 
 public final class com/letta/mobile/ui/theme/LettaElevationTokens {

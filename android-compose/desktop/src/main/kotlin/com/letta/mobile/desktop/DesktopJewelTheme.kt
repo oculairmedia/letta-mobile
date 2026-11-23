@@ -67,12 +67,12 @@ internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
 
 /**
  * Desktop Material theme: what the person chose on the host, drawn through the shared [HostAppearanceTheme]: the
- * Letta palette (teal primary, #0A0A0A background, #1E1E1E surfaces) or the colour preset the host holds, light or dark
+ * Baken palette (vermilion primary over the North Sea Buoy deep-sea surfaces) or the colour preset the host holds, light or dark
  * as the host's theme mode says (SYSTEM follows the live OS appearance through Nucleus). Dynamic colour is Android 12+
  * only and is not drawn here.
  *
  * The OS accent color deliberately does NOT repaint `primary`: the rest of the pairing (onPrimary, containers, the
- * fixed orb gradients) is brand-derived, so a non-teal accent (e.g. Windows red) turned the thinking ring and selection
+ * fixed orb gradients) is brand-derived, so a different accent (e.g. Windows red) turned the thinking ring and selection
  * markers into what read as error states. The live accent remains visible as a read-only row in Settings.
  *
  * The desktop type scale is tighter than Material 3's phone defaults so monitors get more words per line; the shapes

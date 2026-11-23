@@ -6,21 +6,26 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
+import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.plus_jakarta_sans_bold
+import org.jetbrains.compose.resources.Font
 
 /**
  * Text styles only the shell draws. Everything else uses a typography role or a LettaTextStyles
  * token.
  */
 internal object ShellType {
-    /** The brand wordmark on Home's connection hero: `displayLarge` in a serif, semibold, untracked. */
+    /**
+     * The brand wordmark on Home's connection hero: `displayLarge` in the Baken wordmark face, Plus Jakarta Sans Bold
+     * (SIL OFL, see THIRD_PARTY_LICENSES), tracked tight as the brand kit sets it. Only the wordmark uses this face.
+     */
     val wordmark: TextStyle
         @Composable
-        @ReadOnlyComposable
         get() = MaterialTheme.typography.displayLarge.copy(
-            fontFamily = FontFamily.Serif,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.sp,
+            fontFamily = FontFamily(Font(Res.font.plus_jakarta_sans_bold, FontWeight.Bold)),
+            fontWeight = FontWeight.Bold,
+            letterSpacing = WORDMARK_TRACKING_EM.em,
         )
 
     /** A failure's headline on Home's connection hero: `headlineSmall` semibold. */
@@ -59,3 +64,6 @@ internal object ShellType {
         @ReadOnlyComposable
         get() = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
 }
+
+/** The kit's wordmark tracking: -3.5 at a 92 px setting. */
+private const val WORDMARK_TRACKING_EM = -0.038f

@@ -121,11 +121,11 @@ internal fun usageLine(model: AgentContextCardModel, usage: ContextWindowUsage? 
     )
 }
 
-/** Neutral below 70 %, warning to 90 %, error from there (the plan's thresholds). */
+/** Neutral below 70 %, the brand primary to 90 %, error from there (the plan's thresholds). */
 @Composable
 internal fun levelColor(level: ContextMeterLevel): Color = when (level) {
     ContextMeterLevel.Normal -> MaterialTheme.colorScheme.onSurfaceVariant
-    ContextMeterLevel.Warning -> MaterialTheme.colorScheme.tertiary
+    ContextMeterLevel.Warning -> MaterialTheme.colorScheme.primary
     ContextMeterLevel.Critical -> MaterialTheme.colorScheme.error
 }
 

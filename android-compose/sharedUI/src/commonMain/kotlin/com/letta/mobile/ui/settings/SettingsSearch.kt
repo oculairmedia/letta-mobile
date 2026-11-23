@@ -5,6 +5,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.settings.AppearanceSettings
 import com.letta.mobile.data.settings.ChatSettings
@@ -99,7 +100,12 @@ private fun ChatSettings?.entries(): List<SettingsSearchEntry> = if (this == nul
     ).map { it.entry(SettingsGroup.Chat) }
 }
 
-private val PAIRING_ENTRY = SettingsSearchEntry(SettingsGroup.Backend, SettingsGroup.Backend.title, "Pair a device", "Install Letta elsewhere and pair it with this host")
+private val PAIRING_ENTRY = SettingsSearchEntry(
+    SettingsGroup.Backend,
+    SettingsGroup.Backend.title,
+    "Pair a device",
+    "Install ${DisplayNames.PRODUCT} elsewhere and pair it with this host",
+)
 
 /** The hits for the page's query, each opening its group; or the empty state when none match. */
 @Composable

@@ -3,6 +3,7 @@ package com.letta.mobile.ui.chat.render
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import com.letta.mobile.ui.theme.lettaUserBubble
 
 data class ChatBubbleStyle(
     val alignEnd: Boolean,
@@ -55,8 +56,8 @@ fun bubbleStyle(
     return when (role) {
         "user" -> ChatBubbleStyle(
             alignEnd = true,
-            containerColor = colorScheme.primaryContainer,
-            roleColor = colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+            containerColor = lettaUserBubble(colorScheme),
+            roleColor = colorScheme.onSurface.copy(alpha = 0.7f),
             roleLabel = "You",
         )
 
