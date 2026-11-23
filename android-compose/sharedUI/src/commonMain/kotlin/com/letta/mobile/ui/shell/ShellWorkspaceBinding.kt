@@ -10,7 +10,6 @@ import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.CurrentFocusSnapshot
 import com.letta.mobile.data.serialization.LettaJson
@@ -93,7 +92,8 @@ fun SyncShellWorkspace(workspace: ShellWorkspaceState, selection: ShellChatSelec
 
 /**
  * The shared navigation drawer's input over the workspace and its roster [agents] as (id, name):
- * the focused agent heads the panel, the rest are on the rail. With no activity signal to cut a
+ * the focused agent heads the panel, the rest are on the rail. A focus the roster does not name yet
+ * (no roster, or the connection failed) keeps its id with a blank name, so the panel heads nothing. With no activity signal to cut a
  * recents strip by, the whole roster shows, scrolling.
  */
 fun ShellWorkspaceState.navDrawerInput(
@@ -105,7 +105,7 @@ fun ShellWorkspaceState.navDrawerInput(
     val focusedIndex = agents.indexOfFirst { it.first == focus.agentId?.value }
     return ShellNavDrawerInput(
         agent = ShellPanelAgent(
-            name = agents.getOrNull(focusedIndex)?.second ?: DisplayNames.PRODUCT,
+            name = agents.getOrNull(focusedIndex)?.second.orEmpty(),
             orbIndex = focusedIndex.coerceAtLeast(0),
             agentId = focus.agentId?.value,
         ),

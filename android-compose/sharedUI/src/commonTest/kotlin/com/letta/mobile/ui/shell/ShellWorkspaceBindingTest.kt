@@ -131,11 +131,11 @@ class ShellWorkspaceBindingTest {
     }
 
     @Test
-    fun noRosterReadsAsBaken() {
+    fun noRosterLeavesThePanelNameless() {
         val workspace = ShellWorkspaceState(ShellDestination.Chat())
         workspace.rosterChanged(emptyList())
         val drawer = workspace.navDrawerState(emptyList(), now)
-        assertEquals("Baken", drawer.panel.agent.name)
+        assertEquals("", drawer.panel.agent.name)
         assertFalse(drawer.panel.home)
     }
 
@@ -145,7 +145,7 @@ class ShellWorkspaceBindingTest {
         val drawer = workspace.navDrawerState(emptyList(), now)
 
         assertEquals("agent-3", drawer.panel.agent.agentId)
-        assertEquals("Baken", drawer.panel.agent.name)
+        assertEquals("", drawer.panel.agent.name)
     }
 
     private object NoChat : ShellChatPort {
