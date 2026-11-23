@@ -34,6 +34,7 @@ import com.letta.mobile.ui.shell.pages.home.HomeConnectionState
 import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageNavigation
 import com.letta.mobile.ui.shell.pages.home.HomePageOptions
+import com.letta.mobile.ui.shell.pages.home.HomeGreetingOptions
 import com.letta.mobile.ui.shell.shellHomePage
 import kotlinx.coroutines.delay
 import kotlin.time.Clock
@@ -134,12 +135,16 @@ internal fun shellHomeBinding(
         val state by controller.state.collectAsState()
         val callbacks = HomePageCallbacks(actions = controller, navigation = homeNavigation(graph, host))
         // A window header that already names the page (the compact desktop title bar) leaves Home untitled.
-        val options = host.home.options.withPromptBar().let { if (LocalHostTitlesPage.current) it.copy(showTitle = false) else it }
+        val options = host.home.options.withPromptBar().withGreeting()
+            .let { if (LocalHostTitlesPage.current) it.copy(showTitle = false) else it }
         shellHomePage(state, callbacks, options).Content(destination, modifier)
     }
 }
 
 /** Home's prompt bar is the chat page's own composer ([HomePromptComposer]), unless the host set one. */
+/** Home leads with its greeting unless the host set its own. */
+private fun HomePageOptions.withGreeting(): HomePageOptions = if (greeting != null) this else copy(greeting = HomeGreetingOptions())
+
 private fun HomePageOptions.withPromptBar(): HomePageOptions =
     if (promptBar != null) {
         this

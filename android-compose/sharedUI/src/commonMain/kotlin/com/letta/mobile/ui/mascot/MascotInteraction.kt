@@ -72,6 +72,9 @@ internal class MascotGestureEffects {
     var haptics: Haptics = NoHaptics
     var reducedMotion: Boolean = false
 
+    /** Hears the pointer entering and leaving the body, for a surface that reacts to it (the home greeting). */
+    var onHover: ((Boolean) -> Unit)? = null
+
     /** Bumped by every gesture: the live surface keeps moving for the rest delay after the last one. */
     var touches: Int by mutableIntStateOf(0)
         private set
@@ -92,8 +95,8 @@ internal class MascotGestureEffects {
             MascotGesture.NUDGE -> poke()
             MascotGesture.TRICK -> trick(trick)
             MascotGesture.PET_START, MascotGesture.PET_END -> pet(gesture == MascotGesture.PET_START)
-            MascotGesture.HOVER_IN -> director?.onEvent(HOVER_ON)
-            MascotGesture.HOVER_OUT -> director?.onEvent(HOVER_OFF)
+            MascotGesture.HOVER_IN -> hover(true)
+            MascotGesture.HOVER_OUT -> hover(false)
         }
         touches++
     }
@@ -101,6 +104,11 @@ internal class MascotGestureEffects {
     /** A press landed on the mascot: wake the surface before anything is classified. */
     fun pressed() {
         touches++
+    }
+
+    private fun hover(hovered: Boolean) {
+        director?.onEvent(if (hovered) HOVER_ON else HOVER_OFF)
+        onHover?.invoke(hovered)
     }
 
     private fun poke() {
