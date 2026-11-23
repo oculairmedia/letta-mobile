@@ -5,6 +5,7 @@ import com.letta.mobile.data.voice.SpeechEndpointUrl
 import com.letta.mobile.data.voice.SpeechLanguage
 import com.letta.mobile.data.voice.SpeechModelName
 import com.letta.mobile.data.voice.SpeechVoiceName
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.host.HostVoiceEndpointChoice
 import com.letta.mobile.data.voice.host.HostVoiceGrants
 import com.letta.mobile.data.voice.host.HostVoiceKeyChange
@@ -22,9 +23,13 @@ internal class VoiceCandidate(val baseUrl: String, val apiKey: String?) {
     override fun toString(): String = "VoiceCandidate(keySet=${apiKey != null})"
 }
 
-/** One validated clip: its WAVE bytes and the language hint for this request. Prints no audio. */
-internal class VoiceClip(val wav: ByteArray, val language: String?) {
-    override fun toString(): String = "VoiceClip(bytes=${wav.size})"
+/** One validated clip: its WAVE bytes, the language hint for this request and what it is for. Prints no audio. */
+internal class VoiceClip(
+    val wav: ByteArray,
+    val language: String?,
+    val purpose: TranscriptionPurpose = TranscriptionPurpose.TURN,
+) {
+    override fun toString(): String = "VoiceClip(bytes=${wav.size}, purpose=$purpose)"
 }
 
 /**

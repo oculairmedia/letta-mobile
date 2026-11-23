@@ -6,9 +6,11 @@ import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.PcmChunk
 import com.letta.mobile.data.voice.audio.PcmFormat
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.host.HostSpeechEvent
 import com.letta.mobile.data.voice.host.HostSpeechParams
 import com.letta.mobile.data.voice.host.HostSpeechStreamFrame
+import com.letta.mobile.data.voice.host.HostTranscriptionParams
 import com.letta.mobile.data.voice.host.HostTranscriptionResult
 import com.letta.mobile.data.voice.host.HostVoiceClearParams
 import com.letta.mobile.data.voice.host.HostVoiceConnectionCandidate
@@ -92,8 +94,9 @@ class IrohHostVoiceEndpoint(
     override suspend fun models(): HostVoiceModels =
         decode(HostVoiceModels.serializer(), call(HostVoiceWire.MODELS_LIST, EMPTY))
 
-    override suspend fun transcribe(audio: AudioClip, language: SpeechLanguage?): SpeechTranscript {
-        val parts = HostVoiceClips.split(audio).map { piece -> retryingBusy { transcribeOne(piece, language) } }
+    override suspend fun transcribe(audio: AudioClip, language: SpeechLanguage?, purpose: TranscriptionPurpose): SpeechTranscript {
+        val purposeParam = HostTranscriptionParams.wirePurpose(purpose)
+        val parts = HostVoiceClips.split(audio).map { piece -> retryingBusy { transcribeOne(piece, language, purposeParam) } }
         if (parts.size == 1) return parts.single()
         val words = parts.map { it.text.value.trim() }.filter { it.isNotEmpty() }.joinToString(" ")
         return SpeechTranscript(VoiceText(words), parts.flatMap { it.segments })
@@ -111,11 +114,12 @@ class IrohHostVoiceEndpoint(
         }
     }
 
-    private suspend fun transcribeOne(piece: AudioClip, language: SpeechLanguage?): SpeechTranscript {
+    private suspend fun transcribeOne(piece: AudioClip, language: SpeechLanguage?, purpose: String?): SpeechTranscript {
         val params = buildJsonObject {
             put("audio", Base64.encode(piece.bytes))
             put("encoding", piece.encoding.wireName)
             language?.let { put("language", it.value) }
+            purpose?.let { put("purpose", it) }
         }
         return decode(HostTranscriptionResult.serializer(), call(HostVoiceWire.TRANSCRIBE, params)).toTranscript()
     }

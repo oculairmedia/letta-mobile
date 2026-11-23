@@ -79,6 +79,24 @@ class SpeechEndpointClientTest {
     }
 
     @Test
+    fun aLivePartialAsksForLightCleanupAndATurnLeavesTheServerDefault() = realTimeTest {
+        val answering = client { json("""{"text":"hi"}""") }
+        answering.transcribe(transcription.copy(purpose = TranscriptionPurpose.LIVE_PARTIAL))
+        answering.transcribe(transcription)
+        assertEquals(listOf("basic", null), recorded.map { it.headers[CLEANUP_HINT] }, "light for the partial, no header for the turn")
+    }
+
+    @Test
+    fun aLivePartialKeepsItsHintOnThePlainJsonFallback() = realTimeTest {
+        val refusing = client { request ->
+            val verbose = "verbose_json" in request.body.toByteArray().decodeToString()
+            if (verbose) respond("unsupported response_format", HttpStatusCode.BadRequest) else json("""{"text":"yes"}""")
+        }
+        refusing.transcribe(transcription.copy(purpose = TranscriptionPurpose.LIVE_PARTIAL))
+        assertEquals(listOf("basic", "basic"), recorded.map { it.headers[CLEANUP_HINT] })
+    }
+
+    @Test
     fun verboseSegmentsKeepEachSegmentsNumbers() = realTimeTest {
         val body = """{"text":" So.","segments":[""" +
             """{"text":" So.","no_speech_prob":0.92,"avg_logprob":-1.4},""" +
@@ -261,5 +279,10 @@ class SpeechEndpointClientTest {
                 assertEquals("", recorded.single().url.encodedQuery, url)
             }
         }
+    }
+
+    private companion object {
+        /** The speech server's cleanup hint, spelled out so the test pins the header the server reads. */
+        const val CLEANUP_HINT = "X-Voice-Postprocess"
     }
 }

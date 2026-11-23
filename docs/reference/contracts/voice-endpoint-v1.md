@@ -177,6 +177,11 @@ server answers it with a list; otherwise the list is just the stored voice and t
   `voice.payload_too_large`; the ear's turns end at 20 s. The base64 frame may exceed one 1 MiB
   Iroh frame, so the client sends it with `frame_part` continuation (both sides already advertise it).
 - `language` overrides the stored hint for this request; absent uses the stored hint.
+- `purpose` (optional) says what the transcript is for. `live_partial` (a live partial, on screen
+  only briefly) makes the host ask the server for light cleanup with `X-Voice-Postprocess: basic`.
+  Absent, `turn` or an unknown value is a turn: no header, the server's default cleanup. Devices send
+  it only for live partials, so a turn's request is unchanged, and a host that predates the field
+  ignores it (every request then gets the default cleanup).
 - The host asks the server for `verbose_json` and falls back to `json` on a 400, 415 or 422 (the
   device-side `SpeechEndpointClient.transcribe` falls back on 400 and 422), and caches the fallback per
   stored setup revision.

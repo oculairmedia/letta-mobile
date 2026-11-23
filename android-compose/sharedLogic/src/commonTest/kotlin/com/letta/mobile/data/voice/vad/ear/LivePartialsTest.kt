@@ -10,6 +10,7 @@ import com.letta.mobile.data.voice.audio.SamplePosition
 import com.letta.mobile.data.voice.audio.pcm.WavCodec
 import com.letta.mobile.data.voice.audio.pcm.WavParse
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
 import com.letta.mobile.data.voice.vad.SpeechDetectorFactory
@@ -40,19 +41,25 @@ class LivePartialsTest {
     private val format = AudioFrameFormat()
     private val settings = LivePartials(enabled = true, interval = 600.milliseconds, window = 1.seconds)
 
-    /** Answers each request through [answer], recording each clip's length in samples. */
+    /** Answers each request through [answer], recording each clip's length in samples and what it was for. */
     private class FakeTranscriber(private val answer: suspend (call: Int, samples: Int) -> String) : SpeechTranscriber {
         val lengths = mutableListOf<Int>()
+        val purposes = mutableListOf<TranscriptionPurpose>()
 
-        override suspend fun transcribe(audio: AudioClip): SpeechTranscript {
+        override suspend fun transcribe(audio: AudioClip, purpose: TranscriptionPurpose): SpeechTranscript {
             val samples = (WavCodec.parse(audio.bytes) as WavParse.Decoded).audio.samples.size
             lengths += samples
+            purposes += purpose
             return SpeechTranscript(VoiceText(answer(lengths.size, samples)))
         }
     }
 
     /** Drives one [PartialTranscripts] through [script] and returns the partial texts it reported. */
-    private suspend fun partials(transcriber: SpeechTranscriber, script: suspend Driver.() -> Unit): List<String> =
+    private suspend fun partials(
+        transcriber: SpeechTranscriber,
+        settings: LivePartials = this.settings,
+        script: suspend Driver.() -> Unit,
+    ): List<String> =
         channelFlow { Driver(PartialTranscripts(settings, format, transcriber, this)).script() }
             .filterIsInstance<VoiceEarEvent.PartialTranscript>()
             .map { it.text.value }
@@ -229,7 +236,7 @@ class LivePartialsTest {
         val requests = mutableListOf<Request>()
         private var freeAtMs = 0L
 
-        override suspend fun transcribe(audio: AudioClip): SpeechTranscript {
+        override suspend fun transcribe(audio: AudioClip, purpose: TranscriptionPurpose): SpeechTranscript {
             val now = scope.testScheduler.currentTime
             val start = maxOf(now, freeAtMs)
             freeAtMs = start + WORK_MS
@@ -256,6 +263,38 @@ class LivePartialsTest {
         }
         val config = VadEarConfig(policy = EndOfTurnPolicy(), detectors = SpeechDetectorFactory { ValueDetector() }, partials = partials)
         return VadVoiceEar(source, transcriber, config)
+    }
+
+    @Test
+    fun intervalPartialsAskForLightCleanupAndTheWholeTurnForFull() = runTest {
+        val transcriber = FakeTranscriber { _, _ -> "words" }
+        ear(SCRIPT, transcriber, settings).listen().untilEnd()
+        assertTrue(transcriber.purposes.size > 1, "partials and the whole turn were requested")
+        assertTrue(transcriber.purposes.dropLast(1).all { it == TranscriptionPurpose.LIVE_PARTIAL }, "interval partials")
+        assertEquals(TranscriptionPurpose.TURN, transcriber.purposes.last(), "the whole turn")
+    }
+
+    @Test
+    fun theSettlePartialAsksForFullCleanup() = runTest {
+        val transcriber = FakeTranscriber { call, _ -> "words $call" }
+        partials(transcriber, settings.copy(settle = 160.milliseconds)) {
+            partials.turnStarted(0)
+            // Voice stops at 30 frames: the interval partial goes at 19 frames, the settle partial 160 ms (5 frames) into the pause.
+            hearVoiceUntil(30 * FRAME, last = 45 * FRAME)
+            partials.turnEnded()
+        }
+        assertEquals(listOf(TranscriptionPurpose.LIVE_PARTIAL, TranscriptionPurpose.TURN), transcriber.purposes)
+        assertEquals(listOf(19 * FRAME.toInt(), 35 * FRAME.toInt()).map { minOf(it, WINDOW_SAMPLES) }, transcriber.lengths)
+    }
+
+    /** Hears frames up to [last], voice until [voiceEnd] and silence after it, letting requests run in between. */
+    private suspend fun Driver.hearVoiceUntil(voiceEnd: Long, last: Long) {
+        var position = FRAME
+        while (position <= last) {
+            partials.heard(position, voiced = minOf(position, voiceEnd)) { max -> ShortArray(minOf(position, max).toInt()) }
+            yield()
+            position += FRAME
+        }
     }
 
     @Test
@@ -290,6 +329,9 @@ class LivePartialsTest {
         const val FRAME = 512L
         const val FRAME_MS = 32L
         const val WORK_MS = 450L
+
+        /** The test settings' one-second window at 16 kHz. */
+        const val WINDOW_SAMPLES = 16_000
 
         /** Pre-roll, about two seconds of speech, then the silence that ends the turn. */
         val SCRIPT = frames(PRE_ROLL_VALUE, 4) + frames(SPEECH_VALUE, 60) + frames(0, 32)

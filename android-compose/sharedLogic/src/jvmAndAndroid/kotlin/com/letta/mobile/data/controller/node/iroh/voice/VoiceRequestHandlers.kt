@@ -44,7 +44,8 @@ internal class VoiceRequestHandlers(
         val snapshot = configured()
         val model = snapshot.setup.transcriptionModel ?: throw VoiceRefusal(HostVoiceErrorCode.NOT_CONFIGURED)
         requireGrant(snapshot.setup.grants.audioForTranscription)
-        val call = VoiceTranscriptionCall(clip.wav, model, clip.language ?: snapshot.setup.language, verbose = true)
+        val sent = VoiceClip(clip.wav, clip.language ?: snapshot.setup.language, clip.purpose)
+        val call = VoiceTranscriptionCall(sent, model, verbose = true)
         val result = holding(connectionKey(context), VoiceRequestKind.TRANSCRIPTION) { transcript(snapshot, call) }
         return voiceWire(HostTranscriptionResult.serializer(), result)
     }
@@ -55,7 +56,7 @@ internal class VoiceRequestHandlers(
             val first = upstreamCall { upstream.transcribe(snapshot.target, verbose) }
             if (first is VoiceTranscriptionAnswer.Heard) return result(first, HostTranscriptFormat.VERBOSE_JSON)
         }
-        val plain = VoiceTranscriptionCall(verbose.audio, verbose.model, verbose.language, verbose = false)
+        val plain = VoiceTranscriptionCall(verbose.clip, verbose.model, verbose = false)
         val heard = upstreamCall { upstream.transcribe(snapshot.target, plain) } as? VoiceTranscriptionAnswer.Heard
             ?: throw VoiceRefusal(HostVoiceErrorCode.UPSTREAM_REJECTED)
         verboseRefusedAt = snapshot.revision

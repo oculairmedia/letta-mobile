@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller.node.iroh.voice
 import com.letta.mobile.data.voice.SpeechEndpointUrl
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointAddress
 import com.letta.mobile.data.voice.endpoint.SpeechTransportPolicy
+import com.letta.mobile.data.voice.endpoint.TranscriptCleanupHint
 import com.letta.mobile.data.voice.endpoint.TranscriptResponse
 import com.letta.mobile.data.voice.host.HostVoiceErrorCode
 import io.ktor.client.HttpClient
@@ -34,7 +35,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * [VoiceSpeechUpstream] over HTTP on a Ktor [engine]: an isolated client with no logging, no redirects
  * and no shared auth. The base URL must be plain (the address rules of the device-side speech client),
  * and a key is sent only over https or plain http to a loopback literal, else the call is refused with
- * `voice.insecure_transport` before anything is sent. Every budget in [timeouts] ends the call with
+ * `voice.insecure_transport` before anything is sent. A live partial's transcription carries the speech
+ * server's light-cleanup hint ([TranscriptCleanupHint]); a turn's carries none. Every budget in [timeouts] ends the call with
  * `voice.upstream_timeout`. No response body is ever logged or passed on; only its parsed fields are.
  */
 internal class KtorVoiceSpeechUpstream(
@@ -78,6 +80,7 @@ internal class KtorVoiceSpeechUpstream(
     private suspend fun postTranscription(target: VoiceUpstreamTarget, request: VoiceTranscriptionCall): VoiceTranscriptionAnswer {
         val response = client.post {
             aimAt(target, TRANSCRIPTIONS_ROUTE)
+            TranscriptCleanupHint.valueFor(request.clip.purpose)?.let { header(TranscriptCleanupHint.HEADER, it) }
             setBody(VoiceUpstreamWire.transcriptionBody(request))
         }
         if (request.verbose && response.status.value in FORMAT_REFUSED_STATUSES) return VoiceTranscriptionAnswer.FormatRefused

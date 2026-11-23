@@ -5,6 +5,7 @@ import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.PcmChunk
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.tone.ToneCue
 import kotlinx.coroutines.flow.Flow
 
@@ -57,8 +58,14 @@ interface HostVoiceEndpoint {
     /**
      * The words spoken in [audio], a mono 16-bit WAVE clip, with the recogniser's per-segment numbers
      * when the speech server reports them. [language] overrides the stored hint for this request.
+     * [purpose] travels to the host, which asks the speech server for light cleanup for a live partial
+     * and leaves its default for a turn.
      */
-    suspend fun transcribe(audio: AudioClip, language: SpeechLanguage? = null): SpeechTranscript
+    suspend fun transcribe(
+        audio: AudioClip,
+        language: SpeechLanguage? = null,
+        purpose: TranscriptionPurpose = TranscriptionPurpose.TURN,
+    ): SpeechTranscript
 
     /**
      * [text] spoken as [context] asks, as 16-bit PCM emitted while it streams in: the speaking agent,

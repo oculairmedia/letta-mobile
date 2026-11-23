@@ -80,7 +80,8 @@ class SpeechEndpointClient(
      * Transcribes [request]'s audio. Asks for `verbose_json`, whose segments carry the recogniser's
      * own no-speech evidence ([SpeechTranscript.segments]). A server that refuses that format (400 or
      * 422) but accepts plain `json` gets plain `json` from then on, and its transcripts carry no
-     * segments.
+     * segments. A [TranscriptionPurpose.LIVE_PARTIAL] request asks for light cleanup
+     * ([TranscriptCleanupHint]); a turn's request leaves the server's own default.
      */
     suspend fun transcribe(request: TranscriptionRequest): SpeechTranscript = call(SpeechOperation.TRANSCRIPTION) {
         val target = requestUrl(TRANSCRIPTIONS_ROUTE, SpeechOperation.TRANSCRIPTION)
@@ -99,6 +100,7 @@ class SpeechEndpointClient(
         client.post {
             url(target)
             authorize()
+            TranscriptCleanupHint.valueFor(request.purpose)?.let { header(TranscriptCleanupHint.HEADER, it) }
             setBody(transcriptionBody(request, if (verbose) VERBOSE_JSON else PLAIN_JSON))
         }
 
@@ -275,6 +277,26 @@ internal object NameResolutionFailures {
             depth++
         }
         return false
+    }
+}
+
+/**
+ * The speech server's transcript-cleanup hint, the one place its header is named. The device's client
+ * and the host's upstream both send it: [TranscriptionPurpose.LIVE_PARTIAL] asks for `basic` cleanup
+ * (no language-model pass), and a turn sends no header, so the server applies its default. Servers
+ * that do not know the header ignore it.
+ */
+internal object TranscriptCleanupHint {
+    /** The request header. */
+    const val HEADER: String = "X-Voice-Postprocess"
+
+    /** Cleanup without the language-model pass. */
+    const val BASIC: String = "basic"
+
+    /** The header value for [purpose], or null to send no header. */
+    fun valueFor(purpose: TranscriptionPurpose): String? = when (purpose) {
+        TranscriptionPurpose.TURN -> null
+        TranscriptionPurpose.LIVE_PARTIAL -> BASIC
     }
 }
 

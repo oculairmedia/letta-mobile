@@ -10,6 +10,7 @@ import com.letta.mobile.data.voice.endpoint.SpeechOperation
 import com.letta.mobile.data.voice.endpoint.SpeechSpeed
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
 import com.letta.mobile.data.voice.endpoint.StreamingSpeechSynthesizer
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.host.HostVoiceEndpoint
 import com.letta.mobile.data.voice.host.HostVoiceException
 import com.letta.mobile.data.voice.host.SpeechContext
@@ -24,16 +25,18 @@ import kotlinx.coroutines.flow.catch
  * device's own one-time acknowledgement that its microphone audio may go to the shared server
  * ([acknowledged]); without it the request is refused with PERMISSION_REQUIRED and nothing is sent.
  * Host failures become [SpeechEndpointException]s carrying the voice loop's code, as the direct
- * transcriber's do.
+ * transcriber's do. Each request's purpose goes to the host, which turns it into the speech server's
+ * cleanup hint.
  */
 class HostSpeechTranscriber(
     private val endpoint: HostVoiceEndpoint,
     private val language: SpeechLanguage? = null,
     private val acknowledged: () -> Boolean,
 ) : SpeechTranscriber {
-    override suspend fun transcribe(audio: AudioClip): SpeechTranscript {
+    override suspend fun transcribe(audio: AudioClip, purpose: TranscriptionPurpose): SpeechTranscript {
         if (!acknowledged()) throw SpeechEndpointException(SpeechOperation.TRANSCRIPTION, VoiceErrorCode.PERMISSION_REQUIRED)
-        return runCatching { endpoint.transcribe(audio, language) }.getOrElse { throw asSpeechFailure(it, SpeechOperation.TRANSCRIPTION) }
+        return runCatching { endpoint.transcribe(audio, language, purpose) }
+            .getOrElse { throw asSpeechFailure(it, SpeechOperation.TRANSCRIPTION) }
     }
 }
 

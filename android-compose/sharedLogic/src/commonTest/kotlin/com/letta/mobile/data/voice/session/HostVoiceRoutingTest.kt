@@ -13,6 +13,7 @@ import com.letta.mobile.data.voice.audio.PcmChunk
 import com.letta.mobile.data.voice.consent.EndpointOrigin
 import com.letta.mobile.data.voice.consent.VoiceEndpointGrants
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.engine.SpeechSegment
 import com.letta.mobile.data.voice.engine.SpeechSegmentId
 import com.letta.mobile.data.voice.host.HostVoiceConnectionCandidate
@@ -233,7 +234,11 @@ class HostVoiceRoutingTest {
 
         override suspend fun models(): HostVoiceModels = error("unused")
 
-        override suspend fun transcribe(audio: AudioClip, language: com.letta.mobile.data.voice.SpeechLanguage?): SpeechTranscript =
+        override suspend fun transcribe(
+            audio: AudioClip,
+            language: com.letta.mobile.data.voice.SpeechLanguage?,
+            purpose: TranscriptionPurpose,
+        ): SpeechTranscript =
             error("unused")
 
         override fun synthesize(text: VoiceText, context: SpeechContext): Flow<PcmChunk> {
