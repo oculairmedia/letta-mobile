@@ -713,9 +713,6 @@ from rig.ids import (FOLLOW_NODE, LAG_NODE, OVERLAPS, OVERLAP_REST_ANIM, SPARKLE
                      SPARKLE_REST_ANIM, SPARKLE_STARS, overlap_anim, sparkle_anim)
 import timeline  # noqa: E402
 
-LAG_TICK = 2       # frames between the linear ticks that carry a segment the lag cuts in two
-
-
 def _ease(bezier):
     """An rml bezier token as timeline's Ease, so a key list can be sampled like the file plays it."""
     if not bezier:
@@ -725,39 +722,81 @@ def _ease(bezier):
     return timeline.Ease("cubic", tuple(float(v) for v in bezier.split()))
 
 
+def _lerp(a, b, t):
+    return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+
+
+def _bezier_x_inverse(x1, x2, u):
+    """The curve parameter at which a (0,0)-(1,1) ease's time reaches u (time is monotone in it)."""
+    lo, hi = 0.0, 1.0
+    for _ in range(60):
+        t = (lo + hi) / 2
+        x = 3 * (1 - t) ** 2 * t * x1 + 3 * (1 - t) * t * t * x2 + t ** 3
+        lo, hi = (t, hi) if x < u else (lo, t)
+    return (lo + hi) / 2
+
+
+def _box(points, origin, extent):
+    """Control points renormalised into the unit box from `origin` across `extent`, as a token."""
+    def axis(v, i):
+        return (v - origin[i]) / extent[i] if abs(extent[i]) > 1e-9 else v
+    (_, _), p1, p2, (_, _) = points
+    return " ".join(f"{round(c, 6):g}" for c in (axis(p1[0], 0), axis(p1[1], 1), axis(p2[0], 0), axis(p2[1], 1)))
+
+
+def split_ease(bezier, u):
+    """An ease cut at time fraction u, exactly: (the first part's ease, the second's, the value
+    fraction reached at the cut). de Casteljau at the parameter where the time is u, then each half
+    renormalised into its own unit box - two keys carry the cut segment with no approximation."""
+    x1, y1, x2, y2 = (float(v) for v in bezier.split())
+    t = _bezier_x_inverse(x1, x2, u)
+    p0, p1, p2, p3 = (0.0, 0.0), (x1, y1), (x2, y2), (1.0, 1.0)
+    p01, p12, p23 = _lerp(p0, p1, t), _lerp(p1, p2, t), _lerp(p2, p3, t)
+    p012, p123 = _lerp(p01, p12, t), _lerp(p12, p23, t)
+    cut = _lerp(p012, p123, t)
+    first = _box((p0, p01, p012, cut), p0, cut)
+    second = _box((cut, p123, p23, p3), cut, (1 - cut[0], 1 - cut[1]))
+    return first, second, cut[1]
+
+
+def _bezier_of(k):
+    """A key's leaving curve; a key without one plays on the animation default (rml: SOFT_OUT)."""
+    return k[2] if len(k) > 2 and k[2] else SOFT_OUT
+
+
+def _wrapped(keys, lag, period):
+    """The key list rotated `lag` frames later round the loop, the segment the wrap cuts split
+    exactly: [(frame, value, bezier)] from frame 0 to `period`."""
+    cut = period - lag
+    a = max(k for k in keys if k[0] <= cut)            # the key the cut segment leaves
+    b = next(k for k in keys if k[0] > cut) if a[0] < cut else a
+    head, tail = [k for k in keys if b[0] <= k[0] < period], [k for k in keys if k[0] <= a[0]]
+    if a[0] == cut:                                    # the cut falls on a key: nothing to split
+        start, last_bez, value = None, None, float(a[1])
+    else:
+        first, second, frac = split_ease(_bezier_of(a), (cut - a[0]) / (b[0] - a[0]))
+        value = float(a[1]) + (float(b[1]) - float(a[1])) * frac
+        start, last_bez = (0, value, second), first
+    out = [] if start is None else [start]
+    out += [(k[0] - cut, float(k[1]), _bezier_of(k)) for k in head]
+    out += [(k[0] + lag, float(k[1]), last_bez if (k is a and last_bez) else _bezier_of(k)) for k in tail]
+    return out + [(period, value)]
+
+
 def lagged(keys, lag, period):
     """A looping key list played `lag` frames late: value(t) = keys(t - lag), wrapped at `period`.
 
-    The overlap of the loops: the face trails the body it rides on. Whole segments keep their own
-    curve, shifted; the one segment the wrap cuts in two (and only it) is carried by linear ticks
-    sampled from the original curve, so the shifted loop is the original motion exactly, a beat late,
-    and still closes on itself - offset by the constant that puts its frame 0 on the original's.
-    A constant, or no lag, comes back unchanged."""
+    The overlap of the loops: the face trails the body it rides on. Every segment keeps its own
+    curve, shifted round the loop; the one the wrap cuts in two is split exactly (split_ease), so
+    the lagged loop is the original motion a beat late, with one key more, and still closes on
+    itself. It is anchored so its frame 0 is the original's: the lag is a shape, not an offset - it
+    moves the whole track by at most a third of a pixel, and every rest an entry or a calm twin
+    lands on is exactly what it was. A constant, or no lag, comes back unchanged."""
     if not isinstance(keys, list) or not lag or period <= 1:
         return keys
-    # A key without a bezier plays on the animation's default (rml.animation: SOFT_OUT), not a hold.
-    curve = [timeline.Key(k[0], float(k[1]), _ease(k[2] if len(k) > 2 and k[2] else SOFT_OUT), "double")
-             for k in keys]
-    raw = lambda t: timeline.sample(curve, ((t - lag) % period) or (0 if t == 0 else period))[0]
-    # Anchored so frame 0 is the body's own frame 0: the lag is a shape, not an offset. It moves
-    # the whole face track by at most a third of a pixel, and in return every rest an entry or a
-    # calm twin lands on is exactly what it was without the lag.
-    anchor = float(keys[0][1]) - raw(0)
-    at = lambda t: round(raw(t) + anchor, 4)
-    frames_of = [k[0] for k in keys]
-    next_of = dict(zip(frames_of, frames_of[1:]))
-    bez_of = {k[0]: (k[2] if len(k) > 2 and k[2] else SOFT_OUT) for k in keys}
-    image = {(f + lag) % period: f for f in frames_of if f < period}
-    marks = sorted(set(image) | {0, period})
-    out = []
-    for g0, g1 in zip(marks, marks[1:]):
-        f0 = image.get(g0)
-        if f0 is not None and f0 in next_of and next_of[f0] - f0 == g1 - g0:
-            out.append((g0, at(g0), bez_of[f0]))
-        else:
-            out += [(t, at(t), LINEAR) for t in range(g0, g1, LAG_TICK)]
-    out.append((period, at(period)))
-    return out
+    out = _wrapped(keys, lag, period)
+    anchor = float(keys[0][1]) - out[0][1]
+    return [(k[0], round(k[1] + anchor, 4)) + tuple(k[2:]) for k in out]
 
 
 def loop_lag(state, keys, period_frames):

@@ -359,27 +359,23 @@ class TestSecondaries(unittest.TestCase):
                 self.assertAlmostEqual(timeline.sample(got, t)[0], want, delta=0.06, msg=f"t={t} lag={lag}")
             self.assertEqual(out[0][1], out[-1][1], "the lagged loop does not close")
 
+    @staticmethod
+    def _calm_face_keys(state):
+        """{propertyKey: first value} of FACE in the calm twin of `state`."""
+        from rig.ids import FACE
+        name = "Calm" + state[0].upper() + state[1:]
+        calm = next(a for a in scene_tree().getroot().iter("LinearAnimation") if a.get("name") == name)
+        face = next(ko for ko in calm.iter("KeyedObject") if ko.get("objectId") == FACE)
+        return {kp.get("propertyKey"): float(next(iter(kp)).get("value")) for kp in face.iter("KeyedProperty")}
+
     def test_calm_twins_hold_the_lagged_frame_zero(self):
         """The calm twin and the loop agree at frame 0, so reduceMotion and entries land on it."""
         from rig.motion import sustained_rest
         from rig.constants import LOOP_LAG_FRAMES
-        from rig.ids import FACE
-        checked = 0
         for st in LOOP_LAG_FRAMES:
-            rest = sustained_rest(st)
-            calm = next(a for a in scene_tree().getroot().iter("LinearAnimation")
-                        if a.get("name") == "Calm" + st[0].upper() + st[1:])
-            for ko in calm.iter("KeyedObject"):
-                if ko.get("objectId") != FACE:
-                    continue
-                for kp in ko.iter("KeyedProperty"):
-                    v = float(next(iter(kp)).get("value"))
-                    want = {"13": rest.face_x, "14": rest.face_y}.get(kp.get("propertyKey"))
-                    if want is not None:
-                        checked += 1
-                        self.assertAlmostEqual(v, want, places=3, msg=f"{st} face key {kp.get('propertyKey')}")
-        self.assertEqual(checked, 2 * len(LOOP_LAG_FRAMES))
-
+            rest, keys = sustained_rest(st), self._calm_face_keys(st)
+            self.assertAlmostEqual(keys["13"], rest.face_x, places=3, msg=f"{st} face x")
+            self.assertAlmostEqual(keys["14"], rest.face_y, places=3, msg=f"{st} face y")
 
 if __name__ == "__main__":
     unittest.main()

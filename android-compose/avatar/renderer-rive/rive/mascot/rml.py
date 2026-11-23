@@ -1,6 +1,7 @@
 """RML primitives for the mascot generator: Rive property keys, view-model ids, easing tokens and
 the small XML builders (keyframes, animations, states, transitions). No mascot knowledge lives
 here; gen_scene.py composes these into the rig. Star-imported by gen_scene.py."""
+import re
 from textwrap import indent
 
 # --- property keys (rive schema) --------------------------------------------------------------
@@ -251,3 +252,37 @@ def when_input(input_id, op, value):
 
 def weighted(t, weight):
     return t.replace("<StateTransition ", f'<StateTransition randomWeight="{weight}" ', 1)
+
+
+# --- shared interpolators -------------------------------------------------------------------------
+_KEY_EASE = re.compile(r'(<(KeyFrameDouble|StateTransition)\b[^>]*?interpolationType="cubic")>(\s*)'
+                       r'<CubicEaseInterpolator x1="([^"]*)" y1="([^"]*)" x2="([^"]*)" y2="([^"]*)"/>')
+_ARTBOARD = re.compile(r"(<Artboard\b.*?</Artboard>)", re.S)
+
+
+def share_interpolators(document, id_for):
+    """One CubicEaseInterpolator per distinct curve per artboard, the rest by reference.
+
+    A key (or transition) with a cubic curve normally nests its own interpolator, so a file with a
+    few thousand eased keys carries a few thousand copies of fifteen curves. Within each artboard
+    (an interpolator id resolves inside its own artboard), the first use of a curve keeps its nested
+    interpolator - now with the id `id_for(artboard name, "x1 y1 x2 y2")` returns - and every later
+    use drops its copy and points at that one with `interpolatorId`. The runtime reads the same
+    curve either way; the file is a good deal smaller. timeline.py resolves the references, so the
+    ledger and the review tools read the same eases. Opt-in: a generator calls it on its document;
+    nothing else changes."""
+    def per_artboard(board):
+        name = re.search(r'\bname="([^"]*)"', board.group(1)).group(1)
+        seen = {}
+
+        def one(m):
+            head, _tag, space, curve = m.group(1), m.group(2), m.group(3), " ".join(m.group(4, 5, 6, 7))
+            if curve in seen:
+                # The copy goes; the whitespace that led up to it goes too (what followed it stays).
+                return f'{head} interpolatorId="{seen[curve]}">'
+            seen[curve] = id_for(name, curve)
+            x1, y1, x2, y2 = curve.split()
+            return (f'{head}>{space}<CubicEaseInterpolator x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" '
+                    f'id="{seen[curve]}"/>')
+        return _KEY_EASE.sub(one, board.group(1))
+    return _ARTBOARD.sub(per_artboard, document)

@@ -14,6 +14,7 @@ Rive rules that bite here:
     Transitions are also evaluated in declared order, which is why each park check is written first.
 """
 from textwrap import indent
+from typing import NamedTuple
 
 from rml import (BIND_BOOL, EASE_OUT, SOFT_OUT, SPRING, VM_BLINK, VM_DRAGGED, VM_ERROR, VM_HOVER,
                  VM_SHAPE, VM_STATE, VM_SUCCESS, bind, when_bool, when_enum, when_number, when_trigger)
@@ -395,7 +396,17 @@ def _moment_trigger(m):
     return VM_SUCCESS if m == "success" else VM_NEW[m]
 
 
-def _moment_layer(name, lid, rest_anim, rest_node, moments, anim_of, node_of):
+class MomentLayer(NamedTuple):
+    """One moment layer: its name and id, its rest state, and the one-shot per moment."""
+    name: str
+    lid: str
+    rest: tuple            # (animation id, state node id)
+    moments: list
+    anim_of: dict
+    node_of: dict
+
+
+def _moment_layer(spec):
     """A layer of one-shots fired by moment triggers, only while reduceMotion is off.
 
     Like React: fired from wherever the layer is, in at the floor (a new moment restarts over a
@@ -403,22 +414,23 @@ def _moment_layer(name, lid, rest_anim, rest_node, moments, anim_of, node_of):
     reduceMotion no trigger reaches it at all - the secondaries and the sparkle are pure
     embellishment, and the calm twins already carry each moment's meaning."""
     full = when_bool(VM_REDUCE, "false")
-    fired = [When(node_of[m], (when_trigger(_moment_trigger(m)), full), MIN_TRANSITION_MS, SOFT_OUT)
-             for m in moments]
+    rest_anim, rest_node = spec.rest
+    fired = [When(spec.node_of[m], (when_trigger(_moment_trigger(m)), full), MIN_TRANSITION_MS, SOFT_OUT)
+             for m in spec.moments]
     states = [State(rest_anim, rest_node, 0)]
-    states += [State(anim_of[m], node_of[m], 1 + i, reset=True, transitions=[Exit(rest_node)])
-               for i, m in enumerate(moments)]
-    return Layer(name, lid, rest_node, any_transitions=fired, states=states).rml()
+    states += [State(spec.anim_of[m], spec.node_of[m], 1 + i, reset=True, transitions=[Exit(rest_node)])
+               for i, m in enumerate(spec.moments)]
+    return Layer(spec.name, spec.lid, rest_node, any_transitions=fired, states=states).rml()
 
 
 def _secondary_layers():
     """Overlap (the face trailing and overshooting the body, the body following through) and
     Sparkle (star glints at success, toolDone and wake). They key only Lag, Follow's scale and the
     stars - nodes nothing else keys - so they sit on top without fighting anything."""
-    overlap = _moment_layer("Overlap", OVERLAP_LAYER, OVERLAP_REST_ANIM, OVERLAP_REST_NODE, OVERLAPS,
-                            overlap_anim, overlap_node)
-    sparkle = _moment_layer("Sparkle", SPARKLE_LAYER, SPARKLE_REST_ANIM, SPARKLE_REST_NODE, SPARKLES,
-                            sparkle_anim, sparkle_node)
+    overlap = _moment_layer(MomentLayer("Overlap", OVERLAP_LAYER, (OVERLAP_REST_ANIM, OVERLAP_REST_NODE),
+                                        OVERLAPS, overlap_anim, overlap_node))
+    sparkle = _moment_layer(MomentLayer("Sparkle", SPARKLE_LAYER, (SPARKLE_REST_ANIM, SPARKLE_REST_NODE),
+                                        SPARKLES, sparkle_anim, sparkle_node))
     return overlap, sparkle
 
 

@@ -382,6 +382,14 @@ plate 7:10-7:15.
   snap to rest in one frame. `rig/seams.py pose_moves()` weighs every frame a source can be left at.
 - The CLI compiles every `*.rml` in the directory; scratch fragments go elsewhere.
 - PowerShell `>` writes UTF-16; redirect from bash.
+- **The web bundle budget counts every byte of `mascot.riv`** (`web-wasm`: a gzip ceiling). A
+  cubic key nests its own interpolator by default, so ~5000 eased keys carried ~5000 copies of
+  fifteen curves. `gen_scene.py` runs `rml.share_interpolators()` on the document: one
+  interpolator per curve per artboard (ids from `alloc()`), every other key references it with
+  `interpolatorId`. That took the file from 38.9 kB to 22.1 kB gzip with identical telemetry (the
+  goldens recorded before it still pass). `timeline.register_interpolators()` resolves the
+  references for the ledger and the review tools. Dense linear ticks are the other cost to watch:
+  split a cubic exactly (`rig/motion.py split_ease`) rather than sampling it.
 
 ## Reviewing motion
 

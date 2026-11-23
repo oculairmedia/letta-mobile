@@ -64,7 +64,7 @@ class Scene:
 
     def __init__(self, path):
         self.path = path
-        self.root = ET.parse(path).getroot()
+        self.root = register_interpolators(ET.parse(path).getroot())
         self.parent = {child: el for el in self.root.iter() for child in el}
         self.by_id = {}
         for el in self.root.iter():
@@ -162,8 +162,23 @@ def _bezier_y(b, u):
     return 3 * mt * mt * t * y1 + 3 * mt * t * t * y2 + t ** 3
 
 
+# Interpolators shared by reference (rml.share_interpolators): id -> the defining element. Filled by
+# register_interpolators() from every document this module or rig/seams.py parses.
+SHARED_INTERPOLATORS = {}
+
+
+def register_interpolators(root):
+    """Index every interpolator that carries an id, so a key that only references one reads its curve."""
+    for c in root.iter("CubicEaseInterpolator"):
+        if c.get("id") is not None:
+            SHARED_INTERPOLATORS[c.get("id")] = c
+    return root
+
+
 def _cubic_ease(kf):
     c = kf.find("CubicEaseInterpolator")
+    if c is None:
+        c = SHARED_INTERPOLATORS.get(kf.get("interpolatorId"))
     if c is None:
         return HOLD
     b = tuple(float(c.get(a, 0)) for a in ("x1", "y1", "x2", "y2"))

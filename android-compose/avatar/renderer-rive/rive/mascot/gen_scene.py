@@ -36,7 +36,7 @@ import os
 import re
 from textwrap import indent
 
-from rml import (BACK_OUT, BACK_SOFT, ELASTIC_HEAVY, ELASTIC_SOFT, GRADIENT_OPACITY, ROT, SINE, SX, SY, VM, VM_BLINK, VM_COLOR,
+from rml import (share_interpolators, BACK_OUT, BACK_SOFT, ELASTIC_HEAVY, ELASTIC_SOFT, GRADIENT_OPACITY, ROT, SINE, SX, SY, VM, VM_BLINK, VM_COLOR,
                  VM_DRAGGED, VM_ERROR, VM_HOVER, VM_LOOKX, VM_LOOKY, VM_MOUTH, VM_SHAPE, VM_STATE,
                  VM_SUCCESS, Y, anim_state, animation, bind, layer_frame)
 from rig.body import INFLATE_NODE, body, sine, squash
@@ -255,8 +255,26 @@ def data():
 </ViewModel>'''
 
 
+# Each artboard's shared interpolators get their ids from that artboard's id space (rml.share_interpolators).
+_EASE_SPACE = {"Mascot": 3, "Plate": 7}
+
+
+def _ease_id(artboard, curve):
+    """A shared interpolator's id: allocated once per (artboard, curve) and recorded, like every id."""
+    from rig.ids import alloc
+    return alloc(_EASE_SPACE[artboard], f"Ease {artboard} {curve}")
+
+
 def scene_document(solo=None):
-    """The whole scene.rml document: the root artboard, the Plate component and the data section."""
+    """The whole scene.rml document: the root artboard, the Plate component and the data section.
+
+    Every eased key shares its curve's one interpolator per artboard (rml.share_interpolators):
+    about five thousand keys use fifteen curves, and the web bundle budget counts every byte of the
+    file. The blend policy has already checked the animations by then (root_artboard)."""
+    return share_interpolators(_scene_document(solo), _ease_id)
+
+
+def _scene_document(solo=None):
     return f'''<Rive version="1" kind="fragment">
     <!--
         The Letta agent mascot, v4: SPEC.md + art/*.svg through gen_scene.py. Regenerate rather
