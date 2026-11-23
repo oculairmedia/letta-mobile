@@ -56612,6 +56612,8 @@ final class com.letta.mobile.data.pairing/PairLink { // com.letta.mobile.data.pa
     final fun toString(): kotlin/String // com.letta.mobile.data.pairing/PairLink.toString|toString(){}[0]
 
     final object Companion { // com.letta.mobile.data.pairing/PairLink.Companion|null[0]
+        final const val PRODUCT_NAME // com.letta.mobile.data.pairing/PairLink.Companion.PRODUCT_NAME|{}PRODUCT_NAME[0]
+            final fun <get-PRODUCT_NAME>(): kotlin/String // com.letta.mobile.data.pairing/PairLink.Companion.PRODUCT_NAME.<get-PRODUCT_NAME>|<get-PRODUCT_NAME>(){}[0]
         final const val QR_MAX_CHARS // com.letta.mobile.data.pairing/PairLink.Companion.QR_MAX_CHARS|{}QR_MAX_CHARS[0]
             final fun <get-QR_MAX_CHARS>(): kotlin/Int // com.letta.mobile.data.pairing/PairLink.Companion.QR_MAX_CHARS.<get-QR_MAX_CHARS>|<get-QR_MAX_CHARS>(){}[0]
         final const val QR_SCHEME_PREFIX // com.letta.mobile.data.pairing/PairLink.Companion.QR_SCHEME_PREFIX|{}QR_SCHEME_PREFIX[0]

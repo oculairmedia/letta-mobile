@@ -39609,6 +39609,7 @@ public final class com/letta/mobile/data/pairing/PairInviteUiState {
 
 public final class com/letta/mobile/data/pairing/PairLink {
 	public static final field Companion Lcom/letta/mobile/data/pairing/PairLink$Companion;
+	public static final field PRODUCT_NAME Ljava/lang/String;
 	public static final field QR_MAX_CHARS I
 	public static final field QR_SCHEME_PREFIX Ljava/lang/String;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
