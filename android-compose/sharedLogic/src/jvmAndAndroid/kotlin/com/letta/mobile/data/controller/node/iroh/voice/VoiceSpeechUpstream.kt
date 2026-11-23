@@ -40,15 +40,23 @@ internal class VoiceUpstreamTarget(
     override fun toString(): String = "VoiceUpstreamTarget(keySet=${apiKey != null})"
 }
 
-/** One clip to transcribe. Prints no audio. */
+/**
+ * One clip to transcribe: [clip] carries the audio, the language to send (the request's own or the
+ * stored hint) and the purpose, which decides the cleanup hint sent with it. Prints no audio.
+ */
 internal class VoiceTranscriptionCall(
-    val audio: ByteArray,
+    val clip: VoiceClip,
     val model: String,
-    val language: String?,
     /** Whether to ask for `verbose_json` (with segment numbers) rather than plain `json`. */
     val verbose: Boolean,
 ) {
-    override fun toString(): String = "VoiceTranscriptionCall(bytes=${audio.size}, verbose=$verbose)"
+    /** The WAVE bytes. */
+    val audio: ByteArray get() = clip.wav
+
+    /** The language hint to send, or null to let the server detect it. */
+    val language: String? get() = clip.language
+
+    override fun toString(): String = "VoiceTranscriptionCall(bytes=${audio.size}, verbose=$verbose, purpose=${clip.purpose})"
 }
 
 /** What a transcription call came back with. */

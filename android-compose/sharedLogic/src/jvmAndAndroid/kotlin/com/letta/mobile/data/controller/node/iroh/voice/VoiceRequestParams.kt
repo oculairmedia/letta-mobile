@@ -4,6 +4,7 @@ import com.letta.mobile.data.controller.node.iroh.isSafeMemfsSegment
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.voice.audio.pcm.WavCodec
 import com.letta.mobile.data.voice.audio.pcm.WavParse
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.host.HostTranscriptionParams
 import com.letta.mobile.data.voice.host.HostVoiceErrorCode
 import com.letta.mobile.data.voice.host.HostVoiceWire
@@ -15,14 +16,16 @@ import kotlinx.serialization.json.JsonObject
 internal object VoiceRequestParams {
     /**
      * `voice.transcribe` params as a clip: only `wav`, mono 16-bit PCM, at most 1 MiB decoded and 30 s by
-     * its header. The size is checked before the clip is decoded.
+     * its header. The size is checked before the clip is decoded. The optional `purpose` names a
+     * [TranscriptionPurpose]; absent or unknown is a turn, so a request from an older device gets the
+     * speech server's full cleanup.
      */
     fun clip(params: JsonObject?): VoiceClip {
         val fields = params ?: voiceInvalid()
         if ((fields.voiceString("encoding") ?: HostTranscriptionParams.WAV) != HostTranscriptionParams.WAV) voiceInvalid()
         val bytes = clipBytes(fields.voiceString("audio") ?: voiceInvalid())
         requireMonoWithinDuration(bytes)
-        return VoiceClip(bytes, fields.voiceName("language"))
+        return VoiceClip(bytes, fields.voiceName("language"), TranscriptionPurpose.fromWire(fields.voiceName("purpose")))
     }
 
     /** The clip's bytes, refused as too large before and after decoding. */

@@ -9,6 +9,7 @@ import com.letta.mobile.data.voice.audio.SamplePosition
 import com.letta.mobile.data.voice.audio.pcm.WavCodec
 import com.letta.mobile.data.voice.audio.pcm.WavParse
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
 import com.letta.mobile.data.voice.vad.SpeechDetectorFactory
@@ -31,13 +32,15 @@ import kotlin.time.Duration.Companion.milliseconds
  * withdraws it, and the turn's end always carries the authoritative words.
  */
 class EarlyOffersTest {
-    /** Answers through [answer] with each clip's length in samples, recording the lengths. */
+    /** Answers through [answer] with each clip's length in samples, recording the lengths and what each request was for. */
     private class Transcriber(private val answer: (call: Int, samples: Int) -> String) : SpeechTranscriber {
         val lengths = mutableListOf<Int>()
+        val purposes = mutableListOf<TranscriptionPurpose>()
 
-        override suspend fun transcribe(audio: AudioClip): SpeechTranscript {
+        override suspend fun transcribe(audio: AudioClip, purpose: TranscriptionPurpose): SpeechTranscript {
             val samples = (WavCodec.parse(audio.bytes) as WavParse.Decoded).audio.samples.size
             lengths += samples
+            purposes += purpose
             return SpeechTranscript(VoiceText(answer(lengths.size, samples)))
         }
     }
@@ -57,6 +60,7 @@ class EarlyOffersTest {
         assertTrue(events.indexOfFirst(tentative) < events.indexOf(VoiceEarEvent.SpeechEnded), "offered before the turn's end")
         assertEquals("book a table", events.final())
         assertEquals(1, transcriber.lengths.size, "the turn is not transcribed again")
+        assertEquals(listOf(TranscriptionPurpose.TURN), transcriber.purposes, "the early transcription may become the turn's: full cleanup")
     }
 
     @Test
@@ -107,7 +111,7 @@ class EarlyOffersTest {
     fun aFailedEarlyTranscriptionIsTranscribedAgainAtTheTurnsEnd() = runTest {
         var calls = 0
         val transcriber = object : SpeechTranscriber {
-            override suspend fun transcribe(audio: AudioClip): SpeechTranscript {
+            override suspend fun transcribe(audio: AudioClip, purpose: TranscriptionPurpose): SpeechTranscript {
                 calls++
                 if (calls == 1) error("server busy")
                 return SpeechTranscript(VoiceText("hello"))

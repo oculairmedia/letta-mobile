@@ -11,6 +11,8 @@ import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioEncoding
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointException
 import com.letta.mobile.data.voice.endpoint.SpeechOperation
+import com.letta.mobile.data.voice.endpoint.SpeechTranscript
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.engine.SpeechSegment
 import com.letta.mobile.data.voice.engine.SpeechSegmentId
 import com.letta.mobile.data.voice.engine.VoiceCancelOutcome
@@ -189,12 +191,28 @@ class VoiceTelemetryTest {
     }
 
     @Test
+    fun theTranscriberPassesEachRequestsPurposeOn() = runTest {
+        val seen = mutableListOf<TranscriptionPurpose>()
+        val recording = SpeechTranscriber { _, purpose ->
+            seen += purpose
+            SpeechTranscript(VoiceText("ok"))
+        }
+        val transcriber = TelemetryTranscriber(recording, telemetry)
+        val clip = AudioClip(ByteArray(4), AudioEncoding.WAV)
+        transcriber.transcribe(clip, TranscriptionPurpose.LIVE_PARTIAL)
+        transcriber.transcribe(clip, TranscriptionPurpose.TURN)
+        assertEquals(listOf(TranscriptionPurpose.LIVE_PARTIAL, TranscriptionPurpose.TURN), seen)
+    }
+
+    @Test
     fun endpointErrorsAreReportedWithKindAndStatusAndRethrown() = runTest {
         val transcriber = TelemetryTranscriber(
-            SpeechTranscriber { throw SpeechEndpointException(SpeechOperation.TRANSCRIPTION, VoiceErrorCode.REJECTED, 422) },
+            SpeechTranscriber { _, _ -> throw SpeechEndpointException(SpeechOperation.TRANSCRIPTION, VoiceErrorCode.REJECTED, 422) },
             telemetry,
         )
-        assertFailsWith<SpeechEndpointException> { transcriber.transcribe(AudioClip(ByteArray(4), AudioEncoding.WAV)) }
+        assertFailsWith<SpeechEndpointException> {
+            transcriber.transcribe(AudioClip(ByteArray(4), AudioEncoding.WAV), TranscriptionPurpose.TURN)
+        }
 
         val event = named("endpoint.error")
         assertEquals("REJECTED", attr(event, "kind"))

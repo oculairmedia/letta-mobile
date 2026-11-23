@@ -97,7 +97,32 @@ data class TranscriptionRequest(
     val model: SpeechModelName,
     /** A language hint; null lets the server detect it. */
     val language: SpeechLanguage? = null,
+    /** What the transcript is for, which decides how much cleanup the server is asked for. */
+    val purpose: TranscriptionPurpose = TranscriptionPurpose.TURN,
 )
+
+/**
+ * What a transcription is for. The ear says this with every request; the speech client (directly or
+ * through the host) turns it into the server's cleanup hint, so a short-lived live partial does not pay
+ * for the cleanup a turn's transcript gets. A server without the hint ignores it.
+ */
+enum class TranscriptionPurpose(
+    /** The name on the host wire (`voice.transcribe` params' `purpose`). */
+    val wireName: String,
+) {
+    /** A transcript that may be sent as the person's words: the server's full cleanup. */
+    TURN("turn"),
+
+    /** A live partial, shown while the person is still speaking and replaced soon after: light cleanup. */
+    LIVE_PARTIAL("live_partial"),
+    ;
+
+    /** Wire names. */
+    companion object {
+        /** The purpose named [wireName]; absent or unknown is [TURN], so an older or newer peer gets full cleanup. */
+        fun fromWire(wireName: String?): TranscriptionPurpose = entries.firstOrNull { it.wireName == wireName } ?: TURN
+    }
+}
 
 /** One synthesis request. */
 data class SpeechRequest(

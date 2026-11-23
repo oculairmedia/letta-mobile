@@ -6,6 +6,7 @@ import com.letta.mobile.data.voice.audio.AudioFrameFormat
 import com.letta.mobile.data.voice.audio.AudioFrameSource
 import com.letta.mobile.data.voice.endpoint.EndpointTranscriber
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.engine.VoiceEar
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
@@ -25,13 +26,19 @@ import kotlin.time.Duration.Companion.milliseconds
  * reported as TRANSCRIPTION_FAILED.
  */
 fun interface SpeechTranscriber {
-    /** The words spoken in [audio] (a WAVE clip), with the recogniser's numbers when it has them. */
-    suspend fun transcribe(audio: AudioClip): SpeechTranscript
+    /**
+     * The words spoken in [audio] (a WAVE clip), with the recogniser's numbers when it has them.
+     * [purpose] says what the words are for: a turn's transcript, or a live partial that may get
+     * lighter cleanup. A transcriber that cannot vary its cleanup ignores it; one that wraps another
+     * passes it on.
+     */
+    suspend fun transcribe(audio: AudioClip, purpose: TranscriptionPurpose): SpeechTranscript
 
     /** Adapters. */
     companion object {
         /** Transcribes through an OpenAI-compatible endpoint, with its destination-grant check. */
-        fun endpoint(transcriber: EndpointTranscriber): SpeechTranscriber = SpeechTranscriber { transcriber.transcribe(it) }
+        fun endpoint(transcriber: EndpointTranscriber): SpeechTranscriber =
+            SpeechTranscriber { audio, purpose -> transcriber.transcribe(audio, purpose) }
     }
 }
 

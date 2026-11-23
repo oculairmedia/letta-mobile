@@ -19,6 +19,7 @@ import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
 import com.letta.mobile.data.voice.audio.pcm.WavCodec
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointException
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.vad.CaptureRecorder
 import com.letta.mobile.data.voice.vad.Hop
@@ -502,7 +503,7 @@ private class TranscriptionWorker(
 
     private suspend fun transcribe(turn: CapturedTurn): Result<SpeechTranscript> {
         val clip = AudioClip(WavCodec.encode(PcmAudio(turn.samples, PcmFormat(format.sampleRateHz, format.channels))), AudioEncoding.WAV)
-        val outcome = runCatching { parts.transcriber.transcribe(clip) }
+        val outcome = runCatching { parts.transcriber.transcribe(clip, TranscriptionPurpose.TURN) }
         clip.bytes.fill(0)
         return outcome
     }

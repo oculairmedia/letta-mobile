@@ -147,7 +147,7 @@ class VadVoiceEarTest {
     @Test
     fun aFailureAfterTheNextSpeechStartedOffersNoRetry() = runTest {
         val gate = CompletableDeferred<SpeechTranscript>()
-        val ear = valueEar(ScriptedSource(turn() + openTurn()), SpeechTranscriber { gate.await() })
+        val ear = valueEar(ScriptedSource(turn() + openTurn()), SpeechTranscriber { _, _ -> gate.await() })
         ear.turns().test {
             assertEquals(VoiceEarEvent.ListeningStarted, awaitItem())
             assertEquals(VoiceEarEvent.SpeechStarted, awaitItem())
@@ -161,7 +161,7 @@ class VadVoiceEarTest {
     @Test
     fun turnsBeyondTheTranscriptionBacklogAreRefused() = runTest {
         val script = List(PendingTurns.MAX_PENDING_TURNS + 3) { turn() }.flatten()
-        val ear = valueEar(ScriptedSource(script), SpeechTranscriber { awaitCancellation() })
+        val ear = valueEar(ScriptedSource(script), SpeechTranscriber { _, _ -> awaitCancellation() })
         ear.turns().test {
             var event = awaitItem()
             while (event !is VoiceEarEvent.Failed) event = awaitItem()

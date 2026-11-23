@@ -288,6 +288,7 @@ internal object VoiceContractHarness {
 
         private suspend fun transcription(scope: MockRequestHandleScope, request: HttpRequestData): HttpResponseData {
             val verbose = request.body.toByteArray().decodeToString().contains("verbose_json")
+            checkCleanupHint(request)
             return when (spec["transcription"]?.jsonPrimitive?.content) {
                 "verbose_json" -> scope.jsonReply(Json.parseToJsonElement(VERBOSE_TRANSCRIPT).jsonObject)
                 "json_only" -> if (verbose) {
@@ -297,6 +298,13 @@ internal object VoiceContractHarness {
                 }
                 else -> error("Unexpected transcription")
             }
+        }
+
+        /** The case's `expect_postprocess`: the cleanup hint header's value, or `absent` for none. */
+        private fun checkCleanupHint(request: HttpRequestData) {
+            val expected = spec["expect_postprocess"]?.jsonPrimitive?.contentOrNull ?: return
+            val sent = request.headers[CLEANUP_HINT_HEADER] ?: HINT_ABSENT
+            if (sent != expected) violations += "cleanup hint $sent, expected $expected"
         }
 
         /** A WAVE body the test writes piece by piece, as the case's `speech` says. */
@@ -370,4 +378,8 @@ internal object VoiceContractHarness {
     }
 
     private const val WAV_HEADER_BYTES = 44
+
+    /** The speech server's cleanup hint, spelled out so the test pins the header the server reads. */
+    private const val CLEANUP_HINT_HEADER = "X-Voice-Postprocess"
+    private const val HINT_ABSENT = "absent"
 }

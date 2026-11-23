@@ -7,6 +7,7 @@ import com.letta.mobile.data.voice.audio.AudioFrameFormat
 import com.letta.mobile.data.voice.audio.PcmFormat
 import com.letta.mobile.data.voice.audio.pcm.PcmAudio
 import com.letta.mobile.data.voice.audio.pcm.WavCodec
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -70,6 +71,13 @@ data class LivePartials(
  * whole-turn transcription at its end stays authoritative: [covering] only offers the newest
  * partial's words when they already reach the person's last voice. A failed partial is ignored
  * silently. Partial audio is wiped once sent; nothing about a partial is logged.
+ *
+ * Each request says what it is for. A partial sent on the [LivePartials.interval] asks for
+ * [TranscriptionPurpose.LIVE_PARTIAL] (light cleanup: its words are on screen only briefly). A partial
+ * sent because the pause [settles] asks for [TranscriptionPurpose.TURN], the server's full cleanup: it
+ * is the one most likely to cover the turn and be offered by [covering] as its transcript. One edge
+ * remains: an interval partial that happens to reach the person's last voice also covers the turn, so
+ * [covering] can offer words that had only light cleanup.
  */
 internal class PartialTranscripts(
     private val settings: LivePartials,
@@ -114,16 +122,22 @@ internal class PartialTranscripts(
         val due = nextTick ?: return
         val quiet = position - lastVoiced
         if (quiet >= quietCutoff) return
-        if (position < due && !settles(quiet)) return
+        val settling = settles(quiet)
+        if (position < due && !settling) return
         nextTick = position + interval
         if (job?.isActive == true) return
         val samples = snapshot(window)
         issuedEnd = position
         val ticket = synchronized(lock) { Ticket(turn, ++issued, position, whole = samples.size < window) }
-        job = out.launch { request(samples, ticket) }
+        val purpose = if (settling) TranscriptionPurpose.TURN else TranscriptionPurpose.LIVE_PARTIAL
+        job = out.launch { request(samples, ticket, purpose) }
     }
 
-    /** Whether, [quiet] samples into a pause, one more partial should go now: none sent so far reaches the last voice. */
+    /**
+     * Whether, [quiet] samples into a pause, one more partial should go now: none sent so far reaches
+     * the last voice. A partial sent while this holds asks for full cleanup, even when the interval was
+     * also due, since its words may become the turn's.
+     */
     private fun settles(quiet: Long): Boolean {
         val after = settle ?: return false
         return quiet >= after && issuedEnd < lastVoiced
@@ -156,10 +170,10 @@ internal class PartialTranscripts(
     /** The words a shown partial heard, and the audio they cover. */
     private class Cover(val turn: Long, val end: Long, val whole: Boolean, val text: VoiceText)
 
-    private suspend fun request(samples: ShortArray, ticket: Ticket) {
+    private suspend fun request(samples: ShortArray, ticket: Ticket, purpose: TranscriptionPurpose) {
         val clip = AudioClip(WavCodec.encode(PcmAudio(samples, PcmFormat(format.sampleRateHz, format.channels))), AudioEncoding.WAV)
         samples.fill(0)
-        val outcome = runCatching { transcriber.transcribe(clip) }
+        val outcome = runCatching { transcriber.transcribe(clip, purpose) }
         clip.bytes.fill(0)
         val error = outcome.exceptionOrNull()
         if (error is CancellationException) throw error

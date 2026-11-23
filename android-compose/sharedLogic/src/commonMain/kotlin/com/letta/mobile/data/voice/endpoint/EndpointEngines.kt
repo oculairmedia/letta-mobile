@@ -35,10 +35,13 @@ class EndpointTranscriber(
     private val grants: VoiceEndpointGrantSource,
     private val settings: VoiceEndpointSettings,
 ) {
-    /** The text spoken in [audio], with the recogniser's own numbers when the server reports them. */
-    suspend fun transcribe(audio: AudioClip): SpeechTranscript {
+    /**
+     * The text spoken in [audio], with the recogniser's own numbers when the server reports them;
+     * [purpose] decides how much cleanup the server is asked for.
+     */
+    suspend fun transcribe(audio: AudioClip, purpose: TranscriptionPurpose = TranscriptionPurpose.TURN): SpeechTranscript {
         client.requireGrant(grants, VoiceEndpointPayload.AUDIO_FOR_TRANSCRIPTION, SpeechOperation.TRANSCRIPTION)
-        return client.transcribe(TranscriptionRequest(audio, settings.transcriptionModel, settings.language))
+        return client.transcribe(TranscriptionRequest(audio, settings.transcriptionModel, settings.language, purpose))
     }
 }
 

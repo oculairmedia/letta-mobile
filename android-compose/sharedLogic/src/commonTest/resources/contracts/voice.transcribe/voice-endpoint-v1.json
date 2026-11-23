@@ -12,7 +12,7 @@
     {
       "name": "verbose answer with segment numbers",
       "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
-      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-a", "grants": {"audio_for_transcription": true, "text_for_synthesis": false}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"transcription": "verbose_json"}}},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-a", "grants": {"audio_for_transcription": true, "text_for_synthesis": false}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"transcription": "verbose_json", "expect_postprocess": "absent"}}},
       "params": {"audio": "UklGRiwAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQgAAAAAAAAAAAAAAA==", "encoding": "wav", "language": "en"},
       "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"text": "placeholder words", "format": "verbose_json", "segments": [{"no_speech_prob": 0.02, "avg_logprob": -0.25}, {"no_speech_prob": 0.9, "avg_logprob": -1.5}]}}
     },
@@ -22,6 +22,27 @@
       "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-a", "grants": {"audio_for_transcription": true, "text_for_synthesis": false}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"transcription": "json_only"}}},
       "params": {"audio": "UklGRiwAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQgAAAAAAAAAAAAAAA==", "encoding": "wav"},
       "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"text": "placeholder words", "format": "json", "segments": []}}
+    },
+    {
+      "name": "live partial asks for light cleanup",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-a", "grants": {"audio_for_transcription": true, "text_for_synthesis": false}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"transcription": "verbose_json", "expect_postprocess": "basic"}}},
+      "params": {"audio": "UklGRiwAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQgAAAAAAAAAAAAAAA==", "encoding": "wav", "purpose": "live_partial"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"text": "placeholder words", "format": "verbose_json", "segments": [{"no_speech_prob": 0.02, "avg_logprob": -0.25}, {"no_speech_prob": 0.9, "avg_logprob": -1.5}]}}
+    },
+    {
+      "name": "live partial keeps its hint on the plain fallback",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-a", "grants": {"audio_for_transcription": true, "text_for_synthesis": false}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"transcription": "json_only", "expect_postprocess": "basic"}}},
+      "params": {"audio": "UklGRiwAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQgAAAAAAAAAAAAAAA==", "encoding": "wav", "purpose": "live_partial"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"text": "placeholder words", "format": "json", "segments": []}}
+    },
+    {
+      "name": "unknown purpose is a turn",
+      "context": {"authenticated": true, "capabilities": ["chat.read", "chat.send", "conversation.manage"]},
+      "host_state": {"controller_state": "connected", "voice": {"stored": {"revision": "rev-2", "base_url": "https://speech.example.invalid", "has_api_key": true, "transcription_model": "stt-model-a", "grants": {"audio_for_transcription": true, "text_for_synthesis": false}, "granted_at_ms": 1767225600000, "reachability": {"state": "unknown"}}, "upstream": {"transcription": "verbose_json", "expect_postprocess": "absent"}}},
+      "params": {"audio": "UklGRiwAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQgAAAAAAAAAAAAAAA==", "encoding": "wav", "purpose": "placeholder_future_purpose"},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"text": "placeholder words", "format": "verbose_json", "segments": [{"no_speech_prob": 0.02, "avg_logprob": -0.25}, {"no_speech_prob": 0.9, "avg_logprob": -1.5}]}}
     },
     {
       "name": "audio grant missing",

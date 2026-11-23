@@ -74198,7 +74198,8 @@ public final class com/letta/mobile/data/voice/endpoint/EndpointSpeechSynthesize
 
 public final class com/letta/mobile/data/voice/endpoint/EndpointTranscriber {
 	public fun <init> (Lcom/letta/mobile/data/voice/endpoint/SpeechEndpointClient;Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrantSource;Lcom/letta/mobile/data/voice/VoiceEndpointSettings;)V
-	public final fun transcribe (Lcom/letta/mobile/data/voice/audio/AudioClip;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun transcribe (Lcom/letta/mobile/data/voice/audio/AudioClip;Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun transcribe$default (Lcom/letta/mobile/data/voice/endpoint/EndpointTranscriber;Lcom/letta/mobile/data/voice/audio/AudioClip;Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/voice/endpoint/EndpointVoiceMouth : com/letta/mobile/data/voice/engine/VoiceMouth {
@@ -74390,18 +74391,34 @@ public final class com/letta/mobile/data/voice/endpoint/StreamingSpeechSynthesiz
 	public static fun warm (Lcom/letta/mobile/data/voice/endpoint/StreamingSpeechSynthesizer;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public final class com/letta/mobile/data/voice/endpoint/TranscriptionPurpose : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose$Companion;
+	public static final field LIVE_PARTIAL Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;
+	public static final field TURN Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getWireName ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;
+	public static fun values ()[Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;
+}
+
+public final class com/letta/mobile/data/voice/endpoint/TranscriptionPurpose$Companion {
+	public final fun fromWire (Ljava/lang/String;)Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;
+}
+
 public final class com/letta/mobile/data/voice/endpoint/TranscriptionRequest {
-	public synthetic fun <init> (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/voice/audio/AudioClip;
 	public final fun component2-CAMs64U ()Ljava/lang/String;
 	public final fun component3-VV7C9BA ()Ljava/lang/String;
-	public final fun copy-modvSwU (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/voice/endpoint/TranscriptionRequest;
-	public static synthetic fun copy-modvSwU$default (Lcom/letta/mobile/data/voice/endpoint/TranscriptionRequest;Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/endpoint/TranscriptionRequest;
+	public final fun component4 ()Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;
+	public final fun copy-tTiuUCA (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;)Lcom/letta/mobile/data/voice/endpoint/TranscriptionRequest;
+	public static synthetic fun copy-tTiuUCA$default (Lcom/letta/mobile/data/voice/endpoint/TranscriptionRequest;Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/endpoint/TranscriptionRequest;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAudio ()Lcom/letta/mobile/data/voice/audio/AudioClip;
 	public final fun getLanguage-VV7C9BA ()Ljava/lang/String;
 	public final fun getModel-CAMs64U ()Ljava/lang/String;
+	public final fun getPurpose ()Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -74823,8 +74840,8 @@ public abstract interface class com/letta/mobile/data/voice/host/HostVoiceEndpoi
 	public static synthetic fun synthesize-iyX4eW4$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Ljava/lang/String;Lcom/letta/mobile/data/voice/host/SpeechContext;ILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
 	public abstract fun testConnection (Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun testConnection$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidate;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public abstract fun transcribe-SW44lzk (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun transcribe-SW44lzk$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun transcribe-V5JiFMw (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun transcribe-V5JiFMw$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public abstract fun writeSetup (Lcom/letta/mobile/data/voice/host/HostVoiceSetupCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -74832,7 +74849,7 @@ public final class com/letta/mobile/data/voice/host/HostVoiceEndpoint$DefaultImp
 	public static synthetic fun clearSetup$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static synthetic fun synthesize-iyX4eW4$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Ljava/lang/String;Lcom/letta/mobile/data/voice/host/SpeechContext;ILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
 	public static synthetic fun testConnection$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidate;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static synthetic fun transcribe-SW44lzk$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun transcribe-V5JiFMw$default (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/voice/host/HostVoiceEndpointChoice {
@@ -75186,7 +75203,7 @@ public final class com/letta/mobile/data/voice/host/client/HostSpeechSynthesizer
 public final class com/letta/mobile/data/voice/host/client/HostSpeechTranscriber : com/letta/mobile/data/voice/vad/ear/SpeechTranscriber {
 	public synthetic fun <init> (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Ljava/lang/String;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/voice/host/HostVoiceEndpoint;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun transcribe (Lcom/letta/mobile/data/voice/audio/AudioClip;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun transcribe (Lcom/letta/mobile/data/voice/audio/AudioClip;Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class com/letta/mobile/data/voice/host/client/HostVoiceLink {
@@ -75233,7 +75250,7 @@ public final class com/letta/mobile/data/voice/host/client/IrohHostVoiceEndpoint
 	public fun status (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun synthesize-iyX4eW4 (Ljava/lang/String;Lcom/letta/mobile/data/voice/host/SpeechContext;)Lkotlinx/coroutines/flow/Flow;
 	public fun testConnection (Lcom/letta/mobile/data/voice/host/HostVoiceConnectionCandidate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun transcribe-SW44lzk (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun transcribe-V5JiFMw (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun writeSetup (Lcom/letta/mobile/data/voice/host/HostVoiceSetupCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -76665,7 +76682,7 @@ public final class com/letta/mobile/data/voice/vad/ear/NotSpeechThresholds {
 
 public abstract interface class com/letta/mobile/data/voice/vad/ear/SpeechTranscriber {
 	public static final field Companion Lcom/letta/mobile/data/voice/vad/ear/SpeechTranscriber$Companion;
-	public abstract fun transcribe (Lcom/letta/mobile/data/voice/audio/AudioClip;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun transcribe (Lcom/letta/mobile/data/voice/audio/AudioClip;Lcom/letta/mobile/data/voice/endpoint/TranscriptionPurpose;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/voice/vad/ear/SpeechTranscriber$Companion {

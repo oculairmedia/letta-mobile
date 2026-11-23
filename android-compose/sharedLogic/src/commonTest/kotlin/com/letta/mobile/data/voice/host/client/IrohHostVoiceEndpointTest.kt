@@ -14,6 +14,7 @@ import com.letta.mobile.data.voice.audio.PcmFormat
 import com.letta.mobile.data.voice.audio.pcm.PcmAudio
 import com.letta.mobile.data.voice.audio.pcm.WavCodec
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointException
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.host.HostVoiceConnectionCandidate
 import com.letta.mobile.data.voice.host.HostVoiceEndpointChoice
 import com.letta.mobile.data.voice.host.HostVoiceErrorCode
@@ -137,15 +138,46 @@ class IrohHostVoiceEndpointTest {
             link.answer = { _, _ -> reply(case.response) }
             val clip = AudioClip(Base64.decode(case.params.getValue("audio").jsonPrimitive.content), encodingOf(case))
             val language = case.params["language"]?.jsonPrimitive?.content?.let(::SpeechLanguage)
+            val purpose = TranscriptionPurpose.fromWire(case.params["purpose"]?.jsonPrimitive?.content)
             if (case.succeeded) {
-                val transcript = endpoint.transcribe(clip, language)
+                val transcript = endpoint.transcribe(clip, language, purpose)
                 val text = (case.response.getValue("result") as JsonObject).getValue("text").jsonPrimitive.content
                 assertEquals(text, transcript.text.value, case.toString())
-                assertEquals(case.params, link.calls.single().second, case.toString())
+                assertEquals(sentFor(case.params, purpose), link.calls.single().second, case.toString())
             } else {
-                expectCode(case) { endpoint.transcribe(clip, language) }
+                expectCode(case) { endpoint.transcribe(clip, language, purpose) }
             }
         }
+    }
+
+    /** What this device sends for a case's params: a turn names no purpose (an unknown one is a turn). */
+    private fun sentFor(params: JsonObject, purpose: TranscriptionPurpose): JsonObject =
+        if (purpose == TranscriptionPurpose.TURN) JsonObject(params - "purpose") else params
+
+    @Test
+    fun theHostTranscriberRelaysEachRequestsPurpose() = runTest {
+        val case = VoiceFixtures.case(HostVoiceWire.TRANSCRIBE, "verbose answer with segment numbers")
+        val clip = AudioClip(Base64.decode(case.params.getValue("audio").jsonPrimitive.content), AudioEncoding.WAV)
+        link.answer = { _, _ -> reply(case.response) }
+        val transcriber = HostSpeechTranscriber(endpoint) { true }
+
+        transcriber.transcribe(clip, TranscriptionPurpose.LIVE_PARTIAL)
+        transcriber.transcribe(clip, TranscriptionPurpose.TURN)
+
+        val purposes = link.calls.map { (_, params) -> params["purpose"]?.jsonPrimitive?.content }
+        assertEquals(listOf("live_partial", null), purposes, "a live partial is named; a turn's request is unchanged")
+    }
+
+    @Test
+    fun everyPieceOfALongLivePartialNamesItsPurpose() = runTest {
+        val rate = 16_000
+        val clip = AudioClip(WavCodec.encode(PcmAudio(ShortArray(rate * 45), PcmFormat(rate, 1))), AudioEncoding.WAV)
+        link.answer = { _, _ -> HostVoiceReply(true, transcription("part")) }
+
+        endpoint.transcribe(clip, purpose = TranscriptionPurpose.LIVE_PARTIAL)
+
+        val purposes = link.calls.map { (_, params) -> params.getValue("purpose").jsonPrimitive.content }
+        assertEquals(listOf("live_partial", "live_partial"), purposes)
     }
 
     @Test
@@ -325,13 +357,13 @@ class IrohHostVoiceEndpointTest {
         var acknowledged = false
         val transcriber = HostSpeechTranscriber(endpoint) { acknowledged }
 
-        val refused = assertFailsWith<SpeechEndpointException> { transcriber.transcribe(clip) }
+        val refused = assertFailsWith<SpeechEndpointException> { transcriber.transcribe(clip, TranscriptionPurpose.TURN) }
         assertEquals(VoiceErrorCode.PERMISSION_REQUIRED, refused.code)
         assertTrue(link.calls.isEmpty(), "nothing is sent before this device acknowledged it")
 
         acknowledged = true
         link.answer = { _, _ -> reply(case.response) }
-        val failure = assertFailsWith<SpeechEndpointException> { transcriber.transcribe(clip) }
+        val failure = assertFailsWith<SpeechEndpointException> { transcriber.transcribe(clip, TranscriptionPurpose.TURN) }
         assertEquals(HostVoiceErrorCode.CONSENT_REQUIRED.voiceCode, failure.code)
     }
 

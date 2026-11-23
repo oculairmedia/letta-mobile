@@ -6,6 +6,7 @@ import com.letta.mobile.data.voice.audio.PcmChunk
 import com.letta.mobile.data.voice.audio.PcmFormat
 import com.letta.mobile.data.voice.endpoint.RecognizerConfidence
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import kotlin.io.encoding.Base64
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -16,15 +17,23 @@ internal data class HostTranscriptionParams(
     @SerialName("audio") val audio: String,
     @SerialName("encoding") val encoding: String = WAV,
     @SerialName("language") val language: String? = null,
+    /**
+     * [TranscriptionPurpose.wireName], sent only for a live partial. A host that predates it ignores it
+     * (full cleanup); a request without it is a turn.
+     */
+    @SerialName("purpose") val purpose: String? = null,
 ) {
-    override fun toString(): String = "HostTranscriptionParams(audioChars=${audio.length}, encoding=$encoding)"
+    override fun toString(): String = "HostTranscriptionParams(audioChars=${audio.length}, encoding=$encoding, purpose=$purpose)"
 
     companion object {
         /** The only encoding v1 accepts: mono 16-bit PCM WAVE. */
         const val WAV: String = "wav"
 
-        fun of(clip: AudioClip, language: String?): HostTranscriptionParams =
-            HostTranscriptionParams(Base64.encode(clip.bytes), clip.encoding.wireName, language)
+        fun of(clip: AudioClip, language: String?, purpose: TranscriptionPurpose = TranscriptionPurpose.TURN): HostTranscriptionParams =
+            HostTranscriptionParams(Base64.encode(clip.bytes), clip.encoding.wireName, language, wirePurpose(purpose))
+
+        /** The `purpose` param for [purpose]: absent for a turn, so a turn's request is what it always was. */
+        fun wirePurpose(purpose: TranscriptionPurpose): String? = purpose.wireName.takeIf { purpose != TranscriptionPurpose.TURN }
     }
 }
 

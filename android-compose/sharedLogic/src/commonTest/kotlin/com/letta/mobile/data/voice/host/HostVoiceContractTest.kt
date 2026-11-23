@@ -9,6 +9,7 @@ import com.letta.mobile.data.voice.SpeechVoiceName
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioEncoding
 import com.letta.mobile.data.voice.audio.PcmFormat
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -96,16 +97,35 @@ class HostVoiceContractTest {
     fun transcriptionsCarryTheClipAndTheSegmentNumbers() {
         cases(HostVoiceWire.TRANSCRIBE).forEach { case ->
             val params = roundTrip(HostTranscriptionParams.serializer(), case.params)
-            if (params.encoding == HostTranscriptionParams.WAV) {
+            val purpose = TranscriptionPurpose.fromWire(params.purpose)
+            val known = params.purpose == null || params.purpose == purpose.wireName
+            if (params.encoding == HostTranscriptionParams.WAV && known) {
                 val clip = AudioClip(Base64.decode(params.audio), AudioEncoding.WAV)
-                assertEquals(params, HostTranscriptionParams.of(clip, params.language), case.name)
+                assertEquals(params, HostTranscriptionParams.of(clip, params.language, purpose), case.name)
             }
         }
         val transcripts = successes(setOf(HostVoiceWire.TRANSCRIBE)).map { roundTrip(HostTranscriptionResult.serializer(), it) }
-        val verbose = transcripts.single { it.format == HostTranscriptFormat.VERBOSE_JSON }.toTranscript()
-        assertEquals(listOf(0.02, 0.9), verbose.segments.map { it.noSpeechProbability })
-        assertEquals(listOf(-0.25, -1.5), verbose.segments.map { it.averageLogProbability })
-        assertTrue(transcripts.single { it.format == HostTranscriptFormat.JSON }.toTranscript().segments.isEmpty())
+        val verbose = transcripts.filter { it.format == HostTranscriptFormat.VERBOSE_JSON }.map { it.toTranscript() }
+        assertTrue(verbose.isNotEmpty(), "a verbose answer is covered")
+        verbose.forEach { transcript ->
+            assertEquals(listOf(0.02, 0.9), transcript.segments.map { it.noSpeechProbability })
+            assertEquals(listOf(-0.25, -1.5), transcript.segments.map { it.averageLogProbability })
+        }
+        val plain = transcripts.filter { it.format == HostTranscriptFormat.JSON }
+        assertTrue(plain.isNotEmpty() && plain.all { it.toTranscript().segments.isEmpty() }, "plain answers carry no segments")
+    }
+
+    @Test
+    fun onlyALivePartialNamesItsPurposeOnTheWire() {
+        val clip = AudioClip(byteArrayOf(0, 0), AudioEncoding.WAV)
+        assertEquals(null, HostTranscriptionParams.of(clip, null).purpose, "a turn's request is unchanged")
+        assertEquals("live_partial", HostTranscriptionParams.of(clip, null, TranscriptionPurpose.LIVE_PARTIAL).purpose)
+        val partial = cases(HostVoiceWire.TRANSCRIBE).map { roundTrip(HostTranscriptionParams.serializer(), it.params) }
+            .filter { it.purpose != null }
+        val purposes = partial.map { TranscriptionPurpose.fromWire(it.purpose) }
+        assertTrue(TranscriptionPurpose.LIVE_PARTIAL in purposes, "a live partial is covered")
+        assertTrue(TranscriptionPurpose.TURN in purposes, "an unknown purpose is covered")
+        assertEquals(TranscriptionPurpose.TURN, TranscriptionPurpose.fromWire(null), "a request without a purpose is a turn")
     }
 
     @Test

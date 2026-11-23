@@ -9,6 +9,7 @@ import com.letta.mobile.data.voice.audio.PcmFormat
 import com.letta.mobile.data.voice.audio.pcm.PcmAudio
 import com.letta.mobile.data.voice.audio.pcm.WavCodec
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
@@ -171,7 +172,7 @@ internal class EarlyOffers(
     private fun transcribe(samples: ShortArray): Deferred<Result<SpeechTranscript>> = out.async {
         val clip = AudioClip(WavCodec.encode(PcmAudio(samples, PcmFormat(format.sampleRateHz, format.channels))), AudioEncoding.WAV)
         samples.fill(0)
-        val outcome = runCatching { parts.transcriber.transcribe(clip) }
+        val outcome = runCatching { parts.transcriber.transcribe(clip, TranscriptionPurpose.TURN) }
         clip.bytes.fill(0)
         outcome.exceptionOrNull()?.let { if (it is CancellationException) throw it }
         outcome

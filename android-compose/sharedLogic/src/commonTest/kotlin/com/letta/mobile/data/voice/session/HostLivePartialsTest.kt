@@ -14,6 +14,7 @@ import com.letta.mobile.data.voice.consent.VoiceEndpointGrant
 import com.letta.mobile.data.voice.consent.VoiceEndpointGrants
 import com.letta.mobile.data.voice.consent.VoiceEndpointPayload
 import com.letta.mobile.data.voice.endpoint.SpeechTranscript
+import com.letta.mobile.data.voice.endpoint.TranscriptionPurpose
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.host.HostSpeechSetup
 import com.letta.mobile.data.voice.host.HostTranscriptionSetup
@@ -58,16 +59,21 @@ class HostLivePartialsTest {
 
     @Test
     fun aSharedServerOnTheTailnetShowsTheWordsLive() = runTest {
-        val events = listenOnce("https://speech.example-tailnet.ts.net:8443")
+        val endpoint = Endpoint()
+        val events = listenOnce("https://speech.example-tailnet.ts.net:8443", endpoint)
         val partials = events.filterIsInstance<VoiceEarEvent.PartialTranscript>()
         assertTrue(partials.isNotEmpty(), "live words while the person speaks")
         assertEquals("hello there", (events.last() as VoiceEarEvent.EndOfTurn).utterance.text.value)
+        assertTrue(TranscriptionPurpose.LIVE_PARTIAL in endpoint.purposes, "interval partials reach the host as live partials")
+        assertEquals(TranscriptionPurpose.TURN, endpoint.purposes.last(), "the whole turn reaches the host as a turn")
     }
 
     @Test
     fun aSharedServerOnTheInternetSendsNoPartials() = runTest {
-        val events = listenOnce("https://speech.example.invalid")
+        val endpoint = Endpoint()
+        val events = listenOnce("https://speech.example.invalid", endpoint)
         assertEquals(emptyList(), events.filterIsInstance<VoiceEarEvent.PartialTranscript>())
+        assertEquals(listOf(TranscriptionPurpose.TURN), endpoint.purposes, "only the whole turn, as a turn")
         assertEquals("hello there", (events.last() as VoiceEarEvent.EndOfTurn).utterance.text.value)
     }
 
@@ -88,7 +94,7 @@ class HostLivePartialsTest {
     }
 
     /** One spoken turn through a session routed to the host's shared server at [server]; every ear event up to its end. */
-    private suspend fun kotlinx.coroutines.test.TestScope.listenOnce(server: String): List<VoiceEarEvent> {
+    private suspend fun kotlinx.coroutines.test.TestScope.listenOnce(server: String, endpoint: Endpoint): List<VoiceEarEvent> {
         val origin = EndpointOrigin(server)
         val status = HostVoiceSetupStatus(
             contractVersion = HostVoiceWire.CONTRACT_VERSION,
@@ -98,7 +104,7 @@ class HostLivePartialsTest {
             speech = HostSpeechSetup(available = true, model = "tts-1", voice = "alloy"),
         )
         val grants = VoiceEndpointGrants(setOf(VoiceEndpointGrant(origin, VoiceEndpointPayload.AUDIO_FOR_TRANSCRIPTION)))
-        val route = VoiceRoute.Host(Endpoint, status, origin)
+        val route = VoiceRoute.Host(endpoint, status, origin)
         val factory = EndpointVoiceEngineFactory(Audio(spokenTurn()), { MockEngine { error("no direct request") } })
         val services = VoiceSessionServices.standalone(VoiceSetup())
         val request = VoiceEngineRequest(Session, VoiceSetup(), null, { grants }, backgroundScope, services, route)
@@ -139,8 +145,10 @@ class HostLivePartialsTest {
         override fun stopRun() = Unit
     }
 
-    /** The host: every transcription, partial or final, hears the same words. */
-    private object Endpoint : HostVoiceEndpoint {
+    /** The host: every transcription, partial or final, hears the same words; each request's purpose is recorded. */
+    private class Endpoint : HostVoiceEndpoint {
+        val purposes = mutableListOf<TranscriptionPurpose>()
+
         override suspend fun status(): HostVoiceSetupStatus = error("unused")
 
         override suspend fun writeSetup(command: HostVoiceSetupCommand): HostVoiceSetupStatus = error("unused")
@@ -151,8 +159,10 @@ class HostLivePartialsTest {
 
         override suspend fun models(): HostVoiceModels = error("unused")
 
-        override suspend fun transcribe(audio: AudioClip, language: SpeechLanguage?): SpeechTranscript =
-            SpeechTranscript(VoiceText("hello there"))
+        override suspend fun transcribe(audio: AudioClip, language: SpeechLanguage?, purpose: TranscriptionPurpose): SpeechTranscript {
+            purposes += purpose
+            return SpeechTranscript(VoiceText("hello there"))
+        }
 
         override fun synthesize(text: VoiceText, context: SpeechContext): Flow<PcmChunk> = emptyFlow()
     }

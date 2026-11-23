@@ -4289,6 +4289,23 @@ final enum class com.letta.mobile.data.voice.endpoint/SpeechOperation : kotlin/E
     final fun values(): kotlin/Array<com.letta.mobile.data.voice.endpoint/SpeechOperation> // com.letta.mobile.data.voice.endpoint/SpeechOperation.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.voice.endpoint/TranscriptionPurpose : kotlin/Enum<com.letta.mobile.data.voice.endpoint/TranscriptionPurpose> { // com.letta.mobile.data.voice.endpoint/TranscriptionPurpose|null[0]
+    enum entry LIVE_PARTIAL // com.letta.mobile.data.voice.endpoint/TranscriptionPurpose.LIVE_PARTIAL|null[0]
+    enum entry TURN // com.letta.mobile.data.voice.endpoint/TranscriptionPurpose.TURN|null[0]
+
+    final val entries // com.letta.mobile.data.voice.endpoint/TranscriptionPurpose.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.voice.endpoint/TranscriptionPurpose> // com.letta.mobile.data.voice.endpoint/TranscriptionPurpose.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val wireName // com.letta.mobile.data.voice.endpoint/TranscriptionPurpose.wireName|{}wireName[0]
+        final fun <get-wireName>(): kotlin/String // com.letta.mobile.data.voice.endpoint/TranscriptionPurpose.wireName.<get-wireName>|<get-wireName>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.voice.endpoint/TranscriptionPurpose // com.letta.mobile.data.voice.endpoint/TranscriptionPurpose.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.voice.endpoint/TranscriptionPurpose> // com.letta.mobile.data.voice.endpoint/TranscriptionPurpose.values|values#static(){}[0]
+
+    final object Companion { // com.letta.mobile.data.voice.endpoint/TranscriptionPurpose.Companion|null[0]
+        final fun fromWire(kotlin/String?): com.letta.mobile.data.voice.endpoint/TranscriptionPurpose // com.letta.mobile.data.voice.endpoint/TranscriptionPurpose.Companion.fromWire|fromWire(kotlin.String?){}[0]
+    }
+}
+
 final enum class com.letta.mobile.data.voice.engine/VoiceCancelOutcome : kotlin/Enum<com.letta.mobile.data.voice.engine/VoiceCancelOutcome> { // com.letta.mobile.data.voice.engine/VoiceCancelOutcome|null[0]
     enum entry ALREADY_FINISHED // com.letta.mobile.data.voice.engine/VoiceCancelOutcome.ALREADY_FINISHED|null[0]
     enum entry STOPPED // com.letta.mobile.data.voice.engine/VoiceCancelOutcome.STOPPED|null[0]
@@ -5445,7 +5462,7 @@ abstract fun interface com.letta.mobile.data.voice.session/VoiceEngineFactory { 
 }
 
 abstract fun interface com.letta.mobile.data.voice.vad.ear/SpeechTranscriber { // com.letta.mobile.data.voice.vad.ear/SpeechTranscriber|null[0]
-    abstract suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.vad.ear/SpeechTranscriber.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip){}[0]
+    abstract suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip, com.letta.mobile.data.voice.endpoint/TranscriptionPurpose): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.vad.ear/SpeechTranscriber.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip;com.letta.mobile.data.voice.endpoint.TranscriptionPurpose){}[0]
 
     final object Companion { // com.letta.mobile.data.voice.vad.ear/SpeechTranscriber.Companion|null[0]
         final fun endpoint(com.letta.mobile.data.voice.endpoint/EndpointTranscriber): com.letta.mobile.data.voice.vad.ear/SpeechTranscriber // com.letta.mobile.data.voice.vad.ear/SpeechTranscriber.Companion.endpoint|endpoint(com.letta.mobile.data.voice.endpoint.EndpointTranscriber){}[0]
@@ -7882,7 +7899,7 @@ abstract interface com.letta.mobile.data.voice.host/HostVoiceEndpoint { // com.l
     abstract suspend fun models(): com.letta.mobile.data.voice.host/HostVoiceModels // com.letta.mobile.data.voice.host/HostVoiceEndpoint.models|models(){}[0]
     abstract suspend fun status(): com.letta.mobile.data.voice.host/HostVoiceSetupStatus // com.letta.mobile.data.voice.host/HostVoiceEndpoint.status|status(){}[0]
     abstract suspend fun testConnection(com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate? = ...): com.letta.mobile.data.voice.host/HostVoiceTestResult // com.letta.mobile.data.voice.host/HostVoiceEndpoint.testConnection|testConnection(com.letta.mobile.data.voice.host.HostVoiceConnectionCandidate?){}[0]
-    abstract suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip, com.letta.mobile.data.voice/SpeechLanguage? = ...): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.host/HostVoiceEndpoint.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip;com.letta.mobile.data.voice.SpeechLanguage?){}[0]
+    abstract suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip, com.letta.mobile.data.voice/SpeechLanguage? = ..., com.letta.mobile.data.voice.endpoint/TranscriptionPurpose = ...): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.host/HostVoiceEndpoint.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip;com.letta.mobile.data.voice.SpeechLanguage?;com.letta.mobile.data.voice.endpoint.TranscriptionPurpose){}[0]
     abstract suspend fun writeSetup(com.letta.mobile.data.voice.host/HostVoiceSetupCommand): com.letta.mobile.data.voice.host/HostVoiceSetupStatus // com.letta.mobile.data.voice.host/HostVoiceEndpoint.writeSetup|writeSetup(com.letta.mobile.data.voice.host.HostVoiceSetupCommand){}[0]
 }
 
@@ -72889,7 +72906,7 @@ final class com.letta.mobile.data.voice.endpoint/EndpointSpeechSynthesizer : com
 final class com.letta.mobile.data.voice.endpoint/EndpointTranscriber { // com.letta.mobile.data.voice.endpoint/EndpointTranscriber|null[0]
     constructor <init>(com.letta.mobile.data.voice.endpoint/SpeechEndpointClient, com.letta.mobile.data.voice.consent/VoiceEndpointGrantSource, com.letta.mobile.data.voice/VoiceEndpointSettings) // com.letta.mobile.data.voice.endpoint/EndpointTranscriber.<init>|<init>(com.letta.mobile.data.voice.endpoint.SpeechEndpointClient;com.letta.mobile.data.voice.consent.VoiceEndpointGrantSource;com.letta.mobile.data.voice.VoiceEndpointSettings){}[0]
 
-    final suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.endpoint/EndpointTranscriber.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip){}[0]
+    final suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip, com.letta.mobile.data.voice.endpoint/TranscriptionPurpose = ...): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.endpoint/EndpointTranscriber.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip;com.letta.mobile.data.voice.endpoint.TranscriptionPurpose){}[0]
 }
 
 final class com.letta.mobile.data.voice.endpoint/EndpointVoiceMouth : com.letta.mobile.data.voice.engine/VoiceMouth { // com.letta.mobile.data.voice.endpoint/EndpointVoiceMouth|null[0]
@@ -73060,7 +73077,7 @@ final class com.letta.mobile.data.voice.endpoint/SpeechTranscript { // com.letta
 }
 
 final class com.letta.mobile.data.voice.endpoint/TranscriptionRequest { // com.letta.mobile.data.voice.endpoint/TranscriptionRequest|null[0]
-    constructor <init>(com.letta.mobile.data.voice.audio/AudioClip, com.letta.mobile.data.voice/SpeechModelName, com.letta.mobile.data.voice/SpeechLanguage? = ...) // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.<init>|<init>(com.letta.mobile.data.voice.audio.AudioClip;com.letta.mobile.data.voice.SpeechModelName;com.letta.mobile.data.voice.SpeechLanguage?){}[0]
+    constructor <init>(com.letta.mobile.data.voice.audio/AudioClip, com.letta.mobile.data.voice/SpeechModelName, com.letta.mobile.data.voice/SpeechLanguage? = ..., com.letta.mobile.data.voice.endpoint/TranscriptionPurpose = ...) // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.<init>|<init>(com.letta.mobile.data.voice.audio.AudioClip;com.letta.mobile.data.voice.SpeechModelName;com.letta.mobile.data.voice.SpeechLanguage?;com.letta.mobile.data.voice.endpoint.TranscriptionPurpose){}[0]
 
     final val audio // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.audio|{}audio[0]
         final fun <get-audio>(): com.letta.mobile.data.voice.audio/AudioClip // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.audio.<get-audio>|<get-audio>(){}[0]
@@ -73068,11 +73085,14 @@ final class com.letta.mobile.data.voice.endpoint/TranscriptionRequest { // com.l
         final fun <get-language>(): com.letta.mobile.data.voice/SpeechLanguage? // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.language.<get-language>|<get-language>(){}[0]
     final val model // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.model|{}model[0]
         final fun <get-model>(): com.letta.mobile.data.voice/SpeechModelName // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.model.<get-model>|<get-model>(){}[0]
+    final val purpose // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.purpose|{}purpose[0]
+        final fun <get-purpose>(): com.letta.mobile.data.voice.endpoint/TranscriptionPurpose // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.purpose.<get-purpose>|<get-purpose>(){}[0]
 
     final fun component1(): com.letta.mobile.data.voice.audio/AudioClip // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.component1|component1(){}[0]
     final fun component2(): com.letta.mobile.data.voice/SpeechModelName // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.component2|component2(){}[0]
     final fun component3(): com.letta.mobile.data.voice/SpeechLanguage? // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.component3|component3(){}[0]
-    final fun copy(com.letta.mobile.data.voice.audio/AudioClip = ..., com.letta.mobile.data.voice/SpeechModelName = ..., com.letta.mobile.data.voice/SpeechLanguage? = ...): com.letta.mobile.data.voice.endpoint/TranscriptionRequest // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.copy|copy(com.letta.mobile.data.voice.audio.AudioClip;com.letta.mobile.data.voice.SpeechModelName;com.letta.mobile.data.voice.SpeechLanguage?){}[0]
+    final fun component4(): com.letta.mobile.data.voice.endpoint/TranscriptionPurpose // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.voice.audio/AudioClip = ..., com.letta.mobile.data.voice/SpeechModelName = ..., com.letta.mobile.data.voice/SpeechLanguage? = ..., com.letta.mobile.data.voice.endpoint/TranscriptionPurpose = ...): com.letta.mobile.data.voice.endpoint/TranscriptionRequest // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.copy|copy(com.letta.mobile.data.voice.audio.AudioClip;com.letta.mobile.data.voice.SpeechModelName;com.letta.mobile.data.voice.SpeechLanguage?;com.letta.mobile.data.voice.endpoint.TranscriptionPurpose){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.endpoint/TranscriptionRequest.toString|toString(){}[0]
@@ -73113,7 +73133,7 @@ final class com.letta.mobile.data.voice.host.client/HostSpeechSynthesizer : com.
 final class com.letta.mobile.data.voice.host.client/HostSpeechTranscriber : com.letta.mobile.data.voice.vad.ear/SpeechTranscriber { // com.letta.mobile.data.voice.host.client/HostSpeechTranscriber|null[0]
     constructor <init>(com.letta.mobile.data.voice.host/HostVoiceEndpoint, com.letta.mobile.data.voice/SpeechLanguage? = ..., kotlin/Function0<kotlin/Boolean>) // com.letta.mobile.data.voice.host.client/HostSpeechTranscriber.<init>|<init>(com.letta.mobile.data.voice.host.HostVoiceEndpoint;com.letta.mobile.data.voice.SpeechLanguage?;kotlin.Function0<kotlin.Boolean>){}[0]
 
-    final suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.host.client/HostSpeechTranscriber.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip){}[0]
+    final suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip, com.letta.mobile.data.voice.endpoint/TranscriptionPurpose): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.host.client/HostSpeechTranscriber.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip;com.letta.mobile.data.voice.endpoint.TranscriptionPurpose){}[0]
 }
 
 final class com.letta.mobile.data.voice.host.client/HostVoiceReply { // com.letta.mobile.data.voice.host.client/HostVoiceReply|null[0]
@@ -73163,7 +73183,7 @@ final class com.letta.mobile.data.voice.host.client/IrohHostVoiceEndpoint : com.
     final suspend fun models(): com.letta.mobile.data.voice.host/HostVoiceModels // com.letta.mobile.data.voice.host.client/IrohHostVoiceEndpoint.models|models(){}[0]
     final suspend fun status(): com.letta.mobile.data.voice.host/HostVoiceSetupStatus // com.letta.mobile.data.voice.host.client/IrohHostVoiceEndpoint.status|status(){}[0]
     final suspend fun testConnection(com.letta.mobile.data.voice.host/HostVoiceConnectionCandidate?): com.letta.mobile.data.voice.host/HostVoiceTestResult // com.letta.mobile.data.voice.host.client/IrohHostVoiceEndpoint.testConnection|testConnection(com.letta.mobile.data.voice.host.HostVoiceConnectionCandidate?){}[0]
-    final suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip, com.letta.mobile.data.voice/SpeechLanguage?): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.host.client/IrohHostVoiceEndpoint.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip;com.letta.mobile.data.voice.SpeechLanguage?){}[0]
+    final suspend fun transcribe(com.letta.mobile.data.voice.audio/AudioClip, com.letta.mobile.data.voice/SpeechLanguage?, com.letta.mobile.data.voice.endpoint/TranscriptionPurpose): com.letta.mobile.data.voice.endpoint/SpeechTranscript // com.letta.mobile.data.voice.host.client/IrohHostVoiceEndpoint.transcribe|transcribe(com.letta.mobile.data.voice.audio.AudioClip;com.letta.mobile.data.voice.SpeechLanguage?;com.letta.mobile.data.voice.endpoint.TranscriptionPurpose){}[0]
     final suspend fun writeSetup(com.letta.mobile.data.voice.host/HostVoiceSetupCommand): com.letta.mobile.data.voice.host/HostVoiceSetupStatus // com.letta.mobile.data.voice.host.client/IrohHostVoiceEndpoint.writeSetup|writeSetup(com.letta.mobile.data.voice.host.HostVoiceSetupCommand){}[0]
 }
 
