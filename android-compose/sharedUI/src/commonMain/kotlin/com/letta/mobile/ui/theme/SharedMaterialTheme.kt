@@ -115,7 +115,7 @@ private fun lettaLightScheme(): ColorScheme = lightColorScheme(
     surfaceContainerLow = Color(LettaColorTokens.LIGHT_SURFACE),
     surfaceContainer = Color(LettaColorTokens.LIGHT_SURFACE_VARIANT),
     surfaceContainerHigh = Color(LettaColorTokens.LIGHT_SURFACE_CONTAINER),
-    surfaceContainerHighest = Color(0xFFD2D9E2),
+    surfaceContainerHighest = Color(LettaColorTokens.LIGHT_SURFACE_CONTAINER_HIGHEST),
     outline = Color(LettaColorTokens.LIGHT_OUTLINE),
     outlineVariant = Color(LettaColorTokens.LIGHT_SURFACE_CONTAINER),
     error = Color(LettaColorTokens.LIGHT_ERROR),
@@ -172,8 +172,8 @@ fun lettaCustomColors(scheme: ColorScheme): CustomColors =
 
 /**
  * The user's chat bubble on [scheme]: a neutral surface, never the vermilion. On the brand palette it is the named
- * token (LettaColorTokens.DARK_USER_BUBBLE, a deep-sea step above the agent's bubble, or LIGHT_USER_BUBBLE, a soft
- * mist); on any other scheme (a preset, Android's wallpaper colours) it is that scheme's surface lifted toward its
+ * token (LettaColorTokens.DARK_USER_BUBBLE, a grey step above the agent's bubble, or LIGHT_USER_BUBBLE, a soft
+ * grey); on any other scheme (a preset, Android's wallpaper colours) it is that scheme's surface lifted toward its
  * ink by the same small step, so it stays neutral there too. Text on it is `onSurface`. Every client (desktop and
  * web through [lettaCustomColors], Android through its custom colours and LettaChatTheme, the shared timeline rows)
  * reads the bubble from here.

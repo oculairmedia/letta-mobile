@@ -80491,6 +80491,7 @@ public final class com/letta/mobile/ui/theme/LettaColorTokens {
 	public static final field LIGHT_SECONDARY_CONTAINER J
 	public static final field LIGHT_SURFACE J
 	public static final field LIGHT_SURFACE_CONTAINER J
+	public static final field LIGHT_SURFACE_CONTAINER_HIGHEST J
 	public static final field LIGHT_SURFACE_VARIANT J
 	public static final field LIGHT_TERTIARY J
 	public static final field LIGHT_TERTIARY_CONTAINER J

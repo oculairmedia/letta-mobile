@@ -26,7 +26,7 @@ private fun warningInk(isLightTheme: Boolean): Color =
 
 /**
  * Warning is a fixed amber (LettaColorTokens), harmonized toward the scheme's primary, never the scheme's
- * tertiary: in the brand palette that is the calm steel mist, not a warning. Returns the ink and its container.
+ * tertiary: in the brand palette that is the calm steel grey, not a warning. Returns the ink and its container.
  */
 private fun harmonizedWarningPair(colorScheme: ColorScheme, isLightTheme: Boolean): Pair<Color, Color> {
     val warningInk = warningInk(isLightTheme)
@@ -141,7 +141,7 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
 
 /**
  * The scheme LettaTheme draws: [base] with the accent contrast boost. On the brand palette (Default, no wallpaper
- * colours) the support roles stay the kit's own slate and mist: the boost's saturation floor would turn the muted
+ * colours) the support roles stay the brand's own slate and steel greys: the boost's saturation floor would turn the muted
  * slate into a vivid blue, and vermilion is the only accent.
  */
 @VisibleForTesting
