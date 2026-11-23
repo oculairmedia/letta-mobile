@@ -71,9 +71,10 @@ class ShellAgentPanelTest {
     }
 
     @Test
-    fun homeReplacesTheAgentAndItsMenu() = runComposeUiTest {
+    fun homeReplacesTheAgentWithTheProductNameAndDropsItsMenu() = runComposeUiTest {
         setContent { Panel(state.copy(home = true), ShellAgentPanelActions()) }
-        onNodeWithText("Home").assertExists()
+        // The page itself says "Home"; the sidebar names the product instead of repeating it.
+        onNodeWithText("Baken").assertExists()
         onNodeWithTag(ShellAgentPanelTags.AGENT_MENU).assertDoesNotExist()
     }
 
