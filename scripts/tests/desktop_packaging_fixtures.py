@@ -47,7 +47,7 @@ class LinuxPackageFixtures(DesktopSmokeFixtures):
         write(self.root / 'bin/Meridian Desktop', elf(), True)
         write(self.root / 'lib/runtime/release', 'JAVA_VERSION="25.0.4"\nOS_ARCH="x86_64"\n')
         write(self.root / 'AppRun', '#!/bin/sh\n', True)
-        write(self.root / 'meridian.desktop', '[Desktop Entry]\nType=Application\nName=Meridian\nExec=meridian %U\nIcon=meridian\nX-AppImage-Version=0.26.0\n')
+        write(self.root / 'meridian.desktop', '[Desktop Entry]\nType=Application\nName=Baken\nExec=meridian %U\nIcon=meridian\nX-AppImage-Version=0.26.0\n')
         write(self.root / 'meridian.png', b'fixture')
         for name in ('libappindicator3.so.1', 'libindicator3.so.7'):
             write(self.root / 'usr/lib' / name, elf())
