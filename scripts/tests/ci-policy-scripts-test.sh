@@ -477,7 +477,7 @@ shared_job="$(
   ' "$android_workflow"
 )"
 assert_contains "$shared_job" 'Run bounded sharedLogic JVM tests'
-assert_contains "$shared_job" 'timeout --preserve-status 12m ./gradlew :sharedLogic:jvmTest --info'
+assert_contains "$shared_job" 'timeout --preserve-status 16m ./gradlew :sharedLogic:jvmTest --info'
 assert_contains "$shared_job" 'Upload sharedLogic JVM test diagnostics'
 assert_contains "$shared_job" 'sharedlogic-jvmtest-diagnostics-${{ github.run_id }}'
 assert_contains "$shared_job" 'Fail when bounded sharedLogic JVM tests fail or hang'
