@@ -199,12 +199,15 @@ fun ShellNavRow(model: ShellNavRowModel, onClick: () -> Unit, modifier: Modifier
  * The title slot, then the agent's menu. The slot is the focused agent (mascot + name, tap to edit),
  * or the product's name while the fleet Home page is open (the page itself already says "Home");
  * the agent menu has nothing to act on then, so it hides. Under a window header that already shows a
- * title ([LocalHostTitlesPage]) the Home header is left out, so the name shows once.
+ * title ([LocalHostTitlesPage]) the Home header is left out, so the name shows once. With no agent to
+ * name (a blank name: no roster yet, or the connection failed) the header is left out too, rather than
+ * standing in an orb and the product's name for an agent that is not there.
  */
 @Composable
 private fun ShellPanelHeader(frame: ShellPanelFrame) {
     val state = frame.state
     if (state.home && LocalHostTitlesPage.current) return
+    if (!state.home && state.agent.name.isBlank()) return
     val agentCard = frame.agentCard
     Column(Modifier.fillMaxWidth().padding(start = LettaDimens.Space.hair, bottom = LettaDimens.Space.lg)) {
         Box(Modifier.fillMaxWidth()) {

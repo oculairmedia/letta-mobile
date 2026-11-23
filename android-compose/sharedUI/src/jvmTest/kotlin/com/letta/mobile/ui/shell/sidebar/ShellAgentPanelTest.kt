@@ -71,6 +71,16 @@ class ShellAgentPanelTest {
     }
 
     @Test
+    fun anAgentTheRosterDoesNotNameHeadsNothing() = runComposeUiTest {
+        setContent { Panel(state.copy(agent = ShellPanelAgent(name = "", agentId = "agent-1")), ShellAgentPanelActions()) }
+        // No roster (or a failed connection): no stand-in orb, no product name, no agent menu.
+        onNodeWithTag(ShellAgentPanelTags.HERO).assertDoesNotExist()
+        onNodeWithTag(ShellAgentPanelTags.AGENT_MENU).assertDoesNotExist()
+        onNodeWithText("Baken").assertDoesNotExist()
+        onNodeWithText("Memory").assertExists()
+    }
+
+    @Test
     fun homeReplacesTheAgentWithTheProductNameAndDropsItsMenu() = runComposeUiTest {
         setContent { Panel(state.copy(home = true), ShellAgentPanelActions()) }
         // The page itself says "Home"; the sidebar names the product instead of repeating it.
