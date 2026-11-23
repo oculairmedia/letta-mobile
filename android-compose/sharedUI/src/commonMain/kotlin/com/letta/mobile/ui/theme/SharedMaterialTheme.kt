@@ -54,59 +54,29 @@ fun SharedMaterialTheme(
  */
 fun lettaColorScheme(dark: Boolean, highContrast: Boolean = false, preset: ThemePreset = ThemePreset.DEFAULT): ColorScheme {
     val base = when (preset) {
-        ThemePreset.DEFAULT -> lettaScheme(dark, if (dark) LettaDarkRoles else LettaLightRoles)
+        ThemePreset.DEFAULT -> if (dark) LettaDarkScheme else LettaLightScheme
         else -> presetThemeColors(preset).let { if (dark) it.darkScheme else it.lightScheme }.withLettaContrastBoost()
     }
     return if (highContrast) base.withHighContrast() else base
 }
 
-/**
- * The brand palette's colour roles for one theme. [lettaScheme] builds either theme's Material scheme from one of
- * these, so the dark and light schemes are one shape filled from two role tables.
- */
-private data class LettaSchemeRoles(
-    val primary: Color,
-    val onPrimary: Color,
-    val primaryContainer: Color,
-    val onPrimaryContainer: Color,
-    val secondary: Color,
-    val onSecondary: Color,
-    val secondaryContainer: Color,
-    val tertiary: Color,
-    val onTertiary: Color,
-    val tertiaryContainer: Color,
-    val onTertiaryContainer: Color,
-    val background: Color,
-    val surface: Color,
-    val onSurface: Color,
-    val surfaceVariant: Color,
-    val onSurfaceVariant: Color,
-    val surfaceContainerLowest: Color,
-    val surfaceContainerLow: Color,
-    val surfaceContainer: Color,
-    val surfaceContainerHigh: Color,
-    val surfaceContainerHighest: Color,
-    val outline: Color,
-    val outlineVariant: Color,
-    val error: Color,
-    val onError: Color,
-    val errorContainer: Color,
-    val onErrorContainer: Color,
-)
-
-private val LettaDarkRoles = LettaSchemeRoles(
+/** The brand palette's dark Material scheme, every role from the design tokens. */
+private val LettaDarkScheme: ColorScheme = darkColorScheme(
     primary = Color(LettaColorTokens.DARK_PRIMARY),
     onPrimary = Color(LettaColorTokens.DARK_ON_PRIMARY),
     primaryContainer = Color(LettaColorTokens.DARK_PRIMARY_VARIANT),
     onPrimaryContainer = Color(LettaColorTokens.DARK_ON_PRIMARY_CONTAINER),
+    surfaceTint = Color(LettaColorTokens.DARK_PRIMARY),
     secondary = Color(LettaColorTokens.DARK_SECONDARY),
     onSecondary = Color(LettaColorTokens.DARK_ON_SECONDARY),
     secondaryContainer = Color(LettaColorTokens.DARK_SECONDARY_CONTAINER),
+    onSecondaryContainer = Color(LettaColorTokens.DARK_ON_SURFACE),
     tertiary = Color(LettaColorTokens.DARK_TERTIARY),
     onTertiary = Color(LettaColorTokens.DARK_ON_TERTIARY),
     tertiaryContainer = Color(LettaColorTokens.DARK_TERTIARY_CONTAINER),
     onTertiaryContainer = Color(LettaColorTokens.DARK_ON_TERTIARY_CONTAINER),
     background = Color(LettaColorTokens.DARK_BACKGROUND),
+    onBackground = Color(LettaColorTokens.DARK_ON_SURFACE),
     surface = Color(LettaColorTokens.DARK_SURFACE),
     onSurface = Color(LettaColorTokens.DARK_ON_SURFACE),
     surfaceVariant = Color(LettaColorTokens.DARK_SURFACE_VARIANT),
@@ -124,19 +94,23 @@ private val LettaDarkRoles = LettaSchemeRoles(
     onErrorContainer = Color(0xFFFFDAD6),
 )
 
-private val LettaLightRoles = LettaSchemeRoles(
+/** The brand palette's light Material scheme, every role from the design tokens. */
+private val LettaLightScheme: ColorScheme = lightColorScheme(
     primary = Color(LettaColorTokens.LIGHT_PRIMARY),
     onPrimary = Color(LettaColorTokens.LIGHT_ON_PRIMARY),
     primaryContainer = Color(LettaColorTokens.LIGHT_PRIMARY).copy(alpha = LIGHT_PRIMARY_CONTAINER_TINT),
     onPrimaryContainer = Color(LettaColorTokens.LIGHT_ON_SURFACE),
+    surfaceTint = Color(LettaColorTokens.LIGHT_PRIMARY),
     secondary = Color(LettaColorTokens.LIGHT_SECONDARY),
     onSecondary = Color(LettaColorTokens.LIGHT_ON_SECONDARY),
     secondaryContainer = Color(LettaColorTokens.LIGHT_SECONDARY_CONTAINER),
+    onSecondaryContainer = Color(LettaColorTokens.LIGHT_ON_SURFACE),
     tertiary = Color(LettaColorTokens.LIGHT_TERTIARY),
     onTertiary = Color(LettaColorTokens.LIGHT_ON_TERTIARY),
     tertiaryContainer = Color(LettaColorTokens.LIGHT_TERTIARY_CONTAINER),
     onTertiaryContainer = Color(LettaColorTokens.LIGHT_ON_TERTIARY_CONTAINER),
     background = Color(LettaColorTokens.LIGHT_BACKGROUND),
+    onBackground = Color(LettaColorTokens.LIGHT_ON_SURFACE),
     surface = Color(LettaColorTokens.LIGHT_SURFACE),
     onSurface = Color(LettaColorTokens.LIGHT_ON_SURFACE),
     surfaceVariant = Color(LettaColorTokens.LIGHT_SURFACE_VARIANT),
@@ -158,39 +132,6 @@ private val LettaLightRoles = LettaSchemeRoles(
  * The brand palette's Material scheme for one theme: [roles] over Material's own dark or light scheme, which keeps
  * the roles the brand does not name (inverse, scrim, fixed) at Material's values for that theme.
  */
-private fun lettaScheme(dark: Boolean, roles: LettaSchemeRoles): ColorScheme =
-    (if (dark) darkColorScheme() else lightColorScheme()).copy(
-        primary = roles.primary,
-        onPrimary = roles.onPrimary,
-        primaryContainer = roles.primaryContainer,
-        onPrimaryContainer = roles.onPrimaryContainer,
-        surfaceTint = roles.primary,
-        secondary = roles.secondary,
-        onSecondary = roles.onSecondary,
-        secondaryContainer = roles.secondaryContainer,
-        onSecondaryContainer = roles.onSurface,
-        tertiary = roles.tertiary,
-        onTertiary = roles.onTertiary,
-        tertiaryContainer = roles.tertiaryContainer,
-        onTertiaryContainer = roles.onTertiaryContainer,
-        background = roles.background,
-        onBackground = roles.onSurface,
-        surface = roles.surface,
-        onSurface = roles.onSurface,
-        surfaceVariant = roles.surfaceVariant,
-        onSurfaceVariant = roles.onSurfaceVariant,
-        surfaceContainerLowest = roles.surfaceContainerLowest,
-        surfaceContainerLow = roles.surfaceContainerLow,
-        surfaceContainer = roles.surfaceContainer,
-        surfaceContainerHigh = roles.surfaceContainerHigh,
-        surfaceContainerHighest = roles.surfaceContainerHighest,
-        outline = roles.outline,
-        outlineVariant = roles.outlineVariant,
-        error = roles.error,
-        onError = roles.onError,
-        errorContainer = roles.errorContainer,
-        onErrorContainer = roles.onErrorContainer,
-    )
 
 /** The Letta [CustomColors] derived from a [lettaColorScheme] (fixed brand status/agent colours). */
 fun lettaCustomColors(scheme: ColorScheme): CustomColors =
