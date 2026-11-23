@@ -271,7 +271,7 @@ private fun BackendConnectionStatus.homeHero(onRetry: () -> Unit): ShellHomeConn
         is BackendConnectionStatus.Failed -> ChatScreenStatus.BackendOffline(message)
         is BackendConnectionStatus.Connected -> return null
     }
-    return ShellHomeConnection(HomeConnectionState(status, (this as? BackendConnectionStatus.Failed)?.message), onRetry, wordmark = "LETTA")
+    return ShellHomeConnection(HomeConnectionState(status, (this as? BackendConnectionStatus.Failed)?.message), onRetry)
 }
 
 /** No transport carries a Home card's A2UI action on Android yet (as on desktop): it is logged and dropped. */

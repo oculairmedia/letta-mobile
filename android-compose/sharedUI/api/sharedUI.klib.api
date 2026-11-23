@@ -7319,7 +7319,7 @@ final class com.letta.mobile.ui.shell.pages/ShellAgentEditorHost { // com.letta.
 }
 
 final class com.letta.mobile.ui.shell.pages/ShellHomeConnection { // com.letta.mobile.ui.shell.pages/ShellHomeConnection|null[0]
-    constructor <init>(com.letta.mobile.ui.shell.pages.home/HomeConnectionState, kotlin/Function0<kotlin/Unit>, kotlin/String) // com.letta.mobile.ui.shell.pages/ShellHomeConnection.<init>|<init>(com.letta.mobile.ui.shell.pages.home.HomeConnectionState;kotlin.Function0<kotlin.Unit>;kotlin.String){}[0]
+    constructor <init>(com.letta.mobile.ui.shell.pages.home/HomeConnectionState, kotlin/Function0<kotlin/Unit>, kotlin/String = ...) // com.letta.mobile.ui.shell.pages/ShellHomeConnection.<init>|<init>(com.letta.mobile.ui.shell.pages.home.HomeConnectionState;kotlin.Function0<kotlin.Unit>;kotlin.String){}[0]
 
     final val onRetry // com.letta.mobile.ui.shell.pages/ShellHomeConnection.onRetry|{}onRetry[0]
         final fun <get-onRetry>(): kotlin/Function0<kotlin/Unit> // com.letta.mobile.ui.shell.pages/ShellHomeConnection.onRetry.<get-onRetry>|<get-onRetry>(){}[0]
@@ -10108,6 +10108,13 @@ final object com.letta.mobile.ui.host/OverlayTags { // com.letta.mobile.ui.host/
         final fun <get-DISMISS>(): kotlin/String // com.letta.mobile.ui.host/OverlayTags.DISMISS.<get-DISMISS>|<get-DISMISS>(){}[0]
     final const val SNACKBAR // com.letta.mobile.ui.host/OverlayTags.SNACKBAR|{}SNACKBAR[0]
         final fun <get-SNACKBAR>(): kotlin/String // com.letta.mobile.ui.host/OverlayTags.SNACKBAR.<get-SNACKBAR>|<get-SNACKBAR>(){}[0]
+}
+
+final object com.letta.mobile.ui.icons/BakenMark { // com.letta.mobile.ui.icons/BakenMark|null[0]
+    final val mono // com.letta.mobile.ui.icons/BakenMark.mono|{}mono[0]
+        final fun <get-mono>(): androidx.compose.ui.graphics.vector/ImageVector // com.letta.mobile.ui.icons/BakenMark.mono.<get-mono>|<get-mono>(){}[0]
+
+    final fun brand(androidx.compose.ui.graphics/Color, androidx.compose.ui.graphics/Color): androidx.compose.ui.graphics.vector/ImageVector // com.letta.mobile.ui.icons/BakenMark.brand|brand(androidx.compose.ui.graphics.Color;androidx.compose.ui.graphics.Color){}[0]
 }
 
 final object com.letta.mobile.ui.icons/LettaIcons { // com.letta.mobile.ui.icons/LettaIcons|null[0]
@@ -13579,6 +13586,7 @@ final val com.letta.mobile.ui.host/com_letta_mobile_ui_host_Overlay_Snackbar$sta
 final val com.letta.mobile.ui.host/com_letta_mobile_ui_host_PaneSize$stableprop // com.letta.mobile.ui.host/com_letta_mobile_ui_host_PaneSize$stableprop|#static{}com_letta_mobile_ui_host_PaneSize$stableprop[0]
 final val com.letta.mobile.ui.host/com_letta_mobile_ui_host_PaneSpec$stableprop // com.letta.mobile.ui.host/com_letta_mobile_ui_host_PaneSpec$stableprop|#static{}com_letta_mobile_ui_host_PaneSpec$stableprop[0]
 final val com.letta.mobile.ui.host/com_letta_mobile_ui_host_RowDragTracker$stableprop // com.letta.mobile.ui.host/com_letta_mobile_ui_host_RowDragTracker$stableprop|#static{}com_letta_mobile_ui_host_RowDragTracker$stableprop[0]
+final val com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_BakenMark$stableprop // com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_BakenMark$stableprop|#static{}com_letta_mobile_ui_icons_BakenMark$stableprop[0]
 final val com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_LettaIcons$stableprop // com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_LettaIcons$stableprop|#static{}com_letta_mobile_ui_icons_LettaIcons$stableprop[0]
 final val com.letta.mobile.ui.markdown/LocalMermaidDiagramRenderer // com.letta.mobile.ui.markdown/LocalMermaidDiagramRenderer|{}LocalMermaidDiagramRenderer[0]
     final fun <get-LocalMermaidDiagramRenderer>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.markdown/MermaidDiagramRenderer?> // com.letta.mobile.ui.markdown/LocalMermaidDiagramRenderer.<get-LocalMermaidDiagramRenderer>|<get-LocalMermaidDiagramRenderer>(){}[0]
@@ -14550,6 +14558,7 @@ final fun com.letta.mobile.ui.components.foundation/lettaInlineTarget(androidx.c
 final fun com.letta.mobile.ui.components.foundation/lettaPanelBorder(androidx.compose.runtime/Composer?, kotlin/Int): androidx.compose.foundation/BorderStroke // com.letta.mobile.ui.components.foundation/lettaPanelBorder|lettaPanelBorder(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components.foundation/lettaRowTarget(androidx.compose.runtime/Composer?, kotlin/Int): com.letta.mobile.ui.components.foundation/LettaClickTarget // com.letta.mobile.ui.components.foundation/lettaRowTarget|lettaRowTarget(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components.foundation/lettaSectionTitle(kotlin/String, kotlin/Int?): kotlin/String // com.letta.mobile.ui.components.foundation/lettaSectionTitle|lettaSectionTitle(kotlin.String;kotlin.Int?){}[0]
+final fun com.letta.mobile.ui.components.foundation/lettaSliderColors(androidx.compose.runtime/Composer?, kotlin/Int): androidx.compose.material3/SliderColors // com.letta.mobile.ui.components.foundation/lettaSliderColors|lettaSliderColors(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayRelease$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayRelease$stableprop_getter|com_letta_mobile_ui_components_gesture_SwipeAwayRelease$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwaySpec$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwaySpec$stableprop_getter|com_letta_mobile_ui_components_gesture_SwipeAwaySpec$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Distance$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components.gesture/com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Distance$stableprop_getter|com_letta_mobile_ui_components_gesture_SwipeAwayThreshold_Distance$stableprop_getter(){}[0]
@@ -14719,6 +14728,7 @@ final fun com.letta.mobile.ui.host/lettaIdiom(com.letta.mobile.ui.host/LettaInpu
 final fun com.letta.mobile.ui.host/rememberInspectorHost(androidx.compose.runtime/Composer?, kotlin/Int): com.letta.mobile.ui.host/InspectorHost // com.letta.mobile.ui.host/rememberInspectorHost|rememberInspectorHost(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.host/rememberOverlayHost(androidx.compose.runtime/Composer?, kotlin/Int): com.letta.mobile.ui.host/OverlayHost // com.letta.mobile.ui.host/rememberOverlayHost|rememberOverlayHost(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.host/rememberPrimaryPointer(androidx.compose.runtime/Composer?, kotlin/Int): com.letta.mobile.ui.host/LettaInput // com.letta.mobile.ui.host/rememberPrimaryPointer|rememberPrimaryPointer(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_BakenMark$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_BakenMark$stableprop_getter|com_letta_mobile_ui_icons_BakenMark$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_LettaIcons$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.icons/com_letta_mobile_ui_icons_LettaIcons$stableprop_getter|com_letta_mobile_ui_icons_LettaIcons$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.image/decodeImageBitmap(kotlin/ByteArray): androidx.compose.ui.graphics/ImageBitmap? // com.letta.mobile.ui.image/decodeImageBitmap|decodeImageBitmap(kotlin.ByteArray){}[0]
 final fun com.letta.mobile.ui.markdown/MessageReferenceDefinitions(kotlin.collections/Map<kotlin/String, kotlin/String>, kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.markdown/MessageReferenceDefinitions|MessageReferenceDefinitions(kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
@@ -15391,8 +15401,11 @@ final fun com.letta.mobile.ui.theme/com_letta_mobile_ui_theme_LettaDimens_Stroke
 final fun com.letta.mobile.ui.theme/com_letta_mobile_ui_theme_LettaDimens_Type$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme/com_letta_mobile_ui_theme_LettaDimens_Type$stableprop_getter|com_letta_mobile_ui_theme_LettaDimens_Type$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.theme/com_letta_mobile_ui_theme_PresetThemeColors$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme/com_letta_mobile_ui_theme_PresetThemeColors$stableprop_getter|com_letta_mobile_ui_theme_PresetThemeColors$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.theme/com_letta_mobile_ui_theme_TouchComposerDimens$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.theme/com_letta_mobile_ui_theme_TouchComposerDimens$stableprop_getter|com_letta_mobile_ui_theme_TouchComposerDimens$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.theme/lettaCategoryPersona(androidx.compose.material3/ColorScheme): androidx.compose.ui.graphics/Color // com.letta.mobile.ui.theme/lettaCategoryPersona|lettaCategoryPersona(androidx.compose.material3.ColorScheme){}[0]
 final fun com.letta.mobile.ui.theme/lettaColorScheme(kotlin/Boolean, kotlin/Boolean = ..., com.letta.mobile.data.model/ThemePreset = ...): androidx.compose.material3/ColorScheme // com.letta.mobile.ui.theme/lettaColorScheme|lettaColorScheme(kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.model.ThemePreset){}[0]
 final fun com.letta.mobile.ui.theme/lettaCustomColors(androidx.compose.material3/ColorScheme): com.letta.mobile.ui.theme.tokens/CustomColors // com.letta.mobile.ui.theme/lettaCustomColors|lettaCustomColors(androidx.compose.material3.ColorScheme){}[0]
+final fun com.letta.mobile.ui.theme/lettaPrimaryText(androidx.compose.material3/ColorScheme): androidx.compose.ui.graphics/Color // com.letta.mobile.ui.theme/lettaPrimaryText|lettaPrimaryText(androidx.compose.material3.ColorScheme){}[0]
+final fun com.letta.mobile.ui.theme/lettaUserBubble(androidx.compose.material3/ColorScheme): androidx.compose.ui.graphics/Color // com.letta.mobile.ui.theme/lettaUserBubble|lettaUserBubble(androidx.compose.material3.ColorScheme){}[0]
 final fun com.letta.mobile.ui.theme/presetThemeColors(com.letta.mobile.data.model/ThemePreset): com.letta.mobile.ui.theme/PresetThemeColors // com.letta.mobile.ui.theme/presetThemeColors|presetThemeColors(com.letta.mobile.data.model.ThemePreset){}[0]
 final fun com.letta.mobile.ui.theme/rememberHostDark(com.letta.mobile.data.shellstate/HostAppearance, kotlin/Boolean, kotlin/Boolean?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int): kotlin/Boolean // com.letta.mobile.ui.theme/rememberHostDark|rememberHostDark(com.letta.mobile.data.shellstate.HostAppearance;kotlin.Boolean;kotlin.Boolean?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.theme/rememberReducedMotionEnabled(androidx.compose.runtime/Composer?, kotlin/Int): kotlin/Boolean // com.letta.mobile.ui.theme/rememberReducedMotionEnabled|rememberReducedMotionEnabled(androidx.compose.runtime.Composer?;kotlin.Int){}[0]

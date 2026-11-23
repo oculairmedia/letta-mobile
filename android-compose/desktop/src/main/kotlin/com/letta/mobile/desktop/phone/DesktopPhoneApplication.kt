@@ -4,7 +4,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
+import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.desktop.CrashReportingExceptionHandlerFactory
+import com.letta.mobile.desktop.DESKTOP_APP_NAME
 import com.letta.mobile.desktop.DesktopAppShellBindings
 import com.letta.mobile.desktop.DesktopDeepLinkRequest
 import com.letta.mobile.desktop.DesktopJewelTheme
@@ -35,7 +37,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
  */
 @OptIn(ExperimentalComposeUiApi::class)
 internal fun runDesktopPhoneApplication(args: Array<String>) {
-    println("PHONE: launching Letta Desktop as a phone ($PHONE_ENV_VARIABLE). Press F1 in the window for the shortcuts.")
+    println("PHONE: launching $DESKTOP_APP_NAME as a phone ($PHONE_ENV_VARIABLE). Press F1 in the window for the shortcuts.")
     val deepLinks = MutableStateFlow<DesktopDeepLinkRequest?>(null)
     val quickQuery = DesktopQuickQueryCoordinator()
     nucleusApplication(args = args, backend = NucleusBackend.Awt, enableSingleInstance = false) {
@@ -46,7 +48,8 @@ internal fun runDesktopPhoneApplication(args: Array<String>) {
         val mascots = remember { MascotIdentityRegistry() }
         val mascotTransport = remember { MascotTransport() }
         CompositionLocalProvider(LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory) {
-            DesktopPhoneWindow(state, titlePrefix = "Letta Phone", onCloseRequest = nucleusScope::exitApplication) { window ->
+            val titlePrefix = "${DisplayNames.PRODUCT} Phone"
+            DesktopPhoneWindow(state, titlePrefix = titlePrefix, onCloseRequest = nucleusScope::exitApplication) { window ->
                 CompositionLocalProvider(
                     LocalMermaidDiagramRenderer provides DesktopMermaidDiagramRenderer,
                     LocalMascotHost provides DesktopMascotHost,

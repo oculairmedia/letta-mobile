@@ -146,7 +146,7 @@ internal fun DesktopQuickQueryWindow(coordinator: DesktopQuickQueryCoordinator) 
         transparent = true,
         resizable = false,
         alwaysOnTop = true,
-        title = "Letta Quick Query",
+        title = "${com.letta.mobile.data.model.DisplayNames.PRODUCT} Quick Query",
     ) {
         DisposableEffect(window) {
             // Close on click-away — but only once the window has actually held

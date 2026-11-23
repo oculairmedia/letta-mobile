@@ -14,6 +14,7 @@ import com.letta.mobile.data.session.graph.HostSessionGraphProvider
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
+import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.surface.LayoutPrefStorage
 import com.letta.mobile.ui.chat.surface.canvasBubbleLayoutStorage
@@ -99,7 +100,7 @@ class DesktopFileSecureSettingsStore(
         val tmp = Files.createTempFile(parent, target.fileName.toString(), ".tmp")
         try {
             Files.newOutputStream(tmp).use<OutputStream, Unit> { output ->
-                properties.store(output, "Letta Desktop settings")
+                properties.store(output, "${DisplayNames.PRODUCT} settings")
             }
             try {
                 Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)

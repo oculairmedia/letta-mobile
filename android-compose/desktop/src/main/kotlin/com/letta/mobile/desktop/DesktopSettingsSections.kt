@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.runtime.LocalRuntimeProviderConfig
 import com.letta.mobile.data.runtime.LocalRuntimeProviderStatus
 import com.letta.mobile.data.runtime.supervisor.RuntimeHealth
@@ -262,7 +263,7 @@ internal fun confirmSwitchMessage(candidatePath: String): String {
             " at its top level) — the app will start showing whatever agents and conversations live there instead of what you see now."
     }
     return "The bundled local runtime will restart against:\n\n$candidatePath\n\n$contentsNote\n\n" +
-        "If another Letta process (including the letta-code CLI) is already using this folder, you may see a harmless " +
+        "If another Letta Code process (including the letta-code CLI) is already using this folder, you may see a harmless " +
         "\"could not claim scheduler lease\" notice in the runtime log — only cron scheduling is affected, chat still works."
 }
 
@@ -295,10 +296,10 @@ private val RAIL_RECENCY_CHOICES: List<Pair<Int, String>> = listOf(
 internal fun systemAppearanceSection(dark: Boolean, accentHex: String?): SettingsSectionModel = SettingsSectionModel(
     key = "desktop-system-appearance",
     title = "System appearance",
-    supporting = "Letta follows the OS theme and accent as they change. High contrast is the shared Appearance row.",
+    supporting = "${DisplayNames.PRODUCT} follows the OS theme and accent as they change. High contrast is the shared Appearance row.",
     rows = listOf(
         SettingsRow.Info("system-theme", "Theme", if (dark) "Dark" else "Light"),
-        SettingsRow.Info("system-accent", "Accent", accentHex ?: "Letta default"),
+        SettingsRow.Info("system-accent", "Accent", accentHex ?: "${DisplayNames.PRODUCT} default"),
     ),
 )
 
@@ -336,7 +337,8 @@ internal fun desktopAboutSections(
     SettingsSectionModel(
         key = "desktop-readiness",
         title = "Startup readiness",
-        supporting = "Ctrl+Shift+Space opens the quick switcher globally. Closing the window keeps Letta running in the system tray.",
+        supporting = "Ctrl+Shift+Space opens the quick switcher globally. " +
+            "Closing the window keeps ${DisplayNames.PRODUCT} running in the system tray.",
         rows = readiness.mapIndexed { index, feature ->
             SettingsRow.Info("readiness-$index", feature.title, feature.state.label, feature.state.tone)
         },
@@ -378,7 +380,7 @@ private fun autoLaunchSection(autoLaunch: AutoLaunchState, actions: DestinationN
             add(
                 SettingsRow.Toggle(
                     key = "auto-launch",
-                    title = "Launch Letta when I sign in",
+                    title = "Launch ${DisplayNames.PRODUCT} when I sign in",
                     checked = enabled,
                     supporting = "Nucleus backend: ${autoLaunch.name.lowercase().replace('_', ' ')}",
                     enabled = autoLaunch != AutoLaunchState.UNSUPPORTED && !externallyLocked,

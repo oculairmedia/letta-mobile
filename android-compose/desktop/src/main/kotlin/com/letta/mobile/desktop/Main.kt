@@ -47,7 +47,7 @@ private val DESKTOP_DENSITY_SCALE: Float =
     System.getProperty("letta.desktop.density")?.toFloatOrNull()?.takeIf { it in 0.5f..1.0f } ?: 0.8f
 
 internal const val LETTA_WINDOWS_AUMID = "com.letta.desktop"
-internal const val LETTA_DESKTOP_APP_NAME = "Letta Desktop"
+internal const val DESKTOP_APP_NAME = "${com.letta.mobile.data.model.DisplayNames.PRODUCT} Desktop"
 fun main(args: Array<String>) {
     com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder()).use {
         installBeamShaderTelemetry()
@@ -123,7 +123,7 @@ private fun runDesktopApplication(
             SingleInstanceRestoreEffect {
                 activationHandler.showUserThatAppIsRunning()
             }
-            var windowTitle by remember { mutableStateOf("Letta Desktop") }
+            var windowTitle by remember { mutableStateOf(DESKTOP_APP_NAME) }
             // Lifted the same way as windowTitle: LettaDesktopApp owns the live
             // chat/shell state the header needs (identity block + sidebar
             // toggle), but the header itself renders in the custom title bar,
@@ -272,7 +272,7 @@ internal val CrashReportingExceptionHandlerFactory = WindowExceptionHandlerFacto
         }
         crashShutdown.request {
             runCatching {
-                JOptionPane.showMessageDialog(window, message, "Letta Desktop", JOptionPane.ERROR_MESSAGE)
+                JOptionPane.showMessageDialog(window, message, DESKTOP_APP_NAME, JOptionPane.ERROR_MESSAGE)
             }
         }
     }

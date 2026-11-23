@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.CurrentFocusSnapshot
 import com.letta.mobile.data.serialization.LettaJson
@@ -104,7 +105,7 @@ fun ShellWorkspaceState.navDrawerInput(
     val focusedIndex = agents.indexOfFirst { it.first == focus.agentId?.value }
     return ShellNavDrawerInput(
         agent = ShellPanelAgent(
-            name = agents.getOrNull(focusedIndex)?.second ?: "Letta",
+            name = agents.getOrNull(focusedIndex)?.second ?: DisplayNames.PRODUCT,
             orbIndex = focusedIndex.coerceAtLeast(0),
             agentId = focus.agentId?.value,
         ),

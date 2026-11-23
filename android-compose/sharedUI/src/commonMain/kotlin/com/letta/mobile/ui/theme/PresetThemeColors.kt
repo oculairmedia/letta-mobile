@@ -24,19 +24,27 @@ data class PresetThemeColors(
 private val DefaultThemeColors = LettaThemeTokens.default.toGeneratedThemeColors().let { generated ->
     PresetThemeColors(
         lightScheme = generated.lightScheme.copy(
-            onPrimaryContainer = Color(0xFF004D40),
-            secondaryContainer = LightSurfaceContainer,
-            outlineVariant = Color(0xFFE0E0E0),
+            onPrimary = Color(LettaColorTokens.LIGHT_ON_PRIMARY),
+            onPrimaryContainer = LightOnSurface,
+            secondaryContainer = Color(LettaColorTokens.LIGHT_SECONDARY_CONTAINER),
+            outlineVariant = LightSurfaceContainer,
             inversePrimary = DarkPrimary,
+            tertiaryContainer = Color(LettaColorTokens.LIGHT_TERTIARY_CONTAINER),
+            onTertiaryContainer = Color(LettaColorTokens.LIGHT_ON_TERTIARY_CONTAINER),
             surfaceContainerHigh = LightSurfaceContainer,
-            surfaceContainerHighest = Color(0xFFD6D6D6),
+            surfaceContainerHighest = Color(LettaColorTokens.LIGHT_SURFACE_CONTAINER_HIGHEST),
         ),
         darkScheme = generated.darkScheme.copy(
-            outlineVariant = Color(0xFF303030),
+            onPrimary = Color(LettaColorTokens.DARK_ON_PRIMARY),
+            outlineVariant = Color(LettaColorTokens.DARK_OUTLINE_VARIANT),
             inversePrimary = LightPrimary,
-            surfaceContainerLowest = Color(0xFF0D0D0D),
-            surfaceContainerHigh = DarkSurfaceContainer,
-            surfaceContainerHighest = Color(0xFF353535),
+            onSecondary = Color(LettaColorTokens.DARK_ON_SECONDARY),
+            secondaryContainer = Color(LettaColorTokens.DARK_SECONDARY_CONTAINER),
+            tertiaryContainer = Color(LettaColorTokens.DARK_TERTIARY_CONTAINER),
+            onTertiaryContainer = Color(LettaColorTokens.DARK_ON_TERTIARY_CONTAINER),
+            surfaceContainerLowest = Color(LettaColorTokens.DARK_SURFACE_CONTAINER_LOWEST),
+            surfaceContainerHigh = Color(LettaColorTokens.DARK_SURFACE_CONTAINER_HIGH),
+            surfaceContainerHighest = Color(LettaColorTokens.DARK_SURFACE_CONTAINER_HIGHEST),
         ),
     )
 }

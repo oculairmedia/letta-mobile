@@ -17,6 +17,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.util.TimelineOpenTrace
 import com.letta.mobile.data.presence.runningAgentIds
 import com.letta.mobile.data.session.agentRosterOrEmpty
@@ -39,11 +40,11 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
-/** The connection hero Home waits behind until the backend is there. */
+/** The connection hero Home waits behind until the backend is there; [wordmark] is the product's on every client. */
 class ShellHomeConnection(
     val state: HomeConnectionState,
     val onRetry: () -> Unit,
-    val wordmark: String,
+    val wordmark: String = DisplayNames.WORDMARK,
 )
 
 /** The host's presentation of Home, the hero it waits behind (null once connected), and where card actions go. */

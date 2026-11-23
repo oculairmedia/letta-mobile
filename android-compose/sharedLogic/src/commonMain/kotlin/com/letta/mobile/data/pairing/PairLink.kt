@@ -48,6 +48,9 @@ data class PairLink(val qrInvite: String, val dial: String?) {
     override fun toString(): String = "PairLink(<redacted>, dial=${dial != null})"
 
     companion object {
+        /** The product name pairing copy shows to the person (display only; the link scheme stays `meridian://`). */
+        const val PRODUCT_NAME: String = com.letta.mobile.data.model.DisplayNames.PRODUCT
+
         const val QR_SCHEME_PREFIX = "letta-qr-v1."
         private const val CANONICAL_PREFIX = "meridian://pair?"
         private val ACCEPTED_PREFIXES = listOf("meridian://pair?", "letta://pair?", "meridian://pair/?", "letta://pair/?")

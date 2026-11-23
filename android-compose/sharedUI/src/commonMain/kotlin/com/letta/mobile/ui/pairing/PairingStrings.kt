@@ -2,6 +2,7 @@ package com.letta.mobile.ui.pairing
 
 import com.letta.mobile.data.pairing.DeviceAccess
 import com.letta.mobile.data.pairing.HostIds
+import com.letta.mobile.data.pairing.PairLink
 import com.letta.mobile.data.pairing.PairedDevice
 import com.letta.mobile.data.pairing.PairingError
 import com.letta.mobile.data.pairing.PairingState
@@ -33,7 +34,8 @@ object PairingStrings {
     const val TORCH_ON = "Turn flashlight off"
     const val TORCH_OFF = "Turn flashlight on"
     const val CAMERA_RATIONALE_TITLE = "Allow camera to scan"
-    const val CAMERA_RATIONALE_BODY = "Meridian uses the camera only to read the pairing code. Nothing is recorded or uploaded."
+    const val CAMERA_RATIONALE_BODY =
+        "${PairLink.PRODUCT_NAME} uses the camera only to read the pairing code. Nothing is recorded or uploaded."
     const val CAMERA_ALLOW = "Allow camera"
     const val CAMERA_DENIED_TITLE = "Camera access is off"
     const val CAMERA_DENIED_BODY = "Turn on camera access in settings to scan, or paste the pairing link instead."
@@ -57,7 +59,7 @@ object PairingStrings {
     const val VERIFYING_TITLE = "Verifying…"
     const val VERIFYING_STEP_CONTACT = "Contacting host…"
     const val VERIFYING_STEP_SECURE = "Securing connection…"
-    const val VERIFYING_KEEP_OPEN = "Keep Meridian open on both devices."
+    const val VERIFYING_KEEP_OPEN = "Keep ${PairLink.PRODUCT_NAME} open on both devices."
 
     // Success.
     fun pairedTitle(paired: PairingState.Paired) = "Paired with ${HostIds.short(paired.host.nodeId)}"
@@ -73,7 +75,7 @@ object PairingStrings {
     const val RETRY = "Retry"
 
     fun error(error: PairingError): String = when (error) {
-        PairingError.NOT_A_PAIRING_CODE -> "That is not a Meridian pairing code."
+        PairingError.NOT_A_PAIRING_CODE -> "That is not a ${PairLink.PRODUCT_NAME} pairing code."
         PairingError.UNSUPPORTED_VERSION -> "This pairing code is newer than this app. Update the app and try again."
         PairingError.MALFORMED -> "This pairing code is damaged or incomplete. Ask for a new one."
         PairingError.EXPIRED -> "This code expired. Ask for a new one."
@@ -102,7 +104,7 @@ object PairingStrings {
     const val INVITE_SETTINGS_TOGGLE = "Allow settings changes"
     const val INVITE_SETTINGS_BODY = "Lets the device change memory, tools, skills and schedules. Off: chat only."
     const val INVITE_SHOW_CODE = "Show pairing code"
-    const val INVITE_STEP_1 = "1. Open Meridian on your phone."
+    const val INVITE_STEP_1 = "1. Open ${PairLink.PRODUCT_NAME} on your phone."
     const val INVITE_STEP_2 = "2. Settings > Scan to connect."
     const val INVITE_STEP_3 = "3. Point it at this code."
     const val SHOW_LINK = "Show code instead"
@@ -194,7 +196,7 @@ object PairingStrings {
 
     // Install-and-pair card (letta-mobile-dpv7m.3).
     const val JOIN_TITLE = "Connect to a host with a pairing link"
-    const val INSTALL_TITLE = "Get the Meridian app on the phone"
+    const val INSTALL_TITLE = "Get the ${PairLink.PRODUCT_NAME} app on the phone"
     const val INSTALL_BODY = "Scan with the phone's camera to download the Android app, then scan the pairing code below."
 
     /** The latest Android release; the APK is attached to every GitHub release. */

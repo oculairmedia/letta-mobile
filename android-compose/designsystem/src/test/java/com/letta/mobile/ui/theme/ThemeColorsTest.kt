@@ -30,7 +30,7 @@ class ThemeColorsTest {
     @Test
     fun `presetThemeColors DEFAULT is lightColorScheme based`() {
         val scheme = presetThemeColors(ThemePreset.DEFAULT).lightScheme
-        assertEquals(Color(0xFF00897B), scheme.primary)
+        assertEquals(Color(0xFFE04A32), scheme.primary)
     }
 
     @Test
@@ -69,10 +69,45 @@ class ThemeColorsTest {
     // ── deriveCustomColors ────────────────────────────────────
 
     @Test
-    fun `deriveCustomColors maps primaryContainer to userBubbleBgColor`() {
+    fun `deriveCustomColors user bubble is the shared neutral bubble, not primaryContainer`() {
         val scheme = lightColorScheme(primaryContainer = Color(0xFFBBCCDD))
         val custom = deriveCustomColors(scheme)
-        assertEquals(Color(0xFFBBCCDD), custom.userBubbleBgColor)
+        assertEquals(lettaUserBubble(scheme), custom.userBubbleBgColor)
+        assertTrue(custom.userBubbleBgColor != scheme.primaryContainer)
+    }
+
+    @Test
+    fun `Android keeps the brand slate and steel support roles on the Default palette`() {
+        val colors = presetThemeColors(ThemePreset.DEFAULT)
+        val dark = lettaThemeScheme(colors.darkScheme, brandPalette = true)
+        val light = lettaThemeScheme(colors.lightScheme, brandPalette = true)
+        assertEquals(Color(0xFF8C98A3), dark.secondary)
+        assertEquals(Color(0xFFA9B3BC), dark.tertiary)
+        assertEquals(Color(0xFF4C5761), light.secondary)
+        assertEquals(Color(0xFF5A6670), light.tertiary)
+        assertEquals(Color(0xFF262B30), dark.tertiaryContainer)
+        assertEquals(Color(0xFFE2E6EA), light.tertiaryContainer)
+    }
+
+    @Test
+    fun `Android Default draws the same vermilion primary roles as desktop and the web`() {
+        val colors = presetThemeColors(ThemePreset.DEFAULT)
+        for (base in listOf(colors.darkScheme, colors.lightScheme)) {
+            val drawn = lettaThemeScheme(base, brandPalette = true)
+            assertEquals(base.primary, drawn.primary)
+            assertEquals(base.onPrimary, drawn.onPrimary)
+            assertEquals(base.primaryContainer, drawn.primaryContainer)
+            assertEquals(base.onPrimaryContainer, drawn.onPrimaryContainer)
+        }
+        assertEquals(Color(0xFFEE5A3F), lettaThemeScheme(colors.darkScheme, brandPalette = true).primary)
+        assertEquals(Color(0xFFE04A32), lettaThemeScheme(colors.lightScheme, brandPalette = true).primary)
+    }
+
+    @Test
+    fun `the brand palette's user bubble is the neutral grey token on Android too`() {
+        val colors = presetThemeColors(ThemePreset.DEFAULT)
+        assertEquals(Color(0xFF23272C), deriveCustomColors(colors.darkScheme).userBubbleBgColor)
+        assertEquals(Color(0xFFE4E7EA), deriveCustomColors(colors.lightScheme).userBubbleBgColor)
     }
 
     @Test

@@ -232,5 +232,5 @@ internal fun projectDesktopFocus(
 
 private fun desktopActiveTitle(destination: DesktopDestination, conversationTitle: String?): String {
     if (destination != DesktopDestination.Conversations) return destination.label
-    return conversationTitle ?: "Letta Desktop"
+    return conversationTitle ?: DESKTOP_APP_NAME
 }

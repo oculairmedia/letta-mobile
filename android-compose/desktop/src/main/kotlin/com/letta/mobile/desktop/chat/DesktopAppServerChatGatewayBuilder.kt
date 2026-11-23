@@ -308,7 +308,7 @@ internal fun desktopAgentToolsModePolicy(
 
 private val DESKTOP_CLIENT_INFO = AppServerRuntimeStartClientInfo(
     name = "letta-desktop",
-    title = "Letta Desktop",
+    title = com.letta.mobile.desktop.DESKTOP_APP_NAME,
     version = "0.2.0",
 )
 

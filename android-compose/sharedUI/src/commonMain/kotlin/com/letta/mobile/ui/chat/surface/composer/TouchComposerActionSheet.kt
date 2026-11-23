@@ -101,8 +101,10 @@ private fun TouchSheetRow(item: TouchSheetItem, onClick: () -> Unit) {
             .then(item.stateDescription?.let { state -> Modifier.semantics { stateDescription = state } } ?: Modifier)
             .testTag(ComposerTestTags.TOUCH_SHEET_ROW),
         shape = chatSheetRowShape(look.corner),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = look.elevation,
+        // The neutral surface step, lifted by a shadow rather than tonal elevation: Material tints a tonally
+        // elevated surface with the primary, which washed every tile in vermilion.
+        color = if (pressed) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = look.elevation,
         interactionSource = interaction,
     ) {
         ListItem(
@@ -112,7 +114,8 @@ private fun TouchSheetRow(item: TouchSheetItem, onClick: () -> Unit) {
                     imageVector = item.icon,
                     contentDescription = null,
                     modifier = Modifier.size(TouchComposerDimens.sheetIcon),
-                    tint = MaterialTheme.colorScheme.primary,
+                    // Quiet icons: the sheet is a list of options, not a row of accents.
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -126,7 +129,7 @@ internal data class SheetRowLook(val corner: Dp, val elevation: Dp)
 
 /**
  * The pressed row's morph (legacy designsystem ActionSheetItem): its
- * corners round from 8 to 12 dp and it lifts from 2 to 4 dp of tonal elevation, on the expressive
+ * corners round from 8 to 12 dp and it lifts from 2 to 4 dp of shadow, on the expressive
  * scheme's fast spatial spring. Snaps under reduced motion.
  */
 internal fun sheetRowLook(pressed: Boolean): SheetRowLook = if (pressed) {

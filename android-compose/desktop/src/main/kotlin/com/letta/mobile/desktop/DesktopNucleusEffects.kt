@@ -1,7 +1,5 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.DisposableEffect
@@ -31,6 +29,7 @@ import dev.nucleusframework.media.control.MediaPlaybackStatus
 import dev.nucleusframework.taskbarprogress.TaskbarProgress
 import dev.nucleusframework.composenativetray.tray.api.Tray
 import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.ui.icons.BakenMark
 import com.letta.mobile.data.model.UiMessage
 import java.awt.Frame
 import java.awt.Window
@@ -289,7 +288,7 @@ private fun AgentWorkEffect(window: Window, state: DesktopNucleusEffectState) {
             EnergyManager.disableLightEfficiencyMode()
             EnergyManager.keepScreenAwake()
             MediaControlService.setMetadata(
-                MediaMetadata(title = "${state.agentName} is working", artist = "Letta Desktop"),
+                MediaMetadata(title = "${state.agentName} is working", artist = DESKTOP_APP_NAME),
             )
             MediaControlService.setPlaybackState(MediaPlaybackState(MediaPlaybackStatus.PLAYING))
         } else {
@@ -297,7 +296,7 @@ private fun AgentWorkEffect(window: Window, state: DesktopNucleusEffectState) {
             EnergyManager.releaseScreenAwake()
             EnergyManager.enableLightEfficiencyMode()
             MediaControlService.setMetadata(
-                MediaMetadata(title = state.agentName, artist = "Letta Desktop"),
+                MediaMetadata(title = state.agentName, artist = DESKTOP_APP_NAME),
             )
             MediaControlService.setPlaybackState(MediaPlaybackState(MediaPlaybackStatus.PAUSED))
         }
@@ -409,7 +408,7 @@ private fun registerQuickSwitcher(onQuickQuery: () -> Unit): Long =
     GlobalHotKeyManager.register(
         keyCode = KeyEvent.VK_SPACE,
         modifiers = HotKeyModifier.CONTROL + HotKeyModifier.SHIFT,
-        description = "Open Letta quick query",
+        description = "Open ${com.letta.mobile.data.model.DisplayNames.PRODUCT} quick query",
     ) { _, _ ->
         // Deliberately does NOT activate the main window: the quick-query bar
         // floats over the user's current context (which it also captures —
@@ -452,11 +451,12 @@ private fun DesktopTray(
     actions: DesktopTrayActions,
 ) {
     Tray(
-        icon = Icons.Outlined.SmartToy,
-        tooltip = if (isAgentWorking) "Letta Desktop — agent working" else "Letta Desktop",
+        // The Baken mark in one ink: the tray tints it to the system's light or dark taskbar.
+        icon = BakenMark.mono,
+        tooltip = if (isAgentWorking) "$DESKTOP_APP_NAME — agent working" else DESKTOP_APP_NAME,
         primaryAction = actions.onShow,
     ) {
-        Item(label = "Show Letta Desktop", onClick = actions.onShow)
+        Item(label = "Show $DESKTOP_APP_NAME", onClick = actions.onShow)
         Item(label = "Settings", onClick = actions.onOpenSettings)
         Item(label = "Check for updates", onClick = actions.onCheckForUpdates)
         Divider()
@@ -466,8 +466,8 @@ private fun DesktopTray(
 
 private fun configureMediaControls(agentName: String, onActivate: () -> Unit) {
     if (!MediaControlService.isAvailable()) return
-    MediaControlService.configure(displayName = "Letta Desktop")
-    MediaControlService.setMetadata(MediaMetadata(title = agentName, artist = "Letta Desktop"))
+    MediaControlService.configure(displayName = DESKTOP_APP_NAME)
+    MediaControlService.setMetadata(MediaMetadata(title = agentName, artist = DESKTOP_APP_NAME))
     MediaControlService.attach { event ->
         when (event) {
             MediaControlEvent.Play,
@@ -496,7 +496,7 @@ private fun configureLauncherMenus(onShow: () -> Unit, onOpenSettings: () -> Uni
             }
             MacOsDockMenu.setDockMenu(
                 listOf(
-                    DockMenuItem(id = 1, title = "Show Letta Desktop"),
+                    DockMenuItem(id = 1, title = "Show $DESKTOP_APP_NAME"),
                     DockMenuItem(id = 2, title = "Settings"),
                 ),
             )
@@ -508,8 +508,8 @@ private fun configureLauncherMenus(onShow: () -> Unit, onOpenSettings: () -> Uni
 private fun configureWindowsJumpList() {
     WindowsJumpListManager.setJumpList(
         tasks = listOf(
-            JumpListItem("Open conversations", "meridian://conversations", "Show Letta Desktop conversations"),
-            JumpListItem("Open settings", "meridian://settings", "Show Letta Desktop settings"),
+            JumpListItem("Open conversations", "meridian://conversations", "Show $DESKTOP_APP_NAME conversations"),
+            JumpListItem("Open settings", "meridian://settings", "Show $DESKTOP_APP_NAME settings"),
         ),
     )
 }

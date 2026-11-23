@@ -286,11 +286,11 @@ private fun CompactControls(model: AgentContextCardModel, onCompact: () -> Unit)
     }
 }
 
-/** The amber nudge near a full window. */
+/** The nudge near a full window: the brand primary (vermilion, its dark onPrimary ink), the one action that matters now. */
 @Composable
 private fun nudgeColors() = ButtonDefaults.filledTonalButtonColors(
-    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+    containerColor = MaterialTheme.colorScheme.primary,
+    contentColor = MaterialTheme.colorScheme.onPrimary,
 )
 
 @Composable

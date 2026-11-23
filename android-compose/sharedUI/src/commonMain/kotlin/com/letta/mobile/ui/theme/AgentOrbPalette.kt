@@ -3,8 +3,8 @@ package com.letta.mobile.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /*
- * The agent orbs' illustrative palette, from the Penpot "App Mockups v2" desktop boards. These are
- * artwork colours, not theme roles: an agent's orb keeps its identity colours in light and dark.
+ * The agent orbs' illustrative palette, from the Penpot "App Mockups v2" desktop boards. The orb
+ * gradients are identity colours, not theme roles: an agent's orb keeps them in light and dark.
  */
 
 /** Diagonal linear-gradient pairs (start to end) for the rail and sidebar orbs, by orb index. */
@@ -17,10 +17,13 @@ internal val AgentOrbGradients: List<Pair<Color, Color>> = listOf(
     Color(0xFF3FC0D0) to Color(0xFF3F90A0),
 )
 
-/** The assistant sphere's radial teal: centre, the 0.55 stop, and rim. */
-internal val AgentSphereCore: Color = Color(0xFF7CF0DE)
-internal val AgentSphereMid: Color = Color(0xFF00BFA5)
-internal val AgentSphereRim: Color = Color(0xFF00897B)
+/**
+ * The assistant sphere's radial, from the brand tokens: the vermilion's lit face at the centre, Buoy
+ * Vermilion at the 0.55 stop, and the mark's deep petrol stone at the rim.
+ */
+internal val AgentSphereCore: Color = Color(LettaColorTokens.PRIMARY_HIGHLIGHT)
+internal val AgentSphereMid: Color = Color(LettaColorTokens.DARK_PRIMARY)
+internal val AgentSphereRim: Color = Color(LettaColorTokens.LIGHT_MARK_STONE)
 
 /** The sphere's glossy highlight, fading to clear. */
 internal val AgentSphereHighlight: Color = Color(0x80FFFFFF)

@@ -16,7 +16,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.LettaTheme
@@ -40,7 +39,7 @@ internal fun PreviewMessageBubbleContent() {
                             .background(MaterialTheme.customColors.userBubbleBgColor)
                             .padding(12.dp)
                     ) {
-                        Text("Hello! How are you?", color = Color.White)
+                        Text("Hello! How are you?", color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
 

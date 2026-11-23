@@ -15,7 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
@@ -36,6 +35,7 @@ import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.ChatRowType
+import com.letta.mobile.ui.theme.lettaUserBubble
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
@@ -79,7 +79,7 @@ fun SendFlightLayer(state: SendFlightState, modifier: Modifier = Modifier, conte
 /**
  * The flying prompt, placed on the eased path between the field and the row. It morphs from the
  * field's text at take-off into the new prompt bubble on landing, drawn as UserPromptRow draws
- * it: the primaryContainer fill on the user bubble shape, the bubble's padding, the "You" label
+ * it: the neutral user bubble fill (lettaUserBubble) on the user bubble shape, the bubble's padding, the "You" label
  * over the text, and the text in the bubble's style and colour. Landed, it is the bubble.
  */
 @Composable
@@ -88,6 +88,7 @@ private fun SendFlightGhost(flight: SendFlight, modifier: Modifier) {
     val typography = MaterialTheme.typography
     val scheme = MaterialTheme.colorScheme
     val fillAlpha = (progress / ChatMotionTokens.SendFlight.FILL_IN_FRACTION).coerceIn(0f, 1f)
+    val bubble = lettaUserBubble(scheme)
     Box(modifier) {
         Box(
             Modifier
@@ -96,7 +97,7 @@ private fun SendFlightGhost(flight: SendFlight, modifier: Modifier) {
                 // Hidden from accessibility: the real row already announces the prompt.
                 .clearAndSetSemantics { testTag = SendFlightTestTags.GHOST }
                 .clip(ChatBubbleShapes.user())
-                .background(scheme.primaryContainer.copy(alpha = scheme.primaryContainer.alpha * fillAlpha)),
+                .background(bubble.copy(alpha = bubble.alpha * fillAlpha)),
         ) {
             Column(
                 modifier = Modifier.padding(
@@ -109,7 +110,7 @@ private fun SendFlightGhost(flight: SendFlight, modifier: Modifier) {
                 Text(
                     text = stringResource(Res.string.rows_role_you),
                     style = ChatRowType.roleLabel,
-                    color = scheme.onPrimaryContainer.copy(alpha = ChatRowAlpha.userRoleLabel * progress),
+                    color = scheme.onSurface.copy(alpha = ChatRowAlpha.userRoleLabel * progress),
                     maxLines = 1,
                     modifier = Modifier.growIn(progress),
                 )
@@ -117,7 +118,7 @@ private fun SendFlightGhost(flight: SendFlight, modifier: Modifier) {
                 Text(
                     text = flight.text,
                     style = lerp(typography.bodyLarge, typography.bodyMedium, progress),
-                    color = lerp(scheme.onSurface, scheme.onPrimaryContainer, progress),
+                    color = scheme.onSurface,
                     maxLines = ChatRowDimens.promptCollapsedMaxLines,
                     overflow = TextOverflow.Ellipsis,
                 )
