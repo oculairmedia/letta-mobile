@@ -42,6 +42,7 @@ object GreetingPlay {
     ): GreetingState = when (input) {
         is GreetingInput.Tick -> tick(state, input.seconds, random, tuning)
         is GreetingInput.ReducedMotion -> reducedMotion(state, input.active)
+        GreetingInput.Quiet -> if (state.reducedMotion) state else state.queue(listOfNotNull(idleGlance(state, random)))
         // Under reduced motion moments raise no cues; the levels they carry are still kept.
         else -> record(if (state.reducedMotion) state else state.queue(cuesFor(state, input)), input)
     }

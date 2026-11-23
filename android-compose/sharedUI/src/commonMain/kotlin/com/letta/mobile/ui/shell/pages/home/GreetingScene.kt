@@ -14,8 +14,10 @@ import com.letta.mobile.data.home.greeting.GreetingInput
 import com.letta.mobile.data.home.greeting.GreetingPlay
 import com.letta.mobile.data.home.greeting.GreetingState
 import com.letta.mobile.data.home.greeting.GreetingTarget
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * One greeting on screen: the reducer's [state], the chance it plays with, and where each actor is
@@ -52,14 +54,19 @@ internal object GreetingLaunch {
 internal fun rememberGreetingScene(): GreetingScene = remember { GreetingScene(seed = Random.nextInt(), booted = GreetingLaunch.booted) }
 
 /**
- * The greeting's clock: frames tick the reducer only while something is playing ([GreetingState.active]);
- * at rest it asks for no frames at all.
+ * The greeting's clock: frames tick the reducer only while something is playing ([GreetingState.active]).
+ * At rest it asks for no frames; after a quiet spell it hands the reducer a [GreetingInput.Quiet], so a
+ * resting crew still turns to each other now and then.
  */
 @Composable
 internal fun GreetingClock(scene: GreetingScene) {
     LaunchedEffect(scene) {
         snapshotFlow { scene.state.active }.collectLatest { active ->
-            if (!active) return@collectLatest
+            // At rest: a quiet moment now and then, until something plays (which cancels this).
+            while (!active) {
+                delay(QUIET_SPELL + QUIET_JITTER * Random.nextDouble())
+                scene.send(GreetingInput.Quiet)
+            }
             var last = 0L
             while (true) {
                 withFrameNanos { now ->
@@ -72,6 +79,10 @@ internal fun GreetingClock(scene: GreetingScene) {
 }
 
 private const val NANOS_PER_SECOND = 1_000_000_000f
+
+/** How long the crew rests before one of them glances at a neighbour, plus up to [QUIET_JITTER] more. */
+private val QUIET_SPELL = 6.seconds
+private val QUIET_JITTER = 6.seconds
 
 /** A frame longer than this (the window was hidden) counts as this long. */
 private const val MAX_TICK_SECONDS = 0.1f

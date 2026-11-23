@@ -31,11 +31,28 @@ internal object ShellDimens {
     /** One agent in Home's avatar row: the avatar and its name under it. */
     val homeAvatarTile: Dp = 64.dp
 
-    /** One mascot's tile in Home's greeting; the rig draws the character across ~60 % of it. */
-    val homeGreetingMascot: Dp = 96.dp
+    /**
+     * Home greeting lineup: a mascot's tile at its three sizes. The rig draws the character across
+     * [homeLineupBodyShare] of the tile, so neighbouring tiles overlap and the bodies sit close.
+     */
+    val homeLineupSmall: Dp = 72.dp
+    val homeLineupMedium: Dp = 84.dp
+    val homeLineupLarge: Dp = 100.dp
 
-    /** The Baken mark before Home's greeting line, a little taller than the line. */
-    val homeGreetingMark: Dp = 36.dp
+    /** The Baken mark's tile when it stands in the lineup: the smallest member. */
+    val homeLineupMark: Dp = 60.dp
+
+    /** How far a lineup member sits above or below the row's line, at most (in steps of half of it). */
+    val homeLineupLift: Dp = 6.dp
+
+    /** One step of the gap between two lineup bodies: from a slight overlap to a slight gap. */
+    val homeLineupNudge: Dp = 2.dp
+
+    /** The share of a mascot's tile its body covers. */
+    const val homeLineupBodyShare: Float = 0.6f
+
+    /** One step of a lineup member's tilt, in degrees (two steps either way at most). */
+    const val homeLineupTiltStep: Float = 1.5f
 
     /** One tile of Home's pinned grid. */
     val homePinTileHeight: Dp = 108.dp

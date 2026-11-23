@@ -101,6 +101,9 @@ val LocalMascotHost = compositionLocalOf<MascotHost> { NoMascotHost }
  */
 internal val LocalMascotWake = compositionLocalOf { 0 }
 
+/** Hears the pointer entering and leaving a live mascot's body (its hit area, not its whole tile). */
+internal val LocalMascotHover = compositionLocalOf<((Boolean) -> Unit)?> { null }
+
 /**
  * The product rule for whether an agent's tile moves: it is live while the agent is at work
  * (thinking or speaking, as the shell's presence says) and a still otherwise. One rule for every
@@ -233,6 +236,7 @@ private fun rememberMascotGestureEffects(entry: MascotEntry, onClick: (() -> Uni
     effects.onClick = onClick
     effects.haptics = LocalHaptics.current
     effects.reducedMotion = motion.reduced
+    effects.onHover = LocalMascotHover.current
     return effects
 }
 

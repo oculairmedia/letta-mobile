@@ -12,10 +12,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.min
 import com.letta.mobile.data.home.HomeAgentRef
 import com.letta.mobile.data.home.greeting.GreetingMood
 import com.letta.mobile.data.presence.AgentActivityKind
@@ -23,33 +25,66 @@ import com.letta.mobile.data.presence.AgentPresence
 import com.letta.mobile.ui.mascot.greetingMood
 import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
-import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** Home's greeting geometry at every viewport: the line and mark on top, three mascots centred under them, nothing overlapping. */
+/**
+ * Home's greeting at every viewport: two lines over a tight, organic lineup. Bodies sit within a
+ * step of each other, never overlap past a set share, never leave the stage, and stand the same way
+ * every time for the same agents.
+ */
 class HomeGreetingTest {
-    private val cast = listOf(HomeAgentRef("a-1", "One"), HomeAgentRef("a-2", "Two"), HomeAgentRef("a-3", "Three"))
+    private val pool = (1..GREETING_POOL).map { HomeAgentRef("agent-$it", "Agent $it") }
+    private val members = pool.map { LineupMember(it.id) }
+
+    private fun body(spot: LineupSpot): Pair<Dp, Dp> {
+        val width = spot.size * ShellDimens.homeLineupBodyShare
+        val left = spot.x + (spot.size - width) / 2
+        return left to left + width
+    }
 
     @Test
-    fun slotsAreCentredAndNeverOverlapAtEveryViewport() {
+    fun theLineupIsTightAtEveryViewport() {
         VIEWPORTS.forEach { width ->
             listOf(false, true).forEach { huddled ->
-                val slots = greetingSlots(cast.size, width, huddled)
-                assertEquals(0f, slots.sumOf { it.value.toDouble() }.toFloat(), 0.01f, "centred at $width")
-                slots.zipWithNext().forEach { (a, b) -> assertTrue(b - a >= ShellDimens.homeGreetingMascot, "overlap at $width") }
-                val half = ShellDimens.homeGreetingMascot / 2
-                assertTrue(slots.first() - half >= -width / 2 && slots.last() + half <= width / 2, "inside the stage at $width")
+                val spots = greetingLineup(members, width, huddled)
+                spots.map(::body).zipWithNext().forEach { (a, b) ->
+                    val gap = b.first - a.second
+                    assertTrue(gap <= ShellDimens.homeLineupNudge, "gap $gap at $width")
+                    val smaller = min(a.second - a.first, b.second - b.first)
+                    assertTrue(-gap <= smaller * MAX_OVERLAP_SHARE, "overlap ${-gap} at $width")
+                }
+                spots.map(::body).forEach { (left, right) -> assertTrue(left >= 0.dp && right <= width, "clipped at $width") }
             }
         }
     }
 
     @Test
-    fun anUnsettledLinkDrawsTheRowIn() {
-        val open = greetingSlots(cast.size, 1200.dp, huddled = false)
-        val huddled = greetingSlots(cast.size, 1200.dp, huddled = true)
-        assertTrue(huddled.last() < open.last())
+    fun aWiderStageFitsMoreOfTheCrew() {
+        val counts = VIEWPORTS.map { greetingLineup(members, it).size }
+        assertTrue(counts.first() in PHONE_CAST, "phone cast ${counts.first()}")
+        assertEquals(counts.sorted(), counts)
+        assertTrue(counts.last() > counts.first())
+    }
+
+    @Test
+    fun theCrewStandsTheSameWayEveryVisitAndVaries() {
+        val once = greetingLineup(members, VIEWPORTS.last())
+        assertEquals(once, greetingLineup(members, VIEWPORTS.last()))
+        assertTrue(once.map { it.size }.distinct().size > 1, "sizes vary")
+        assertTrue(once.map { it.lift }.distinct().size > 1, "heights vary")
+        assertTrue(once.map { it.tilt }.distinct().size > 1, "tilts vary")
+        once.forEach { assertTrue(it.lift in -ShellDimens.homeLineupLift..ShellDimens.homeLineupLift) }
+    }
+
+    @Test
+    fun aBusyAgentStandsBiggerLowerAndInFront() {
+        members.forEach { member ->
+            val idle = greetingLineup(listOf(member), VIEWPORTS.last()).single()
+            val busy = greetingLineup(listOf(member.copy(busy = true)), VIEWPORTS.last()).single()
+            assertTrue(busy.size >= idle.size && busy.lift >= idle.lift && busy.front && !idle.front)
+        }
     }
 
     @Test
@@ -58,7 +93,9 @@ class HomeGreetingTest {
         setContent {
             MaterialTheme {
                 CompositionLocalProvider(LocalReducedMotion provides true) {
-                    Box(Modifier.requiredWidth(width)) { HomeGreeting(cast, HomeGreetingOptions(hour = EVENING), hydrating = false) }
+                    Box(Modifier.requiredWidth(width)) {
+                        HomeGreeting(GreetingCast(pool), HomeGreetingOptions(hour = EVENING), hydrating = false)
+                    }
                 }
             }
         }
@@ -66,17 +103,23 @@ class HomeGreetingTest {
             width = viewport
             waitForIdle()
             val line = onNodeWithTag(HomeGreetingTags.LINE).getUnclippedBoundsInRoot()
-            val mark = onNodeWithTag(HomeGreetingTags.MARK).getUnclippedBoundsInRoot()
+            val status = onNodeWithTag(HomeGreetingTags.STATUS).getUnclippedBoundsInRoot()
             val stage = onNodeWithTag(HomeGreetingTags.STAGE).getUnclippedBoundsInRoot()
-            assertTrue(mark.right <= line.left, "mark before the line at $viewport")
-            assertTrue(stage.top >= line.bottom && stage.top >= mark.bottom, "stage under the line at $viewport")
-            val mascots = cast.map { onNodeWithTag(HomeGreetingTags.mascot(it.id)).getUnclippedBoundsInRoot() }
-            mascots.zipWithNext().forEach { (a, b) -> assertTrue(a.right <= b.left, "mascots overlap at $viewport") }
-            assertEquals(viewport.value, (stage.right - stage.left).value, 0.5f, "stage spans the viewport at $viewport")
-            mascots.forEach { assertTrue(it.left >= stage.left && it.right <= stage.right, "mascot off the stage at $viewport") }
-            val rowCentre = (mascots.first().left + mascots.last().right) / 2
-            val stageCentre = (stage.left + stage.right) / 2
-            assertTrue(abs((rowCentre - stageCentre).value) <= 1f, "row centred at $viewport")
+            assertTrue(status.top >= line.bottom && stage.top >= status.bottom, "two lines over the stage at $viewport")
+            assertEquals(GreetingStageHeight.value, (stage.bottom - stage.top).value, 0.5f, "stage height at $viewport")
+            // The placeholder mark is not drawn: it would read as broken.
+            assertEquals(0, onAllNodesWithTag(HomeGreetingTags.MARK).fetchSemanticsNodes().size)
+            val expected = greetingLineup(members, viewport).size
+            val tiles = pool.take(expected).map { onNodeWithTag(HomeGreetingTags.mascot(it.id)).getUnclippedBoundsInRoot() }
+            tiles.forEach { tile ->
+                val inset = (tile.right - tile.left) * (1f - ShellDimens.homeLineupBodyShare) / 2
+                val inside = tile.left + inset >= stage.left - TOLERANCE && tile.right - inset <= stage.right + TOLERANCE
+                assertTrue(inside, "clipped at $viewport")
+            }
+            // Whoever does not fit is not drawn at all, rather than squeezed or cut off.
+            if (expected < pool.size) {
+                assertEquals(0, onAllNodesWithTag(HomeGreetingTags.mascot(pool[expected].id)).fetchSemanticsNodes().size)
+            }
         }
     }
 
@@ -92,6 +135,11 @@ class HomeGreetingTest {
 
     private companion object {
         val VIEWPORTS: List<Dp> = listOf(360.dp, 700.dp, 760.dp, 1200.dp)
+        const val GREETING_POOL = 12
         const val EVENING = 19
+        const val MAX_OVERLAP_SHARE = 0.15f
+        val PHONE_CAST = 4..7
+        /** A tilted tile's bounds grow by about this much; the body inside it does not. */
+        val TOLERANCE = 2.dp
     }
 }

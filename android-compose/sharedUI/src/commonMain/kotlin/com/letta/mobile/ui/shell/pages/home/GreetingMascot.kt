@@ -1,9 +1,6 @@
 package com.letta.mobile.ui.shell.pages.home
 
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
@@ -33,11 +30,12 @@ import com.letta.mobile.data.home.greeting.GreetingTarget
 import com.letta.mobile.data.home.greeting.intentFor
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.mascot.LocalMascotHost
+import com.letta.mobile.ui.mascot.LocalMascotHover
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.mascot.LocalMascotWake
 import com.letta.mobile.ui.mascot.MascotLive
 import com.letta.mobile.ui.mascot.toGazeRect
-import com.letta.mobile.ui.shell.tokens.ShellDimens
+import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.tokens.LettaSurfaceSizes
 import kotlinx.coroutines.awaitCancellation
@@ -49,11 +47,13 @@ import kotlin.time.Duration.Companion.milliseconds
 /**
  * One agent on the greeting's stage: its live mascot when the host can draw one (a still otherwise,
  * and always under reduced motion), reporting hover and taps to the [scene] and playing the intent
- * the reducer gives it through the agent's own director. The agent's sustained state stays its
- * presence; this only adds looks, a perk, a lean, a hop and a wave.
+ * the reducer gives it through the agent's own director, at its lineup [size]. The agent's sustained
+ * state stays its presence; this only adds looks, a perk, a lean, a hop, a happy face and a wave.
+ * Hover is read on the body (the mascot's own hit area), never the whole tile: tiles overlap in the
+ * lineup, and a neighbour's tile must not take the pointer.
  */
 @Composable
-internal fun GreetingMascot(agent: HomeAgentRef, scene: GreetingScene, modifier: Modifier = Modifier) {
+internal fun GreetingMascot(agent: HomeAgentRef, scene: GreetingScene, size: Dp, modifier: Modifier = Modifier) {
     val self = GreetingTarget.Actor(agent.id)
     val intent by remember(scene, agent.id) { derivedStateOf { scene.state.intentFor(agent.id) } }
     val identity = LocalMascotRegistry.current.identities[agent.id]
@@ -68,12 +68,12 @@ internal fun GreetingMascot(agent: HomeAgentRef, scene: GreetingScene, modifier:
         }
         DriveDirector(drive, intent) { wake.intValue++ }
     }
-    val hover = remember { MutableInteractionSource() }
-    val hovered by hover.collectIsHoveredAsState()
-    LaunchedEffect(scene, hovered) {
-        when {
-            hovered -> scene.send(GreetingInput.PointerOver(self))
-            scene.state.pointer == self -> scene.send(GreetingInput.PointerOver(null))
+    val onHover: (Boolean) -> Unit = remember(scene, self) {
+        { hovered ->
+            when {
+                hovered -> scene.send(GreetingInput.PointerOver(self))
+                scene.state.pointer == self -> scene.send(GreetingInput.PointerOver(null))
+            }
         }
     }
     val nudge by animateDpAsState(nudgeOf(intent, scene, self), label = "greeting-nudge")
@@ -81,15 +81,14 @@ internal fun GreetingMascot(agent: HomeAgentRef, scene: GreetingScene, modifier:
     Box(
         modifier
             .offset(x = nudge)
-            .hoverable(hover)
             .onGloballyPositioned { scene.place(self, it.boundsInWindow()) }
             .testTag(HomeGreetingTags.mascot(agent.id)),
     ) {
-        CompositionLocalProvider(LocalMascotWake provides wake.intValue) {
+        CompositionLocalProvider(LocalMascotWake provides wake.intValue, LocalMascotHover provides onHover) {
             if (live && identity != null) {
-                MascotLive(agent.id, identity, ShellDimens.homeGreetingMascot, onClick = onTap)
+                MascotLive(agent.id, identity, size, onClick = onTap)
             } else {
-                AgentAvatar(agent.id, agent.name, ShellDimens.homeGreetingMascot, live = false, onClick = onTap)
+                AgentAvatar(agent.id, agent.name, size, live = false, onClick = onTap)
             }
         }
     }
@@ -114,9 +113,9 @@ private fun sideOf(scene: GreetingScene, self: GreetingTarget, toward: GreetingT
 private class GreetingDrive(val director: MascotDirector, val scene: GreetingScene, val self: GreetingTarget, val minReachPx: Float) {
     /** [target] in this mascot's gaze units; the user is straight ahead. */
     fun gazeAt(target: GreetingTarget): GazePoint? {
-        if (target == GreetingTarget.User) return GazePoint(0f, 0f)
         val me = scene.rects[self] ?: return null
-        val them = scene.rects[target] ?: return null
+        // The user is straight ahead; so is the mark while it is not on stage.
+        val them = scene.rects[target] ?: return GazePoint(0f, 0f)
         return GazeMath.pointerPxToGaze(GazePoint(them.center.x, them.center.y), me.toGazeRect(), minReachPx)
     }
 }
@@ -155,6 +154,14 @@ private fun DriveDirector(drive: GreetingDrive, intent: GreetingIntent, onWake: 
         director.setMotion(if (lean == null) 0f else sideOf(drive.scene, drive.self, lean) * LEAN_MOTION, 0f)
         if (lean != null) onWake()
     }
+    val smiling = remember(drive) { mutableIntStateOf(0) }
+    LaunchedEffect(drive, intent.happy) {
+        val now = if (intent.happy) 1 else 0
+        if (now == smiling.intValue) return@LaunchedEffect
+        smiling.intValue = now
+        director.onEvent(MascotEvent.Petting(intent.happy))
+        onWake()
+    }
     LaunchedEffect(drive, intent.hop) {
         if (intent.hop == null) return@LaunchedEffect
         try {
@@ -163,7 +170,12 @@ private fun DriveDirector(drive: GreetingDrive, intent: GreetingIntent, onWake: 
             director.onEvent(MascotEvent.Landed(HOP_IMPACT))
         }
     }
-    DisposableEffect(drive) { onDispose { director.setMotion(0f, 0f) } }
+    DisposableEffect(drive) {
+        onDispose {
+            director.setMotion(0f, 0f)
+            if (smiling.intValue == 1) director.onEvent(MascotEvent.Petting(false))
+        }
+    }
 }
 
 /**
@@ -174,6 +186,9 @@ private fun trickFor(gesture: GreetingGesture): Int = when (gesture) {
     GreetingGesture.WAVE -> PEEKABOO_TRICK
     GreetingGesture.CHEER -> TWIRL_TRICK
 }
+
+/** How far a cheering mascot hops toward its neighbour, and a concerned one leans (half of it). */
+private val GreetingHop: Dp = LettaDimens.Space.md
 
 private const val PEEKABOO_TRICK = 2
 private const val TWIRL_TRICK = 1

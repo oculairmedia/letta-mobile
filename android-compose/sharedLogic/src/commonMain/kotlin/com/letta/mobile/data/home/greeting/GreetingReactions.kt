@@ -99,7 +99,7 @@ private fun invitation(kind: GreetingCueKind): Invitation = when (kind) {
     GreetingCueKind.NEIGHBOUR_TROUBLE -> Invitation(CONCERNED, CONCERN_DWELL)
     GreetingCueKind.NEIGHBOUR_BUSY -> Invitation(CURIOUS, CURIOUS_DWELL)
     GreetingCueKind.POINTED, GreetingCueKind.TAPPED, GreetingCueKind.NEIGHBOUR_CHEERED,
-    GreetingCueKind.MARK_CHANGED, GreetingCueKind.USER_TYPING,
+    GreetingCueKind.MARK_CHANGED, GreetingCueKind.USER_TYPING, GreetingCueKind.IDLE_GLANCE,
     -> Invitation(NOTICING, NOTICE_DWELL)
 }
 

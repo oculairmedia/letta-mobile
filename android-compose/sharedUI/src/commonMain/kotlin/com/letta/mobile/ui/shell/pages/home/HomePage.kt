@@ -36,7 +36,7 @@ import com.letta.mobile.data.home.HomePageActions
 import com.letta.mobile.data.home.HomePageState
 import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.data.home.HomeViews
-import com.letta.mobile.data.home.greeting.GREETING_CAST_SIZE
+import com.letta.mobile.data.home.greeting.GREETING_CAST_LIMIT
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.view.RuntimeViewId
@@ -192,7 +192,11 @@ internal class HomePageScope(
 private fun LazyListScope.homeGreetingAndSections(page: HomePageScope) {
     page.options.greeting?.let { greeting ->
         item(key = "greeting") {
-            HomeGreeting(page.state.avatarRowAgents().take(GREETING_CAST_SIZE), greeting, hydrating = page.state.stats.loading)
+            val cast = GreetingCast(
+                agents = page.state.avatarRowAgents().take(GREETING_CAST_LIMIT),
+                updatesToday = page.state.fleet.agents.associate { it.agentId to (it.activityByDay.lastOrNull() ?: 0) },
+            )
+            HomeGreeting(cast, greeting, hydrating = page.state.stats.loading)
         }
     }
     homeSections(page)

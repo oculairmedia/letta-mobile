@@ -84,6 +84,12 @@ sealed interface GreetingInput {
 
     /** Time passed. The only clock the reducer has. */
     data class Tick(val seconds: Float) : GreetingInput
+
+    /**
+     * Nothing has happened for a while. One idle mascot, picked by the reducer's chance, turns to a
+     * neighbour, so a resting lineup still lives without the host ticking it every frame.
+     */
+    data object Quiet : GreetingInput
 }
 
 /** What a mascot is doing in the greeting. Each is one reaction to one stimulus, never a sequence. */
@@ -129,6 +135,9 @@ enum class GreetingCueKind {
     NEIGHBOUR_BUSY,
     MARK_CHANGED,
     USER_TYPING,
+
+    /** A quiet moment: one mascot glances at a neighbour. */
+    IDLE_GLANCE,
 }
 
 /**

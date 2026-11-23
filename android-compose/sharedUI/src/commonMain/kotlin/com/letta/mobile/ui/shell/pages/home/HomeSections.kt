@@ -80,7 +80,8 @@ internal val homeSectionViews: Map<RuntimeViewId, HomeSectionView> = mapOf(
     HomeViews.COMPOSER to section { page -> if (page.wide) item { HomePromptBar(page) } },
     HomeViews.NOW to section { page -> homeNowStrip(page) },
     HomeViews.RECENTS to section { page -> homeRecents(page) },
-    HomeViews.AGENTS to section { page -> homeAgentAvatarRow(page) },
+    // The greeting's lineup already shows the agents; the avatar row would only repeat them.
+    HomeViews.AGENTS to section { page -> if (page.options.greeting == null) homeAgentAvatarRow(page) },
     HomeViews.STATS to section { page -> item(key = "stats-strip") { HomeStatsStrip(page) } },
     HomeViews.PINNED to section { page -> if (page.editingPins) homePinnedSection(page) else homePinnedShortcutRow(page) },
     HomeViews.FLEET to section { page -> if (page.wide) homeFleetSection(page) },

@@ -9556,6 +9556,11 @@ public final class com/letta/mobile/ui/shell/pages/conversations/ConversationsPa
 
 public abstract interface class com/letta/mobile/ui/shell/pages/home/BrandMarkHost {
 	public abstract fun Mark (Lcom/letta/mobile/data/home/greeting/GreetingMarkIntent;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;I)V
+	public fun getAvailable ()Z
+}
+
+public final class com/letta/mobile/ui/shell/pages/home/BrandMarkHost$DefaultImpls {
+	public static fun getAvailable (Lcom/letta/mobile/ui/shell/pages/home/BrandMarkHost;)Z
 }
 
 public final class com/letta/mobile/ui/shell/pages/home/BrandMarkHostKt {
@@ -9647,6 +9652,7 @@ public final class com/letta/mobile/ui/shell/pages/home/HomeGreetingTags {
 	public static final field LINE Ljava/lang/String;
 	public static final field MARK Ljava/lang/String;
 	public static final field STAGE Ljava/lang/String;
+	public static final field STATUS Ljava/lang/String;
 	public final fun mascot (Ljava/lang/String;)Ljava/lang/String;
 }
 
@@ -9772,6 +9778,7 @@ public final class com/letta/mobile/ui/shell/pages/home/PlaceholderBrandMark : c
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/home/PlaceholderBrandMark;
 	public fun Mark (Lcom/letta/mobile/data/home/greeting/GreetingMarkIntent;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;I)V
+	public fun getAvailable ()Z
 }
 
 public final class com/letta/mobile/ui/shell/pages/memfs/ComposableSingletons$MemfsPageEditorKt {

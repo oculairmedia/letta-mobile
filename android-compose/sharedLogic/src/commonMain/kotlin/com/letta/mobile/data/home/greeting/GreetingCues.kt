@@ -1,5 +1,7 @@
 package com.letta.mobile.data.home.greeting
 
+import kotlin.random.Random
+
 /** The cues a moment raises, read against the state before the moment is recorded. */
 internal fun cuesFor(state: GreetingState, input: GreetingInput): List<GreetingCue> = when (input) {
     is GreetingInput.Cast -> moodCues(state, input.members)
@@ -17,6 +19,23 @@ internal fun cuesFor(state: GreetingState, input: GreetingInput): List<GreetingC
 
 /** A busy mascot's moment for its neighbours: the strength it starts at when it only catches an eye. */
 internal fun busyAmbientCue(id: String): GreetingCue = cue(GreetingCueKind.NEIGHBOUR_BUSY, GreetingTarget.Actor(id), BUSY_AMBIENT)
+
+/**
+ * A quiet moment's glance: one idle mascot (not busy, not already reacting) turns to a neighbour beside
+ * it, both picked by [random]. Null when no one is free or the mascot is alone on the stage.
+ */
+internal fun idleGlance(state: GreetingState, random: Random): GreetingCue? {
+    val actors = state.actors
+    val free = actors.indices.filter { actors[it].behavior == GreetingBehavior.SETTLED && !actors[it].mood.busy }
+    if (actors.size < 2 || free.isEmpty()) return null
+    val index = free[random.nextInt(free.size)]
+    val neighbour = when (index) {
+        0 -> 1
+        actors.lastIndex -> index - 1
+        else -> if (random.nextBoolean()) index - 1 else index + 1
+    }
+    return GreetingCue(GreetingCueKind.IDLE_GLANCE, GreetingTarget.Actor(actors[neighbour].id), IDLE_GLANCE, only = actors[index].id)
+}
 
 private fun cue(kind: GreetingCueKind, source: GreetingTarget, salience: Float) = GreetingCue(kind, source, salience)
 
@@ -56,3 +75,4 @@ private const val POINTED = 0.6f
 private const val TAPPED = 0.75f
 private const val TYPING = 0.5f
 private const val MARK = 0.7f
+private const val IDLE_GLANCE = 0.45f

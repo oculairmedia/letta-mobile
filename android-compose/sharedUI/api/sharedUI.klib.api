@@ -1021,6 +1021,9 @@ abstract interface com.letta.mobile.ui.secrets/SecureSurface { // com.letta.mobi
 }
 
 abstract interface com.letta.mobile.ui.shell.pages.home/BrandMarkHost { // com.letta.mobile.ui.shell.pages.home/BrandMarkHost|null[0]
+    open val available // com.letta.mobile.ui.shell.pages.home/BrandMarkHost.available|{}available[0]
+        open fun <get-available>(): kotlin/Boolean // com.letta.mobile.ui.shell.pages.home/BrandMarkHost.available.<get-available>|<get-available>(){}[0]
+
     abstract fun Mark(com.letta.mobile.data.home.greeting/GreetingMarkIntent, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.shell.pages.home/BrandMarkHost.Mark|Mark(com.letta.mobile.data.home.greeting.GreetingMarkIntent;androidx.compose.ui.Modifier;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 }
 
@@ -11592,6 +11595,8 @@ final object com.letta.mobile.ui.shell.pages.home/HomeGreetingTags { // com.lett
         final fun <get-MARK>(): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.MARK.<get-MARK>|<get-MARK>(){}[0]
     final const val STAGE // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.STAGE|{}STAGE[0]
         final fun <get-STAGE>(): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.STAGE.<get-STAGE>|<get-STAGE>(){}[0]
+    final const val STATUS // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.STATUS|{}STATUS[0]
+        final fun <get-STATUS>(): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.STATUS.<get-STATUS>|<get-STATUS>(){}[0]
 
     final fun mascot(kotlin/String): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.mascot|mascot(kotlin.String){}[0]
 }
@@ -11652,6 +11657,9 @@ final object com.letta.mobile.ui.shell.pages.home/HomePageTags { // com.letta.mo
 }
 
 final object com.letta.mobile.ui.shell.pages.home/PlaceholderBrandMark : com.letta.mobile.ui.shell.pages.home/BrandMarkHost { // com.letta.mobile.ui.shell.pages.home/PlaceholderBrandMark|null[0]
+    final val available // com.letta.mobile.ui.shell.pages.home/PlaceholderBrandMark.available|{}available[0]
+        final fun <get-available>(): kotlin/Boolean // com.letta.mobile.ui.shell.pages.home/PlaceholderBrandMark.available.<get-available>|<get-available>(){}[0]
+
     final fun Mark(com.letta.mobile.data.home.greeting/GreetingMarkIntent, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.shell.pages.home/PlaceholderBrandMark.Mark|Mark(com.letta.mobile.data.home.greeting.GreetingMarkIntent;androidx.compose.ui.Modifier;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 }
 

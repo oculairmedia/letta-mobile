@@ -19,19 +19,25 @@ import com.letta.mobile.ui.theme.tokens.LettaStatusTone
  * What draws the Baken mark beside Home's greeting. The mark shows app and connection states only
  * ([GreetingMarkIntent]); a host with the animated mark (the BakenMark artboard and its BrandMark
  * state machine) provides its own through [LocalBrandMarkHost], every other host draws the static
- * [PlaceholderBrandMark].
+ * [PlaceholderBrandMark], which draws nothing: a stand-in that reads as a glitch is worse than none.
  */
 interface BrandMarkHost {
+    /** Whether this host draws the real mark; while false the greeting leaves the mark out entirely. */
+    val available: Boolean get() = true
+
     /** Draws the mark filling [modifier]'s bounds, playing [intent]'s state and one-shots. */
     @Composable
     fun Mark(intent: GreetingMarkIntent, modifier: Modifier)
 }
 
 /**
- * The still mark until the animated one ships: an anchor with a pebble nested at its seam, in the
- * accent colour, dimmed while connecting or loading and amber while degraded.
+ * The stand-in until the animated mark ships. It reports itself unavailable, so the greeting leaves
+ * the mark out; should a surface draw it anyway, it is an anchor with a pebble nested at its seam, in
+ * the accent colour, dimmed while connecting or loading and amber while degraded.
  */
 object PlaceholderBrandMark : BrandMarkHost {
+    override val available: Boolean = false
+
     @Composable
     override fun Mark(intent: GreetingMarkIntent, modifier: Modifier) {
         val ink = markInk(intent.state)

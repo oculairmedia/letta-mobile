@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.shell.pages.home
 
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
@@ -7,9 +8,9 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -24,19 +25,24 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.zIndex
 import com.letta.mobile.data.home.HomeAgentRef
 import com.letta.mobile.data.home.greeting.GreetingCastMember
 import com.letta.mobile.data.home.greeting.GreetingInput
+import com.letta.mobile.data.home.greeting.GreetingRunTally
+import com.letta.mobile.data.home.greeting.GreetingStatusAgent
 import com.letta.mobile.data.home.greeting.GreetingTarget
 import com.letta.mobile.data.home.greeting.greetingLine
+import com.letta.mobile.data.home.greeting.greetingStatusLine
 import com.letta.mobile.data.home.greeting.markIntent
-import com.letta.mobile.data.home.greeting.GreetingRunTally
 import com.letta.mobile.ui.components.foundation.lettaClickable
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.mascot.MascotIdentityRegistry
@@ -52,41 +58,38 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Home's hello: one short line with the Baken mark before it, and a few of the user's agents
- * standing under it, reacting to each other, the user and the app. Nothing here is a scripted
- * sequence: agent presence, pointer, taps, typing and the connection go into the greeting's reducer
- * ([com.letta.mobile.data.home.greeting.GreetingPlay]) and each actor plays the intent it gives back.
+ * Home's hello: two lines ("Good evening", then what the agents are up to) over a tight, organic
+ * lineup of the user's agents, standing nearly shoulder to shoulder at their own sizes, heights and
+ * tilts ([greetingLineup]). Nothing is scripted: presence, pointer, taps, typing and the connection go
+ * into the greeting's reducer ([com.letta.mobile.data.home.greeting.GreetingPlay]) and each actor plays
+ * the intent it gives back. The Baken mark joins the row only once the host can draw the real one.
  */
 @Composable
-internal fun HomeGreeting(cast: List<HomeAgentRef>, options: HomeGreetingOptions, hydrating: Boolean, modifier: Modifier = Modifier) {
+internal fun HomeGreeting(cast: GreetingCast, options: HomeGreetingOptions, hydrating: Boolean, modifier: Modifier = Modifier) {
     val scene = rememberGreetingScene()
-    GreetingInputs(scene, cast, options, hydrating)
+    GreetingInputs(scene, options, hydrating)
     GreetingClock(scene)
     Column(
         modifier = modifier.fillMaxWidth().testTag(HomeGreetingTags.GREETING),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        GreetingLine(scene, options)
-        GreetingStage(scene, cast)
+        GreetingText(cast, options)
+        GreetingStage(scene, cast.agents)
     }
 }
 
-/** Feeds the reducer what the app knows: the cast and its moods, run endings, typing, the link, loading, motion. */
+/** Feeds the reducer the app's state that is not per agent: the link, loading, motion, typing, the arrival. */
 @Composable
-private fun GreetingInputs(scene: GreetingScene, cast: List<HomeAgentRef>, options: HomeGreetingOptions, hydrating: Boolean) {
+private fun GreetingInputs(scene: GreetingScene, options: HomeGreetingOptions, hydrating: Boolean) {
     val registry = LocalMascotRegistry.current
     val reduced = LocalReducedMotion.current
     LaunchedEffect(scene, reduced) { scene.send(GreetingInput.ReducedMotion(reduced)) }
-    val members = cast.map { GreetingCastMember(it.id, registry.greetingMood(it.id)) }
-    LaunchedEffect(scene, members) { scene.send(GreetingInput.Cast(members)) }
     LaunchedEffect(scene, options.connection) { scene.send(GreetingInput.Connection(options.connection)) }
     LaunchedEffect(scene, hydrating) { scene.send(GreetingInput.Hydrating(hydrating)) }
     LaunchedEffect(scene) {
         scene.send(GreetingInput.Arrived(returning = GreetingLaunch.booted))
         GreetingLaunch.booted = true
     }
-    cast.forEach { agent -> key(agent.id) { RunEndings(scene, registry, agent.id) } }
     TypingWatch(scene, registry)
 }
 
@@ -127,25 +130,86 @@ private fun TypingWatch(scene: GreetingScene, registry: MascotIdentityRegistry) 
     }
 }
 
-/** The mark, then the line ("Good evening"). The mark is an actor too: the cast looks at it and it answers hover and taps. */
+/** "Good evening", and under it what the agents are up to. */
 @Composable
-private fun GreetingLine(scene: GreetingScene, options: HomeGreetingOptions) {
+private fun GreetingText(cast: GreetingCast, options: HomeGreetingOptions) {
+    val registry = LocalMascotRegistry.current
     val hour = options.hour ?: remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).hour }
+    val status = greetingStatusLine(
+        cast.agents.map { GreetingStatusAgent(it.name, registry.greetingMood(it.id), cast.updatesToday[it.id] ?: 0) },
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+        Text(greetingLine(hour), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.testTag(HomeGreetingTags.LINE))
+        Text(
+            status,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag(HomeGreetingTags.STATUS),
+        )
+    }
+}
+
+/**
+ * The lineup: as many agents as fit the stage's width, the mark among them once it can draw. Only the
+ * agents that fit are the reducer's cast, so its neighbours are the ones the user sees side by side.
+ */
+@Composable
+private fun GreetingStage(scene: GreetingScene, agents: List<HomeAgentRef>) {
+    if (agents.isEmpty()) return
+    val registry = LocalMascotRegistry.current
+    val markHost = LocalBrandMarkHost.current
+    val reduced = LocalReducedMotion.current
+    val huddled by remember(scene) { derivedStateOf { scene.state.connection.unsettled && !scene.state.reducedMotion } }
+    val members = lineupMembers(agents, registry, markHost.available)
+    BoxWithConstraints(Modifier.fillMaxWidth().height(GreetingStageHeight).testTag(HomeGreetingTags.STAGE)) {
+        val spots = greetingLineup(members, maxWidth, huddled)
+        val onStage = spots.filterNot { it.mark }.map { GreetingCastMember(it.id, registry.greetingMood(it.id)) }
+        LaunchedEffect(scene, onStage) { scene.send(GreetingInput.Cast(onStage)) }
+        val spec: AnimationSpec<Dp> = if (reduced) snap() else spring()
+        spots.forEach { spot ->
+            key(spot.id) {
+                val x by animateDpAsState(spot.x, spec, label = "lineup-x")
+                val place = Modifier
+                    .align(Alignment.BottomStart)
+                    .offset(x = x, y = spot.lift - ShellDimens.homeLineupLift)
+                    .zIndex(if (spot.front) 1f else 0f)
+                    .rotate(spot.tilt)
+                if (spot.mark) {
+                    GreetingMark(scene, spot.size, place)
+                } else {
+                    val agent = agents.first { it.id == spot.id }
+                    RunEndings(scene, registry, agent.id)
+                    GreetingMascot(agent, scene, spot.size, place)
+                }
+            }
+        }
+    }
+}
+
+private fun lineupMembers(agents: List<HomeAgentRef>, registry: MascotIdentityRegistry, withMark: Boolean): List<LineupMember> {
+    val crew = agents.map { LineupMember(it.id, busy = registry.greetingMood(it.id).busy) }
+    if (!withMark) return crew
+    // The mark stands among the crew, a couple of places in, never at the end where it would look apart.
+    return crew.toMutableList().apply { add(minOf(MARK_PLACE, size), LineupMember(MARK_ID, mark = true)) }
+}
+
+/** The Baken mark as the lineup's smallest member: an actor the cast looks at, answering hover and taps. */
+@Composable
+private fun GreetingMark(scene: GreetingScene, size: Dp, modifier: Modifier) {
     val mark by remember(scene) { derivedStateOf { scene.state.markIntent } }
     val hover = remember { MutableInteractionSource() }
     val hovered by hover.collectIsHoveredAsState()
     LaunchedEffect(scene, hovered) {
-        if (hovered) {
-            scene.send(GreetingInput.PointerOver(GreetingTarget.Mark))
-        } else if (scene.state.pointer == GreetingTarget.Mark) {
-            scene.send(GreetingInput.PointerOver(null))
+        when {
+            hovered -> scene.send(GreetingInput.PointerOver(GreetingTarget.Mark))
+            scene.state.pointer == GreetingTarget.Mark -> scene.send(GreetingInput.PointerOver(null))
         }
     }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
         LocalBrandMarkHost.current.Mark(
             mark,
             Modifier
-                .size(ShellDimens.homeGreetingMark)
+                .size(size * ShellDimens.homeLineupBodyShare)
                 .hoverable(hover)
                 .lettaClickable(role = Role.Button, shape = MaterialTheme.shapes.small) {
                     scene.send(GreetingInput.Tapped(GreetingTarget.Mark))
@@ -154,27 +218,11 @@ private fun GreetingLine(scene: GreetingScene, options: HomeGreetingOptions) {
                 .onGloballyPositioned { scene.place(GreetingTarget.Mark, it.boundsInWindow()) }
                 .testTag(HomeGreetingTags.MARK),
         )
-        Text(greetingLine(hour), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.testTag(HomeGreetingTags.LINE))
     }
 }
 
-/** The ground the cast stands on, centred under the line; the row draws in while the link is unsettled. */
-@Composable
-private fun GreetingStage(scene: GreetingScene, cast: List<HomeAgentRef>) {
-    if (cast.isEmpty()) return
-    val reduced = LocalReducedMotion.current
-    val huddled by remember(scene) { derivedStateOf { scene.state.connection.unsettled && !scene.state.reducedMotion } }
-    BoxWithConstraints(Modifier.fillMaxWidth().height(ShellDimens.homeGreetingMascot).testTag(HomeGreetingTags.STAGE)) {
-        val slots = greetingSlots(cast.size, maxWidth, huddled)
-        cast.forEachIndexed { index, agent ->
-            key(agent.id) {
-                val x by animateDpAsState(slots[index], if (reduced) snap() else spring(), label = "greeting-slot")
-                GreetingMascot(agent, scene, Modifier.align(Alignment.Center).offset(x = x))
-            }
-        }
-    }
-}
-
+private const val MARK_ID = "baken-mark"
+private const val MARK_PLACE = 2
 private const val MARK_LABEL = "Baken"
 private val TYPING_POLL = 250.milliseconds
 private val TYPING_QUIET = 1_500.milliseconds

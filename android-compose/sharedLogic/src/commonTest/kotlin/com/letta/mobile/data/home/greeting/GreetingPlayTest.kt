@@ -8,6 +8,7 @@ import com.letta.mobile.data.home.greeting.GreetingInput.ReducedMotion
 import com.letta.mobile.data.home.greeting.GreetingInput.RunFinished
 import com.letta.mobile.data.home.greeting.GreetingInput.Tapped
 import com.letta.mobile.data.home.greeting.GreetingInput.Tick
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.random.Random
 import kotlin.test.Test
@@ -185,6 +186,44 @@ class GreetingPlayTest {
         assertEquals("Good afternoon", greetingLine(13))
         assertEquals("Good evening", greetingLine(19))
         assertEquals("Still up?", greetingLine(2))
+    }
+
+    @Test
+    fun aQuietMomentTurnsOneIdleMascotToItsNeighbour() {
+        val run = Run().send(cast(GreetingMood.IDLE, GreetingMood.IDLE, GreetingMood.IDLE), GreetingInput.Quiet).advance(FRAME)
+        val turned = run.state.actors.filter { it.behavior == GreetingBehavior.NOTICING }
+        assertEquals(1, turned.size)
+        val index = run.state.actors.indexOf(turned.single())
+        val target = turned.single().target as GreetingTarget.Actor
+        assertEquals(1, abs(run.state.actors.indexOfFirst { it.id == target.id } - index))
+    }
+
+    @Test
+    fun aQuietMomentLeavesBusyMascotsAlone() {
+        val run = Run().send(cast(GreetingMood.WORKING, GreetingMood.THINKING), GreetingInput.Quiet)
+        assertTrue(run.state.pending.isEmpty())
+    }
+
+    @Test
+    fun aWaveAndACheerLookHappy() {
+        val run = Run().send(cast(GreetingMood.IDLE, GreetingMood.IDLE), Arrived()).advance(FRAME)
+        assertTrue(run.state.intentFor("a0").happy)
+        val settled = Run().send(cast(GreetingMood.IDLE, GreetingMood.IDLE)).advance(FRAME)
+        assertFalse(settled.state.intentFor("a0").happy)
+    }
+
+    @Test
+    fun theStatusLineSaysWhatTheAgentsAreDoing() {
+        fun line(vararg agents: GreetingStatusAgent) = greetingStatusLine(agents.toList())
+        fun ada(mood: GreetingMood, today: Int = 0) = GreetingStatusAgent("Ada", mood, today)
+        fun pip(mood: GreetingMood, today: Int = 0) = GreetingStatusAgent("Pip", mood, today)
+        assertEquals("Pip needs you", line(ada(GreetingMood.WORKING), pip(GreetingMood.WAITING)))
+        assertEquals("Ada hit a snag", line(ada(GreetingMood.ERROR)))
+        assertEquals("Ada is on it", line(ada(GreetingMood.THINKING), pip(GreetingMood.IDLE)))
+        assertEquals("Ada and Pip are busy", line(ada(GreetingMood.WORKING), pip(GreetingMood.THINKING)))
+        assertEquals("Pip's been busy today", line(ada(GreetingMood.IDLE, 1), pip(GreetingMood.IDLE, 5)))
+        assertEquals("All quiet. Your agents are resting", line(ada(GreetingMood.IDLE, 1)))
+        assertEquals("Your agents will gather here", line())
     }
 
     private companion object {

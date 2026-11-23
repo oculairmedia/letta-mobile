@@ -2,7 +2,7 @@ package com.letta.mobile.data.home.greeting
 
 /**
  * What one mascot should do right now, in terms its rig already plays: where to [look], whether to
- * [perk] up (hover), which way to [lean] or [hop], and a one-shot [gesture] to play each time
+ * [perk] up (hover), which way to [lean] or [hop], whether to look [happy], and a one-shot [gesture] to play each time
  * [gestureSerial] goes up. Its sustained state (thinking, working, error) is never here: that stays
  * the agent's presence.
  */
@@ -11,6 +11,8 @@ data class GreetingIntent(
     val perk: Boolean = false,
     val lean: GreetingTarget? = null,
     val hop: GreetingTarget? = null,
+    /** The face goes happy (the rig's content glyph and its little sway) while this holds. */
+    val happy: Boolean = false,
     val gesture: GreetingGesture? = null,
     val gestureSerial: Int = 0,
 )
@@ -45,8 +47,8 @@ fun GreetingState.intentFor(id: String): GreetingIntent {
     val base = GreetingIntent(look = target ?: GreetingTarget.User.takeIf { perk }, perk = perk, gestureSerial = actor.gestureSerial)
     return when (actor.behavior) {
         GreetingBehavior.SETTLED, GreetingBehavior.NOTICING, GreetingBehavior.CURIOUS -> base
-        GreetingBehavior.GREETING -> base.copy(gesture = actor.gesture)
-        GreetingBehavior.CHEERING -> base.copy(hop = target, gesture = actor.gesture)
+        GreetingBehavior.GREETING -> base.copy(happy = true, gesture = actor.gesture)
+        GreetingBehavior.CHEERING -> base.copy(hop = target, happy = true, gesture = actor.gesture)
         GreetingBehavior.CONCERNED, GreetingBehavior.HUDDLED -> base.copy(lean = target)
     }
 }
