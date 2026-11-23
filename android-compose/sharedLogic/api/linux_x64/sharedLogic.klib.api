@@ -1529,6 +1529,7 @@ final enum class com.letta.mobile.data.home.greeting/GreetingConnection : kotlin
 }
 
 final enum class com.letta.mobile.data.home.greeting/GreetingCueKind : kotlin/Enum<com.letta.mobile.data.home.greeting/GreetingCueKind> { // com.letta.mobile.data.home.greeting/GreetingCueKind|null[0]
+    enum entry IDLE_GLANCE // com.letta.mobile.data.home.greeting/GreetingCueKind.IDLE_GLANCE|null[0]
     enum entry MARK_CHANGED // com.letta.mobile.data.home.greeting/GreetingCueKind.MARK_CHANGED|null[0]
     enum entry NEIGHBOUR_BUSY // com.letta.mobile.data.home.greeting/GreetingCueKind.NEIGHBOUR_BUSY|null[0]
     enum entry NEIGHBOUR_CHEERED // com.letta.mobile.data.home.greeting/GreetingCueKind.NEIGHBOUR_CHEERED|null[0]
@@ -12676,6 +12677,12 @@ sealed interface com.letta.mobile.data.home.greeting/GreetingInput { // com.lett
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.home.greeting/GreetingInput.Typing.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.home.greeting/GreetingInput.Typing.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.home.greeting/GreetingInput.Typing.toString|toString(){}[0]
+    }
+
+    final object Quiet : com.letta.mobile.data.home.greeting/GreetingInput { // com.letta.mobile.data.home.greeting/GreetingInput.Quiet|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.home.greeting/GreetingInput.Quiet.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.home.greeting/GreetingInput.Quiet.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.home.greeting/GreetingInput.Quiet.toString|toString(){}[0]
     }
 }
 
@@ -42910,12 +42917,14 @@ final class com.letta.mobile.data.home.greeting/GreetingCue { // com.letta.mobil
 }
 
 final class com.letta.mobile.data.home.greeting/GreetingIntent { // com.letta.mobile.data.home.greeting/GreetingIntent|null[0]
-    constructor <init>(com.letta.mobile.data.home.greeting/GreetingTarget? = ..., kotlin/Boolean = ..., com.letta.mobile.data.home.greeting/GreetingTarget? = ..., com.letta.mobile.data.home.greeting/GreetingTarget? = ..., com.letta.mobile.data.home.greeting/GreetingGesture? = ..., kotlin/Int = ...) // com.letta.mobile.data.home.greeting/GreetingIntent.<init>|<init>(com.letta.mobile.data.home.greeting.GreetingTarget?;kotlin.Boolean;com.letta.mobile.data.home.greeting.GreetingTarget?;com.letta.mobile.data.home.greeting.GreetingTarget?;com.letta.mobile.data.home.greeting.GreetingGesture?;kotlin.Int){}[0]
+    constructor <init>(com.letta.mobile.data.home.greeting/GreetingTarget? = ..., kotlin/Boolean = ..., com.letta.mobile.data.home.greeting/GreetingTarget? = ..., com.letta.mobile.data.home.greeting/GreetingTarget? = ..., kotlin/Boolean = ..., com.letta.mobile.data.home.greeting/GreetingGesture? = ..., kotlin/Int = ...) // com.letta.mobile.data.home.greeting/GreetingIntent.<init>|<init>(com.letta.mobile.data.home.greeting.GreetingTarget?;kotlin.Boolean;com.letta.mobile.data.home.greeting.GreetingTarget?;com.letta.mobile.data.home.greeting.GreetingTarget?;kotlin.Boolean;com.letta.mobile.data.home.greeting.GreetingGesture?;kotlin.Int){}[0]
 
     final val gesture // com.letta.mobile.data.home.greeting/GreetingIntent.gesture|{}gesture[0]
         final fun <get-gesture>(): com.letta.mobile.data.home.greeting/GreetingGesture? // com.letta.mobile.data.home.greeting/GreetingIntent.gesture.<get-gesture>|<get-gesture>(){}[0]
     final val gestureSerial // com.letta.mobile.data.home.greeting/GreetingIntent.gestureSerial|{}gestureSerial[0]
         final fun <get-gestureSerial>(): kotlin/Int // com.letta.mobile.data.home.greeting/GreetingIntent.gestureSerial.<get-gestureSerial>|<get-gestureSerial>(){}[0]
+    final val happy // com.letta.mobile.data.home.greeting/GreetingIntent.happy|{}happy[0]
+        final fun <get-happy>(): kotlin/Boolean // com.letta.mobile.data.home.greeting/GreetingIntent.happy.<get-happy>|<get-happy>(){}[0]
     final val hop // com.letta.mobile.data.home.greeting/GreetingIntent.hop|{}hop[0]
         final fun <get-hop>(): com.letta.mobile.data.home.greeting/GreetingTarget? // com.letta.mobile.data.home.greeting/GreetingIntent.hop.<get-hop>|<get-hop>(){}[0]
     final val lean // com.letta.mobile.data.home.greeting/GreetingIntent.lean|{}lean[0]
@@ -42929,9 +42938,10 @@ final class com.letta.mobile.data.home.greeting/GreetingIntent { // com.letta.mo
     final fun component2(): kotlin/Boolean // com.letta.mobile.data.home.greeting/GreetingIntent.component2|component2(){}[0]
     final fun component3(): com.letta.mobile.data.home.greeting/GreetingTarget? // com.letta.mobile.data.home.greeting/GreetingIntent.component3|component3(){}[0]
     final fun component4(): com.letta.mobile.data.home.greeting/GreetingTarget? // com.letta.mobile.data.home.greeting/GreetingIntent.component4|component4(){}[0]
-    final fun component5(): com.letta.mobile.data.home.greeting/GreetingGesture? // com.letta.mobile.data.home.greeting/GreetingIntent.component5|component5(){}[0]
-    final fun component6(): kotlin/Int // com.letta.mobile.data.home.greeting/GreetingIntent.component6|component6(){}[0]
-    final fun copy(com.letta.mobile.data.home.greeting/GreetingTarget? = ..., kotlin/Boolean = ..., com.letta.mobile.data.home.greeting/GreetingTarget? = ..., com.letta.mobile.data.home.greeting/GreetingTarget? = ..., com.letta.mobile.data.home.greeting/GreetingGesture? = ..., kotlin/Int = ...): com.letta.mobile.data.home.greeting/GreetingIntent // com.letta.mobile.data.home.greeting/GreetingIntent.copy|copy(com.letta.mobile.data.home.greeting.GreetingTarget?;kotlin.Boolean;com.letta.mobile.data.home.greeting.GreetingTarget?;com.letta.mobile.data.home.greeting.GreetingTarget?;com.letta.mobile.data.home.greeting.GreetingGesture?;kotlin.Int){}[0]
+    final fun component5(): kotlin/Boolean // com.letta.mobile.data.home.greeting/GreetingIntent.component5|component5(){}[0]
+    final fun component6(): com.letta.mobile.data.home.greeting/GreetingGesture? // com.letta.mobile.data.home.greeting/GreetingIntent.component6|component6(){}[0]
+    final fun component7(): kotlin/Int // com.letta.mobile.data.home.greeting/GreetingIntent.component7|component7(){}[0]
+    final fun copy(com.letta.mobile.data.home.greeting/GreetingTarget? = ..., kotlin/Boolean = ..., com.letta.mobile.data.home.greeting/GreetingTarget? = ..., com.letta.mobile.data.home.greeting/GreetingTarget? = ..., kotlin/Boolean = ..., com.letta.mobile.data.home.greeting/GreetingGesture? = ..., kotlin/Int = ...): com.letta.mobile.data.home.greeting/GreetingIntent // com.letta.mobile.data.home.greeting/GreetingIntent.copy|copy(com.letta.mobile.data.home.greeting.GreetingTarget?;kotlin.Boolean;com.letta.mobile.data.home.greeting.GreetingTarget?;com.letta.mobile.data.home.greeting.GreetingTarget?;kotlin.Boolean;com.letta.mobile.data.home.greeting.GreetingGesture?;kotlin.Int){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.home.greeting/GreetingIntent.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.home.greeting/GreetingIntent.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.home.greeting/GreetingIntent.toString|toString(){}[0]
@@ -43018,6 +43028,25 @@ final class com.letta.mobile.data.home.greeting/GreetingState { // com.letta.mob
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.home.greeting/GreetingState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.home.greeting/GreetingState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.home.greeting/GreetingState.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.home.greeting/GreetingStatusAgent { // com.letta.mobile.data.home.greeting/GreetingStatusAgent|null[0]
+    constructor <init>(kotlin/String, com.letta.mobile.data.home.greeting/GreetingMood, kotlin/Int = ...) // com.letta.mobile.data.home.greeting/GreetingStatusAgent.<init>|<init>(kotlin.String;com.letta.mobile.data.home.greeting.GreetingMood;kotlin.Int){}[0]
+
+    final val mood // com.letta.mobile.data.home.greeting/GreetingStatusAgent.mood|{}mood[0]
+        final fun <get-mood>(): com.letta.mobile.data.home.greeting/GreetingMood // com.letta.mobile.data.home.greeting/GreetingStatusAgent.mood.<get-mood>|<get-mood>(){}[0]
+    final val name // com.letta.mobile.data.home.greeting/GreetingStatusAgent.name|{}name[0]
+        final fun <get-name>(): kotlin/String // com.letta.mobile.data.home.greeting/GreetingStatusAgent.name.<get-name>|<get-name>(){}[0]
+    final val updatesToday // com.letta.mobile.data.home.greeting/GreetingStatusAgent.updatesToday|{}updatesToday[0]
+        final fun <get-updatesToday>(): kotlin/Int // com.letta.mobile.data.home.greeting/GreetingStatusAgent.updatesToday.<get-updatesToday>|<get-updatesToday>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.home.greeting/GreetingStatusAgent.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.home.greeting/GreetingMood // com.letta.mobile.data.home.greeting/GreetingStatusAgent.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // com.letta.mobile.data.home.greeting/GreetingStatusAgent.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., com.letta.mobile.data.home.greeting/GreetingMood = ..., kotlin/Int = ...): com.letta.mobile.data.home.greeting/GreetingStatusAgent // com.letta.mobile.data.home.greeting/GreetingStatusAgent.copy|copy(kotlin.String;com.letta.mobile.data.home.greeting.GreetingMood;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.home.greeting/GreetingStatusAgent.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.home.greeting/GreetingStatusAgent.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.home.greeting/GreetingStatusAgent.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.data.home.greeting/GreetingTuning { // com.letta.mobile.data.home.greeting/GreetingTuning|null[0]
@@ -85702,8 +85731,8 @@ final const val com.letta.mobile.data.canvas/CANVAS_PRIMARY_DOCUMENT_ID // com.l
     final fun <get-CANVAS_PRIMARY_DOCUMENT_ID>(): kotlin/String // com.letta.mobile.data.canvas/CANVAS_PRIMARY_DOCUMENT_ID.<get-CANVAS_PRIMARY_DOCUMENT_ID>|<get-CANVAS_PRIMARY_DOCUMENT_ID>(){}[0]
 final const val com.letta.mobile.data.context.estimate/ESTIMATE_SOURCE // com.letta.mobile.data.context.estimate/ESTIMATE_SOURCE|{}ESTIMATE_SOURCE[0]
     final fun <get-ESTIMATE_SOURCE>(): kotlin/String // com.letta.mobile.data.context.estimate/ESTIMATE_SOURCE.<get-ESTIMATE_SOURCE>|<get-ESTIMATE_SOURCE>(){}[0]
-final const val com.letta.mobile.data.home.greeting/GREETING_CAST_SIZE // com.letta.mobile.data.home.greeting/GREETING_CAST_SIZE|{}GREETING_CAST_SIZE[0]
-    final fun <get-GREETING_CAST_SIZE>(): kotlin/Int // com.letta.mobile.data.home.greeting/GREETING_CAST_SIZE.<get-GREETING_CAST_SIZE>|<get-GREETING_CAST_SIZE>(){}[0]
+final const val com.letta.mobile.data.home.greeting/GREETING_CAST_LIMIT // com.letta.mobile.data.home.greeting/GREETING_CAST_LIMIT|{}GREETING_CAST_LIMIT[0]
+    final fun <get-GREETING_CAST_LIMIT>(): kotlin/Int // com.letta.mobile.data.home.greeting/GREETING_CAST_LIMIT.<get-GREETING_CAST_LIMIT>|<get-GREETING_CAST_LIMIT>(){}[0]
 final const val com.letta.mobile.data.home/FLEET_ACTIVITY_DAYS // com.letta.mobile.data.home/FLEET_ACTIVITY_DAYS|{}FLEET_ACTIVITY_DAYS[0]
     final fun <get-FLEET_ACTIVITY_DAYS>(): kotlin/Int // com.letta.mobile.data.home/FLEET_ACTIVITY_DAYS.<get-FLEET_ACTIVITY_DAYS>|<get-FLEET_ACTIVITY_DAYS>(){}[0]
 final const val com.letta.mobile.data.home/FLEET_ACTIVITY_HOURS // com.letta.mobile.data.home/FLEET_ACTIVITY_HOURS|{}FLEET_ACTIVITY_HOURS[0]
@@ -86172,6 +86201,7 @@ final fun com.letta.mobile.data.feed.channel/channelFeedRows(com.letta.mobile.da
 final fun com.letta.mobile.data.feed.channel/channelFeedRows(com.letta.mobile.data.transport.api/IChannelTransport?, com.letta.mobile.data.timeline.snapshot/TimelineScope): kotlin/Function1<kotlinx.coroutines/CoroutineScope, kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.chat.projection/ChatRenderItem>?>>? // com.letta.mobile.data.feed.channel/channelFeedRows|channelFeedRows(com.letta.mobile.data.transport.api.IChannelTransport?;com.letta.mobile.data.timeline.snapshot.TimelineScope){}[0]
 final fun com.letta.mobile.data.feed.channel/channelFeedTimelineSource(com.letta.mobile.data.transport.api/IChannelTransport, com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId, kotlinx.coroutines/CoroutineScope, kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.model/LettaMessage, kotlin/Unit> = ...): com.letta.mobile.data.feed.client/FeedTimelineSource? // com.letta.mobile.data.feed.channel/channelFeedTimelineSource|channelFeedTimelineSource(com.letta.mobile.data.transport.api.IChannelTransport;com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId;kotlinx.coroutines.CoroutineScope;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.model.LettaMessage,kotlin.Unit>){}[0]
 final fun com.letta.mobile.data.home.greeting/greetingLine(kotlin/Int): kotlin/String // com.letta.mobile.data.home.greeting/greetingLine|greetingLine(kotlin.Int){}[0]
+final fun com.letta.mobile.data.home.greeting/greetingStatusLine(kotlin.collections/List<com.letta.mobile.data.home.greeting/GreetingStatusAgent>): kotlin/String // com.letta.mobile.data.home.greeting/greetingStatusLine|greetingStatusLine(kotlin.collections.List<com.letta.mobile.data.home.greeting.GreetingStatusAgent>){}[0]
 final fun com.letta.mobile.data.home/buildFleetOverview(com.letta.mobile.data.home/FleetOverviewParams): com.letta.mobile.data.home/FleetOverview // com.letta.mobile.data.home/buildFleetOverview|buildFleetOverview(com.letta.mobile.data.home.FleetOverviewParams){}[0]
 final fun com.letta.mobile.data.home/conversationRecency(kotlin/String): kotlin.time/Instant // com.letta.mobile.data.home/conversationRecency|conversationRecency(kotlin.String){}[0]
 final fun com.letta.mobile.data.home/formatGroupedNumber(kotlin/Int): kotlin/String // com.letta.mobile.data.home/formatGroupedNumber|formatGroupedNumber(kotlin.Int){}[0]
