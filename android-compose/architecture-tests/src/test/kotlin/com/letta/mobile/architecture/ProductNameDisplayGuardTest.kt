@@ -38,7 +38,7 @@ class ProductNameDisplayGuardTest {
             compose.resolve("sharedUI/src/commonMain/composeResources")
         val hits = resourceDirs.flatMap { dir ->
             files(dir) { it.extension == "xml" && it.parent.name.startsWith("values") }
-                .flatMap { file -> OLD_NAME.findAll(withoutXmlComments(file.readText())).map { "${relative(file)}: ${it.value}" } }
+                .flatMap { file -> OLD_NAME.findAll(file.readText().withoutXmlComments()).map { "${relative(file)}: ${it.value}" } }
         }
         check(hits.isEmpty()) { "string resources still say Meridian: $hits" }
     }
@@ -67,21 +67,21 @@ class ProductNameDisplayGuardTest {
         val title = Regex("<title>(.*)</title>").find(web.resolve("index.html").readText())?.groupValues?.get(1)
         assertEquals("Baken", title)
         val manifest = web.resolve("manifest.webmanifest").readText()
-        assertEquals("Baken", jsonString(manifest, "name"))
-        assertEquals("Baken", jsonString(manifest, "short_name"))
+        assertEquals("Baken", manifest.jsonString("name"))
+        assertEquals("Baken", manifest.jsonString("short_name"))
     }
 
     @Test
     fun `desktop packaging displays Baken`() {
         val gradle = compose.resolve("desktop/build.gradle.kts")
         val text = gradle.readText()
-        assertEquals("Baken", gradleString(text, "appName"))
-        assertEquals("Baken", gradleString(text, "dockName"))
-        check(gradleString(text, "artifactName")?.startsWith("baken-") == true) {
-            "installer/AppImage file names must start with baken-, found ${gradleString(text, "artifactName")}"
+        assertEquals("Baken", text.gradleString("appName"))
+        assertEquals("Baken", text.gradleString("dockName"))
+        check(text.gradleString("artifactName")?.startsWith("baken-") == true) {
+            "installer/AppImage file names must start with baken-, found ${text.gradleString("artifactName")}"
         }
         val hits = gradle.readLines().withIndex()
-            .filter { (_, line) -> line.trim() !in KEPT_IDENTITY_LINES && !isComment(line) }
+            .filter { (_, line) -> line.trim() !in KEPT_IDENTITY_LINES && !line.isCommentLine() }
             .filter { (_, line) -> STRING_LITERAL.findAll(line).any { OLD_NAME.containsMatchIn(it.value) } }
             .map { (index, line) -> "desktop/build.gradle.kts:${index + 1}: ${line.trim()}" }
         check(hits.isEmpty()) { "desktop packaging still displays Meridian: $hits" }
@@ -94,10 +94,10 @@ class ProductNameDisplayGuardTest {
     @Test
     fun `desktop install and update identities keep the old name`() {
         val text = compose.resolve("desktop/build.gradle.kts").readText()
-        assertEquals("Meridian Desktop", gradleString(text, "packageName"))
-        assertEquals("Meridian Desktop", gradleString(text, "startupWMClass"))
-        assertEquals("44e25263-67d4-443c-b85c-655a41118add", gradleString(text, "upgradeUuid"))
-        assertEquals("ca.oculair.meridian.desktop", gradleString(text, "bundleID"))
+        assertEquals("Meridian Desktop", text.gradleString("packageName"))
+        assertEquals("Meridian Desktop", text.gradleString("startupWMClass"))
+        assertEquals("44e25263-67d4-443c-b85c-655a41118add", text.gradleString("upgradeUuid"))
+        assertEquals("ca.oculair.meridian.desktop", text.gradleString("bundleID"))
         check("-Dnucleus.app.id=ca.oculair.meridian.desktop" in text) { "the Linux Nucleus app id must not move" }
         check("protocol(\"Baken\", \"meridian\")" in text) { "the deep-link scheme stays meridian://" }
     }
@@ -107,12 +107,7 @@ class ProductNameDisplayGuardTest {
         return Regex("""<string name="app_name">([^<]*)</string>""").find(strings)?.groupValues?.get(1)
     }
 
-    private fun literalHits(file: Path): List<String> = file.readLines().withIndex()
-        .filterNot { (_, line) -> isComment(line) }
-        .flatMap { (index, line) ->
-            STRING_LITERAL.findAll(line).filter { OLD_NAME.containsMatchIn(it.value) }
-                .map { "${relative(file)}:${index + 1}: ${it.value}" }
-        }
+    private fun literalHits(file: Path): List<String> = file.readText().literalHitsIn().map { (line, text) -> "${relative(file)}:$line: $text" }
 
     private fun sourceSets(src: Path): List<Path> =
         Files.list(src).use { listing -> listing.filter { it.isDirectory() && !it.name.contains("test", ignoreCase = true) }.toList() }
@@ -126,19 +121,48 @@ class ProductNameDisplayGuardTest {
 
     private fun relative(file: Path): String = compose.relativize(file).invariantSeparatorsPathString
 
-    private fun isComment(line: String): Boolean = line.trimStart().let { it.startsWith("//") || it.startsWith("*") || it.startsWith("/*") }
+    
+    private fun String.withoutXmlComments(): String = replace(Regex("<!--.*?-->", RegexOption.DOT_MATCHES_ALL), "")
 
-    private fun withoutXmlComments(xml: String): String = xml.replace(Regex("<!--.*?-->", RegexOption.DOT_MATCHES_ALL), "")
+    private fun String.jsonString(key: String): String? =
+        Regex("\"${Regex.escape(key)}\"\\s*:\\s*\"([^\"]*)\"").find(this)?.groupValues?.get(1)
 
-    private fun jsonString(json: String, key: String): String? =
-        Regex("\"${Regex.escape(key)}\"\\s*:\\s*\"([^\"]*)\"").find(json)?.groupValues?.get(1)
+    private fun String.gradleString(key: String): String? =
+        Regex("""(?m)^\s*${Regex.escape(key)}\s*=\s*(?:\$\$)?"((?:[^"\\]|\\.)*)"""").find(this)?.groupValues?.get(1)
 
-    private fun gradleString(gradle: String, key: String): String? =
-        Regex("""(?m)^\s*${Regex.escape(key)}\s*=\s*(?:\$\$)?"((?:[^"\\]|\\.)*)"""").find(gradle)?.groupValues?.get(1)
+    @Test
+    fun `the scanner finds the old name in a multiline raw string`() {
+        val source = "val greeting = \"\"\"\n    Welcome to Meridian\n\"\"\"\nval ok = \"Baken\""
+        assertEquals(listOf(2 to "Welcome to Meridian"), source.literalHitsIn().map { (line, text) -> line to text.trim() })
+        assertEquals(listOf(1 to "\"Meridian\""), "val name = \"Meridian\"".literalHitsIn())
+    }
 
     private companion object {
         val OLD_NAME = Regex("""\bMeridian\b""")
         val STRING_LITERAL = Regex(""""(?:[^"\\]|\\.)*"""")
+        const val RAW_QUOTE = "\"\"\""
+
+        /**
+         * The old name inside string literals of this source, as (1-based line, matched text): ordinary quoted strings on
+         * code lines, and the lines of triple-quoted raw strings, which a line-by-line scan would split from their quotes.
+         */
+        fun String.literalHitsIn(): List<Pair<Int, String>> {
+            val hits = mutableListOf<Pair<Int, String>>()
+            var inRaw = false
+            lines().forEachIndexed { index, line ->
+                val quotes = line.windowed(RAW_QUOTE.length).count { it == RAW_QUOTE }
+                val rawLine = inRaw || quotes > 0
+                when {
+                    rawLine && OLD_NAME.containsMatchIn(line) -> hits += index + 1 to line
+                    !rawLine && !line.isCommentLine() -> STRING_LITERAL.findAll(line)
+                        .filter { OLD_NAME.containsMatchIn(it.value) }.forEach { hits += index + 1 to it.value }
+                }
+                if (quotes % 2 == 1) inRaw = !inRaw
+            }
+            return hits
+        }
+
+        fun String.isCommentLine(): Boolean = trimStart().let { it.startsWith("//") || it.startsWith("*") || it.startsWith("/*") }
 
         /** Identity, not display: renaming either orphans existing installs (see the class KDoc). */
         val KEPT_IDENTITY_LINES = setOf(

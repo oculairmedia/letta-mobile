@@ -85,8 +85,10 @@ user-writable directory, then launch its `AppRun` (keep the whole extracted tree
 ```bash
 ./baken-<tag>-linux-x64.AppImage --appimage-extract
 mkdir -p "$HOME/.local/opt"
-# Destination must not already exist.
-mv -f squashfs-root "$HOME/.local/opt/letta-desktop"
+# Updating: remove the previous extracted tree first, or mv nests the new one inside it
+# and the menu entry keeps launching the old AppRun.
+rm -rf "$HOME/.local/opt/letta-desktop"
+mv squashfs-root "$HOME/.local/opt/letta-desktop"
 "$HOME/.local/opt/letta-desktop/AppRun"
 ```
 
