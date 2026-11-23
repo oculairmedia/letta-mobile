@@ -277,6 +277,17 @@ Root state machine `Avatar`, layers in order:
 | `PetFace` | `expr` content | `petting`: the content glyph, cut in and out under a blink (a blended `expr` sweeps through every glyph between) |
 | `React` | Squash, Peek, Base bone | one one-shot per trigger, fired from AnyState over 100 ms and self-returning at rest: `poke` `dizzy` `sent` `toolStart` `toolDone` `wake` `yawn`, `land` by `impact` band (soft / mid / hard), `trick` by `trickId` band (0..3) |
 | `ReactFace` | `expr` | the same triggers, cut: the reaction's glyph under its blinks (`ReactFace_<r>`), home for a reaction without one; with `reduceMotion`, every trigger plays `ReactCalm`: one blink |
+| `Overlap` | Lag (face), Follow (body scale) | letta-mobile-su08n secondaries: one one-shot per moment (`success` `poke` `sent` `toolStart` `toolDone` `land` `wake`, `OVERLAP` in `rig/constants.py`), on the trigger's own clock: the face trails the body and overshoots past it, the body follows through about the feet after a landing, and `success` / `land` blink off the beat. Fired from AnyState over 100 ms **only while `reduceMotion` is off**; every one starts and ends at rest |
+| `Sparkle` | the three stars | star glints at `success` (the hop's apex), `toolDone` (the agent finished) and `wake` (a greeting): three small four-point stars (`art/sparkle-star.svg`) pop by the plate's top-right corner in a stagger and twinkle out with a quarter turn (400 ms each). Never in a loop. Only while `reduceMotion` is off |
+
+**Secondaries and sparkle** (letta-mobile-su08n). Two nodes nobody else keys carry them: `Lag`
+(between `Peek` and `Face`, the face's overlap) and `Follow` (around the body, pivoting at the
+feet). Besides the `Overlap` layer, a turning entry keys `Follow`'s rotation (the body rolls
+`TURN_FOLLOW_DEG` past the turn while the plate leads, settled by the entry's end), and the idle,
+listening, speaking, thinking and working loops play the face a beat behind the body
+(`LOOP_LAG_FRAMES`, `rig/motion.py lagged()`: the body's own curve shifted, anchored so frame 0 -
+and so every rest an entry or calm twin lands on - is unchanged). `test_rig.TestSecondaries` and
+`test_probe.Secondaries` hold all of it, `reduceMotion` included.
 
 With `reduceMotion` on, `Expression` blends (300 ms) each loop to its `Calm_<state>` twin - the
 same pose with the bob, inflate, light and gaze drift held - and entries hand off to the twin in

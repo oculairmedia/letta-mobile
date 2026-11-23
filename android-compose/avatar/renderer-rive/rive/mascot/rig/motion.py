@@ -192,8 +192,12 @@ def sustained_rest(state):
     row = STATE_ROWS[state]
     first = lambda keys: keys[0][1] if isinstance(keys, list) else keys
     mx, my = first(row.motion.get("x", 0)), first(row.motion.get("y", 0))
+    # The face's loop is the body's played a beat late (loop_lag), so its frame 0 is not the
+    # body's: read it from the lagged track, the one the loop and its calm twin actually key.
+    n = frames(row.period_ms) if row.period_ms else 1
+    lx, ly = first(loop_lag(state, row.motion.get("x", 0), n)), first(loop_lag(state, row.motion.get("y", 0), n))
     fx, fy = row.face_offset
-    return Rest(mx, my, mx + fx, my + fy, rad(row.plate_rot_deg),
+    return Rest(mx, my, lx + fx, ly + fy, rad(row.plate_rot_deg),
                 BREATHING[state].lo if state in BREATHING else 1)
 
 
@@ -223,7 +227,9 @@ def sustained_animation(st, calm=False):
 
     mx, my = motion.get("x", 0), motion.get("y", 0)
     body_keys = {X: mx, Y: my}
-    face_keys = {X: shifted(mx, fx), Y: shifted(my, fy), ROT: rad(rot)}
+    lag_period = frames(period) if period else 1
+    face_keys = {X: shifted(loop_lag(st, mx, lag_period), fx), Y: shifted(loop_lag(st, my, lag_period), fy),
+                 ROT: rad(rot)}
     jx, jy = FACING[st]
     halo = {"sleeping": HALO_SLEEP, "dreaming": HALO_SLEEP, "failed": HALO_FAILED}.get(st, HALO_OPACITY)
     gx, gy = GAZE.get(st, (0.5, 0.5))
@@ -401,6 +407,7 @@ def enter_animation(e, aid):
     elif designed is not None:
         keys.update(designed(e))
     merge(keys, inflate_keys(e))
+    merge(keys, turn_follow_keys(e))
     return animation(f"Enter_{e.frm}_{e.to}", aid, e.n, keys, callbacks=(PLATE_BLINK,))
 
 
@@ -695,3 +702,119 @@ def react_animations():
          PEEK_NODE: {Y: [(0, 0, SINE), (30, 10, None), (54, 10, BACK_OUT), (70, 0, None), (n, 0)]}}
     out.append(_react("trick3", n, k, "trick"))
     return out + list(_REACT_FACES)
+
+
+# ================================================================================================
+# Secondaries and sparkle (letta-mobile-su08n)
+# ================================================================================================
+from rig.constants import (LOOP_LAG_FRAMES, OVERLAP, SPARKLE_AT, SPARKLE_FRAMES, SPARKLE_SPIN_DEG,  # noqa: E402
+                           SPARKLE_STAGGER, TURN_FOLLOW_DEG)
+from rig.ids import (FOLLOW_NODE, LAG_NODE, OVERLAPS, OVERLAP_REST_ANIM, SPARKLES,  # noqa: E402
+                     SPARKLE_REST_ANIM, SPARKLE_STARS, overlap_anim, sparkle_anim)
+import timeline  # noqa: E402
+
+LAG_TICK = 2       # frames between the linear ticks that carry a segment the lag cuts in two
+
+
+def _ease(bezier):
+    """An rml bezier token as timeline's Ease, so a key list can be sampled like the file plays it."""
+    if not bezier:
+        return timeline.HOLD
+    if bezier == LINEAR:
+        return timeline.Ease("linear")
+    return timeline.Ease("cubic", tuple(float(v) for v in bezier.split()))
+
+
+def lagged(keys, lag, period):
+    """A looping key list played `lag` frames late: value(t) = keys(t - lag), wrapped at `period`.
+
+    The overlap of the loops: the face trails the body it rides on. Whole segments keep their own
+    curve, shifted; the one segment the wrap cuts in two (and only it) is carried by linear ticks
+    sampled from the original curve, so the shifted loop is the original motion exactly, a beat late,
+    and still closes on itself - offset by the constant that puts its frame 0 on the original's.
+    A constant, or no lag, comes back unchanged."""
+    if not isinstance(keys, list) or not lag or period <= 1:
+        return keys
+    # A key without a bezier plays on the animation's default (rml.animation: SOFT_OUT), not a hold.
+    curve = [timeline.Key(k[0], float(k[1]), _ease(k[2] if len(k) > 2 and k[2] else SOFT_OUT), "double")
+             for k in keys]
+    raw = lambda t: timeline.sample(curve, ((t - lag) % period) or (0 if t == 0 else period))[0]
+    # Anchored so frame 0 is the body's own frame 0: the lag is a shape, not an offset. It moves
+    # the whole face track by at most a third of a pixel, and in return every rest an entry or a
+    # calm twin lands on is exactly what it was without the lag.
+    anchor = float(keys[0][1]) - raw(0)
+    at = lambda t: round(raw(t) + anchor, 4)
+    frames_of = [k[0] for k in keys]
+    next_of = dict(zip(frames_of, frames_of[1:]))
+    bez_of = {k[0]: (k[2] if len(k) > 2 and k[2] else SOFT_OUT) for k in keys}
+    image = {(f + lag) % period: f for f in frames_of if f < period}
+    marks = sorted(set(image) | {0, period})
+    out = []
+    for g0, g1 in zip(marks, marks[1:]):
+        f0 = image.get(g0)
+        if f0 is not None and f0 in next_of and next_of[f0] - f0 == g1 - g0:
+            out.append((g0, at(g0), bez_of[f0]))
+        else:
+            out += [(t, at(t), LINEAR) for t in range(g0, g1, LAG_TICK)]
+    out.append((period, at(period)))
+    return out
+
+
+def loop_lag(state, keys, period_frames):
+    """The face's copy of a sustained loop's motion: lagged by LOOP_LAG_FRAMES[state], if any."""
+    return lagged(keys, LOOP_LAG_FRAMES.get(state, 0), period_frames)
+
+
+def _track(points, convert=float, bezier=SINE):
+    """[(frame, value)] -> rml keys, every segment on `bezier`; a lone point is a constant."""
+    if len(points) == 1:
+        return convert(points[0][1])
+    return [(f, round(convert(v), 4), bezier) for f, v in points[:-1]] + [(points[-1][0], round(convert(points[-1][1]), 4))]
+
+
+def overlap_animations():
+    """The Overlap layer: one secondary per moment (OVERLAP in rig/constants.py), on the Lag and
+    Follow nodes only. Every one keys the same four properties and starts and ends at rest, so it
+    hands nothing back; `blink` frames fire the plate's blink off the main beat."""
+    out = [animation("OverlapRest", OVERLAP_REST_ANIM, 1, {})]
+    for m in OVERLAPS:
+        o = OVERLAP[m]
+        follow = o.get("follow", [(0, 1)])
+        keys = {LAG_NODE: {X: _track(o.get("lag_x", [(0, 0)])), Y: _track(o.get("lag_y", [(0, 0)]))},
+                FOLLOW_NODE: {SY: _track(follow), SX: _track([(f, 1 / v) for f, v in follow])}}
+        fires = {PLATE_BLINK: list(o["blink"])} if o.get("blink") else {}
+        out.append(animation("Overlap_" + m, overlap_anim[m], o["n"], keys, fires=fires))
+    return out
+
+
+def _star_keys(start):
+    """One star's life from `start`: pop past its size, settle, twinkle out with a quarter turn.
+    Its scale is relative (the star's own size sits on its placement node), so it ends at rest."""
+    s, F = start, SPARKLE_FRAMES
+    return {OPACITY: [(0, 0, None), (s, 0, LINEAR), (s + 2, 1, None), (s + F // 2, 1, SINE), (s + F, 0)],
+            SX: [(0, 0, None), (s, 0, BACK_OUT), (s + 6, 1.15, SINE), (s + F // 2, 1, SINE), (s + F, 0.5, None), (s + F + 1, 1)],
+            SY: [(0, 0, None), (s, 0, BACK_OUT), (s + 6, 1.15, SINE), (s + F // 2, 1, SINE), (s + F, 0.5, None), (s + F + 1, 1)],
+            ROT: [(0, 0, None), (s, 0, SINE), (s + F, rad(SPARKLE_SPIN_DEG), None), (s + F + 1, 0)]}
+
+
+def sparkle_animations():
+    """The Sparkle layer: star glints landing on the main beat's peak (SPARKLE_AT), staggered.
+    The stars are invisible at both ends, and their scale and turn are back at rest a frame after
+    they vanish, so a sparkle hands nothing back."""
+    out = [animation("SparkleRest", SPARKLE_REST_ANIM, 1, {})]
+    for m in SPARKLES:
+        at = SPARKLE_AT[m]
+        keys = {sid: _star_keys(at + k * SPARKLE_STAGGER) for k, sid in enumerate(SPARKLE_STARS)}
+        n = at + (len(SPARKLE_STARS) - 1) * SPARKLE_STAGGER + SPARKLE_FRAMES + 2
+        out.append(animation("Sparkle_" + m, sparkle_anim[m], n, keys))
+    return out
+
+
+def turn_follow_keys(e):
+    """A turning entry's follow-through: the plate leads the turn and the body rolls a little past
+    it about the feet, settling by the entry's end (TURN_FOLLOW_DEG). {} for a settle."""
+    if e.turn is not BACK_SOFT:
+        return {}
+    dx, dy = e.face1[0] - e.face0[0], e.face1[1] - e.face0[1]
+    sign = 1 if (dx if abs(dx) >= abs(dy) else dy) > 0 else -1
+    return {FOLLOW_NODE: {ROT: [(0, 0, SINE), (round(e.n * 0.6), rad(sign * TURN_FOLLOW_DEG), SINE), (e.n, 0)]}}

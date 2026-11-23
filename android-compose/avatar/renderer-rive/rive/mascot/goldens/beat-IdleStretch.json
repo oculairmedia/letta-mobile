@@ -186,6 +186,24 @@
       "settle_frame": 93,
       "spacing": "ease-in"
     },
+    "Follow.rotation": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
+    "Follow.scaleY": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 1.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
     "Joystick.x": {
       "max_delta": 0.0,
       "overshoot_pct": 0.0,
@@ -196,6 +214,24 @@
       "spacing": "hold"
     },
     "Joystick.y": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
+    "Lag.x": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
+    "Lag.y": {
       "max_delta": 0.0,
       "overshoot_pct": 0.0,
       "peak": 0.0,
@@ -295,6 +331,15 @@
       "spacing": "hold"
     },
     "Squash.y": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
+    "Star0.opacity": {
       "max_delta": 0.0,
       "overshoot_pct": 0.0,
       "peak": 0.0,

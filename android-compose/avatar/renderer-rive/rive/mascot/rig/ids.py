@@ -528,4 +528,27 @@ react_face_anim = {r: alloc(3, "ReactFace_" + r) for r in REACT_EXPR}
 react_face_node = {r: alloc(3, "ReactFace_" + r + "Node") for r in REACT_EXPR}
 
 
+# --- secondaries and sparkle (letta-mobile-su08n) ------------------------------------------------
+# Two nodes no older layer keys: Lag (between Peek and Face) carries the face's overlap - it trails
+# the body on a hop or a squish and overshoots past it - and Follow (around the body) carries the
+# body's follow-through, pivoting at the feet. The Overlap layer keys both; a turning entry keys
+# Follow's rotation (its settle). The sparkle stars sit inside Face, so they ride the plate.
+LAG_NODE = alloc(0, "LagNode")
+FOLLOW_NODE = alloc(0, "FollowNode")
+SPARKLE_NODE = alloc(0, "SparkleNode")
+SPARKLE_STARS = [alloc(0, f"SparkleStar{k}") for k in range(3)]
+
+# The moments that earn a secondary, and those that earn a sparkle (rig/constants.py has the keys).
+OVERLAPS = ["success", "poke", "sent", "toolStart", "toolDone", "land", "wake"]
+SPARKLES = ["success", "toolDone", "wake"]
+
+OVERLAP_LAYER, SPARKLE_LAYER = alloc(3, "OverlapLayer"), alloc(3, "SparkleLayer")
+OVERLAP_REST_ANIM, OVERLAP_REST_NODE = alloc(3, "OverlapRest"), alloc(3, "OverlapRestNode")
+overlap_anim = {m: alloc(3, "Overlap_" + m) for m in OVERLAPS}
+overlap_node = {m: alloc(3, "Overlap_" + m + "Node") for m in OVERLAPS}
+SPARKLE_REST_ANIM, SPARKLE_REST_NODE = alloc(3, "SparkleRest"), alloc(3, "SparkleRestNode")
+sparkle_anim = {m: alloc(3, "Sparkle_" + m) for m in SPARKLES}
+sparkle_node = {m: alloc(3, "Sparkle_" + m + "Node") for m in SPARKLES}
+
+
 _OWNER = _check_unique()
