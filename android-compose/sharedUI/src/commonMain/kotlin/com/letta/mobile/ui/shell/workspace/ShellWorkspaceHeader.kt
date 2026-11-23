@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.shell.workspace
 
+import com.letta.mobile.brand.Brand
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
@@ -24,7 +25,6 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.shell_new_conversation_tab
 import com.letta.mobile.sharedui.resources.shell_sidebar_hide
 import com.letta.mobile.sharedui.resources.shell_sidebar_show
-import com.letta.mobile.sharedui.resources.shell_workspace_title
 import com.letta.mobile.ui.components.foundation.LettaMenuItem
 import com.letta.mobile.ui.components.tabs.LettaTab
 import com.letta.mobile.ui.components.tabs.LettaTabStrip
@@ -152,7 +152,7 @@ fun ShellWorkspaceHeaderState.barHeight(plain: Dp): Dp = when {
 /** The header's own words: the app's name as the fallback title, and the strip's "+" label. */
 @Composable
 private fun ShellWorkspaceHeaderState.labelled(): ShellWorkspaceHeaderState = copy(
-    title = title ?: stringResource(Res.string.shell_workspace_title),
+    title = title ?: Brand.NAME,
     tabs = tabs.copy(actions = tabs.actions.copy(newLabel = stringResource(Res.string.shell_new_conversation_tab))),
 )
 

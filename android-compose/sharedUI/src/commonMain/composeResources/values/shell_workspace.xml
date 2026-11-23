@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- letta-mobile-ckmub.17.4: the shared shell workspace (desktop window and browser). -->
-    <string name="shell_workspace_title">Baken</string>
     <string name="shell_sidebar_show">Show sidebar (Ctrl+B)</string>
     <string name="shell_sidebar_hide">Hide sidebar (Ctrl+B)</string>
     <string name="shell_open_navigation">Agents and conversations</string>

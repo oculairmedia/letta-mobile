@@ -80970,6 +80970,11 @@ sealed class com.letta.mobile.ui.theme/ChatBackgroundToken { // com.letta.mobile
     }
 }
 
+final object com.letta.mobile.brand/Brand { // com.letta.mobile.brand/Brand|null[0]
+    final const val NAME // com.letta.mobile.brand/Brand.NAME|{}NAME[0]
+        final fun <get-NAME>(): kotlin/String // com.letta.mobile.brand/Brand.NAME.<get-NAME>|<get-NAME>(){}[0]
+}
+
 final object com.letta.mobile.data.a2ui/A2uiBindingResolver { // com.letta.mobile.data.a2ui/A2uiBindingResolver|null[0]
     final fun applyDataModelPatch(com.letta.mobile.data.a2ui/A2uiDataModel, kotlin/String, kotlinx.serialization.json/JsonElement?): com.letta.mobile.data.a2ui/A2uiDataModel // com.letta.mobile.data.a2ui/A2uiBindingResolver.applyDataModelPatch|applyDataModelPatch(com.letta.mobile.data.a2ui.A2uiDataModel;kotlin.String;kotlinx.serialization.json.JsonElement?){}[0]
     final fun displayText(kotlinx.serialization.json/JsonElement): kotlin/String // com.letta.mobile.data.a2ui/A2uiBindingResolver.displayText|displayText(kotlinx.serialization.json.JsonElement){}[0]

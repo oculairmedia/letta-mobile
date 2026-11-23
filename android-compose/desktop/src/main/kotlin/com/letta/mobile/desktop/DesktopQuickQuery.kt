@@ -75,7 +75,6 @@ internal fun captureForegroundWindowTitle(): String? {
 }
 
 private const val FOREGROUND_TITLE_MAX_CHARS = 1024
-
 // letta-mobile-sspxj: ambient window title is attacker-controlled (any app on
 // screen can set its title), and it is interpolated into the LLM prompt as a
 // quoted string. Without sanitization, a window title that contains a
@@ -147,6 +146,7 @@ internal fun DesktopQuickQueryWindow(coordinator: DesktopQuickQueryCoordinator) 
         resizable = false,
         alwaysOnTop = true,
         title = "${com.letta.mobile.data.model.DisplayNames.PRODUCT} Quick Query",
+        icon = remember { com.letta.mobile.ui.icons.BakenAppIcon.painter() },
     ) {
         DisposableEffect(window) {
             // Close on click-away — but only once the window has actually held

@@ -37,6 +37,10 @@ gradlePlugin {
             id = "com.letta.mobile.kmp.library"
             implementationClass = "com.letta.mobile.kmp.KmpLibraryPlugin"
         }
+        create("brand") {
+            id = "com.letta.mobile.brand"
+            implementationClass = "com.letta.mobile.brand.BrandPlugin"
+        }
         create("jni16Kb") {
             id = "com.letta.mobile.jni-16kb"
             implementationClass = "com.letta.mobile.jni.Jni16KbPlugin"

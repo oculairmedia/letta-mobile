@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <!-- Before any CSS, so the browser picks the dark canvas up front (no white flash). -->
     <meta name="color-scheme" content="light dark">
-    <meta name="description" content="Manage Letta agents and conversations from the browser.">
-    <title>Baken</title>
+    <meta name="description" content="Manage your agents and conversations from the browser.">
+    <!-- @BRAND_NAME@ is the product name from branding/brand.properties, filled in at build time. -->
+    <title>@BRAND_NAME@</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png">
@@ -18,7 +19,7 @@
     <meta name="theme-color" content="#0D1821" media="(prefers-color-scheme: dark)">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="Baken">
+    <meta name="apple-mobile-web-app-title" content="@BRAND_NAME@">
     <style>
         html, body {
             box-sizing: border-box;
@@ -201,7 +202,7 @@
                         urls: [location.href, ...performance.getEntriesByType('resource').map((entry) => entry.name)],
                     }))
                     .catch((error) => {
-                        console.warn('Letta Web service worker was not registered', error);
+                        console.warn('@BRAND_NAME@ service worker was not registered', error);
                     });
             });
         }

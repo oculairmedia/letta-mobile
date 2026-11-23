@@ -100,6 +100,19 @@ class PackageCoverageTest(unittest.TestCase):
         self.write('android-compose/example/build/generated/tests/Fixture.kt', 'package tests.only\nval fixture = "data"')
         self.assertEqual((1, []), coverage.check(self.root))
 
+    def test_generated_brand_root_publishes_its_declared_package(self):
+        self.write('android-compose/example/build.gradle.kts',
+                   'val generateBrandSource = tasks.register<GenerateBrandSourceTask>("generateBrandSource") {\n'
+                   '    packageName = "example.brand"\n}\n'
+                   'kotlin.sourceSets.commonMain { kotlin.srcDir(generateBrandSource) }')
+        self.assertIn('missing # Package example.brand', self.problems())
+        self.overview('# Package example\n\n' + PROSE + '\n\n# Package example.brand\n\n' + PROSE)
+        self.assertEqual((2, []), coverage.check(self.root))
+
+    def test_generated_brand_root_without_a_literal_package_fails_closed(self):
+        self.write('android-compose/example/build.gradle.kts', 'kotlin.srcDir(generateBrandSource)')
+        self.assertIn('one literal packageName', self.problems())
+
     def test_explicit_production_root_still_fails_closed(self):
         self.write('android-compose/example/build.gradle.kts',
                    'kotlin.sourceSets.getByName("commonMain").kotlin.srcDir("extra")')

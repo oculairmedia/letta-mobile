@@ -6,8 +6,9 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image
 
 /**
- * The Baken app icon: the brand kit's lit icon (svg/baken-app-icon-lit.svg) at 256 px, for a
- * desktop window's title bar and taskbar entry. Null when the resource is missing, so a window still opens.
+ * The app icon for a desktop window's title bar and taskbar entry: the brand source's PNG
+ * (`brand.icon.png` in branding/brand.properties), which the desktop build stages onto the classpath.
+ * Null when the resource is missing, so a window still opens.
  */
 object BakenAppIcon {
     fun painter(): Painter? =

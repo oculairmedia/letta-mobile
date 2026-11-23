@@ -1,7 +1,7 @@
 {
-  "name": "Baken",
-  "short_name": "Baken",
-  "description": "Manage Letta agents and conversations from the browser.",
+  "name": "@BRAND_NAME@",
+  "short_name": "@BRAND_NAME@",
+  "description": "Manage your agents and conversations from the browser.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

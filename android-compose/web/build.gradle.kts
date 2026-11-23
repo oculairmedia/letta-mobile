@@ -6,6 +6,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.compose")
     id("io.gitlab.arturbosch.detekt")
+    // The `brand` extension: page title, manifest name and icons from branding/brand.properties.
+    id("com.letta.mobile.brand")
 }
 
 detekt {
@@ -117,9 +119,22 @@ kotlin {
     }
 }
 
-tasks.named("wasmJsProcessResources") {
+tasks.named<ProcessResources>("wasmJsProcessResources") {
     dependsOn(generateIrohWasmBindings)
     dependsOn(stageRiveWasm)
+    // index.html and the install manifest write @BRAND_NAME@ where the product name goes; the brand
+    // source fills it in, and its icons join the bundle (favicon.svg at the root, PNGs under icons/).
+    val identity = brand
+    inputs.property("brandName", identity.name)
+    filesMatching(listOf("index.html", "manifest.webmanifest")) {
+        filter { line -> identity.expand(line) }
+    }
+    val webIcons = rootProject.file(identity.webIcons)
+    from(webIcons) { include("favicon.svg") }
+    from(webIcons) {
+        include("*.png")
+        into("icons")
+    }
 }
 
 // letta-mobile-o4ygk.4.5: the Compose Gradle plugin (1.10) ships the browser its own Skiko runtime

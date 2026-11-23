@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 200 200">
+  <defs>
+    <radialGradient id="bg" cx="62%" cy="62%" r="72%">
+      <stop offset="0%" stop-color="#1A3245"/><stop offset="55%" stop-color="#10202D"/><stop offset="100%" stop-color="#09121A"/>
+    </radialGradient>
+    <linearGradient id="stA" x1="15%" y1="10%" x2="85%" y2="92%">
+      <stop offset="0%" stop-color="#F2F7FA"/><stop offset="65%" stop-color="#D5E2EC"/><stop offset="100%" stop-color="#B0C4D4"/>
+    </linearGradient>
+    <radialGradient id="bnc" cx="98%" cy="68%" r="50%">
+      <stop offset="0%" stop-color="#EE5A3F" stop-opacity="0.28"/><stop offset="100%" stop-color="#EE5A3F" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="stP" x1="25%" y1="12%" x2="80%" y2="92%">
+      <stop offset="0%" stop-color="#FF785A"/><stop offset="55%" stop-color="#EE5A3F"/><stop offset="100%" stop-color="#C83E25"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="46" fill="url(#bg)"/>
+  <g transform="translate(22 22) scale(0.78)">
+    <path d="M 33.05 45.11 C 35.20 32.93, 52.02 29.75, 63.34 33.97 C 73.67 38.26, 80.33 61.85, 83.54 107.74 C 86.19 145.65, 84.52 164.81, 68.70 167.92 C 49.82 170.25, 36.50 166.16, 34.11 146.28 C 30.46 108.45, 30.96 58.29, 33.05 45.11 Z" fill="url(#stA)"/><path d="M 33.05 45.11 C 35.20 32.93, 52.02 29.75, 63.34 33.97 C 73.67 38.26, 80.33 61.85, 83.54 107.74 C 86.19 145.65, 84.52 164.81, 68.70 167.92 C 49.82 170.25, 36.50 166.16, 34.11 146.28 C 30.46 108.45, 30.96 58.29, 33.05 45.11 Z" fill="url(#bnc)"/><path d="M 90.98 132.84 C 93.79 106.97, 110.87 92.13, 133.75 94.73 C 155.62 97.26, 166.55 113.06, 162.74 138.86 C 159.14 161.66, 143.55 169.60, 119.61 167.92 C 97.66 166.39, 88.38 155.71, 90.98 132.84 Z" fill="url(#stP)"/>
+  </g>
+</svg>
