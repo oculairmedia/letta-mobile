@@ -100,7 +100,12 @@ private fun ChatSettings?.entries(): List<SettingsSearchEntry> = if (this == nul
     ).map { it.entry(SettingsGroup.Chat) }
 }
 
-private val PAIRING_ENTRY = SettingsSearchEntry(SettingsGroup.Backend, SettingsGroup.Backend.title, "Pair a device", "Install ${DisplayNames.PRODUCT} elsewhere and pair it with this host")
+private val PAIRING_ENTRY = SettingsSearchEntry(
+    SettingsGroup.Backend,
+    SettingsGroup.Backend.title,
+    "Pair a device",
+    "Install ${DisplayNames.PRODUCT} elsewhere and pair it with this host",
+)
 
 /** The hits for the page's query, each opening its group; or the empty state when none match. */
 @Composable

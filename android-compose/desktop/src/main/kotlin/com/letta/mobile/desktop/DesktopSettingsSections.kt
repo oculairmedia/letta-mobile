@@ -337,7 +337,8 @@ internal fun desktopAboutSections(
     SettingsSectionModel(
         key = "desktop-readiness",
         title = "Startup readiness",
-        supporting = "Ctrl+Shift+Space opens the quick switcher globally. Closing the window keeps ${DisplayNames.PRODUCT} running in the system tray.",
+        supporting = "Ctrl+Shift+Space opens the quick switcher globally. " +
+            "Closing the window keeps ${DisplayNames.PRODUCT} running in the system tray.",
         rows = readiness.mapIndexed { index, feature ->
             SettingsRow.Info("readiness-$index", feature.title, feature.state.label, feature.state.tone)
         },
