@@ -37,23 +37,44 @@ object LettaColorTokens {
     const val DARK_MARK_STONE = 0xFFDCE6EE
     const val LIGHT_MARK_STONE = 0xFF163044
 
+    // The vermilion's lit face: the highlight at the centre of the assistant sphere's vermilion-to-petrol radial.
+    const val PRIMARY_HIGHLIGHT = 0xFFF5A28C
+
     // Voice mode's two voices: the person in a cool blue, the agent in a warm rose, far apart in hue
-    // from each other and from the teal the run's thinking glow uses. The light values are deepened
+    // from each other and from the mist the run's thinking glow uses. The light values are deepened
     // so a hairline of either still reads on a light surface.
     const val DARK_VOICE_YOU = 0xFF6AA6FF
     const val DARK_VOICE_AGENT = 0xFFF08FA8
     const val LIGHT_VOICE_YOU = 0xFF2F6BD9
     const val LIGHT_VOICE_AGENT = 0xFFC0436B
 
-    // Warning: an amber, so a warning never reads as one of the teal/cyan accents. The ink reads at
+    // Warning: an amber, so a warning never reads as one of the slate/mist accents. The ink reads at
     // 5:1 or more on every surface and on the container of its own theme.
     const val LIGHT_WARNING = 0xFF8F5200
     const val LIGHT_WARNING_CONTAINER = 0xFFFFE8C7
     const val DARK_WARNING = 0xFFE0A458
     const val DARK_WARNING_CONTAINER = 0xFF3B2A12
 
-    const val TEAL_ACCENT = 0xFF1DE9B6
-    const val CYAN_ACCENT = 0xFF00E5FF
+    // Secondary and tertiary: the North Sea Buoy petrol slate and steel mist. Quiet support roles, so
+    // Buoy Vermilion stays the only accent. Each reads at 3:1 (slate, a graphic) or 4.5:1 (mist, text)
+    // on its theme's surfaces; its ink and container pair read at 4.5:1 or more.
+    const val DARK_SECONDARY = 0xFF7A96AA
+    const val DARK_ON_SECONDARY = 0xFF0D1821
+    const val DARK_TERTIARY = 0xFF9FB4C4
+    const val DARK_ON_TERTIARY = 0xFF0D1821
+    const val DARK_TERTIARY_CONTAINER = 0xFF263B4B
+    const val DARK_ON_TERTIARY_CONTAINER = 0xFFDCE6EE
+    const val LIGHT_SECONDARY = 0xFF3D5A70
+    const val LIGHT_ON_SECONDARY = 0xFFFFFFFF
+    const val LIGHT_TERTIARY = 0xFF4F6B80
+    const val LIGHT_ON_TERTIARY = 0xFFFFFFFF
+    const val LIGHT_TERTIARY_CONTAINER = 0xFFD8E3EC
+    const val LIGHT_ON_TERTIARY_CONTAINER = 0xFF10202C
+
+    // The user's chat bubble: a neutral surface, never the vermilion. On dark a deep-sea step above the
+    // agent's bubble (surfaceContainerLow); on light a soft mist. Text on it is onSurface.
+    const val DARK_USER_BUBBLE = 0xFF1C2A36
+    const val LIGHT_USER_BUBBLE = 0xFFDDE5EB
 
     // Surface levels (dark) used by the desktop scheme + template chrome (North Sea Buoy deep-sea family).
     const val DARK_SURFACE_CONTAINER_LOWEST = 0xFF0A131B
@@ -65,7 +86,10 @@ object LettaColorTokens {
 
     // Memory-block category tokens (Phase 6 / §1.1b). Distinct from agentA/B/C
     // (subagent identity) — these color-code memory blocks by category.
-    const val DARK_CATEGORY_PERSONA = 0xFF00BFA5
+    // Persona is the agent's own voice, so it takes the brand's vermilion family (a coral on dark, a
+    // deep brick on light), apart from the blue, amber, violet and grey of the other categories.
+    const val DARK_CATEGORY_PERSONA = 0xFFF08A70
+    const val LIGHT_CATEGORY_PERSONA = 0xFFB8432E
     const val DARK_CATEGORY_HUMAN = 0xFF5C9BD6
     const val DARK_CATEGORY_ONBOARDING = 0xFFD1A05A
     const val DARK_CATEGORY_PROJECT = 0xFF9B8AE0
@@ -93,8 +117,8 @@ object LettaThemeTokens {
         light = LettaThemePaletteTokens(
             primaryArgb = LettaColorTokens.LIGHT_PRIMARY,
             primaryContainerArgb = 0xFFFAD5CD,
-            secondaryArgb = 0xFF00ACC1,
-            tertiaryArgb = 0xFF0091EA,
+            secondaryArgb = LettaColorTokens.LIGHT_SECONDARY,
+            tertiaryArgb = LettaColorTokens.LIGHT_TERTIARY,
             backgroundArgb = LettaColorTokens.LIGHT_BACKGROUND,
             surfaceArgb = LettaColorTokens.LIGHT_SURFACE,
             surfaceVariantArgb = LettaColorTokens.LIGHT_SURFACE_VARIANT,
@@ -103,8 +127,8 @@ object LettaThemeTokens {
         dark = LettaThemePaletteTokens(
             primaryArgb = LettaColorTokens.DARK_PRIMARY,
             primaryContainerArgb = LettaColorTokens.DARK_PRIMARY_VARIANT,
-            secondaryArgb = LettaColorTokens.TEAL_ACCENT,
-            tertiaryArgb = LettaColorTokens.CYAN_ACCENT,
+            secondaryArgb = LettaColorTokens.DARK_SECONDARY,
+            tertiaryArgb = LettaColorTokens.DARK_TERTIARY,
             backgroundArgb = LettaColorTokens.DARK_BACKGROUND,
             surfaceArgb = LettaColorTokens.DARK_SURFACE,
             surfaceVariantArgb = LettaColorTokens.DARK_SURFACE_VARIANT,

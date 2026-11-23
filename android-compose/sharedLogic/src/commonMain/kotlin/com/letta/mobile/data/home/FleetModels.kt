@@ -3,6 +3,7 @@ package com.letta.mobile.data.home
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.DisplayNames
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
@@ -298,7 +299,7 @@ private fun buildRecentConversations(
         FleetRecentConversation(
             conversationId = conversation.id,
             agentId = conversation.agentId,
-            agentName = conversation.agentId?.let(nameByAgentId::get) ?: conversation.agentName.ifBlank { "Letta" },
+            agentName = conversation.agentId?.let(nameByAgentId::get) ?: conversation.agentName.ifBlank { DisplayNames.PRODUCT },
             title = conversation.title,
             preview = conversation.preview.trim().takeUnless { it.equals("Loaded from backend", ignoreCase = true) }.orEmpty(),
             updatedAt = parseConversationInstant(conversation.updatedAtLabel),
