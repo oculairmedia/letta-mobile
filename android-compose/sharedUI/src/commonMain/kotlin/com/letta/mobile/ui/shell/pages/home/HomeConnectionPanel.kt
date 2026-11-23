@@ -20,7 +20,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.ui.shell.tokens.ShellDimens
-import com.letta.mobile.ui.shell.tokens.shellBrandMark
+import com.letta.mobile.ui.theme.shellBrandMark
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
 import com.letta.mobile.data.chat.runtime.isConnectionRetryable
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth

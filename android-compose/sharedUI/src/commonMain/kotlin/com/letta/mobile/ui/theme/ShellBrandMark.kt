@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.shell.tokens
+package com.letta.mobile.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -7,7 +7,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.letta.mobile.ui.icons.BakenMark
-import com.letta.mobile.ui.theme.LettaColorTokens
 
 /**
  * The two-colour Baken mark (its stone and the vermilion pebble, from the design tokens) for the theme in scope: the

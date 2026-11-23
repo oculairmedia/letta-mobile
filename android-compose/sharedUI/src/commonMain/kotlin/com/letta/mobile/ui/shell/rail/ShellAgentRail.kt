@@ -4,7 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.semantics.Role
 import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.shell.tokens.ShellType
-import com.letta.mobile.ui.shell.tokens.shellBrandMark
+import com.letta.mobile.ui.theme.shellBrandMark
 import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.icons.LettaIcons
