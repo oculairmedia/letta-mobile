@@ -100,13 +100,31 @@
       "spacing": "hold"
     },
     "Face.y": {
-      "max_delta": 0.0423,
+      "max_delta": 0.0277,
       "overshoot_pct": 0.0,
-      "peak": -0.8562,
+      "peak": -0.187,
       "peak_frame": 40,
-      "range": 0.8562,
+      "range": 0.357,
       "settle_frame": 39,
       "spacing": "ease-out"
+    },
+    "Follow.rotation": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
+    "Follow.scaleY": {
+      "max_delta": 0.0076,
+      "overshoot_pct": 0.0,
+      "peak": 1.02,
+      "peak_frame": 17,
+      "range": 0.03,
+      "settle_frame": 29,
+      "spacing": "s"
     },
     "Joystick.x": {
       "max_delta": 0.0,
@@ -118,6 +136,24 @@
       "spacing": "hold"
     },
     "Joystick.y": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
+    "Lag.x": {
+      "max_delta": 2.0155,
+      "overshoot_pct": 0.0,
+      "peak": -5.0,
+      "peak_frame": 9,
+      "range": 8.0,
+      "settle_frame": 28,
+      "spacing": "ease-in"
+    },
+    "Lag.y": {
       "max_delta": 0.0,
       "overshoot_pct": 0.0,
       "peak": 0.0,
@@ -181,42 +217,51 @@
       "spacing": "ease-out"
     },
     "Squash.rotation": {
-      "max_delta": 0.0378,
+      "max_delta": 0.0374,
       "overshoot_pct": 0.0,
-      "peak": -0.0524,
+      "peak": -0.0519,
       "peak_frame": 5,
-      "range": 0.0785,
+      "range": 0.0781,
       "settle_frame": 23,
       "spacing": "ease-in"
     },
     "Squash.scaleX": {
-      "max_delta": 0.1125,
+      "max_delta": 0.1112,
       "overshoot_pct": 0.0,
-      "peak": 1.16,
+      "peak": 1.1587,
       "peak_frame": 5,
-      "range": 0.225,
+      "range": 0.2237,
       "settle_frame": 24,
       "spacing": "ease-in"
     },
     "Squash.scaleY": {
-      "max_delta": 0.1037,
+      "max_delta": 0.1026,
       "overshoot_pct": 0.0,
-      "peak": 0.8621,
+      "peak": 0.8633,
       "peak_frame": 5,
-      "range": 0.2074,
+      "range": 0.2062,
       "settle_frame": 24,
       "spacing": "ease-in"
     },
     "Squash.x": {
-      "max_delta": 2.3777,
+      "max_delta": 2.4067,
       "overshoot_pct": 0.0,
-      "peak": -4.0,
+      "peak": -3.9663,
       "peak_frame": 5,
-      "range": 4.0,
+      "range": 3.9663,
       "settle_frame": 10,
       "spacing": "ease-in"
     },
     "Squash.y": {
+      "max_delta": 0.0,
+      "overshoot_pct": 0.0,
+      "peak": 0.0,
+      "peak_frame": 0,
+      "range": 0.0,
+      "settle_frame": 0,
+      "spacing": "hold"
+    },
+    "Star0.opacity": {
       "max_delta": 0.0,
       "overshoot_pct": 0.0,
       "peak": 0.0,

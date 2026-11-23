@@ -309,5 +309,84 @@ class TestSeams(unittest.TestCase):
         layer(ok, [onward(100)]).rml(seams=index)
 
 
+class TestSecondaries(unittest.TestCase):
+    """letta-mobile-su08n, statically (no CLI): reduceMotion gates every secondary and sparkle,
+    the loop overlap is the body's motion exactly a beat late, and the calm twins hold it still."""
+
+    def _layer(self, name):
+        for layer in scene_tree().getroot().iter("StateMachineLayer"):
+            if layer.get("name") == name:
+                return layer
+        self.fail(f"no {name} layer")
+
+    def test_every_secondary_and_sparkle_needs_reduce_motion_off(self):
+        from rig.ids import VM_NEW
+        gate = f"{'1:50'}-{VM_NEW['reduceMotion']}"
+        for name in ("Overlap", "Sparkle"):
+            fired = list(self._layer(name).find("AnyState").iter("StateTransition"))
+            self.assertTrue(fired, f"{name} has no triggers")
+            for t in fired:
+                xml = ET.tostring(t, encoding="unicode")
+                with self.subTest(layer=name, to=t.get("stateToId")):
+                    self.assertIn(f'sourcePathIds="{gate}"', xml, "fires without a reduceMotion condition")
+                    self.assertIn('TransitionValueBooleanComparator value="false"', xml)
+
+    def test_no_loop_and_no_calm_twin_keys_a_secondary_node(self):
+        from rig.ids import FOLLOW_NODE, LAG_NODE, SPARKLE_STARS
+        owned = {LAG_NODE, FOLLOW_NODE, *SPARKLE_STARS}
+        for anim in scene_tree().getroot().iter("LinearAnimation"):
+            name = anim.get("name")
+            if not (name.startswith("State") or name.startswith("Calm")):
+                continue
+            keyed = {ko.get("objectId") for ko in anim.iter("KeyedObject")}
+            self.assertFalse(keyed & owned, f"{name} keys a secondary node")
+
+    def test_the_loop_lag_is_the_same_motion_a_beat_late(self):
+        import timeline
+        from rig.body import breath2, sine
+        from rig.lag import ease_of as _ease, lagged
+        from rml import SOFT_OUT
+        for keys, lag, period in ((breath2(), 14, 780), (sine(2, 3200), 12, 192), (sine(3, 2400), 8, 144)):
+            src = [timeline.Key(k[0], float(k[1]), _ease(k[2] if len(k) > 2 and k[2] else SOFT_OUT), "double")
+                   for k in keys]
+            out = lagged(keys, lag, period)
+            got = [timeline.Key(k[0], float(k[1]), _ease(k[2] if len(k) > 2 and k[2] else SOFT_OUT), "double")
+                   for k in out]
+            anchor = float(keys[0][1]) - timeline.sample(src, (-lag) % period)[0]
+            self.assertEqual(out[0][1], keys[0][1], "frame 0 moved: entries would land elsewhere")
+            self.assertLess(abs(anchor), 0.5, "the anchoring offset is visible")
+            for t in range(0, period + 1, 5):
+                want = timeline.sample(src, (t - lag) % period)[0] + anchor
+                self.assertAlmostEqual(timeline.sample(got, t)[0], want, delta=0.06, msg=f"t={t} lag={lag}")
+            self.assertEqual(out[0][1], out[-1][1], "the lagged loop does not close")
+
+    @staticmethod
+    def _calm_face_keys(state):
+        """{propertyKey: first value} of FACE in the calm twin of `state`."""
+        from rig.ids import FACE
+        name = "Calm" + state[0].upper() + state[1:]
+        calm = next(a for a in scene_tree().getroot().iter("LinearAnimation") if a.get("name") == name)
+        face = next(ko for ko in calm.iter("KeyedObject") if ko.get("objectId") == FACE)
+        return {kp.get("propertyKey"): float(next(iter(kp)).get("value")) for kp in face.iter("KeyedProperty")}
+
+    def test_a_lag_that_lands_on_a_key_splits_nothing(self):
+        """When the wrap cuts exactly at a key, every segment is whole: one key per original key."""
+        from rig.body import sine
+        from rig.lag import lagged
+        keys = sine(2, 3200)                     # keys at 0, 48, 96, 144, 192
+        out = lagged(keys, 48, 192)
+        self.assertEqual([k[0] for k in out], [0, 48, 96, 144, 192])
+        self.assertEqual(out[0][1], out[-1][1])
+        self.assertEqual(len({k[0] for k in out}), len(out), "a frame is keyed twice")
+
+    def test_calm_twins_hold_the_lagged_frame_zero(self):
+        """The calm twin and the loop agree at frame 0, so reduceMotion and entries land on it."""
+        from rig.motion import sustained_rest
+        from rig.constants import LOOP_LAG_FRAMES
+        for st in LOOP_LAG_FRAMES:
+            rest, keys = sustained_rest(st), self._calm_face_keys(st)
+            self.assertAlmostEqual(keys["13"], rest.face_x, places=3, msg=f"{st} face x")
+            self.assertAlmostEqual(keys["14"], rest.face_y, places=3, msg=f"{st} face y")
+
 if __name__ == "__main__":
     unittest.main()

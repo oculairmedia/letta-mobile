@@ -41,7 +41,8 @@ from typing import NamedTuple
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from timeline import PROP_NAMES, ROTATION_KEYS, num, prop_name, property_key, read_keys, sample  # noqa: E402
+from timeline import (PROP_NAMES, ROTATION_KEYS, num, prop_name, property_key, read_keys,  # noqa: E402
+                      register_interpolators, sample)
 
 NESTED_FIRE = 401  # callbacks have no value; never a seam
 
@@ -158,15 +159,17 @@ def parse(document):
     """An ElementTree root from a path, a document string, or a bare run of LinearAnimations
     (the joined animation XML gen_scene.py holds before it becomes an artboard)."""
     if isinstance(document, ET.Element):
-        return document
+        return register_interpolators(document)
     text = document
     if not str(document).lstrip().startswith("<"):
         with open(document, encoding="utf-8") as f:
             text = f.read()
     try:
-        return ET.fromstring(text)
+        root = ET.fromstring(text)
     except ET.ParseError:
-        return ET.fromstring("<SeamFragment>\n" + text + "\n</SeamFragment>")
+        root = ET.fromstring("<SeamFragment>\n" + text + "\n</SeamFragment>")
+    # Keys that share an interpolator by reference (rml.share_interpolators) read its curve.
+    return register_interpolators(root)
 
 
 def animation_index(document):

@@ -36,7 +36,7 @@ import os
 import re
 from textwrap import indent
 
-from rml import (BACK_OUT, BACK_SOFT, ELASTIC_HEAVY, ELASTIC_SOFT, GRADIENT_OPACITY, ROT, SINE, SX, SY, VM, VM_BLINK, VM_COLOR,
+from rml import (share_interpolators, BACK_OUT, BACK_SOFT, ELASTIC_HEAVY, ELASTIC_SOFT, GRADIENT_OPACITY, ROT, SINE, SX, SY, VM, VM_BLINK, VM_COLOR,
                  VM_DRAGGED, VM_ERROR, VM_HOVER, VM_LOOKX, VM_LOOKY, VM_MOUTH, VM_SHAPE, VM_STATE,
                  VM_SUCCESS, Y, anim_state, animation, bind, layer_frame)
 from rig.body import INFLATE_NODE, body, sine, squash
@@ -51,13 +51,13 @@ from rig.ids import (
     PLATE_BLINK, ROOT, SHAPES, SM, SUSTAINED, TURN_X_ANIM, TURN_Y_ANIM, VM_INSTANCE, VM_TUNE_SCALE,
     VM_SHAPE_ROTATION, VM_TURN_X, VM_TURN_Y, shape_enum_ids, state_enum_ids,
     CONV_LISTEN_SCALE, CONV_LISTEN_Y, CONV_MOVE_LEAN, CONV_MOVE_SX, CONV_MOVE_SY, SQUASH_NODE,
-    TRAVEL_NODE, VM_NEW,
+    TRAVEL_NODE, VM_NEW, FOLLOW_NODE,
 )
 from rig.contract import AVATAR
 from rig.layers import set_animation_index
 from rig.machine import root_machine
 from rig.seams import animation_index
-from rig.motion import (calm_animations, enter_animations, idle_variety_animations, momentary_animations,
+from rig.motion import (calm_animations, overlap_animations, sparkle_animations, enter_animations, idle_variety_animations, momentary_animations,
                         pet_animations, react_animations, shape_animations, sustained_animations,
                         wander_animations)
 from rig.plate import plate_component
@@ -106,7 +106,8 @@ def root_artboard(solo=None):
            BODY_NODE: {ROT: [(0, rad(-2))]}}), "loop")
     anims = (shape_animations() + sustained_animations() + enter_animations() + momentary_animations() + idle_variety_animations()
              + turn_animations() + wander_animations() + [breath, blink_rest, blink, hover_rest, hover, hover_held]
-             + calm_animations() + pet_animations() + react_animations())
+             + calm_animations() + pet_animations() + react_animations()
+             + overlap_animations() + sparkle_animations())
     # The blend policy (MOTION-PIPELINE step A): every animation this artboard plays, indexed by
     # its keyed ends, so root_machine()'s layers can refuse a 0 ms transition that tears a value.
     # The animations exist before the machine does, so the index is simply the XML just built.
@@ -131,7 +132,11 @@ def root_artboard(solo=None):
         <Node x="0" y="0" name="Lean" id="{LEAN_NODE}">
             {bind(VM_TURN_X, ROT, CONV_LEAN)}
 {indent(face(), "            ")}
-{indent(body(), "            ")}
+            <!-- Follow (letta-mobile-su08n): the body's follow-through, pivoting at the feet like
+                 Squash and Lean. Keyed by the Overlap layer (squash) and turning entries (roll). -->
+            <Node x="0" y="0" name="Follow" id="{FOLLOW_NODE}">
+{indent(body(), "                ")}
+            </Node>
         </Node>
         </Node>
         </Node>
@@ -250,8 +255,26 @@ def data():
 </ViewModel>'''
 
 
+# Each artboard's shared interpolators get their ids from that artboard's id space (rml.share_interpolators).
+_EASE_SPACE = {"Mascot": 3, "Plate": 7}
+
+
+def _ease_id(artboard, curve):
+    """A shared interpolator's id: allocated once per (artboard, curve) and recorded, like every id."""
+    from rig.ids import alloc
+    return alloc(_EASE_SPACE[artboard], f"Ease {artboard} {curve}")
+
+
 def scene_document(solo=None):
-    """The whole scene.rml document: the root artboard, the Plate component and the data section."""
+    """The whole scene.rml document: the root artboard, the Plate component and the data section.
+
+    Every eased key shares its curve's one interpolator per artboard (rml.share_interpolators):
+    about five thousand keys use fifteen curves, and the web bundle budget counts every byte of the
+    file. The blend policy has already checked the animations by then (root_artboard)."""
+    return share_interpolators(_scene_document(solo), _ease_id)
+
+
+def _scene_document(solo=None):
     return f'''<Rive version="1" kind="fragment">
     <!--
         The Letta agent mascot, v4: SPEC.md + art/*.svg through gen_scene.py. Regenerate rather

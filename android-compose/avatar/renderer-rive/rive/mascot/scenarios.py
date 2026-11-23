@@ -165,6 +165,11 @@ SCENARIOS = {s.name: s for s in [
              note="60 s of idle with reduceMotion: IdleVariety, Wander and the breath bob held"),
     scenario("reduce-motion-poke", (data("reduceMotion=true"), data("poke=true"), advance(40)),
              note="a poke with reduceMotion: ReactCalm, one blink and nothing that moves"),
+    # letta-mobile-su08n: the moments that carry a secondary and a sparkle, with reduceMotion on.
+    scenario("reduce-motion-success", (data("reduceMotion=true"), data("success=true"), advance(60)),
+             note="success with reduceMotion: SuccessCalm only - no overlap, no follow-through, no stars"),
+    scenario("reduce-motion-toolDone", (data("reduceMotion=true"), data("toolDone=true"), advance(50)),
+             note="toolDone with reduceMotion: no nod echo and no stars"),
     scenario("idle-60s", (advance(3600),),
              note="60 s of plain idle: the control for reduce-motion-idle (beats and wander DO fire)"),
 ]}

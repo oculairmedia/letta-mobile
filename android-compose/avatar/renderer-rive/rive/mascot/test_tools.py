@@ -245,5 +245,43 @@ class TimelineChart(unittest.TestCase):
             self.assertIn(line, charted.splitlines())
 
 
+class SharedInterpolators(unittest.TestCase):
+    """rml.share_interpolators: one interpolator per curve per artboard, the rest by reference, and
+    timeline reads a referencing key's curve exactly as it read the nested copy."""
+
+    DOC = """<Rive>
+<Artboard name="A" id="0:1">
+  <LinearAnimation fps="60" duration="10" name="X" id="3:1"><KeyedObject objectId="0:2"><KeyedProperty propertyKey="13">
+    <KeyFrameDouble value="0" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0.37" y1="0" x2="0.63" y2="1"/></KeyFrameDouble>
+    <KeyFrameDouble value="5" frame="5" interpolationType="cubic"><CubicEaseInterpolator x1="0.37" y1="0" x2="0.63" y2="1"/></KeyFrameDouble>
+    <KeyFrameDouble value="9" frame="10"/>
+  </KeyedProperty></KeyedObject></LinearAnimation>
+</Artboard>
+<Artboard name="B" id="7:2">
+  <LinearAnimation fps="60" duration="10" name="Y" id="7:9"><KeyedObject objectId="7:3"><KeyedProperty propertyKey="13">
+    <KeyFrameDouble value="0" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0.37" y1="0" x2="0.63" y2="1"/></KeyFrameDouble>
+    <KeyFrameDouble value="9" frame="10"/>
+  </KeyedProperty></KeyedObject></LinearAnimation>
+</Artboard>
+</Rive>"""
+
+    def test_one_definition_per_curve_per_artboard(self):
+        import xml.etree.ElementTree as ET
+        from rml import share_interpolators
+        ids = iter(["3:100", "7:100"])
+        out = share_interpolators(self.DOC, lambda board, curve: next(ids))
+        self.assertEqual(out.count("<CubicEaseInterpolator"), 2, "one per artboard")
+        self.assertEqual(out.count('interpolatorId="3:100"'), 1)
+        root = timeline.register_interpolators(ET.fromstring(out))
+        before = timeline.register_interpolators(ET.fromstring(self.DOC))
+        for kp_new, kp_old in zip(root.iter("KeyedProperty"), before.iter("KeyedProperty")):
+            self.assertEqual([k.ease for k in timeline.read_keys(kp_new)], [k.ease for k in timeline.read_keys(kp_old)])
+
+    def test_the_shipped_document_shares_its_curves(self):
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "scene.rml"), encoding="utf-8") as f:
+            doc = f.read()
+        self.assertLess(doc.count("<CubicEaseInterpolator"), 60, "the generator stopped sharing interpolators")
+
+
 if __name__ == "__main__":
     unittest.main()
