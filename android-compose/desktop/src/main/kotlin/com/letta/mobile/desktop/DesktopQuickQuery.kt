@@ -13,6 +13,7 @@ import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
+import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.palette.QuickQueryActions
 import com.letta.mobile.ui.shell.palette.QuickQueryPanel
@@ -146,7 +147,7 @@ internal fun DesktopQuickQueryWindow(coordinator: DesktopQuickQueryCoordinator) 
         transparent = true,
         resizable = false,
         alwaysOnTop = true,
-        title = "Letta Quick Query",
+        title = "${DisplayNames.PRODUCT} Quick Query",
     ) {
         DisposableEffect(window) {
             // Close on click-away — but only once the window has actually held

@@ -89,7 +89,8 @@ class BakenBrandTest {
         assertEquals(Color(0xFFDDE5EB), light.userBubbleBgColor)
         for ((scheme, colours) in listOf(darkScheme to dark, lightScheme to light)) {
             val bubble = colours.userBubbleBgColor
-            assertTrue(bubble.saturation() < NEUTRAL_SATURATION, "the user bubble ${bubble.hex()} is not neutral")
+            // Chroma (max - min channel), not HSL saturation, which inflates for dark colours: the vermilion is ~0.7.
+            assertTrue(bubble.chroma() < NEUTRAL_CHROMA, "the user bubble ${bubble.hex()} is not neutral")
             assertNotEquals(scheme.primaryContainer, bubble, "the user bubble still reuses primaryContainer")
             assertNotEquals(colours.agentBubbleBgColor, bubble, "the user bubble must stand apart from the agent's")
             assertReads(scheme.onSurface, bubble, TEXT_CONTRAST, "text on the user bubble")
@@ -131,6 +132,8 @@ class BakenBrandTest {
 
     private fun Color.channels(): List<Double> = listOf(red, green, blue).map(Float::toDouble)
 
+    private fun Color.chroma(): Double = channels().let { it.max() - it.min() }
+
     private fun Color.saturation(): Double {
         val (max, min) = channels().let { it.max() to it.min() }
         val lightness = (max + min) / 2
@@ -165,7 +168,7 @@ class BakenBrandTest {
         const val KIT_PATHS = 2
         const val TEXT_CONTRAST = 4.5
         const val GRAPHIC_CONTRAST = 3.0
-        const val NEUTRAL_SATURATION = 0.3
+        const val NEUTRAL_CHROMA = 0.15
         const val VIVID_SATURATION = 0.35
         val TEAL_HUES = 150.0..200.0
         const val HUE_SECTORS = 6.0

@@ -31,6 +31,7 @@ import com.letta.mobile.AppLaunchTarget
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
 import com.letta.mobile.data.model.BackendConnectionStatus
+import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.backendConnectionStatus
 import com.letta.mobile.data.repository.api.ISettingsRepository
@@ -271,7 +272,7 @@ private fun BackendConnectionStatus.homeHero(onRetry: () -> Unit): ShellHomeConn
         is BackendConnectionStatus.Failed -> ChatScreenStatus.BackendOffline(message)
         is BackendConnectionStatus.Connected -> return null
     }
-    return ShellHomeConnection(HomeConnectionState(status, (this as? BackendConnectionStatus.Failed)?.message), onRetry, wordmark = "LETTA")
+    return ShellHomeConnection(HomeConnectionState(status, (this as? BackendConnectionStatus.Failed)?.message), onRetry, wordmark = DisplayNames.WORDMARK)
 }
 
 /** No transport carries a Home card's A2UI action on Android yet (as on desktop): it is logged and dropped. */

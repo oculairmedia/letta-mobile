@@ -21,6 +21,13 @@ internal object ShellDimens {
     /** The two-colour Baken mark over the wordmark on Home's connection hero. */
     val heroMark: Dp = 72.dp
 
+    /**
+     * The rail's Home button: a tile the size of an agent orb (LettaDimens.Orb.lg) holding the two-colour mark, which
+     * fills most of it so Home carries the same visual weight as the agents under it.
+     */
+    val railHomeTile: Dp = 40.dp
+    val railHomeMark: Dp = 30.dp
+
     /** One agent in Home's avatar row: the avatar and its name under it. */
     val homeAvatarTile: Dp = 64.dp
 

@@ -1,7 +1,10 @@
 package com.letta.mobile.ui.shell.rail
 
+import androidx.compose.foundation.Image
 import androidx.compose.ui.semantics.Role
+import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.shell.tokens.ShellType
+import com.letta.mobile.ui.shell.tokens.shellBrandMark
 import com.letta.mobile.ui.components.foundation.LettaIcon
 import com.letta.mobile.ui.components.foundation.LettaIconStyle
 import com.letta.mobile.ui.icons.LettaIcons
@@ -130,7 +133,34 @@ private val railParts: Map<RuntimeViewId, ShellRailPart> = mapOf(
 private fun RailHomePart(frame: ShellRailFrame) {
     val actions = frame.actions
     RailHeaderRow(onClick = actions.onHome, label = "Home".takeIf { frame.state.expanded }) {
-        RailActionIcon(icon = LettaIcons.Home, description = "Home", selected = frame.state.homeSelected, onClick = actions.onHome)
+        RailHomeButton(selected = frame.state.homeSelected, onClick = actions.onHome)
+    }
+}
+
+/**
+ * Home at the top of the rail: the two-colour Baken mark (untinted) on an orb-sized tile, in an orb's slot with the
+ * same selected marker the agents have, so it weighs what an agent weighs.
+ */
+@Composable
+private fun RailHomeButton(selected: Boolean, onClick: () -> Unit) {
+    LocalLettaHost.current.tooltip(HOME) {
+        Box(
+            modifier = Modifier.size(width = LettaDimens.Orb.railSlotWidth, height = LettaDimens.Orb.railSlotHeight),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) SelectedRailMarker(Modifier.align(Alignment.CenterStart))
+            Box(
+                modifier = Modifier
+                    .size(ShellDimens.railHomeTile)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
+                    .clickable(role = Role.Button, onClick = onClick)
+                    .semantics { contentDescription = HOME },
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(imageVector = shellBrandMark(), contentDescription = null, modifier = Modifier.size(ShellDimens.railHomeMark))
+            }
+        }
     }
 }
 
@@ -291,21 +321,6 @@ private fun SelectedRailMarker(modifier: Modifier = Modifier) {
     )
 }
 
-/** A rail control: [icon] on a circle, raised while it is the open page. */
-@Composable
-private fun RailActionIcon(icon: ImageVector, description: String, selected: Boolean, onClick: () -> Unit) {
-    RailCircleButton(
-        RailCircleButtonStyle(
-            icon = icon,
-            description = description,
-            diameter = LettaDimens.Control.iconButtonLg,
-            container = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
-            tint = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-        ),
-        onClick = onClick,
-    )
-}
-
 /** The rail's plus: opens the agent picker, whose top rows are the create actions. */
 @Composable
 private fun NewSessionButton(onNewSession: () -> Unit) {
@@ -346,3 +361,4 @@ private fun RailCircleButton(style: RailCircleButtonStyle, onClick: () -> Unit) 
 }
 
 private const val FADE_MS = 250
+private const val HOME = "Home"

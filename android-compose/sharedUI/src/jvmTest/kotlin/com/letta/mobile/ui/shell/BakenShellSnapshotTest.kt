@@ -24,6 +24,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
+import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.ui.chat.AgentSphere
 import com.letta.mobile.ui.chat.surface.timeline.rows.RenderRow
 import com.letta.mobile.ui.chat.surface.timeline.rows.message
@@ -62,7 +63,7 @@ class BakenShellSnapshotTest {
                         modifier = Modifier.fillMaxHeight(),
                     )
                     Column(Modifier.width(CONTENT_WIDTH.dp).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        HomeConnectionPanel(HomeConnectionState(ChatScreenStatus.Loading), onRetryConnection = {}, wordmark = "baken")
+                        HomeConnectionPanel(HomeConnectionState(ChatScreenStatus.Loading), onRetryConnection = {}, wordmark = DisplayNames.WORDMARK)
                         Button(onClick = {}) { Text("Send") }
                         OutlinedTextField(value = "Message Alpha", onValueChange = {})
                     }

@@ -149,7 +149,7 @@ internal class DesktopNucleusController(
                     }
                 }
                 UpdateResult.NotAvailable -> mutableState.update {
-                    it.copy(updatePhase = DesktopUpdatePhase.UpToDate, updateMessage = "Letta Desktop is up to date.")
+                    it.copy(updatePhase = DesktopUpdatePhase.UpToDate, updateMessage = "$DESKTOP_APP_NAME is up to date.")
                 }
                 is UpdateResult.Error -> mutableState.update {
                     it.copy(
@@ -244,7 +244,7 @@ internal class DesktopNucleusController(
     fun sendTestNotification(onActivated: () -> Unit) {
         scope.launch(Dispatchers.IO) {
             val result = notification(
-                title = "Letta Desktop",
+                title = DESKTOP_APP_NAME,
                 message = "Native notifications are connected.",
                 onActivated = onActivated,
                 onFailed = {
@@ -390,7 +390,7 @@ internal class DesktopNucleusController(
     fun notifyFailure(message: String, onActivated: () -> Unit) {
         scope.launch(Dispatchers.IO) {
             notification(
-                title = "Letta Desktop needs attention",
+                title = "$DESKTOP_APP_NAME needs attention",
                 message = message,
                 onActivated = onActivated,
             ).send()
@@ -413,7 +413,7 @@ internal class DesktopNucleusController(
         val initialized = if (Platform.Current == Platform.Windows) {
             WindowsNotificationCenter.initialize(
                 aumid = LETTA_WINDOWS_AUMID,
-                appName = LETTA_DESKTOP_APP_NAME,
+                appName = DESKTOP_APP_NAME,
                 shortcutPolicy = ShortcutPolicy.REQUIRE_CREATE,
             ).also { ok ->
                 // Inline-reply toasts route their typed text back through this

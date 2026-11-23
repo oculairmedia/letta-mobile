@@ -16,6 +16,9 @@ object DisplayNames {
      */
     const val PRODUCT = "Baken"
 
+    /** The product's wordmark as the brand kit sets it (lowercase), on Home's connection hero on every client. */
+    val WORDMARK: String = PRODUCT.lowercase()
+
     /**
      * The agent's name when it has a usable one, else "Agent <short-id>".
      * A "name" that is itself the raw id (upstream fallback already applied)

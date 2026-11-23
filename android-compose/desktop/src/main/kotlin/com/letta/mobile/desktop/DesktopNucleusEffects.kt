@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import com.letta.mobile.data.model.DisplayNames
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -288,7 +289,7 @@ private fun AgentWorkEffect(window: Window, state: DesktopNucleusEffectState) {
             EnergyManager.disableLightEfficiencyMode()
             EnergyManager.keepScreenAwake()
             MediaControlService.setMetadata(
-                MediaMetadata(title = "${state.agentName} is working", artist = "Letta Desktop"),
+                MediaMetadata(title = "${state.agentName} is working", artist = DESKTOP_APP_NAME),
             )
             MediaControlService.setPlaybackState(MediaPlaybackState(MediaPlaybackStatus.PLAYING))
         } else {
@@ -296,7 +297,7 @@ private fun AgentWorkEffect(window: Window, state: DesktopNucleusEffectState) {
             EnergyManager.releaseScreenAwake()
             EnergyManager.enableLightEfficiencyMode()
             MediaControlService.setMetadata(
-                MediaMetadata(title = state.agentName, artist = "Letta Desktop"),
+                MediaMetadata(title = state.agentName, artist = DESKTOP_APP_NAME),
             )
             MediaControlService.setPlaybackState(MediaPlaybackState(MediaPlaybackStatus.PAUSED))
         }
@@ -408,7 +409,7 @@ private fun registerQuickSwitcher(onQuickQuery: () -> Unit): Long =
     GlobalHotKeyManager.register(
         keyCode = KeyEvent.VK_SPACE,
         modifiers = HotKeyModifier.CONTROL + HotKeyModifier.SHIFT,
-        description = "Open Letta quick query",
+        description = "Open ${DisplayNames.PRODUCT} quick query",
     ) { _, _ ->
         // Deliberately does NOT activate the main window: the quick-query bar
         // floats over the user's current context (which it also captures —
@@ -453,10 +454,10 @@ private fun DesktopTray(
     Tray(
         // The Baken mark in one ink: the tray tints it to the system's light or dark taskbar.
         icon = BakenMark.mono,
-        tooltip = if (isAgentWorking) "Letta Desktop — agent working" else "Letta Desktop",
+        tooltip = if (isAgentWorking) "$DESKTOP_APP_NAME — agent working" else DESKTOP_APP_NAME,
         primaryAction = actions.onShow,
     ) {
-        Item(label = "Show Letta Desktop", onClick = actions.onShow)
+        Item(label = "Show $DESKTOP_APP_NAME", onClick = actions.onShow)
         Item(label = "Settings", onClick = actions.onOpenSettings)
         Item(label = "Check for updates", onClick = actions.onCheckForUpdates)
         Divider()
@@ -466,8 +467,8 @@ private fun DesktopTray(
 
 private fun configureMediaControls(agentName: String, onActivate: () -> Unit) {
     if (!MediaControlService.isAvailable()) return
-    MediaControlService.configure(displayName = "Letta Desktop")
-    MediaControlService.setMetadata(MediaMetadata(title = agentName, artist = "Letta Desktop"))
+    MediaControlService.configure(displayName = DESKTOP_APP_NAME)
+    MediaControlService.setMetadata(MediaMetadata(title = agentName, artist = DESKTOP_APP_NAME))
     MediaControlService.attach { event ->
         when (event) {
             MediaControlEvent.Play,
@@ -496,7 +497,7 @@ private fun configureLauncherMenus(onShow: () -> Unit, onOpenSettings: () -> Uni
             }
             MacOsDockMenu.setDockMenu(
                 listOf(
-                    DockMenuItem(id = 1, title = "Show Letta Desktop"),
+                    DockMenuItem(id = 1, title = "Show $DESKTOP_APP_NAME"),
                     DockMenuItem(id = 2, title = "Settings"),
                 ),
             )
@@ -508,8 +509,8 @@ private fun configureLauncherMenus(onShow: () -> Unit, onOpenSettings: () -> Uni
 private fun configureWindowsJumpList() {
     WindowsJumpListManager.setJumpList(
         tasks = listOf(
-            JumpListItem("Open conversations", "meridian://conversations", "Show Letta Desktop conversations"),
-            JumpListItem("Open settings", "meridian://settings", "Show Letta Desktop settings"),
+            JumpListItem("Open conversations", "meridian://conversations", "Show $DESKTOP_APP_NAME conversations"),
+            JumpListItem("Open settings", "meridian://settings", "Show $DESKTOP_APP_NAME settings"),
         ),
     )
 }
