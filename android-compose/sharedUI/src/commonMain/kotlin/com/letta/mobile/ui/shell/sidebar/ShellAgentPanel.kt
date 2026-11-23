@@ -71,6 +71,7 @@ import com.letta.mobile.sharedui.resources.shared_notes_hide
 import com.letta.mobile.sharedui.resources.shared_notes_show
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
+import com.letta.mobile.sharedui.resources.shell_workspace_title
 
 /** Test tags for the agent panel's parts. */
 object ShellAgentPanelTags {
@@ -196,9 +197,9 @@ fun ShellNavRow(model: ShellNavRowModel, onClick: () -> Unit, modifier: Modifier
 
 /**
  * The title slot, then the agent's menu. The slot is the focused agent (mascot + name, tap to edit),
- * or "Home" while the fleet page is open; the agent menu has nothing to act on then, so it hides.
- * Under a window header that already names the page ([LocalHostTitlesPage]) the "Home" header is
- * left out, so the page name shows once.
+ * or the product's name while the fleet Home page is open (the page itself already says "Home");
+ * the agent menu has nothing to act on then, so it hides. Under a window header that already shows a
+ * title ([LocalHostTitlesPage]) the Home header is left out, so the name shows once.
  */
 @Composable
 private fun ShellPanelHeader(frame: ShellPanelFrame) {
@@ -216,7 +217,7 @@ private fun ShellPanelHeader(frame: ShellPanelFrame) {
     }
 }
 
-/** Cross-fades the agent identity and "Home" in one slot, the new title sliding up into place. */
+/** Cross-fades the agent identity and the product's name in one slot, the new title sliding up into place. */
 @Composable
 private fun ShellPanelTitleSlot(state: ShellAgentPanelState, onEditAgent: () -> Unit, modifier: Modifier = Modifier) {
     AnimatedContent(
@@ -230,7 +231,7 @@ private fun ShellPanelTitleSlot(state: ShellAgentPanelState, onEditAgent: () -> 
     ) { home ->
         if (home) {
             Text(
-                text = "Home",
+                text = stringResource(Res.string.shell_workspace_title),
                 style = LettaTextStyles.titleMediumSemibold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
