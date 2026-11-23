@@ -1,6 +1,6 @@
 {
-  "name": "Letta Web",
-  "short_name": "Letta",
+  "name": "Baken",
+  "short_name": "Baken",
   "description": "Manage Letta agents and conversations from the browser.",
   "id": "./",
   "start_url": "./",

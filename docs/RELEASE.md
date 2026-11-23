@@ -17,8 +17,8 @@ verify the actual workflow run and attached assets for each release.
 
 ## Linux x86-64 desktop (Omarchy / Arch)
 
-The desktop artifact is `letta-desktop-<tag>-linux-x64.AppImage`, accompanied by
-`letta-desktop-<tag>-linux-x64.AppImage.sha256`. It runs the same shared Compose
+The desktop artifact is `baken-<tag>-linux-x64.AppImage`, accompanied by
+`baken-<tag>-linux-x64.AppImage.sha256`. It runs the same shared Compose
 UI as Windows. It is separate from `meridian-iroh-wrapper-<tag>-linux-x64.tar`,
 which is a server CLI and cannot launch the desktop UI. This is a portable
 AppImage, not an Arch/pacman package; there is no validated PKGBUILD.
@@ -72,9 +72,9 @@ or claimed. No live Intel Surface Pro7/Omarchy verification has been performed.
 Download the AppImage and matching checksum from the same verified release:
 
 ```bash
-sha256sum -c letta-desktop-<tag>-linux-x64.AppImage.sha256
-chmod +x letta-desktop-<tag>-linux-x64.AppImage
-./letta-desktop-<tag>-linux-x64.AppImage
+sha256sum -c baken-<tag>-linux-x64.AppImage.sha256
+chmod +x baken-<tag>-linux-x64.AppImage
+./baken-<tag>-linux-x64.AppImage
 ```
 
 Replace `<tag>` with the release tag in these commands. The pinned toolset carries
@@ -83,21 +83,25 @@ launch path. To run without a FUSE mount, extract into a permanent,
 user-writable directory, then launch its `AppRun` (keep the whole extracted tree):
 
 ```bash
-./letta-desktop-<tag>-linux-x64.AppImage --appimage-extract
+./baken-<tag>-linux-x64.AppImage --appimage-extract
 mkdir -p "$HOME/.local/opt"
-# Destination must not already exist.
-mv -f squashfs-root "$HOME/.local/opt/letta-desktop"
+# Updating: remove the previous extracted tree first, or mv nests the new one inside it
+# and the menu entry keeps launching the old AppRun.
+rm -rf "$HOME/.local/opt/letta-desktop"
+mv squashfs-root "$HOME/.local/opt/letta-desktop"
 "$HOME/.local/opt/letta-desktop/AppRun"
 ```
 
 For menu integration, create `~/.local/share/applications/letta-desktop.desktop`
 with the following content, replacing `/home/YOU` with your actual home path.
+The directory and entry file keep their `letta-desktop` names so an existing
+extracted install and its menu entry are replaced in place, not duplicated.
 Use the existing image's icon if desired; the minimal entry needs no icon:
 
 ```ini
 [Desktop Entry]
 Type=Application
-Name=Letta Desktop
+Name=Baken
 Exec="/home/YOU/.local/opt/letta-desktop/AppRun" %U
 Terminal=false
 Categories=Utility;
