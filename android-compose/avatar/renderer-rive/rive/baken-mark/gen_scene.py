@@ -9,6 +9,7 @@ Structure:
   BakenMark (artboard 500x500, view model `BrandMark`, state machine `BrandMark`)
     rig/__init__.py the path bootstrap onto the mascot rig's shared tools (rig.layers, rig.seams)
     rig/ids.py      every named Rive object id, frozen
+    rig/brand.py    the brand the app ships: BakenMark.kt's paths, ThemeTokens.kt's colours
     rig/stones.py   the drawing: Base > Lean > Event > Pose > Tone per stone, the seam light
     rig/motion.py   every animation, from the tables in rig/constants.py
     rig/machine.py  the five layers: Theme, Pose, Light, Event, Hover
@@ -157,23 +158,31 @@ def scene_document(solo=None, backdrop=None):
 '''
 
 
+def _take(argv, flag):
+    """Remove `flag VALUE` from argv and return VALUE (None when the flag is absent)."""
+    if flag not in argv:
+        return None
+    i = argv.index(flag)
+    if i + 1 >= len(argv):
+        raise SystemExit(f"{flag} needs a value")
+    value = argv[i + 1]
+    del argv[i:i + 2]
+    return value
+
+
+def _take_switch(argv, flag):
+    """Remove a bare `flag` from argv; True when it was there."""
+    present = flag in argv
+    if present:
+        argv.remove(flag)
+    return present
+
+
 def main(argv):
-    argv, solo = list(argv), None
-    if "--solo" in argv:
-        i = argv.index("--solo")
-        if i + 1 >= len(argv):
-            raise SystemExit("--solo needs an animation name")
-        solo = argv[i + 1]
-        del argv[i:i + 2]
-    backdrop = None
-    if "--backdrop" in argv:
-        i = argv.index("--backdrop")
-        backdrop = argv[i + 1]
-        del argv[i:i + 2]
-    probe = "--probe" in argv
-    if probe:
-        argv.remove("--probe")
-    if (solo or probe or backdrop) and not argv:
+    argv = list(argv)
+    solo, backdrop, probe = _take(argv, "--solo"), _take(argv, "--backdrop"), _take_switch(argv, "--probe")
+    throwaway = any((solo, backdrop, probe))
+    if throwaway and not argv:
         raise SystemExit("--solo, --probe and --backdrop write a throwaway document: pass its output path")
     doc = scene_document(solo, backdrop)
     if probe:

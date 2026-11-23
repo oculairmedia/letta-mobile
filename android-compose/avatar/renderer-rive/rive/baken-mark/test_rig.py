@@ -126,17 +126,25 @@ class Grounded(unittest.TestCase):
 
 
 class Loops(unittest.TestCase):
+    @staticmethod
+    def _loop_ends(track):
+        """A light track's first and last keys, minus any property allowed to wrap while hidden;
+        raises when one wraps while it can be seen."""
+        first, last = dict(track[0][1]), dict(track[-1][1])
+        for prop, hider in constants.LOOP_WRAPS_HIDDEN.items():
+            if first.get(prop) == last.get(prop):
+                continue
+            if (first.get(hider), last.get(hider)) != (0, 0):
+                raise AssertionError(f"{prop} wraps while {hider} is visible")
+            first.pop(prop), last.pop(prop)
+        return first, last
+
     def test_every_sustained_track_closes(self):
-        for state, (_ms, _bez, tracks) in constants.POSE.items():
-            for stone, track in tracks.items():
-                self.assertEqual(track[0][1], track[-1][1], f"Pose {state}/{stone} does not loop")
+        pose = [(f"{s}/{stone}", t) for s, (_ms, _b, tracks) in constants.POSE.items() for stone, t in tracks.items()]
+        for name, track in pose:
+            self.assertEqual(track[0][1], track[-1][1], f"Pose {name} does not loop")
         for state, (_ms, _bez, track) in constants.LIGHT.items():
-            first, last = dict(track[0][1]), dict(track[-1][1])
-            for prop, hider in constants.LOOP_WRAPS_HIDDEN.items():
-                if first.get(prop) != last.get(prop):
-                    self.assertEqual((first.get(hider), last.get(hider)), (0, 0),
-                                     f"Light {state}: {prop} wraps while {hider} is visible")
-                    first.pop(prop), last.pop(prop)
+            first, last = self._loop_ends(track)
             self.assertEqual(first, last, f"Light {state} does not loop")
 
     def test_the_spec_timings(self):
@@ -190,6 +198,35 @@ class Motion(unittest.TestCase):
         track = [(0, {}), (50, {"rot": 2}), (100, {})]
         self.assertEqual(motion.track_keys(track, "rot", 0, 1000), [(0, 0), (30, 2), (60, 0)])
         self.assertEqual(motion.track_keys(track, "x", 0, 1000), [(0, 0)])
+
+
+class Brand(unittest.TestCase):
+    """The rig draws the brand the app ships (#2626): BakenMark.kt's paths and ThemeTokens.kt's
+    colours, read at generation time - no copy of either lives in the rig."""
+
+    def test_the_stones_are_bakenmark_kt_paths(self):
+        from rig import brand
+        for stone in ids.STONES:
+            path = brand.mark_path(stone)
+            self.assertTrue(path.startswith("M ") and path.rstrip().endswith("Z"), stone)
+            self.assertEqual(len(stones.stone_vertices(stone)), path.count(" C "), stone)
+
+    def test_the_palette_is_the_theme_tokens(self):
+        from rig import brand
+        p = constants.PALETTE
+        self.assertEqual((p["dark"]["stone"], p["dark"]["accent"]),
+                         (brand.token("DARK_MARK_STONE"), brand.token("DARK_PRIMARY")))
+        self.assertEqual((p["light"]["stone"], p["light"]["accent"]),
+                         (brand.token("LIGHT_MARK_STONE"), brand.token("LIGHT_PRIMARY")))
+        self.assertEqual(p["monoDark"]["stone"], p["monoDark"]["accent"])
+        self.assertEqual(p["monoLight"]["stone"], p["monoLight"]["accent"])
+
+    def test_no_copy_of_the_art_or_the_palette_in_the_rig(self):
+        self.assertFalse(os.path.isdir(os.path.join(HERE, "art")), "the mark's paths come from BakenMark.kt")
+        with open(os.path.join(HERE, "rig", "constants.py"), encoding="utf-8") as f:
+            src = f.read()
+        for hexcode in ("DCE6EE", "163044", "EE5A3F", "E04A32"):
+            self.assertNotIn(f'"FF{hexcode}"', src, f"{hexcode} is a theme token, not a rig constant")
 
 
 if __name__ == "__main__":

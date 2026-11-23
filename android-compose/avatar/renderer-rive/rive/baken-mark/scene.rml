@@ -240,12 +240,12 @@
         <LinearAnimation fps="60" duration="1" loopValue="oneShot" name="Theme_monoDark" id="3:12">
             <KeyedObject objectId="0:120">
                 <KeyedProperty propertyKey="37">
-                    <KeyFrameColor value="FF10202C" frame="0"/>
+                    <KeyFrameColor value="FF163044" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:220">
                 <KeyedProperty propertyKey="37">
-                    <KeyFrameColor value="FF10202C" frame="0"/>
+                    <KeyFrameColor value="FF163044" frame="0"/>
                 </KeyedProperty>
             </KeyedObject>
             <KeyedObject objectId="0:221">

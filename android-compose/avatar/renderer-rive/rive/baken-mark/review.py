@@ -108,8 +108,10 @@ def label(im, text, colour=(225, 228, 232)):
     return im
 
 
-def motion_sheet(r, name, flags, frame_list, title):
-    """A strip of the frames, then their onion skin, with the title above."""
+def motion_sheet(r, name, motion):
+    """A strip of the frames, then their onion skin, with the title above. `motion` is one entry of
+    motions(): (flags, frames, title)."""
+    flags, frame_list, title = motion
     cells = [label(r.cell(flags, f), str(f)) for f in frame_list]
     paths = [r.shot(flags, f) for f in frame_list]      # plain renders: onion.load cuts them out
     look = _onion.Look(tint=False, edges=False, min_alpha=0.18)
@@ -174,7 +176,7 @@ def main(argv=None):
         for name, (flags, frame_list, title) in motions().items():
             if a.only and a.only != name:
                 continue
-            sheet = reduce_motion_sheet(r) if name == "reduce-motion" else motion_sheet(r, name, flags, frame_list, title)
+            sheet = reduce_motion_sheet(r) if name == "reduce-motion" else motion_sheet(r, name, (flags, frame_list, title))
             path = os.path.join(OUT, f"{name}.png")
             sheet.save(path, optimize=True)
             print("wrote", path)

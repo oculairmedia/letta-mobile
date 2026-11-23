@@ -18,6 +18,8 @@ A track is the lab's own notation: [(percent, {prop: value}), ...]. A property a
 is interpolated between the keys that do name it, and a property the first or last key leaves
 out is at rest there - the CSS @keyframes rules, so a track reads across from the lab unchanged.
 """
+from typing import NamedTuple
+
 from rml import COLOR, OPACITY, ROT, SX, SY, X, Y, animation
 
 from rig.constants import (AMBIENT_MS, BOOT, BOOT_CALM_MS, BOOT_LAB_MS, BOOT_MS, BOUNCE_STOPS, EASE,
@@ -45,12 +47,21 @@ def _r(v):
     return round(v, 6)
 
 
-def track_keys(track, prop, rest, ms, lab_ms=None):
-    """One property's keys out of a lab track: [(frame, value)], CSS @keyframes semantics.
+class Clock(NamedTuple):
+    """How a track plays: the animation's length, its curve, and - when it plays only part of the
+    lab's (boot stops at 60 % of the lab's 2.2 s) - the length the lab's percentages are of."""
+    ms: int
+    bezier: str = None
+    lab_ms: int = None
 
-    `lab_ms` is the length the percentages are of (the lab's), when the animation plays only part
-    of it (boot stops at 60 % of the lab's 2.2 s)."""
-    base = lab_ms or ms
+    @property
+    def base(self):
+        return self.lab_ms or self.ms
+
+
+def track_keys(track, prop, rest, base):
+    """One property's keys out of a lab track: [(frame, value)], CSS @keyframes semantics.
+    `base` is the length (ms) the track's percentages are of."""
     named = [(pct, keys[prop]) for pct, keys in track if prop in keys]
     first, last = track[0][0], track[-1][0]
     if not named:
@@ -69,7 +80,7 @@ def _eased(keys, convert, bezier):
     return [(f, _r(convert(v)), bezier) for f, v in keys[:-1]] + [(keys[-1][0], _r(convert(keys[-1][1])))]
 
 
-def _transform_objects(node_of, tracks, props, ms, bezier, lab_ms=None):
+def _transform_objects(node_of, tracks, props, clock):
     """{node id: {key: keys}} for each stone's track on the given property set."""
     objs = {}
     for stone in STONES:
@@ -77,7 +88,7 @@ def _transform_objects(node_of, tracks, props, ms, bezier, lab_ms=None):
         objs[node] = {}
         for prop in props:
             key, rest, convert = TRANSFORM[prop]
-            objs[node][key] = _eased(track_keys(track, prop, rest, ms, lab_ms), convert, bezier)
+            objs[node][key] = _eased(track_keys(track, prop, rest, clock.base), convert, clock.bezier)
     return objs
 
 
@@ -113,7 +124,7 @@ def pose_animations():
     for s in STATES:
         ms, bezier, tracks = POSE[s]
         out.append(animation(f"Pose_{s}", pose_anim[s], frames(ms),
-                             _transform_objects(_pose_nodes(), tracks, POSE_PROPS, ms, bezier), "loop"))
+                             _transform_objects(_pose_nodes(), tracks, POSE_PROPS, Clock(ms, bezier)), "loop"))
     return out
 
 
@@ -122,7 +133,7 @@ def pose_calm_animations():
     for s in STATES:
         tracks = {stone: _static(POSE_CALM[s][stone]) for stone in STONES}
         out.append(animation(f"PoseCalm_{s}", pose_calm_anim[s], 1,
-                             _transform_objects(_pose_nodes(), tracks, POSE_PROPS, 1, None)))
+                             _transform_objects(_pose_nodes(), tracks, POSE_PROPS, Clock(1))))
     return out
 
 
@@ -176,16 +187,16 @@ def _bloom(points, ms, bezier):
 
 def event_animations():
     rest = animation("EventRest", EVENT_REST_ANIM, 1, {})
-    boot = _transform_objects(_event_nodes(), BOOT, EVENT_PROPS, BOOT_MS, SOFT_OUT, lab_ms=BOOT_LAB_MS)
+    boot = _transform_objects(_event_nodes(), BOOT, EVENT_PROPS, Clock(BOOT_MS, SOFT_OUT, BOOT_LAB_MS))
     boot.update(_bloom([(0, 0)], BOOT_MS, None))
-    success = _transform_objects(_event_nodes(), SUCCESS, EVENT_PROPS, SUCCESS_MS, SOFT_OUT)
+    success = _transform_objects(_event_nodes(), SUCCESS, EVENT_PROPS, Clock(SUCCESS_MS, SOFT_OUT))
     success.update(_bloom(SUCCESS_BLOOM, SUCCESS_MS, EASE))
     # Calm twins: the same property set, transforms held at rest, light only.
     fade = {s: [(0, {"op": 0}), (100, {"op": 1})] for s in STONES}
-    boot_calm = _transform_objects(_event_nodes(), fade, EVENT_PROPS, BOOT_CALM_MS, EASE_IN_OUT)
+    boot_calm = _transform_objects(_event_nodes(), fade, EVENT_PROPS, Clock(BOOT_CALM_MS, EASE_IN_OUT))
     boot_calm.update(_bloom([(0, 0)], BOOT_CALM_MS, None))
     still = {s: [(0, {}), (100, {})] for s in STONES}
-    success_calm = _transform_objects(_event_nodes(), still, EVENT_PROPS, SUCCESS_CALM_MS, None)
+    success_calm = _transform_objects(_event_nodes(), still, EVENT_PROPS, Clock(SUCCESS_CALM_MS))
     success_calm.update(_bloom(SUCCESS_CALM_BLOOM, SUCCESS_CALM_MS, EASE))
     return [rest,
             animation("Boot", BOOT_ANIM, frames(BOOT_MS), boot),

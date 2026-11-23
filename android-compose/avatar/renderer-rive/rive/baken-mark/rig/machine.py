@@ -20,6 +20,7 @@ entrance from nothing rather than from the resting mark. `rig.layers` knows one 
 `_conditional_entry()` replaces that line with the list after the layer has validated.
 """
 from textwrap import indent
+from typing import NamedTuple
 
 from rml import STANDARD, transition, when_bool, when_enum, when_trigger
 
@@ -64,35 +65,57 @@ def theme_layer():
 
 
 # --- Pose and Light: a loop and its calm twin per state ------------------------------------------
-def _sustained_layer(name, lid, loop_anim, loop_node, calm_anim, calm_node, blend_ms, bezier):
-    states, i = [], 0
-    for s in STATES:
-        # The reduceMotion check comes first: Rive evaluates a state's transitions in order.
-        states.append(State(loop_anim[s], loop_node[s], i, transitions=[
+class Sustained(NamedTuple):
+    """A layer with one loop and one reduceMotion twin per state, and how it blends between them."""
+    name: str
+    lid: str
+    loop: tuple          # ({state: animation id}, {state: state node id})
+    calm: tuple          # the same, for the calm twins
+    blend: tuple         # (ms, bezier) between two states
+
+
+def _sustained_states(spec):
+    """Each state's loop and its calm twin; the reduceMotion check first (Rive evaluates a state's
+    transitions in order)."""
+    (loop_anim, loop_node), (calm_anim, calm_node), (ms, bezier) = spec.loop, spec.calm, spec.blend
+    states = []
+    for i, s in enumerate(STATES):
+        others = [o for o in STATES if o != s]
+        states.append(State(loop_anim[s], loop_node[s], 2 * i, transitions=[
             OnBool(calm_node[s], VM_REDUCE, "true", CALM_BLEND_MS, STANDARD)] + [
-            OnEnum(loop_node[o], state_enum_ids[o], blend_ms, bezier) for o in STATES if o != s]))
-        states.append(State(calm_anim[s], calm_node[s], i + 1, transitions=[
+            OnEnum(loop_node[o], state_enum_ids[o], ms, bezier) for o in others]))
+        states.append(State(calm_anim[s], calm_node[s], 2 * i + 1, transitions=[
             OnBool(loop_node[s], VM_REDUCE, "false", CALM_BLEND_MS, STANDARD)] + [
-            OnEnum(calm_node[o], state_enum_ids[o], blend_ms, bezier) for o in STATES if o != s]))
-        i += 2
-    first = loop_node[STATES[0]]
-    layer = Layer(name, lid, first, states=states, anim_loops=_loops(loop_anim))
+            OnEnum(calm_node[o], state_enum_ids[o], ms, bezier) for o in others]))
+    return states
+
+
+def _sustained_entries(spec):
+    """Enter straight into what the view model asks for: the calm twin under reduceMotion, else the loop.
+    The first state's loop is the layer's own entry, the unconditional fallback, so it gets no branch."""
+    loop_node, calm_node = spec.loop[1], spec.calm[1]
     branches = []
     for s in STATES:
         branches.append((calm_node[s], [when_bool(VM_REDUCE, "true"), when_enum(VM_STATE, state_enum_ids[s])]))
         if s != STATES[0]:
             branches.append((loop_node[s], [when_enum(VM_STATE, state_enum_ids[s])]))
-    return _conditional_entry(layer.rml(), first, branches)
+    return branches
+
+
+def _sustained_layer(spec):
+    first = spec.loop[1][STATES[0]]
+    layer = Layer(spec.name, spec.lid, first, states=_sustained_states(spec), anim_loops=_loops(spec.loop[0]))
+    return _conditional_entry(layer.rml(), first, _sustained_entries(spec))
 
 
 def pose_layer():
-    return _sustained_layer("Pose", LAYER_POSE, pose_anim, pose_node, pose_calm_anim, pose_calm_node,
-                            STATE_BLEND_MS, STANDARD)
+    return _sustained_layer(Sustained("Pose", LAYER_POSE, (pose_anim, pose_node), (pose_calm_anim, pose_calm_node),
+                                      (STATE_BLEND_MS, STANDARD)))
 
 
 def light_layer():
-    return _sustained_layer("Light", LAYER_LIGHT, light_anim, light_node, light_calm_anim, light_calm_node,
-                            LIGHT_BLEND_MS, STANDARD)
+    return _sustained_layer(Sustained("Light", LAYER_LIGHT, (light_anim, light_node),
+                                      (light_calm_anim, light_calm_node), (LIGHT_BLEND_MS, STANDARD)))
 
 
 # --- Event: boot and success ----------------------------------------------------------------------

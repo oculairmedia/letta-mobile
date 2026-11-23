@@ -19,11 +19,12 @@ and every light is painted on a stone or in the seam between them.
 One node per layer is the rule the mascot learned the hard way: placement and keyed motion never
 share a node, and two layers never key the same property, so nothing a layer lets go of snaps.
 """
-import os
 from textwrap import indent
 
 from rml import COLOR, bind  # noqa: F401 - COLOR documents the key the Theme layer keys
-from svgpath import _vertex_xml, parse_path, read_svg
+from svgpath import _vertex_xml, parse_path
+
+from rig.brand import mark_path
 
 from rig.constants import (ART_SCALE, BOUNCE_CENTRE, BOUNCE_RADIUS, BOUNCE_STOPS, DEFAULT_THEME,
                            PALETTE, PIVOT, SEAM_CENTRE, SEAM_RADII, SEAM_STOPS, SHEEN_ALPHA,
@@ -34,16 +35,14 @@ from rig.ids import (ANCHOR_BOUNCE, ANCHOR_BOUNCE_GRAD, ANCHOR_BOUNCE_STOPS, ANC
                      PEBBLE_WARM, PEBBLE_WARM_FILL, SEAM_GLOW, SEAM_GRAD, SEAM_NODE, SEAM_POSE,
                      SEAM_STOPS as SEAM_STOP_IDS, SHEEN_GRAD)
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ART = os.path.join(HERE, "art")
 
 
 def stone_vertices(stone):
     """The stone's path as (x, y, c_in, c_out) in artboard px, relative to its ground contact."""
     px, py = PIVOT[stone]
-    subs = parse_path(read_svg(os.path.join(ART, f"{stone}.svg"))["d"])
+    subs = parse_path(mark_path(stone))
     if len(subs) != 1 or not subs[0]["closed"]:
-        raise ValueError(f"art/{stone}.svg: a stone is one closed path")
+        raise ValueError(f"BakenMark.kt {stone}: a stone is one closed path")
 
     def place(pt):
         return None if pt is None else (round((pt[0] - px) * ART_SCALE, 4), round((pt[1] - py) * ART_SCALE, 4))
@@ -60,8 +59,10 @@ def _solid(name, sid, colour):
     return f'<Fill name="{name}">\n    <SolidColor colorValue="{colour}" name="Color" id="{sid}"/>\n</Fill>'
 
 
-def _shape(stone, name, sid, paint, opacity=None):
-    op = f' opacity="{opacity}"' if opacity is not None else ""
+def _shape(part, paint, opacity=None):
+    """One outline of a stone with its paint: `part` is (stone, shape name, shape id)."""
+    stone, name, sid = part
+    op =f' opacity="{opacity}"' if opacity is not None else ""
     return (f'<Shape{op} name="{name}" id="{sid}">\n{indent(stone_path(stone), "    ")}\n'
             f'{indent(paint, "    ")}\n</Shape>')
 
@@ -99,8 +100,8 @@ def anchor():
              f'    </Shape>\n</Node>')
     return "\n".join([
         sheen,
-        _shape("anchor", "AnchorBounce", ANCHOR_BOUNCE, bounce),
-        _shape("anchor", "AnchorStone", ANCHOR_STONE, _solid("Fill", ANCHOR_FILL, p["stone"])),
+        _shape(("anchor", "AnchorBounce", ANCHOR_BOUNCE), bounce),
+        _shape(("anchor", "AnchorStone", ANCHOR_STONE), _solid("Fill", ANCHOR_FILL, p["stone"])),
     ])
 
 
@@ -108,10 +109,10 @@ def pebble():
     """The pebble (the beacon): base fill, then dim, warm and bloom overlays of the same outline."""
     p = PALETTE[DEFAULT_THEME]
     return "\n".join([
-        _shape("pebble", "PebbleBloom", PEBBLE_BLOOM, _solid("Fill", PEBBLE_BLOOM_FILL, p["warm"]), 0),
-        _shape("pebble", "PebbleWarm", PEBBLE_WARM, _solid("Fill", PEBBLE_WARM_FILL, p["warm"]), 0),
-        _shape("pebble", "PebbleDim", PEBBLE_DIM, _solid("Fill", PEBBLE_DIM_FILL, p["dim"]), 0),
-        _shape("pebble", "PebbleStone", PEBBLE_STONE, _solid("Fill", PEBBLE_FILL, p["accent"])),
+        _shape(("pebble", "PebbleBloom", PEBBLE_BLOOM), _solid("Fill", PEBBLE_BLOOM_FILL, p["warm"]), 0),
+        _shape(("pebble", "PebbleWarm", PEBBLE_WARM), _solid("Fill", PEBBLE_WARM_FILL, p["warm"]), 0),
+        _shape(("pebble", "PebbleDim", PEBBLE_DIM), _solid("Fill", PEBBLE_DIM_FILL, p["dim"]), 0),
+        _shape(("pebble", "PebbleStone", PEBBLE_STONE), _solid("Fill", PEBBLE_FILL, p["accent"])),
     ])
 
 

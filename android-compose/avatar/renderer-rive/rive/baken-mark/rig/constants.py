@@ -17,6 +17,8 @@ x, y (art px), rot (deg), sx, sy (scale), op (opacity).
 """
 import math
 
+from rig.brand import theme_inks
+
 ART_SCALE = 2.5                       # 200x200 art -> 500x500 artboard
 ARTBOARD = 500
 GROUND_Y = 168                        # art: the flush baseline both stones sit on
@@ -52,21 +54,21 @@ EASE = "0.25 0.1 0.25 1"              # CSS ease
 SOFT_OUT = "0.22 1 0.36 1"            # the lab's boot / success curve (rml.SOFT_OUT)
 CRADLE = "0.45 0.05 0.55 0.95"        # loading's stone-cradle weight transfer
 
-# --- palette (01 North Sea Buoy), ARGB --------------------------------------------------------
-# stone/accent: the two fills. warm: the ambient / success warming of the accent stone (lab
-# --stone2-warm). dim: degraded's muted slate-rust (lab --stone2-dim). light: the colour of the
-# reflected bounce and the seam glow. In the mono themes there is no hue to warm, so every state
-# reads through luminance only: warm lifts the ink, dim greys it, light is plain light.
-PALETTE = {
-    "dark":      {"stone": "FFDCE6EE", "accent": "FFEE5A3F", "warm": "FFFF7858", "dim": "FF7C5C59",
-                  "light": ("FF7555", "FF7A59", "EE5A3F"), "bg": "FF0D1821"},
-    "light":     {"stone": "FF163044", "accent": "FFE04A32", "warm": "FFF4664A", "dim": "FF8D7C7B",
-                  "light": ("F4664A", "F4664A", "E04A32"), "bg": "FFEFF3F6"},
-    "monoDark":  {"stone": "FF10202C", "accent": "FF10202C", "warm": "FF2E4A60", "dim": "FF586E7F",
-                  "light": ("586E7F", "586E7F", "586E7F"), "bg": "FFEFF3F6"},
-    "monoLight": {"stone": "FFDCE6EE", "accent": "FFDCE6EE", "warm": "FFFFFFFF", "dim": "FF7F96A8",
-                  "light": ("FFFFFF", "FFFFFF", "FFFFFF"), "bg": "FF0D1821"},
+# --- palette, ARGB ------------------------------------------------------------------------------
+# stone / accent / bg are the brand's, read from the app's own tokens (rig/brand.py: ThemeTokens.kt),
+# never restated here. What only the animation needs is motion data from the brand kit's motion lab:
+# warm, the ambient / success warming of the pebble (lab --stone2-warm); dim, degraded's muted
+# slate-rust (lab --stone2-dim); light, the colour of the reflected bounce and the seam glow. In the
+# mono themes there is no hue to warm, so every state reads through luminance only: warm lifts the
+# ink, dim greys it, light is plain light.
+MOTION_TONES = {
+    "dark":      {"warm": "FFFF7858", "dim": "FF7C5C59", "light": ("FF7555", "FF7A59", "EE5A3F")},
+    "light":     {"warm": "FFF4664A", "dim": "FF8D7C7B", "light": ("F4664A", "F4664A", "E04A32")},
+    "monoDark":  {"warm": "FF2E4A60", "dim": "FF586E7F", "light": ("586E7F", "586E7F", "586E7F")},
+    "monoLight": {"warm": "FFFFFFFF", "dim": "FF7F96A8", "light": ("FFFFFF", "FFFFFF", "FFFFFF")},
 }
+PALETTE = {theme: {"stone": stone, "accent": accent, "bg": bg, **MOTION_TONES[theme]}
+           for theme, (stone, accent, bg) in theme_inks().items()}
 DEFAULT_THEME = "dark"
 DEFAULT_STATE = "idle"
 

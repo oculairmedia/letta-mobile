@@ -21,13 +21,13 @@ than copying it: `rig/__init__.py` lets `rig.layers`, `rig.seams` and `rig.chart
 |---|---|---|
 | `gen_scene.py` | Assembly only: the artboard shell, the enums and view model, the document; `--solo`, `--probe` and `--backdrop` variants. **Entry point.** | yes |
 | `rig/ids.py` | Every named Rive object id and the vocabulary (`STATES`, `THEMES`). Uniqueness checked at import. **Existing ids are frozen**: append. | add only |
-| `rig/constants.py` | The design numbers as data: palette, light geometry, blend times, and every keyframe track in the lab's own percentages (`POSE`, `LIGHT`, `BOOT`, `SUCCESS`, the calm twins). Almost nothing else carries a number | yes |
-| `rig/stones.py` | The drawing: the two stones from `art/*.svg`, re-based on their ground contacts, their overlays, the sheen, the bounce and seam lights | rarely |
+| `rig/constants.py` | The design numbers as data: the palette (built from the brand tokens plus the motion-only warm / dim / glow tones), light geometry, blend times, and every keyframe track in the lab's own percentages (`POSE`, `LIGHT`, `BOOT`, `SUCCESS`, the calm twins). Almost nothing else carries a number | yes |
+| `rig/stones.py` | The drawing: the two stones from `BakenMark.kt`'s paths (`rig/brand.py`), re-based on their ground contacts, their overlays, the sheen, the bounce and seam lights | rarely |
 | `rig/motion.py` | Every animation, built from the constants tables with CSS `@keyframes` semantics | yes |
 | `rig/machine.py` | The `BrandMark` state machine: five layers, conditional entries | yes |
 | `rig/contract.py` | The `BrandMark` view-model contract as data; `gen_scene.py` emits the view model from it, `test_contract.py` holds the built file to it | when the contract changes |
 | `rig/probe.py` | The probe table (which node properties telemetry reads) and `inject()` | add probes |
-| `art/anchor.svg`, `art/pebble.svg` | The brand kit's two paths, unchanged (from `svg/baken-mark-dark.svg`) | via the brand kit |
+| `rig/brand.py` | The brand as the app ships it (#2626), read at generation time and never copied: the two paths from `sharedUI/.../icons/BakenMark.kt`, the stone / vermilion / background colours per theme from `sharedLogic/.../ui/theme/ThemeTokens.kt`. `test_rig.Brand` fails if a copy creeps back in | no - change the app's brand |
 | `scene.rml` | Generated. Committed so diffs are reviewable. Never hand-edit | no |
 | `build/baken_mark.riv` | Built by the CLI; copied to the two shipped paths below | no |
 | `rive.yaml` | Build config. **No `push:` section**: there is no Rive cloud file for the mark | no |
@@ -140,9 +140,7 @@ contract):
 | `degraded` | host / Iroh connection lost | pebble rolled away (+10 px, +10 deg) on its outer edge, muted slate-rust; anchor dimmed to 62 % |
 | `ambient` | an unread background / ambient update | grounded and still; the pebble warms and reflects on the anchor's right flank (3400 ms) |
 
-`BakenMarkTheme`: `dark`, `light`, `monoDark` (one dark ink, for light grounds), `monoLight` (one
-pale ink, for dark grounds). In the mono themes there is no hue to warm, so every state reads
-through luminance only.
+`BakenMarkTheme`: `dark` and `light` are the app's own theme colours (`LettaColorTokens`: the mark stone and the vermilion primary); `monoDark` is one dark ink (`LIGHT_MARK_STONE`, for light grounds) and `monoLight` one pale ink (`DARK_MARK_STONE`, for dark grounds), like `BakenMark.mono`. In the mono themes there is no hue to warm, so every state reads through luminance only.
 
 **Host rules.**
 - Write `theme` and `state` (and `reduceMotion`) **before the first advance**; fire `boot` then

@@ -18,6 +18,11 @@ STATES = ("idle", "loading", "connecting", "degraded", "ambient")
 THEMES = ("dark", "light", "monoDark", "monoLight")
 STONES = ("anchor", "pebble")
 
+def _run(client, start, names):
+    """Consecutive ids from `client:start`, one per name, in vocabulary order."""
+    return {n: f"{client}:{start + i}" for i, n in enumerate(names)}
+
+
 # --- artboard -----------------------------------------------------------------------------------
 ROOT = "0:1"
 STYLE = "0:3"
@@ -42,26 +47,26 @@ SEAM_STOPS = ("0:310", "0:311", "0:312")
 VM_THEME, VM_BOOT, VM_SUCCESS, VM_REDUCE, VM_HOVER = "1:2", "1:3", "1:4", "1:5", "1:6"
 VM_INSTANCE = "1:20"
 ENUM_STATE, ENUM_THEME = "1:100", "1:200"
-state_enum_ids = {s: f"1:{101 + i}" for i, s in enumerate(STATES)}
-theme_enum_ids = {t: f"1:{201 + i}" for i, t in enumerate(THEMES)}
+state_enum_ids = _run("1", 101, STATES)
+theme_enum_ids = _run("1", 201, THEMES)
 
 # --- animations and state nodes (3:*) -----------------------------------------------------------
 SM = "3:1"
 LAYER_THEME, LAYER_POSE, LAYER_LIGHT, LAYER_EVENT, LAYER_HOVER = "3:2", "3:3", "3:4", "3:5", "3:6"
 
 # Themes: one 1-frame pose each, 3:10.. animations, 3:20.. nodes.
-theme_anim = {t: f"3:{10 + i}" for i, t in enumerate(THEMES)}
-theme_node = {t: f"3:{20 + i}" for i, t in enumerate(THEMES)}
+theme_anim = _run("3", 10, THEMES)
+theme_node = _run("3", 20, THEMES)
 
 # Pose and Light: a loop and its reduceMotion twin per state.
-pose_anim = {s: f"3:{100 + i}" for i, s in enumerate(STATES)}
-pose_node = {s: f"3:{110 + i}" for i, s in enumerate(STATES)}
-pose_calm_anim = {s: f"3:{120 + i}" for i, s in enumerate(STATES)}
-pose_calm_node = {s: f"3:{130 + i}" for i, s in enumerate(STATES)}
-light_anim = {s: f"3:{140 + i}" for i, s in enumerate(STATES)}
-light_node = {s: f"3:{150 + i}" for i, s in enumerate(STATES)}
-light_calm_anim = {s: f"3:{160 + i}" for i, s in enumerate(STATES)}
-light_calm_node = {s: f"3:{170 + i}" for i, s in enumerate(STATES)}
+pose_anim = _run("3", 100, STATES)
+pose_node = _run("3", 110, STATES)
+pose_calm_anim = _run("3", 120, STATES)
+pose_calm_node = _run("3", 130, STATES)
+light_anim = _run("3", 140, STATES)
+light_node = _run("3", 150, STATES)
+light_calm_anim = _run("3", 160, STATES)
+light_calm_node = _run("3", 170, STATES)
 
 # Event: a rest that keys nothing, and the two one-shots with their calm twins.
 EVENT_REST_ANIM, EVENT_REST_NODE = "3:200", "3:201"
