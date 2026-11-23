@@ -104,6 +104,12 @@ tasks.test {
     ).withPropertyName("jsonRatchetSources").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file("json-instances-baseline.txt")
         .withPropertyName("jsonRatchetBaseline").withPathSensitivity(PathSensitivity.RELATIVE)
+    // SplashColourMirrorTest reads the Android window/splash colours and the tokens they mirror: a change to either
+    // alone must re-run it rather than reuse an up-to-date or cached result.
+    inputs.files(
+        fileTree(rootProject.projectDir.resolve("app/src/main/res")) { include("values*/colors.xml") },
+        rootProject.projectDir.resolve("sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/theme/ThemeTokens.kt"),
+    ).withPropertyName("splashColourMirror").withPathSensitivity(PathSensitivity.RELATIVE)
     // StructureExportFixtureTest pins the export to the golden package_headroom.py also matches.
     inputs.dir(rootProject.projectDir.resolve("../scripts/tests/fixtures/structure-parity"))
         .withPropertyName("structureParityFixture").withPathSensitivity(PathSensitivity.RELATIVE)

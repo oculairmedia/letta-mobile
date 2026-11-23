@@ -8,8 +8,8 @@
       Baken mark's DARK_MARK_STONE / DARK_PRIMARY tokens defined in
       sharedLogic/.../ui/theme/ThemeTokens.kt. Keep them in sync.
     -->
-    <color name="letta_background">#FF0D1821</color>
-    <color name="letta_on_background">#FFE8EFF4</color>
+    <color name="letta_background">#FF101214</color>
+    <color name="letta_on_background">#FFE8EBEE</color>
     <color name="letta_mark_stone">#FFDCE6EE</color>
     <color name="letta_mark_pebble">#FFEE5A3F</color>
 </resources>
