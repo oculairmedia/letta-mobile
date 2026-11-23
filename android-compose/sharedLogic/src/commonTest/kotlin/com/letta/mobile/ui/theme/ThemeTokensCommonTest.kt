@@ -44,7 +44,7 @@ class ThemeTokensCommonTest {
     }
 
     @Test
-    fun `default preset's secondary and tertiary are slate and steel greys, not teal or cyan`() {
+    fun `default preset's secondary and tertiary are slate and steel greys and never teal or cyan`() {
         val tokens = LettaThemeTokens.preset(ThemePreset.DEFAULT)
 
         // The Baken kit's petrol slate (secondary) and steel mist (tertiary), per theme.
@@ -57,7 +57,7 @@ class ThemeTokensCommonTest {
     }
 
     @Test
-    fun `the persona category is a brand-family colour, not teal`() {
+    fun `the persona category is a brand-family colour and never teal`() {
         assertFalse(isTealOrCyan(LettaColorTokens.DARK_CATEGORY_PERSONA))
     }
 
