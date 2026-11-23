@@ -102,13 +102,14 @@ class SharedChatSubagentLauncherTest {
         compose.setContent { LettaChatTheme { Page(navigation) } }
 
         compose.waitUntil(WAIT_MS) { repository.currentActiveSubagents(scope).size == dispatches.size }
-        compose.waitForIdle()
+        // The page shows the count one recomposition after the store has it: wait for the launcher itself,
+        // not the repository, before asserting on it.
+        val launcherMatcher = hasTestTag(BackgroundTasksTags.TOGGLE) and hasContentDescription("Background tasks · 3 running")
+        compose.waitUntil(WAIT_MS) { compose.onAllNodes(launcherMatcher).fetchSemanticsNodes().isNotEmpty() }
         // No plan, so no ring: the cause, and why the launcher must stand in for it.
         compose.onNode(hasTestTag(ActiveSubagentRingsTags.RINGS)).assertDoesNotExist()
 
-        val launcher = compose.onNode(
-            hasTestTag(BackgroundTasksTags.TOGGLE) and hasContentDescription("Background tasks · 3 running"),
-        )
+        val launcher = compose.onNode(launcherMatcher)
         launcher.assertIsDisplayed()
         launcher.performClick()
         compose.runOnIdle { assertEquals(1, opened) }
