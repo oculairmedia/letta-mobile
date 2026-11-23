@@ -32,7 +32,7 @@ private val DefaultThemeColors = LettaThemeTokens.default.toGeneratedThemeColors
             tertiaryContainer = Color(LettaColorTokens.LIGHT_TERTIARY_CONTAINER),
             onTertiaryContainer = Color(LettaColorTokens.LIGHT_ON_TERTIARY_CONTAINER),
             surfaceContainerHigh = LightSurfaceContainer,
-            surfaceContainerHighest = Color(LettaColorTokens.LIGHT_OUTLINE),
+            surfaceContainerHighest = Color(LettaColorTokens.LIGHT_SURFACE_CONTAINER_HIGHEST),
         ),
         darkScheme = generated.darkScheme.copy(
             onPrimary = Color(LettaColorTokens.DARK_ON_PRIMARY),
@@ -43,7 +43,7 @@ private val DefaultThemeColors = LettaThemeTokens.default.toGeneratedThemeColors
             tertiaryContainer = Color(LettaColorTokens.DARK_TERTIARY_CONTAINER),
             onTertiaryContainer = Color(LettaColorTokens.DARK_ON_TERTIARY_CONTAINER),
             surfaceContainerLowest = Color(LettaColorTokens.DARK_SURFACE_CONTAINER_LOWEST),
-            surfaceContainerHigh = DarkSurfaceContainer,
+            surfaceContainerHigh = Color(LettaColorTokens.DARK_SURFACE_CONTAINER_HIGH),
             surfaceContainerHighest = Color(LettaColorTokens.DARK_SURFACE_CONTAINER_HIGHEST),
         ),
     )

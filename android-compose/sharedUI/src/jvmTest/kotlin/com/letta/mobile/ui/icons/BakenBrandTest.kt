@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
 
 /**
  * Home is drawn as the Baken mark (the kit's two basalt stones on a 200 viewport), text on the vermilion primary is
- * white in both themes, vermilion is the only accent (secondary and tertiary are the kit's slate and mist), and the
+ * white in both themes, vermilion is the only accent (secondary and tertiary are slate and steel greys), and the
  * user's chat bubble is a neutral surface. The oracles are the kit's own numbers, not the production helpers.
  */
 class BakenBrandTest {
@@ -43,10 +43,10 @@ class BakenBrandTest {
 
     @Test
     fun theSchemeSitsOnTheNorthSeaBuoyBackgrounds() {
-        assertEquals(Color(0xFF0D1821), lettaColorScheme(dark = true).background)
-        assertEquals(Color(0xFFEFF3F6), lettaColorScheme(dark = false).background)
-        assertEquals(Color(0xFFE8EFF4), lettaColorScheme(dark = true).onSurface)
-        assertEquals(Color(0xFF10202C), lettaColorScheme(dark = false).onSurface)
+        assertEquals(Color(0xFF101214), lettaColorScheme(dark = true).background)
+        assertEquals(Color(0xFFF4F5F6), lettaColorScheme(dark = false).background)
+        assertEquals(Color(0xFFE8EBEE), lettaColorScheme(dark = true).onSurface)
+        assertEquals(Color(0xFF15191D), lettaColorScheme(dark = false).onSurface)
     }
 
     @Test
@@ -54,10 +54,10 @@ class BakenBrandTest {
         val dark = lettaColorScheme(dark = true)
         val light = lettaColorScheme(dark = false)
 
-        assertEquals(Color(0xFF7A96AA), dark.secondary)
-        assertEquals(Color(0xFF9FB4C4), dark.tertiary)
-        assertEquals(Color(0xFF3D5A70), light.secondary)
-        assertEquals(Color(0xFF4F6B80), light.tertiary)
+        assertEquals(Color(0xFF8C98A3), dark.secondary)
+        assertEquals(Color(0xFFA9B3BC), dark.tertiary)
+        assertEquals(Color(0xFF4C5761), light.secondary)
+        assertEquals(Color(0xFF5C6872), light.tertiary)
         for (scheme in listOf(dark, light)) {
             for ((role, colour) in accentRoles(scheme)) {
                 assertFalse(colour.isTealOrCyan(), "$role ${colour.hex()} still reads as teal/cyan")
@@ -84,9 +84,9 @@ class BakenBrandTest {
         val dark = lettaCustomColors(darkScheme)
         val light = lettaCustomColors(lightScheme)
 
-        // The kit's deep-sea step above the agent bubble (dark) and its soft mist (light).
-        assertEquals(Color(0xFF1C2A36), dark.userBubbleBgColor)
-        assertEquals(Color(0xFFDDE5EB), light.userBubbleBgColor)
+        // A grey step above the agent bubble (dark) and a soft grey (light).
+        assertEquals(Color(0xFF23272C), dark.userBubbleBgColor)
+        assertEquals(Color(0xFFE4E7EA), light.userBubbleBgColor)
         for ((scheme, colours) in listOf(darkScheme to dark, lightScheme to light)) {
             val bubble = colours.userBubbleBgColor
             // Chroma (max - min channel), not HSL saturation, which inflates for dark colours: the vermilion is ~0.7.
@@ -113,6 +113,27 @@ class BakenBrandTest {
             val persona = lettaCustomColors(scheme).categoryPersonaColor
             assertFalse(persona.isTealOrCyan(), "persona ${persona.hex()} still reads as teal")
             assertReads(persona, scheme.surface, GRAPHIC_CONTRAST, "persona on surface")
+        }
+    }
+
+    @Test
+    fun theSurfacesAreNeutralGreysWithOnlyAFaintCoolTint() {
+        for (scheme in listOf(lettaColorScheme(dark = true), lettaColorScheme(dark = false))) {
+            val colours = lettaCustomColors(scheme)
+            val roles = listOf(
+                "background" to scheme.background,
+                "surface" to scheme.surface,
+                "surfaceContainerLow" to scheme.surfaceContainerLow,
+                "surfaceContainer" to scheme.surfaceContainer,
+                "surfaceContainerHigh" to scheme.surfaceContainerHigh,
+                "surfaceContainerHighest" to scheme.surfaceContainerHighest,
+                "secondaryContainer" to scheme.secondaryContainer,
+                "outlineVariant" to scheme.outlineVariant,
+                "userBubble" to colours.userBubbleBgColor,
+            )
+            for ((role, colour) in roles) {
+                assertTrue(colour.saturation() <= NEUTRAL_SURFACE_SATURATION, "$role ${colour.hex()} reads as a colour, not a grey")
+            }
         }
     }
 
@@ -169,6 +190,7 @@ class BakenBrandTest {
         const val TEXT_CONTRAST = 4.5
         const val GRAPHIC_CONTRAST = 3.0
         const val NEUTRAL_CHROMA = 0.15
+        const val NEUTRAL_SURFACE_SATURATION = 0.16
         const val VIVID_SATURATION = 0.35
         val TEAL_HUES = 150.0..200.0
         const val HUE_SECTORS = 6.0

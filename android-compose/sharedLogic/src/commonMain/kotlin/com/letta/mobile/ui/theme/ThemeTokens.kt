@@ -3,35 +3,36 @@ package com.letta.mobile.ui.theme
 import com.letta.mobile.data.model.ThemePreset
 
 object LettaColorTokens {
-    // Baken brand: Buoy Vermilion primary over the "North Sea Buoy"
-    // deep-sea neutrals from the Baken brand kit. Text on the vermilion primary is white in both themes.
+    // Baken brand: Buoy Vermilion primary over neutral greys with only a faint cool tint (saturation about 8-12 %),
+    // so the vermilion is the one colour on screen. Text on the vermilion primary is white in both themes.
     // Single source of truth for every client (default preset).
-    const val DARK_SURFACE = 0xFF13212D
-    const val DARK_SURFACE_VARIANT = 0xFF1A2B39
-    const val DARK_SURFACE_CONTAINER = 0xFF1A2B39
+    const val DARK_SURFACE = 0xFF15181B
+    const val DARK_SURFACE_VARIANT = 0xFF1C1F23
+    const val DARK_SURFACE_CONTAINER = 0xFF1C1F23
     const val DARK_PRIMARY = 0xFFEE5A3F
     const val DARK_PRIMARY_VARIANT = 0xFFB8432E
     const val DARK_ON_PRIMARY = 0xFFFFFFFF
-    const val DARK_ON_SURFACE = 0xFFE8EFF4
-    const val DARK_ON_SURFACE_VARIANT = 0xFFA9BAC8
-    const val DARK_ON_SURFACE_MUTED = 0xFF7F96A8
+    const val DARK_ON_SURFACE = 0xFFE8EBEE
+    const val DARK_ON_SURFACE_VARIANT = 0xFFA9B1B9
+    const val DARK_ON_SURFACE_MUTED = 0xFF808A94
     const val DARK_ERROR = 0xFFCF6679
     const val DARK_ON_ERROR = 0xFF000000
-    const val DARK_BACKGROUND = 0xFF0D1821
-    const val DARK_OUTLINE = 0xFF3A4E5E
+    const val DARK_BACKGROUND = 0xFF101214
+    const val DARK_OUTLINE = 0xFF4A5158
 
-    const val LIGHT_SURFACE = 0xFFF7FAFC
-    const val LIGHT_SURFACE_VARIANT = 0xFFE8EEF2
-    const val LIGHT_SURFACE_CONTAINER = 0xFFD7E0E7
+    const val LIGHT_SURFACE = 0xFFFFFFFF
+    const val LIGHT_SURFACE_VARIANT = 0xFFEEF0F2
+    const val LIGHT_SURFACE_CONTAINER = 0xFFE6E9EC
     const val LIGHT_PRIMARY = 0xFFE04A32
     const val LIGHT_ON_PRIMARY = 0xFFFFFFFF
-    const val LIGHT_ON_SURFACE = 0xFF10202C
-    const val LIGHT_ON_SURFACE_VARIANT = 0xFF44586A
-    const val LIGHT_ON_SURFACE_MUTED = 0xFF586E7F
+    const val LIGHT_ON_SURFACE = 0xFF15191D
+    const val LIGHT_ON_SURFACE_VARIANT = 0xFF4A525A
+    const val LIGHT_ON_SURFACE_MUTED = 0xFF5E6770
     const val LIGHT_ERROR = 0xFFB00020
     const val LIGHT_ON_ERROR = 0xFFFFFFFF
-    const val LIGHT_BACKGROUND = 0xFFEFF3F6
-    const val LIGHT_OUTLINE = 0xFFADBCC8
+    const val LIGHT_BACKGROUND = 0xFFF4F5F6
+    const val LIGHT_OUTLINE = 0xFFAEB4BA
+    const val LIGHT_SURFACE_CONTAINER_HIGHEST = 0xFFDEE2E6
 
     // The Baken mark's stones: the pale/petrol stone and the vermilion pebble, per theme (kit svg/baken-mark-*.svg).
     const val DARK_MARK_STONE = 0xFFDCE6EE
@@ -41,51 +42,51 @@ object LettaColorTokens {
     const val PRIMARY_HIGHLIGHT = 0xFFF5A28C
 
     // Voice mode's two voices: the person in a cool blue, the agent in a warm rose, far apart in hue
-    // from each other and from the mist the run's thinking glow uses. The light values are deepened
+    // from each other and from the steel grey the run's thinking glow uses. The light values are deepened
     // so a hairline of either still reads on a light surface.
     const val DARK_VOICE_YOU = 0xFF6AA6FF
     const val DARK_VOICE_AGENT = 0xFFF08FA8
     const val LIGHT_VOICE_YOU = 0xFF2F6BD9
     const val LIGHT_VOICE_AGENT = 0xFFC0436B
 
-    // Warning: an amber, so a warning never reads as one of the slate/mist accents. The ink reads at
+    // Warning: an amber, so a warning never reads as one of the grey support roles. The ink reads at
     // 5:1 or more on every surface and on the container of its own theme.
     const val LIGHT_WARNING = 0xFF8F5200
     const val LIGHT_WARNING_CONTAINER = 0xFFFFE8C7
     const val DARK_WARNING = 0xFFE0A458
     const val DARK_WARNING_CONTAINER = 0xFF3B2A12
 
-    // Secondary and tertiary: the North Sea Buoy petrol slate and steel mist. Quiet support roles, so
-    // Buoy Vermilion stays the only accent. Each reads at 3:1 (slate, a graphic) or 4.5:1 (mist, text)
+    // Secondary and tertiary: a slate grey and a lighter steel grey. Quiet support roles, so
+    // Buoy Vermilion stays the only accent. Each reads at 3:1 (secondary, a graphic) or 4.5:1 (tertiary, text)
     // on its theme's surfaces; its ink and container pair read at 4.5:1 or more.
-    const val DARK_SECONDARY = 0xFF7A96AA
-    const val DARK_ON_SECONDARY = 0xFF0D1821
-    // The selected surface (a chosen chip, segment or picker row): a petrol step above the surfaces, onSurface ink.
-    const val DARK_SECONDARY_CONTAINER = 0xFF243F52
-    const val DARK_TERTIARY = 0xFF9FB4C4
-    const val DARK_ON_TERTIARY = 0xFF0D1821
-    const val DARK_TERTIARY_CONTAINER = 0xFF263B4B
-    const val DARK_ON_TERTIARY_CONTAINER = 0xFFDCE6EE
-    const val LIGHT_SECONDARY = 0xFF3D5A70
+    const val DARK_SECONDARY = 0xFF8C98A3
+    const val DARK_ON_SECONDARY = 0xFF101214
+    // The selected surface (a chosen chip, segment or picker row): a neutral step above the surfaces, onSurface ink.
+    const val DARK_SECONDARY_CONTAINER = 0xFF2B3036
+    const val DARK_TERTIARY = 0xFFA9B3BC
+    const val DARK_ON_TERTIARY = 0xFF101214
+    const val DARK_TERTIARY_CONTAINER = 0xFF262B30
+    const val DARK_ON_TERTIARY_CONTAINER = 0xFFE1E6EA
+    const val LIGHT_SECONDARY = 0xFF4C5761
     const val LIGHT_ON_SECONDARY = 0xFFFFFFFF
-    const val LIGHT_SECONDARY_CONTAINER = 0xFFC8D7E3
-    const val LIGHT_TERTIARY = 0xFF4F6B80
+    const val LIGHT_SECONDARY_CONTAINER = 0xFFDDE1E5
+    const val LIGHT_TERTIARY = 0xFF5C6872
     const val LIGHT_ON_TERTIARY = 0xFFFFFFFF
-    const val LIGHT_TERTIARY_CONTAINER = 0xFFD8E3EC
-    const val LIGHT_ON_TERTIARY_CONTAINER = 0xFF10202C
+    const val LIGHT_TERTIARY_CONTAINER = 0xFFE2E6EA
+    const val LIGHT_ON_TERTIARY_CONTAINER = 0xFF15191D
 
-    // The user's chat bubble: a neutral surface, never the vermilion. On dark a deep-sea step above the
-    // agent's bubble (surfaceContainerLow); on light a soft mist. Text on it is onSurface.
-    const val DARK_USER_BUBBLE = 0xFF1C2A36
-    const val LIGHT_USER_BUBBLE = 0xFFDDE5EB
+    // The user's chat bubble: a neutral surface, never the vermilion. On dark a grey step above the agent's
+    // bubble (surfaceContainerLow); on light a soft grey. Text on it is onSurface.
+    const val DARK_USER_BUBBLE = 0xFF23272C
+    const val LIGHT_USER_BUBBLE = 0xFFE4E7EA
 
-    // Surface levels (dark) used by the desktop scheme + template chrome (North Sea Buoy deep-sea family).
-    const val DARK_SURFACE_CONTAINER_LOWEST = 0xFF0A131B
-    const val DARK_SURFACE_CONTAINER_LOW = 0xFF13212D
-    const val DARK_SURFACE_CONTAINER_DEFAULT = 0xFF1A2B39
-    const val DARK_SURFACE_CONTAINER_HIGH = 0xFF233645
-    const val DARK_SURFACE_CONTAINER_HIGHEST = 0xFF2C4152
-    const val DARK_OUTLINE_VARIANT = 0xFF263A4A
+    // Surface levels (dark) used by the desktop scheme + template chrome (the neutral grey family).
+    const val DARK_SURFACE_CONTAINER_LOWEST = 0xFF0C0E10
+    const val DARK_SURFACE_CONTAINER_LOW = 0xFF181B1E
+    const val DARK_SURFACE_CONTAINER_DEFAULT = 0xFF1C1F23
+    const val DARK_SURFACE_CONTAINER_HIGH = 0xFF22262A
+    const val DARK_SURFACE_CONTAINER_HIGHEST = 0xFF2A2E33
+    const val DARK_OUTLINE_VARIANT = 0xFF2C3136
 
     // Memory-block category tokens (Phase 6 / §1.1b). Distinct from agentA/B/C
     // (subagent identity) — these color-code memory blocks by category.

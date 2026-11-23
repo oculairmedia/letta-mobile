@@ -77,23 +77,23 @@ class ThemeColorsTest {
     }
 
     @Test
-    fun `Android keeps the brand slate and mist support roles on the Default palette`() {
+    fun `Android keeps the brand slate and steel support roles on the Default palette`() {
         val colors = presetThemeColors(ThemePreset.DEFAULT)
         val dark = lettaThemeScheme(colors.darkScheme, brandPalette = true)
         val light = lettaThemeScheme(colors.lightScheme, brandPalette = true)
-        assertEquals(Color(0xFF7A96AA), dark.secondary)
-        assertEquals(Color(0xFF9FB4C4), dark.tertiary)
-        assertEquals(Color(0xFF3D5A70), light.secondary)
-        assertEquals(Color(0xFF4F6B80), light.tertiary)
-        assertEquals(Color(0xFF263B4B), dark.tertiaryContainer)
-        assertEquals(Color(0xFFD8E3EC), light.tertiaryContainer)
+        assertEquals(Color(0xFF8C98A3), dark.secondary)
+        assertEquals(Color(0xFFA9B3BC), dark.tertiary)
+        assertEquals(Color(0xFF4C5761), light.secondary)
+        assertEquals(Color(0xFF5C6872), light.tertiary)
+        assertEquals(Color(0xFF262B30), dark.tertiaryContainer)
+        assertEquals(Color(0xFFE2E6EA), light.tertiaryContainer)
     }
 
     @Test
-    fun `the brand palette's user bubble is the deep-sea and mist token on Android too`() {
+    fun `the brand palette's user bubble is the neutral grey token on Android too`() {
         val colors = presetThemeColors(ThemePreset.DEFAULT)
-        assertEquals(Color(0xFF1C2A36), deriveCustomColors(colors.darkScheme).userBubbleBgColor)
-        assertEquals(Color(0xFFDDE5EB), deriveCustomColors(colors.lightScheme).userBubbleBgColor)
+        assertEquals(Color(0xFF23272C), deriveCustomColors(colors.darkScheme).userBubbleBgColor)
+        assertEquals(Color(0xFFE4E7EA), deriveCustomColors(colors.lightScheme).userBubbleBgColor)
     }
 
     @Test

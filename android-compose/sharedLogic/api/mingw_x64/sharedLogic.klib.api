@@ -84825,6 +84825,8 @@ final object com.letta.mobile.ui.theme/LettaColorTokens { // com.letta.mobile.ui
         final fun <get-LIGHT_SURFACE>(): kotlin/Long // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_SURFACE.<get-LIGHT_SURFACE>|<get-LIGHT_SURFACE>(){}[0]
     final const val LIGHT_SURFACE_CONTAINER // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_SURFACE_CONTAINER|{}LIGHT_SURFACE_CONTAINER[0]
         final fun <get-LIGHT_SURFACE_CONTAINER>(): kotlin/Long // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_SURFACE_CONTAINER.<get-LIGHT_SURFACE_CONTAINER>|<get-LIGHT_SURFACE_CONTAINER>(){}[0]
+    final const val LIGHT_SURFACE_CONTAINER_HIGHEST // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_SURFACE_CONTAINER_HIGHEST|{}LIGHT_SURFACE_CONTAINER_HIGHEST[0]
+        final fun <get-LIGHT_SURFACE_CONTAINER_HIGHEST>(): kotlin/Long // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_SURFACE_CONTAINER_HIGHEST.<get-LIGHT_SURFACE_CONTAINER_HIGHEST>|<get-LIGHT_SURFACE_CONTAINER_HIGHEST>(){}[0]
     final const val LIGHT_SURFACE_VARIANT // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_SURFACE_VARIANT|{}LIGHT_SURFACE_VARIANT[0]
         final fun <get-LIGHT_SURFACE_VARIANT>(): kotlin/Long // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_SURFACE_VARIANT.<get-LIGHT_SURFACE_VARIANT>|<get-LIGHT_SURFACE_VARIANT>(){}[0]
     final const val LIGHT_TERTIARY // com.letta.mobile.ui.theme/LettaColorTokens.LIGHT_TERTIARY|{}LIGHT_TERTIARY[0]

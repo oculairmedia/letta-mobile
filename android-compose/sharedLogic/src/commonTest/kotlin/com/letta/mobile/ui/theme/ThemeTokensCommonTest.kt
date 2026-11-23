@@ -25,13 +25,13 @@ class ThemeTokensCommonTest {
     }
 
     @Test
-    fun `default preset sits on the North Sea Buoy backgrounds`() {
+    fun `default preset sits on the neutral grey backgrounds`() {
         val tokens = LettaThemeTokens.preset(ThemePreset.DEFAULT)
 
-        assertEquals(0xFFEFF3F6, tokens.light.backgroundArgb)
-        assertEquals(0xFF0D1821, tokens.dark.backgroundArgb)
-        assertEquals(0xFF10202C, LettaColorTokens.LIGHT_ON_SURFACE)
-        assertEquals(0xFFE8EFF4, LettaColorTokens.DARK_ON_SURFACE)
+        assertEquals(0xFFF4F5F6, tokens.light.backgroundArgb)
+        assertEquals(0xFF101214, tokens.dark.backgroundArgb)
+        assertEquals(0xFF15191D, LettaColorTokens.LIGHT_ON_SURFACE)
+        assertEquals(0xFFE8EBEE, LettaColorTokens.DARK_ON_SURFACE)
     }
 
     @Test
@@ -44,14 +44,14 @@ class ThemeTokensCommonTest {
     }
 
     @Test
-    fun `default preset's secondary and tertiary are the North Sea Buoy slate and mist, not teal or cyan`() {
+    fun `default preset's secondary and tertiary are slate and steel greys, not teal or cyan`() {
         val tokens = LettaThemeTokens.preset(ThemePreset.DEFAULT)
 
         // The Baken kit's petrol slate (secondary) and steel mist (tertiary), per theme.
-        assertEquals(0xFF7A96AA, tokens.dark.secondaryArgb)
-        assertEquals(0xFF9FB4C4, tokens.dark.tertiaryArgb)
-        assertEquals(0xFF3D5A70, tokens.light.secondaryArgb)
-        assertEquals(0xFF4F6B80, tokens.light.tertiaryArgb)
+        assertEquals(0xFF8C98A3, tokens.dark.secondaryArgb)
+        assertEquals(0xFFA9B3BC, tokens.dark.tertiaryArgb)
+        assertEquals(0xFF4C5761, tokens.light.secondaryArgb)
+        assertEquals(0xFF5C6872, tokens.light.tertiaryArgb)
         listOf(tokens.dark.secondaryArgb, tokens.dark.tertiaryArgb, tokens.light.secondaryArgb, tokens.light.tertiaryArgb)
             .forEach { argb -> assertFalse(isTealOrCyan(argb), "0x${argb.toString(HEX)} reads as teal/cyan") }
     }
