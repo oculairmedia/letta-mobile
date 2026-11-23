@@ -344,7 +344,8 @@ class TestSecondaries(unittest.TestCase):
     def test_the_loop_lag_is_the_same_motion_a_beat_late(self):
         import timeline
         from rig.body import breath2, sine
-        from rig.motion import SOFT_OUT, _ease, lagged
+        from rig.lag import ease_of as _ease, lagged
+        from rml import SOFT_OUT
         for keys, lag, period in ((breath2(), 14, 780), (sine(2, 3200), 12, 192), (sine(3, 2400), 8, 144)):
             src = [timeline.Key(k[0], float(k[1]), _ease(k[2] if len(k) > 2 and k[2] else SOFT_OUT), "double")
                    for k in keys]
@@ -367,6 +368,16 @@ class TestSecondaries(unittest.TestCase):
         calm = next(a for a in scene_tree().getroot().iter("LinearAnimation") if a.get("name") == name)
         face = next(ko for ko in calm.iter("KeyedObject") if ko.get("objectId") == FACE)
         return {kp.get("propertyKey"): float(next(iter(kp)).get("value")) for kp in face.iter("KeyedProperty")}
+
+    def test_a_lag_that_lands_on_a_key_splits_nothing(self):
+        """When the wrap cuts exactly at a key, every segment is whole: one key per original key."""
+        from rig.body import sine
+        from rig.lag import lagged
+        keys = sine(2, 3200)                     # keys at 0, 48, 96, 144, 192
+        out = lagged(keys, 48, 192)
+        self.assertEqual([k[0] for k in out], [0, 48, 96, 144, 192])
+        self.assertEqual(out[0][1], out[-1][1])
+        self.assertEqual(len({k[0] for k in out}), len(out), "a frame is keyed twice")
 
     def test_calm_twins_hold_the_lagged_frame_zero(self):
         """The calm twin and the loop agree at frame 0, so reduceMotion and entries land on it."""
