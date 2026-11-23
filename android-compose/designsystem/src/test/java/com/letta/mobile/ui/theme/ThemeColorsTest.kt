@@ -84,9 +84,23 @@ class ThemeColorsTest {
         assertEquals(Color(0xFF8C98A3), dark.secondary)
         assertEquals(Color(0xFFA9B3BC), dark.tertiary)
         assertEquals(Color(0xFF4C5761), light.secondary)
-        assertEquals(Color(0xFF5C6872), light.tertiary)
+        assertEquals(Color(0xFF5A6670), light.tertiary)
         assertEquals(Color(0xFF262B30), dark.tertiaryContainer)
         assertEquals(Color(0xFFE2E6EA), light.tertiaryContainer)
+    }
+
+    @Test
+    fun `Android Default draws the same vermilion primary roles as desktop and the web`() {
+        val colors = presetThemeColors(ThemePreset.DEFAULT)
+        for (base in listOf(colors.darkScheme, colors.lightScheme)) {
+            val drawn = lettaThemeScheme(base, brandPalette = true)
+            assertEquals(base.primary, drawn.primary)
+            assertEquals(base.onPrimary, drawn.onPrimary)
+            assertEquals(base.primaryContainer, drawn.primaryContainer)
+            assertEquals(base.onPrimaryContainer, drawn.onPrimaryContainer)
+        }
+        assertEquals(Color(0xFFEE5A3F), lettaThemeScheme(colors.darkScheme, brandPalette = true).primary)
+        assertEquals(Color(0xFFE04A32), lettaThemeScheme(colors.lightScheme, brandPalette = true).primary)
     }
 
     @Test

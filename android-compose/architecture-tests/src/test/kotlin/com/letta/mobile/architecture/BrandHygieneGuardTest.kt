@@ -129,24 +129,41 @@ class BrandHygieneGuardTest {
     }
 }
 
+/**
+ * The walk both brand scans share: every file whose name ends in one of [extensions], as `path:line` for each line
+ * [lineHits] reports.
+ */
+internal class SourceLineScan(private val extensions: List<String>, private val lineHits: (Path) -> List<Int>) {
+    /** `path:line` of every hit under [roots] (relative to [projectRoot]) outside [allowed] files, in path order. */
+    fun hits(projectRoot: Path, roots: List<String>, allowed: Set<String>): List<String> = roots
+        .map(projectRoot::resolve)
+        .filter(Files::isDirectory)
+        .flatMap { root -> Files.walk(root).use { walk -> walk.filter { file -> file.hasExtension() }.toList() } }
+        .map { file -> projectRoot.relativize(file).invariantSeparatorsPathString to file }
+        .filterNot { (relative, _) -> relative in allowed }
+        .sortedBy { it.first }
+        .flatMap { (relative, file) -> lineHits(file).map { line -> "$relative:$line" } }
+
+    private fun Path.hasExtension(): Boolean = extensions.any { toString().endsWith(it) }
+
+    companion object {
+        /** The 0-based index and text of each line of [file] that is not a comment or KDoc line. */
+        fun codeLines(file: Path): List<IndexedValue<String>> = file.readLines().withIndex()
+            .filterNot { (_, line) -> line.trimStart().let { it.startsWith("//") || it.startsWith("*") || it.startsWith("/*") } }
+    }
+}
+
 /** Finds colour literals (`Color(0x...)` with a bare literal, `"#RRGGBB[AA]"`) in Kotlin sources. */
 internal object HardcodedColourScan {
     private val COLOUR_LITERAL = Regex("""\bColor\(\s*0x[0-9A-Fa-f]{8}L?\s*\)""")
     private val HEX_STRING = Regex(""""#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?"""")
 
     /** `path:line` of every hit under [roots] (relative to [projectRoot]) outside [allowed] files. */
-    fun hits(projectRoot: Path, roots: List<String>, allowed: Set<String>): List<String> = roots
-        .map(projectRoot::resolve)
-        .filter(Files::isDirectory)
-        .flatMap { root -> Files.walk(root).use { walk -> walk.filter { it.toString().endsWith(".kt") }.toList() } }
-        .map { file -> projectRoot.relativize(file).invariantSeparatorsPathString to file }
-        .filterNot { (relative, _) -> relative in allowed }
-        .sortedBy { it.first }
-        .flatMap { (relative, file) -> lineHits(file).map { line -> "$relative:$line" } }
+    fun hits(projectRoot: Path, roots: List<String>, allowed: Set<String>): List<String> =
+        SourceLineScan(listOf(".kt"), ::lineHits).hits(projectRoot, roots, allowed)
 
     /** 1-based numbers of the lines in [file] that name a colour, comment lines excepted. */
-    fun lineHits(file: Path): List<Int> = file.readLines().withIndex()
-        .filterNot { (_, line) -> line.trimStart().let { it.startsWith("//") || it.startsWith("*") || it.startsWith("/*") } }
+    fun lineHits(file: Path): List<Int> = SourceLineScan.codeLines(file)
         .filter { (_, line) -> COLOUR_LITERAL.containsMatchIn(line) || HEX_STRING.containsMatchIn(line) }
         .map { it.index + 1 }
 }
@@ -164,21 +181,12 @@ internal object ProductNameScan {
         "Letta Code", "Letta server", "Letta backend", "Letta agent", "Letta AI platform", "Letta models", "Letta-hosted",
     )
 
-    fun hits(projectRoot: Path, roots: List<String>, allowed: Set<String>): List<String> = roots
-        .map(projectRoot::resolve)
-        .filter(Files::isDirectory)
-        .flatMap { root ->
-            Files.walk(root).use { walk -> walk.filter { it.toString().endsWith(".kt") || it.toString().endsWith(".xml") }.toList() }
-        }
-        .map { file -> projectRoot.relativize(file).invariantSeparatorsPathString to file }
-        .filterNot { (relative, _) -> relative in allowed }
-        .sortedBy { it.first }
-        .flatMap { (relative, file) -> lineHits(file).map { line -> "$relative:$line" } }
+    fun hits(projectRoot: Path, roots: List<String>, allowed: Set<String>): List<String> =
+        SourceLineScan(listOf(".kt", ".xml"), ::lineHits).hits(projectRoot, roots, allowed)
 
     private fun lineHits(file: Path): List<Int> {
         val strings = if (file.toString().endsWith(".kt")) KOTLIN_STRING else RESOURCE_TEXT
-        return file.readLines().withIndex()
-            .filterNot { (_, line) -> line.trimStart().let { it.startsWith("//") || it.startsWith("*") || it.startsWith("/*") } }
+        return SourceLineScan.codeLines(file)
             .filter { (_, line) -> strings.findAll(line).any { names(it.value) } }
             .map { it.index + 1 }
     }

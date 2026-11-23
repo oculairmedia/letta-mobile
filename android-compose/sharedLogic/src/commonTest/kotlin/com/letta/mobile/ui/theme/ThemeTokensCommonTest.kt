@@ -51,7 +51,7 @@ class ThemeTokensCommonTest {
         assertEquals(0xFF8C98A3, tokens.dark.secondaryArgb)
         assertEquals(0xFFA9B3BC, tokens.dark.tertiaryArgb)
         assertEquals(0xFF4C5761, tokens.light.secondaryArgb)
-        assertEquals(0xFF5C6872, tokens.light.tertiaryArgb)
+        assertEquals(0xFF5A6670, tokens.light.tertiaryArgb)
         listOf(tokens.dark.secondaryArgb, tokens.dark.tertiaryArgb, tokens.light.secondaryArgb, tokens.light.tertiaryArgb)
             .forEach { argb -> assertFalse(isTealOrCyan(argb), "0x${argb.toString(HEX)} reads as teal/cyan") }
     }

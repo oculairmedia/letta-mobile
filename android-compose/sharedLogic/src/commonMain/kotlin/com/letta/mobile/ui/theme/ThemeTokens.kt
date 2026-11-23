@@ -4,14 +4,17 @@ import com.letta.mobile.data.model.ThemePreset
 
 object LettaColorTokens {
     // Baken brand: Buoy Vermilion primary over neutral greys with only a faint cool tint (saturation about 8-12 %),
-    // so the vermilion is the one colour on screen. Text on the vermilion primary is white in both themes.
+    // so the vermilion is the one colour on screen. Text on a vermilion fill is a near-black ink in both themes
+    // (5.5:1 on the dark primary, 4.6:1 on the light one; white reads only 3.4:1 and 4.0:1 there).
     // Single source of truth for every client (default preset).
     const val DARK_SURFACE = 0xFF15181B
     const val DARK_SURFACE_VARIANT = 0xFF1C1F23
     const val DARK_SURFACE_CONTAINER = 0xFF1C1F23
     const val DARK_PRIMARY = 0xFFEE5A3F
     const val DARK_PRIMARY_VARIANT = 0xFFB8432E
-    const val DARK_ON_PRIMARY = 0xFFFFFFFF
+    const val DARK_ON_PRIMARY = 0xFF1A0F0C
+    // Text on the deep vermilion container (DARK_PRIMARY_VARIANT): white, 5.4:1.
+    const val DARK_ON_PRIMARY_CONTAINER = 0xFFFFFFFF
     const val DARK_ON_SURFACE = 0xFFE8EBEE
     const val DARK_ON_SURFACE_VARIANT = 0xFFA9B1B9
     const val DARK_ON_SURFACE_MUTED = 0xFF808A94
@@ -24,7 +27,7 @@ object LettaColorTokens {
     const val LIGHT_SURFACE_VARIANT = 0xFFEEF0F2
     const val LIGHT_SURFACE_CONTAINER = 0xFFE6E9EC
     const val LIGHT_PRIMARY = 0xFFE04A32
-    const val LIGHT_ON_PRIMARY = 0xFFFFFFFF
+    const val LIGHT_ON_PRIMARY = 0xFF1A0F0C
     const val LIGHT_ON_SURFACE = 0xFF15191D
     const val LIGHT_ON_SURFACE_VARIANT = 0xFF4A525A
     const val LIGHT_ON_SURFACE_MUTED = 0xFF5E6770
@@ -37,6 +40,11 @@ object LettaColorTokens {
     // The Baken mark's stones: the pale/petrol stone and the vermilion pebble, per theme (kit svg/baken-mark-*.svg).
     const val DARK_MARK_STONE = 0xFFDCE6EE
     const val LIGHT_MARK_STONE = 0xFF163044
+
+    // Vermilion as small TEXT on the surfaces (a warning label): the light one deepened, the dark one lifted, so it
+    // reads at 4.5:1 or more on every surface level of its theme, surfaceContainerHighest included.
+    const val LIGHT_PRIMARY_TEXT = 0xFFB23A24
+    const val DARK_PRIMARY_TEXT = 0xFFF26E54
 
     // The vermilion's lit face: the highlight at the centre of the assistant sphere's vermilion-to-petrol radial.
     const val PRIMARY_HIGHLIGHT = 0xFFF5A28C
@@ -70,7 +78,7 @@ object LettaColorTokens {
     const val LIGHT_SECONDARY = 0xFF4C5761
     const val LIGHT_ON_SECONDARY = 0xFFFFFFFF
     const val LIGHT_SECONDARY_CONTAINER = 0xFFDDE1E5
-    const val LIGHT_TERTIARY = 0xFF5C6872
+    const val LIGHT_TERTIARY = 0xFF5A6670
     const val LIGHT_ON_TERTIARY = 0xFFFFFFFF
     const val LIGHT_TERTIARY_CONTAINER = 0xFFE2E6EA
     const val LIGHT_ON_TERTIARY_CONTAINER = 0xFF15191D

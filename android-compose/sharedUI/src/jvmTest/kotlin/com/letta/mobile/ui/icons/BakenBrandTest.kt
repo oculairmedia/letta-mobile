@@ -2,6 +2,7 @@ package com.letta.mobile.ui.icons
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.VectorPath
 import com.letta.mobile.ui.theme.AgentSphereCore
@@ -18,8 +19,8 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
- * Home is drawn as the Baken mark (the kit's two basalt stones on a 200 viewport), text on the vermilion primary is
- * white in both themes, vermilion is the only accent (secondary and tertiary are slate and steel greys), and the
+ * Home is drawn as the Baken mark (the kit's two basalt stones on a 200 viewport), text on the vermilion primary
+ * reads at 4.5:1 in both themes, vermilion is the only accent (secondary and tertiary are slate and steel greys), and the
  * user's chat bubble is a neutral surface. The oracles are the kit's own numbers, not the production helpers.
  */
 class BakenBrandTest {
@@ -34,11 +35,14 @@ class BakenBrandTest {
     }
 
     @Test
-    fun textOnTheVermilionPrimaryIsWhiteInBothThemes() {
+    fun textOnTheVermilionPrimaryReadsInBothThemes() {
         assertEquals(Color(0xFFEE5A3F), lettaColorScheme(dark = true).primary)
         assertEquals(Color(0xFFE04A32), lettaColorScheme(dark = false).primary)
-        assertEquals(Color.White, lettaColorScheme(dark = true).onPrimary)
-        assertEquals(Color.White, lettaColorScheme(dark = false).onPrimary)
+        for (scheme in listOf(lettaColorScheme(dark = true), lettaColorScheme(dark = false))) {
+            assertReads(scheme.onPrimary, scheme.primary, TEXT_CONTRAST, "onPrimary on primary")
+            val container = scheme.primaryContainer.compositeOver(scheme.surface)
+            assertReads(scheme.onPrimaryContainer, container, TEXT_CONTRAST, "onPrimaryContainer")
+        }
     }
 
     @Test
@@ -57,7 +61,7 @@ class BakenBrandTest {
         assertEquals(Color(0xFF8C98A3), dark.secondary)
         assertEquals(Color(0xFFA9B3BC), dark.tertiary)
         assertEquals(Color(0xFF4C5761), light.secondary)
-        assertEquals(Color(0xFF5C6872), light.tertiary)
+        assertEquals(Color(0xFF5A6670), light.tertiary)
         for (scheme in listOf(dark, light)) {
             for ((role, colour) in accentRoles(scheme)) {
                 assertFalse(colour.isTealOrCyan(), "$role ${colour.hex()} still reads as teal/cyan")
@@ -69,7 +73,9 @@ class BakenBrandTest {
     fun secondaryAndTertiaryInkReadOnTheirSurfacesAndContainers() {
         for (scheme in listOf(lettaColorScheme(dark = true), lettaColorScheme(dark = false))) {
             assertReads(scheme.secondary, scheme.surface, GRAPHIC_CONTRAST, "secondary on surface")
-            assertReads(scheme.tertiary, scheme.surface, TEXT_CONTRAST, "tertiary on surface")
+            for ((role, surface) in surfaceRoles(scheme)) {
+                assertReads(scheme.tertiary, surface, TEXT_CONTRAST, "tertiary on $role")
+            }
             assertReads(scheme.onSecondary, scheme.secondary, TEXT_CONTRAST, "onSecondary on secondary")
             assertReads(scheme.onTertiary, scheme.tertiary, TEXT_CONTRAST, "onTertiary on tertiary")
             assertReads(scheme.onSecondaryContainer, scheme.secondaryContainer, TEXT_CONTRAST, "onSecondaryContainer")
@@ -136,6 +142,17 @@ class BakenBrandTest {
             }
         }
     }
+
+    private fun surfaceRoles(scheme: ColorScheme) = listOf(
+        "background" to scheme.background,
+        "surface" to scheme.surface,
+        "surfaceVariant" to scheme.surfaceVariant,
+        "surfaceContainerLowest" to scheme.surfaceContainerLowest,
+        "surfaceContainerLow" to scheme.surfaceContainerLow,
+        "surfaceContainer" to scheme.surfaceContainer,
+        "surfaceContainerHigh" to scheme.surfaceContainerHigh,
+        "surfaceContainerHighest" to scheme.surfaceContainerHighest,
+    )
 
     private fun accentRoles(scheme: ColorScheme) = listOf(
         "secondary" to scheme.secondary,

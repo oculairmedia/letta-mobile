@@ -141,14 +141,19 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
 
 /**
  * The scheme LettaTheme draws: [base] with the accent contrast boost. On the brand palette (Default, no wallpaper
- * colours) the support roles stay the brand's own slate and steel greys: the boost's saturation floor would turn the muted
- * slate into a vivid blue, and vermilion is the only accent.
+ * colours) the primary roles stay the brand's own vermilion, as desktop and the web draw it (the boost's lightness
+ * clamp would shift it), and the support roles stay the brand's slate and steel greys: the boost's saturation floor
+ * would turn the muted slate into a vivid blue, and vermilion is the only accent.
  */
 @VisibleForTesting
 internal fun lettaThemeScheme(base: ColorScheme, brandPalette: Boolean): ColorScheme {
     val boosted = base.withLettaContrastBoost()
     if (!brandPalette) return boosted
     return boosted.copy(
+        primary = base.primary,
+        onPrimary = base.onPrimary,
+        primaryContainer = base.primaryContainer,
+        onPrimaryContainer = base.onPrimaryContainer,
         secondary = base.secondary,
         onSecondary = base.onSecondary,
         secondaryContainer = base.secondaryContainer,

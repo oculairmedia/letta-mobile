@@ -29,6 +29,7 @@ import com.letta.mobile.ui.theme.AgentContextDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.theme.lettaPrimaryText
 import kotlin.math.roundToInt
 import com.letta.mobile.ui.theme.tokens.LettaTextStyles
 import com.letta.mobile.ui.components.disclosure.LettaMenuIndicator
@@ -121,11 +122,11 @@ internal fun usageLine(model: AgentContextCardModel, usage: ContextWindowUsage? 
     )
 }
 
-/** Neutral below 70 %, the brand primary to 90 %, error from there (the plan's thresholds). */
+/** Neutral below 70 %, the brand primary (its text-safe shade) to 90 %, error from there (the plan's thresholds). */
 @Composable
 internal fun levelColor(level: ContextMeterLevel): Color = when (level) {
     ContextMeterLevel.Normal -> MaterialTheme.colorScheme.onSurfaceVariant
-    ContextMeterLevel.Warning -> MaterialTheme.colorScheme.primary
+    ContextMeterLevel.Warning -> lettaPrimaryText(MaterialTheme.colorScheme)
     ContextMeterLevel.Critical -> MaterialTheme.colorScheme.error
 }
 

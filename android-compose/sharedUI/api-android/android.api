@@ -12681,6 +12681,7 @@ public final class com/letta/mobile/ui/theme/SharedMaterialThemeKt {
 	public static final fun lettaColorScheme (ZZLcom/letta/mobile/data/model/ThemePreset;)Landroidx/compose/material3/ColorScheme;
 	public static synthetic fun lettaColorScheme$default (ZZLcom/letta/mobile/data/model/ThemePreset;ILjava/lang/Object;)Landroidx/compose/material3/ColorScheme;
 	public static final fun lettaCustomColors (Landroidx/compose/material3/ColorScheme;)Lcom/letta/mobile/ui/theme/tokens/CustomColors;
+	public static final fun lettaPrimaryText (Landroidx/compose/material3/ColorScheme;)J
 	public static final fun lettaUserBubble (Landroidx/compose/material3/ColorScheme;)J
 }
 
