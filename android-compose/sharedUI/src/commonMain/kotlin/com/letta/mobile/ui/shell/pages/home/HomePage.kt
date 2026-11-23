@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +36,7 @@ import com.letta.mobile.data.home.HomePageActions
 import com.letta.mobile.data.home.HomePageState
 import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.data.home.HomeViews
+import com.letta.mobile.data.home.greeting.GREETING_CAST_SIZE
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.view.RuntimeViewId
@@ -150,6 +152,8 @@ data class HomePageOptions(
     val orbIndexByAgentId: Map<String, Int> = emptyMap(),
     val headerActions: (@Composable RowScope.() -> Unit)? = null,
     val document: UiGeneratedComponent? = null,
+    /** Home's hello (the line, the mark and a few mascots) above the sections; null leaves it out. */
+    val greeting: HomeGreetingOptions? = null,
 )
 
 internal class HomePageScope(
@@ -184,6 +188,16 @@ internal class HomePageScope(
     fun offers(shortcut: HomeShortcut): Boolean = shortcut in state.availableShortcuts
 }
 
+/** The greeting first, when the host asked for it, then the home lane's sections. */
+private fun LazyListScope.homeGreetingAndSections(page: HomePageScope) {
+    page.options.greeting?.let { greeting ->
+        item(key = "greeting") {
+            HomeGreeting(page.state.avatarRowAgents().take(GREETING_CAST_SIZE), greeting, hydrating = page.state.stats.loading)
+        }
+    }
+    homeSections(page)
+}
+
 /**
  * Touch hosts also support an explicit pull. Page entry and reconnection refresh automatically.
  */
@@ -213,7 +227,7 @@ private fun WideHomeList(page: HomePageScope) {
             bottom = LettaDimens.Space.xl,
         ),
     ) {
-        if (page.state.search.isActive) homeSearchResults(page) else homeSections(page)
+        if (page.state.search.isActive) homeSearchResults(page) else homeGreetingAndSections(page)
     }
 }
 
@@ -241,7 +255,7 @@ private fun CompactHomeLayout(page: HomePageScope) {
                         bottom = LettaDimens.Space.lg + if (docked) barHeight else 0.dp,
                     ),
                 ) {
-                    if (page.state.search.isActive) homeSearchResults(page) else homeSections(page)
+                    if (page.state.search.isActive) homeSearchResults(page) else homeGreetingAndSections(page)
                 }
             }
             // The chat composer runs edge to edge at the bottom, as on the compact chat page.

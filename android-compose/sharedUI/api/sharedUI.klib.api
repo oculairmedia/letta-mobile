@@ -998,6 +998,10 @@ abstract interface com.letta.mobile.ui.secrets/SecureSurface { // com.letta.mobi
     abstract fun exit() // com.letta.mobile.ui.secrets/SecureSurface.exit|exit(){}[0]
 }
 
+abstract interface com.letta.mobile.ui.shell.pages.home/BrandMarkHost { // com.letta.mobile.ui.shell.pages.home/BrandMarkHost|null[0]
+    abstract fun Mark(com.letta.mobile.data.home.greeting/GreetingMarkIntent, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.shell.pages.home/BrandMarkHost.Mark|Mark(com.letta.mobile.data.home.greeting.GreetingMarkIntent;androidx.compose.ui.Modifier;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
+}
+
 abstract interface com.letta.mobile.ui.shell.sidebar/ShellCanvasMounts { // com.letta.mobile.ui.shell.sidebar/ShellCanvasMounts|null[0]
     abstract val state // com.letta.mobile.ui.shell.sidebar/ShellCanvasMounts.state|{}state[0]
         abstract fun <get-state>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState> // com.letta.mobile.ui.shell.sidebar/ShellCanvasMounts.state.<get-state>|<get-state>(){}[0]
@@ -6670,6 +6674,22 @@ final class com.letta.mobile.ui.shell.pages.home/HomeConnectionState { // com.le
     final fun toString(): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeConnectionState.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions { // com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions|null[0]
+    constructor <init>(com.letta.mobile.data.home.greeting/GreetingConnection = ..., kotlin/Int? = ...) // com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions.<init>|<init>(com.letta.mobile.data.home.greeting.GreetingConnection;kotlin.Int?){}[0]
+
+    final val connection // com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions.connection|{}connection[0]
+        final fun <get-connection>(): com.letta.mobile.data.home.greeting/GreetingConnection // com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions.connection.<get-connection>|<get-connection>(){}[0]
+    final val hour // com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions.hour|{}hour[0]
+        final fun <get-hour>(): kotlin/Int? // com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions.hour.<get-hour>|<get-hour>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.home.greeting/GreetingConnection // com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions.component1|component1(){}[0]
+    final fun component2(): kotlin/Int? // com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.home.greeting/GreetingConnection = ..., kotlin/Int? = ...): com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions // com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions.copy|copy(com.letta.mobile.data.home.greeting.GreetingConnection;kotlin.Int?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.ui.shell.pages.home/HomePageCallbacks { // com.letta.mobile.ui.shell.pages.home/HomePageCallbacks|null[0]
     constructor <init>(com.letta.mobile.data.home/HomePageActions, com.letta.mobile.ui.shell.pages.home/HomePageNavigation) // com.letta.mobile.ui.shell.pages.home/HomePageCallbacks.<init>|<init>(com.letta.mobile.data.home.HomePageActions;com.letta.mobile.ui.shell.pages.home.HomePageNavigation){}[0]
 
@@ -6724,12 +6744,14 @@ final class com.letta.mobile.ui.shell.pages.home/HomePageNavigation { // com.let
 }
 
 final class com.letta.mobile.ui.shell.pages.home/HomePageOptions { // com.letta.mobile.ui.shell.pages.home/HomePageOptions|null[0]
-    constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String = ..., kotlin/Function5<kotlin/String, kotlin/Function1<kotlin/String, kotlin/Unit>, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin/Function3<androidx.compose.foundation.layout/RowScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ..., com.letta.mobile.data.model/UiGeneratedComponent? = ...) // com.letta.mobile.ui.shell.pages.home/HomePageOptions.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String;kotlin.Function5<kotlin.String,kotlin.Function1<kotlin.String,kotlin.Unit>,androidx.compose.ui.Modifier,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.Function3<androidx.compose.foundation.layout.RowScope,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;com.letta.mobile.data.model.UiGeneratedComponent?){}[0]
+    constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String = ..., kotlin/Function5<kotlin/String, kotlin/Function1<kotlin/String, kotlin/Unit>, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin/Function3<androidx.compose.foundation.layout/RowScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ..., com.letta.mobile.data.model/UiGeneratedComponent? = ..., com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions? = ...) // com.letta.mobile.ui.shell.pages.home/HomePageOptions.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String;kotlin.Function5<kotlin.String,kotlin.Function1<kotlin.String,kotlin.Unit>,androidx.compose.ui.Modifier,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.Function3<androidx.compose.foundation.layout.RowScope,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;com.letta.mobile.data.model.UiGeneratedComponent?;com.letta.mobile.ui.shell.pages.home.HomeGreetingOptions?){}[0]
 
     final val composerPlaceholder // com.letta.mobile.ui.shell.pages.home/HomePageOptions.composerPlaceholder|{}composerPlaceholder[0]
         final fun <get-composerPlaceholder>(): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomePageOptions.composerPlaceholder.<get-composerPlaceholder>|<get-composerPlaceholder>(){}[0]
     final val document // com.letta.mobile.ui.shell.pages.home/HomePageOptions.document|{}document[0]
         final fun <get-document>(): com.letta.mobile.data.model/UiGeneratedComponent? // com.letta.mobile.ui.shell.pages.home/HomePageOptions.document.<get-document>|<get-document>(){}[0]
+    final val greeting // com.letta.mobile.ui.shell.pages.home/HomePageOptions.greeting|{}greeting[0]
+        final fun <get-greeting>(): com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions? // com.letta.mobile.ui.shell.pages.home/HomePageOptions.greeting.<get-greeting>|<get-greeting>(){}[0]
     final val headerActions // com.letta.mobile.ui.shell.pages.home/HomePageOptions.headerActions|{}headerActions[0]
         final fun <get-headerActions>(): kotlin/Function3<androidx.compose.foundation.layout/RowScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? // com.letta.mobile.ui.shell.pages.home/HomePageOptions.headerActions.<get-headerActions>|<get-headerActions>(){}[0]
     final val orbIndexByAgentId // com.letta.mobile.ui.shell.pages.home/HomePageOptions.orbIndexByAgentId|{}orbIndexByAgentId[0]
@@ -6751,7 +6773,8 @@ final class com.letta.mobile.ui.shell.pages.home/HomePageOptions { // com.letta.
     final fun component6(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.letta.mobile.ui.shell.pages.home/HomePageOptions.component6|component6(){}[0]
     final fun component7(): kotlin/Function3<androidx.compose.foundation.layout/RowScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? // com.letta.mobile.ui.shell.pages.home/HomePageOptions.component7|component7(){}[0]
     final fun component8(): com.letta.mobile.data.model/UiGeneratedComponent? // com.letta.mobile.ui.shell.pages.home/HomePageOptions.component8|component8(){}[0]
-    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String = ..., kotlin/Function5<kotlin/String, kotlin/Function1<kotlin/String, kotlin/Unit>, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin/Function3<androidx.compose.foundation.layout/RowScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ..., com.letta.mobile.data.model/UiGeneratedComponent? = ...): com.letta.mobile.ui.shell.pages.home/HomePageOptions // com.letta.mobile.ui.shell.pages.home/HomePageOptions.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String;kotlin.Function5<kotlin.String,kotlin.Function1<kotlin.String,kotlin.Unit>,androidx.compose.ui.Modifier,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.Function3<androidx.compose.foundation.layout.RowScope,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;com.letta.mobile.data.model.UiGeneratedComponent?){}[0]
+    final fun component9(): com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions? // com.letta.mobile.ui.shell.pages.home/HomePageOptions.component9|component9(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String = ..., kotlin/Function5<kotlin/String, kotlin/Function1<kotlin/String, kotlin/Unit>, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin/Function3<androidx.compose.foundation.layout/RowScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ..., com.letta.mobile.data.model/UiGeneratedComponent? = ..., com.letta.mobile.ui.shell.pages.home/HomeGreetingOptions? = ...): com.letta.mobile.ui.shell.pages.home/HomePageOptions // com.letta.mobile.ui.shell.pages.home/HomePageOptions.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String;kotlin.Function5<kotlin.String,kotlin.Function1<kotlin.String,kotlin.Unit>,androidx.compose.ui.Modifier,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.Function3<androidx.compose.foundation.layout.RowScope,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;com.letta.mobile.data.model.UiGeneratedComponent?;com.letta.mobile.ui.shell.pages.home.HomeGreetingOptions?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.shell.pages.home/HomePageOptions.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.ui.shell.pages.home/HomePageOptions.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomePageOptions.toString|toString(){}[0]
@@ -11487,6 +11510,19 @@ final object com.letta.mobile.ui.shell.pages.home/HomeConnectionPanelTags { // c
         final fun <get-RETRY>(): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeConnectionPanelTags.RETRY.<get-RETRY>|<get-RETRY>(){}[0]
 }
 
+final object com.letta.mobile.ui.shell.pages.home/HomeGreetingTags { // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags|null[0]
+    final const val GREETING // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.GREETING|{}GREETING[0]
+        final fun <get-GREETING>(): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.GREETING.<get-GREETING>|<get-GREETING>(){}[0]
+    final const val LINE // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.LINE|{}LINE[0]
+        final fun <get-LINE>(): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.LINE.<get-LINE>|<get-LINE>(){}[0]
+    final const val MARK // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.MARK|{}MARK[0]
+        final fun <get-MARK>(): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.MARK.<get-MARK>|<get-MARK>(){}[0]
+    final const val STAGE // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.STAGE|{}STAGE[0]
+        final fun <get-STAGE>(): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.STAGE.<get-STAGE>|<get-STAGE>(){}[0]
+
+    final fun mascot(kotlin/String): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.mascot|mascot(kotlin.String){}[0]
+}
+
 final object com.letta.mobile.ui.shell.pages.home/HomePageTags { // com.letta.mobile.ui.shell.pages.home/HomePageTags|null[0]
     final const val ADD_PIN // com.letta.mobile.ui.shell.pages.home/HomePageTags.ADD_PIN|{}ADD_PIN[0]
         final fun <get-ADD_PIN>(): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomePageTags.ADD_PIN.<get-ADD_PIN>|<get-ADD_PIN>(){}[0]
@@ -11540,6 +11576,10 @@ final object com.letta.mobile.ui.shell.pages.home/HomePageTags { // com.letta.mo
     final fun sort(com.letta.mobile.data.home/FleetSortKey): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomePageTags.sort|sort(com.letta.mobile.data.home.FleetSortKey){}[0]
     final fun stat(kotlin/String): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomePageTags.stat|stat(kotlin.String){}[0]
     final fun unpin(com.letta.mobile.data.home/HomePinnedItem): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomePageTags.unpin|unpin(com.letta.mobile.data.home.HomePinnedItem){}[0]
+}
+
+final object com.letta.mobile.ui.shell.pages.home/PlaceholderBrandMark : com.letta.mobile.ui.shell.pages.home/BrandMarkHost { // com.letta.mobile.ui.shell.pages.home/PlaceholderBrandMark|null[0]
+    final fun Mark(com.letta.mobile.data.home.greeting/GreetingMarkIntent, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.shell.pages.home/PlaceholderBrandMark.Mark|Mark(com.letta.mobile.data.home.greeting.GreetingMarkIntent;androidx.compose.ui.Modifier;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 }
 
 final object com.letta.mobile.ui.shell.pages.memfs/MemfsPageTags { // com.letta.mobile.ui.shell.pages.memfs/MemfsPageTags|null[0]
@@ -13739,12 +13779,17 @@ final val com.letta.mobile.ui.shell.pages.conversations/com_letta_mobile_ui_shel
 final val com.letta.mobile.ui.shell.pages.conversations/com_letta_mobile_ui_shell_pages_conversations_ConversationsPageMapping$stableprop // com.letta.mobile.ui.shell.pages.conversations/com_letta_mobile_ui_shell_pages_conversations_ConversationsPageMapping$stableprop|#static{}com_letta_mobile_ui_shell_pages_conversations_ConversationsPageMapping$stableprop[0]
 final val com.letta.mobile.ui.shell.pages.conversations/com_letta_mobile_ui_shell_pages_conversations_ConversationsPageState$stableprop // com.letta.mobile.ui.shell.pages.conversations/com_letta_mobile_ui_shell_pages_conversations_ConversationsPageState$stableprop|#static{}com_letta_mobile_ui_shell_pages_conversations_ConversationsPageState$stableprop[0]
 final val com.letta.mobile.ui.shell.pages.conversations/com_letta_mobile_ui_shell_pages_conversations_ConversationsPageTags$stableprop // com.letta.mobile.ui.shell.pages.conversations/com_letta_mobile_ui_shell_pages_conversations_ConversationsPageTags$stableprop|#static{}com_letta_mobile_ui_shell_pages_conversations_ConversationsPageTags$stableprop[0]
+final val com.letta.mobile.ui.shell.pages.home/LocalBrandMarkHost // com.letta.mobile.ui.shell.pages.home/LocalBrandMarkHost|{}LocalBrandMarkHost[0]
+    final fun <get-LocalBrandMarkHost>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.shell.pages.home/BrandMarkHost> // com.letta.mobile.ui.shell.pages.home/LocalBrandMarkHost.<get-LocalBrandMarkHost>|<get-LocalBrandMarkHost>(){}[0]
 final val com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeConnectionPanelTags$stableprop // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeConnectionPanelTags$stableprop|#static{}com_letta_mobile_ui_shell_pages_home_HomeConnectionPanelTags$stableprop[0]
 final val com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeConnectionState$stableprop // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeConnectionState$stableprop|#static{}com_letta_mobile_ui_shell_pages_home_HomeConnectionState$stableprop[0]
+final val com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeGreetingOptions$stableprop // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeGreetingOptions$stableprop|#static{}com_letta_mobile_ui_shell_pages_home_HomeGreetingOptions$stableprop[0]
+final val com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeGreetingTags$stableprop // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeGreetingTags$stableprop|#static{}com_letta_mobile_ui_shell_pages_home_HomeGreetingTags$stableprop[0]
 final val com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageCallbacks$stableprop // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageCallbacks$stableprop|#static{}com_letta_mobile_ui_shell_pages_home_HomePageCallbacks$stableprop[0]
 final val com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageNavigation$stableprop // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageNavigation$stableprop|#static{}com_letta_mobile_ui_shell_pages_home_HomePageNavigation$stableprop[0]
 final val com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageOptions$stableprop // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageOptions$stableprop|#static{}com_letta_mobile_ui_shell_pages_home_HomePageOptions$stableprop[0]
 final val com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageTags$stableprop // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageTags$stableprop|#static{}com_letta_mobile_ui_shell_pages_home_HomePageTags$stableprop[0]
+final val com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_PlaceholderBrandMark$stableprop // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_PlaceholderBrandMark$stableprop|#static{}com_letta_mobile_ui_shell_pages_home_PlaceholderBrandMark$stableprop[0]
 final val com.letta.mobile.ui.shell.pages.memfs/com_letta_mobile_ui_shell_pages_memfs_MemfsPageOptions$stableprop // com.letta.mobile.ui.shell.pages.memfs/com_letta_mobile_ui_shell_pages_memfs_MemfsPageOptions$stableprop|#static{}com_letta_mobile_ui_shell_pages_memfs_MemfsPageOptions$stableprop[0]
 final val com.letta.mobile.ui.shell.pages.memfs/com_letta_mobile_ui_shell_pages_memfs_MemfsPageTags$stableprop // com.letta.mobile.ui.shell.pages.memfs/com_letta_mobile_ui_shell_pages_memfs_MemfsPageTags$stableprop|#static{}com_letta_mobile_ui_shell_pages_memfs_MemfsPageTags$stableprop[0]
 final val com.letta.mobile.ui.shell.pages.memory/com_letta_mobile_ui_shell_pages_memory_MemoryWorkspaceBinding$stableprop // com.letta.mobile.ui.shell.pages.memory/com_letta_mobile_ui_shell_pages_memory_MemoryWorkspaceBinding$stableprop|#static{}com_letta_mobile_ui_shell_pages_memory_MemoryWorkspaceBinding$stableprop[0]
@@ -14977,10 +15022,13 @@ final fun com.letta.mobile.ui.shell.pages.home/HomeConnectionPanel(com.letta.mob
 final fun com.letta.mobile.ui.shell.pages.home/HomePage(com.letta.mobile.data.home/HomePageState, com.letta.mobile.ui.shell.pages.home/HomePageCallbacks, androidx.compose.ui/Modifier?, com.letta.mobile.ui.shell.pages.home/HomePageOptions?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.shell.pages.home/HomePage|HomePage(com.letta.mobile.data.home.HomePageState;com.letta.mobile.ui.shell.pages.home.HomePageCallbacks;androidx.compose.ui.Modifier?;com.letta.mobile.ui.shell.pages.home.HomePageOptions?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeConnectionPanelTags$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeConnectionPanelTags$stableprop_getter|com_letta_mobile_ui_shell_pages_home_HomeConnectionPanelTags$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeConnectionState$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeConnectionState$stableprop_getter|com_letta_mobile_ui_shell_pages_home_HomeConnectionState$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeGreetingOptions$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeGreetingOptions$stableprop_getter|com_letta_mobile_ui_shell_pages_home_HomeGreetingOptions$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeGreetingTags$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomeGreetingTags$stableprop_getter|com_letta_mobile_ui_shell_pages_home_HomeGreetingTags$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageCallbacks$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageCallbacks$stableprop_getter|com_letta_mobile_ui_shell_pages_home_HomePageCallbacks$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageNavigation$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageNavigation$stableprop_getter|com_letta_mobile_ui_shell_pages_home_HomePageNavigation$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageOptions$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageOptions$stableprop_getter|com_letta_mobile_ui_shell_pages_home_HomePageOptions$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageTags$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_HomePageTags$stableprop_getter|com_letta_mobile_ui_shell_pages_home_HomePageTags$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_PlaceholderBrandMark$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.shell.pages.home/com_letta_mobile_ui_shell_pages_home_PlaceholderBrandMark$stableprop_getter|com_letta_mobile_ui_shell_pages_home_PlaceholderBrandMark$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.shell.pages.home/connectionFailureHeadline(com.letta.mobile.data.chat.runtime/ChatScreenStatus, kotlin/String?): kotlin/String? // com.letta.mobile.ui.shell.pages.home/connectionFailureHeadline|connectionFailureHeadline(com.letta.mobile.data.chat.runtime.ChatScreenStatus;kotlin.String?){}[0]
 final fun com.letta.mobile.ui.shell.pages.memfs/MemfsPage(com.letta.mobile.data.memory.memfs/MemfsPageState, com.letta.mobile.data.memory.memfs/MemfsPageActions, androidx.compose.ui/Modifier?, com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.shell.pages.memfs/MemfsPage|MemfsPage(com.letta.mobile.data.memory.memfs.MemfsPageState;com.letta.mobile.data.memory.memfs.MemfsPageActions;androidx.compose.ui.Modifier?;com.letta.mobile.ui.shell.pages.memfs.MemfsPageOptions?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.shell.pages.memfs/com_letta_mobile_ui_shell_pages_memfs_MemfsPageOptions$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.shell.pages.memfs/com_letta_mobile_ui_shell_pages_memfs_MemfsPageOptions$stableprop_getter|com_letta_mobile_ui_shell_pages_memfs_MemfsPageOptions$stableprop_getter(){}[0]
