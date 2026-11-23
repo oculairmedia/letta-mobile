@@ -114,7 +114,7 @@ android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldMainContent.kt 136 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldPickers.kt 110 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldRecentInteractions.kt 36 legacy-pending(ckmub.2)
-android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/ChatScreen.kt 167 legacy-pending(ckmub.2)
+android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/ChatScreen.kt 154 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/ChatScreenEffects.kt 186 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/ChatScreenSubagentState.kt 38 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/ChatCanvasSlot.kt 31 legacy-pending(ckmub.2)
