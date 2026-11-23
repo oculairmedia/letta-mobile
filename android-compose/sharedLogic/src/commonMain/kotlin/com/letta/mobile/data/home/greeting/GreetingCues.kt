@@ -49,9 +49,10 @@ private fun moodCues(state: GreetingState, members: List<GreetingCastMember>): L
     }
 }
 
-private fun pointerCues(state: GreetingState, target: GreetingTarget?): List<GreetingCue> {
-    if (target == null || target == state.pointer || target == GreetingTarget.User) return emptyList()
-    return listOf(cue(GreetingCueKind.POINTED, target, POINTED))
+/** The pointer arriving on a mascot or the mark; leaving, or staying where it was, is no moment. */
+private fun pointerCues(state: GreetingState, target: GreetingTarget?): List<GreetingCue> = when (target) {
+    null, GreetingTarget.User, state.pointer -> emptyList()
+    else -> listOf(cue(GreetingCueKind.POINTED, target, POINTED))
 }
 
 private fun tapCues(target: GreetingTarget): List<GreetingCue> = when (target) {

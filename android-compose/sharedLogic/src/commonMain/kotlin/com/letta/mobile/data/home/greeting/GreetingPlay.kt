@@ -79,7 +79,7 @@ object GreetingPlay {
     private fun GreetingState.queue(cues: List<GreetingCue>): GreetingState = if (cues.isEmpty()) this else copy(pending = pending + cues)
 
     private fun tick(state: GreetingState, seconds: Float, random: Random, tuning: GreetingTuning): GreetingState {
-        if (state.reducedMotion || seconds <= 0f || seconds.isNaN()) return state
+        if (state.reducedMotion || !(seconds > 0f)) return state
         val cues = state.pending + ambientCues(state, seconds, random, tuning)
         val ids = state.actors.map { it.id }
         val passedOn = mutableListOf<GreetingCue>()

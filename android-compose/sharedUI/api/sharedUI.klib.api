@@ -11598,7 +11598,7 @@ final object com.letta.mobile.ui.shell.pages.home/HomeGreetingTags { // com.lett
     final const val STATUS // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.STATUS|{}STATUS[0]
         final fun <get-STATUS>(): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.STATUS.<get-STATUS>|<get-STATUS>(){}[0]
 
-    final fun mascot(kotlin/String): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.mascot|mascot(kotlin.String){}[0]
+    final fun mascot(com.letta.mobile.data.model/AgentId): kotlin/String // com.letta.mobile.ui.shell.pages.home/HomeGreetingTags.mascot|mascot(com.letta.mobile.data.model.AgentId){}[0]
 }
 
 final object com.letta.mobile.ui.shell.pages.home/HomePageTags { // com.letta.mobile.ui.shell.pages.home/HomePageTags|null[0]

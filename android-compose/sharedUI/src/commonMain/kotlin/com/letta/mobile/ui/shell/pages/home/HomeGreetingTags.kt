@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.shell.pages.home
 
+import com.letta.mobile.data.model.AgentId
+
 /** Test tags for Home's greeting. */
 object HomeGreetingTags {
     const val GREETING = "home_greeting"
@@ -8,5 +10,5 @@ object HomeGreetingTags {
     const val MARK = "home_greeting_mark"
     const val STAGE = "home_greeting_stage"
 
-    fun mascot(agentId: String): String = "home_greeting_mascot_$agentId"
+    fun mascot(agent: AgentId): String = "home_greeting_mascot_${agent.value}"
 }

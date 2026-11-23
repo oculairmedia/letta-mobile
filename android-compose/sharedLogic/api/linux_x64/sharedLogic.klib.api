@@ -1508,6 +1508,8 @@ final enum class com.letta.mobile.data.home.greeting/GreetingBehavior : kotlin/E
 
     final val entries // com.letta.mobile.data.home.greeting/GreetingBehavior.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.home.greeting/GreetingBehavior> // com.letta.mobile.data.home.greeting/GreetingBehavior.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val resting // com.letta.mobile.data.home.greeting/GreetingBehavior.resting|{}resting[0]
+        final fun <get-resting>(): kotlin/Boolean // com.letta.mobile.data.home.greeting/GreetingBehavior.resting.<get-resting>|<get-resting>(){}[0]
 
     final fun valueOf(kotlin/String): com.letta.mobile.data.home.greeting/GreetingBehavior // com.letta.mobile.data.home.greeting/GreetingBehavior.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<com.letta.mobile.data.home.greeting/GreetingBehavior> // com.letta.mobile.data.home.greeting/GreetingBehavior.values|values#static(){}[0]

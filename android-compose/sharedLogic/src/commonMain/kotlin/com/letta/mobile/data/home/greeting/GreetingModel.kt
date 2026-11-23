@@ -114,6 +114,10 @@ enum class GreetingBehavior {
 
     /** The connection is unsettled: drawn in toward the mark. */
     HUDDLED,
+    ;
+
+    /** Not reacting to anything: settled, or huddled because of the connection. */
+    val resting: Boolean get() = this == SETTLED || this == HUDDLED
 }
 
 /** A one-shot the rig plays. */
@@ -184,10 +188,13 @@ data class GreetingState(
 ) {
     /** Something is playing or about to: the host keeps ticking while this holds, and rests otherwise. */
     val active: Boolean
-        get() = !reducedMotion && (
-            pending.isNotEmpty() ||
-                actors.any { it.behavior != GreetingBehavior.SETTLED && it.behavior != GreetingBehavior.HUDDLED } ||
-                actors.any { it.interest.isNotEmpty() || it.gestureCooldown > 0f } ||
-                (actors.size > 1 && actors.any { it.mood.busy })
-            )
+        get() = if (reducedMotion) false else pending.isNotEmpty() || actors.any { it.lively } || busyAmongOthers
+
+    /** A busy mascot catches its neighbours' eyes now and then, so the clock runs while one stands among others. */
+    private val busyAmongOthers: Boolean
+        get() = actors.size > 1 && actors.any { it.mood.busy }
 }
+
+/** This mascot is reacting, still habituating to something, or waiting out a gesture's cooldown. */
+private val GreetingActor.lively: Boolean
+    get() = !behavior.resting || interest.isNotEmpty() || gestureCooldown > 0f

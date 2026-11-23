@@ -16,6 +16,9 @@ internal class GreetingStage(val index: Int, val ids: List<String>, val random: 
 /** A mascot's new state, and the cue its reaction passes on to the neighbours, if any. */
 internal class GreetingReaction(val actor: GreetingActor, val passedOn: GreetingCue?)
 
+/** Whether this cue is for the mascot [id]: everyone's, or addressed to it. */
+private fun GreetingCue.reaches(id: String): Boolean = only == null || only == id
+
 /** Time passes for one mascot: its reaction runs down, interest habituates and recovers. */
 internal fun age(actor: GreetingActor, seconds: Float, tuning: GreetingTuning): GreetingActor {
     val focus = actor.target.takeIf { actor.behavior != SETTLED }
@@ -27,7 +30,7 @@ internal fun age(actor: GreetingActor, seconds: Float, tuning: GreetingTuning): 
         }
     }
     val remaining = actor.remaining - seconds
-    val ended = remaining <= 0f && actor.behavior != SETTLED && actor.behavior != HUDDLED
+    val ended = remaining <= 0f && !actor.behavior.resting
     return actor.copy(
         interest = interest,
         remaining = remaining.coerceAtLeast(0f),
@@ -50,11 +53,11 @@ internal fun baseline(actor: GreetingActor, connection: GreetingConnection): Gre
 internal fun react(actor: GreetingActor, cues: List<GreetingCue>, stage: GreetingStage): GreetingReaction? {
     val self = GreetingTarget.Actor(actor.id)
     val best = cues.asSequence()
-        .filter { (it.only == null || it.only == actor.id) && it.source != self }
+        .filter { it.reaches(actor.id) && it.source != self }
         .map { it to it.salience * (actor.interest[it.source] ?: 1f) * nearness(stage, it.source) }
         .maxByOrNull { it.second } ?: return null
     val (cue, score) = best
-    val holding = if (actor.behavior == SETTLED || actor.behavior == HUDDLED) 0f else actor.score
+    val holding = if (actor.behavior.resting) 0f else actor.score
     if (score <= holding + stage.tuning.hysteresis) return null
     return adopt(actor, cue, score, stage)
 }

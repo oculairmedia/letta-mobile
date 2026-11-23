@@ -9653,7 +9653,7 @@ public final class com/letta/mobile/ui/shell/pages/home/HomeGreetingTags {
 	public static final field MARK Ljava/lang/String;
 	public static final field STAGE Ljava/lang/String;
 	public static final field STATUS Ljava/lang/String;
-	public final fun mascot (Ljava/lang/String;)Ljava/lang/String;
+	public final fun mascot-qkT7gGE (Ljava/lang/String;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/shell/pages/home/HomePageCallbacks {

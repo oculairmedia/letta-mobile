@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import com.letta.mobile.data.home.HomeAgentRef
 import com.letta.mobile.data.home.greeting.GreetingMood
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.AgentPresence
 import com.letta.mobile.ui.mascot.greetingMood
@@ -110,7 +111,7 @@ class HomeGreetingTest {
             // The placeholder mark is not drawn: it would read as broken.
             assertEquals(0, onAllNodesWithTag(HomeGreetingTags.MARK).fetchSemanticsNodes().size)
             val expected = greetingLineup(members, viewport).size
-            val tiles = pool.take(expected).map { onNodeWithTag(HomeGreetingTags.mascot(it.id)).getUnclippedBoundsInRoot() }
+            val tiles = pool.take(expected).map { onNodeWithTag(HomeGreetingTags.mascot(AgentId(it.id))).getUnclippedBoundsInRoot() }
             tiles.forEach { tile ->
                 val inset = (tile.right - tile.left) * (1f - ShellDimens.homeLineupBodyShare) / 2
                 val inside = tile.left + inset >= stage.left - TOLERANCE && tile.right - inset <= stage.right + TOLERANCE
@@ -118,7 +119,7 @@ class HomeGreetingTest {
             }
             // Whoever does not fit is not drawn at all, rather than squeezed or cut off.
             if (expected < pool.size) {
-                assertEquals(0, onAllNodesWithTag(HomeGreetingTags.mascot(pool[expected].id)).fetchSemanticsNodes().size)
+                assertEquals(0, onAllNodesWithTag(HomeGreetingTags.mascot(AgentId(pool[expected].id))).fetchSemanticsNodes().size)
             }
         }
     }

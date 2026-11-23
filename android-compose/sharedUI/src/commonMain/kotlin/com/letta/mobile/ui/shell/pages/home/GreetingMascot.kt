@@ -28,6 +28,7 @@ import com.letta.mobile.data.home.greeting.GreetingInput
 import com.letta.mobile.data.home.greeting.GreetingIntent
 import com.letta.mobile.data.home.greeting.GreetingTarget
 import com.letta.mobile.data.home.greeting.intentFor
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.mascot.LocalMascotHost
 import com.letta.mobile.ui.mascot.LocalMascotHover
@@ -82,7 +83,7 @@ internal fun GreetingMascot(agent: HomeAgentRef, scene: GreetingScene, size: Dp,
         modifier
             .offset(x = nudge)
             .onGloballyPositioned { scene.place(self, it.boundsInWindow()) }
-            .testTag(HomeGreetingTags.mascot(agent.id)),
+            .testTag(HomeGreetingTags.mascot(AgentId(agent.id))),
     ) {
         CompositionLocalProvider(LocalMascotWake provides wake.intValue, LocalMascotHover provides onHover) {
             if (live && identity != null) {
@@ -120,60 +121,77 @@ private class GreetingDrive(val director: MascotDirector, val scene: GreetingSce
     }
 }
 
-/** Plays [intent] on the director, waking the scene ([onWake]) for each beat so it is seen. */
+/** Plays [intent] on the director, one channel at a time, waking the scene ([onWake]) for each beat so it is seen. */
 @Composable
 private fun DriveDirector(drive: GreetingDrive, intent: GreetingIntent, onWake: () -> Unit) {
-    val director = drive.director
-    LaunchedEffect(drive, intent.look) {
-        val look = intent.look ?: return@LaunchedEffect
+    DriveLook(drive, intent.look, onWake)
+    DriveToggle(drive, intent.perk, onWake) { MascotEvent.Hover(it) }
+    DriveToggle(drive, intent.happy, onWake) { MascotEvent.Petting(it) }
+    DriveGesture(drive, intent, onWake)
+    DriveLean(drive, intent.lean, onWake)
+    DriveHop(drive, intent.hop)
+}
+
+/** Keeps the eyes on [look] while it holds, re-aimed as the actors move. */
+@Composable
+private fun DriveLook(drive: GreetingDrive, look: GreetingTarget?, onWake: () -> Unit) {
+    LaunchedEffect(drive, look) {
+        if (look == null) return@LaunchedEffect
         onWake()
         while (true) {
-            drive.gazeAt(look)?.let(director::leadGaze)
+            drive.gazeAt(look)?.let(drive.director::leadGaze)
             delay(LOOK_REFRESH)
         }
     }
-    val perked = remember(drive) { mutableIntStateOf(0) }
-    LaunchedEffect(drive, intent.perk) {
-        val now = if (intent.perk) 1 else 0
-        if (now == perked.intValue) return@LaunchedEffect
-        perked.intValue = now
-        director.onEvent(MascotEvent.Hover(intent.perk))
+}
+
+/** A held state the rig shows while [on] (a perk, a happy face): one event each way, and off when the mascot leaves. */
+@Composable
+private fun DriveToggle(drive: GreetingDrive, on: Boolean, onWake: () -> Unit, event: (Boolean) -> MascotEvent) {
+    val shown = remember(drive) { booleanArrayOf(false) }
+    LaunchedEffect(drive, on) {
+        if (on == shown[0]) return@LaunchedEffect
+        shown[0] = on
+        drive.director.onEvent(event(on))
         onWake()
     }
-    val played = remember(drive) { mutableIntStateOf(intent.gestureSerial) }
+    DisposableEffect(drive) { onDispose { if (shown[0]) drive.director.onEvent(event(false)) } }
+}
+
+/** Plays the intent's one-shot each time its serial goes up (never the one already played when this composed). */
+@Composable
+private fun DriveGesture(drive: GreetingDrive, intent: GreetingIntent, onWake: () -> Unit) {
+    val played = remember(drive) { intArrayOf(intent.gestureSerial) }
     LaunchedEffect(drive, intent.gestureSerial) {
         val gesture = intent.gesture
-        if (gesture != null && intent.gestureSerial > played.intValue) {
-            director.onEvent(MascotEvent.DoubleTap(trickFor(gesture)))
+        if (gesture != null && intent.gestureSerial > played[0]) {
+            drive.director.onEvent(MascotEvent.DoubleTap(trickFor(gesture)))
             onWake()
         }
-        played.intValue = intent.gestureSerial
+        played[0] = intent.gestureSerial
     }
-    LaunchedEffect(drive, intent.lean) {
-        val lean = intent.lean
-        director.setMotion(if (lean == null) 0f else sideOf(drive.scene, drive.self, lean) * LEAN_MOTION, 0f)
+}
+
+/** Leans the body toward [lean] while it holds; upright again when it ends or the mascot leaves. */
+@Composable
+private fun DriveLean(drive: GreetingDrive, lean: GreetingTarget?, onWake: () -> Unit) {
+    LaunchedEffect(drive, lean) {
+        val side = lean?.let { sideOf(drive.scene, drive.self, it) } ?: 0f
+        drive.director.setMotion(side * LEAN_MOTION, 0f)
         if (lean != null) onWake()
     }
-    val smiling = remember(drive) { mutableIntStateOf(0) }
-    LaunchedEffect(drive, intent.happy) {
-        val now = if (intent.happy) 1 else 0
-        if (now == smiling.intValue) return@LaunchedEffect
-        smiling.intValue = now
-        director.onEvent(MascotEvent.Petting(intent.happy))
-        onWake()
-    }
-    LaunchedEffect(drive, intent.hop) {
-        if (intent.hop == null) return@LaunchedEffect
+    DisposableEffect(drive) { onDispose { drive.director.setMotion(0f, 0f) } }
+}
+
+/** A hop lands when it ends: a soft landing for the rig. */
+@Composable
+private fun DriveHop(drive: GreetingDrive, hop: GreetingTarget?) {
+    LaunchedEffect(drive, hop) {
+        if (hop == null) return@LaunchedEffect
         try {
             awaitCancellation()
         } finally {
-            director.onEvent(MascotEvent.Landed(HOP_IMPACT))
-        }
-    }
-    DisposableEffect(drive) {
-        onDispose {
-            director.setMotion(0f, 0f)
-            if (smiling.intValue == 1) director.onEvent(MascotEvent.Petting(false))
+            drive.director.onEvent(MascotEvent.Landed(HOP_IMPACT))
         }
     }
 }

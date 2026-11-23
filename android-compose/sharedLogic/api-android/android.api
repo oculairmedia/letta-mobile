@@ -24419,6 +24419,7 @@ public final class com/letta/mobile/data/home/greeting/GreetingBehavior : java/l
 	public static final field NOTICING Lcom/letta/mobile/data/home/greeting/GreetingBehavior;
 	public static final field SETTLED Lcom/letta/mobile/data/home/greeting/GreetingBehavior;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getResting ()Z
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/home/greeting/GreetingBehavior;
 	public static fun values ()[Lcom/letta/mobile/data/home/greeting/GreetingBehavior;
 }

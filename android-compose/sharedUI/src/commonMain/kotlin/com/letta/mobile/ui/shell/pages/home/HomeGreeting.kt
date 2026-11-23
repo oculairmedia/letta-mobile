@@ -43,6 +43,7 @@ import com.letta.mobile.data.home.greeting.GreetingTarget
 import com.letta.mobile.data.home.greeting.greetingLine
 import com.letta.mobile.data.home.greeting.greetingStatusLine
 import com.letta.mobile.data.home.greeting.markIntent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.ui.components.foundation.lettaClickable
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.mascot.MascotIdentityRegistry
@@ -93,17 +94,17 @@ private fun GreetingInputs(scene: GreetingScene, options: HomeGreetingOptions, h
     TypingWatch(scene, registry)
 }
 
-/** A run of [agentId]'s that ends while Home shows is a moment its neighbours react to. */
+/** A run of [agent]'s that ends while Home shows is a moment its neighbours react to. */
 @Composable
-private fun RunEndings(scene: GreetingScene, registry: MascotIdentityRegistry, agentId: String) {
-    val tally = registry.greetingRunTally(agentId)
-    val seen = remember(agentId) { arrayOfNulls<GreetingRunTally>(1) }
+private fun RunEndings(scene: GreetingScene, registry: MascotIdentityRegistry, agent: AgentId) {
+    val tally = registry.greetingRunTally(agent)
+    val seen = remember(agent) { arrayOfNulls<GreetingRunTally>(1) }
     LaunchedEffect(scene, tally) {
         val was = seen[0]
         seen[0] = tally
         if (was == null) return@LaunchedEffect
-        if (tally.ok > was.ok) scene.send(GreetingInput.RunFinished(agentId, ok = true))
-        if (tally.notOk > was.notOk) scene.send(GreetingInput.RunFinished(agentId, ok = false))
+        if (tally.ok > was.ok) scene.send(GreetingInput.RunFinished(agent.value, ok = true))
+        if (tally.notOk > was.notOk) scene.send(GreetingInput.RunFinished(agent.value, ok = false))
     }
 }
 
@@ -136,7 +137,7 @@ private fun GreetingText(cast: GreetingCast, options: HomeGreetingOptions) {
     val registry = LocalMascotRegistry.current
     val hour = options.hour ?: remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).hour }
     val status = greetingStatusLine(
-        cast.agents.map { GreetingStatusAgent(it.name, registry.greetingMood(it.id), cast.updatesToday[it.id] ?: 0) },
+        cast.agents.map { GreetingStatusAgent(it.name, registry.greetingMood(AgentId(it.id)), cast.updatesToday[it.id] ?: 0) },
     )
     Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         Text(greetingLine(hour), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.testTag(HomeGreetingTags.LINE))
@@ -163,7 +164,7 @@ private fun GreetingStage(scene: GreetingScene, agents: List<HomeAgentRef>) {
     val members = lineupMembers(agents, registry, markHost.available)
     BoxWithConstraints(Modifier.fillMaxWidth().height(GreetingStageHeight).testTag(HomeGreetingTags.STAGE)) {
         val spots = greetingLineup(members, maxWidth, huddled)
-        val onStage = spots.filterNot { it.mark }.map { GreetingCastMember(it.id, registry.greetingMood(it.id)) }
+        val onStage = spots.filterNot { it.mark }.map { GreetingCastMember(it.id, registry.greetingMood(AgentId(it.id))) }
         LaunchedEffect(scene, onStage) { scene.send(GreetingInput.Cast(onStage)) }
         val spec: AnimationSpec<Dp> = if (reduced) snap() else spring()
         spots.forEach { spot ->
@@ -178,7 +179,7 @@ private fun GreetingStage(scene: GreetingScene, agents: List<HomeAgentRef>) {
                     GreetingMark(scene, spot.size, place)
                 } else {
                     val agent = agents.first { it.id == spot.id }
-                    RunEndings(scene, registry, agent.id)
+                    RunEndings(scene, registry, AgentId(agent.id))
                     GreetingMascot(agent, scene, spot.size, place)
                 }
             }
@@ -187,7 +188,7 @@ private fun GreetingStage(scene: GreetingScene, agents: List<HomeAgentRef>) {
 }
 
 private fun lineupMembers(agents: List<HomeAgentRef>, registry: MascotIdentityRegistry, withMark: Boolean): List<LineupMember> {
-    val crew = agents.map { LineupMember(it.id, busy = registry.greetingMood(it.id).busy) }
+    val crew = agents.map { LineupMember(it.id, busy = registry.greetingMood(AgentId(it.id)).busy) }
     if (!withMark) return crew
     // The mark stands among the crew, a couple of places in, never at the end where it would look apart.
     return crew.toMutableList().apply { add(minOf(MARK_PLACE, size), LineupMember(MARK_ID, mark = true)) }
