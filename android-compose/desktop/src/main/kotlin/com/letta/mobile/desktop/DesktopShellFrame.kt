@@ -21,7 +21,6 @@ import com.letta.mobile.data.memory.graph.MemoryPageState
 import com.letta.mobile.data.tools.ToolLibraryState
 import com.letta.mobile.desktop.workspace.rememberDesktopFileMentions
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.presence.presenceByAgent
@@ -179,7 +178,7 @@ private fun selectedAgentName(
     chatState: DesktopChatSurfaceState,
 ): String {
     val railName = railAgents.firstOrNull { it.first == selectedAgentId }?.second
-    return railName ?: chatState.selectedConversation?.agentName ?: DisplayNames.PRODUCT
+    return railName ?: chatState.selectedConversation?.agentName ?: com.letta.mobile.data.model.DisplayNames.PRODUCT
 }
 
 @Composable
@@ -330,11 +329,7 @@ internal fun rememberDesktopHomeHost(context: DesktopShellContext, frame: Deskto
 /** The connection hero while the backend is not there yet (connecting, unconfigured, offline); null once it is. */
 private fun DesktopChatSurfaceState.homeConnection(onRetry: () -> Unit): ShellHomeConnection? =
     if (connectionState in ConnectionPendingStates) {
-        ShellHomeConnection(
-            HomeConnectionState(chatScreenStatus, errorMessage, loading = isLoading),
-            onRetry,
-            wordmark = DisplayNames.WORDMARK,
-        )
+        ShellHomeConnection(HomeConnectionState(chatScreenStatus, errorMessage, loading = isLoading), onRetry)
     } else {
         null
     }
