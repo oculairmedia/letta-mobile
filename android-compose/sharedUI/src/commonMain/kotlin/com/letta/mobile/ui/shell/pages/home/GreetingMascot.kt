@@ -22,6 +22,7 @@ import com.letta.mobile.avatar.core.MascotDirector
 import com.letta.mobile.avatar.core.MascotEvent
 import com.letta.mobile.avatar.core.gaze.GazeMath
 import com.letta.mobile.avatar.core.gaze.GazePoint
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.home.HomeAgentRef
 import com.letta.mobile.data.home.greeting.GreetingGesture
 import com.letta.mobile.data.home.greeting.GreetingInput
@@ -55,43 +56,64 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 @Composable
 internal fun GreetingMascot(agent: HomeAgentRef, scene: GreetingScene, size: Dp, modifier: Modifier = Modifier) {
-    val self = GreetingTarget.Actor(agent.id)
-    val intent by remember(scene, agent.id) { derivedStateOf { scene.state.intentFor(agent.id) } }
-    val identity = LocalMascotRegistry.current.identities[agent.id]
-    val host = LocalMascotHost.current
-    val live = !LocalReducedMotion.current && host.available && identity != null
-    val director = if (live && identity != null) remember(host, agent.id, identity) { host.entry(agent.id, identity)?.director } else null
+    val actor = remember(agent, scene) { GreetingActorHandle(agent, scene) }
+    val intent by remember(actor) { derivedStateOf { scene.state.intentFor(agent.id) } }
+    val identity = liveIdentity(AgentId(agent.id))
     val wake = remember { mutableIntStateOf(0) }
-    val density = LocalDensity.current
-    if (director != null) {
-        val drive = remember(director, scene, density) {
-            GreetingDrive(director, scene, self, with(density) { LettaSurfaceSizes.mascotGazeMinReach.toPx() })
-        }
-        DriveDirector(drive, intent) { wake.intValue++ }
-    }
-    val onHover: (Boolean) -> Unit = remember(scene, self) {
-        { hovered ->
-            when {
-                hovered -> scene.send(GreetingInput.PointerOver(self))
-                scene.state.pointer == self -> scene.send(GreetingInput.PointerOver(null))
-            }
-        }
-    }
-    val nudge by animateDpAsState(nudgeOf(intent, scene, self), label = "greeting-nudge")
-    val onTap = { scene.send(GreetingInput.Tapped(self)) }
+    if (identity != null) DriveLive(actor, identity, intent) { wake.intValue++ }
+    val nudge by animateDpAsState(nudgeOf(intent, scene, actor.self), label = "greeting-nudge")
     Box(
         modifier
             .offset(x = nudge)
-            .onGloballyPositioned { scene.place(self, it.boundsInWindow()) }
+            .onGloballyPositioned { scene.place(actor.self, it.boundsInWindow()) }
             .testTag(HomeGreetingTags.mascot(AgentId(agent.id))),
     ) {
-        CompositionLocalProvider(LocalMascotWake provides wake.intValue, LocalMascotHover provides onHover) {
-            if (live && identity != null) {
-                MascotLive(agent.id, identity, size, onClick = onTap)
-            } else {
-                AgentAvatar(agent.id, agent.name, size, live = false, onClick = onTap)
-            }
+        CompositionLocalProvider(LocalMascotWake provides wake.intValue, LocalMascotHover provides actor.onHover) {
+            GreetingMascotFace(agent, identity, size, actor.onTap)
         }
+    }
+}
+
+/** One agent as an actor of the greeting: its target, and what its taps and hovers tell the scene. */
+private class GreetingActorHandle(val agent: HomeAgentRef, val scene: GreetingScene) {
+    val self = GreetingTarget.Actor(agent.id)
+    val onTap: () -> Unit = { scene.send(GreetingInput.Tapped(self)) }
+
+    /** The pointer on the body is this actor; leaving it clears the pointer only if it was still here. */
+    val onHover: (Boolean) -> Unit = { hovered ->
+        val leftUs = !hovered && scene.state.pointer == self
+        if (hovered) scene.send(GreetingInput.PointerOver(self))
+        if (leftUs) scene.send(GreetingInput.PointerOver(null))
+    }
+}
+
+/** [agent]'s identity when its mascot draws live here; null for a still (no renderer, reduced motion, no identity). */
+@Composable
+private fun liveIdentity(agent: AgentId): MascotIdentity? {
+    val identity = LocalMascotRegistry.current.identities[agent.value]
+    val drawsLive = !LocalReducedMotion.current && LocalMascotHost.current.available
+    return identity.takeIf { drawsLive }
+}
+
+/** Drives the agent's own director with the intent, once the host has its live entry. */
+@Composable
+private fun DriveLive(actor: GreetingActorHandle, identity: MascotIdentity, intent: GreetingIntent, onWake: () -> Unit) {
+    val host = LocalMascotHost.current
+    val director = remember(host, actor, identity) { host.entry(actor.agent.id, identity)?.director } ?: return
+    val density = LocalDensity.current
+    val drive = remember(director, actor, density) {
+        GreetingDrive(director, actor.scene, actor.self, with(density) { LettaSurfaceSizes.mascotGazeMinReach.toPx() })
+    }
+    DriveDirector(drive, intent, onWake)
+}
+
+/** The live character when there is an [identity] to draw, the agent's still avatar otherwise. */
+@Composable
+private fun GreetingMascotFace(agent: HomeAgentRef, identity: MascotIdentity?, size: Dp, onTap: () -> Unit) {
+    if (identity != null) {
+        MascotLive(agent.id, identity, size, onClick = onTap)
+    } else {
+        AgentAvatar(agent.id, agent.name, size, live = false, onClick = onTap)
     }
 }
 

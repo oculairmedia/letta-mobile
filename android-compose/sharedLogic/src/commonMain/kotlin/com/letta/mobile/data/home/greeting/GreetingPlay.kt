@@ -84,8 +84,8 @@ object GreetingPlay {
         val ids = state.actors.map { it.id }
         val passedOn = mutableListOf<GreetingCue>()
         val actors = state.actors.mapIndexed { index, actor ->
-            val aged = baseline(age(actor, seconds, tuning), state.connection)
-            react(aged, cues, GreetingStage(index, ids, random, tuning))?.let { reaction ->
+            val aged = GreetingReactions.baseline(GreetingReactions.age(actor, seconds, tuning), state.connection)
+            GreetingReactions.react(aged, cues, GreetingStage(index, ids, random, tuning))?.let { reaction ->
                 reaction.passedOn?.takeIf { it.salience >= tuning.minSalience }?.let(passedOn::add)
                 reaction.actor
             } ?: aged
