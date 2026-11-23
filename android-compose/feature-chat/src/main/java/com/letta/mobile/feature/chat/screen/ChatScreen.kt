@@ -1,6 +1,5 @@
 package com.letta.mobile.feature.chat.screen
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -61,25 +60,14 @@ internal fun ChatScreen(
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsStateWithLifecycle()
     val openChatsOnCanvas by viewModel.openChatsOnCanvas.collectAsStateWithLifecycle()
 
-    val backgroundModifier = when (chatBackground) {
-        is ChatBackground.Default -> Modifier
-        is ChatBackground.SolidColor -> Modifier.background(chatBackground.color)
-        is ChatBackground.Gradient -> Modifier.background(chatBackground.toBrush())
-    }
+    val backgroundModifier = chatBackground.fillModifier()
 
-    val navigation = remember(
-        onBugCommand, onViewSubagentConversation, onOpenAgentPane, onOpenCanvas, onOpenAgentSwitcher, onOpenConversation, onOpenBackgroundTasks,
-    ) {
-        ChatScreenNavigationCallbacks(
-            onBugCommand = onBugCommand,
-            onViewSubagentConversation = onViewSubagentConversation,
-            onOpenAgentPane = onOpenAgentPane,
-            onOpenCanvas = onOpenCanvas,
-            onOpenAgentSwitcher = onOpenAgentSwitcher,
-            onOpenConversation = onOpenConversation,
-            onOpenBackgroundTasks = onOpenBackgroundTasks,
-        )
-    }
+    // A data class, so remember keyed on it keeps one instance while the callbacks stay the same.
+    val callbacks = ChatScreenNavigationCallbacks(
+        onBugCommand, onViewSubagentConversation, onOpenAgentPane, onOpenCanvas, onOpenAgentSwitcher, onOpenConversation,
+        onOpenBackgroundTasks,
+    )
+    val navigation = remember(callbacks) { callbacks }
 
     // The font scale loads from settings; the page waits for it so its rows never re-lay out on arrival.
     val fontScale = activeFontScale ?: return
@@ -94,13 +82,7 @@ internal fun ChatScreen(
         val ambient = rememberChatScreenAmbientState()
         val streamActivityPulse = rememberVisibleAssistantStreamPulse(state)
 
-        ChatScreenEffects(
-            params = ChatScreenEffectsParams(
-                state = state,
-                hapticsEnabled = hapticsEnabled,
-                ambient = ambient,
-            ),
-        )
+        ChatScreenEffects(params = ChatScreenEffectsParams(state = state, hapticsEnabled = hapticsEnabled, ambient = ambient))
 
         // The composer's height, as the page measures it, so the glow can stay above it.
         var composerHeight by remember { mutableStateOf(androidx.compose.ui.unit.Dp.Unspecified) }
