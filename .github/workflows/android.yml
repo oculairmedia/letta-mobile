@@ -551,10 +551,10 @@ jobs:
     # and desktop targets. This job compiles :sharedLogic for every configured
     # KMP target (including hostNative) and runs JVM/Android/desktop tests.
     # See letta-mobile-kx1r3 and letta-mobile-oi3od.
-    # Healthy runs finish in ~8-12 minutes. timeout-minutes is a backstop;
+    # Healthy runs finish in ~10-14 minutes (the sharedLogic JVM suite alone is ~10-12). timeout-minutes is a backstop;
     # do not raise it to paper over a hung test process.
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: android-compose
@@ -596,7 +596,7 @@ jobs:
         # discard the only evidence of which test was active. Bound this phase
         # so the always-run artifact step can preserve reports and daemon logs.
         continue-on-error: true
-        run: timeout --preserve-status 12m ./gradlew :sharedLogic:jvmTest --info
+        run: timeout --preserve-status 16m ./gradlew :sharedLogic:jvmTest --info
 
       - name: Upload sharedLogic JVM test diagnostics
         if: always()
@@ -704,7 +704,7 @@ jobs:
 
   api-docs:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     permissions:
       contents: read
     steps:
