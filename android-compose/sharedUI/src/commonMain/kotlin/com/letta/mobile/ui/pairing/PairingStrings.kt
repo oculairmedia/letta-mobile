@@ -110,7 +110,6 @@ object PairingStrings {
     const val SHOW_LINK = "Show code instead"
     const val SHOW_QR = "Show QR code"
     const val COPY_LINK = "Copy link"
-    const val LINK_COPIED = "Link copied"
     const val SHARE_LINK = "Share"
     const val LINK_SECRET_NOTE = "Works once. Anyone with this link can pair until it is used or expires."
     const val LINK_ONLY_NO_QR = "This code is too long to draw as a QR. Copy the link and open it on the other device."
