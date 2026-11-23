@@ -22,6 +22,7 @@ import com.letta.mobile.ui.ambient.reduceVisibleAssistantStreamPulse
 import com.letta.mobile.ui.components.AmbientShaderAgentBackground
 import com.letta.mobile.ui.components.audio.VoiceRecognizerOverlay
 import com.letta.mobile.ui.theme.ChatBackground
+import com.letta.mobile.ui.theme.fillModifier
 import com.letta.mobile.ui.theme.LettaChatTheme
 
 /**

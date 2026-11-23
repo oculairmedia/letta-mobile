@@ -379,7 +379,9 @@ jobs:
           path: |
             android-compose/**/build/kotlin/abi/**
             android-compose/**/build/api-contract/**
-          if-no-files-found: error
+          # A missing dump is an error only when the job otherwise succeeded; after an earlier
+          # failure the API step never ran, and a second "no files" error just hides the real one.
+          if-no-files-found: ${{ job.status == 'success' && 'error' || 'warn' }}
           retention-days: 7
 
 
