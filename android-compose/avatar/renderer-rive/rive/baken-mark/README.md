@@ -59,6 +59,11 @@ python probe.py connecting                   # numbers before pixels
 python review.py --gif                       # then LOOK at review/*.png
 ```
 
+The scripts, by path (all run from this directory): the generator `gen_scene.py` (with
+`rig/__init__.py`, the bootstrap onto the mascot's shared tools, and `rig/ids.py`, the frozen ids,
+under it); the checks `test_rig.py` and `test_contract.py` (no CLI) and `test_probe.py` (the Rive
+CLI); the tools `probe.py`, `scenarios.py` and `review.py`.
+
 The build is deterministic: the same `scene.rml` and CLI give the same bytes, so both shipped
 copies are always plain `rive . --once` output. `test_contract` fails if they differ from each
 other or from `build/baken_mark.riv`.

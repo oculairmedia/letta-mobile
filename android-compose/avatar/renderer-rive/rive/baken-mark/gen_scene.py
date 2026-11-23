@@ -7,9 +7,16 @@ on the stones or glow inside the seam between them. The mark owns app and connec
 
 Structure:
   BakenMark (artboard 500x500, view model `BrandMark`, state machine `BrandMark`)
+    rig/__init__.py the path bootstrap onto the mascot rig's shared tools (rig.layers, rig.seams)
+    rig/ids.py      every named Rive object id, frozen
     rig/stones.py   the drawing: Base > Lean > Event > Pose > Tone per stone, the seam light
     rig/motion.py   every animation, from the tables in rig/constants.py
     rig/machine.py  the five layers: Theme, Pose, Light, Event, Hover
+
+The checks, run from this directory (README.md, "The loop"):
+    test_rig.py       python -m unittest test_rig       no CLI: parity, references, reduceMotion
+    test_contract.py  python -m unittest test_contract  no CLI: the shipped .riv is rig/contract.py
+    test_probe.py     python -m unittest test_probe     Rive CLI: goldens, reduceMotion telemetry
 
 This file only assembles: the artboard shell, the data section (enums, view model) and the
 document, plus the two throwaway variants (`--solo`, `--probe`). See README.md for the loop.
