@@ -9135,6 +9135,7 @@ public final class com/letta/mobile/ui/shell/pages/ShellHomeBindingKt {
 public final class com/letta/mobile/ui/shell/pages/ShellHomeConnection {
 	public static final field $stable I
 	public fun <init> (Lcom/letta/mobile/ui/shell/pages/home/HomeConnectionState;Lkotlin/jvm/functions/Function0;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/shell/pages/home/HomeConnectionState;Lkotlin/jvm/functions/Function0;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getOnRetry ()Lkotlin/jvm/functions/Function0;
 	public final fun getState ()Lcom/letta/mobile/ui/shell/pages/home/HomeConnectionState;
 	public final fun getWordmark ()Ljava/lang/String;

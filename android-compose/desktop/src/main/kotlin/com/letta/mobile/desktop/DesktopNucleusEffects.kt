@@ -7,7 +7,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import com.letta.mobile.data.model.DisplayNames
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -409,7 +408,7 @@ private fun registerQuickSwitcher(onQuickQuery: () -> Unit): Long =
     GlobalHotKeyManager.register(
         keyCode = KeyEvent.VK_SPACE,
         modifiers = HotKeyModifier.CONTROL + HotKeyModifier.SHIFT,
-        description = "Open ${DisplayNames.PRODUCT} quick query",
+        description = "Open ${com.letta.mobile.data.model.DisplayNames.PRODUCT} quick query",
     ) { _, _ ->
         // Deliberately does NOT activate the main window: the quick-query bar
         // floats over the user's current context (which it also captures —

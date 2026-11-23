@@ -7246,7 +7246,7 @@ final class com.letta.mobile.ui.shell.pages/ShellAgentEditorHost { // com.letta.
 }
 
 final class com.letta.mobile.ui.shell.pages/ShellHomeConnection { // com.letta.mobile.ui.shell.pages/ShellHomeConnection|null[0]
-    constructor <init>(com.letta.mobile.ui.shell.pages.home/HomeConnectionState, kotlin/Function0<kotlin/Unit>, kotlin/String) // com.letta.mobile.ui.shell.pages/ShellHomeConnection.<init>|<init>(com.letta.mobile.ui.shell.pages.home.HomeConnectionState;kotlin.Function0<kotlin.Unit>;kotlin.String){}[0]
+    constructor <init>(com.letta.mobile.ui.shell.pages.home/HomeConnectionState, kotlin/Function0<kotlin/Unit>, kotlin/String = ...) // com.letta.mobile.ui.shell.pages/ShellHomeConnection.<init>|<init>(com.letta.mobile.ui.shell.pages.home.HomeConnectionState;kotlin.Function0<kotlin.Unit>;kotlin.String){}[0]
 
     final val onRetry // com.letta.mobile.ui.shell.pages/ShellHomeConnection.onRetry|{}onRetry[0]
         final fun <get-onRetry>(): kotlin/Function0<kotlin/Unit> // com.letta.mobile.ui.shell.pages/ShellHomeConnection.onRetry.<get-onRetry>|<get-onRetry>(){}[0]

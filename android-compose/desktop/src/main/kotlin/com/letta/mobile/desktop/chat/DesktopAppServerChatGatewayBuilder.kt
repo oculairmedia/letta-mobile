@@ -12,7 +12,6 @@ import com.letta.mobile.data.meridian.AgentToolsModePolicy
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.fanout.StreamIntegrityBinding
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.desktop.DESKTOP_APP_NAME
 import com.letta.mobile.desktop.canvas.DesktopCanvasMountClient
 import com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore
 import com.letta.mobile.data.runtime.AppServerTurnEngine
@@ -309,7 +308,7 @@ internal fun desktopAgentToolsModePolicy(
 
 private val DESKTOP_CLIENT_INFO = AppServerRuntimeStartClientInfo(
     name = "letta-desktop",
-    title = DESKTOP_APP_NAME,
+    title = com.letta.mobile.desktop.DESKTOP_APP_NAME,
     version = "0.2.0",
 )
 

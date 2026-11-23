@@ -1,6 +1,5 @@
 package com.letta.mobile.desktop
 
-import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.ui.components.beam.telemetry.installBeamShaderTelemetry
 import com.letta.mobile.data.canvas.bubble.CanvasBubbleLayout
 import com.letta.mobile.desktop.data.DesktopPreferences
@@ -48,8 +47,7 @@ private val DESKTOP_DENSITY_SCALE: Float =
     System.getProperty("letta.desktop.density")?.toFloatOrNull()?.takeIf { it in 0.5f..1.0f } ?: 0.8f
 
 internal const val LETTA_WINDOWS_AUMID = "com.letta.desktop"
-/** The desktop app's display name: window titles, the tray, toasts, media sessions, dialogs. */
-internal const val DESKTOP_APP_NAME = "${DisplayNames.PRODUCT} Desktop"
+internal const val DESKTOP_APP_NAME = "${com.letta.mobile.data.model.DisplayNames.PRODUCT} Desktop"
 fun main(args: Array<String>) {
     com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder()).use {
         installBeamShaderTelemetry()
