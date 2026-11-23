@@ -85,7 +85,11 @@ class BakenShellSnapshotTest {
                         modifier = Modifier.fillMaxHeight(),
                     )
                     Column(Modifier.width(CONTENT_WIDTH.dp).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        HomeConnectionPanel(HomeConnectionState(ChatScreenStatus.Loading), onRetryConnection = {}, wordmark = DisplayNames.WORDMARK)
+                        HomeConnectionPanel(
+                            HomeConnectionState(ChatScreenStatus.Loading),
+                            onRetryConnection = {},
+                            wordmark = DisplayNames.WORDMARK,
+                        )
                         Button(onClick = {}) { Text("Send") }
                         OutlinedTextField(value = "Message Alpha", onValueChange = {})
                     }
@@ -153,11 +157,17 @@ class BakenShellSnapshotTest {
             val stops = checkNotNull(ContextLimitStops.of(modelMax = 1_000_000, current = 1_000_000))
             AgentContextSheetContent(
                 model = AgentContextCardModel.present(
-                    AgentContextCardInputs("Claude Opus 5.5", "high", ContextMeter.of(859_000, 1_000_000), true, true, compacting = false, turnRunning = false),
+                    AgentContextCardInputs(
+                        "Claude Opus 5.5", "high", ContextMeter.of(859_000, 1_000_000), true, true,
+                        compacting = false, turnRunning = false,
+                    ),
                 ),
                 picker = picker,
                 onCompact = {},
-                limit = ContextLimitControl.Adjustable(ContextLimitSetting(stops, current = 1_000_000, usedTokens = 859_000, scope = ContextLimitScope.Conversation), onApply = {}),
+                limit = ContextLimitControl.Adjustable(
+                    ContextLimitSetting(stops, current = 1_000_000, usedTokens = 859_000, scope = ContextLimitScope.Conversation),
+                    onApply = {},
+                ),
             )
         }
     }
@@ -182,7 +192,10 @@ class BakenShellSnapshotTest {
     fun pickerAndSegmentedInBothThemes() = listOf(true, false).forEach { dark ->
         render("picker-and-segmented", dark, SHEET_WIDTH, SHEET_HEIGHT) {
             LettaSegmentedControl(
-                LettaSegmentedChoice(listOf(LettaSegment("local", "Local runtime"), LettaSegment("remote", "Remote host")), selected = "local"),
+                LettaSegmentedChoice(
+                    listOf(LettaSegment("local", "Local runtime"), LettaSegment("remote", "Remote host")),
+                    selected = "local",
+                ),
                 onSelect = {},
                 modifier = Modifier.padding(16.dp),
             )

@@ -48,7 +48,8 @@ internal fun runDesktopPhoneApplication(args: Array<String>) {
         val mascots = remember { MascotIdentityRegistry() }
         val mascotTransport = remember { MascotTransport() }
         CompositionLocalProvider(LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory) {
-            DesktopPhoneWindow(state, titlePrefix = "${DisplayNames.PRODUCT} Phone", onCloseRequest = nucleusScope::exitApplication) { window ->
+            val titlePrefix = "${DisplayNames.PRODUCT} Phone"
+            DesktopPhoneWindow(state, titlePrefix = titlePrefix, onCloseRequest = nucleusScope::exitApplication) { window ->
                 CompositionLocalProvider(
                     LocalMermaidDiagramRenderer provides DesktopMermaidDiagramRenderer,
                     LocalMascotHost provides DesktopMascotHost,

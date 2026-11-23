@@ -34,7 +34,8 @@ object PairingStrings {
     const val TORCH_ON = "Turn flashlight off"
     const val TORCH_OFF = "Turn flashlight on"
     const val CAMERA_RATIONALE_TITLE = "Allow camera to scan"
-    const val CAMERA_RATIONALE_BODY = "${DisplayNames.PRODUCT} uses the camera only to read the pairing code. Nothing is recorded or uploaded."
+    const val CAMERA_RATIONALE_BODY =
+        "${DisplayNames.PRODUCT} uses the camera only to read the pairing code. Nothing is recorded or uploaded."
     const val CAMERA_ALLOW = "Allow camera"
     const val CAMERA_DENIED_TITLE = "Camera access is off"
     const val CAMERA_DENIED_BODY = "Turn on camera access in settings to scan, or paste the pairing link instead."
