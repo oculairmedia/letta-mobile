@@ -51,7 +51,6 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopAttentio
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopChatFontScale.kt 107 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopChatShellHelpers.kt 489 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopDeepLink.kt 19 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopDreamNotifications.kt 51 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopImageIngress.kt 126 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopIrohBindings.kt 379 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopIrohHttpApis.kt 42 legacy-pending(ckmub.3)

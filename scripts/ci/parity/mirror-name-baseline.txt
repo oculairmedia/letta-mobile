@@ -14,7 +14,6 @@ DesktopChatConnectionState mirrors shared ChatConnectionState
 DesktopChatGateway mirrors shared ChatGateway
 DesktopConversationSummary mirrors shared ConversationSummary
 DesktopIrohBlockApi mirrors shared IrohBlockApi
-DesktopIrohSlashCommandApi mirrors shared IrohSlashCommandApi
 DesktopQuickQueryActions mirrors shared QuickQueryActions
 DesktopRunId mirrors shared RunId
 DesktopRuntimeEventSource mirrors shared RuntimeEventSource
