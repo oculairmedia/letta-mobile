@@ -33,9 +33,8 @@ import org.jetbrains.skia.ImageInfo
  * copied into a Skia image the shared [com.letta.mobile.ui.mascot.frame.RiveFrameSurface] draws.
  * Nothing is put in the DOM.
  *
- * Unavailable until [prepare] has the runtime and the mascot file; if either fails - a JS throw out
- * of the interop, a missing file, a `load` that returns nothing - it stays unavailable and every
- * mascot keeps drawing its fallback (one console line, no retry loop).
+ * Unavailable until [prepare] has the runtime and the mascot file; if either fails it stays
+ * unavailable and every mascot keeps drawing its fallback (one console line, no retry loop).
  */
 internal class RiveCanvasRenderer : RiveFrameRenderer {
     private class Loaded(val rive: JsAny, val file: JsAny, val version: String)
@@ -51,11 +50,7 @@ internal class RiveCanvasRenderer : RiveFrameRenderer {
     // TODO(letta-mobile-ckmub.17.7): keep stills in the browser store W7 adds; memory only until then.
     override val stillStore: MascotStillStore? = null
 
-    /**
-     * Brings up the runtime and the shipped mascot; safe to call again (it returns once loaded).
-     * Throws when it cannot - the interop's [JsException], a fetch that fails, a file that does not
-     * load - and [com.letta.mobile.ui.mascot.frame.ProvideFrameMascots] turns that into the fallback.
-     */
+    /** [JsException] is the interop's own throw; [RiveFrameRenderer.prepare] says what a failure costs. */
     override suspend fun prepare() = preparing.withLock {
         if (loaded != null) return@withLock
         val rive = riveInitRuntime(RIVE_WASM_PATH).await<JsAny>()
